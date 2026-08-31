@@ -317,8 +317,17 @@ fn emit_inst(
         return Ok(());
     }
 
-    let Some(dest) = inst.dest else { return Ok(()) };
-    let d = reg[dest.0 as usize];
+    let d = match inst.dest {
+        Some(dest) => reg[dest.0 as usize],
+        // DCE clears the destination of a call whose result nothing reads
+        // (`crate::passes::dce::dest_droppable`). The call must still run, so
+        // it emits as usual with its result thrown into `scratch` — written,
+        // never read. Any other destination-less instruction that reached
+        // here is not one `emit_value` knows how to emit; `emit_effect` above
+        // was its only handler.
+        None if crate::passes::dce::dest_droppable(&inst.kind) => scratch,
+        None => return Ok(()),
+    };
     values::emit_value(
         chunk,
         inst,

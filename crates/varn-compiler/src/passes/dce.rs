@@ -18,11 +18,17 @@ pub fn run(func: &mut SsaFunc) -> bool {
         let mut new_insts = Vec::new();
 
         let old_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
-        for inst in old_insts {
+        for mut inst in old_insts {
             if let Some(dest) = inst.dest {
-                if !used.contains(&dest) && is_pure(&inst.kind) {
-                    changed = true;
-                    continue;
+                if !used.contains(&dest) {
+                    if is_pure(&inst.kind) {
+                        changed = true;
+                        continue;
+                    }
+                    if dest_droppable(&inst.kind) {
+                        inst.dest = None;
+                        changed = true;
+                    }
                 }
             }
             new_insts.push(inst);
@@ -49,6 +55,37 @@ pub fn run(func: &mut SsaFunc) -> bool {
     }
 
     changed
+}
+
+/// Whether an instruction that must RUN can still give up its destination
+/// when nothing reads it.
+///
+/// A call to a `void` function is the common case, and in a test corpus it is
+/// most of the code: `assert(...)`, `print(...)`. The call has to happen, but
+/// its result is nobody's — and while it kept a destination it kept an SSA
+/// value, a live range, a register the allocator had to colour and, since
+/// `void` has no `CgTy`, a `Dynamic` one at that.
+///
+/// Restricted to the call family on purpose. Everything else that defines a
+/// value either has its destination read (or the pass above would have
+/// deleted it) or uses it as part of a protocol the emitter depends on —
+/// `Try`'s landing value, `CatchParam`, the suspension points. A `false` here
+/// costs a register; a wrong `true` loses an instruction, because
+/// `emit_inst` hands a destination-less instruction to `emit_effect` and
+/// drops whatever that does not recognize.
+pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
+    use InstKind::*;
+    matches!(
+        kind,
+        Call { .. }
+            | SelfCall { .. }
+            | MethodCall { .. }
+            | SuperCall { .. }
+            | SuperMethodCall { .. }
+            | ExtensionCall { .. }
+            | IntrinsicCall { .. }
+            | CallNativeOp { .. }
+    )
 }
 
 /// Whether an instruction can be deleted when its result is unused.
