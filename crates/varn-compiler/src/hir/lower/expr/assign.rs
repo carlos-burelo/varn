@@ -245,7 +245,7 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 let binding = match &target.kind {
-                    ExprKind::Identifier { name } => self.resolve(name, scope),
+                    ExprKind::Identifier { name } => self.resolve(name, scope, HirType::Dynamic),
                     _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
                 };
                 let val_expr = self.lower_expr(value, scope)?;

@@ -682,7 +682,7 @@ fn dump_binding(b: &HirBinding) -> String {
     match b {
         HirBinding::Param(i) => format!("{CYAN}p{i}{R}"),
         HirBinding::Local(id) => format!("{CYAN}l{}{R}", id.0),
-        HirBinding::Global(n) => format!("{CYAN}g:{n}{R}"),
+        HirBinding::Global(n, _) => format!("{CYAN}g:{n}{R}"),
         HirBinding::Upvalue(i) => format!("{CYAN}uv{i}{R}"),
     }
 }

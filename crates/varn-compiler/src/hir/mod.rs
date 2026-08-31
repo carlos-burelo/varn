@@ -110,9 +110,12 @@ impl TyTable {
                     HirType::Nullable(id)
                 }
             }
-            CgTy::Char | CgTy::Decimal | CgTy::BigInt | CgTy::Fn | CgTy::Dynamic => {
-                HirType::Dynamic
-            }
+            // A function value is a closure or a native — either way a heap
+            // reference, never an immediate. `Ref` is the honest projection
+            // and it is what keeps every read of a module function from
+            // landing in a `Dynamic` register.
+            CgTy::Fn => HirType::Ref,
+            CgTy::Char | CgTy::Decimal | CgTy::BigInt | CgTy::Dynamic => HirType::Dynamic,
         }
     }
 }
@@ -121,7 +124,18 @@ impl TyTable {
 pub enum HirBinding {
     Param(u32),
     Local(LocalId),
-    Global(Rc<str>),
+    /// A module-level binding, by qualified name, WITH the type the checker
+    /// proved for it at this use.
+    ///
+    /// The type is carried here rather than looked up later because there is
+    /// nowhere later to look: the SSA builder sees only the binding, so a
+    /// nameless `Global` left it writing `HirType::Dynamic` by hand — 44 % of
+    /// every `Dynamic` value in the corpus came from those two lines. As a
+    /// field of the variant, "no type" is not expressible by omission.
+    ///
+    /// On an assignment TARGET the type is the declared type of the global,
+    /// and consumers of the store path ignore it.
+    Global(Rc<str>, HirType),
     Upvalue(u32),
 }
 

@@ -272,11 +272,16 @@ impl<'a> Lowerer<'a> {
                 }
 
                 if let Some(slot_idx) = self.ann.get_slot_idx(AnnKey::decl(offset)) {
+                    // The exported binding's type, taken from the property the
+                    // checker annotated — the same source `GetFixedField` just
+                    // below uses. Reading it across a module boundary is not a
+                    // reason to lose it.
+                    let ty = self.value_ty(AnnKey::expr(property.id));
                     let object_hir = self.lower_expr(object, scope)?;
                     return Ok(HirExpr::ModuleSlot {
                         object: Box::new(object_hir),
                         slot: slot_idx as u16,
-                        ty: HirType::Dynamic,
+                        ty,
                     });
                 }
 

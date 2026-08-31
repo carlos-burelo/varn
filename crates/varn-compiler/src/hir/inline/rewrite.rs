@@ -1,8 +1,6 @@
-use crate::hir::{
-    HirBinding, HirExpr, HirFunction, HirObjectProp, HirStmt,
-};
 use super::traverse::{child_stmts_mut, for_each_child_expr_mut, for_each_stmt_expr_mut};
 use super::Candidates;
+use crate::hir::{HirBinding, HirExpr, HirFunction, HirObjectProp, HirStmt};
 
 pub(crate) fn rewrite_function(f: &mut HirFunction, candidates: &Candidates) {
     for s in &mut f.body {
@@ -72,7 +70,7 @@ pub(crate) fn rewrite_expr(e: &mut HirExpr, candidates: &Candidates) {
     let HirExpr::Call { callee, args, .. } = e else {
         return;
     };
-    let HirExpr::Var(HirBinding::Global(name)) = callee.as_ref() else {
+    let HirExpr::Var(HirBinding::Global(name, _)) = callee.as_ref() else {
         return;
     };
     let Some((arity, body)) = candidates.get(name) else {

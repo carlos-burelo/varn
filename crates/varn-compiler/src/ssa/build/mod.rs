@@ -128,9 +128,11 @@ impl Builder {
 
     fn emit_effect(&mut self, kind: InstKind) {
         let line = self.current_line;
-        self.block_mut(self.current)
-            .insts
-            .push(Inst { dest: None, kind, line });
+        self.block_mut(self.current).insts.push(Inst {
+            dest: None,
+            kind,
+            line,
+        });
     }
 
     fn fresh_synthetic(&mut self) -> VarId {
@@ -238,9 +240,14 @@ impl Builder {
         let var = match binding {
             HirBinding::Param(i) => VarId::Param(*i),
             HirBinding::Local(id) => VarId::Local(*id),
-            HirBinding::Global(name) => {
-                return Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic));
+            HirBinding::Global(name, ty) => {
+                return Ok(self.emit(InstKind::LoadGlobal(name.clone()), *ty));
             }
+            // An upvalue's type is not carried yet: the binding is a capture
+            // INDEX, and reconstructing the captured variable's type means
+            // walking `HirUpvalueSrc` back to the enclosing function's locals.
+            // Worth doing — it is the same class of loss as globals were — but
+            // it is a separate change, and it is only 0.5 % of the corpus.
             HirBinding::Upvalue(uv) => {
                 return Ok(self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic));
             }
@@ -257,7 +264,7 @@ impl Builder {
         let var = match binding {
             HirBinding::Param(i) => VarId::Param(*i),
             HirBinding::Local(id) => VarId::Local(*id),
-            HirBinding::Global(name) => {
+            HirBinding::Global(name, _) => {
                 self.emit_effect(InstKind::StoreGlobal {
                     name: name.clone(),
                     value,

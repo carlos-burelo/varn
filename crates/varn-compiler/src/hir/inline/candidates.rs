@@ -1,12 +1,10 @@
-use std::rc::Rc;
 use rustc_hash::FxHashSet;
+use std::rc::Rc;
 
+use super::traverse::{for_each_child_expr_mut, for_each_stmt_expr, push_child_stmts, walk_exprs};
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinding, HirExpr, HirFunction, HirModule, HirObjectProp,
     HirOptionalProperty, HirPropKey, HirStmt, HirTemplatePart, LocalId,
-};
-use super::traverse::{
-    for_each_child_expr_mut, for_each_stmt_expr, push_child_stmts, walk_exprs,
 };
 
 /// Collapses a body to the single expression it returns, folding away any
@@ -93,7 +91,7 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         | BigInt(_)
         | Null
         | Regex { .. } => true,
-        Var(HirBinding::Param(_)) | Var(HirBinding::Global(_)) => true,
+        Var(HirBinding::Param(_)) | Var(HirBinding::Global(..)) => true,
         Var(HirBinding::Local(_)) | Var(HirBinding::Upvalue(_)) => false,
 
         NonNull(x) | Spread(x) | TypeTest { value: x, .. } => body_is_inlinable(x),
@@ -180,7 +178,7 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
 pub(crate) fn body_mentions(e: &HirExpr, name: &Rc<str>) -> bool {
     let mut found = false;
     walk_exprs(e, &mut |x| {
-        if let HirExpr::Var(HirBinding::Global(g)) = x {
+        if let HirExpr::Var(HirBinding::Global(g, _)) = x {
             if g == name {
                 found = true;
             }
@@ -205,7 +203,7 @@ pub(crate) fn scan_function(f: &HirFunction, out: &mut FxHashSet<Rc<str>>) {
 pub(crate) fn scan_stmts(stmts: &[HirStmt], out: &mut FxHashSet<Rc<str>>) {
     for s in stmts {
         if let HirStmt::Assign {
-            target: HirBinding::Global(g),
+            target: HirBinding::Global(g, _),
             ..
         } = s
         {
@@ -213,7 +211,7 @@ pub(crate) fn scan_stmts(stmts: &[HirStmt], out: &mut FxHashSet<Rc<str>>) {
         }
         for_each_stmt_expr(s, &mut |e| {
             let mut check = |t: &HirAssignTarget| {
-                if let HirAssignTarget::Var(HirBinding::Global(g)) = t {
+                if let HirAssignTarget::Var(HirBinding::Global(g, _)) = t {
                     out.insert(g.clone());
                 }
             };

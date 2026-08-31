@@ -203,10 +203,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                         }
                         hierarchy.reverse();
 
-                        if !hierarchy
-                            .iter()
-                            .all(|c| ctx.bind.is_user_class(c.as_ref()))
-                        {
+                        if !hierarchy.iter().all(|c| ctx.bind.is_user_class(c.as_ref())) {
                             return;
                         }
 
@@ -221,17 +218,18 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                     if !m.is_static
                                         && (m.kind == crate::types::ClassMemberKind::Property
                                             || m.kind == crate::types::ClassMemberKind::Variable)
-                                        && known_props.insert(m.name.clone()) {
-                                            if m.name.as_ref() == prop_name.as_ref() {
-                                                ann.record_fixed_field_slot(
-                                                    AnnKey::expr(property.id),
-                                                    slot,
-                                                );
-                                                found = true;
-                                                break;
-                                            }
-                                            slot += 1;
+                                        && known_props.insert(m.name.clone())
+                                    {
+                                        if m.name.as_ref() == prop_name.as_ref() {
+                                            ann.record_fixed_field_slot(
+                                                AnnKey::expr(property.id),
+                                                slot,
+                                            );
+                                            found = true;
+                                            break;
                                         }
+                                        slot += 1;
+                                    }
                                 }
                             }
                             if found {
@@ -277,6 +275,13 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 };
                 annotate_expr(e, ann, ctx);
             }
+            // `new C(...)` is a `C`. This is the one expression whose type
+            // needs no inference at all — the word `new` says it — and it went
+            // unrecorded, so every constructed object reached the backend as
+            // `Dynamic` and every field read on it had to re-prove the class
+            // at run time.
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
         }
         ExprKind::Template { parts } => {
             for part in parts {
@@ -338,9 +343,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
         } => {
             annotate_expr(e, ann, ctx);
         }
-        ExprKind::Yield {
-            argument: None, ..
-        } => {}
+        ExprKind::Yield { argument: None, .. } => {}
         ExprKind::NonNull { expression } | ExprKind::Try { expression } => {
             annotate_expr(expression, ann, ctx)
         }
@@ -439,25 +442,23 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
             }
             CgTy::Dynamic
         }
-        TypeKind::Named(name, origin) => {
-            match varn_core::IntrinsicType::from_str(name.as_ref()) {
-                Some(varn_core::IntrinsicType::Map) => {
-                    CgTy::Map(Box::new(CgTy::Dynamic), Box::new(CgTy::Dynamic))
-                }
-                Some(varn_core::IntrinsicType::Set) => CgTy::Set(Box::new(CgTy::Dynamic)),
-                _ => {
-                    if ctx
-                        .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
-                        .is_some()
-                        || ctx.bind.get_enum_members_local(name).is_some()
-                    {
-                        CgTy::Class(name.clone())
-                    } else {
-                        CgTy::Dynamic
-                    }
+        TypeKind::Named(name, origin) => match varn_core::IntrinsicType::from_str(name.as_ref()) {
+            Some(varn_core::IntrinsicType::Map) => {
+                CgTy::Map(Box::new(CgTy::Dynamic), Box::new(CgTy::Dynamic))
+            }
+            Some(varn_core::IntrinsicType::Set) => CgTy::Set(Box::new(CgTy::Dynamic)),
+            _ => {
+                if ctx
+                    .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
+                    .is_some()
+                    || ctx.bind.get_enum_members_local(name).is_some()
+                {
+                    CgTy::Class(name.clone())
+                } else {
+                    CgTy::Dynamic
                 }
             }
-        }
+        },
         TypeKind::EnumVariant { enum_name, .. } => CgTy::Class(enum_name.clone()),
         TypeKind::Fn(_) => CgTy::Fn,
         TypeKind::Union(members) => {

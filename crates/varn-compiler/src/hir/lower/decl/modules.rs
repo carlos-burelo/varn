@@ -46,7 +46,7 @@ impl<'a> Lowerer<'a> {
             .map(|name| {
                 let binding = scope
                     .resolve_in_current_frame(&name)
-                    .unwrap_or_else(|| self.global_binding(name.clone()));
+                    .unwrap_or_else(|| self.global_binding(name.clone(), HirType::Dynamic));
                 let value = HirExpr::Var(binding);
                 HirObjectProp::Property {
                     key: HirPropKey::Static(name),
@@ -58,7 +58,7 @@ impl<'a> Lowerer<'a> {
         self.in_namespace = was_in_namespace;
         let value = HirExpr::Object { properties };
         if is_global {
-            let target = self.global_binding(ns.id.clone());
+            let target = self.global_binding(ns.id.clone(), HirType::Dynamic);
             out.push(HirStmt::Assign { target, value });
         } else {
             let local = scope.alloc_local(ns.id.clone());
@@ -139,7 +139,7 @@ impl<'a> Lowerer<'a> {
             return_ty,
             scope,
         )?;
-        let target = self.global_binding(name);
+        let target = self.global_binding(name, HirType::Dynamic);
         out.push(HirStmt::Assign {
             target,
             value: HirExpr::Closure {
@@ -233,7 +233,7 @@ impl<'a> Lowerer<'a> {
                         let hir_class = self.lower_class(cl, scope)?;
                         let value = HirExpr::Class(Box::new(hir_class));
                         if scope.is_global() {
-                            let target = self.global_binding(name.clone());
+                            let target = self.global_binding(name.clone(), HirType::Dynamic);
                             out.push(HirStmt::Assign { target, value });
                         } else {
                             let local = scope.alloc_local(name.clone());
@@ -268,13 +268,11 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ExportDecl::Named {
-                specifiers,
-                source,
-                ..
+                specifiers, source, ..
             } => {
                 let mut specs = Vec::new();
                 for spec in specifiers {
-                    let binding = self.resolve(&spec.local, scope);
+                    let binding = self.resolve(&spec.local, scope, HirType::Dynamic);
                     let local_slot = self
                         .ann
                         .get_slot_idx(AnnKey::decl(spec.range.start.offset))
@@ -283,7 +281,10 @@ impl<'a> Lowerer<'a> {
                         .export_names
                         .iter()
                         .position(|n| **n == *spec.exported)
-                        .or_else(|| self.ann.get_exported_slot_idx(AnnKey::decl(spec.range.start.offset)))
+                        .or_else(|| {
+                            self.ann
+                                .get_exported_slot_idx(AnnKey::decl(spec.range.start.offset))
+                        })
                         .map(|s| s as u16);
                     specs.push(HirExportSpec {
                         binding,
@@ -349,4 +350,3 @@ fn extension_type_name(target: &TypeNode) -> String {
         _ => IntrinsicType::Dynamic.as_str().to_owned(),
     }
 }
-

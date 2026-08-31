@@ -148,7 +148,7 @@ impl Scope {
                     HirUpvalueSrc::ParentLocal(id)
                 }
                 HirBinding::Upvalue(uv) => HirUpvalueSrc::ParentUpvalue(uv),
-                HirBinding::Global(_) => return None,
+                HirBinding::Global(..) => return None,
             };
             let idx = self.add_upvalue(frame_idx, src);
             return Some(HirBinding::Upvalue(idx));
@@ -335,7 +335,9 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         collect_pattern_identifiers(&d.id, &mut names);
                         for n in names {
                             if !lo.export_names.contains(&n) {
-                                if let HirBinding::Global(q) = lo.global_binding(n) {
+                                if let HirBinding::Global(q, _) =
+                                    lo.global_binding(n, HirType::Dynamic)
+                                {
                                     lo.top_level_lets.push(q);
                                 }
                             }
@@ -345,7 +347,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Class(cl) => {
                     let name = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                     let hir_class = lo.lower_class(cl, &mut module_scope)?;
-                    let target = lo.global_binding(name);
+                    let target = lo.global_binding(name, HirType::Dynamic);
                     top_body.push(HirStmt::Assign {
                         target,
                         value: HirExpr::Class(Box::new(hir_class)),
@@ -353,7 +355,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 }
                 Decl::Enum(en) => {
                     let hir_enum = lo.lower_enum(en, &mut module_scope)?;
-                    let target = lo.global_binding(en.id.clone());
+                    let target = lo.global_binding(en.id.clone(), HirType::Dynamic);
                     top_body.push(HirStmt::Assign {
                         target,
                         value: HirExpr::Enum(Box::new(hir_enum)),
@@ -592,7 +594,7 @@ impl<'a> Lowerer<'a> {
     ) -> R<()> {
         match pat {
             Pattern::Identifier { name, .. } => {
-                let target = self.global_binding(name.clone());
+                let target = self.global_binding(name.clone(), HirType::Dynamic);
                 out.push(HirStmt::Assign { target, value: src });
             }
             Pattern::Array { elements, rest, .. } => {

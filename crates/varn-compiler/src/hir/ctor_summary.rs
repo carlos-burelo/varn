@@ -181,7 +181,7 @@ impl Scan {
 
     fn stmt(&mut self, s: &HirStmt) {
         if let HirStmt::Assign {
-            target: HirBinding::Global(g),
+            target: HirBinding::Global(g, _),
             value,
         } = s
         {
@@ -206,7 +206,7 @@ impl Scan {
         for_each_stmt_expr(s, &mut |e| {
             walk_exprs(e, &mut |inner| match inner {
                 HirExpr::Assign { target: t, .. } | HirExpr::Update { target: t, .. } => {
-                    if let HirAssignTarget::Var(HirBinding::Global(g)) = &**t {
+                    if let HirAssignTarget::Var(HirBinding::Global(g, _)) = &**t {
                         rebound.push(g.clone());
                     }
                 }

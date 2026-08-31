@@ -24,7 +24,13 @@ impl<'a> Lowerer<'a> {
             None => None,
         };
 
-type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a Modifiers);
+        type MethodAstTuple<'a> = (
+            Rc<str>,
+            &'a [Param],
+            &'a Stmt,
+            &'a [Decorator],
+            &'a Modifiers,
+        );
 
         let mut fields: Vec<Rc<str>> = Vec::new();
         let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();
@@ -326,7 +332,7 @@ type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a 
                     upvalues: Vec::new(),
                 };
                 if is_global {
-                    let target = self.global_binding(f.id.clone());
+                    let target = self.global_binding(f.id.clone(), HirType::Dynamic);
                     out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(f.id.clone());
@@ -343,7 +349,7 @@ type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a 
                 let hir_class = self.lower_class(cl, scope)?;
                 let value = HirExpr::Class(Box::new(hir_class));
                 if is_global {
-                    let target = self.global_binding(name.clone());
+                    let target = self.global_binding(name.clone(), HirType::Dynamic);
                     out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(name.clone());
@@ -359,7 +365,7 @@ type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a 
                 let hir_enum = self.lower_enum(en, scope)?;
                 let value = HirExpr::Enum(Box::new(hir_enum));
                 if is_global {
-                    let target = self.global_binding(en.id.clone());
+                    let target = self.global_binding(en.id.clone(), HirType::Dynamic);
                     out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(en.id.clone());
@@ -376,11 +382,11 @@ type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a 
                 let value = HirExpr::Enum(Box::new(hir_enum));
                 let mut bound = vec![st.id.clone()];
                 if is_global {
-                    let target = self.global_binding(st.id.clone());
+                    let target = self.global_binding(st.id.clone(), HirType::Dynamic);
                     out.push(HirStmt::Assign { target, value });
                     for v in &st.variants {
-                        let target = self.global_binding(v.name.clone());
-                        let st_global = self.global_binding(st.id.clone());
+                        let target = self.global_binding(v.name.clone(), HirType::Dynamic);
+                        let st_global = self.global_binding(st.id.clone(), HirType::Dynamic);
                         out.push(HirStmt::Assign {
                             target,
                             value: HirExpr::Member {
@@ -435,7 +441,9 @@ type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a 
                     if is_global && !self.in_namespace {
                         for n in &names[before..] {
                             if !self.export_names.contains(n) {
-                                if let HirBinding::Global(q) = self.global_binding(n.clone()) {
+                                if let HirBinding::Global(q, _) =
+                                    self.global_binding(n.clone(), HirType::Dynamic)
+                                {
                                     self.top_level_lets.push(q);
                                 }
                             }

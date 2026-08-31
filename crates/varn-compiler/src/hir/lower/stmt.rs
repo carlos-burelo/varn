@@ -282,7 +282,9 @@ impl<'a> Lowerer<'a> {
                         return Ok(());
                     }
                     let binding = match &target.kind {
-                        ExprKind::Identifier { name } => self.resolve(name, scope),
+                        ExprKind::Identifier { name } => {
+                            self.resolve(name, scope, HirType::Dynamic)
+                        }
                         _ => {
                             return Err(OptError::Unsupported("hir: non-identifier assign target"))
                         }
@@ -628,11 +630,7 @@ impl<'a> Lowerer<'a> {
                     match &d.id {
                         Pattern::Identifier { name, .. } => {
                             let local = scope.alloc_local(name.clone());
-                            out.push(HirStmt::Let {
-                                local,
-                                value,
-                                ty,
-                            });
+                            out.push(HirStmt::Let { local, value, ty });
                             scope.record_disposable(local, *is_await);
                         }
                         _ => {

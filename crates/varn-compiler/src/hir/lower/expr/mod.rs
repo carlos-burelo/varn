@@ -19,7 +19,11 @@ mod match_expr;
 impl<'a> Lowerer<'a> {
     fn lower_assign_target(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirAssignTarget> {
         match &expr.kind {
-            ExprKind::Identifier { name } => Ok(HirAssignTarget::Var(self.resolve(name, scope))),
+            ExprKind::Identifier { name } => Ok(HirAssignTarget::Var(self.resolve(
+                name,
+                scope,
+                HirType::Dynamic,
+            ))),
             ExprKind::Member {
                 object,
                 property,
@@ -97,15 +101,19 @@ impl<'a> Lowerer<'a> {
             ExprKind::This => Ok(HirExpr::This),
             ExprKind::New { callee, args, .. } => {
                 let hargs = self.lower_call_args(args, key, scope)?;
+                let ty = self.value_ty(key);
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
                     args: hargs,
-                    ty: HirType::Dynamic,
+                    ty,
                 })
             }
             ExprKind::Paren { expression } => self.lower_expr(expression, scope),
-            ExprKind::Identifier { name } => Ok(HirExpr::Var(self.resolve(name, scope))),
+            ExprKind::Identifier { name } => {
+                let ty = self.value_ty(key);
+                Ok(HirExpr::Var(self.resolve(name, scope, ty)))
+            }
             ExprKind::Binary { op, left, right } => {
                 let lhs = Box::new(self.lower_expr(left, scope)?);
                 let rhs = Box::new(self.lower_expr(right, scope)?);
@@ -349,20 +357,27 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    pub(super) fn resolve(&self, name: &Rc<str>, scope: &mut Scope) -> HirBinding {
+    /// Resolve `name` in `scope`, falling back to a module global.
+    ///
+    /// `ty` is the type the checker proved for THIS use, and is used only if
+    /// the name resolves to a global — a param or a local already carries its
+    /// type in the SSA builder's `var_ty`. Callers that only want the
+    /// resolved NAME (an assignment target, an `instanceof` test) pass
+    /// `HirType::Dynamic`; nothing downstream reads the type on those paths.
+    pub(super) fn resolve(&self, name: &Rc<str>, scope: &mut Scope, ty: HirType) -> HirBinding {
         if let Some(b) = scope.resolve(name) {
             b
         } else {
-            self.global_binding(name.clone())
+            self.global_binding(name.clone(), ty)
         }
     }
 
-    pub(super) fn global_binding(&self, name: Rc<str>) -> HirBinding {
+    pub(super) fn global_binding(&self, name: Rc<str>, ty: HirType) -> HirBinding {
         if self.local_globals.contains(&name) {
             let qualified = format!("{}::{}", self.source_file, name);
-            HirBinding::Global(Rc::from(qualified))
+            HirBinding::Global(Rc::from(qualified), ty)
         } else {
-            HirBinding::Global(name)
+            HirBinding::Global(name, ty)
         }
     }
 
@@ -383,9 +398,9 @@ impl<'a> Lowerer<'a> {
                 }
                 _ => {
                     let name_rc = Rc::from(name.as_str());
-                    let binding = self.global_binding(name_rc);
+                    let binding = self.global_binding(name_rc, HirType::Dynamic);
                     let final_name = match binding {
-                        HirBinding::Global(n) => n,
+                        HirBinding::Global(n, _) => n,
                         _ => Rc::from(name.as_str()),
                     };
                     HirTypeTest::Instanceof(final_name)

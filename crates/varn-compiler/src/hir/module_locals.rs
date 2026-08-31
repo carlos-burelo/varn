@@ -82,7 +82,7 @@ pub fn run(module: &mut HirModule) {
         if in_nested {
             return;
         }
-        if let HirBinding::Global(g) = b {
+        if let HirBinding::Global(g, _) = b {
             if let Some(&local) = promoted.get(g) {
                 *b = HirBinding::Local(local);
             }
@@ -103,7 +103,7 @@ fn nested_globals(module: &HirModule) -> FxHashSet<Rc<str>> {
         let mut body = f.body.clone();
         walk_stmts(&mut body, start_nested, &mut |b, in_nested| {
             if in_nested {
-                if let HirBinding::Global(g) = b {
+                if let HirBinding::Global(g, _) = b {
                     out.insert(g.clone());
                 }
             }
