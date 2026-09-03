@@ -176,8 +176,9 @@ impl DocumentState {
                             {
                                 parent_name
                             } else {
-                                type_name_of(&res.receiver_ty)
-                                    .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string())
+                                type_name_of(&res.receiver_ty).unwrap_or_else(|| {
+                                    varn_core::TypeTag::Dynamic.name().to_string()
+                                })
                             };
                             return Some(ChainResult::Member {
                                 member: summary_from_resolution(res),
@@ -222,14 +223,11 @@ impl DocumentState {
                     }
 
                     if sid_matches {
-                        let found = self
-                            .symbols()
-                            .find(|s| s.id == sid)
-                            .or_else(|| {
-                                self.symbols().find(|s| {
-                                    !s.is_from_stdlib() && s.line() == sym.line && s.col() == sym.col
-                                })
-                            });
+                        let found = self.symbols().find(|s| s.id == sid).or_else(|| {
+                            self.symbols().find(|s| {
+                                !s.is_from_stdlib() && s.line() == sym.line && s.col() == sym.col
+                            })
+                        });
                         if let Some(s) = found {
                             return Some(ChainResult::Symbol(s));
                         }
@@ -315,7 +313,11 @@ impl DocumentState {
     }
 
     /// The member the cursor sits on, and the type it belongs to.
-    pub fn member_at_pos(&self, line: u32, col: u32) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
+    pub fn member_at_pos(
+        &self,
+        line: u32,
+        col: u32,
+    ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
         // A member *access*: the checker recorded the receiver and the member.
@@ -336,7 +338,10 @@ impl DocumentState {
     ///
     /// Found by asking which type's member table claims this symbol, which is
     /// the checker's own record of ownership — not a mirror of it.
-    fn declared_member_at(&self, tok: &TokenRecord) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
+    fn declared_member_at(
+        &self,
+        tok: &TokenRecord,
+    ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let sid = self.resolve_symbol_id_at_offset(tok.offset)?;
         let members = &self.db.bind.type_members;
 
@@ -344,7 +349,12 @@ impl DocumentState {
             .classes
             .iter()
             .find(|(_, e)| e.members.iter().any(|m| m.symbol_id == Some(sid)))
-            .map(|(name, e)| (name.clone(), e.members.iter().find(|m| m.symbol_id == Some(sid))))
+            .map(|(name, e)| {
+                (
+                    name.clone(),
+                    e.members.iter().find(|m| m.symbol_id == Some(sid)),
+                )
+            })
             .or_else(|| {
                 members.interfaces.iter().find_map(|(name, ms)| {
                     ms.iter()

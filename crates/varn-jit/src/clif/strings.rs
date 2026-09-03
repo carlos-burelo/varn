@@ -79,7 +79,9 @@ pub(super) fn emit_str_intrinsic_native(
             box_or_load_home(b, actx, state, dest + 2)
         } else {
             let null_v = b.ins().iconst(types::I64, 0);
-            let null_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let null_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
             b.ins().iconcat(null_tag, null_v)
         };
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
@@ -118,7 +120,9 @@ pub(super) fn emit_str_intrinsic_native(
             box_or_load_home(b, actx, state, dest + 2)
         } else {
             let null_v = b.ins().iconst(types::I64, 0);
-            let null_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let null_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
             b.ins().iconcat(null_tag, null_v)
         };
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
@@ -160,7 +164,13 @@ pub(super) fn emit_str_intrinsic_native(
             b,
             actx.cc,
             actx.helpers.str_starts_with_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_bool(b, res);
         def_result(b, actx, dest, boxed);
@@ -178,7 +188,13 @@ pub(super) fn emit_str_intrinsic_native(
             b,
             actx.cc,
             actx.helpers.str_ends_with_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_bool(b, res);
         def_result(b, actx, dest, boxed);
@@ -196,7 +212,13 @@ pub(super) fn emit_str_intrinsic_native(
             b,
             actx.cc,
             actx.helpers.str_includes_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_bool(b, res);
         def_result(b, actx, dest, boxed);
@@ -214,7 +236,13 @@ pub(super) fn emit_str_intrinsic_native(
             b,
             actx.cc,
             actx.helpers.str_index_of_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_int(b, res);
         def_result(b, actx, dest, boxed);
@@ -232,7 +260,13 @@ pub(super) fn emit_str_intrinsic_native(
             b,
             actx.cc,
             actx.helpers.str_last_index_of_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_int(b, res);
         def_result(b, actx, dest, boxed);

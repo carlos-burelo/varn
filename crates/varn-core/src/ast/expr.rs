@@ -301,8 +301,6 @@ impl Expr {
         Self { id, range, kind }
     }
 
-
-
     pub fn id(&self) -> AstId {
         self.id
     }

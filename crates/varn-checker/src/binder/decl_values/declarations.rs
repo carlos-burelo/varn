@@ -47,8 +47,8 @@ impl<'r> super::super::Binder<'r> {
                         })
                 });
 
-            let needs_enrich = !has_explicit_ann
-                && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
+            let needs_enrich =
+                !has_explicit_ann && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
 
             if let Pattern::Identifier { name, .. } = &d.id {
@@ -151,10 +151,7 @@ impl<'r> super::super::Binder<'r> {
         let ret = if f.modifiers.is_generator {
             crate::types::generator_of(declared_ret.unwrap_or(Type::Dynamic), f.modifiers.is_async)
         } else {
-            crate::types::async_fn_return(
-                declared_ret.unwrap_or(Type::Void),
-                f.modifiers.is_async,
-            )
+            crate::types::async_fn_return(declared_ret.unwrap_or(Type::Void), f.modifiers.is_async)
         };
         let fn_type = Type::fn_(FunctionType {
             params: params.clone(),
@@ -358,8 +355,8 @@ impl<'r> super::super::Binder<'r> {
                 is_readonly: false,
                 is_override: false,
                 symbol_id: Some(variant_sym_id),
-                        ..Default::default()
-                        });
+                ..Default::default()
+            });
         }
 
         let child = self

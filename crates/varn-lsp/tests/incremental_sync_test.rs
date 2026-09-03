@@ -1,8 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
+use tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use varn_lsp::backend::sync::edits::apply_change;
 use varn_lsp::document::position::byte_offset;
-use tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
 #[test]
 fn test_incremental_edit_application() {
@@ -11,8 +11,14 @@ fn test_incremental_edit_application() {
     // Replace `42` with `100` on line 1 (0-indexed), cols 11..13
     let change = TextDocumentContentChangeEvent {
         range: Some(Range {
-            start: Position { line: 1, character: 11 },
-            end: Position { line: 1, character: 13 },
+            start: Position {
+                line: 1,
+                character: 11,
+            },
+            end: Position {
+                line: 1,
+                character: 13,
+            },
         }),
         range_length: None,
         text: "100".to_string(),
@@ -28,7 +34,13 @@ fn test_position_with_utf16_astral_characters() {
     let source = "const emoji = \"😀\";\nconst next = 1;\n";
 
     // Start of line 1 (second line)
-    let offset_line1 = byte_offset(source, Position { line: 1, character: 0 });
+    let offset_line1 = byte_offset(
+        source,
+        Position {
+            line: 1,
+            character: 0,
+        },
+    );
     let expected = "const emoji = \"😀\";\n".len();
     assert_eq!(offset_line1, expected);
 }

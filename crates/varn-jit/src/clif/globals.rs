@@ -93,7 +93,9 @@ pub(super) fn emit_store_global_idx(
         if b.func.dfg.value_type(raw) == types::I128 {
             raw
         } else {
-            let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            let tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
             b.ins().iconcat(tag, raw)
         }
     };

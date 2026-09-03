@@ -163,11 +163,17 @@ pub fn build_reflection_completions(
                     if m.is_static && seen.insert(m_name.clone()) {
                         items.push(CompletionItem {
                             label: m_name.clone(),
-                            kind: Some(if matches!(m.kind, varn_checker::ResolvedMemberKind::Method | varn_checker::ResolvedMemberKind::StaticMethod) {
-                                CompletionItemKind::METHOD
-                            } else {
-                                CompletionItemKind::PROPERTY
-                            }),
+                            kind: Some(
+                                if matches!(
+                                    m.kind,
+                                    varn_checker::ResolvedMemberKind::Method
+                                        | varn_checker::ResolvedMemberKind::StaticMethod
+                                ) {
+                                    CompletionItemKind::METHOD
+                                } else {
+                                    CompletionItemKind::PROPERTY
+                                },
+                            ),
                             detail: Some(format!("static {}::{}: {}", receiver_name, m_name, m.ty)),
                             sort_text: Some(format!("1_{}", m_name)),
                             ..Default::default()

@@ -94,8 +94,10 @@ impl<'r> Checker<'r> {
                 for (i, arg) in args.iter().enumerate() {
                     match arg {
                         Arg::Named { label, .. } => {
-                            if let Some(pos) =
-                                ft.params.iter().position(|p| p.name.as_deref() == Some(label.as_str()))
+                            if let Some(pos) = ft
+                                .params
+                                .iter()
+                                .position(|p| p.name.as_deref() == Some(label.as_str()))
                             {
                                 arg_to_param_map.push(pos);
                             } else {
@@ -114,8 +116,10 @@ impl<'r> Checker<'r> {
                     return_ty: *ft.return_type.clone(),
                     arg_to_param_map,
                 };
-                self.call_resolutions.insert(range.start.offset, call_res.clone());
-                self.call_resolutions.insert(callee.range.start.offset, call_res);
+                self.call_resolutions
+                    .insert(range.start.offset, call_res.clone());
+                self.call_resolutions
+                    .insert(callee.range.start.offset, call_res);
             }
         }
 

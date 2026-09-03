@@ -88,7 +88,12 @@ impl Builder {
                 }
             },
 
-            HirExpr::Update { target, op, prefix, ty } => {
+            HirExpr::Update {
+                target,
+                op,
+                prefix,
+                ty,
+            } => {
                 let eff_ty = *ty;
                 let one_fn = |this: &mut Self| {
                     if eff_ty == HirType::Float {
@@ -240,8 +245,7 @@ impl Builder {
                         Err(OptError::Unsupported("ssa: update module slot"))
                     }
                     HirAssignTarget::SuperMember { name } => {
-                        let old =
-                            self.emit(InstKind::GetSuper { name: name.clone() }, eff_ty);
+                        let old = self.emit(InstKind::GetSuper { name: name.clone() }, eff_ty);
                         let one = one_fn(self);
                         let bop = match op {
                             HirUpdateOp::Inc => HirBinOp::Add,

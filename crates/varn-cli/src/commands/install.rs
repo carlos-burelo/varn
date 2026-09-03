@@ -1,9 +1,9 @@
 use crate::error::CliError;
+use varn_core::term::terminal;
 use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
-use varn_core::term::terminal;
 
 pub fn execute() -> Result<(), CliError> {
     let cwd =
@@ -36,10 +36,7 @@ pub fn execute() -> Result<(), CliError> {
         terminal::log(format!("Resolving {} dependency(ies)...", deps.len()));
         let result = installer::resolve_and_install(&project_root, &deps, None, false)
             .map_err(CliError::fatal)?;
-        result
-            .lock
-            .save(&lock_path)
-            .map_err(CliError::fatal)?;
+        result.lock.save(&lock_path).map_err(CliError::fatal)?;
         terminal::log("Lockfile written.");
     }
 

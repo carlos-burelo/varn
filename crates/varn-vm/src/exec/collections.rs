@@ -351,11 +351,7 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
 pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()) {
-            let keys: Vec<Value> = o
-                .borrow()
-                .keys()
-                .map(|k| Value::Str(k.clone()))
-                .collect();
+            let keys: Vec<Value> = o.borrow().keys().map(|k| Value::Str(k.clone())).collect();
             return Ok(heap.alloc_array(keys));
         }
     }

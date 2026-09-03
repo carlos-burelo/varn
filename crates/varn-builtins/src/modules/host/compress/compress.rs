@@ -18,22 +18,31 @@ fn zip_dir_recursive(
     for entry in entries {
         let entry = entry.map_err(|e| format!("Zip dir entry error: {e}"))?;
         let path = entry.path();
-        let rel_path = path.strip_prefix(base_dir).map_err(|e| format!("Zip strip prefix error: {e}"))?;
+        let rel_path = path
+            .strip_prefix(base_dir)
+            .map_err(|e| format!("Zip strip prefix error: {e}"))?;
         let name = rel_path.to_string_lossy().replace('\\', "/");
 
         if path.is_dir() {
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
-            writer.add_directory(&name, options).map_err(|e| format!("Zip add dir error: {e}"))?;
+            writer
+                .add_directory(&name, options)
+                .map_err(|e| format!("Zip add dir error: {e}"))?;
             zip_dir_recursive(writer, base_dir, &path)?;
         } else {
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
-            writer.start_file(&name, options).map_err(|e| format!("Zip start file error: {e}"))?;
+            writer
+                .start_file(&name, options)
+                .map_err(|e| format!("Zip start file error: {e}"))?;
             let mut f = File::open(&path).map_err(|e| format!("Zip open file error: {e}"))?;
             let mut buf = Vec::new();
-            f.read_to_end(&mut buf).map_err(|e| format!("Zip read file error: {e}"))?;
-            writer.write_all(&buf).map_err(|e| format!("Zip write error: {e}"))?;
+            f.read_to_end(&mut buf)
+                .map_err(|e| format!("Zip read file error: {e}"))?;
+            writer
+                .write_all(&buf)
+                .map_err(|e| format!("Zip write error: {e}"))?;
         }
     }
     Ok(())

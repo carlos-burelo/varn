@@ -17,7 +17,11 @@ fn vm_params_to_sqlite(ctx: &dyn NativeCtx, params: VnArray) -> Vec<rusqlite::ty
         if v.is_null() {
             out.push(rusqlite::types::Value::Null);
         } else if v.is_bool() {
-            out.push(rusqlite::types::Value::Integer(if v.as_bool() { 1 } else { 0 }));
+            out.push(rusqlite::types::Value::Integer(if v.as_bool() {
+                1
+            } else {
+                0
+            }));
         } else if v.is_int() {
             out.push(rusqlite::types::Value::Integer(v.as_int()));
         } else if v.is_f64() {

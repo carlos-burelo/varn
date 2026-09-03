@@ -19,8 +19,8 @@ pub(crate) use candidates::*;
 pub(crate) use rewrite::*;
 pub(crate) use traverse::*;
 
-use std::rc::Rc;
 use rustc_hash::FxHashMap;
+use std::rc::Rc;
 
 use crate::hir::{HirExpr, HirModule};
 

@@ -182,7 +182,19 @@ varn_contract! {
         }
         fn split(ctx: &mut dyn NativeCtx, this: &str, separator: Option<&str>) -> Vec<VmValue> {
             match separator {
-                Some(sep) => this.split(sep).map(|p| ctx.alloc_str(p)).collect(),
+                Some(sep) => {
+                    if sep.len() == 1 {
+                        let byte = sep.as_bytes()[0];
+                        let count = this.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
+                        let mut out = Vec::with_capacity(count);
+                        for p in this.split(sep) {
+                            out.push(ctx.alloc_str(p));
+                        }
+                        out
+                    } else {
+                        this.split(sep).map(|p| ctx.alloc_str(p)).collect()
+                    }
+                }
                 None => {
                     let mut buf = [0u8; 4];
                     this.chars().map(|c| ctx.alloc_str(c.encode_utf8(&mut buf))).collect()

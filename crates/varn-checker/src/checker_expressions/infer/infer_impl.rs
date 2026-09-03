@@ -222,17 +222,15 @@ impl<'r> Checker<'r> {
                         is_arrow: true,
                         type_params: vec![],
                     }),
-                    Some(varn_core::MemberKey::Entries) => {
-                        Type::fn_(crate::types::FunctionType {
-                            params: vec![],
-                            return_type: Box::new(Type::array(Type(
-                                TypeKind::Tuple(vec![Type::Str, Type::Dynamic]),
-                                false,
-                            ))),
-                            is_arrow: true,
-                            type_params: vec![],
-                        })
-                    }
+                    Some(varn_core::MemberKey::Entries) => Type::fn_(crate::types::FunctionType {
+                        params: vec![],
+                        return_type: Box::new(Type::array(Type(
+                            TypeKind::Tuple(vec![Type::Str, Type::Dynamic]),
+                            false,
+                        ))),
+                        is_arrow: true,
+                        type_params: vec![],
+                    }),
                     Some(varn_core::MemberKey::HasOwn) => Type::fn_(crate::types::FunctionType {
                         params: vec![crate::types::FunctionParam {
                             name: Some(std::rc::Rc::from("key")),
@@ -502,7 +500,8 @@ impl<'r> Checker<'r> {
                         }
                     } else if let varn_core::TypeKind::Named(name, origin) = &spread_ty.0 {
                         let view = crate::binder::BindView::new(bind, self.resolver);
-                        if let Some(cms) = view.get_class_members(name.as_ref(), origin.as_deref()) {
+                        if let Some(cms) = view.get_class_members(name.as_ref(), origin.as_deref())
+                        {
                             for cm in cms {
                                 if !cm.is_static {
                                     members.push(ObjectTypeMember::Property {

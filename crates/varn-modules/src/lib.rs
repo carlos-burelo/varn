@@ -342,16 +342,25 @@ fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String>
 
     let raw = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
-    let parsed: RawManifest = toml::from_str(&raw)
-        .map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
+    let parsed: RawManifest =
+        toml::from_str(&raw).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
 
-    let name = parsed.package.as_ref().and_then(|p| p.name.clone())
+    let name = parsed
+        .package
+        .as_ref()
+        .and_then(|p| p.name.clone())
         .or_else(|| parsed.project.as_ref().and_then(|p| p.name.clone()))
         .or(parsed.name);
-    let version = parsed.package.as_ref().and_then(|p| p.version.clone())
+    let version = parsed
+        .package
+        .as_ref()
+        .and_then(|p| p.version.clone())
         .or_else(|| parsed.project.as_ref().and_then(|p| p.version.clone()))
         .or(parsed.version);
-    let main = parsed.package.as_ref().and_then(|p| p.main.clone())
+    let main = parsed
+        .package
+        .as_ref()
+        .and_then(|p| p.main.clone())
         .or_else(|| parsed.project.as_ref().and_then(|p| p.main.clone()))
         .or(parsed.main);
 

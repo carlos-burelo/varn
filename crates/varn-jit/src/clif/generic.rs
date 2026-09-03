@@ -6,14 +6,16 @@
 //! allocation never triggers a collection), so they work in ANY routed
 //! function. Comparison results are unboxed to 0/1 so branches read them
 //! directly; arithmetic results stay boxed (unboxed at an int use).
+use super::alloc::AllocCtx;
+use super::emit::{
+    box_int, box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce,
+};
+use super::kinds::K;
+use crate::JitHelpers;
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
-use super::alloc::AllocCtx;
-use super::emit::{box_int, box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
-use super::kinds::K;
-use crate::JitHelpers;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
@@ -40,7 +42,11 @@ fn box_operand(
     if b.func.dfg.value_type(v) == types::I128 {
         b.ins().isplit(v)
     } else {
-        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), v)
+        (
+            b.ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+            v,
+        )
     }
 }
 
@@ -79,7 +85,12 @@ pub(super) fn emit_binop(
     let b_r = (code[ip + 1] & 0xFF) as usize;
     let (a_tag, a_payload) = box_operand(b, g, state, a_r);
     let (b_tag, b_payload) = box_operand(b, g, state, b_r);
-    call_helper_void(b, g.cc, helper, &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    call_helper_void(
+        b,
+        g.cc,
+        helper,
+        &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload],
+    );
     let res = b.ins().load(
         types::I128,
         MemFlags::trusted(),
@@ -165,14 +176,14 @@ pub(super) fn try_emit(
         OpCode::Div | OpCode::DivFloat | OpCode::DivInt => emit_binop(b, g, state, code, ip, h.div),
         OpCode::Mod | OpCode::ModFloat => emit_binop(b, g, state, code, ip, h.modulo),
         OpCode::Pow | OpCode::PowInt | OpCode::PowFloat => emit_binop(b, g, state, code, ip, h.pow),
-        OpCode::Eq | OpCode::EqFloat => emit_compare(b, g, state, code, ip, h.eq),
-        OpCode::Neq | OpCode::NeqFloat => emit_compare(b, g, state, code, ip, h.neq),
-        OpCode::Lt | OpCode::LtFloat => emit_compare(b, g, state, code, ip, h.lt),
-        OpCode::Gt | OpCode::GtFloat => emit_compare(b, g, state, code, ip, h.gt),
-        OpCode::Lte | OpCode::LteFloat => emit_compare(b, g, state, code, ip, h.lte),
-        OpCode::Gte | OpCode::GteFloat => emit_compare(b, g, state, code, ip, h.gte),
-        OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof),
-        OpCode::In => emit_compare(b, g, state, code, ip, h.op_in),
+        OpCode::Eq | OpCode::EqFloat => emit_compare(b, g, state, code, ip, h.eq, op),
+        OpCode::Neq | OpCode::NeqFloat => emit_compare(b, g, state, code, ip, h.neq, op),
+        OpCode::Lt | OpCode::LtFloat => emit_compare(b, g, state, code, ip, h.lt, op),
+        OpCode::Gt | OpCode::GtFloat => emit_compare(b, g, state, code, ip, h.gt, op),
+        OpCode::Lte | OpCode::LteFloat => emit_compare(b, g, state, code, ip, h.lte, op),
+        OpCode::Gte | OpCode::GteFloat => emit_compare(b, g, state, code, ip, h.gte, op),
+        OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof, op),
+        OpCode::In => emit_compare(b, g, state, code, ip, h.op_in, op),
         OpCode::BitAnd => emit_binop(b, g, state, code, ip, h.bit_and),
         OpCode::BitOr => emit_binop(b, g, state, code, ip, h.bit_or),
         OpCode::BitXor => emit_binop(b, g, state, code, ip, h.bit_xor),
@@ -230,8 +241,12 @@ pub(super) fn emit_str_length(
     let src = (code[ip + 1] >> 8) as usize;
     let (tag, payload) = box_operand(b, g, state, src);
 
-    let kind = b.ins().band_imm(tag, varn_types::vm_value::KIND_MASK as i64);
-    let is_sso = b.ins().icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
+    let kind = b
+        .ins()
+        .band_imm(tag, varn_types::vm_value::KIND_MASK as i64);
+    let is_sso = b
+        .ins()
+        .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
 
     let fast = b.create_block();
     let slow = b.create_block();
@@ -297,7 +312,12 @@ pub(super) fn emit_get_symbol(
     let sym_idx = code[ip + 2] as usize;
     let (obj_tag, obj_payload) = box_operand(b, g, state, obj_r);
     let sym = b.ins().iconst(types::I64, sym_idx as i64);
-    call_helper_void(b, g.cc, get_symbol, &[g.exec_ctx, obj_tag, obj_payload, sym]);
+    call_helper_void(
+        b,
+        g.cc,
+        get_symbol,
+        &[g.exec_ctx, obj_tag, obj_payload, sym],
+    );
     let res = b.ins().load(
         types::I128,
         MemFlags::trusted(),
@@ -316,13 +336,69 @@ pub(super) fn emit_compare(
     code: &[u16],
     ip: usize,
     helper: usize,
+    op: OpCode,
 ) {
     let dest = (code[ip] >> 8) as usize;
     let a_r = (code[ip + 1] >> 8) as usize;
     let b_r = (code[ip + 1] & 0xFF) as usize;
     let (a_tag, a_payload) = box_operand(b, g, state, a_r);
     let (b_tag, b_payload) = box_operand(b, g, state, b_r);
-    let cond = call_helper(b, g.cc, helper, &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+
+    let is_eq = matches!(op, OpCode::Eq | OpCode::EqFloat | OpCode::EqInt);
+    let is_neq = matches!(op, OpCode::Neq | OpCode::NeqFloat | OpCode::NeqInt);
+
+    let cond = if is_eq || is_neq {
+        let tag_eq = b.ins().icmp(IntCC::Equal, a_tag, b_tag);
+        let pay_eq = b.ins().icmp(IntCC::Equal, a_payload, b_payload);
+        let bits_eq = b.ins().band(tag_eq, pay_eq);
+
+        let a_kind = b.ins().band_imm(a_tag, 0xFF);
+        let not_float = b.ins().icmp_imm(IntCC::NotEqual, a_kind, 3);
+        let same_non_float = b.ins().band(bits_eq, not_float);
+
+        let a_is_sso = b.ins().icmp_imm(IntCC::Equal, a_kind, 5);
+        let b_kind = b.ins().band_imm(b_tag, 0xFF);
+        let b_is_sso = b.ins().icmp_imm(IntCC::Equal, b_kind, 5);
+        let both_sso = b.ins().band(a_is_sso, b_is_sso);
+
+        let can_inline = b.ins().bor(same_non_float, both_sso);
+
+        let fast_blk = b.create_block();
+        let slow_blk = b.create_block();
+        let merge_blk = b.create_block();
+        b.append_block_param(merge_blk, types::I64);
+
+        b.ins().brif(can_inline, fast_blk, &[], slow_blk, &[]);
+
+        b.switch_to_block(fast_blk);
+        let fast_res = if is_eq {
+            b.ins().uextend(types::I64, bits_eq)
+        } else {
+            let u = b.ins().uextend(types::I64, bits_eq);
+            b.ins().bxor_imm(u, 1)
+        };
+        b.ins().jump(merge_blk, &[fast_res.into()]);
+
+        b.switch_to_block(slow_blk);
+        let slow_res = call_helper(
+            b,
+            g.cc,
+            helper,
+            &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload],
+        );
+        b.ins().jump(merge_blk, &[slow_res.into()]);
+
+        b.switch_to_block(merge_blk);
+        b.block_params(merge_blk)[0]
+    } else {
+        call_helper(
+            b,
+            g.cc,
+            helper,
+            &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload],
+        )
+    };
+
     if let Some(actx) = g.actx {
         let boxed = super::emit::box_bool(b, cond);
         super::alloc::def_result(b, actx, dest, boxed);

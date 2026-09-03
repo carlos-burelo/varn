@@ -123,7 +123,11 @@ impl BuildId {
             "interp"
         };
         Self {
-            profile: if cfg!(debug_assertions) { "debug" } else { "release" },
+            profile: if cfg!(debug_assertions) {
+                "debug"
+            } else {
+                "release"
+            },
             backend,
             commit: option_env!("VARN_GIT_SHA"),
         }
@@ -257,7 +261,9 @@ impl Headline<'_> {
                     self.split
                         .as_ref()
                         .map(|s| {
-                            chalk(format!("  ↪{}", fmt_compact(s.compile))).dim().to_string()
+                            chalk(format!("  ↪{}", fmt_compact(s.compile)))
+                                .dim()
+                                .to_string()
                         })
                         .unwrap_or_default()
                 } else {
@@ -305,10 +311,14 @@ impl Headline<'_> {
                     chalk(fmt_pct(ratio)).yellow().bold().to_string()
                 };
                 let grade = jit_grade(ratio);
-                let counts = chalk(format!("({compiled}/{total_fns} fns)")).dim().to_string();
+                let counts = chalk(format!("({compiled}/{total_fns} fns)"))
+                    .dim()
+                    .to_string();
 
-                let jit_line =
-                    format!("JIT  {}  {} {}  {}", bar_colored, pct_colored, grade, counts);
+                let jit_line = format!(
+                    "JIT  {}  {} {}  {}",
+                    bar_colored, pct_colored, grade, counts
+                );
                 terminal::log(box_line(&jit_line));
 
                 // Note: distinguish uncompilable functions (real problem) from
@@ -318,27 +328,22 @@ impl Headline<'_> {
                     let note = if let Some((name, reason)) = &self.top_blocker {
                         let reason_short =
                             super::fmt::truncate_middle(&format!("{name}: {reason}"), 40);
-                        format!(
-                            "{} fns sin compilar  ·  {}",
-                            fmt_num(blocked),
-                            reason_short
-                        )
+                        format!("{} fns sin compilar  ·  {}", fmt_num(blocked), reason_short)
                     } else {
                         format!("{} fns sin compilar", fmt_num(blocked))
                     };
                     terminal::log(box_line(&chalk(note).dim().to_string()));
                 } else if jit.never_compiled_frames() > 0 {
                     let tiering = jit.never_compiled_frames();
-                    let note = format!(
-                        "{} entradas de calentamiento (tiering)",
-                        fmt_num(tiering)
-                    );
+                    let note = format!("{} entradas de calentamiento (tiering)", fmt_num(tiering));
                     terminal::log(box_line(&chalk(note).dim().to_string()));
                 }
             }
         } else if show_jit_section {
             terminal::log(box_line(
-                &chalk("JIT desactivado — línea base de intérprete").dim().to_string(),
+                &chalk("JIT desactivado — línea base de intérprete")
+                    .dim()
+                    .to_string(),
             ));
         }
 
@@ -347,7 +352,10 @@ impl Headline<'_> {
             if let Some(samples) = self.e2e_samples {
                 let hist = freq_histogram(samples, HIST_COLS);
                 let spread = e2e.spread();
-                let spread_warn = self.execute.map(|ex| ex.cv() >= CV_UNRELIABLE).unwrap_or(false);
+                let spread_warn = self
+                    .execute
+                    .map(|ex| ex.cv() >= CV_UNRELIABLE)
+                    .unwrap_or(false);
 
                 let dist = format!(
                     "{}  {}  σ {}  {}–{}",
@@ -358,7 +366,10 @@ impl Headline<'_> {
                     fmt_dur(e2e.max),
                 );
                 let spread_part = if spread_warn {
-                    format!("  {}", chalk(format!("⚠ spread {}", fmt_pct(spread))).yellow())
+                    format!(
+                        "  {}",
+                        chalk(format!("⚠ spread {}", fmt_pct(spread))).yellow()
+                    )
                 } else {
                     String::new()
                 };
@@ -380,12 +391,7 @@ impl Headline<'_> {
                     }
                 });
 
-                let dist_line = format!(
-                    "{}{}{}",
-                    dist,
-                    spread_part,
-                    throttle.unwrap_or_default(),
-                );
+                let dist_line = format!("{}{}{}", dist, spread_part, throttle.unwrap_or_default(),);
                 terminal::log(box_line(&dist_line));
             }
         }

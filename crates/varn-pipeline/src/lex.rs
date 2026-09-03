@@ -26,7 +26,10 @@ pub fn lex(
             error_count,
             if error_count > 1 { "s" } else { "" }
         );
-        return Err(PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer)));
+        return Err(PipelineError::new(
+            3,
+            format!("{}\n{}", msgs.join("\n"), footer),
+        ));
     }
 
     if verbose {

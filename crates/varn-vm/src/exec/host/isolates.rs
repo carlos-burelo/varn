@@ -98,7 +98,8 @@ impl ExecCtx {
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(crate::error::RuntimeError::new)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args)
+                    .map_err(crate::error::RuntimeError::new)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {

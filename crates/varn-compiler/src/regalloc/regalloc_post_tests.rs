@@ -5,9 +5,9 @@
 //! colourer had no legal colour left for the object's destination and handed
 //! out `base` anyway, aliasing it onto a register that was still live.
 
-use std::collections::HashMap;
 use crate::regalloc::liveness::{DefSites, LiveRange};
 use crate::regalloc::regalloc_post::*;
+use std::collections::HashMap;
 
 fn range(vreg: u16, start: usize, end: usize, interference: &[u16]) -> LiveRange {
     LiveRange {

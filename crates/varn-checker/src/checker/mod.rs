@@ -245,7 +245,10 @@ impl<'r> Checker<'r> {
     /// rather than ambient state so that a check is a function of its
     /// arguments: two callers with different module graphs cannot interfere,
     /// and nothing the checker consults can be invalidated behind its back.
-    pub fn check(program: &Program, resolver: &'r dyn crate::module_resolver::ImportResolver) -> CheckResult {
+    pub fn check(
+        program: &Program,
+        resolver: &'r dyn crate::module_resolver::ImportResolver,
+    ) -> CheckResult {
         Self::check_with(program, resolver, CheckOptions::compile())
     }
 

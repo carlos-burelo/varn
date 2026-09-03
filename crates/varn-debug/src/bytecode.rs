@@ -1,8 +1,8 @@
 use varn_compiler::FunctionProto;
-use varn_core::OpCode;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::Section;
+use varn_core::OpCode;
 use varn_types::PoolEntry;
 
 const R: &str = "\x1b[0m";
@@ -541,7 +541,12 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                         format!("uv{}", lo(d))
                     });
                 }
-                format!("r{} = closure[{}] uvs=[{}]", dest, proto_idx, uvs.join(", "))
+                format!(
+                    "r{} = closure[{}] uvs=[{}]",
+                    dest,
+                    proto_idx,
+                    uvs.join(", ")
+                )
             }
 
             OpCode::MakeClass => {

@@ -35,12 +35,7 @@ fn parse_property_name(s: &mut TokenStream) -> Expr {
     }
     let name = s.lexeme().to_owned();
     let tok = s.consume();
-    s.expr(
-        tok.range,
-        ExprKind::Identifier {
-            name: name.into(),
-        },
-    )
+    s.expr(tok.range, ExprKind::Identifier { name: name.into() })
 }
 
 pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {

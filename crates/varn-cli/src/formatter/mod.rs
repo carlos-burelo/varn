@@ -1,9 +1,8 @@
+use crate::cli::FmtArgs;
+use crate::error::CliError;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use crate::cli::FmtArgs;
-use crate::error::CliError;
-
 
 pub fn run_fmt(args: FmtArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
@@ -290,7 +289,11 @@ fn format_line_tokens(line: &str) -> String {
         // Spacing around commas: `a, b`
         if c == ',' {
             out.push(',');
-            if chars.peek().map(|&next| next != ' ' && next != '\n' && next != ')').unwrap_or(false) {
+            if chars
+                .peek()
+                .map(|&next| next != ' ' && next != '\n' && next != ')')
+                .unwrap_or(false)
+            {
                 out.push(' ');
             }
             continue;
@@ -304,7 +307,11 @@ fn format_line_tokens(line: &str) -> String {
                 continue;
             }
             out.push(':');
-            if chars.peek().map(|&next| next != ' ' && next != ':').unwrap_or(false) {
+            if chars
+                .peek()
+                .map(|&next| next != ' ' && next != ':')
+                .unwrap_or(false)
+            {
                 out.push(' ');
             }
             continue;

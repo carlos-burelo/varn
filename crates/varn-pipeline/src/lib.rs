@@ -1,4 +1,3 @@
-pub mod resolver;
 pub mod cache;
 mod check;
 mod compile;
@@ -12,9 +11,10 @@ mod lockfile;
 pub mod module_precompile;
 mod opts;
 mod parse;
-mod quiet_parse;
-pub mod stdlib_loader;
 pub mod portable;
+mod quiet_parse;
+pub mod resolver;
+pub mod stdlib_loader;
 
 mod lex;
 
@@ -161,7 +161,10 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
     let compiled = compile_source(source, path, verbose, &DebugFlags::default(), false)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
-            varn_core::term::terminal::tagged("Varn", format_args!("compile cache write skipped: {e}"));
+            varn_core::term::terminal::tagged(
+                "Varn",
+                format_args!("compile cache write skipped: {e}"),
+            );
         }
     }
     Ok(compiled)

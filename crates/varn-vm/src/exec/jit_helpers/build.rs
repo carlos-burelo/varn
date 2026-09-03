@@ -21,11 +21,7 @@ pub(crate) extern "C" fn jit_build_array(
     }
 }
 
-pub(crate) extern "C" fn jit_build_str(
-    ctx: *mut ExecCtx,
-    parts_ptr: *const VmValue,
-    count: usize,
-) {
+pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmValue, count: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
@@ -121,11 +117,7 @@ pub(crate) extern "C" fn jit_range(
     }
 }
 
-pub(crate) extern "C" fn jit_wrap_spread_stub(
-    ctx: *mut ExecCtx,
-    val_tag: u64,
-    val_payload: u64,
-) {
+pub(crate) extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);

@@ -422,7 +422,9 @@ fn dump_expr(expr: &HirExpr) -> String {
             };
             format!("({} {sym} {})", dump_expr(lhs), dump_expr(rhs))
         }
-        HirExpr::Conditional { test, cons, alt, .. } => {
+        HirExpr::Conditional {
+            test, cons, alt, ..
+        } => {
             format!(
                 "({} ? {} : {})",
                 dump_expr(test),
@@ -430,7 +432,9 @@ fn dump_expr(expr: &HirExpr) -> String {
                 dump_expr(alt)
             )
         }
-        HirExpr::Update { target, op, prefix, .. } => {
+        HirExpr::Update {
+            target, op, prefix, ..
+        } => {
             let sym = match op {
                 HirUpdateOp::Inc => "++",
                 HirUpdateOp::Dec => "--",

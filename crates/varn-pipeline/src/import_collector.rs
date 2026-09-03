@@ -25,7 +25,9 @@ impl ImportCollector {
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let StmtKind::Decl(decl) = &stmt.kind { self.visit_decl(decl) }
+        if let StmtKind::Decl(decl) = &stmt.kind {
+            self.visit_decl(decl)
+        }
     }
 
     fn visit_decl(&mut self, decl: &Decl) {

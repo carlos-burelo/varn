@@ -127,7 +127,9 @@ impl<'a> Lowerer<'a> {
                                 rhs: Box::new(assign),
                                 ty,
                             });
-                        } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                        } else if let Some(slot) =
+                            self.ann.get_fixed_field_slot(AnnKey::expr(property.id))
+                        {
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::GetFixedField {
                                 object: Box::new(object_hir.clone()),
@@ -210,7 +212,9 @@ impl<'a> Lowerer<'a> {
                                 target: Box::new(tgt),
                                 value: Box::new(new_val),
                             });
-                        } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                        } else if let Some(slot) =
+                            self.ann.get_fixed_field_slot(AnnKey::expr(property.id))
+                        {
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::GetFixedField {
                                 object: Box::new(object_hir.clone()),
@@ -271,7 +275,9 @@ impl<'a> Lowerer<'a> {
                             index,
                             is_array,
                         }
-                    } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                    } else if let Some(slot) =
+                        self.ann.get_fixed_field_slot(AnnKey::expr(property.id))
+                    {
                         HirAssignTarget::SetFixedField {
                             object: object_hir,
                             slot,

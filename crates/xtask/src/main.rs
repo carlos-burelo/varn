@@ -22,18 +22,78 @@ struct BenchDef {
 }
 
 const ALL_BENCHMARKS: &[BenchDef] = &[
-    BenchDef { name: "fib",                 vn: "bench_fib.vn",                 ts: "bench_fib.ts",                 py: Some("py/fib.py") },
-    BenchDef { name: "gc_alloc",            vn: "bench_gc_alloc.vn",            ts: "bench_gc_alloc.ts",            py: Some("py/gc_alloc.py") },
-    BenchDef { name: "dto",                 vn: "bench_dto_local.vn",           ts: "bench_dto.ts",                 py: Some("py/dto.py") },
-    BenchDef { name: "matrix",              vn: "bench_matrix.vn",              ts: "bench_matrix.ts",              py: Some("py/matrix.py") },
-    BenchDef { name: "str_ops",             vn: "bench_str_ops.vn",             ts: "bench_str_ops.ts",             py: None },
-    BenchDef { name: "json_native",         vn: "bench_json.vn",                ts: "bench_json.ts",                py: None },
-    BenchDef { name: "json_pure",           vn: "bench_json_pure.vn",           ts: "bench_json_pure.ts",           py: None },
-    BenchDef { name: "csv_pipeline",        vn: "bench_csv_pipeline.vn",        ts: "bench_csv_pipeline.ts",        py: None },
-    BenchDef { name: "collection_pipeline", vn: "bench_collection_pipeline.vn", ts: "bench_collection_pipeline.ts", py: None },
-    BenchDef { name: "http_routing",        vn: "bench_http_routing.vn",        ts: "bench_http_routing.ts",        py: None },
-    BenchDef { name: "csv_etl",             vn: "bench_csv_etl.vn",             ts: "bench_csv_etl.ts",             py: None },
-    BenchDef { name: "json_api_payloads",   vn: "bench_json_api_payloads.vn",   ts: "bench_json_api_payloads.ts",   py: None },
+    BenchDef {
+        name: "fib",
+        vn: "bench_fib.vn",
+        ts: "bench_fib.ts",
+        py: Some("py/fib.py"),
+    },
+    BenchDef {
+        name: "gc_alloc",
+        vn: "bench_gc_alloc.vn",
+        ts: "bench_gc_alloc.ts",
+        py: Some("py/gc_alloc.py"),
+    },
+    BenchDef {
+        name: "dto",
+        vn: "bench_dto_local.vn",
+        ts: "bench_dto.ts",
+        py: Some("py/dto.py"),
+    },
+    BenchDef {
+        name: "matrix",
+        vn: "bench_matrix.vn",
+        ts: "bench_matrix.ts",
+        py: Some("py/matrix.py"),
+    },
+    BenchDef {
+        name: "str_ops",
+        vn: "bench_str_ops.vn",
+        ts: "bench_str_ops.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "json_native",
+        vn: "bench_json.vn",
+        ts: "bench_json.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "json_pure",
+        vn: "bench_json_pure.vn",
+        ts: "bench_json_pure.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "csv_pipeline",
+        vn: "bench_csv_pipeline.vn",
+        ts: "bench_csv_pipeline.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "collection_pipeline",
+        vn: "bench_collection_pipeline.vn",
+        ts: "bench_collection_pipeline.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "http_routing",
+        vn: "bench_http_routing.vn",
+        ts: "bench_http_routing.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "csv_etl",
+        vn: "bench_csv_etl.vn",
+        ts: "bench_csv_etl.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "json_api_payloads",
+        vn: "bench_json_api_payloads.vn",
+        ts: "bench_json_api_payloads.ts",
+        py: None,
+    },
 ];
 
 /// Parsed CLI options for the compare command.
@@ -81,7 +141,9 @@ fn parse_args() -> Result<Opts, String> {
             if first.starts_with('-') {
                 parse_option(&mut opts, &first, &mut args)?;
             } else {
-                return Err(format!("Unknown command: '{first}'. Usage: cargo xtask compare [options]"));
+                return Err(format!(
+                    "Unknown command: '{first}'. Usage: cargo xtask compare [options]"
+                ));
             }
         }
     }
@@ -104,19 +166,37 @@ fn parse_args() -> Result<Opts, String> {
     Ok(opts)
 }
 
-fn parse_option(opts: &mut Opts, flag: &str, args: &mut impl Iterator<Item = String>) -> Result<(), String> {
+fn parse_option(
+    opts: &mut Opts,
+    flag: &str,
+    args: &mut impl Iterator<Item = String>,
+) -> Result<(), String> {
     match flag {
         "--runs" | "-r" => {
-            let val = args.next().ok_or_else(|| "--runs requires an integer value".to_string())?;
-            opts.runs = val.parse::<usize>().map_err(|_| format!("Invalid runs value: '{val}'"))?;
+            let val = args
+                .next()
+                .ok_or_else(|| "--runs requires an integer value".to_string())?;
+            opts.runs = val
+                .parse::<usize>()
+                .map_err(|_| format!("Invalid runs value: '{val}'"))?;
         }
         "--warmup" | "-w" => {
-            let val = args.next().ok_or_else(|| "--warmup requires an integer value".to_string())?;
-            opts.warmup = val.parse::<usize>().map_err(|_| format!("Invalid warmup value: '{val}'"))?;
+            let val = args
+                .next()
+                .ok_or_else(|| "--warmup requires an integer value".to_string())?;
+            opts.warmup = val
+                .parse::<usize>()
+                .map_err(|_| format!("Invalid warmup value: '{val}'"))?;
         }
         "--only" | "-o" => {
-            let val = args.next().ok_or_else(|| "--only requires a benchmark name or comma-separated list".to_string())?;
-            let items: Vec<String> = val.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            let val = args.next().ok_or_else(|| {
+                "--only requires a benchmark name or comma-separated list".to_string()
+            })?;
+            let items: Vec<String> = val
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
             if let Some(ref mut existing) = opts.only {
                 existing.extend(items);
             } else {
@@ -124,7 +204,9 @@ fn parse_option(opts: &mut Opts, flag: &str, args: &mut impl Iterator<Item = Str
             }
         }
         "--baseline" | "-b" => {
-            let val = args.next().ok_or_else(|| "--baseline requires a path to vn binary".to_string())?;
+            let val = args
+                .next()
+                .ok_or_else(|| "--baseline requires a path to vn binary".to_string())?;
             let path = PathBuf::from(&val);
             if !path.exists() {
                 return Err(format!("Baseline binary not found at: {}", path.display()));
@@ -150,14 +232,17 @@ fn parse_option(opts: &mut Opts, flag: &str, args: &mut impl Iterator<Item = Str
             opts.no_color = true;
         }
         other => {
-            return Err(format!("Unknown option: '{other}'. Use --help to see available flags."));
+            return Err(format!(
+                "Unknown option: '{other}'. Use --help to see available flags."
+            ));
         }
     }
     Ok(())
 }
 
 fn print_help() {
-    println!(r#"cargo xtask compare — High-precision runtime benchmark comparison harness
+    println!(
+        r#"cargo xtask compare — High-precision runtime benchmark comparison harness
 
 USAGE:
     cargo xtask compare [OPTIONS]
@@ -175,7 +260,8 @@ OPTIONS:
     -d, --detailed         Include extended statistics (mean, stddev, P95)
         --no-color         Disable ANSI color output
     -h, --help             Show this help message
-"#);
+"#
+    );
 }
 
 /// Information about an available runtime launcher.
@@ -236,7 +322,9 @@ impl SampleStats {
         };
         let stddev = variance.sqrt();
 
-        let p95_idx = ((count as f64 * 0.95).ceil() as usize).saturating_sub(1).min(count - 1);
+        let p95_idx = ((count as f64 * 0.95).ceil() as usize)
+            .saturating_sub(1)
+            .min(count - 1);
         let p95 = sorted[p95_idx];
 
         Self {
@@ -281,7 +369,9 @@ struct RowResult {
 
 /// Extracted comparable signature from raw output.
 fn get_result_signature(raw: &str) -> String {
-    let re_drop = Regex::new(r"(?i)elapsed|took|\btime\b|(?:^|[^a-z])ms\b|_ms\b|\bms\s*[=:]|\bbytes\b").unwrap();
+    let re_drop =
+        Regex::new(r"(?i)elapsed|took|\btime\b|(?:^|[^a-z])ms\b|_ms\b|\bms\s*[=:]|\bbytes\b")
+            .unwrap();
     let mut nums = Vec::new();
 
     for line in raw.lines() {
@@ -292,7 +382,9 @@ fn get_result_signature(raw: &str) -> String {
         let len = bytes.len();
         let mut i = 0;
         while i < len {
-            if bytes[i].is_ascii_digit() || (bytes[i] == b'-' && i + 1 < len && bytes[i + 1].is_ascii_digit()) {
+            if bytes[i].is_ascii_digit()
+                || (bytes[i] == b'-' && i + 1 < len && bytes[i + 1].is_ascii_digit())
+            {
                 let preceded_by_dot = i > 0 && bytes[i - 1] == b'.';
                 let start = i;
                 if bytes[i] == b'-' {
@@ -352,19 +444,43 @@ impl Term {
     }
 
     fn color(&self, code: &str, s: &str) -> String {
-        if self.no_color { s.to_string() } else { format!("\x1b[{code}m{s}\x1b[0m") }
+        if self.no_color {
+            s.to_string()
+        } else {
+            format!("\x1b[{code}m{s}\x1b[0m")
+        }
     }
 
-    fn cyan(&self, s: &str) -> String { self.color("36", s) }
-    fn bold_cyan(&self, s: &str) -> String { self.color("1;36", s) }
-    fn green(&self, s: &str) -> String { self.color("32", s) }
-    fn bold_green(&self, s: &str) -> String { self.color("1;32", s) }
-    fn red(&self, s: &str) -> String { self.color("31", s) }
-    fn bold_red(&self, s: &str) -> String { self.color("1;31", s) }
-    fn yellow(&self, s: &str) -> String { self.color("33", s) }
-    fn gray(&self, s: &str) -> String { self.color("90", s) }
-    fn white(&self, s: &str) -> String { self.color("37", s) }
-    fn bold_white(&self, s: &str) -> String { self.color("1;37", s) }
+    fn cyan(&self, s: &str) -> String {
+        self.color("36", s)
+    }
+    fn bold_cyan(&self, s: &str) -> String {
+        self.color("1;36", s)
+    }
+    fn green(&self, s: &str) -> String {
+        self.color("32", s)
+    }
+    fn bold_green(&self, s: &str) -> String {
+        self.color("1;32", s)
+    }
+    fn red(&self, s: &str) -> String {
+        self.color("31", s)
+    }
+    fn bold_red(&self, s: &str) -> String {
+        self.color("1;31", s)
+    }
+    fn yellow(&self, s: &str) -> String {
+        self.color("33", s)
+    }
+    fn gray(&self, s: &str) -> String {
+        self.color("90", s)
+    }
+    fn white(&self, s: &str) -> String {
+        self.color("37", s)
+    }
+    fn bold_white(&self, s: &str) -> String {
+        self.color("1;37", s)
+    }
 
     fn rt_color(&self, rt: &str, s: &str) -> String {
         match rt {
@@ -424,7 +540,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_path_buf();
 
     let bench_dir = workspace_root.join("tests").join("benchmarks");
-    let target_vn = workspace_root.join("target").join("release").join(if cfg!(windows) { "vn.exe" } else { "vn" });
+    let target_vn = workspace_root
+        .join("target")
+        .join("release")
+        .join(if cfg!(windows) { "vn.exe" } else { "vn" });
 
     if !target_vn.exists() {
         eprintln!("error: vn executable not found at {}", target_vn.display());
@@ -529,13 +648,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             " ".repeat(pad_title),
             term.gray("│")
         );
-        let info_line1 = format!("Host: {}   •   Runs: {} ({} warmup)", cpu, opts.runs, opts.warmup);
+        let info_line1 = format!(
+            "Host: {}   •   Runs: {} ({} warmup)",
+            cpu, opts.runs, opts.warmup
+        );
         let pad_info1 = (box_width - 4).saturating_sub(info_line1.chars().count());
-        println!("  {}  {}{}{}", term.gray("│"), term.gray(&info_line1), " ".repeat(pad_info1), term.gray("│"));
+        println!(
+            "  {}  {}{}{}",
+            term.gray("│"),
+            term.gray(&info_line1),
+            " ".repeat(pad_info1),
+            term.gray("│")
+        );
 
         let info_line2 = format!("Runtimes: {}", rt_names.join(", "));
         let pad_info2 = (box_width - 4).saturating_sub(info_line2.chars().count());
-        println!("  {}  {}{}{}", term.gray("│"), term.cyan(&info_line2), " ".repeat(pad_info2), term.gray("│"));
+        println!(
+            "  {}  {}{}{}",
+            term.gray("│"),
+            term.cyan(&info_line2),
+            " ".repeat(pad_info2),
+            term.gray("│")
+        );
 
         println!("  {}", term.gray(&format!("└{}┘", "─".repeat(box_width))));
         println!();
@@ -578,8 +712,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Visual Startup Gauge
     if !opts.json {
-        println!("  {}", term.bold_cyan("🚀 Startup Latency (empty program):"));
-        let max_su = startup_stats.values().map(|s| s.median).fold(0.0f64, f64::max);
+        println!(
+            "  {}",
+            term.bold_cyan("🚀 Startup Latency (empty program):")
+        );
+        let max_su = startup_stats
+            .values()
+            .map(|s| s.median)
+            .fold(0.0f64, f64::max);
 
         for rt in &runtimes {
             let st = &startup_stats[&rt.name];
@@ -587,12 +727,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ((st.median / max_su) * 26.0).round() as usize
             } else {
                 1
-            }.max(1);
+            }
+            .max(1);
             let bar_str = term.bar(&rt.name, bar_len);
             let extra = if rt.name == "varn" {
                 if let Some(bun_st) = startup_stats.get("bun") {
                     let factor = bun_st.median / st.median.max(0.1);
-                    format!("   {}", term.bold_green(&format!("[⚡ {:.1}x faster]", factor)))
+                    format!(
+                        "   {}",
+                        term.bold_green(&format!("[⚡ {:.1}x faster]", factor))
+                    )
                 } else {
                     String::new()
                 }
@@ -603,7 +747,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let bar_pad = 26_usize.saturating_sub(bar_len);
             println!(
                 "    {}{:>6.1} ms  {}{}{}",
-                format!("{}{}", term.rt_color(&rt.name, &rt.name), " ".repeat(rt_pad)),
+                format!(
+                    "{}{}",
+                    term.rt_color(&rt.name, &rt.name),
+                    " ".repeat(rt_pad)
+                ),
                 st.median,
                 bar_str,
                 " ".repeat(bar_pad),
@@ -639,7 +787,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let present_rts: Vec<&RuntimeInfo> = runtimes.iter().filter(|r| bench_files.contains_key(&r.name)).collect();
+        let present_rts: Vec<&RuntimeInfo> = runtimes
+            .iter()
+            .filter(|r| bench_files.contains_key(&r.name))
+            .collect();
 
         let mut samples: HashMap<String, Vec<f64>> = HashMap::new();
         let mut last_outputs: HashMap<String, String> = HashMap::new();
@@ -710,7 +861,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let varn_w = &work_stats["varn"];
             let rival_w = &work_stats[rw_name];
             let non_overlapping = (varn_w.max < rival_w.min) || (rival_w.max < varn_w.min);
-            let significant_diff = (varn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.08;
+            let significant_diff =
+                (varn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.08;
             non_overlapping || significant_diff
         } else {
             false
@@ -801,9 +953,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let bun_w = r.work_stats.get("bun").map(|w| w.median);
             let node_w = r.work_stats.get("node").map(|w| w.median);
 
-            let v_str = varn_w.map(|w| format!("{:>7.1} ms", w)).unwrap_or_else(|| format!("{:>10}", "--"));
-            let b_str = bun_w.map(|w| format!("{:>7.1} ms", w)).unwrap_or_else(|| format!("{:>10}", "--"));
-            let n_str = node_w.map(|w| format!("{:>7.1} ms", w)).unwrap_or_else(|| format!("{:>10}", "--"));
+            let v_str = varn_w
+                .map(|w| format!("{:>7.1} ms", w))
+                .unwrap_or_else(|| format!("{:>10}", "--"));
+            let b_str = bun_w
+                .map(|w| format!("{:>7.1} ms", w))
+                .unwrap_or_else(|| format!("{:>10}", "--"));
+            let n_str = node_w
+                .map(|w| format!("{:>7.1} ms", w))
+                .unwrap_or_else(|| format!("{:>10}", "--"));
 
             let rel_bar = if let (Some(vw), Some(bw)) = (varn_w, bun_w) {
                 let total = vw + bw;
@@ -822,7 +980,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             let badge = get_verdict_badge(r, &term);
-            println!("  {:<20} {} {} {}   {}   {}", r.bench_name, v_str, b_str, n_str, rel_bar, badge);
+            println!(
+                "  {:<20} {} {} {}   {}   {}",
+                r.bench_name, v_str, b_str, n_str, rel_bar, badge
+            );
         }
     } else {
         // High-Impact Visual Card Mode
@@ -832,13 +993,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let title = if r.output_ok {
                 format!("  ┌─ {} ", term.bold_white(&r.bench_name))
             } else {
-                format!("  ┌─ {} {} ", term.bold_white(&r.bench_name), term.bold_red("[MISMATCH]"))
+                format!(
+                    "  ┌─ {} {} ",
+                    term.bold_white(&r.bench_name),
+                    term.bold_red("[MISMATCH]")
+                )
             };
             let title_len = r.bench_name.len() + 5 + if r.output_ok { 0 } else { 11 };
             let pad_dashes = card_width.saturating_sub(title_len);
             println!("{}{}", title, term.gray(&"─".repeat(pad_dashes)) + "┐");
 
-            let mut rivals_median: Vec<f64> = r.work_stats.iter()
+            let mut rivals_median: Vec<f64> = r
+                .work_stats
+                .iter()
                 .filter(|(rt, _)| *rt != "python")
                 .map(|(_, st)| st.median)
                 .collect();
@@ -849,22 +1016,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             for rt in &runtimes {
                 if let Some(wrk) = r.work_stats.get(&rt.name) {
                     let (cols, tag) = if wrk.median > max_normal * 3.5 && rt.name == "python" {
-                        (bar_max_cols, format!(" {}", term.gray(&format!("[+{:.0}ms]", wrk.median))))
+                        (
+                            bar_max_cols,
+                            format!(" {}", term.gray(&format!("[+{:.0}ms]", wrk.median))),
+                        )
                     } else {
-                        let c = ((wrk.median / max_normal) * (bar_max_cols as f64)).round() as usize;
-                        let c = if wrk.median > 0.0 { c.max(1).min(bar_max_cols) } else { 0 };
+                        let c =
+                            ((wrk.median / max_normal) * (bar_max_cols as f64)).round() as usize;
+                        let c = if wrk.median > 0.0 {
+                            c.max(1).min(bar_max_cols)
+                        } else {
+                            0
+                        };
                         (c, String::new())
                     };
                     let bar_str = term.bar(&rt.name, cols);
 
                     let rt_pad = 7_usize.saturating_sub(rt.name.len());
-                    let rt_name_spaced = format!("{}{}", term.rt_color(&rt.name, &rt.name), " ".repeat(rt_pad));
+                    let rt_name_spaced = format!(
+                        "{}{}",
+                        term.rt_color(&rt.name, &rt.name),
+                        " ".repeat(rt_pad)
+                    );
                     let time_str = format!("{:>6.1} ms", wrk.median);
                     let bar_pad = bar_max_cols.saturating_sub(cols);
-                    let row_visual = format!("{} {}  {}{}{}", rt_name_spaced, time_str, bar_str, " ".repeat(bar_pad), tag);
-                    let plain_len = 7 + 1 + 9 + 2 + cols + bar_pad + if tag.is_empty() { 0 } else { 10 };
+                    let row_visual = format!(
+                        "{} {}  {}{}{}",
+                        rt_name_spaced,
+                        time_str,
+                        bar_str,
+                        " ".repeat(bar_pad),
+                        tag
+                    );
+                    let plain_len =
+                        7 + 1 + 9 + 2 + cols + bar_pad + if tag.is_empty() { 0 } else { 10 };
                     let right_pad = card_width.saturating_sub(plain_len + 4);
-                    println!("  │  {}{}{}│", row_visual, " ".repeat(right_pad), term.gray(""));
+                    println!(
+                        "  │  {}{}{}│",
+                        row_visual,
+                        " ".repeat(right_pad),
+                        term.gray("")
+                    );
                 }
             }
 
@@ -875,16 +1067,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         snippet.truncate(50);
                         snippet.push_str("...");
                     }
-                    let snip_line = format!("{} {}", term.bold_red(&format!("{rt}:")), term.gray(&snippet));
+                    let snip_line = format!(
+                        "{} {}",
+                        term.bold_red(&format!("{rt}:")),
+                        term.gray(&snippet)
+                    );
                     let snip_pad = card_width.saturating_sub(rt.len() + 2 + snippet.len() + 4);
-                    println!("  │  {}{}{}│", snip_line, " ".repeat(snip_pad), term.gray(""));
+                    println!(
+                        "  │  {}{}{}│",
+                        snip_line,
+                        " ".repeat(snip_pad),
+                        term.gray("")
+                    );
                 }
             }
 
             let bottom_prefix = format!("  └─ {} ", badge);
             let badge_vis_len = get_verdict_badge_len(r);
             let bottom_dashes = card_width.saturating_sub(badge_vis_len + 5);
-            println!("{}{}", bottom_prefix, term.gray(&"─".repeat(bottom_dashes)) + "┘");
+            println!(
+                "{}{}",
+                bottom_prefix,
+                term.gray(&"─".repeat(bottom_dashes)) + "┘"
+            );
             println!();
         }
     }
@@ -914,11 +1119,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let su_speedup = if let (Some(v), Some(b)) = (startup_stats.get("varn"), startup_stats.get("bun")) {
-            b.median / v.median.max(0.1)
-        } else {
-            1.0
-        };
+        let su_speedup =
+            if let (Some(v), Some(b)) = (startup_stats.get("varn"), startup_stats.get("bun")) {
+                b.median / v.median.max(0.1)
+            } else {
+                1.0
+            };
 
         let box_width = 80_usize;
         println!("  {}", term.gray(&format!("┌{}┐", "─".repeat(box_width))));
@@ -929,12 +1135,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let title_colored = format!(
             "{}   {} {}   •   {} {}   •   {} {}",
             term.bold_white("📊 SCOREBOARD:"),
-            "🏆", term.bold_green(&format!("{varn_wins} Wins")),
-            "🤝", term.cyan(&format!("{tied} Tied")),
-            "🔻", term.yellow(&format!("{rival_wins} Rivals"))
+            "🏆",
+            term.bold_green(&format!("{varn_wins} Wins")),
+            "🤝",
+            term.cyan(&format!("{tied} Tied")),
+            "🔻",
+            term.yellow(&format!("{rival_wins} Rivals"))
         );
         let pad_title = (box_width - 4).saturating_sub(title_line.chars().count());
-        println!("  {}  {}{}  {}", term.gray("│"), title_colored, " ".repeat(pad_title), term.gray("│"));
+        println!(
+            "  {}  {}{}  {}",
+            term.gray("│"),
+            title_colored,
+            " ".repeat(pad_title),
+            term.gray("│")
+        );
 
         let integrity = if mismatches == 0 {
             term.bold_green("100% Verified (Zero mismatches)")
@@ -949,10 +1164,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sub_plain = format!(
             "🚀 Startup: {:.1}x faster than Bun   •   Integrity: {}",
             su_speedup,
-            if mismatches == 0 { "100% Verified (Zero mismatches)" } else { "MISMATCHES" }
+            if mismatches == 0 {
+                "100% Verified (Zero mismatches)"
+            } else {
+                "MISMATCHES"
+            }
         );
         let pad_sub = (box_width - 4).saturating_sub(sub_plain.chars().count());
-        println!("  {}  {}{}  {}", term.gray("│"), sub_colored, " ".repeat(pad_sub), term.gray("│"));
+        println!(
+            "  {}  {}{}  {}",
+            term.gray("│"),
+            sub_colored,
+            " ".repeat(pad_sub),
+            term.gray("│")
+        );
         println!("  {}", term.gray(&format!("└{}┘", "─".repeat(box_width))));
         println!();
     }
@@ -1014,7 +1239,11 @@ fn get_verdict_text(r: &RowResult) -> String {
     }
 }
 
-fn invoke_once(rt: &RuntimeInfo, file: &Path, cache_dir: &Path) -> Result<RunResult, Box<dyn std::error::Error>> {
+fn invoke_once(
+    rt: &RuntimeInfo,
+    file: &Path,
+    cache_dir: &Path,
+) -> Result<RunResult, Box<dyn std::error::Error>> {
     let mut cmd = Command::new(&rt.bin);
     for arg in &rt.args_prefix {
         cmd.arg(arg);
@@ -1048,7 +1277,12 @@ fn get_cpu_info() -> String {
     #[cfg(windows)]
     {
         let out = Command::new("reg")
-            .args(["query", r"HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "/v", "ProcessorNameString"])
+            .args([
+                "query",
+                r"HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0",
+                "/v",
+                "ProcessorNameString",
+            ])
             .output()
             .ok();
         if let Some(o) = out {

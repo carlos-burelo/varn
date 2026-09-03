@@ -135,14 +135,11 @@ impl ExecCtx {
                             (*ctx).frames[frame_idx].ip = ip;
                             let mut err: crate::error::RuntimeError = err;
                             if err.frames.is_empty() {
-                                err.frames = crate::exec::exceptions::collect_frames(
-                                    &(*ctx).frames,
-                                );
+                                err.frames =
+                                    crate::exec::exceptions::collect_frames(&(*ctx).frames);
                             }
-                            let tv = crate::exec::exceptions::thrown_value_for(
-                                &err,
-                                &mut (*ctx).heap,
-                            );
+                            let tv =
+                                crate::exec::exceptions::thrown_value_for(&err, &mut (*ctx).heap);
                             if crate::exec::exceptions::dispatch_to_handler(ctx, tv, depth) {
                                 continue 'frame_loop;
                             }
@@ -419,9 +416,11 @@ impl ExecCtx {
                     | OpCode::DefineStaticSetter
                     | OpCode::BindMethod => {
                         (*ctx).frames[frame_idx].ip = ip;
-                        tryv!((*ctx).exec_class_op(
-                            op, code, &mut ip, base, frame_idx, closure, first_reg,
-                        ));
+                        tryv!(
+                            (*ctx).exec_class_op(
+                                op, code, &mut ip, base, frame_idx, closure, first_reg,
+                            )
+                        );
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
                     }
@@ -522,9 +521,8 @@ impl ExecCtx {
 
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
                         (*ctx).frames[frame_idx].ip = ip;
-                        tryv!((*ctx).exec_module_op_reg(
-                            op, code, &mut ip, frame_idx, closure, first_reg,
-                        ));
+                        tryv!((*ctx)
+                            .exec_module_op_reg(op, code, &mut ip, frame_idx, closure, first_reg,));
                         ip = (*ctx).frames[frame_idx].ip;
                     }
 
@@ -684,7 +682,6 @@ impl ExecCtx {
         }
         final_val
     }
-
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
         use varn_core::TypeTag;

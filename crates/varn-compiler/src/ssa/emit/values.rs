@@ -181,7 +181,10 @@ pub(super) fn emit_value(
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], line);
             }
             let argc = args.len() as u8;
-            if matches!(value_tys.get(recv.0 as usize), Some(crate::hir::HirType::Class(_))) {
+            if matches!(
+                value_tys.get(recv.0 as usize),
+                Some(crate::hir::HirType::Class(_))
+            ) {
                 chunk.emit(OpCode::InvokeVirtual, line);
                 chunk.write(Chunk::pack(d, reg[recv.0 as usize]), line);
                 chunk.write(name_idx, line);

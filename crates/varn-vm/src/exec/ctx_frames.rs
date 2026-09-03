@@ -17,38 +17,37 @@ impl ExecCtx {
         if let Some((prepared, needs_receiver)) =
             super::calls::try_prepare_call_fast(callee_nv, arg_count, &self.stack, &self.heap)
         {
-            if needs_receiver
-                && callee_nv.is_heap() {
-                    let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
-                        self.heap.get(callee_nv.as_heap_idx())
-                    {
-                        Some(bm.receiver.clone())
-                    } else {
-                        None
-                    };
-                    if let Some(receiver) = receiver_clone {
-                        let recv_nv = self.heap.intern(receiver);
-                        match prepared {
-                            PreparedCall::Frame(ref frame) => {
-                                if frame.base >= self.stack.len() {
-                                    self.stack.push(recv_nv);
-                                } else {
-                                    self.stack[frame.base] = recv_nv;
-                                }
+            if needs_receiver && callee_nv.is_heap() {
+                let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
+                    self.heap.get(callee_nv.as_heap_idx())
+                {
+                    Some(bm.receiver.clone())
+                } else {
+                    None
+                };
+                if let Some(receiver) = receiver_clone {
+                    let recv_nv = self.heap.intern(receiver);
+                    match prepared {
+                        PreparedCall::Frame(ref frame) => {
+                            if frame.base >= self.stack.len() {
+                                self.stack.push(recv_nv);
+                            } else {
+                                self.stack[frame.base] = recv_nv;
                             }
-                            PreparedCall::NativeImmediate(_, _)
-                            | PreparedCall::RawNativeImmediate(_, _) => {
-                                let args_start = self.stack.len() - arg_count;
-                                if args_start >= self.stack.len() {
-                                    self.stack.push(recv_nv);
-                                } else {
-                                    self.stack[args_start] = recv_nv;
-                                }
-                            }
-                            _ => {}
                         }
+                        PreparedCall::NativeImmediate(_, _)
+                        | PreparedCall::RawNativeImmediate(_, _) => {
+                            let args_start = self.stack.len() - arg_count;
+                            if args_start >= self.stack.len() {
+                                self.stack.push(recv_nv);
+                            } else {
+                                self.stack[args_start] = recv_nv;
+                            }
+                        }
+                        _ => {}
                     }
                 }
+            }
             return Ok(prepared);
         }
 

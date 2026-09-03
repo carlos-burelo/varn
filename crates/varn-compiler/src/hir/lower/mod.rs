@@ -156,7 +156,8 @@ impl Scope {
             return Some(b);
         }
 
-        if let Some(HirBinding::Upvalue(parent_uv, _)) = self.resolve_upvalue(parent_idx, name, ty) {
+        if let Some(HirBinding::Upvalue(parent_uv, _)) = self.resolve_upvalue(parent_idx, name, ty)
+        {
             let idx = self.add_upvalue(frame_idx, HirUpvalueSrc::ParentUpvalue(parent_uv));
             let b = HirBinding::Upvalue(idx, ty);
             self.frames[frame_idx].blocks[0].insert(Rc::from(name), b.clone());

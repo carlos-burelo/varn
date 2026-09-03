@@ -118,7 +118,10 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
         let mut int_val: i64 = 0;
         let mut overflow = false;
         for &b in &bytes[idx..] {
-            if let Some(next) = int_val.checked_mul(10).and_then(|v| v.checked_add((b - b'0') as i64)) {
+            if let Some(next) = int_val
+                .checked_mul(10)
+                .and_then(|v| v.checked_add((b - b'0') as i64))
+            {
                 int_val = next;
             } else {
                 overflow = true;
@@ -162,7 +165,10 @@ impl<'a> FastCsvParser<'a> {
         }
     }
 
-    fn next_row_into(&mut self, fields: &mut Vec<std::borrow::Cow<'a, str>>) -> Result<bool, String> {
+    fn next_row_into(
+        &mut self,
+        fields: &mut Vec<std::borrow::Cow<'a, str>>,
+    ) -> Result<bool, String> {
         fields.clear();
         if self.pos >= self.bytes.len() {
             return Ok(false);
@@ -183,7 +189,9 @@ impl<'a> FastCsvParser<'a> {
                             has_escapes = true;
                             escaped_buf.clear();
                             escaped_buf.push_str(unsafe {
-                                std::str::from_utf8_unchecked(&self.bytes[field_start + 1..self.pos])
+                                std::str::from_utf8_unchecked(
+                                    &self.bytes[field_start + 1..self.pos],
+                                )
                             });
                         }
                         escaped_buf.push('"');
@@ -232,7 +240,10 @@ impl<'a> FastCsvParser<'a> {
                     std::borrow::Cow::Borrowed(s)
                 };
                 fields.push(cell);
-                if b == b'\r' && self.pos + 1 < self.bytes.len() && self.bytes[self.pos + 1] == b'\n' {
+                if b == b'\r'
+                    && self.pos + 1 < self.bytes.len()
+                    && self.bytes[self.pos + 1] == b'\n'
+                {
                     self.pos += 2;
                 } else {
                     self.pos += 1;
@@ -428,10 +439,8 @@ fn write_vm_value_csv(out: &mut String, ctx: &ExecCtx, val: VmValue, delimiter: 
 }
 
 fn write_csv_cell(out: &mut String, s: &str, delimiter: char) {
-    let needs_quotes = s.contains(delimiter)
-        || s.contains('"')
-        || s.contains('\n')
-        || s.contains('\r');
+    let needs_quotes =
+        s.contains(delimiter) || s.contains('"') || s.contains('\n') || s.contains('\r');
 
     if !needs_quotes {
         out.push_str(s);

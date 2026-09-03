@@ -249,7 +249,8 @@ impl IoDriver {
                                 Ok(n) => {
                                     buf.truncate(n);
                                     let s = String::from_utf8_lossy(&buf).into_owned();
-                                    pr.task.settle(Ok(Value::Str(std::rc::Rc::from(s.as_str()))));
+                                    pr.task
+                                        .settle(Ok(Value::Str(std::rc::Rc::from(s.as_str()))));
                                 }
                                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                     stream_state.pending_read = Some(pr);
@@ -422,7 +423,10 @@ impl IoDriver {
             }
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 let task = AsyncTask::pending();
-                stream_state.pending_read = Some(PendingRead { len, task: task.clone() });
+                stream_state.pending_read = Some(PendingRead {
+                    len,
+                    task: task.clone(),
+                });
                 drop(reg);
                 let _ = self.waker.wake();
                 task
@@ -485,7 +489,9 @@ impl IoDriver {
                 pw.task.settle(Ok(Value::Int(-1)));
             }
             drop(reg);
-            let _ = self.cmd_tx.send(DriverCommand::DeregisterStream(stream_state.stream));
+            let _ = self
+                .cmd_tx
+                .send(DriverCommand::DeregisterStream(stream_state.stream));
             let _ = self.waker.wake();
         }
     }
@@ -497,7 +503,9 @@ impl IoDriver {
                 task.settle(Ok(Value::Int(-1)));
             }
             drop(reg);
-            let _ = self.cmd_tx.send(DriverCommand::DeregisterListener(listener_state.listener));
+            let _ = self
+                .cmd_tx
+                .send(DriverCommand::DeregisterListener(listener_state.listener));
             let _ = self.waker.wake();
         }
     }

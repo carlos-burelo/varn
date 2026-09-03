@@ -74,14 +74,6 @@ impl StrBuf {
     }
 
     #[inline]
-    pub(crate) fn len(&self) -> usize {
-        match &self.spilled {
-            Some(s) => s.len(),
-            None => self.len,
-        }
-    }
-
-    #[inline]
     pub(crate) fn as_str(&self) -> &str {
         match &self.spilled {
             Some(s) => s,

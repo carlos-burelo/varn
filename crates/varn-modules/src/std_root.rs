@@ -57,9 +57,15 @@ pub fn classify(path: &Path) -> Option<StdSource> {
 
 /// `"std"` key in the project's varn.toml, resolved relative to the manifest.
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
-    let manifest_path = if project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE).exists() {
+    let manifest_path = if project_root
+        .join(crate::artifact::PACKAGE_MANIFEST_FILE)
+        .exists()
+    {
         project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE)
-    } else if project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE_VN).exists() {
+    } else if project_root
+        .join(crate::artifact::PACKAGE_MANIFEST_FILE_VN)
+        .exists()
+    {
         project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE_VN)
     } else {
         return None;

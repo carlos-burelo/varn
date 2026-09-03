@@ -51,9 +51,8 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
         }
 
         // Count leading closing tokens on this line to dedent before printing
-        let starts_closing = trimmed.starts_with('}')
-            || trimmed.starts_with(']')
-            || trimmed.starts_with(')');
+        let starts_closing =
+            trimmed.starts_with('}') || trimmed.starts_with(']') || trimmed.starts_with(')');
 
         let line_effective_indent = if starts_closing && current_indent > 0 {
             current_indent.saturating_sub(1)
@@ -141,4 +140,3 @@ fn compute_line_indent_delta(line: &str) -> i32 {
 
     delta
 }
-

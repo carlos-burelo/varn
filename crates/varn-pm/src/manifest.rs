@@ -141,15 +141,24 @@ pub struct ProjectManifest {
 
 impl ProjectManifest {
     pub fn get_name(&self) -> Option<&str> {
-        self.package.as_ref().and_then(|p| p.name.as_deref()).or(self.name.as_deref())
+        self.package
+            .as_ref()
+            .and_then(|p| p.name.as_deref())
+            .or(self.name.as_deref())
     }
 
     pub fn get_version(&self) -> Option<&str> {
-        self.package.as_ref().and_then(|p| p.version.as_deref()).or(self.version.as_deref())
+        self.package
+            .as_ref()
+            .and_then(|p| p.version.as_deref())
+            .or(self.version.as_deref())
     }
 
     pub fn get_main(&self) -> Option<&str> {
-        self.package.as_ref().and_then(|p| p.main.as_deref()).or(self.main.as_deref())
+        self.package
+            .as_ref()
+            .and_then(|p| p.main.as_deref())
+            .or(self.main.as_deref())
     }
 
     pub fn load(path: &Path) -> Result<Self, String> {
@@ -159,8 +168,8 @@ impl ProjectManifest {
     }
 
     pub fn save(&self, path: &Path) -> Result<(), String> {
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| format!("cannot serialize manifest: {e}"))?;
+        let content =
+            toml::to_string_pretty(self).map_err(|e| format!("cannot serialize manifest: {e}"))?;
         std::fs::write(path, content).map_err(|e| format!("cannot write {}: {e}", path.display()))
     }
 

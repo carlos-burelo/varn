@@ -165,11 +165,7 @@ impl Liveness {
             }
         }
 
-        Liveness {
-            def,
-            end,
-            live_out,
-        }
+        Liveness { def, end, live_out }
     }
 
     /// Valores vivos DESPUÉS de ejecutar la instrucción `i` del bloque `b`.

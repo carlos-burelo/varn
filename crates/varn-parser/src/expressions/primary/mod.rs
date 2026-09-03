@@ -12,8 +12,8 @@ use varn_core::ParsedNumber;
 use varn_core::TokenKind;
 
 use self::match_expr::parse_match_expr;
-use self::object::parse_object_expr;
 pub(crate) use self::object::parse_object_body;
+use self::object::parse_object_expr;
 pub(crate) use self::template::parse_template;
 
 pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
@@ -31,13 +31,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 _ => parse_int_radix(&raw)
                     .ok_or_else(|| format!("integer literal `{}` overflows i64", raw))?,
             };
-            Ok(s.expr(
-                range,
-                ExprKind::IntLiteral {
-                    value,
-                    raw,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
         }
         TokenKind::FloatLiteral => {
             let pre_parsed = s.parsed_num();
@@ -48,72 +42,37 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                     .parse()
                     .map_err(|_| format!("invalid float literal: {}", raw))?,
             };
-            Ok(s.expr(
-                range,
-                ExprKind::FloatLiteral {
-                    value,
-                    raw,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::FloatLiteral { value, raw }))
         }
         TokenKind::BigIntLiteral => {
             let raw = s.consume_lexeme();
-            Ok(s.expr(
-                range,
-                ExprKind::BigIntLiteral {
-                    raw,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::BigIntLiteral { raw }))
         }
         TokenKind::DecimalLiteral => {
             let raw = s.consume_lexeme();
-            Ok(s.expr(
-                range,
-                ExprKind::DecimalLiteral {
-                    raw,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::DecimalLiteral { raw }))
         }
         TokenKind::RawStr => {
             let value = s.consume_lexeme().to_string();
-            Ok(s.expr(
-                range,
-                ExprKind::StrLiteral {
-                    value,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::StrLiteral { value }))
         }
         TokenKind::Str => {
             let value = unescape_string(s.lexeme());
             s.advance();
-            Ok(s.expr(
-                range,
-                ExprKind::StrLiteral {
-                    value,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::StrLiteral { value }))
         }
         TokenKind::Char => {
             let ch = unescape_string(s.lexeme()).chars().next().unwrap_or('\0');
             s.advance();
-            Ok(s.expr(
-                range,
-                ExprKind::CharLiteral { value: ch },
-            ))
+            Ok(s.expr(range, ExprKind::CharLiteral { value: ch }))
         }
         TokenKind::True => {
             s.advance();
-            Ok(s.expr(
-                range,
-                ExprKind::BoolLiteral { value: true },
-            ))
+            Ok(s.expr(range, ExprKind::BoolLiteral { value: true }))
         }
         TokenKind::False => {
             s.advance();
-            Ok(s.expr(
-                range,
-                ExprKind::BoolLiteral { value: false },
-            ))
+            Ok(s.expr(range, ExprKind::BoolLiteral { value: false }))
         }
         TokenKind::Null => {
             s.advance();
@@ -122,23 +81,14 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::RegularExpression => {
             let raw = s.consume_lexeme();
             let (pattern, flags) = split_regex(&raw);
-            Ok(s.expr(
-                range,
-                ExprKind::RegexLiteral {
-                    pattern,
-                    flags,
-                },
-            ))
+            Ok(s.expr(range, ExprKind::RegexLiteral { pattern, flags }))
         }
 
         TokenKind::Template | TokenKind::TemplateHead => parse_template(s),
 
         TokenKind::Identifier => {
             let name = s.consume_lexeme();
-            Ok(s.expr(
-                range,
-                ExprKind::Identifier { name },
-            ))
+            Ok(s.expr(range, ExprKind::Identifier { name }))
         }
         TokenKind::Placeholder => {
             s.advance();

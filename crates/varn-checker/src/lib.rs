@@ -22,4 +22,3 @@ pub use semantic_info::{
 };
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use types::Type;
-

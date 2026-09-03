@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::regalloc::liveness::LiveRange;
 use super::scan::ScanResult;
+use crate::regalloc::liveness::LiveRange;
 
 /// Re-colour the function's registers by liveness, coalescing `Move` copies.
 ///

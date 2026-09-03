@@ -217,9 +217,7 @@ fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind 
         HirType::Str => SlotKind::Str,
         HirType::Class(id) => SlotKind::Class(id.0),
         HirType::Array(id) => SlotKind::Array(id.0),
-        HirType::Ref
-        | HirType::Map(_, _)
-        | HirType::Set(_) => SlotKind::Ref,
+        HirType::Ref | HirType::Map(_, _) | HirType::Set(_) => SlotKind::Ref,
         HirType::Nullable(id) => SlotKind::Nullable(id.0),
         HirType::Dynamic => SlotKind::Dynamic,
     }

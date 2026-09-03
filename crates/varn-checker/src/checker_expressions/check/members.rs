@@ -165,7 +165,10 @@ impl<'r> Checker<'r> {
 
             let member_kind = if is_enum {
                 crate::semantic_info::ResolvedMemberKind::EnumMember
-            } else if self.extension_members.contains_key(&property.range.start.offset) {
+            } else if self
+                .extension_members
+                .contains_key(&property.range.start.offset)
+            {
                 if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
                     crate::semantic_info::ResolvedMemberKind::ExtensionMethod
                 } else {

@@ -9,6 +9,113 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_types::chunk::ICKind;
 
+struct ActiveMethodCache {
+    class_id: u32,
+    name_idx: usize,
+    closure: std::rc::Rc<crate::closure::VmClosure>,
+    jit_fn: Option<varn_jit::JitFn>,
+}
+
+thread_local! {
+    static ACTIVE_METHOD: std::cell::RefCell<Option<ActiveMethodCache>> = const { std::cell::RefCell::new(None) };
+}
+
+#[inline(always)]
+pub(crate) fn try_fast_jit_method(
+    ctx_ref: &mut ExecCtx,
+    closure_ref: &crate::closure::VmClosure,
+    this_val: VmValue,
+    base: usize,
+    name_idx: usize,
+    arg_start: usize,
+    arg_count: usize,
+) -> Option<VmValue> {
+    if !this_val.is_heap() {
+        return None;
+    }
+    let class_rc = match ctx_ref.heap.get(this_val.as_heap_idx()) {
+        Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
+            o.borrow().class()?
+        }
+        _ => return None,
+    };
+
+    let hit = ACTIVE_METHOD.with(|cell| {
+        let b = cell.borrow();
+        if let Some(ref c) = *b {
+            if c.class_id == class_rc.id && c.name_idx == name_idx {
+                return Some((c.closure.clone(), c.jit_fn));
+            }
+        }
+        None
+    });
+
+    let (nc, jit_fn) = match hit {
+        Some((c, j)) => (c, j?),
+        None => {
+            let name_nv = *closure_ref.constants.get(name_idx)?;
+            let name = ctx_ref.heap.str_val(name_nv)?;
+            let (method_val, _owner) =
+                varn_types::find_method_with_owner(&class_rc, name.as_ref())?;
+            let nc = match method_val {
+                varn_types::Value::VmValue(payload) => {
+                    let wrapper = payload
+                        .as_any()
+                        .downcast_ref::<crate::closure::VmClosurePayload>()?;
+                    wrapper.0.clone()
+                }
+                _ => return None,
+            };
+            if nc.proto.is_generator || nc.proto.is_async || arg_count > nc.proto.arity {
+                return None;
+            }
+            let jit_fn = nc.jit_fn();
+            ACTIVE_METHOD.with(|cell| {
+                *cell.borrow_mut() = Some(ActiveMethodCache {
+                    class_id: class_rc.id,
+                    name_idx,
+                    closure: nc.clone(),
+                    jit_fn,
+                });
+            });
+            (nc, jit_fn?)
+        }
+    };
+
+    let orig_len = ctx_ref.stack.len();
+    let callee_base = orig_len;
+    let required = callee_base + nc.proto.register_count as usize + 32;
+    if ctx_ref.stack.len() < required {
+        ctx_ref.stack.resize(required, VmValue::null());
+    }
+    ctx_ref.stack[callee_base] = this_val;
+    let src_start = base + arg_start;
+    for i in 0..arg_count {
+        ctx_ref.stack[callee_base + 1 + i] = ctx_ref.stack[src_start + i];
+    }
+    for i in (1 + arg_count)..(nc.proto.arity) {
+        ctx_ref.stack[callee_base + i] = VmValue::null();
+    }
+    ctx_ref
+        .frames
+        .push(crate::frame::CallFrame::new(&nc, callee_base));
+    ctx_ref.jit_frame_prepushed = 1;
+    let res = unsafe {
+        (jit_fn)(
+            ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
+            &*nc as *const crate::closure::VmClosure as *const std::ffi::c_void,
+            callee_base,
+            ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
+        )
+    };
+    ctx_ref.frames.pop();
+    if nc.proto.upvalue_count > 0 {
+        ctx_ref.close_upvalues_above(callee_base);
+    }
+    ctx_ref.stack.truncate(orig_len);
+    Some(res)
+}
+
 pub(crate) extern "C" fn jit_invoke_virtual(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -21,6 +128,19 @@ pub(crate) extern "C" fn jit_invoke_virtual(
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
         let base = ctx_ref.frames[frame_idx].base;
+
+        if let Some(res) = try_fast_jit_method(
+            ctx_ref,
+            closure_ref,
+            args.this_val,
+            base,
+            args.name_idx,
+            args.arg_start,
+            args.arg_count,
+        ) {
+            ctx_ref.stack[base + args.dest] = res;
+            return res;
+        }
 
         ctx_ref.frames[frame_idx].ip = args.ip;
 

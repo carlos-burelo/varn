@@ -99,10 +99,8 @@ impl<'r> super::super::Binder<'r> {
                                     }
                                     let origin_path = origin.as_deref()?;
                                     let mut visiting = vec![self.source_file.to_string()];
-                                    let exports = self.resolver.module_exports(
-                                        origin_path,
-                                        &mut visiting,
-                                    );
+                                    let exports =
+                                        self.resolver.module_exports(origin_path, &mut visiting);
                                     if let Some(sym) = exports.get(prop.key.as_ref()) {
                                         prop_kind = sym.kind;
                                         sym.ty.clone()

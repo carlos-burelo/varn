@@ -53,10 +53,7 @@ pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is
                 }
                 a.workspace.update_file(uri_str.clone(), source);
                 let analysis = a.workspace.get(&uri_str)?;
-                let user_syms = analysis
-                    .symbols()
-                    .filter(|s| s.line() != u32::MAX)
-                    .count();
+                let user_syms = analysis.symbols().filter(|s| s.line() != u32::MAX).count();
                 Some((
                     convert_diagnostics(&analysis),
                     analysis.tokens.len(),

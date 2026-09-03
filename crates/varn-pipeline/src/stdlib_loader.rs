@@ -1,8 +1,8 @@
-use varn_checker::module_resolver::ImportResolver;
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use varn_checker::module_resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
 use varn_core::{ImportSpecifier, ModuleId};
@@ -198,8 +198,7 @@ fn compile_source_inner(
     reject_type_errors: bool,
 ) -> Result<FunctionProto, String> {
     let program = crate::quiet_parse::parse_module(source, path, "")?;
-    let check =
-        crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, r));
+    let check = crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, r));
     if reject_type_errors && check.diagnostics.has_errors() {
         // The stdlib goes through the same checker as user code. Silently
         // dropping these diagnostics let `std/*.vn` carry types the backend

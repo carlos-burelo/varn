@@ -17,9 +17,9 @@ pub fn build_goto_implementation(
 
     // Check if target is an interface or class in current file
     let (is_interface, is_class_or_method) = {
-        let is_iface = state.symbols().any(|s| {
-            s.name() == *target_name && s.kind() == varn_checker::SymbolKind::Interface
-        });
+        let is_iface = state
+            .symbols()
+            .any(|s| s.name() == *target_name && s.kind() == varn_checker::SymbolKind::Interface);
         let is_cls = state.symbols().any(|s| {
             s.name() == *target_name
                 && matches!(
@@ -72,10 +72,7 @@ fn find_interface_implementations(
     for stmt in &program.body {
         if let StmtKind::Decl(decl) = &stmt.kind {
             if let Decl::Class(c) = decl.as_ref() {
-                let implements_iface = c
-                    .implements
-                    .iter()
-                    .any(|t| type_node_name(t) == iface_name);
+                let implements_iface = c.implements.iter().any(|t| type_node_name(t) == iface_name);
 
                 if implements_iface {
                     locations.push(class_location(c, url));

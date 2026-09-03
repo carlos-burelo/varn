@@ -1,8 +1,8 @@
-use varn_checker::module_resolver::ImportResolver;
 use super::check::CheckResult;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use varn_checker::module_resolver::ImportResolver;
 use varn_compiler::FunctionProto;
 use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;

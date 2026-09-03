@@ -29,14 +29,34 @@ p.
     let state = run_pipeline(source.to_string(), uri);
 
     // Trigger completion right after 'p.' on line 7, col 2
-    let (completions, _) = build_completion_response(&state, 7, 2, Some("."), "trigger_character".to_string(), None);
-    assert!(completions.is_some(), "Completion after dot on 'p.' should return candidate members");
+    let (completions, _) = build_completion_response(
+        &state,
+        7,
+        2,
+        Some("."),
+        "trigger_character".to_string(),
+        None,
+    );
+    assert!(
+        completions.is_some(),
+        "Completion after dot on 'p.' should return candidate members"
+    );
     let items = completions.unwrap();
     let names: Vec<String> = match items {
-        tower_lsp::lsp_types::CompletionResponse::Array(arr) => arr.into_iter().map(|i| i.label).collect(),
-        tower_lsp::lsp_types::CompletionResponse::List(list) => list.items.into_iter().map(|i| i.label).collect(),
+        tower_lsp::lsp_types::CompletionResponse::Array(arr) => {
+            arr.into_iter().map(|i| i.label).collect()
+        }
+        tower_lsp::lsp_types::CompletionResponse::List(list) => {
+            list.items.into_iter().map(|i| i.label).collect()
+        }
     };
 
-    assert!(names.contains(&"name".to_string()), "Completion should suggest 'name'");
-    assert!(names.contains(&"age".to_string()), "Completion should suggest 'age'");
+    assert!(
+        names.contains(&"name".to_string()),
+        "Completion should suggest 'name'"
+    );
+    assert!(
+        names.contains(&"age".to_string()),
+        "Completion should suggest 'age'"
+    );
 }

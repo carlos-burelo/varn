@@ -344,7 +344,11 @@ fn dot_receiver_source_fallback(
     let dot_tok = state
         .tokens
         .iter()
-        .filter(|t| t.line == line && t.col < col && (t.kind == TokenKind::Dot || t.kind == TokenKind::QuestionDot))
+        .filter(|t| {
+            t.line == line
+                && t.col < col
+                && (t.kind == TokenKind::Dot || t.kind == TokenKind::QuestionDot)
+        })
         .max_by_key(|t| t.col)?;
 
     let receiver_tok = state
@@ -354,7 +358,10 @@ fn dot_receiver_source_fallback(
         .max_by_key(|t| t.col)?;
 
     if receiver_tok.kind == TokenKind::Identifier {
-        if let Some((sid, ty)) = state.db.resolve_at(&receiver_tok.lexeme, receiver_tok.offset) {
+        if let Some((sid, ty)) = state
+            .db
+            .resolve_at(&receiver_tok.lexeme, receiver_tok.offset)
+        {
             if sid < state.db.arena.len() {
                 let sym = state.db.arena.get(sid);
                 if matches!(

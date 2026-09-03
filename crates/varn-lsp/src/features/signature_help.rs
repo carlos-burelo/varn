@@ -110,7 +110,12 @@ fn resolve_callee_signature(
         if let TypeKind::Fn(ft) = &mem_res.member_ty.0 {
             let params_str = format_params(ft);
             let ret_str = ft.return_type.to_string();
-            return build_signature_response(&mem_res.member_name, &params_str, &ret_str, active_param);
+            return build_signature_response(
+                &mem_res.member_name,
+                &params_str,
+                &ret_str,
+                active_param,
+            );
         }
     }
 

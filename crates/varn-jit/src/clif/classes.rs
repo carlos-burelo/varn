@@ -65,7 +65,13 @@ pub(super) fn emit_class_member_op(
             b,
             actx.cc,
             actx.helpers.inherit,
-            &[actx.exec_ctx, class_tag, class_payload, super_tag, super_payload],
+            &[
+                actx.exec_ctx,
+                class_tag,
+                class_payload,
+                super_tag,
+                super_payload,
+            ],
         );
         reload_boxed(b, actx, state, &regs);
         return Ok(());

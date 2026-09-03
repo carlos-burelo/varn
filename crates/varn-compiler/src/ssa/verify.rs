@@ -359,7 +359,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Int {
-                    return Err(format!("ConstInt defines v{}: {dty:?}, expected Int", dest.0));
+                    return Err(format!(
+                        "ConstInt defines v{}: {dty:?}, expected Int",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -367,7 +370,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Float {
-                    return Err(format!("ConstFloat defines v{}: {dty:?}, expected Float", dest.0));
+                    return Err(format!(
+                        "ConstFloat defines v{}: {dty:?}, expected Float",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -375,7 +381,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Bool {
-                    return Err(format!("ConstBool defines v{}: {dty:?}, expected Bool", dest.0));
+                    return Err(format!(
+                        "ConstBool defines v{}: {dty:?}, expected Bool",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -383,7 +392,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Str {
-                    return Err(format!("ConstStr defines v{}: {dty:?}, expected Str", dest.0));
+                    return Err(format!(
+                        "ConstStr defines v{}: {dty:?}, expected Str",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -391,7 +403,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Int {
-                    return Err(format!("ConstChar defines v{}: {dty:?}, expected Int", dest.0));
+                    return Err(format!(
+                        "ConstChar defines v{}: {dty:?}, expected Int",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -399,7 +414,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != HirType::Bool {
-                    return Err(format!("IsNull defines v{}: {dty:?}, expected Bool", dest.0));
+                    return Err(format!(
+                        "IsNull defines v{}: {dty:?}, expected Bool",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -407,7 +425,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 if dty != *ty {
-                    return Err(format!("Cast defines v{}: {dty:?}, expected {ty:?}", dest.0));
+                    return Err(format!(
+                        "Cast defines v{}: {dty:?}, expected {ty:?}",
+                        dest.0
+                    ));
                 }
             }
         }
@@ -424,4 +445,3 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
     }
     Ok(())
 }
-

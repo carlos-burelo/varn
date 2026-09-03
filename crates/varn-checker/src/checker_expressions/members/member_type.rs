@@ -171,15 +171,10 @@ impl<'r> Checker<'r> {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(self.resolver.stdlib_exports(
-                                origin_path,
-                            ))
+                            Some(self.resolver.stdlib_exports(origin_path))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(self.resolver.module_exports(
-                                origin_path,
-                                &mut visiting,
-                            ))
+                            Some(self.resolver.module_exports(origin_path, &mut visiting))
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
@@ -219,8 +214,7 @@ impl<'r> Checker<'r> {
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
-                    if let Some(ext_bind) =
-                        self.resolver.find_bind_for_type(name, &origin_modules)
+                    if let Some(ext_bind) = self.resolver.find_bind_for_type(name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -236,10 +230,7 @@ impl<'r> Checker<'r> {
                             }
                         }
                         if let Some(ext_bind) =
-                            self.resolver.find_bind_for_type(
-                                name,
-                                &origin_modules,
-                            )
+                            self.resolver.find_bind_for_type(name, &origin_modules)
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if let Some((_, ty)) =
@@ -298,8 +289,7 @@ impl<'r> Checker<'r> {
                 }
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-                let ext_bind_opt =
-                    self.resolver.find_bind_for_type(name, &origin_modules);
+                let ext_bind_opt = self.resolver.find_bind_for_type(name, &origin_modules);
                 let candidates: Box<dyn Iterator<Item = Rc<crate::binder::BindResult>>> =
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
@@ -307,9 +297,7 @@ impl<'r> Checker<'r> {
                         Box::new(
                             varn_modules::std_module_ids()
                                 .into_iter()
-                                .filter_map(|spec| {
-                                    self.resolver.stdlib_bind(spec)
-                                }),
+                                .filter_map(|spec| self.resolver.stdlib_bind(spec)),
                         )
                     } else {
                         Box::new(std::iter::empty())
@@ -348,7 +336,13 @@ impl<'r> Checker<'r> {
                 // an unbound `T`.
                 self.find_member_info_uncached(&base, key, bind)
                     .map(|(member_ty, sym)| {
-                        let mapping = generic_mapping(self.resolver, name.as_ref(), args, origin.as_ref(), bind);
+                        let mapping = generic_mapping(
+                            self.resolver,
+                            name.as_ref(),
+                            args,
+                            origin.as_ref(),
+                            bind,
+                        );
                         if mapping.is_empty() {
                             (member_ty, sym)
                         } else {
@@ -488,15 +482,10 @@ impl<'r> Checker<'r> {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(self.resolver.stdlib_exports(
-                                origin_path,
-                            ))
+                            Some(self.resolver.stdlib_exports(origin_path))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(self.resolver.module_exports(
-                                origin_path,
-                                &mut visiting,
-                            ))
+                            Some(self.resolver.module_exports(origin_path, &mut visiting))
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
@@ -535,7 +524,13 @@ impl<'r> Checker<'r> {
                     if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
                         // Same substitution as `find_member_info_uncached`: the
                         // member's type is written in the class's parameters.
-                        let mapping = generic_mapping(self.resolver, name.as_ref(), args, origin.as_ref(), bind);
+                        let mapping = generic_mapping(
+                            self.resolver,
+                            name.as_ref(),
+                            args,
+                            origin.as_ref(),
+                            bind,
+                        );
                         return Some(ObjectTypeMember::Property {
                             name: m.name.clone(),
                             ty: if mapping.is_empty() {

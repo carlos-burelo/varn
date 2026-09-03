@@ -66,4 +66,3 @@ pub fn build_references(
         Some(locs)
     }
 }
-

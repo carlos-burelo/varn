@@ -218,7 +218,11 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
 
     match op {
         o if o == StrOp::At as u8 => {
-            let len = if ascii { s.len() as i64 } else { char_len(s, ascii) as i64 };
+            let len = if ascii {
+                s.len() as i64
+            } else {
+                char_len(s, ascii) as i64
+            };
             let idx = req_int(args, 1, heap);
             let idx = if idx < 0 { len + idx } else { idx };
             if idx < 0 || idx >= len {
@@ -238,7 +242,11 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             let a = (start.max(0) as usize).min(len);
             let b = end.map(|e| e.max(0) as usize).unwrap_or(len).min(len);
             let (si, ei) = if a <= b { (a, b) } else { (b, a) };
-            let (bs, be) = if ascii { (si, ei) } else { char_range_to_bytes(s, ascii, si, ei) };
+            let (bs, be) = if ascii {
+                (si, ei)
+            } else {
+                char_range_to_bytes(s, ascii, si, ei)
+            };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         o if o == StrOp::Slice as u8 => {
@@ -249,7 +257,11 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             let ei = normalize_idx(end.unwrap_or(len as i64), len as i64)
                 .min(len)
                 .max(si);
-            let (bs, be) = if ascii { (si, ei) } else { char_range_to_bytes(s, ascii, si, ei) };
+            let (bs, be) = if ascii {
+                (si, ei)
+            } else {
+                char_range_to_bytes(s, ascii, si, ei)
+            };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         o if o == StrOp::Substr as u8 => {
@@ -263,7 +275,11 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             };
             let count = length.map(|c| c.max(0) as usize).unwrap_or(len - st);
             let ei = (st + count).min(len);
-            let (bs, be) = if ascii { (st, ei) } else { char_range_to_bytes(s, ascii, st, ei) };
+            let (bs, be) = if ascii {
+                (st, ei)
+            } else {
+                char_range_to_bytes(s, ascii, st, ei)
+            };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         _ => Err(RuntimeError::new(format!("str intrinsic: unknown op {op}"))),

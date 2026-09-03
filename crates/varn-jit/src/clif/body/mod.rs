@@ -2,7 +2,9 @@
 
 pub(crate) mod op_dispatch;
 
-use cranelift_codegen::ir::{types, Function, InstBuilder, MemFlags, UserFuncName};
+use cranelift_codegen::ir::{
+    condcodes::IntCC, types, Function, InstBuilder, MemFlags, UserFuncName, Value,
+};
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use std::collections::HashMap;
@@ -15,9 +17,7 @@ use super::abi::raw_signature;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
-use super::emit::{
-    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, wrap_i48,
-};
+use super::emit::{box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, wrap_i48};
 use super::fields;
 use super::floats;
 use super::generic;
@@ -27,6 +27,54 @@ use super::lower::ClifLinker;
 use super::piece::{compile_piece, CompiledPiece};
 use super::{preheader, scan, vars};
 use crate::JitHelpers;
+
+fn emit_truthy_fast(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    exec_ctx: Value,
+    logical_not: usize,
+    v: Value,
+) -> Value {
+    let (v_tag, v_payload) = b.ins().isplit(v);
+    let kind = b.ins().band_imm(v_tag, 0xFF);
+    let is_float = b
+        .ins()
+        .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_FLOAT as i64);
+
+    let res_var = b.declare_var(types::I64);
+    let slow_block = b.create_block();
+    let fast_block = b.create_block();
+    let merge_block = b.create_block();
+
+    b.ins().brif(is_float, slow_block, &[], fast_block, &[]);
+
+    // Fast block: for bool, int, heap, sso, null
+    b.switch_to_block(fast_block);
+    let is_heap = b
+        .ins()
+        .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_HEAP as i64);
+    let not_null = b.ins().icmp_imm(
+        IntCC::NotEqual,
+        kind,
+        varn_types::vm_value::KIND_NULL as i64,
+    );
+    let payload_nz = b.ins().icmp_imm(IntCC::NotEqual, v_payload, 0);
+    let non_zero_val = b.ins().band(not_null, payload_nz);
+    let fast_b = b.ins().bor(is_heap, non_zero_val);
+    let fast_res = b.ins().uextend(types::I64, fast_b);
+    b.def_var(res_var, fast_res);
+    b.ins().jump(merge_block, &[]);
+
+    // Slow block: float
+    b.switch_to_block(slow_block);
+    let falsy = call_helper(b, cc, logical_not, &[exec_ctx, v_tag, v_payload]);
+    let slow_res = b.ins().bxor_imm(falsy, 1);
+    b.def_var(res_var, slow_res);
+    b.ins().jump(merge_block, &[]);
+
+    b.switch_to_block(merge_block);
+    b.use_var(res_var)
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_raw(
@@ -81,14 +129,7 @@ pub(super) fn lower_raw(
         str_caches,
         obj_caches,
         all_caches,
-    } = vars::declare(
-        &mut b,
-        proto,
-        &regions,
-        code,
-        pool,
-        want_roots,
-    );
+    } = vars::declare(&mut b, proto, &regions, code, pool, want_roots);
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -178,14 +219,17 @@ pub(super) fn lower_raw(
             let fb = alloc::frame_base_addr(&mut b, actx);
             if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
                 let boxed_p = super::emit::box_int(&mut b, p);
-                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                b.ins()
+                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
                 let boxed_p = super::emit::box_bool(&mut b, p);
-                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                b.ins()
+                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
                 let f = b.use_var(vars[r]);
                 let boxed_p = super::emit::box_f64(&mut b, f);
-                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                b.ins()
+                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
             }
         }
     }
@@ -385,10 +429,7 @@ pub(super) fn lower_raw(
                         } else {
                             box_or_pass(&mut b, &vars, &state, first_reg)
                         };
-                        let (v_tag, v_payload) = b.ins().isplit(v);
-                        let falsy =
-                            call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v_tag, v_payload]);
-                        b.ins().bxor_imm(falsy, 1)
+                        emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
                     }
                     _ => {
                         if meta_is_int(&proto.register_meta, first_reg) {
@@ -399,10 +440,7 @@ pub(super) fn lower_raw(
                             } else {
                                 box_or_pass(&mut b, &vars, &state, first_reg)
                             };
-                            let (v_tag, v_payload) = b.ins().isplit(v);
-                            let falsy =
-                                call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v_tag, v_payload]);
-                            b.ins().bxor_imm(falsy, 1)
+                            emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
                         }
                     }
                 };

@@ -169,12 +169,7 @@ pub fn build_code_lenses(
     lenses
 }
 
-fn count_references(
-    state: &DocumentState,
-    workspace: &Workspace,
-    line: u32,
-    col: u32,
-) -> usize {
+fn count_references(state: &DocumentState, workspace: &Workspace, line: u32, col: u32) -> usize {
     crate::features::references::build_references(state, workspace, line, col)
         .map(|locs| locs.len())
         .unwrap_or(0)

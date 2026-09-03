@@ -1,0 +1,1395 @@
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 41, upvalues: 0)
+  [2mconstants (90)[0m
+  [2m[000][0m [34mfn jsonRes[0m(arity=3)
+  [2m[001][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+  [2m[002][0m [32m"std:json"[0m
+  [2m[003][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+  [2m[004][0m [32m"Route"[0m
+  [2m[005][0m [32m"method"[0m
+  [2m[006][0m [32m"segments"[0m
+  [2m[007][0m [32m"handler"[0m
+  [2m[008][0m [34mfn constructor[0m(arity=4)
+  [2m[009][0m [32m"constructor"[0m
+  [2m[010][0m [34mfn match[0m(arity=3)
+  [2m[011][0m [32m"match"[0m
+  [2m[012][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Route"[0m
+  [2m[013][0m [32m"ReqContext"[0m
+  [2m[014][0m [32m"url"[0m
+  [2m[015][0m [32m"path"[0m
+  [2m[016][0m [32m"headers"[0m
+  [2m[017][0m [32m"params"[0m
+  [2m[018][0m [32m"query"[0m
+  [2m[019][0m [32m"user"[0m
+  [2m[020][0m [34mfn constructor[0m(arity=4)
+  [2m[021][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ReqContext"[0m
+  [2m[022][0m [32m"ResContext"[0m
+  [2m[023][0m [32m"status"[0m
+  [2m[024][0m [32m"body"[0m
+  [2m[025][0m [34mfn constructor[0m(arity=4)
+  [2m[026][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+  [2m[027][0m [32m"Router"[0m
+  [2m[028][0m [32m"routes"[0m
+  [2m[029][0m [34mfn constructor[0m(arity=1)
+  [2m[030][0m [34mfn add[0m(arity=4)
+  [2m[031][0m [32m"add"[0m
+  [2m[032][0m [34mfn dispatch[0m(arity=2)
+  [2m[033][0m [32m"dispatch"[0m
+  [2m[034][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Router"[0m
+  [2m[035][0m [32m"GET"[0m
+  [2m[036][0m [32m"/api/v1/health"[0m
+  [2m[037][0m [34mfn <arrow>[0m(arity=2)
+  [2m[038][0m [32m"/api/v1/users"[0m
+  [2m[039][0m [34mfn <arrow>[0m(arity=2)
+  [2m[040][0m [32m"POST"[0m
+  [2m[041][0m [34mfn <arrow>[0m(arity=2)
+  [2m[042][0m [32m"/api/v1/users/:id"[0m
+  [2m[043][0m [34mfn <arrow>[0m(arity=2)
+  [2m[044][0m [32m"PUT"[0m
+  [2m[045][0m [34mfn <arrow>[0m(arity=2)
+  [2m[046][0m [32m"DELETE"[0m
+  [2m[047][0m [34mfn <arrow>[0m(arity=2)
+  [2m[048][0m [32m"/api/v1/users/:id/orders"[0m
+  [2m[049][0m [34mfn <arrow>[0m(arity=2)
+  [2m[050][0m [34mfn <arrow>[0m(arity=2)
+  [2m[051][0m [32m"/api/v1/users/:id/orders/:orderId"[0m
+  [2m[052][0m [34mfn <arrow>[0m(arity=2)
+  [2m[053][0m [32m"/api/v1/products"[0m
+  [2m[054][0m [34mfn <arrow>[0m(arity=2)
+  [2m[055][0m [32m"/api/v1/products/:id"[0m
+  [2m[056][0m [34mfn <arrow>[0m(arity=2)
+  [2m[057][0m [34mfn <arrow>[0m(arity=2)
+  [2m[058][0m [32m"/api/v1/categories"[0m
+  [2m[059][0m [34mfn <arrow>[0m(arity=2)
+  [2m[060][0m [32m"/api/v1/categories/:id/products"[0m
+  [2m[061][0m [34mfn <arrow>[0m(arity=2)
+  [2m[062][0m [32m"/api/v1/cart/:userId"[0m
+  [2m[063][0m [34mfn <arrow>[0m(arity=2)
+  [2m[064][0m [32m"/api/v1/cart/:userId/items"[0m
+  [2m[065][0m [34mfn <arrow>[0m(arity=2)
+  [2m[066][0m [32m"/api/v1/cart/:userId/items/:itemId"[0m
+  [2m[067][0m [34mfn <arrow>[0m(arity=2)
+  [2m[068][0m [32m"/api/v1/checkout/:userId"[0m
+  [2m[069][0m [34mfn <arrow>[0m(arity=2)
+  [2m[070][0m [32m"/api/v1/analytics/overview"[0m
+  [2m[071][0m [34mfn <arrow>[0m(arity=2)
+  [2m[072][0m [32m"/api/v1/system/metrics"[0m
+  [2m[073][0m [34mfn <arrow>[0m(arity=2)
+  [2m[074][0m [32m"/api/v1/users?page=2"[0m
+  [2m[075][0m [32m"/api/v1/users/42"[0m
+  [2m[076][0m [32m"/api/v1/users/42/orders"[0m
+  [2m[077][0m [32m"/api/v1/users/42/orders/101"[0m
+  [2m[078][0m [32m"/api/v1/products/505"[0m
+  [2m[079][0m [32m"/api/v1/categories/12/products"[0m
+  [2m[080][0m [32m"/api/v1/cart/88/items/99"[0m
+  [2m[081][0m [32m100000[0m
+  [2m[082][0m [32m"Bearer token_secret_"[0m
+  [2m[083][0m [32m"application/json"[0m
+  [2m[084][0m [32m"VarnBench/1.0"[0m
+  [2m[085][0m [2mshape[3][0m
+  [2m[086][0m [32m"print"[0m
+  [2m[087][0m [32m"HTTP Routing: Processed "[0m
+  [2m[088][0m [32m" reqs, Success = "[0m
+  [2m[089][0m [32m", Total Response Bytes = "[0m
+  [2mcode (621) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = static_fn[0]  [2m;[0m [34m→ fn jsonRes[0m
+  0002 │   1 │ [36mDefineGlobal        [0m │ def global[1] = r1  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+  0005 │   1 │ [36mLoadModule          [0m │ r1 = load module[2]  [2m;[0m [32m"std:json"[0m
+  0007 │   1 │ [36mLoadModuleSlot      [0m │ r2 = load module slot r1[0]
+  0010 │   1 │ [36mDefineGlobal        [0m │ def global[3] = r2  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+  0013 │   1 │ [34mMakeClass           [0m │ r1 = class[4] (raw=013f 0000 0004)  [2m;[0m [32m"Route"[0m
+  0016 │   1 │ [34mDeclareField        [0m │ r1 field[5]  [2m;[0m [32m"method"[0m
+  0019 │   1 │ [34mDeclareField        [0m │ r1 field[6]  [2m;[0m [32m"segments"[0m
+  0022 │   1 │ [34mDeclareField        [0m │ r1 field[7]  [2m;[0m [32m"handler"[0m
+  0025 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[8]  [2m;[0m [34m→ fn constructor[0m
+  0027 │   1 │ [34mMethod              [0m │ r1[9] = r3  [2m;[0m [32m"constructor"[0m
+  0030 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[10]  [2m;[0m [34m→ fn match[0m
+  0032 │   1 │ [34mMethod              [0m │ r1[11] = r3  [2m;[0m [32m"match"[0m
+  0035 │   1 │ [36mDefineGlobal        [0m │ def global[12] = r1  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Route"[0m
+  0038 │   1 │ [34mMakeClass           [0m │ r1 = class[13] (raw=013f 0000 000d)  [2m;[0m [32m"ReqContext"[0m
+  0041 │   1 │ [34mDeclareField        [0m │ r1 field[5]  [2m;[0m [32m"method"[0m
+  0044 │   1 │ [34mDeclareField        [0m │ r1 field[14]  [2m;[0m [32m"url"[0m
+  0047 │   1 │ [34mDeclareField        [0m │ r1 field[15]  [2m;[0m [32m"path"[0m
+  0050 │   1 │ [34mDeclareField        [0m │ r1 field[16]  [2m;[0m [32m"headers"[0m
+  0053 │   1 │ [34mDeclareField        [0m │ r1 field[17]  [2m;[0m [32m"params"[0m
+  0056 │   1 │ [34mDeclareField        [0m │ r1 field[18]  [2m;[0m [32m"query"[0m
+  0059 │   1 │ [34mDeclareField        [0m │ r1 field[19]  [2m;[0m [32m"user"[0m
+  0062 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[20]  [2m;[0m [34m→ fn constructor[0m
+  0064 │   1 │ [34mMethod              [0m │ r1[9] = r3  [2m;[0m [32m"constructor"[0m
+  0067 │   1 │ [36mDefineGlobal        [0m │ def global[21] = r1  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ReqContext"[0m
+  0070 │   1 │ [34mMakeClass           [0m │ r1 = class[22] (raw=013f 0000 0016)  [2m;[0m [32m"ResContext"[0m
+  0073 │   1 │ [34mDeclareField        [0m │ r1 field[23]  [2m;[0m [32m"status"[0m
+  0076 │   1 │ [34mDeclareField        [0m │ r1 field[16]  [2m;[0m [32m"headers"[0m
+  0079 │   1 │ [34mDeclareField        [0m │ r1 field[24]  [2m;[0m [32m"body"[0m
+  0082 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[25]  [2m;[0m [34m→ fn constructor[0m
+  0084 │   1 │ [34mMethod              [0m │ r1[9] = r3  [2m;[0m [32m"constructor"[0m
+  0087 │   1 │ [36mDefineGlobal        [0m │ def global[26] = r1  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+  0090 │   1 │ [34mMakeClass           [0m │ r1 = class[27] (raw=013f 0000 001b)  [2m;[0m [32m"Router"[0m
+  0093 │   1 │ [34mDeclareField        [0m │ r1 field[28]  [2m;[0m [32m"routes"[0m
+  0096 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[29]  [2m;[0m [34m→ fn constructor[0m
+  0098 │   1 │ [34mMethod              [0m │ r1[9] = r3  [2m;[0m [32m"constructor"[0m
+  0101 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[30]  [2m;[0m [34m→ fn add[0m
+  0103 │   1 │ [34mMethod              [0m │ r1[31] = r3  [2m;[0m [32m"add"[0m
+  0106 │   1 │ [34mLoadStaticFn        [0m │ r3 = static_fn[32]  [2m;[0m [34m→ fn dispatch[0m
+  0108 │   1 │ [34mMethod              [0m │ r1[33] = r3  [2m;[0m [32m"dispatch"[0m
+  0111 │   1 │ [36mDefineGlobal        [0m │ def global[34] = r1  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Router"[0m
+  0114 │   1 │ [36mLoadGlobal          [0m │ r1 = global[34]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Router"[0m
+  0116 │   1 │ LoadNull            [0m │ r31
+  0117 │   1 │ [35mCall                [0m │ r3 = call r1(1 args @ r31)
+  0120 │ 154 │ [36mLoadConst           [0m │ r4 = const[35]  [2m;[0m [32m"GET"[0m
+  0122 │ 154 │ [36mLoadConst           [0m │ r5 = const[36]  [2m;[0m [32m"/api/v1/health"[0m
+  0124 │ 154 │ [34mLoadStaticFn        [0m │ r1 = static_fn[37]  [2m;[0m [34m→ fn <arrow>[0m
+  0126 │ 154 │ Move                [0m │ r31 = r4
+  0128 │ 154 │ Move                [0m │ r32 = r5
+  0130 │ 154 │ Move                [0m │ r33 = r1
+  0132 │ 154 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0136 │ 155 │ [36mLoadConst           [0m │ r6 = const[38]  [2m;[0m [32m"/api/v1/users"[0m
+  0138 │ 155 │ [34mLoadStaticFn        [0m │ r1 = static_fn[39]  [2m;[0m [34m→ fn <arrow>[0m
+  0140 │ 155 │ Move                [0m │ r31 = r4
+  0142 │ 155 │ Move                [0m │ r32 = r6
+  0144 │ 155 │ Move                [0m │ r33 = r1
+  0146 │ 155 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0150 │ 156 │ [36mLoadConst           [0m │ r7 = const[40]  [2m;[0m [32m"POST"[0m
+  0152 │ 156 │ [34mLoadStaticFn        [0m │ r1 = static_fn[41]  [2m;[0m [34m→ fn <arrow>[0m
+  0154 │ 156 │ Move                [0m │ r31 = r7
+  0156 │ 156 │ Move                [0m │ r32 = r6
+  0158 │ 156 │ Move                [0m │ r33 = r1
+  0160 │ 156 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0164 │ 157 │ [36mLoadConst           [0m │ r6 = const[42]  [2m;[0m [32m"/api/v1/users/:id"[0m
+  0166 │ 157 │ [34mLoadStaticFn        [0m │ r1 = static_fn[43]  [2m;[0m [34m→ fn <arrow>[0m
+  0168 │ 157 │ Move                [0m │ r31 = r4
+  0170 │ 157 │ Move                [0m │ r32 = r6
+  0172 │ 157 │ Move                [0m │ r33 = r1
+  0174 │ 157 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0178 │ 158 │ [36mLoadConst           [0m │ r8 = const[44]  [2m;[0m [32m"PUT"[0m
+  0180 │ 158 │ [34mLoadStaticFn        [0m │ r1 = static_fn[45]  [2m;[0m [34m→ fn <arrow>[0m
+  0182 │ 158 │ Move                [0m │ r31 = r8
+  0184 │ 158 │ Move                [0m │ r32 = r6
+  0186 │ 158 │ Move                [0m │ r33 = r1
+  0188 │ 158 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0192 │ 159 │ [36mLoadConst           [0m │ r8 = const[46]  [2m;[0m [32m"DELETE"[0m
+  0194 │ 159 │ [34mLoadStaticFn        [0m │ r1 = static_fn[47]  [2m;[0m [34m→ fn <arrow>[0m
+  0196 │ 159 │ Move                [0m │ r31 = r8
+  0198 │ 159 │ Move                [0m │ r32 = r6
+  0200 │ 159 │ Move                [0m │ r33 = r1
+  0202 │ 159 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0206 │ 160 │ [36mLoadConst           [0m │ r6 = const[48]  [2m;[0m [32m"/api/v1/users/:id/orders"[0m
+  0208 │ 160 │ [34mLoadStaticFn        [0m │ r1 = static_fn[49]  [2m;[0m [34m→ fn <arrow>[0m
+  0210 │ 160 │ Move                [0m │ r31 = r4
+  0212 │ 160 │ Move                [0m │ r32 = r6
+  0214 │ 160 │ Move                [0m │ r33 = r1
+  0216 │ 160 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0220 │ 161 │ [34mLoadStaticFn        [0m │ r1 = static_fn[50]  [2m;[0m [34m→ fn <arrow>[0m
+  0222 │ 161 │ Move                [0m │ r31 = r7
+  0224 │ 161 │ Move                [0m │ r32 = r6
+  0226 │ 161 │ Move                [0m │ r33 = r1
+  0228 │ 161 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0232 │ 162 │ [36mLoadConst           [0m │ r6 = const[51]  [2m;[0m [32m"/api/v1/users/:id/orders/:orderId"[0m
+  0234 │ 162 │ [34mLoadStaticFn        [0m │ r1 = static_fn[52]  [2m;[0m [34m→ fn <arrow>[0m
+  0236 │ 162 │ Move                [0m │ r31 = r4
+  0238 │ 162 │ Move                [0m │ r32 = r6
+  0240 │ 162 │ Move                [0m │ r33 = r1
+  0242 │ 162 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0246 │ 163 │ [36mLoadConst           [0m │ r6 = const[53]  [2m;[0m [32m"/api/v1/products"[0m
+  0248 │ 163 │ [34mLoadStaticFn        [0m │ r1 = static_fn[54]  [2m;[0m [34m→ fn <arrow>[0m
+  0250 │ 163 │ Move                [0m │ r31 = r4
+  0252 │ 163 │ Move                [0m │ r32 = r6
+  0254 │ 163 │ Move                [0m │ r33 = r1
+  0256 │ 163 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0260 │ 164 │ [36mLoadConst           [0m │ r9 = const[55]  [2m;[0m [32m"/api/v1/products/:id"[0m
+  0262 │ 164 │ [34mLoadStaticFn        [0m │ r1 = static_fn[56]  [2m;[0m [34m→ fn <arrow>[0m
+  0264 │ 164 │ Move                [0m │ r31 = r4
+  0266 │ 164 │ Move                [0m │ r32 = r9
+  0268 │ 164 │ Move                [0m │ r33 = r1
+  0270 │ 164 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0274 │ 165 │ [34mLoadStaticFn        [0m │ r1 = static_fn[57]  [2m;[0m [34m→ fn <arrow>[0m
+  0276 │ 165 │ Move                [0m │ r31 = r7
+  0278 │ 165 │ Move                [0m │ r32 = r6
+  0280 │ 165 │ Move                [0m │ r33 = r1
+  0282 │ 165 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0286 │ 166 │ [36mLoadConst           [0m │ r6 = const[58]  [2m;[0m [32m"/api/v1/categories"[0m
+  0288 │ 166 │ [34mLoadStaticFn        [0m │ r1 = static_fn[59]  [2m;[0m [34m→ fn <arrow>[0m
+  0290 │ 166 │ Move                [0m │ r31 = r4
+  0292 │ 166 │ Move                [0m │ r32 = r6
+  0294 │ 166 │ Move                [0m │ r33 = r1
+  0296 │ 166 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0300 │ 167 │ [36mLoadConst           [0m │ r6 = const[60]  [2m;[0m [32m"/api/v1/categories/:id/products"[0m
+  0302 │ 167 │ [34mLoadStaticFn        [0m │ r1 = static_fn[61]  [2m;[0m [34m→ fn <arrow>[0m
+  0304 │ 167 │ Move                [0m │ r31 = r4
+  0306 │ 167 │ Move                [0m │ r32 = r6
+  0308 │ 167 │ Move                [0m │ r33 = r1
+  0310 │ 167 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0314 │ 168 │ [36mLoadConst           [0m │ r6 = const[62]  [2m;[0m [32m"/api/v1/cart/:userId"[0m
+  0316 │ 168 │ [34mLoadStaticFn        [0m │ r1 = static_fn[63]  [2m;[0m [34m→ fn <arrow>[0m
+  0318 │ 168 │ Move                [0m │ r31 = r4
+  0320 │ 168 │ Move                [0m │ r32 = r6
+  0322 │ 168 │ Move                [0m │ r33 = r1
+  0324 │ 168 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0328 │ 169 │ [36mLoadConst           [0m │ r6 = const[64]  [2m;[0m [32m"/api/v1/cart/:userId/items"[0m
+  0330 │ 169 │ [34mLoadStaticFn        [0m │ r1 = static_fn[65]  [2m;[0m [34m→ fn <arrow>[0m
+  0332 │ 169 │ Move                [0m │ r31 = r7
+  0334 │ 169 │ Move                [0m │ r32 = r6
+  0336 │ 169 │ Move                [0m │ r33 = r1
+  0338 │ 169 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0342 │ 170 │ [36mLoadConst           [0m │ r6 = const[66]  [2m;[0m [32m"/api/v1/cart/:userId/items/:itemId"[0m
+  0344 │ 170 │ [34mLoadStaticFn        [0m │ r1 = static_fn[67]  [2m;[0m [34m→ fn <arrow>[0m
+  0346 │ 170 │ Move                [0m │ r31 = r8
+  0348 │ 170 │ Move                [0m │ r32 = r6
+  0350 │ 170 │ Move                [0m │ r33 = r1
+  0352 │ 170 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0356 │ 171 │ [36mLoadConst           [0m │ r6 = const[68]  [2m;[0m [32m"/api/v1/checkout/:userId"[0m
+  0358 │ 171 │ [34mLoadStaticFn        [0m │ r1 = static_fn[69]  [2m;[0m [34m→ fn <arrow>[0m
+  0360 │ 171 │ Move                [0m │ r31 = r7
+  0362 │ 171 │ Move                [0m │ r32 = r6
+  0364 │ 171 │ Move                [0m │ r33 = r1
+  0366 │ 171 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0370 │ 172 │ [36mLoadConst           [0m │ r6 = const[70]  [2m;[0m [32m"/api/v1/analytics/overview"[0m
+  0372 │ 172 │ [34mLoadStaticFn        [0m │ r1 = static_fn[71]  [2m;[0m [34m→ fn <arrow>[0m
+  0374 │ 172 │ Move                [0m │ r31 = r4
+  0376 │ 172 │ Move                [0m │ r32 = r6
+  0378 │ 172 │ Move                [0m │ r33 = r1
+  0380 │ 172 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0384 │ 173 │ [36mLoadConst           [0m │ r7 = const[72]  [2m;[0m [32m"/api/v1/system/metrics"[0m
+  0386 │ 173 │ [34mLoadStaticFn        [0m │ r1 = static_fn[73]  [2m;[0m [34m→ fn <arrow>[0m
+  0388 │ 173 │ Move                [0m │ r31 = r4
+  0390 │ 173 │ Move                [0m │ r32 = r7
+  0392 │ 173 │ Move                [0m │ r33 = r1
+  0394 │ 173 │ [35mInvokeVirtual       [0m │ r29 = r3.vtable[31](3 args)  [2m;[0m Literal(Str("add"))
+  0398 │ 173 │ [36mLoadConst           [0m │ r9 = const[74]  [2m;[0m [32m"/api/v1/users?page=2"[0m
+  0400 │ 173 │ [36mLoadConst           [0m │ r10 = const[75]  [2m;[0m [32m"/api/v1/users/42"[0m
+  0402 │ 173 │ [36mLoadConst           [0m │ r11 = const[76]  [2m;[0m [32m"/api/v1/users/42/orders"[0m
+  0404 │ 173 │ [36mLoadConst           [0m │ r12 = const[77]  [2m;[0m [32m"/api/v1/users/42/orders/101"[0m
+  0406 │ 173 │ [36mLoadConst           [0m │ r13 = const[78]  [2m;[0m [32m"/api/v1/products/505"[0m
+  0408 │ 173 │ [36mLoadConst           [0m │ r14 = const[79]  [2m;[0m [32m"/api/v1/categories/12/products"[0m
+  0410 │ 173 │ [36mLoadConst           [0m │ r15 = const[80]  [2m;[0m [32m"/api/v1/cart/88/items/99"[0m
+  0412 │ 173 │ Move                [0m │ r31 = r5
+  0414 │ 173 │ Move                [0m │ r32 = r9
+  0416 │ 173 │ Move                [0m │ r33 = r10
+  0418 │ 173 │ Move                [0m │ r34 = r11
+  0420 │ 173 │ Move                [0m │ r35 = r12
+  0422 │ 173 │ Move                [0m │ r36 = r13
+  0424 │ 173 │ Move                [0m │ r37 = r14
+  0426 │ 173 │ Move                [0m │ r38 = r15
+  0428 │ 173 │ Move                [0m │ r39 = r6
+  0430 │ 173 │ Move                [0m │ r40 = r7
+  0432 │ 173 │ [34mBuildArray          [0m │ r1 = [r31..+10]
+  0435 │ 173 │ Move                [0m │ r31 = r4
+  0437 │ 173 │ Move                [0m │ r32 = r4
+  0439 │ 173 │ Move                [0m │ r33 = r4
+  0441 │ 173 │ Move                [0m │ r34 = r4
+  0443 │ 173 │ Move                [0m │ r35 = r4
+  0445 │ 173 │ Move                [0m │ r36 = r4
+  0447 │ 173 │ Move                [0m │ r37 = r4
+  0449 │ 173 │ Move                [0m │ r38 = r8
+  0451 │ 173 │ Move                [0m │ r39 = r4
+  0453 │ 173 │ Move                [0m │ r40 = r4
+  0455 │ 173 │ [34mBuildArray          [0m │ r16 = [r31..+10]
+  0458 │ 173 │ [34mBuildArray          [0m │ r17 = [r31..+0]
+  0461 │ 192 │ [36mLoadIntZero         [0m │ r18 = 0
+  0462 │ 192 │ [36mLoadConst           [0m │ r19 = const[81]  [2m;[0m [32m100000[0m
+  0464 │ 192 │ [32mLtInt               [0m │ r20 = r18 op r19
+  0466 │ 192 │ [33mJumpIfFalse         [0m │ r20 → +50
+  0469 │ 193 │ [36mLoadInt             [0m │ r19 = 10
+  0471 │ 193 │ [32mModInt              [0m │ r21 = r18 op r19
+  0473 │ 194 │ [36mLoadConst           [0m │ r4 = const[82]  [2m;[0m [32m"Bearer token_secret_"[0m
+  0475 │ 194 │ [36mLoadInt             [0m │ r19 = 1000
+  0477 │ 194 │ [32mModInt              [0m │ r22 = r18 op r19
+  0479 │ 194 │ [32mStrConcat           [0m │ r5 = r4 op r22
+  0481 │ 194 │ [36mLoadConst           [0m │ r4 = const[83]  [2m;[0m [32m"application/json"[0m
+  0483 │ 194 │ [36mLoadConst           [0m │ r6 = const[84]  [2m;[0m [32m"VarnBench/1.0"[0m
+  0485 │ 194 │ Move                [0m │ r31 = r5
+  0487 │ 194 │ Move                [0m │ r32 = r4
+  0489 │ 194 │ Move                [0m │ r33 = r6
+  0491 │ 194 │ [34mBuildObjectWithShape[0m │ r23 = shape[85] vals@r31
+  0494 │ 199 │ [36mLoadGlobal          [0m │ r24 = global[21]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ReqContext"[0m
+  0496 │ 199 │ ArrayGetIndex       [0m │ r4 = r16[r21]
+  0498 │ 199 │ ArrayGetIndex       [0m │ r5 = r1[r21]
+  0500 │ 199 │ LoadNull            [0m │ r31
+  0501 │ 199 │ Move                [0m │ r32 = r4
+  0503 │ 199 │ Move                [0m │ r33 = r5
+  0505 │ 199 │ Move                [0m │ r34 = r23
+  0507 │ 199 │ [35mCall                [0m │ r25 = call r24(4 args @ r31)
+  0510 │ 199 │ ArrayPush           [0m │ r17[].push r25
+  0512 │ 199 │ [32mAddImm              [0m │ r21 = r18 + 1
+  0514 │ 199 │ Move                [0m │ r18 = r21
+  0516 │ 199 │ [33mLoop                [0m │ → +57
+  0519 │ 199 │ [36mLoadIntZero         [0m │ r18 = 0
+  0520 │ 206 │ Move                [0m │ r19 = r18
+  0522 │ 206 │ Move                [0m │ r21 = r18
+  0524 │ 206 │ ArrayLength         [0m │ r22 = r17
+  0526 │ 206 │ [32mLtInt               [0m │ r20 = r18 op r22
+  0528 │ 206 │ [33mJumpIfFalse         [0m │ r20 → +58
+  0531 │ 207 │ ArrayGetIndex       [0m │ r1 = r17[r18]
+  0533 │ 207 │ Move                [0m │ r31 = r1
+  0535 │ 207 │ [35mInvokeVirtual       [0m │ r16 = r3.vtable[33](1 args)  [2m;[0m Literal(Str("dispatch"))
+  0539 │ 208 │ GetFixedField       [0m │ r22 = r16.fixed[0]
+  0542 │ 208 │ [36mLoadInt             [0m │ r26 = 200
+  0544 │ 208 │ [32mEqInt               [0m │ r20 = r22 op r26
+  0546 │ 208 │ [33mJumpIfFalse         [0m │ r20 → +3
+  0549 │ 208 │ [33mJump                [0m │ → +7
+  0552 │ 208 │ GetFixedField       [0m │ r22 = r16.fixed[0]
+  0555 │ 208 │ [36mLoadInt             [0m │ r26 = 201
+  0557 │ 208 │ [32mEqInt               [0m │ r20 = r22 op r26
+  0559 │ 208 │ [33mJumpIfFalse         [0m │ r20 → +7
+  0562 │ 209 │ [32mAddImm              [0m │ r26 = r19 + 1
+  0564 │ 209 │ Move                [0m │ r22 = r26
+  0566 │ 209 │ [33mJump                [0m │ → +2
+  0569 │ 208 │ Move                [0m │ r22 = r19
+  0571 │ 211 │ GetFixedField       [0m │ r4 = r16.fixed[2]
+  0574 │ 211 │ StrLength           [0m │ r26 = r4
+  0576 │ 211 │ [32mAddInt              [0m │ r27 = r21 op r26
+  0578 │ 211 │ [32mAddImm              [0m │ r28 = r18 + 1
+  0580 │ 211 │ Move                [0m │ r18 = r28
+  0582 │ 211 │ Move                [0m │ r19 = r22
+  0584 │ 211 │ Move                [0m │ r21 = r27
+  0586 │ 211 │ [33mLoop                [0m │ → +65
+  0589 │ 214 │ [36mLoadGlobal          [0m │ r1 = global[86]  [2m;[0m [32m"print"[0m
+  0591 │ 214 │ [36mLoadConst           [0m │ r4 = const[87]  [2m;[0m [32m"HTTP Routing: Processed "[0m
+  0593 │ 214 │ ArrayLength         [0m │ r18 = r17
+  0595 │ 214 │ [32mStrConcat           [0m │ r5 = r4 op r18
+  0597 │ 214 │ [36mLoadConst           [0m │ r4 = const[88]  [2m;[0m [32m" reqs, Success = "[0m
+  0599 │ 214 │ [32mStrConcat           [0m │ r6 = r5 op r4
+  0601 │ 214 │ [32mStrConcat           [0m │ r4 = r6 op r19
+  0603 │ 214 │ [36mLoadConst           [0m │ r5 = const[89]  [2m;[0m [32m", Total Response Bytes = "[0m
+  0605 │ 214 │ [32mStrConcat           [0m │ r6 = r4 op r5
+  0607 │ 214 │ [32mStrConcat           [0m │ r4 = r6 op r21
+  0609 │ 214 │ LoadNull            [0m │ r31
+  0610 │ 214 │ Move                [0m │ r32 = r4
+  0612 │ 214 │ [35mCall                [0m │ r29 = call r1(2 args @ r31)
+  0615 │ 214 │ LoadNull            [0m │ r30
+  0616 │ 214 │ [33mReturn              [0m │ r30
+  0618 │   1 │ LoadNull            [0m │ r30
+  0619 │   1 │ [33mReturn              [0m │ r30
+[2marray-hoist loop diagnostics (2 loops)[0m
+  [2m@0462[0m..[2m@0516[0m  [31mblocked[0m: body has an allocating/call-shaped op
+  [2m@0524[0m..[2m@0586[0m  [31mblocked[0m: body has an allocating/call-shaped op
+
+  [1mfn[0m [34mjsonRes[0m (arity: 3, regs: 16, upvalues: 0)
+    [2mconstants (6)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+    [2m[001][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+    [2m[002][0m [32m"stringify"[0m
+    [2m[003][0m [32m"application/json"[0m
+    [2m[004][0m [32m"Varn-Native-Router"[0m
+    [2m[005][0m [2mshape[2][0m
+    [2mcode (32) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 148 │ [36mLoadGlobal          [0m │ r3 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+    0002 │ 148 │ [36mLoadGlobal          [0m │ r4 = global[1]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+    0004 │ 148 │ Move                [0m │ r12 = r2
+    0006 │ 148 │ [35mCallMethod          [0m │ r5 = r4.2(1 args @ r12)  [2m;[0m Literal(Str("stringify"))
+    0010 │ 148 │ [36mLoadConst           [0m │ r6 = const[3]  [2m;[0m [32m"application/json"[0m
+    0012 │ 148 │ [36mLoadConst           [0m │ r7 = const[4]  [2m;[0m [32m"Varn-Native-Router"[0m
+    0014 │ 148 │ [34mBuildObjectWithShape[0m │ r8 = shape[5] vals@r6
+    0017 │ 148 │ LoadNull            [0m │ r12
+    0018 │ 148 │ Move                [0m │ r13 = r1
+    0020 │ 148 │ Move                [0m │ r14 = r5
+    0022 │ 148 │ Move                [0m │ r15 = r8
+    0024 │ 148 │ [35mCall                [0m │ r9 = call r3(4 args @ r12)
+    0027 │ 148 │ [33mReturn              [0m │ r9
+    0029 │ 147 │ LoadNull            [0m │ r11
+    0030 │ 147 │ [33mReturn              [0m │ r11
+
+  [1mfn[0m [34mconstructor[0m (arity: 4, regs: 16, upvalues: 0)  [2m[has_this][0m
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"/"[0m
+    [2m[001][0m [32m2370382715509543490[0m
+    [2mcode (67) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │  11 │ Move                [0m │ r4 = r0
+    0002 │  11 │ SetFixedField       [0m │ r4.fixed[0] = r1
+    0005 │  12 │ Move                [0m │ r4 = r0
+    0007 │  12 │ SetFixedField       [0m │ r4.fixed[2] = r3
+    0010 │  13 │ Move                [0m │ r4 = r0
+    0012 │  13 │ [34mBuildArray          [0m │ r5 = [r14..+0]
+    0015 │  13 │ SetFixedField       [0m │ r4.fixed[1] = r5
+    0018 │  15 │ [36mLoadConst           [0m │ r6 = const[0]  [2m;[0m [32m"/"[0m
+    0020 │  15 │ Move                [0m │ r14 = r2
+    0022 │  15 │ Move                [0m │ r15 = r6
+    0024 │  15 │ CallNativeOp        [0m │ r14 = nativeop const[1](2 args)
+    0027 │  15 │ Move                [0m │ r4 = r14
+    0029 │  16 │ [36mLoadIntZero         [0m │ r7 = 0
+    0030 │  16 │ ArrayLength         [0m │ r8 = r4
+    0032 │  16 │ [32mLtInt               [0m │ r9 = r7 op r8
+    0034 │  16 │ [33mJumpIfFalse         [0m │ r9 → +24
+    0037 │  17 │ ArrayGetIndex       [0m │ r6 = r4[r7]
+    0039 │  18 │ StrLength           [0m │ r8 = r6
+    0041 │  18 │ [36mLoadIntZero         [0m │ r10 = 0
+    0042 │  18 │ [32mGtInt               [0m │ r9 = r8 op r10
+    0044 │  18 │ [33mJumpIfFalse         [0m │ r9 → +7
+    0047 │  19 │ Move                [0m │ r5 = r0
+    0049 │  19 │ GetFixedField       [0m │ r11 = r5.fixed[1]
+    0052 │  19 │ ArrayPush           [0m │ r11[].push r6
+    0054 │  19 │ [32mAddImm              [0m │ r10 = r7 + 1
+    0056 │  19 │ Move                [0m │ r7 = r10
+    0058 │  19 │ [33mLoop                [0m │ → +31
+    0061 │  19 │ LoadNull            [0m │ r13
+    0062 │  19 │ [33mReturn              [0m │ r13
+    0064 │  10 │ LoadNull            [0m │ r13
+    0065 │  10 │ [33mReturn              [0m │ r13
+  [2marray-hoist loop diagnostics (1 loop)[0m
+    [2m@0030[0m..[2m@0058[0m  [31mblocked[0m: body has an allocating/call-shaped op
+
+  [1mfn[0m [34mmatch[0m (arity: 3, regs: 18, upvalues: 0)  [2m[has_this][0m
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"*"[0m
+    [2m[001][0m [32m":"[0m
+    [2m[002][0m [2mshape[0][0m
+    [2mcode (165) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │  25 │ Move                [0m │ r3 = r0
+    0002 │  25 │ GetFixedField       [0m │ r4 = r3.fixed[0]
+    0005 │  25 │ [36mLoadConst           [0m │ r5 = const[0]  [2m;[0m [32m"*"[0m
+    0007 │  25 │ [32mNeq                 [0m │ r6 = r4 op r5
+    0009 │  25 │ [33mJumpIfFalse         [0m │ r6 → +12
+    0012 │  25 │ Move                [0m │ r3 = r0
+    0014 │  25 │ GetFixedField       [0m │ r4 = r3.fixed[0]
+    0017 │  25 │ [32mNeq                 [0m │ r7 = r4 op r1
+    0019 │  25 │ Move                [0m │ r6 = r7
+    0021 │  25 │ [33mJump                [0m │ → +0
+    0024 │  25 │ [33mJumpIfFalse         [0m │ r6 → +3
+    0027 │  26 │ LoadNull            [0m │ r8
+    0028 │  26 │ [33mReturn              [0m │ r8
+    0030 │  28 │ Move                [0m │ r3 = r0
+    0032 │  28 │ GetFixedField       [0m │ r9 = r3.fixed[1]
+    0035 │  28 │ ArrayLength         [0m │ r10 = r9
+    0037 │  28 │ ArrayLength         [0m │ r11 = r2
+    0039 │  28 │ [32mNeqInt              [0m │ r6 = r10 op r11
+    0041 │  28 │ [33mJumpIfFalse         [0m │ r6 → +3
+    0044 │  29 │ LoadNull            [0m │ r8
+    0045 │  29 │ [33mReturn              [0m │ r8
+    0047 │  33 │ [36mLoadIntZero         [0m │ r10 = 0
+    0048 │  33 │ Move                [0m │ r3 = r0
+    0050 │  33 │ GetFixedField       [0m │ r9 = r3.fixed[1]
+    0053 │  33 │ ArrayLength         [0m │ r11 = r9
+    0055 │  33 │ [32mLtInt               [0m │ r6 = r10 op r11
+    0057 │  33 │ [33mJumpIfFalse         [0m │ r6 → +44
+    0060 │  34 │ Move                [0m │ r3 = r0
+    0062 │  34 │ GetFixedField       [0m │ r9 = r3.fixed[1]
+    0065 │  34 │ ArrayGetIndex       [0m │ r4 = r9[r10]
+    0067 │  35 │ [36mLoadConst           [0m │ r5 = const[1]  [2m;[0m [32m":"[0m
+    0069 │  35 │ Move                [0m │ r16 = r4
+    0071 │  35 │ Move                [0m │ r17 = r5
+    0073 │  35 │ Intrinsic           [0m │ r16 = intrinsic(0x18, 2 args)
+    0075 │  35 │ Move                [0m │ r6 = r16
+    0077 │  35 │ Not                 [0m │ r7 = r6
+    0079 │  35 │ [33mJumpIfFalse         [0m │ r7 → +7
+    0082 │  35 │ ArrayGetIndex       [0m │ r5 = r2[r10]
+    0084 │  35 │ [32mNeq                 [0m │ r6 = r4 op r5
+    0086 │  35 │ [33mJump                [0m │ → +2
+    0089 │  35 │ Move                [0m │ r6 = r7
+    0091 │  35 │ [33mJumpIfFalse         [0m │ r6 → +3
+    0094 │  36 │ LoadNull            [0m │ r8
+    0095 │  36 │ [33mReturn              [0m │ r8
+    0097 │  36 │ [32mAddImm              [0m │ r12 = r10 + 1
+    0099 │  36 │ Move                [0m │ r10 = r12
+    0101 │  36 │ [33mLoop                [0m │ → +56
+    0104 │  40 │ [34mBuildObjectWithShape[0m │ r3 = shape[2] vals@r16
+    0107 │  41 │ [36mLoadIntZero         [0m │ r10 = 0
+    0108 │  41 │ Move                [0m │ r9 = r0
+    0110 │  41 │ GetFixedField       [0m │ r13 = r9.fixed[1]
+    0113 │  41 │ ArrayLength         [0m │ r11 = r13
+    0115 │  41 │ [32mLtInt               [0m │ r6 = r10 op r11
+    0117 │  41 │ [33mJumpIfFalse         [0m │ r6 → +40
+    0120 │  42 │ Move                [0m │ r9 = r0
+    0122 │  42 │ GetFixedField       [0m │ r13 = r9.fixed[1]
+    0125 │  42 │ ArrayGetIndex       [0m │ r4 = r13[r10]
+    0127 │  43 │ [36mLoadConst           [0m │ r5 = const[1]  [2m;[0m [32m":"[0m
+    0129 │  43 │ Move                [0m │ r16 = r4
+    0131 │  43 │ Move                [0m │ r17 = r5
+    0133 │  43 │ Intrinsic           [0m │ r16 = intrinsic(0x18, 2 args)
+    0135 │  43 │ Move                [0m │ r6 = r16
+    0137 │  43 │ [33mJumpIfFalse         [0m │ r6 → +13
+    0140 │  44 │ [36mLoadIntOne          [0m │ r11 = 1
+    0141 │  44 │ Move                [0m │ r16 = r4
+    0143 │  44 │ Move                [0m │ r17 = r11
+    0145 │  44 │ Intrinsic           [0m │ r16 = intrinsic(0x13, 2 args)
+    0147 │  44 │ Move                [0m │ r5 = r16
+    0149 │  45 │ ArrayGetIndex       [0m │ r4 = r2[r10]
+    0151 │  45 │ SetIndex            [0m │ r3[r5] = r4
+    0153 │  45 │ [32mAddImm              [0m │ r12 = r10 + 1
+    0155 │  45 │ Move                [0m │ r10 = r12
+    0157 │  45 │ [33mLoop                [0m │ → +52
+    0160 │  48 │ [33mReturn              [0m │ r3
+    0162 │  24 │ LoadNull            [0m │ r15
+    0163 │  24 │ [33mReturn              [0m │ r15
+  [2marray-hoist loop diagnostics (2 loops)[0m
+    [2m@0048[0m..[2m@0101[0m  [31mblocked[0m: body has an allocating/call-shaped op
+    [2m@0108[0m..[2m@0157[0m  [31mblocked[0m: body has an allocating/call-shaped op
+
+  [1mfn[0m [34mconstructor[0m (arity: 4, regs: 21, upvalues: 0)  [2m[has_this][0m
+    [2mconstants (6)[0m
+    [2m[000][0m [2mshape[0][0m
+    [2m[001][0m [32m"?"[0m
+    [2m[002][0m [32m"&"[0m
+    [2m[003][0m [32m2370382715509543490[0m
+    [2m[004][0m [32m"="[0m
+    [2m[005][0m [32m"1"[0m
+    [2mcode (175) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │  62 │ Move                [0m │ r4 = r0
+    0002 │  62 │ SetFixedField       [0m │ r4.fixed[0] = r1
+    0005 │  63 │ Move                [0m │ r4 = r0
+    0007 │  63 │ SetFixedField       [0m │ r4.fixed[1] = r2
+    0010 │  64 │ Move                [0m │ r4 = r0
+    0012 │  64 │ SetFixedField       [0m │ r4.fixed[3] = r3
+    0015 │  65 │ Move                [0m │ r4 = r0
+    0017 │  65 │ [34mBuildObjectWithShape[0m │ r5 = shape[0] vals@r18
+    0020 │  65 │ SetFixedField       [0m │ r4.fixed[4] = r5
+    0023 │  66 │ Move                [0m │ r4 = r0
+    0025 │  66 │ [34mBuildObjectWithShape[0m │ r5 = shape[0] vals@r18
+    0028 │  66 │ SetFixedField       [0m │ r4.fixed[5] = r5
+    0031 │  67 │ Move                [0m │ r4 = r0
+    0033 │  67 │ LoadNull            [0m │ r6
+    0034 │  67 │ SetFixedField       [0m │ r4.fixed[6] = r6
+    0037 │  69 │ [36mLoadConst           [0m │ r7 = const[1]  [2m;[0m [32m"?"[0m
+    0039 │  69 │ Move                [0m │ r18 = r2
+    0041 │  69 │ Move                [0m │ r19 = r7
+    0043 │  69 │ Intrinsic           [0m │ r18 = intrinsic(0x16, 2 args)
+    0045 │  69 │ Move                [0m │ r8 = r18
+    0047 │  70 │ [36mLoadIntZero         [0m │ r9 = 0
+    0048 │  70 │ [32mGteInt              [0m │ r10 = r8 op r9
+    0050 │  70 │ [33mJumpIfFalse         [0m │ r10 → +111
+    0053 │  71 │ Move                [0m │ r4 = r0
+    0055 │  71 │ [36mLoadIntZero         [0m │ r9 = 0
+    0056 │  71 │ Move                [0m │ r18 = r2
+    0058 │  71 │ Move                [0m │ r19 = r9
+    0060 │  71 │ Move                [0m │ r20 = r8
+    0062 │  71 │ Intrinsic           [0m │ r18 = intrinsic(0x13, 3 args)
+    0064 │  71 │ Move                [0m │ r7 = r18
+    0066 │  71 │ SetFixedField       [0m │ r4.fixed[2] = r7
+    0069 │  72 │ [32mAddImm              [0m │ r12 = r8 + 1
+    0071 │  72 │ Move                [0m │ r18 = r2
+    0073 │  72 │ Move                [0m │ r19 = r12
+    0075 │  72 │ Intrinsic           [0m │ r18 = intrinsic(0x13, 2 args)
+    0077 │  72 │ Move                [0m │ r7 = r18
+    0079 │  73 │ [36mLoadConst           [0m │ r13 = const[2]  [2m;[0m [32m"&"[0m
+    0081 │  73 │ Move                [0m │ r18 = r7
+    0083 │  73 │ Move                [0m │ r19 = r13
+    0085 │  73 │ CallNativeOp        [0m │ r18 = nativeop const[3](2 args)
+    0088 │  73 │ Move                [0m │ r4 = r18
+    0090 │  74 │ Move                [0m │ r8 = r9
+    0092 │  74 │ ArrayLength         [0m │ r9 = r4
+    0094 │  74 │ [32mLtInt               [0m │ r10 = r8 op r9
+    0096 │  74 │ [33mJumpIfFalse         [0m │ r10 → +70
+    0099 │  75 │ ArrayGetIndex       [0m │ r7 = r4[r8]
+    0101 │  76 │ [36mLoadConst           [0m │ r13 = const[4]  [2m;[0m [32m"="[0m
+    0103 │  76 │ Move                [0m │ r18 = r7
+    0105 │  76 │ Move                [0m │ r19 = r13
+    0107 │  76 │ Intrinsic           [0m │ r18 = intrinsic(0x16, 2 args)
+    0109 │  76 │ Move                [0m │ r9 = r18
+    0111 │  77 │ [36mLoadIntZero         [0m │ r11 = 0
+    0112 │  77 │ [32mGtInt               [0m │ r10 = r9 op r11
+    0114 │  77 │ [33mJumpIfFalse         [0m │ r10 → +31
+    0117 │  78 │ Move                [0m │ r5 = r0
+    0119 │  78 │ GetFixedField       [0m │ r14 = r5.fixed[5]
+    0122 │  78 │ [36mLoadIntZero         [0m │ r11 = 0
+    0123 │  78 │ Move                [0m │ r18 = r7
+    0125 │  78 │ Move                [0m │ r19 = r11
+    0127 │  78 │ Move                [0m │ r20 = r9
+    0129 │  78 │ Intrinsic           [0m │ r18 = intrinsic(0x13, 3 args)
+    0131 │  78 │ Move                [0m │ r13 = r18
+    0133 │  78 │ [32mAddImm              [0m │ r12 = r9 + 1
+    0135 │  78 │ Move                [0m │ r18 = r7
+    0137 │  78 │ Move                [0m │ r19 = r12
+    0139 │  78 │ Intrinsic           [0m │ r18 = intrinsic(0x13, 2 args)
+    0141 │  78 │ Move                [0m │ r15 = r18
+    0143 │  78 │ SetIndex            [0m │ r14[r13] = r15
+    0145 │  78 │ [33mJump                [0m │ → +9
+    0148 │  80 │ Move                [0m │ r5 = r0
+    0150 │  80 │ GetFixedField       [0m │ r14 = r5.fixed[5]
+    0153 │  80 │ [36mLoadConst           [0m │ r13 = const[5]  [2m;[0m [32m"1"[0m
+    0155 │  80 │ SetIndex            [0m │ r14[r7] = r13
+    0157 │  80 │ [32mAddImm              [0m │ r11 = r8 + 1
+    0159 │  80 │ Move                [0m │ r8 = r11
+    0161 │  80 │ [33mLoop                [0m │ → +72
+    0164 │  84 │ Move                [0m │ r4 = r0
+    0166 │  84 │ SetFixedField       [0m │ r4.fixed[2] = r2
+    0169 │  84 │ LoadNull            [0m │ r17
+    0170 │  84 │ [33mReturn              [0m │ r17
+    0172 │  61 │ LoadNull            [0m │ r17
+    0173 │  61 │ [33mReturn              [0m │ r17
+  [2marray-hoist loop diagnostics (1 loop)[0m
+    [2m@0092[0m..[2m@0161[0m  [31mblocked[0m: body has an allocating/call-shaped op
+
+  [1mfn[0m [34mconstructor[0m (arity: 4, regs: 6, upvalues: 0)  [2m[has_this][0m
+    [2mcode (21) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │  95 │ Move                [0m │ r4 = r0
+    0002 │  95 │ SetFixedField       [0m │ r4.fixed[0] = r1
+    0005 │  96 │ Move                [0m │ r4 = r0
+    0007 │  96 │ SetFixedField       [0m │ r4.fixed[2] = r2
+    0010 │  97 │ Move                [0m │ r4 = r0
+    0012 │  97 │ SetFixedField       [0m │ r4.fixed[1] = r3
+    0015 │  97 │ LoadNull            [0m │ r5
+    0016 │  97 │ [33mReturn              [0m │ r5
+    0018 │  94 │ LoadNull            [0m │ r5
+    0019 │  94 │ [33mReturn              [0m │ r5
+
+  [1mfn[0m [34mconstructor[0m (arity: 1, regs: 3, upvalues: 0)  [2m[has_this][0m
+    [2mcode (14) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 105 │ Move                [0m │ r1 = r0
+    0002 │ 105 │ [34mBuildArray          [0m │ r2 = [r5..+0]
+    0005 │ 105 │ SetFixedField       [0m │ r1.fixed[0] = r2
+    0008 │ 105 │ LoadNull            [0m │ r2
+    0009 │ 105 │ [33mReturn              [0m │ r2
+    0011 │ 104 │ LoadNull            [0m │ r2
+    0012 │ 104 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34madd[0m (arity: 4, regs: 13, upvalues: 0)  [2m[has_this][0m
+    [2mconstants (1)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Route"[0m
+    [2mcode (25) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 109 │ Move                [0m │ r4 = r0
+    0002 │ 109 │ GetFixedField       [0m │ r5 = r4.fixed[0]
+    0005 │ 109 │ [36mLoadGlobal          [0m │ r4 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::Route"[0m
+    0007 │ 109 │ LoadNull            [0m │ r9
+    0008 │ 109 │ Move                [0m │ r10 = r1
+    0010 │ 109 │ Move                [0m │ r11 = r2
+    0012 │ 109 │ Move                [0m │ r12 = r3
+    0014 │ 109 │ [35mCall                [0m │ r6 = call r4(4 args @ r9)
+    0017 │ 109 │ ArrayPush           [0m │ r5[].push r6
+    0019 │ 109 │ LoadNull            [0m │ r8
+    0020 │ 109 │ [33mReturn              [0m │ r8
+    0022 │ 108 │ LoadNull            [0m │ r8
+    0023 │ 108 │ [33mReturn              [0m │ r8
+
+  [1mfn[0m [34mdispatch[0m (arity: 2, regs: 19, upvalues: 0)  [2m[has_this][0m
+    [2mconstants (16)[0m
+    [2m[000][0m [32m"authorization"[0m
+    [2m[001][0m [32m"Bearer "[0m
+    [2m[002][0m [32m"startsWith"[0m
+    [2m[003][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+    [2m[004][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+    [2m[005][0m [32m"Unauthorized"[0m
+    [2m[006][0m [2mshape[1][0m
+    [2m[007][0m [32m"stringify"[0m
+    [2m[008][0m [32m"application/json"[0m
+    [2m[009][0m [2mshape[1][0m
+    [2m[010][0m [32m"user_"[0m
+    [2m[011][0m [32m"slice"[0m
+    [2m[012][0m [32m"/"[0m
+    [2m[013][0m [32m2370382715509543490[0m
+    [2m[014][0m [32m"match"[0m
+    [2m[015][0m [32m"Not Found"[0m
+    [2mcode (221) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 114 │ GetFixedField       [0m │ r2 = r1.fixed[3]
+    0003 │ 114 │ [36mLoadConst           [0m │ r3 = const[0]  [2m;[0m [32m"authorization"[0m
+    0005 │ 114 │ GetIndex            [0m │ r4 = r2[r3]
+    0007 │ 115 │ LoadNull            [0m │ r5
+    0008 │ 115 │ [32mEq                  [0m │ r6 = r4 op r5
+    0010 │ 115 │ [33mJumpIfFalse         [0m │ r6 → +3
+    0013 │ 115 │ [33mJump                [0m │ → +10
+    0016 │ 115 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m"Bearer "[0m
+    0018 │ 115 │ Move                [0m │ r15 = r3
+    0020 │ 115 │ [35mCallMethod          [0m │ r5 = r4.2(1 args @ r15)  [2m;[0m Literal(Str("startsWith"))
+    0024 │ 115 │ Not                 [0m │ r6 = r5
+    0026 │ 115 │ [33mJumpIfFalse         [0m │ r6 → +34
+    0029 │ 116 │ [36mLoadGlobal          [0m │ r2 = global[3]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+    0031 │ 116 │ [36mLoadInt             [0m │ r7 = 401
+    0033 │ 116 │ [36mLoadGlobal          [0m │ r5 = global[4]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+    0035 │ 116 │ [36mLoadConst           [0m │ r3 = const[5]  [2m;[0m [32m"Unauthorized"[0m
+    0037 │ 116 │ [34mBuildObjectWithShape[0m │ r8 = shape[6] vals@r3
+    0040 │ 116 │ Move                [0m │ r15 = r8
+    0042 │ 116 │ [35mCallMethod          [0m │ r3 = r5.7(1 args @ r15)  [2m;[0m Literal(Str("stringify"))
+    0046 │ 116 │ [36mLoadConst           [0m │ r9 = const[8]  [2m;[0m [32m"application/json"[0m
+    0048 │ 116 │ [34mBuildObjectWithShape[0m │ r8 = shape[9] vals@r9
+    0051 │ 116 │ LoadNull            [0m │ r15
+    0052 │ 116 │ Move                [0m │ r16 = r7
+    0054 │ 116 │ Move                [0m │ r17 = r3
+    0056 │ 116 │ Move                [0m │ r18 = r8
+    0058 │ 116 │ [35mCall                [0m │ r10 = call r2(4 args @ r15)
+    0061 │ 116 │ [33mReturn              [0m │ r10
+    0063 │ 118 │ [36mLoadConst           [0m │ r3 = const[10]  [2m;[0m [32m"user_"[0m
+    0065 │ 118 │ [36mLoadInt             [0m │ r7 = 7
+    0067 │ 118 │ [36mLoadInt             [0m │ r11 = 12
+    0069 │ 118 │ Move                [0m │ r15 = r7
+    0071 │ 118 │ Move                [0m │ r16 = r11
+    0073 │ 118 │ [35mCallMethod          [0m │ r5 = r4.11(2 args @ r15)  [2m;[0m Literal(Str("slice"))
+    0077 │ 118 │ [32mStrConcat           [0m │ r9 = r3 op r5
+    0079 │ 118 │ SetFixedField       [0m │ r1.fixed[6] = r9
+    0082 │ 121 │ [34mBuildArray          [0m │ r2 = [r15..+0]
+    0085 │ 122 │ GetFixedField       [0m │ r3 = r1.fixed[2]
+    0088 │ 122 │ [36mLoadConst           [0m │ r9 = const[12]  [2m;[0m [32m"/"[0m
+    0090 │ 122 │ Move                [0m │ r15 = r3
+    0092 │ 122 │ Move                [0m │ r16 = r9
+    0094 │ 122 │ CallNativeOp        [0m │ r15 = nativeop const[13](2 args)
+    0097 │ 122 │ Move                [0m │ r8 = r15
+    0099 │ 123 │ [36mLoadIntZero         [0m │ r7 = 0
+    0100 │ 123 │ ArrayLength         [0m │ r11 = r8
+    0102 │ 123 │ [32mLtInt               [0m │ r6 = r7 op r11
+    0104 │ 123 │ [33mJumpIfFalse         [0m │ r6 → +19
+    0107 │ 124 │ ArrayGetIndex       [0m │ r3 = r8[r7]
+    0109 │ 125 │ StrLength           [0m │ r11 = r3
+    0111 │ 125 │ [36mLoadIntZero         [0m │ r12 = 0
+    0112 │ 125 │ [32mGtInt               [0m │ r6 = r11 op r12
+    0114 │ 125 │ [33mJumpIfFalse         [0m │ r6 → +2
+    0117 │ 126 │ ArrayPush           [0m │ r2[].push r3
+    0119 │ 126 │ [32mAddImm              [0m │ r12 = r7 + 1
+    0121 │ 126 │ Move                [0m │ r7 = r12
+    0123 │ 126 │ [33mLoop                [0m │ → +26
+    0126 │ 130 │ [36mLoadIntZero         [0m │ r7 = 0
+    0127 │ 130 │ Move                [0m │ r8 = r0
+    0129 │ 130 │ GetFixedField       [0m │ r10 = r8.fixed[0]
+    0132 │ 130 │ ArrayLength         [0m │ r11 = r10
+    0134 │ 130 │ [32mLtInt               [0m │ r6 = r7 op r11
+    0136 │ 130 │ [33mJumpIfFalse         [0m │ r6 → +45
+    0139 │ 131 │ Move                [0m │ r8 = r0
+    0141 │ 131 │ GetFixedField       [0m │ r10 = r8.fixed[0]
+    0144 │ 131 │ ArrayGetIndex       [0m │ r8 = r10[r7]
+    0146 │ 132 │ GetFixedField       [0m │ r3 = r1.fixed[0]
+    0149 │ 132 │ Move                [0m │ r15 = r3
+    0151 │ 132 │ Move                [0m │ r16 = r2
+    0153 │ 132 │ [35mInvokeVirtual       [0m │ r4 = r8.vtable[14](2 args)  [2m;[0m Literal(Str("match"))
+    0157 │ 133 │ LoadNull            [0m │ r5
+    0158 │ 133 │ [32mNeq                 [0m │ r6 = r4 op r5
+    0160 │ 133 │ [33mJumpIfFalse         [0m │ r6 → +14
+    0163 │ 134 │ SetFixedField       [0m │ r1.fixed[4] = r4
+    0166 │ 135 │ GetFixedField       [0m │ r10 = r8.fixed[2]
+    0169 │ 136 │ LoadNull            [0m │ r15
+    0170 │ 136 │ Move                [0m │ r16 = r1
+    0172 │ 136 │ [35mCall                [0m │ r8 = call r10(2 args @ r15)
+    0175 │ 136 │ [33mReturn              [0m │ r8
+    0177 │ 136 │ [32mAddImm              [0m │ r12 = r7 + 1
+    0179 │ 136 │ Move                [0m │ r7 = r12
+    0181 │ 136 │ [33mLoop                [0m │ → +57
+    0184 │ 140 │ [36mLoadGlobal          [0m │ r2 = global[3]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::ResContext"[0m
+    0186 │ 140 │ [36mLoadInt             [0m │ r7 = 404
+    0188 │ 140 │ [36mLoadGlobal          [0m │ r4 = global[4]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::JSON"[0m
+    0190 │ 140 │ [36mLoadConst           [0m │ r3 = const[15]  [2m;[0m [32m"Not Found"[0m
+    0192 │ 140 │ [34mBuildObjectWithShape[0m │ r8 = shape[6] vals@r3
+    0195 │ 140 │ Move                [0m │ r15 = r8
+    0197 │ 140 │ [35mCallMethod          [0m │ r3 = r4.7(1 args @ r15)  [2m;[0m Literal(Str("stringify"))
+    0201 │ 140 │ [36mLoadConst           [0m │ r9 = const[8]  [2m;[0m [32m"application/json"[0m
+    0203 │ 140 │ [34mBuildObjectWithShape[0m │ r8 = shape[9] vals@r9
+    0206 │ 140 │ LoadNull            [0m │ r15
+    0207 │ 140 │ Move                [0m │ r16 = r7
+    0209 │ 140 │ Move                [0m │ r17 = r3
+    0211 │ 140 │ Move                [0m │ r18 = r8
+    0213 │ 140 │ [35mCall                [0m │ r10 = call r2(4 args @ r15)
+    0216 │ 140 │ [33mReturn              [0m │ r10
+    0218 │ 112 │ LoadNull            [0m │ r14
+    0219 │ 112 │ [33mReturn              [0m │ r14
+  [2marray-hoist loop diagnostics (2 loops)[0m
+    [2m@0100[0m..[2m@0123[0m  [31mblocked[0m: body has an allocating/call-shaped op
+    [2m@0127[0m..[2m@0181[0m  [31mblocked[0m: body has an allocating/call-shaped op
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"OK"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (24) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 154 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 154 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 154 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"OK"[0m
+    0006 │ 154 │ [36mLoadInt             [0m │ r3 = 3600
+    0008 │ 154 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0011 │ 154 │ LoadNull            [0m │ r2
+    0012 │ 154 │ Move                [0m │ r3 = r4
+    0014 │ 154 │ Move                [0m │ r4 = r6
+    0016 │ 154 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0019 │ 154 │ [33mReturn              [0m │ r6
+    0021 │ 154 │ LoadNull            [0m │ r2
+    0022 │ 154 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 14, upvalues: 0)
+    [2mconstants (5)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"Alice"[0m
+    [2m[002][0m [32m"Bob"[0m
+    [2m[003][0m [32m"page"[0m
+    [2m[004][0m [2mshape[2][0m
+    [2mcode (42) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 155 │ [36mLoadGlobal          [0m │ r2 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 155 │ [36mLoadInt             [0m │ r3 = 200
+    0004 │ 155 │ [36mLoadConst           [0m │ r4 = const[1]  [2m;[0m [32m"Alice"[0m
+    0006 │ 155 │ [36mLoadConst           [0m │ r5 = const[2]  [2m;[0m [32m"Bob"[0m
+    0008 │ 155 │ Move                [0m │ r11 = r4
+    0010 │ 155 │ Move                [0m │ r12 = r5
+    0012 │ 155 │ [34mBuildArray          [0m │ r6 = [r11..+2]
+    0015 │ 155 │ GetFixedField       [0m │ r7 = r1.fixed[5]
+    0018 │ 155 │ [36mLoadConst           [0m │ r4 = const[3]  [2m;[0m [32m"page"[0m
+    0020 │ 155 │ GetIndex            [0m │ r8 = r7[r4]
+    0022 │ 155 │ Move                [0m │ r11 = r6
+    0024 │ 155 │ Move                [0m │ r12 = r8
+    0026 │ 155 │ [34mBuildObjectWithShape[0m │ r7 = shape[4] vals@r11
+    0029 │ 155 │ LoadNull            [0m │ r11
+    0030 │ 155 │ Move                [0m │ r12 = r3
+    0032 │ 155 │ Move                [0m │ r13 = r7
+    0034 │ 155 │ [35mCall                [0m │ r6 = call r2(3 args @ r11)
+    0037 │ 155 │ [33mReturn              [0m │ r6
+    0039 │ 155 │ LoadNull            [0m │ r10
+    0040 │ 155 │ [33mReturn              [0m │ r10
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [2mshape[2][0m
+    [2mcode (23) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 156 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 156 │ [36mLoadInt             [0m │ r4 = 201
+    0004 │ 156 │ LoadTrue            [0m │ r2
+    0005 │ 156 │ [36mLoadInt             [0m │ r3 = 999
+    0007 │ 156 │ [34mBuildObjectWithShape[0m │ r6 = shape[1] vals@r2
+    0010 │ 156 │ LoadNull            [0m │ r2
+    0011 │ 156 │ Move                [0m │ r3 = r4
+    0013 │ 156 │ Move                [0m │ r4 = r6
+    0015 │ 156 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0018 │ 156 │ [33mReturn              [0m │ r6
+    0020 │ 156 │ LoadNull            [0m │ r2
+    0021 │ 156 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 9, upvalues: 0)
+    [2mconstants (4)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [32m"User_"[0m
+    [2m[003][0m [2mshape[2][0m
+    [2mcode (42) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 157 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 157 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 157 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 157 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"id"[0m
+    0009 │ 157 │ GetIndex            [0m │ r3 = r6[r2]
+    0011 │ 157 │ [36mLoadConst           [0m │ r7 = const[2]  [2m;[0m [32m"User_"[0m
+    0013 │ 157 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0016 │ 157 │ GetIndex            [0m │ r8 = r6[r2]
+    0018 │ 157 │ Move                [0m │ r2 = r8
+    0020 │ 157 │ [32mStrConcat           [0m │ r8 = r7 op r2
+    0022 │ 157 │ Move                [0m │ r2 = r3
+    0024 │ 157 │ Move                [0m │ r3 = r8
+    0026 │ 157 │ [34mBuildObjectWithShape[0m │ r6 = shape[3] vals@r2
+    0029 │ 157 │ LoadNull            [0m │ r2
+    0030 │ 157 │ Move                [0m │ r3 = r4
+    0032 │ 157 │ Move                [0m │ r4 = r6
+    0034 │ 157 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0037 │ 157 │ [33mReturn              [0m │ r6
+    0039 │ 157 │ LoadNull            [0m │ r2
+    0040 │ 157 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 8, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (32) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 158 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 158 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 158 │ LoadTrue            [0m │ r3
+    0005 │ 158 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0008 │ 158 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"id"[0m
+    0010 │ 158 │ GetIndex            [0m │ r7 = r6[r2]
+    0012 │ 158 │ Move                [0m │ r2 = r3
+    0014 │ 158 │ Move                [0m │ r3 = r7
+    0016 │ 158 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0019 │ 158 │ LoadNull            [0m │ r2
+    0020 │ 158 │ Move                [0m │ r3 = r4
+    0022 │ 158 │ Move                [0m │ r4 = r6
+    0024 │ 158 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0027 │ 158 │ [33mReturn              [0m │ r6
+    0029 │ 158 │ LoadNull            [0m │ r2
+    0030 │ 158 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [2mshape[1][0m
+    [2mcode (21) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 159 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 159 │ [36mLoadInt             [0m │ r4 = 204
+    0004 │ 159 │ LoadTrue            [0m │ r2
+    0005 │ 159 │ [34mBuildObjectWithShape[0m │ r6 = shape[1] vals@r2
+    0008 │ 159 │ LoadNull            [0m │ r2
+    0009 │ 159 │ Move                [0m │ r3 = r4
+    0011 │ 159 │ Move                [0m │ r4 = r6
+    0013 │ 159 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0016 │ 159 │ [33mReturn              [0m │ r6
+    0018 │ 159 │ LoadNull            [0m │ r2
+    0019 │ 159 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (29) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 160 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 160 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 160 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 160 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m"id"[0m
+    0009 │ 160 │ GetIndex            [0m │ r2 = r6[r3]
+    0011 │ 160 │ [36mLoadInt             [0m │ r3 = 5
+    0013 │ 160 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0016 │ 160 │ LoadNull            [0m │ r2
+    0017 │ 160 │ Move                [0m │ r3 = r4
+    0019 │ 160 │ Move                [0m │ r4 = r6
+    0021 │ 160 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0024 │ 160 │ [33mReturn              [0m │ r6
+    0026 │ 160 │ LoadNull            [0m │ r2
+    0027 │ 160 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 8, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (33) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 161 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 161 │ [36mLoadInt             [0m │ r4 = 201
+    0004 │ 161 │ [36mLoadInt             [0m │ r3 = 888
+    0006 │ 161 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0009 │ 161 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"id"[0m
+    0011 │ 161 │ GetIndex            [0m │ r7 = r6[r2]
+    0013 │ 161 │ Move                [0m │ r2 = r3
+    0015 │ 161 │ Move                [0m │ r3 = r7
+    0017 │ 161 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0020 │ 161 │ LoadNull            [0m │ r2
+    0021 │ 161 │ Move                [0m │ r3 = r4
+    0023 │ 161 │ Move                [0m │ r4 = r6
+    0025 │ 161 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0028 │ 161 │ [33mReturn              [0m │ r6
+    0030 │ 161 │ LoadNull            [0m │ r2
+    0031 │ 161 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 9, upvalues: 0)
+    [2mconstants (5)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [32m"orderId"[0m
+    [2m[003][0m [32m"shipped"[0m
+    [2m[004][0m [2mshape[3][0m
+    [2mcode (42) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 162 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 162 │ [36mLoadInt             [0m │ r6 = 200
+    0004 │ 162 │ GetFixedField       [0m │ r7 = r1.fixed[4]
+    0007 │ 162 │ [36mLoadConst           [0m │ r8 = const[1]  [2m;[0m [32m"id"[0m
+    0009 │ 162 │ GetIndex            [0m │ r3 = r7[r8]
+    0011 │ 162 │ GetFixedField       [0m │ r7 = r1.fixed[4]
+    0014 │ 162 │ [36mLoadConst           [0m │ r8 = const[2]  [2m;[0m [32m"orderId"[0m
+    0016 │ 162 │ GetIndex            [0m │ r4 = r7[r8]
+    0018 │ 162 │ [36mLoadConst           [0m │ r8 = const[3]  [2m;[0m [32m"shipped"[0m
+    0020 │ 162 │ Move                [0m │ r2 = r3
+    0022 │ 162 │ Move                [0m │ r3 = r4
+    0024 │ 162 │ Move                [0m │ r4 = r8
+    0026 │ 162 │ [34mBuildObjectWithShape[0m │ r7 = shape[4] vals@r2
+    0029 │ 162 │ LoadNull            [0m │ r2
+    0030 │ 162 │ Move                [0m │ r3 = r6
+    0032 │ 162 │ Move                [0m │ r4 = r7
+    0034 │ 162 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0037 │ 162 │ [33mReturn              [0m │ r6
+    0039 │ 162 │ LoadNull            [0m │ r2
+    0040 │ 162 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 14, upvalues: 0)
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [2mshape[1][0m
+    [2mcode (34) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 163 │ [36mLoadGlobal          [0m │ r2 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 163 │ [36mLoadInt             [0m │ r3 = 200
+    0004 │ 163 │ [36mLoadIntOne          [0m │ r4 = 1
+    0005 │ 163 │ [36mLoadInt             [0m │ r5 = 2
+    0007 │ 163 │ [36mLoadInt             [0m │ r6 = 3
+    0009 │ 163 │ Move                [0m │ r11 = r4
+    0011 │ 163 │ Move                [0m │ r12 = r5
+    0013 │ 163 │ Move                [0m │ r13 = r6
+    0015 │ 163 │ [34mBuildArray          [0m │ r7 = [r11..+3]
+    0018 │ 163 │ [34mBuildObjectWithShape[0m │ r8 = shape[1] vals@r7
+    0021 │ 163 │ LoadNull            [0m │ r11
+    0022 │ 163 │ Move                [0m │ r12 = r3
+    0024 │ 163 │ Move                [0m │ r13 = r8
+    0026 │ 163 │ [35mCall                [0m │ r7 = call r2(3 args @ r11)
+    0029 │ 163 │ [33mReturn              [0m │ r7
+    0031 │ 163 │ LoadNull            [0m │ r10
+    0032 │ 163 │ [33mReturn              [0m │ r10
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (28) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 164 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 164 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 164 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 164 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m"id"[0m
+    0009 │ 164 │ GetIndex            [0m │ r2 = r6[r3]
+    0011 │ 164 │ LoadTrue            [0m │ r3
+    0012 │ 164 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0015 │ 164 │ LoadNull            [0m │ r2
+    0016 │ 164 │ Move                [0m │ r3 = r4
+    0018 │ 164 │ Move                [0m │ r4 = r6
+    0020 │ 164 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0023 │ 164 │ [33mReturn              [0m │ r6
+    0025 │ 164 │ LoadNull            [0m │ r2
+    0026 │ 164 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [2mshape[1][0m
+    [2mcode (21) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 165 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 165 │ [36mLoadInt             [0m │ r4 = 201
+    0004 │ 165 │ LoadTrue            [0m │ r2
+    0005 │ 165 │ [34mBuildObjectWithShape[0m │ r6 = shape[1] vals@r2
+    0008 │ 165 │ LoadNull            [0m │ r2
+    0009 │ 165 │ Move                [0m │ r3 = r4
+    0011 │ 165 │ Move                [0m │ r4 = r6
+    0013 │ 165 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0016 │ 165 │ [33mReturn              [0m │ r6
+    0018 │ 165 │ LoadNull            [0m │ r2
+    0019 │ 165 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 13, upvalues: 0)
+    [2mconstants (4)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"A"[0m
+    [2m[002][0m [32m"B"[0m
+    [2m[003][0m [2mshape[1][0m
+    [2mcode (31) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 166 │ [36mLoadGlobal          [0m │ r2 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 166 │ [36mLoadInt             [0m │ r3 = 200
+    0004 │ 166 │ [36mLoadConst           [0m │ r4 = const[1]  [2m;[0m [32m"A"[0m
+    0006 │ 166 │ [36mLoadConst           [0m │ r5 = const[2]  [2m;[0m [32m"B"[0m
+    0008 │ 166 │ Move                [0m │ r10 = r4
+    0010 │ 166 │ Move                [0m │ r11 = r5
+    0012 │ 166 │ [34mBuildArray          [0m │ r6 = [r10..+2]
+    0015 │ 166 │ [34mBuildObjectWithShape[0m │ r7 = shape[3] vals@r6
+    0018 │ 166 │ LoadNull            [0m │ r10
+    0019 │ 166 │ Move                [0m │ r11 = r3
+    0021 │ 166 │ Move                [0m │ r12 = r7
+    0023 │ 166 │ [35mCall                [0m │ r6 = call r2(3 args @ r10)
+    0026 │ 166 │ [33mReturn              [0m │ r6
+    0028 │ 166 │ LoadNull            [0m │ r9
+    0029 │ 166 │ [33mReturn              [0m │ r9
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"id"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (29) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 167 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 167 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 167 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 167 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m"id"[0m
+    0009 │ 167 │ GetIndex            [0m │ r2 = r6[r3]
+    0011 │ 167 │ [36mLoadInt             [0m │ r3 = 10
+    0013 │ 167 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0016 │ 167 │ LoadNull            [0m │ r2
+    0017 │ 167 │ Move                [0m │ r3 = r4
+    0019 │ 167 │ Move                [0m │ r4 = r6
+    0021 │ 167 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0024 │ 167 │ [33mReturn              [0m │ r6
+    0026 │ 167 │ LoadNull            [0m │ r2
+    0027 │ 167 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"userId"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (29) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 168 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 168 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 168 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 168 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m"userId"[0m
+    0009 │ 168 │ GetIndex            [0m │ r2 = r6[r3]
+    0011 │ 168 │ [36mLoadInt             [0m │ r3 = 2
+    0013 │ 168 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0016 │ 168 │ LoadNull            [0m │ r2
+    0017 │ 168 │ Move                [0m │ r3 = r4
+    0019 │ 168 │ Move                [0m │ r4 = r6
+    0021 │ 168 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0024 │ 168 │ [33mReturn              [0m │ r6
+    0026 │ 168 │ LoadNull            [0m │ r2
+    0027 │ 168 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (2)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [2mshape[1][0m
+    [2mcode (21) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 169 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 169 │ [36mLoadInt             [0m │ r4 = 201
+    0004 │ 169 │ LoadTrue            [0m │ r2
+    0005 │ 169 │ [34mBuildObjectWithShape[0m │ r6 = shape[1] vals@r2
+    0008 │ 169 │ LoadNull            [0m │ r2
+    0009 │ 169 │ Move                [0m │ r3 = r4
+    0011 │ 169 │ Move                [0m │ r4 = r6
+    0013 │ 169 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0016 │ 169 │ [33mReturn              [0m │ r6
+    0018 │ 169 │ LoadNull            [0m │ r2
+    0019 │ 169 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"itemId"[0m
+    [2m[002][0m [2mshape[1][0m
+    [2mcode (27) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 170 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 170 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 170 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0007 │ 170 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"itemId"[0m
+    0009 │ 170 │ GetIndex            [0m │ r3 = r6[r2]
+    0011 │ 170 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r3
+    0014 │ 170 │ LoadNull            [0m │ r2
+    0015 │ 170 │ Move                [0m │ r3 = r4
+    0017 │ 170 │ Move                [0m │ r4 = r6
+    0019 │ 170 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0022 │ 170 │ [33mReturn              [0m │ r6
+    0024 │ 170 │ LoadNull            [0m │ r2
+    0025 │ 170 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 8, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m"userId"[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (33) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 171 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 171 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 171 │ [36mLoadInt             [0m │ r3 = 12345
+    0006 │ 171 │ GetFixedField       [0m │ r6 = r1.fixed[4]
+    0009 │ 171 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m"userId"[0m
+    0011 │ 171 │ GetIndex            [0m │ r7 = r6[r2]
+    0013 │ 171 │ Move                [0m │ r2 = r3
+    0015 │ 171 │ Move                [0m │ r3 = r7
+    0017 │ 171 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0020 │ 171 │ LoadNull            [0m │ r2
+    0021 │ 171 │ Move                [0m │ r3 = r4
+    0023 │ 171 │ Move                [0m │ r4 = r6
+    0025 │ 171 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0028 │ 171 │ [33mReturn              [0m │ r6
+    0030 │ 171 │ LoadNull            [0m │ r2
+    0031 │ 171 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 7, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m45000[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (24) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 172 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 172 │ [36mLoadInt             [0m │ r4 = 200
+    0004 │ 172 │ [36mLoadInt             [0m │ r2 = 1500
+    0006 │ 172 │ [36mLoadConst           [0m │ r3 = const[1]  [2m;[0m [32m45000[0m
+    0008 │ 172 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r2
+    0011 │ 172 │ LoadNull            [0m │ r2
+    0012 │ 172 │ Move                [0m │ r3 = r4
+    0014 │ 172 │ Move                [0m │ r4 = r6
+    0016 │ 172 │ [35mCall                [0m │ r6 = call r5(3 args @ r2)
+    0019 │ 172 │ [33mReturn              [0m │ r6
+    0021 │ 172 │ LoadNull            [0m │ r2
+    0022 │ 172 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34m<arrow>[0m (arity: 2, regs: 13, upvalues: 0)
+    [2mconstants (3)[0m
+    [2m[000][0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    [2m[001][0m [32m12.5[0m
+    [2m[002][0m [2mshape[2][0m
+    [2mcode (24) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │ 173 │ [36mLoadGlobal          [0m │ r2 = global[0]  [2m;[0m [32m"//?/C:/Users/x/dev/varn/varn-lang/tests/benchmarks/bench_http_routing.vn::jsonRes"[0m
+    0002 │ 173 │ [36mLoadInt             [0m │ r3 = 200
+    0004 │ 173 │ [36mLoadConst           [0m │ r4 = const[1]  [2m;[0m [32m12.5[0m
+    0006 │ 173 │ [36mLoadInt             [0m │ r5 = 64
+    0008 │ 173 │ [34mBuildObjectWithShape[0m │ r6 = shape[2] vals@r4
+    0011 │ 173 │ LoadNull            [0m │ r10
+    0012 │ 173 │ Move                [0m │ r11 = r3
+    0014 │ 173 │ Move                [0m │ r12 = r6
+    0016 │ 173 │ [35mCall                [0m │ r7 = call r2(3 args @ r10)
+    0019 │ 173 │ [33mReturn              [0m │ r7
+    0021 │ 173 │ LoadNull            [0m │ r9
+    0022 │ 173 │ [33mReturn              [0m │ r9
+
+  [2m── end: bytecode ──[0m
+
+=== MODULE BYTECODE: runtime:json ===
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 3, upvalues: 0)
+  [2mconstants (4)[0m
+  [2m[000][0m [34mfn parse$[0m(arity=2)
+  [2m[001][0m [32m"runtime:json::parse$"[0m
+  [2m[002][0m [34mfn stringify$[0m(arity=2)
+  [2m[003][0m [32m"runtime:json::stringify$"[0m
+  [2mcode (24) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = static_fn[0]  [2m;[0m [34m→ fn parse$[0m
+  0002 │   1 │ [36mDefineGlobal        [0m │ def global[1] = r1  [2m;[0m [32m"runtime:json::parse$"[0m
+  0005 │   1 │ [36mLoadGlobal          [0m │ r2 = global[1]  [2m;[0m [32m"runtime:json::parse$"[0m
+  0007 │   1 │ [36mStoreModuleSlot     [0m │ r2 slot[0]
+  0009 │   1 │ [34mLoadStaticFn        [0m │ r1 = static_fn[2]  [2m;[0m [34m→ fn stringify$[0m
+  0011 │   1 │ [36mDefineGlobal        [0m │ def global[3] = r1  [2m;[0m [32m"runtime:json::stringify$"[0m
+  0014 │   1 │ [36mLoadGlobal          [0m │ r2 = global[3]  [2m;[0m [32m"runtime:json::stringify$"[0m
+  0016 │   1 │ [36mStoreModuleSlot     [0m │ r2 slot[1]
+  0018 │   1 │ LoadNull            [0m │ r1
+  0019 │   1 │ [33mReturn              [0m │ r1
+  0021 │   1 │ LoadNull            [0m │ r1
+  0022 │   1 │ [33mReturn              [0m │ r1
+
+  [1mfn[0m [34mparse$[0m (arity: 2, regs: 3, upvalues: 0)
+    [2mcode (6) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   3 │ LoadNull            [0m │ r2
+    0001 │   3 │ [33mReturn              [0m │ r2
+    0003 │   3 │ LoadNull            [0m │ r2
+    0004 │   3 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34mstringify$[0m (arity: 2, regs: 3, upvalues: 0)
+    [2mcode (6) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   4 │ LoadNull            [0m │ r2
+    0001 │   4 │ [33mReturn              [0m │ r2
+    0003 │   4 │ LoadNull            [0m │ r2
+    0004 │   4 │ [33mReturn              [0m │ r2
+
+  [2m── end: bytecode ──[0m
+
+=== MODULE BYTECODE: std:json ===
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 3, upvalues: 0)
+  [2mconstants (1)[0m
+  [2m[000][0m [32m"std:json/json"[0m
+  [2mcode (18) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   1 │ [36mLoadModule          [0m │ r1 = load module[0]  [2m;[0m [32m"std:json/json"[0m
+  0002 │   1 │ [36mLoadModuleSlot      [0m │ r2 = load module slot r1[1]
+  0005 │   1 │ [36mStoreModuleSlot     [0m │ r2 slot[1]
+  0007 │   1 │ [36mLoadModuleSlot      [0m │ r2 = load module slot r1[0]
+  0010 │   1 │ [36mStoreModuleSlot     [0m │ r2 slot[0]
+  0012 │   1 │ LoadNull            [0m │ r1
+  0013 │   1 │ [33mReturn              [0m │ r1
+  0015 │   1 │ LoadNull            [0m │ r1
+  0016 │   1 │ [33mReturn              [0m │ r1
+
+  [2m── end: bytecode ──[0m
+
+=== MODULE BYTECODE: std:json/json ===
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 4, upvalues: 0)
+  [2mconstants (9)[0m
+  [2m[000][0m [32m"runtime:json"[0m
+  [2m[001][0m [32m"std:json/json::parse$"[0m
+  [2m[002][0m [32m"std:json/json::stringify$"[0m
+  [2m[003][0m [34mfn parse[0m(arity=2)
+  [2m[004][0m [32m"std:json/json::parse"[0m
+  [2m[005][0m [34mfn stringify[0m(arity=3)
+  [2m[006][0m [32m"std:json/json::stringify"[0m
+  [2m[007][0m [2mshape[2][0m
+  [2m[008][0m [32m"std:json/json::JSON"[0m
+  [2mcode (44) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   1 │ [36mLoadModule          [0m │ r1 = load module[0]  [2m;[0m [32m"runtime:json"[0m
+  0002 │   1 │ [36mLoadModuleSlot      [0m │ r2 = load module slot r1[0]
+  0005 │   1 │ [36mDefineGlobal        [0m │ def global[1] = r2  [2m;[0m [32m"std:json/json::parse$"[0m
+  0008 │   1 │ [36mLoadModuleSlot      [0m │ r2 = load module slot r1[1]
+  0011 │   1 │ [36mDefineGlobal        [0m │ def global[2] = r2  [2m;[0m [32m"std:json/json::stringify$"[0m
+  0014 │   1 │ [34mLoadStaticFn        [0m │ r1 = static_fn[3]  [2m;[0m [34m→ fn parse[0m
+  0016 │   1 │ [36mDefineGlobal        [0m │ def global[4] = r1  [2m;[0m [32m"std:json/json::parse"[0m
+  0019 │   1 │ [34mLoadStaticFn        [0m │ r1 = static_fn[5]  [2m;[0m [34m→ fn stringify[0m
+  0021 │   1 │ [36mDefineGlobal        [0m │ def global[6] = r1  [2m;[0m [32m"std:json/json::stringify"[0m
+  0024 │   1 │ [36mLoadGlobal          [0m │ r1 = global[4]  [2m;[0m [32m"std:json/json::parse"[0m
+  0026 │   1 │ [36mLoadGlobal          [0m │ r2 = global[6]  [2m;[0m [32m"std:json/json::stringify"[0m
+  0028 │   1 │ [34mBuildObjectWithShape[0m │ r3 = shape[7] vals@r1
+  0031 │   1 │ [36mDefineGlobal        [0m │ def global[8] = r3  [2m;[0m [32m"std:json/json::JSON"[0m
+  0034 │   1 │ [36mLoadGlobal          [0m │ r1 = global[8]  [2m;[0m [32m"std:json/json::JSON"[0m
+  0036 │   1 │ [36mStoreModuleSlot     [0m │ r1 slot[0]
+  0038 │   1 │ LoadNull            [0m │ r1
+  0039 │   1 │ [33mReturn              [0m │ r1
+  0041 │   1 │ LoadNull            [0m │ r1
+  0042 │   1 │ [33mReturn              [0m │ r1
+
+  [1mfn[0m [34mparse[0m (arity: 2, regs: 6, upvalues: 0)
+    [2mconstants (1)[0m
+    [2m[000][0m [32m"std:json/json::parse$"[0m
+    [2mcode (13) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   7 │ [36mLoadGlobal          [0m │ r4 = global[0]  [2m;[0m [32m"std:json/json::parse$"[0m
+    0002 │   7 │ LoadNull            [0m │ r2
+    0003 │   7 │ Move                [0m │ r3 = r1
+    0005 │   7 │ [35mCall                [0m │ r5 = call r4(2 args @ r2)
+    0008 │   7 │ [33mReturn              [0m │ r5
+    0010 │   6 │ LoadNull            [0m │ r2
+    0011 │   6 │ [33mReturn              [0m │ r2
+
+  [1mfn[0m [34mstringify[0m (arity: 3, regs: 7, upvalues: 0)
+    [2mconstants (1)[0m
+    [2m[000][0m [32m"std:json/json::stringify$"[0m
+    [2mcode (13) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │  11 │ [36mLoadGlobal          [0m │ r5 = global[0]  [2m;[0m [32m"std:json/json::stringify$"[0m
+    0002 │  11 │ LoadNull            [0m │ r3
+    0003 │  11 │ Move                [0m │ r4 = r1
+    0005 │  11 │ [35mCall                [0m │ r6 = call r5(2 args @ r3)
+    0008 │  11 │ [33mReturn              [0m │ r6
+    0010 │  10 │ LoadNull            [0m │ r3
+    0011 │  10 │ [33mReturn              [0m │ r3
+
+  [2m── end: bytecode ──[0m

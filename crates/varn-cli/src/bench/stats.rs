@@ -99,7 +99,11 @@ pub fn freq_histogram(samples: &[Duration], cols: usize) -> String {
     let max_count = *bins.iter().max().unwrap_or(&1).max(&1);
     bins.iter()
         .map(|&c| {
-            let level = if c == 0 { 0 } else { (c * 8 / max_count).max(1) };
+            let level = if c == 0 {
+                0
+            } else {
+                (c * 8 / max_count).max(1)
+            };
             LEVELS[level.min(8)]
         })
         .collect()

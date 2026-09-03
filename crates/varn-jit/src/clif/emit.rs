@@ -54,7 +54,8 @@ pub(super) fn def_const_int(
         if let Some(actx) = actx {
             let fb = super::alloc::frame_base_addr(b, actx);
             let boxed = box_f64(b, f);
-            b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+            b.ins()
+                .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
         }
     } else {
         let c = b.ins().iconst(types::I64, v);
@@ -62,7 +63,8 @@ pub(super) fn def_const_int(
         if let Some(actx) = actx {
             let fb = super::alloc::frame_base_addr(b, actx);
             let boxed = box_int(b, c);
-            b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+            b.ins()
+                .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
         }
     }
 }
@@ -79,7 +81,8 @@ pub(super) fn def_const_bool(
     if let Some(actx) = actx {
         let fb = super::alloc::frame_base_addr(b, actx);
         let boxed = box_bool(b, c);
-        b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+        b.ins()
+            .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
     }
 }
 
@@ -197,7 +200,9 @@ pub(super) fn box_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
+    let tag = b
+        .ins()
+        .iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
     b.ins().iconcat(tag, v)
 }
 
@@ -209,7 +214,9 @@ pub(super) fn box_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_BOOL as i64);
+    let tag = b
+        .ins()
+        .iconst(types::I64, varn_types::vm_value::KIND_BOOL as i64);
     let payload = if b.func.dfg.value_type(v) == types::I64 {
         v
     } else {
@@ -245,11 +252,12 @@ pub(super) fn box_f64(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
+    let tag = b
+        .ins()
+        .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
     let payload = b.ins().bitcast(types::I64, MemFlags::trusted(), v);
     b.ins().iconcat(tag, payload)
 }
-
 
 /// Unbox a VmValue a float slot may hold as EITHER float bits OR an int
 /// VmValue — the latter arises when a widening int argument is passed to a
@@ -328,7 +336,9 @@ pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r:
 /// any other tracked kind) → the raw bits. Callers pass registers whose
 /// lattice kind the flow has already proven to hold a real value.
 pub(super) fn box_null(b: &mut FunctionBuilder) -> cranelift_codegen::ir::Value {
-    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+    let tag = b
+        .ins()
+        .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
     let zero = b.ins().iconst(types::I64, 0);
     b.ins().iconcat(tag, zero)
 }
@@ -354,7 +364,9 @@ pub(super) fn box_or_pass(
                 box_f64(b, f)
             }
             _ => {
-                let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                let tag = b
+                    .ins()
+                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
                 b.ins().iconcat(tag, raw)
             }
         }
@@ -857,7 +869,12 @@ pub(super) fn guard_overflow(
     let bb = box_int(b, rhs);
     let (a_tag, a_payload) = b.ins().isplit(ba);
     let (b_tag, b_payload) = b.ins().isplit(bb);
-    call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    call_helper_void(
+        b,
+        cc,
+        helper,
+        &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+    );
     b.ins().jump(cont, &[]);
 
     b.switch_to_block(cont);

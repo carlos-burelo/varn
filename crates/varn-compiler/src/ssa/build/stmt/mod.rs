@@ -34,7 +34,10 @@ impl Builder {
                 // que el resultado ya está descartado y el opcode dedicado
                 // evita la ventana de argumentos y el cruce de frontera.
                 if let crate::hir::HirExpr::NativeMethodCall {
-                    object, args, op_id, ..
+                    object,
+                    args,
+                    op_id,
+                    ..
                 } = e
                 {
                     if *op_id == varn_core::op_id::array_push_op_id() && args.len() == 1 {

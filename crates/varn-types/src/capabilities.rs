@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 pub const CAP_FS_READ: u64 = 1 << 0;
 pub const CAP_FS_WRITE: u64 = 1 << 1;
@@ -127,7 +127,9 @@ impl CapabilitySet {
         let Some(ref allowed_vars) = self.env_vars else {
             return true;
         };
-        allowed_vars.iter().any(|v| v == "*" || v.eq_ignore_ascii_case(key))
+        allowed_vars
+            .iter()
+            .any(|v| v == "*" || v.eq_ignore_ascii_case(key))
     }
 
     #[inline(always)]
@@ -142,11 +144,17 @@ impl CapabilitySet {
 }
 
 fn path_matches_any(path: &Path, allowed: &[PathBuf]) -> bool {
-    let Ok(canonical) = path.canonicalize().or_else(|_| Ok::<_, ()>(path.to_path_buf())) else {
+    let Ok(canonical) = path
+        .canonicalize()
+        .or_else(|_| Ok::<_, ()>(path.to_path_buf()))
+    else {
         return false;
     };
     for prefix in allowed {
-        let Ok(canonical_prefix) = prefix.canonicalize().or_else(|_| Ok::<_, ()>(prefix.clone())) else {
+        let Ok(canonical_prefix) = prefix
+            .canonicalize()
+            .or_else(|_| Ok::<_, ()>(prefix.clone()))
+        else {
             continue;
         };
         if canonical.starts_with(&canonical_prefix) {

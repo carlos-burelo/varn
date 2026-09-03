@@ -81,7 +81,10 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
 
             let mut tags = Vec::new();
             let lower_msg = d.message.to_lowercase();
-            if lower_msg.contains("unused") || lower_msg.contains("never read") || lower_msg.contains("never used") {
+            if lower_msg.contains("unused")
+                || lower_msg.contains("never read")
+                || lower_msg.contains("never used")
+            {
                 tags.push(DiagnosticTag::UNNECESSARY);
             }
             if lower_msg.contains("deprecated") {

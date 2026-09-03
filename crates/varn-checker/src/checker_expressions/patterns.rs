@@ -158,7 +158,9 @@ impl<'r> Checker<'r> {
         let mut def_bind: Option<std::rc::Rc<BindResult>> = None;
         if fields.is_none() {
             if let Some(o) = &origin {
-                let mb = self.resolver.module_bind(o.as_ref())
+                let mb = self
+                    .resolver
+                    .module_bind(o.as_ref())
                     .or_else(|| self.resolver.stdlib_bind(o.as_ref()));
                 if let Some(mb) = mb {
                     fields = mb.sum_variant_fields.get(variant).cloned();

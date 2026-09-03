@@ -35,6 +35,9 @@ pub struct ClassObj {
     /// paths skip the `Value` box clone + downcast. `Some((v, None))` means
     /// "class has no constructor". varn-types only provides the slot.
     pub ctor_rt_cache: RefCell<Option<CtorRtCacheEntry>>,
+    /// Cached instance shape and inline field count. In Varn, classes have
+    /// fixed, immutable field layouts once declared.
+    pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
 }
 
 pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
@@ -63,6 +66,7 @@ impl ClassObj {
             static_setter_map: RefCell::new(HashMap::new()),
             ctor_cache: RefCell::new(None),
             ctor_rt_cache: RefCell::new(None),
+            instance_shape_cache: RefCell::new(None),
         }
     }
     pub fn new_native(name: impl Into<String>) -> Self {
@@ -90,7 +94,18 @@ impl ClassObj {
         }
     }
 
+    pub fn instance_shape(&self) -> (Rc<super::shape::Shape>, usize) {
+        if let Some(ref cached) = *self.instance_shape_cache.borrow() {
+            return (Rc::clone(&cached.0), cached.1);
+        }
+        let shape = self.root_shape.borrow().clone();
+        let n = shape.property_names.len();
+        *self.instance_shape_cache.borrow_mut() = Some((Rc::clone(&shape), n));
+        (shape, n)
+    }
+
     pub fn declare_field(&self, name: RuntimeString) -> usize {
+        *self.instance_shape_cache.borrow_mut() = None;
         let mut root = self.root_shape.borrow_mut();
         if let Some(&slot) = root.property_names.get(&name) {
             return slot;

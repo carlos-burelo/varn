@@ -19,10 +19,7 @@ pub fn prepare_call_hierarchy(
 
     for sym in state.symbols() {
         if sym.name() == *target_name
-            && matches!(
-                sym.kind(),
-                SymbolKind::Function | SymbolKind::Method
-            )
+            && matches!(sym.kind(), SymbolKind::Function | SymbolKind::Method)
             && sym.line() != u32::MAX
         {
             let url = Url::parse(&state.uri).ok()?;
@@ -148,10 +145,7 @@ pub fn outgoing_calls(
     }
 }
 
-fn find_calls_in_program(
-    program: &Program,
-    target_callee: &str,
-) -> Vec<(String, Range, Range)> {
+fn find_calls_in_program(program: &Program, target_callee: &str) -> Vec<(String, Range, Range)> {
     let mut results = Vec::new();
     for stmt in &program.body {
         if let StmtKind::Decl(decl) = &stmt.kind {

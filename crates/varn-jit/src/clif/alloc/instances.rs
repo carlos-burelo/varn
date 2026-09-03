@@ -4,8 +4,8 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
-    AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    store_home, AllocCtx,
 };
 
 /// `shape_ptr` es el `Shape` ya resuelto en compilación y `may_hold_closure`

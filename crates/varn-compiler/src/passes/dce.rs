@@ -125,7 +125,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         GetFixedField { .. } | ArrayGetIndex { .. } => true,
 
         // Type tests and tag reads inspect the value, never dispatch.
-        IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => true,
+        IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
+            true
+        }
 
         // Allocation with no observable effect.
         BuildArray { .. }

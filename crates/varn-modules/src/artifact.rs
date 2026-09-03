@@ -299,8 +299,7 @@ pub fn find_project_root(start_path: &Path) -> PathBuf {
     start_path
         .ancestors()
         .find(|dir| {
-            dir.join(PACKAGE_MANIFEST_FILE).exists()
-                || dir.join(PACKAGE_MANIFEST_FILE_VN).exists()
+            dir.join(PACKAGE_MANIFEST_FILE).exists() || dir.join(PACKAGE_MANIFEST_FILE_VN).exists()
         })
         .unwrap_or(start_path)
         .to_path_buf()

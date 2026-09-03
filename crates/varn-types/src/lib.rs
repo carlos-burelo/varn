@@ -13,7 +13,9 @@ pub mod str_util;
 pub mod task;
 pub mod value;
 pub mod vm_value;
-pub use chunk::{Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED};
+pub use chunk::{
+    Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
+};
 pub use generator::{GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};

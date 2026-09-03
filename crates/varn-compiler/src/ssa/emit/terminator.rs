@@ -8,7 +8,13 @@ use varn_types::chunk::Chunk;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-pub(super) fn emit_call_args(chunk: &mut Chunk, reg: &[u8], call_base: u8, args: &[Value], line: u32) {
+pub(super) fn emit_call_args(
+    chunk: &mut Chunk,
+    reg: &[u8],
+    call_base: u8,
+    args: &[Value],
+    line: u32,
+) {
     chunk.emit_rr(OpCode::LoadNull, call_base, 0, line);
     for (i, a) in args.iter().enumerate() {
         chunk.emit_rr(

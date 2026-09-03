@@ -15,8 +15,8 @@ use varn_types::register_meta::RegisterMeta;
 
 use super::alloc::AllocCtx;
 use super::emit::{
-    self, box_or_pass, call_helper_void, meta_is_float, state_meta_int,
-    unbox_f64_coerce, use_boxed, wrap_i48, HEAP_KIND,
+    self, box_or_pass, call_helper_void, meta_is_float, state_meta_int, unbox_f64_coerce,
+    use_boxed, wrap_i48, HEAP_KIND,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -56,10 +56,7 @@ fn emit_object_field_addr(
     let (tag, raw_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
-        (
-            b.ins().iconst(types::I64, HEAP_KIND),
-            obj,
-        )
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
     };
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
@@ -253,7 +250,14 @@ pub(super) fn emit_set_fixed_field(
         b,
         c.cc,
         c.helpers.set_fixed_field,
-        &[c.exec_ctx, obj_tag, obj_payload, slot_v, val_tag, val_payload],
+        &[
+            c.exec_ctx,
+            obj_tag,
+            obj_payload,
+            slot_v,
+            val_tag,
+            val_payload,
+        ],
     );
     b.ins().jump(cont, &[]);
 

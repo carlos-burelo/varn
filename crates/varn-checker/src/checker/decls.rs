@@ -240,7 +240,11 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
-                                self.record_scope_span(body.range.start.offset, body.range.end.offset, ctor_scope);
+                                self.record_scope_span(
+                                    body.range.start.offset,
+                                    body.range.end.offset,
+                                    ctor_scope,
+                                );
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
@@ -261,7 +265,11 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope_span(body.range.start.offset, body.range.end.offset, m_scope);
+                                self.record_scope_span(
+                                    body.range.start.offset,
+                                    body.range.end.offset,
+                                    m_scope,
+                                );
                             }
 
                             self.check_stmt(body, bind);
@@ -285,7 +293,11 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(g_scope) = self.next_child_scope(bind) {
                                 self.current_scope = g_scope;
-                                self.record_scope_span(body.range.start.offset, body.range.end.offset, g_scope);
+                                self.record_scope_span(
+                                    body.range.start.offset,
+                                    body.range.end.offset,
+                                    g_scope,
+                                );
                             }
 
                             self.check_stmt(body, bind);
@@ -302,7 +314,11 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(s_scope) = self.next_child_scope(bind) {
                                 self.current_scope = s_scope;
-                                self.record_scope_span(body.range.start.offset, body.range.end.offset, s_scope);
+                                self.record_scope_span(
+                                    body.range.start.offset,
+                                    body.range.end.offset,
+                                    s_scope,
+                                );
                             }
 
                             self.check_stmt(body, bind);
@@ -442,8 +458,9 @@ impl<'r> Checker<'r> {
 
                                 if param_ty.is_dynamic() {
                                     if let Some(ref class_name) = self.current_class {
-                                        if let Some(members) =
-                                            bind.get_class_entry(class_name).map(|e| e.members.clone())
+                                        if let Some(members) = bind
+                                            .get_class_entry(class_name)
+                                            .map(|e| e.members.clone())
                                         {
                                             if let Some(m) = members
                                                 .iter()

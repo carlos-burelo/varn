@@ -213,11 +213,12 @@ impl<'r> Checker<'r> {
                                             }
                                         } else if ((is_neq && is_true_branch)
                                             || (is_eq && !is_true_branch))
-                                            && !matched.is_empty() {
-                                                if let Some(t) = make_ty(unmatched) {
-                                                    narrowings.push((id, t));
-                                                }
+                                            && !matched.is_empty()
+                                        {
+                                            if let Some(t) = make_ty(unmatched) {
+                                                narrowings.push((id, t));
                                             }
+                                        }
                                     }
                                 }
                             }
@@ -285,13 +286,17 @@ impl<'r> Checker<'r> {
                     let scope = bind.scopes.get(self.current_scope);
                     if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                         if is_true_branch {
-                            let narrowed_ty =
-                                crate::binder::resolve_type_node(type_ann, Some(&crate::binder::BindView::new(bind, self.resolver)));
+                            let narrowed_ty = crate::binder::resolve_type_node(
+                                type_ann,
+                                Some(&crate::binder::BindView::new(bind, self.resolver)),
+                            );
                             narrowings.push((id, narrowed_ty));
                         } else {
                             if let Some(original_ty) = &bind.arena.get(id).ty {
-                                let target_ty =
-                                    crate::binder::resolve_type_node(type_ann, Some(&crate::binder::BindView::new(bind, self.resolver)));
+                                let target_ty = crate::binder::resolve_type_node(
+                                    type_ann,
+                                    Some(&crate::binder::BindView::new(bind, self.resolver)),
+                                );
                                 let narrowed = original_ty.minus(&target_ty);
                                 if narrowed != *original_ty {
                                     narrowings.push((id, narrowed));
@@ -328,7 +333,9 @@ impl<'r> Checker<'r> {
                             None
                         };
 
-                        if let Some(ExprKind::Identifier { name: arg_name }) = arg_expr.map(|e| &e.kind) {
+                        if let Some(ExprKind::Identifier { name: arg_name }) =
+                            arg_expr.map(|e| &e.kind)
+                        {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                                 if is_true_branch {
@@ -411,9 +418,8 @@ impl<'r> Checker<'r> {
                 .get_interface_members_local(cn.as_ref())
                 .or_else(|| bind.get_class_entry(cn.as_ref()).map(|e| &e.members))
                 .is_some_and(|ms| {
-                    ms.iter().any(|cm| {
-                        cm.name.as_ref() == prop_name.as_ref() && cm.ty == *disc_ty
-                    })
+                    ms.iter()
+                        .any(|cm| cm.name.as_ref() == prop_name.as_ref() && cm.ty == *disc_ty)
                 }),
             _ => false,
         }

@@ -5,8 +5,8 @@ use varn_types::register_meta::RegisterMeta;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
-    AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    store_home, AllocCtx,
 };
 
 pub(crate) fn emit_load_upvalue(b: &mut FunctionBuilder, actx: &AllocCtx, code: &[u16], ip: usize) {

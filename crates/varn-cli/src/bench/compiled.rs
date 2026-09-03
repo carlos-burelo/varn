@@ -4,9 +4,9 @@
 use std::rc::Rc;
 use std::time::Duration;
 
-use varn_core::ModuleId;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
+use varn_core::ModuleId;
 use varn_types::value::Closure;
 use varn_vm::Vm;
 

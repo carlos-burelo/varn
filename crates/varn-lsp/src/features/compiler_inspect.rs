@@ -104,10 +104,7 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
                     let dest_str = inst.dest.map(|d| format!("v{}", d.0));
                     let repr_str = format_inst_human(&inst.kind);
                     let op_name = format!("{:?}", inst.kind);
-                    let op_short = op_name
-                        .split(['(', ' ', '{'])
-                        .next()
-                        .unwrap_or(&op_name);
+                    let op_short = op_name.split(['(', ' ', '{']).next().unwrap_or(&op_name);
 
                     json_insts.push(serde_json::json!({
                         "dest": dest_str,
@@ -164,8 +161,7 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
                     varn_compiler::ssa::ir::Terminator::Unreachable => "unreachable".to_string(),
                 };
 
-                let preds: Vec<String> =
-                    block.preds.iter().map(|p| format!("b{}", p.0)).collect();
+                let preds: Vec<String> = block.preds.iter().map(|p| format!("b{}", p.0)).collect();
                 let params: Vec<String> =
                     block.params.iter().map(|p| format!("v{}", p.0)).collect();
 
@@ -267,17 +263,33 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
             format!("self_call({})", args_str)
         }
         GetProperty { object, name } => format!("v{}.{name}", object.0),
-        SetProperty { object, name, value } => format!("v{}.{name} = v{}", object.0, value.0),
+        SetProperty {
+            object,
+            name,
+            value,
+        } => format!("v{}.{name} = v{}", object.0, value.0),
         GetFixedField { object, slot } => format!("v{}.slot[{slot}]", object.0),
-        SetFixedField { object, slot, value } => {
+        SetFixedField {
+            object,
+            slot,
+            value,
+        } => {
             format!("v{}.slot[{slot}] = v{}", object.0, value.0)
         }
         GetIndex { object, index } => format!("v{}[v{}]", object.0, index.0),
-        SetIndex { object, index, value } => {
+        SetIndex {
+            object,
+            index,
+            value,
+        } => {
             format!("v{}[v{}] = v{}", object.0, index.0, value.0)
         }
         ArrayGetIndex { object, index } => format!("v{}[v{}]", object.0, index.0),
-        ArraySetIndex { object, index, value } => {
+        ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
             format!("v{}[v{}] = v{}", object.0, index.0, value.0)
         }
         ArrayPush { array, value } => format!("push v{}, v{}", array.0, value.0),
@@ -499,11 +511,23 @@ pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
 
     let mut out = String::new();
     out.push_str(&format!("; Varn HIR/SSA Module: {}\n", program.filename));
-    out.push_str(&format!("; Top-level + {} functions\n\n", module.functions.len()));
+    out.push_str(&format!(
+        "; Top-level + {} functions\n\n",
+        module.functions.len()
+    ));
 
-    out.push_str(&format!("fn @top_level (params: {}, locals: {})\n", module.top_level.params.len(), module.top_level.locals));
+    out.push_str(&format!(
+        "fn @top_level (params: {}, locals: {})\n",
+        module.top_level.params.len(),
+        module.top_level.locals
+    ));
     for (idx, func) in module.functions.iter().enumerate() {
-        out.push_str(&format!("fn #{idx} @{} (params: {}, locals: {})\n", func.name, func.params.len(), func.locals));
+        out.push_str(&format!(
+            "fn #{idx} @{} (params: {}, locals: {})\n",
+            func.name,
+            func.params.len(),
+            func.locals
+        ));
     }
 
     Ok(out)
@@ -517,19 +541,34 @@ fn format_proto(proto: &FunctionProto, depth: usize, out: &mut String) {
         indent, name, proto.arity, proto.register_count, proto.upvalue_count
     ));
 
-    out.push_str(&format!("{}Constants ({}):\n", indent, proto.chunk.constants.len()));
+    out.push_str(&format!(
+        "{}Constants ({}):\n",
+        indent,
+        proto.chunk.constants.len()
+    ));
     for (idx, c) in proto.chunk.constants.iter().enumerate() {
         match c {
-            PoolEntry::Literal(lit) => out.push_str(&format!("{}  [{:03}] Literal: {:?}\n", indent, idx, lit)),
+            PoolEntry::Literal(lit) => {
+                out.push_str(&format!("{}  [{:03}] Literal: {:?}\n", indent, idx, lit))
+            }
             PoolEntry::Function(f) => {
                 let fname = f.name.as_deref().unwrap_or("<anonymous>");
                 out.push_str(&format!("{}  [{:03}] Function: {}\n", indent, idx, fname));
             }
-            PoolEntry::Shape(keys) => out.push_str(&format!("{}  [{:03}] Shape: [{}]\n", indent, idx, keys.join(", "))),
+            PoolEntry::Shape(keys) => out.push_str(&format!(
+                "{}  [{:03}] Shape: [{}]\n",
+                indent,
+                idx,
+                keys.join(", ")
+            )),
         }
     }
 
-    out.push_str(&format!("{}Bytecode ({} instructions):\n", indent, proto.chunk.code.len()));
+    out.push_str(&format!(
+        "{}Bytecode ({} instructions):\n",
+        indent,
+        proto.chunk.code.len()
+    ));
     let mut ip = 0;
     while ip < proto.chunk.code.len() {
         let op_u16 = proto.chunk.code[ip];
@@ -564,11 +603,22 @@ pub fn dump_ast_json(state: &DocumentState) -> Result<serde_json::Value, String>
     Ok(serde_json::Value::Array(roots))
 }
 
-fn make_ast_node(label: String, kind: &str, line: u32, children: Vec<serde_json::Value>) -> serde_json::Value {
+fn make_ast_node(
+    label: String,
+    kind: &str,
+    line: u32,
+    children: Vec<serde_json::Value>,
+) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     map.insert("label".to_string(), serde_json::Value::String(label));
-    map.insert("kind".to_string(), serde_json::Value::String(kind.to_string()));
-    map.insert("line".to_string(), serde_json::Value::Number(serde_json::Number::from(line.saturating_sub(1))));
+    map.insert(
+        "kind".to_string(),
+        serde_json::Value::String(kind.to_string()),
+    );
+    map.insert(
+        "line".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(line.saturating_sub(1))),
+    );
     if !children.is_empty() {
         map.insert("children".to_string(), serde_json::Value::Array(children));
     }
@@ -606,7 +656,9 @@ fn ast_stmt_to_json(stmt: &varn_core::ast::Stmt) -> serde_json::Value {
                                 vec![],
                             ));
                         }
-                        varn_core::ast::ClassMember::Method { key, body, range, .. } => {
+                        varn_core::ast::ClassMember::Method {
+                            key, body, range, ..
+                        } => {
                             let mut method_children = Vec::new();
                             if let Some(b) = body {
                                 method_children.push(ast_stmt_to_json(b));
@@ -660,27 +712,33 @@ fn ast_stmt_to_json(stmt: &varn_core::ast::Stmt) -> serde_json::Value {
                 let children: Vec<_> = e
                     .members
                     .iter()
-                    .map(|m| make_ast_node(format!("variant {}", m.id), "enum_member", m.range.start.line, vec![]))
+                    .map(|m| {
+                        make_ast_node(
+                            format!("variant {}", m.id),
+                            "enum_member",
+                            m.range.start.line,
+                            vec![],
+                        )
+                    })
                     .collect();
                 make_ast_node(format!("enum {}", e.id), "enum", line, children)
             }
-            Decl::Struct(s) => {
-                make_ast_node(format!("struct {}", s.id), "struct", line, vec![])
-            }
-            Decl::TypeAlias(t) => {
-                make_ast_node(format!("type {}", t.id), "type", line, vec![])
-            }
+            Decl::Struct(s) => make_ast_node(format!("struct {}", s.id), "struct", line, vec![]),
+            Decl::TypeAlias(t) => make_ast_node(format!("type {}", t.id), "type", line, vec![]),
             Decl::Import(imp) => {
                 make_ast_node(format!("import '{}'", imp.source), "import", line, vec![])
             }
             Decl::Export(exp) => match exp {
-                varn_core::ast::ExportDecl::Decl { declaration, .. } => {
-                    make_ast_node("export".to_string(), "export", line, vec![ast_stmt_to_json(&varn_core::ast::Stmt {
+                varn_core::ast::ExportDecl::Decl { declaration, .. } => make_ast_node(
+                    "export".to_string(),
+                    "export",
+                    line,
+                    vec![ast_stmt_to_json(&varn_core::ast::Stmt {
                         id: 0,
                         kind: varn_core::ast::StmtKind::Decl(declaration.clone()),
                         range: stmt.range,
-                    })])
-                }
+                    })],
+                ),
                 _ => make_ast_node("export".to_string(), "export", line, vec![]),
             },
             Decl::Variable(v) => {
@@ -688,8 +746,17 @@ fn ast_stmt_to_json(stmt: &varn_core::ast::Stmt) -> serde_json::Value {
                     .declarators
                     .iter()
                     .map(|d| {
-                        let val_children = d.init.as_ref().map(|init| vec![ast_expr_to_json(init)]).unwrap_or_default();
-                        make_ast_node(format!("{:?} {:?}", v.kind, d.id), "variable", d.range.start.line, val_children)
+                        let val_children = d
+                            .init
+                            .as_ref()
+                            .map(|init| vec![ast_expr_to_json(init)])
+                            .unwrap_or_default();
+                        make_ast_node(
+                            format!("{:?} {:?}", v.kind, d.id),
+                            "variable",
+                            d.range.start.line,
+                            val_children,
+                        )
                     })
                     .collect();
                 make_ast_node(format!("{:?}Decl", v.kind), "variable", line, children)
@@ -703,49 +770,92 @@ fn ast_stmt_to_json(stmt: &varn_core::ast::Stmt) -> serde_json::Value {
             let children = stmts.iter().map(ast_stmt_to_json).collect();
             make_ast_node("Block".to_string(), "method", line, children)
         }
-        StmtKind::Expr { expression } => {
-            make_ast_node("ExprStmt".to_string(), "statement", line, vec![ast_expr_to_json(expression)])
-        }
-        StmtKind::If { test, consequent, alternate } => {
+        StmtKind::Expr { expression } => make_ast_node(
+            "ExprStmt".to_string(),
+            "statement",
+            line,
+            vec![ast_expr_to_json(expression)],
+        ),
+        StmtKind::If {
+            test,
+            consequent,
+            alternate,
+        } => {
             let mut children = vec![ast_expr_to_json(test), ast_stmt_to_json(consequent)];
             if let Some(alt) = alternate {
                 children.push(ast_stmt_to_json(alt));
             }
             make_ast_node("IfStmt".to_string(), "keyword", line, children)
         }
-        StmtKind::While { test, body } => {
-            make_ast_node("WhileStmt".to_string(), "keyword", line, vec![ast_expr_to_json(test), ast_stmt_to_json(body)])
-        }
-        StmtKind::For { init, test, update, body } => {
+        StmtKind::While { test, body } => make_ast_node(
+            "WhileStmt".to_string(),
+            "keyword",
+            line,
+            vec![ast_expr_to_json(test), ast_stmt_to_json(body)],
+        ),
+        StmtKind::For {
+            init,
+            test,
+            update,
+            body,
+        } => {
             let mut children = Vec::new();
             if let Some(i) = init {
                 match &**i {
                     varn_core::ast::ForInit::Var { kind, declarators } => {
                         for d in declarators {
-                            let val_children = d.init.as_ref().map(|init| vec![ast_expr_to_json(init)]).unwrap_or_default();
-                            children.push(make_ast_node(format!("{:?} {:?}", kind, d.id), "variable", d.range.start.line, val_children));
+                            let val_children = d
+                                .init
+                                .as_ref()
+                                .map(|init| vec![ast_expr_to_json(init)])
+                                .unwrap_or_default();
+                            children.push(make_ast_node(
+                                format!("{:?} {:?}", kind, d.id),
+                                "variable",
+                                d.range.start.line,
+                                val_children,
+                            ));
                         }
                     }
                     varn_core::ast::ForInit::Expr(e) => children.push(ast_expr_to_json(e)),
                 }
             }
-            if let Some(t) = test { children.push(ast_expr_to_json(t)); }
-            if let Some(u) = update { children.push(ast_expr_to_json(u)); }
+            if let Some(t) = test {
+                children.push(ast_expr_to_json(t));
+            }
+            if let Some(u) = update {
+                children.push(ast_expr_to_json(u));
+            }
             children.push(ast_stmt_to_json(body));
             make_ast_node("ForStmt".to_string(), "keyword", line, children)
         }
-        StmtKind::ForIn { left, right, body, .. } => {
-            make_ast_node(format!("for {:?} in", left), "keyword", line, vec![ast_expr_to_json(right), ast_stmt_to_json(body)])
-        }
-        StmtKind::ForOf { left, right, body, .. } => {
-            make_ast_node(format!("for {:?} of", left), "keyword", line, vec![ast_expr_to_json(right), ast_stmt_to_json(body)])
-        }
+        StmtKind::ForIn {
+            left, right, body, ..
+        } => make_ast_node(
+            format!("for {:?} in", left),
+            "keyword",
+            line,
+            vec![ast_expr_to_json(right), ast_stmt_to_json(body)],
+        ),
+        StmtKind::ForOf {
+            left, right, body, ..
+        } => make_ast_node(
+            format!("for {:?} of", left),
+            "keyword",
+            line,
+            vec![ast_expr_to_json(right), ast_stmt_to_json(body)],
+        ),
         StmtKind::Return { argument } => {
-            let children = argument.as_ref().map(|a| vec![ast_expr_to_json(a)]).unwrap_or_default();
+            let children = argument
+                .as_ref()
+                .map(|a| vec![ast_expr_to_json(a)])
+                .unwrap_or_default();
             make_ast_node("ReturnStmt".to_string(), "keyword", line, children)
         }
         StmtKind::Break { .. } => make_ast_node("BreakStmt".to_string(), "keyword", line, vec![]),
-        StmtKind::Continue { .. } => make_ast_node("ContinueStmt".to_string(), "keyword", line, vec![]),
+        StmtKind::Continue { .. } => {
+            make_ast_node("ContinueStmt".to_string(), "keyword", line, vec![])
+        }
         StmtKind::Empty => make_ast_node("EmptyStmt".to_string(), "field", line, vec![]),
         StmtKind::Error => make_ast_node("ErrorStmt".to_string(), "field", line, vec![]),
         _ => make_ast_node("Stmt".to_string(), "statement", line, vec![]),
@@ -774,25 +884,19 @@ fn ast_expr_to_json(expr: &varn_core::ast::Expr) -> serde_json::Value {
         ExprKind::CharLiteral { value } => {
             make_ast_node(format!("Char: '{value}'"), "constant", line, vec![])
         }
-        ExprKind::NullLiteral => {
-            make_ast_node("null".to_string(), "constant", line, vec![])
-        }
-        ExprKind::Binary { left, op, right } => {
-            make_ast_node(
-                format!("BinaryExpr ({op:?})"),
-                "operator",
-                line,
-                vec![ast_expr_to_json(left), ast_expr_to_json(right)],
-            )
-        }
-        ExprKind::Unary { op, operand, .. } => {
-            make_ast_node(
-                format!("UnaryExpr ({op:?})"),
-                "operator",
-                line,
-                vec![ast_expr_to_json(operand)],
-            )
-        }
+        ExprKind::NullLiteral => make_ast_node("null".to_string(), "constant", line, vec![]),
+        ExprKind::Binary { left, op, right } => make_ast_node(
+            format!("BinaryExpr ({op:?})"),
+            "operator",
+            line,
+            vec![ast_expr_to_json(left), ast_expr_to_json(right)],
+        ),
+        ExprKind::Unary { op, operand, .. } => make_ast_node(
+            format!("UnaryExpr ({op:?})"),
+            "operator",
+            line,
+            vec![ast_expr_to_json(operand)],
+        ),
         ExprKind::Call { callee, args, .. } => {
             let mut children = vec![ast_expr_to_json(callee)];
             for arg in args {
@@ -801,13 +905,23 @@ fn ast_expr_to_json(expr: &varn_core::ast::Expr) -> serde_json::Value {
                         children.push(ast_expr_to_json(e));
                     }
                     varn_core::ast::Arg::Named { label, value } => {
-                        children.push(make_ast_node(format!("{label}:"), "parameter", value.range.start.line, vec![ast_expr_to_json(value)]));
+                        children.push(make_ast_node(
+                            format!("{label}:"),
+                            "parameter",
+                            value.range.start.line,
+                            vec![ast_expr_to_json(value)],
+                        ));
                     }
                 }
             }
             make_ast_node("CallExpr".to_string(), "keyword", line, children)
         }
-        ExprKind::Member { object, property, computed, .. } => {
+        ExprKind::Member {
+            object,
+            property,
+            computed,
+            ..
+        } => {
             let label = if *computed { "IndexExpr" } else { "MemberExpr" };
             make_ast_node(
                 label.to_string(),
@@ -816,22 +930,18 @@ fn ast_expr_to_json(expr: &varn_core::ast::Expr) -> serde_json::Value {
                 vec![ast_expr_to_json(object), ast_expr_to_json(property)],
             )
         }
-        ExprKind::Pipeline { left, right } => {
-            make_ast_node(
-                "Pipeline (|>)".to_string(),
-                "operator",
-                line,
-                vec![ast_expr_to_json(left), ast_expr_to_json(right)],
-            )
-        }
-        ExprKind::Assign { op, target, value } => {
-            make_ast_node(
-                format!("AssignExpr ({op:?})"),
-                "operator",
-                line,
-                vec![ast_expr_to_json(target), ast_expr_to_json(value)],
-            )
-        }
+        ExprKind::Pipeline { left, right } => make_ast_node(
+            "Pipeline (|>)".to_string(),
+            "operator",
+            line,
+            vec![ast_expr_to_json(left), ast_expr_to_json(right)],
+        ),
+        ExprKind::Assign { op, target, value } => make_ast_node(
+            format!("AssignExpr ({op:?})"),
+            "operator",
+            line,
+            vec![ast_expr_to_json(target), ast_expr_to_json(value)],
+        ),
         ExprKind::Match { subject, cases } => {
             let mut children = vec![ast_expr_to_json(subject)];
             for case in cases {
@@ -839,11 +949,15 @@ fn ast_expr_to_json(expr: &varn_core::ast::Expr) -> serde_json::Value {
                     varn_core::ast::MatchBody::Expr(e) => ast_expr_to_json(e),
                     varn_core::ast::MatchBody::Block(b) => ast_stmt_to_json(b),
                 };
-                children.push(make_ast_node("MatchCase".to_string(), "keyword", case.range.start.line, vec![case_child]));
+                children.push(make_ast_node(
+                    "MatchCase".to_string(),
+                    "keyword",
+                    case.range.start.line,
+                    vec![case_child],
+                ));
             }
             make_ast_node("MatchExpr".to_string(), "keyword", line, children)
         }
         _ => make_ast_node("Expr".to_string(), "statement", line, vec![]),
     }
 }
-

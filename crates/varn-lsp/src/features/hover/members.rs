@@ -18,9 +18,15 @@ pub fn format_member_sig(
         && clean_parent != member.name.as_ref();
 
     match member.kind {
-        ResolvedMemberKind::Property | ResolvedMemberKind::StaticProperty | ResolvedMemberKind::ExtensionProperty | ResolvedMemberKind::Getter => {
+        ResolvedMemberKind::Property
+        | ResolvedMemberKind::StaticProperty
+        | ResolvedMemberKind::ExtensionProperty
+        | ResolvedMemberKind::Getter => {
             if member.is_static && has_parent {
-                format!("(static property) {}.{}: {}", clean_parent, member.name, member.ty)
+                format!(
+                    "(static property) {}.{}: {}",
+                    clean_parent, member.name, member.ty
+                )
             } else if has_parent {
                 format!("(property) {}.{}: {}", clean_parent, member.name, member.ty)
             } else {
@@ -29,9 +35,19 @@ pub fn format_member_sig(
         }
         ResolvedMemberKind::Setter => {
             if member.is_static && has_parent {
-                format!("(static setter) {}.{}({})", clean_parent, member.name, member_params(member))
+                format!(
+                    "(static setter) {}.{}({})",
+                    clean_parent,
+                    member.name,
+                    member_params(member)
+                )
             } else if has_parent {
-                format!("(setter) {}.{}({})", clean_parent, member.name, member_params(member))
+                format!(
+                    "(setter) {}.{}({})",
+                    clean_parent,
+                    member.name,
+                    member_params(member)
+                )
             } else {
                 format!("(setter) {}({})", member.name, member_params(member))
             }
@@ -43,27 +59,43 @@ pub fn format_member_sig(
                 format!("constructor({})", member_params(member))
             }
         }
-        ResolvedMemberKind::Method | ResolvedMemberKind::StaticMethod | ResolvedMemberKind::ExtensionMethod => {
+        ResolvedMemberKind::Method
+        | ResolvedMemberKind::StaticMethod
+        | ResolvedMemberKind::ExtensionMethod => {
             if member.is_static && has_parent {
                 format!(
                     "(static method) {}.{}({}): {}",
-                    clean_parent, member.name, member_params(member), member.ty
+                    clean_parent,
+                    member.name,
+                    member_params(member),
+                    member.ty
                 )
             } else if has_parent {
                 format!(
                     "(method) {}.{}({}): {}",
-                    clean_parent, member.name, member_params(member), member.ty
+                    clean_parent,
+                    member.name,
+                    member_params(member),
+                    member.ty
                 )
             } else {
                 format!(
                     "function {}({}): {}",
-                    member.name, member_params(member), member.ty
+                    member.name,
+                    member_params(member),
+                    member.ty
                 )
             }
         }
-        ResolvedMemberKind::NestedType(NestedTypeKind::Class) => format_nested_class(state, clean_parent, member),
-        ResolvedMemberKind::NestedType(NestedTypeKind::Interface) => format_nested_interface(state, clean_parent, member),
-        ResolvedMemberKind::NestedType(NestedTypeKind::Namespace) => format_nested_namespace(state, clean_parent, member),
+        ResolvedMemberKind::NestedType(NestedTypeKind::Class) => {
+            format_nested_class(state, clean_parent, member)
+        }
+        ResolvedMemberKind::NestedType(NestedTypeKind::Interface) => {
+            format_nested_interface(state, clean_parent, member)
+        }
+        ResolvedMemberKind::NestedType(NestedTypeKind::Namespace) => {
+            format_nested_namespace(state, clean_parent, member)
+        }
         ResolvedMemberKind::NestedType(NestedTypeKind::Enum) => {
             if has_parent {
                 format!("enum {}.{}", clean_parent, member.name)
@@ -97,7 +129,11 @@ pub fn format_enum_member(enum_name: &str, member_name: &str, init_value: &str) 
     }
 }
 
-fn format_nested_class(state: &DocumentState, parent_name: &str, m: &ResolvedMemberSummary) -> String {
+fn format_nested_class(
+    state: &DocumentState,
+    parent_name: &str,
+    m: &ResolvedMemberSummary,
+) -> String {
     use super::format::format_type_params_str;
     let tp = format_type_params_str(&m.ty);
     let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
@@ -118,7 +154,11 @@ fn format_nested_class(state: &DocumentState, parent_name: &str, m: &ResolvedMem
     lines.join("\n")
 }
 
-fn format_nested_interface(state: &DocumentState, parent_name: &str, m: &ResolvedMemberSummary) -> String {
+fn format_nested_interface(
+    state: &DocumentState,
+    parent_name: &str,
+    m: &ResolvedMemberSummary,
+) -> String {
     use super::format::format_type_params_str;
     let tp = format_type_params_str(&m.ty);
     let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
@@ -139,7 +179,11 @@ fn format_nested_interface(state: &DocumentState, parent_name: &str, m: &Resolve
     lines.join("\n")
 }
 
-fn format_nested_namespace(state: &DocumentState, parent_name: &str, m: &ResolvedMemberSummary) -> String {
+fn format_nested_namespace(
+    state: &DocumentState,
+    parent_name: &str,
+    m: &ResolvedMemberSummary,
+) -> String {
     let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
         format!("{}.", parent_name)
     } else {

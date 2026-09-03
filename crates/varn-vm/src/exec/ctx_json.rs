@@ -467,7 +467,11 @@ fn fast_parse_f64(s: &[u8]) -> Option<f64> {
     if s.is_empty() {
         return None;
     }
-    let (neg, s) = if s[0] == b'-' { (true, &s[1..]) } else { (false, s) };
+    let (neg, s) = if s[0] == b'-' {
+        (true, &s[1..])
+    } else {
+        (false, s)
+    };
     if s.is_empty() {
         return None;
     }
@@ -510,15 +514,32 @@ fn fast_parse_f64(s: &[u8]) -> Option<f64> {
             }
         }
         const POW10: [f64; 16] = [
-            1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0,
-            100000000.0, 1000000000.0, 10000000000.0, 100000000000.0, 1000000000000.0,
-            10000000000000.0, 100000000000000.0, 1000000000000000.0,
+            1.0,
+            10.0,
+            100.0,
+            1000.0,
+            10000.0,
+            100000.0,
+            1000000.0,
+            10000000.0,
+            100000000.0,
+            1000000000.0,
+            10000000000.0,
+            100000000000.0,
+            1000000000000.0,
+            10000000000000.0,
+            100000000000000.0,
+            1000000000000000.0,
         ];
         let frac = (frac_val as f64) / POW10[frac_len as usize];
         let val = (int_val as f64) + frac;
         Some(if neg { -val } else { val })
     } else {
-        Some(if neg { -(int_val as f64) } else { int_val as f64 })
+        Some(if neg {
+            -(int_val as f64)
+        } else {
+            int_val as f64
+        })
     }
 }
 

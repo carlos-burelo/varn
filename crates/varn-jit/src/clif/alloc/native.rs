@@ -6,8 +6,8 @@ use varn_types::register_meta::RegisterMeta;
 use super::super::emit::{call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
-    AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    store_home, AllocCtx,
 };
 
 pub(crate) fn emit_call_native_op(

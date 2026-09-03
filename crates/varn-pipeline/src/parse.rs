@@ -42,7 +42,6 @@ pub fn parse(
     if debug.modules {
         varn_debug::modules::debug_modules(&program);
     }
-    
 
     Ok(program)
 }

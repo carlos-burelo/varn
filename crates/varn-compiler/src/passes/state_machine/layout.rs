@@ -47,10 +47,7 @@ impl StateLayout {
                 max_live = slots.len();
             }
 
-            point_layouts.push(PointLayout {
-                resume_disc,
-                slots,
-            });
+            point_layouts.push(PointLayout { resume_disc, slots });
         }
 
         let state_size = (1 + max_live) as u16;

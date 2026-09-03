@@ -71,8 +71,7 @@ impl ExecCtx {
             }
 
             let mut bound_method = None;
-            if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(heap_idx)
-            {
+            if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(heap_idx) {
                 bound_method = Some((**bm).clone());
             }
 
@@ -226,82 +225,82 @@ impl ExecCtx {
                         return Ok(false);
                     }
                     Some(crate::heap::HeapObj::VmClosure(nc))
-                        if !nc.proto.is_generator && !nc.proto.is_async => {
-                            let arity = nc.proto.arity;
+                        if !nc.proto.is_generator && !nc.proto.is_async =>
+                    {
+                        let arity = nc.proto.arity;
 
-                            if !nc.proto.has_rest && arg_count <= arity {
-                                let nc = nc.clone();
-                                if self.hotspot_counters.is_some() {
-                                    let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
-                                    let is_jit = nc.jit_fn().is_some();
-                                    self.record_hotspot_fn(fn_name, is_jit);
-                                }
-                                let new_base = self.stack.len();
-                                if self.frames.len() >= 10000 {
-                                    return Err(crate::error::RuntimeError::new(
-                                        "stack overflow: call depth exceeded 10000",
-                                    ));
-                                }
-                                let required = new_base + nc.proto.register_count as usize;
-                                if self.stack.len() < required {
-                                    self.stack.resize(required, VmValue::null());
-                                }
-                                if arg_count > 0 {
-                                    unsafe {
-                                        let src = self.stack.as_ptr().add(base + arg_start);
-                                        let dst = self.stack.as_mut_ptr().add(new_base);
-                                        std::ptr::copy_nonoverlapping(src, dst, arg_count);
-                                    }
-                                }
-                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                                frame.return_reg = Some(dest as u16);
-                                self.record_call_vm_fast();
-                                self.frames.push(frame);
-                                return Ok(true);
-                            } else if nc.proto.has_rest && arg_count <= arity {
-                                let nc = nc.clone();
-                                let fn_name2 =
-                                    nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
-                                let is_jit2 = nc.jit_fn().is_some();
-                                self.record_hotspot_fn(&fn_name2, is_jit2);
-                                let rest_idx = arity.saturating_sub(1);
-                                let regular_count = arg_count.min(rest_idx);
-                                for i in 0..regular_count {
-                                    let v = self.stack[base + arg_start + i];
-                                    self.stack.push(v);
-                                }
-                                for _ in regular_count..rest_idx {
-                                    self.stack.push(VmValue::null());
-                                }
-                                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                                    (rest_idx..arg_count)
-                                        .map(|i| self.stack[base + arg_start + i])
-                                        .collect()
-                                } else {
-                                    vec![]
-                                };
-                                let rest_nv =
-                                    VmValue::from_heap_idx(self.heap.alloc(
-                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                                    ));
-                                self.stack.push(rest_nv);
-                                if self.frames.len() >= 10000 {
-                                    return Err(crate::error::RuntimeError::new(
-                                        "stack overflow: call depth exceeded 10000",
-                                    ));
-                                }
-                                let new_base = self.stack.len() - arity;
-                                let required = new_base + nc.proto.register_count as usize;
-                                if self.stack.len() < required {
-                                    self.stack.resize(required, VmValue::null());
-                                }
-                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                                frame.return_reg = Some(dest as u16);
-                                self.record_call_vm_fast();
-                                self.frames.push(frame);
-                                return Ok(true);
+                        if !nc.proto.has_rest && arg_count <= arity {
+                            let nc = nc.clone();
+                            if self.hotspot_counters.is_some() {
+                                let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                                let is_jit = nc.jit_fn().is_some();
+                                self.record_hotspot_fn(fn_name, is_jit);
                             }
+                            let new_base = self.stack.len();
+                            if self.frames.len() >= 10000 {
+                                return Err(crate::error::RuntimeError::new(
+                                    "stack overflow: call depth exceeded 10000",
+                                ));
+                            }
+                            let required = new_base + nc.proto.register_count as usize;
+                            if self.stack.len() < required {
+                                self.stack.resize(required, VmValue::null());
+                            }
+                            if arg_count > 0 {
+                                unsafe {
+                                    let src = self.stack.as_ptr().add(base + arg_start);
+                                    let dst = self.stack.as_mut_ptr().add(new_base);
+                                    std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                                }
+                            }
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                            frame.return_reg = Some(dest as u16);
+                            self.record_call_vm_fast();
+                            self.frames.push(frame);
+                            return Ok(true);
+                        } else if nc.proto.has_rest && arg_count <= arity {
+                            let nc = nc.clone();
+                            let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                            let is_jit2 = nc.jit_fn().is_some();
+                            self.record_hotspot_fn(&fn_name2, is_jit2);
+                            let rest_idx = arity.saturating_sub(1);
+                            let regular_count = arg_count.min(rest_idx);
+                            for i in 0..regular_count {
+                                let v = self.stack[base + arg_start + i];
+                                self.stack.push(v);
+                            }
+                            for _ in regular_count..rest_idx {
+                                self.stack.push(VmValue::null());
+                            }
+                            let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                                (rest_idx..arg_count)
+                                    .map(|i| self.stack[base + arg_start + i])
+                                    .collect()
+                            } else {
+                                vec![]
+                            };
+                            let rest_nv = VmValue::from_heap_idx(
+                                self.heap
+                                    .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+                            );
+                            self.stack.push(rest_nv);
+                            if self.frames.len() >= 10000 {
+                                return Err(crate::error::RuntimeError::new(
+                                    "stack overflow: call depth exceeded 10000",
+                                ));
+                            }
+                            let new_base = self.stack.len() - arity;
+                            let required = new_base + nc.proto.register_count as usize;
+                            if self.stack.len() < required {
+                                self.stack.resize(required, VmValue::null());
+                            }
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                            frame.return_reg = Some(dest as u16);
+                            self.record_call_vm_fast();
+                            self.frames.push(frame);
+                            return Ok(true);
                         }
+                    }
                     _ => {}
                 }
             }

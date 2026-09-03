@@ -111,10 +111,7 @@ impl LivenessAnalyzer {
     }
 
     pub fn record_use(&mut self, vreg: u16, instr_idx: usize) {
-        self.use_sites
-            .entry(vreg)
-            .or_default()
-            .push(instr_idx);
+        self.use_sites.entry(vreg).or_default().push(instr_idx);
     }
 
     fn compute_interference(&mut self) {

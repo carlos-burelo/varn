@@ -5,9 +5,9 @@
 //! engages, and — when it doesn't — which specific check rejected it,
 //! instead of requiring a manual trace through the JIT's analysis passes.
 
+use varn_core::term::terminal;
 use varn_core::OpCode;
 use varn_jit::CacheSource;
-use varn_core::term::terminal;
 
 const DIM: &str = "\x1b[2m";
 const R: &str = "\x1b[0m";

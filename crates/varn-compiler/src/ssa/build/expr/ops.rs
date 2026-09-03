@@ -13,28 +13,17 @@ impl Builder {
             HirExpr::Logical { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
                 match op {
-                    HirLogicalOp::And => self.lower_branch_value(
-                        l,
-                        |s| s.lower_expr(rhs),
-                        |_| Ok(l),
-                        *ty,
-                    ),
+                    HirLogicalOp::And => {
+                        self.lower_branch_value(l, |s| s.lower_expr(rhs), |_| Ok(l), *ty)
+                    }
 
-                    HirLogicalOp::Or => self.lower_branch_value(
-                        l,
-                        |_| Ok(l),
-                        |s| s.lower_expr(rhs),
-                        *ty,
-                    ),
+                    HirLogicalOp::Or => {
+                        self.lower_branch_value(l, |_| Ok(l), |s| s.lower_expr(rhs), *ty)
+                    }
 
                     HirLogicalOp::Nullish => {
                         let isnull = self.emit(InstKind::IsNull { operand: l }, HirType::Bool);
-                        self.lower_branch_value(
-                            isnull,
-                            |s| s.lower_expr(rhs),
-                            |_| Ok(l),
-                            *ty,
-                        )
+                        self.lower_branch_value(isnull, |s| s.lower_expr(rhs), |_| Ok(l), *ty)
                     }
                 }
             }
@@ -58,14 +47,14 @@ impl Builder {
                     Ok(self.emit(InstKind::BuildStr { parts: pvals }, HirType::Str))
                 }
             }
-            HirExpr::Conditional { test, cons, alt, ty } => {
+            HirExpr::Conditional {
+                test,
+                cons,
+                alt,
+                ty,
+            } => {
                 let t = self.lower_expr(test)?;
-                self.lower_branch_value(
-                    t,
-                    |s| s.lower_expr(cons),
-                    |s| s.lower_expr(alt),
-                    *ty,
-                )
+                self.lower_branch_value(t, |s| s.lower_expr(cons), |s| s.lower_expr(alt), *ty)
             }
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;

@@ -30,9 +30,7 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
 ///
 /// Memoized by the resolver, not here: the result is a function of which
 /// stdlib is active, so it must not outlive a change of stdlib.
-pub(crate) fn build_core_exports(
-    resolver: &dyn ImportResolver,
-) -> FxHashMap<Rc<str>, Symbol> {
+pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> FxHashMap<Rc<str>, Symbol> {
     let mut globals = FxHashMap::default();
     for spec in varn_modules::core_module_ids() {
         for (k, v) in resolver.stdlib_exports(spec).as_ref() {

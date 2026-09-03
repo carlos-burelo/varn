@@ -23,10 +23,7 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         })
         .collect();
 
-    for sym in state
-        .symbols()
-        .filter(|s| is_indexable(s.kind(), s.line()))
-    {
+    for sym in state.symbols().filter(|s| is_indexable(s.kind(), s.line())) {
         collect_member_exports(state, uri, sym, &mut exports);
     }
 

@@ -175,7 +175,12 @@ impl<'a> Lowerer<'a> {
                 let cons = Box::new(self.lower_expr(consequent, scope)?);
                 let alt = Box::new(self.lower_expr(alternate, scope)?);
                 let ty = self.value_ty(key);
-                Ok(HirExpr::Conditional { test, cons, alt, ty })
+                Ok(HirExpr::Conditional {
+                    test,
+                    cons,
+                    alt,
+                    ty,
+                })
             }
             ExprKind::Match { subject, cases } => self.lower_match(subject, cases, scope),
             ExprKind::CharLiteral { value } => Ok(HirExpr::Char(*value)),

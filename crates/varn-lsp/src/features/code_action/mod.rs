@@ -125,9 +125,7 @@ pub fn build_code_action(
             actions.push(iface_action);
         }
 
-        if let Some(organize_action) =
-            organize_imports::generate_organize_imports_action(st, uri)
-        {
+        if let Some(organize_action) = organize_imports::generate_organize_imports_action(st, uri) {
             actions.push(organize_action);
         }
 

@@ -36,29 +36,32 @@ pub(crate) extern "C" fn jit_prepare_call(
         jit_guard_call_depth(ctx_ref);
         let heap_idx = callee.as_heap_idx();
         if let Some(closure) = ctx_ref.heap.get_closure(heap_idx) {
-            if !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest
-                && closure.jit_fn().is_some() {
-                    let required_cap = callee_base + closure.proto.register_count as usize + 32;
-                    let required_len = callee_base + closure.proto.register_count as usize;
-                    let stack_len = ctx_ref.stack.len();
-                    if ctx_ref.stack.capacity() < required_cap {
-                        ctx_ref.stack.reserve(required_cap - stack_len);
-                    }
-                    if stack_len < required_len {
-                        ctx_ref.stack.set_len(required_len);
-                        let ptr = ctx_ref.stack.as_mut_ptr();
-                        for i in stack_len..required_len {
-                            std::ptr::write(ptr.add(i), VmValue::null());
-                        }
-                    }
-                    let mut frame = crate::frame::CallFrame::new(closure, callee_base);
-                    // Return destination for a possible interpreted resume after
-                    // an exception unwind (fast machine-return store is skipped
-                    // in that case).
-                    frame.return_reg = Some(call_dest);
-                    ctx_ref.frames.push(frame);
-                    return closure as *const crate::closure::VmClosure;
+            if !closure.proto.is_async
+                && !closure.proto.is_generator
+                && !closure.proto.has_rest
+                && closure.jit_fn().is_some()
+            {
+                let required_cap = callee_base + closure.proto.register_count as usize + 32;
+                let required_len = callee_base + closure.proto.register_count as usize;
+                let stack_len = ctx_ref.stack.len();
+                if ctx_ref.stack.capacity() < required_cap {
+                    ctx_ref.stack.reserve(required_cap - stack_len);
                 }
+                if stack_len < required_len {
+                    ctx_ref.stack.set_len(required_len);
+                    let ptr = ctx_ref.stack.as_mut_ptr();
+                    for i in stack_len..required_len {
+                        std::ptr::write(ptr.add(i), VmValue::null());
+                    }
+                }
+                let mut frame = crate::frame::CallFrame::new(closure, callee_base);
+                // Return destination for a possible interpreted resume after
+                // an exception unwind (fast machine-return store is skipped
+                // in that case).
+                frame.return_reg = Some(call_dest);
+                ctx_ref.frames.push(frame);
+                return closure as *const crate::closure::VmClosure;
+            }
         } else if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(heap_idx) {
             let cls = cls.clone();
             let oref = varn_types::value::ObjRef::instance(cls.clone());
@@ -73,35 +76,36 @@ pub(crate) extern "C" fn jit_prepare_call(
                             .downcast_ref::<crate::closure::VmClosurePayload>()
                         {
                             let closure = wrapper.0.clone();
-                            if !closure.proto.is_async && !closure.proto.is_generator
-                                && closure.jit_fn().is_some() {
-                                    let required_cap =
-                                        callee_base + closure.proto.register_count as usize + 32;
-                                    let required_len =
-                                        callee_base + closure.proto.register_count as usize;
-                                    let stack_len = ctx_ref.stack.len();
-                                    if ctx_ref.stack.capacity() < required_cap {
-                                        ctx_ref.stack.reserve(required_cap - stack_len);
-                                    }
-                                    if stack_len < required_len {
-                                        ctx_ref.stack.set_len(required_len);
-                                        let ptr = ctx_ref.stack.as_mut_ptr();
-                                        for i in stack_len..required_len {
-                                            std::ptr::write(ptr.add(i), VmValue::null());
-                                        }
-                                    }
-                                    let ctor_closure_ptr =
-                                        &*closure as *const crate::closure::VmClosure;
-                                    let returning_frame_idx = ctx_ref.frames.len();
-                                    ctx_ref
-                                        .pending_constructors
-                                        .push((returning_frame_idx, instance_nv));
-                                    let mut frame =
-                                        crate::frame::CallFrame::new(&closure, callee_base);
-                                    frame.return_reg = Some(call_dest);
-                                    ctx_ref.frames.push(frame);
-                                    return ctor_closure_ptr;
+                            if !closure.proto.is_async
+                                && !closure.proto.is_generator
+                                && closure.jit_fn().is_some()
+                            {
+                                let required_cap =
+                                    callee_base + closure.proto.register_count as usize + 32;
+                                let required_len =
+                                    callee_base + closure.proto.register_count as usize;
+                                let stack_len = ctx_ref.stack.len();
+                                if ctx_ref.stack.capacity() < required_cap {
+                                    ctx_ref.stack.reserve(required_cap - stack_len);
                                 }
+                                if stack_len < required_len {
+                                    ctx_ref.stack.set_len(required_len);
+                                    let ptr = ctx_ref.stack.as_mut_ptr();
+                                    for i in stack_len..required_len {
+                                        std::ptr::write(ptr.add(i), VmValue::null());
+                                    }
+                                }
+                                let ctor_closure_ptr =
+                                    &*closure as *const crate::closure::VmClosure;
+                                let returning_frame_idx = ctx_ref.frames.len();
+                                ctx_ref
+                                    .pending_constructors
+                                    .push((returning_frame_idx, instance_nv));
+                                let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
+                                frame.return_reg = Some(call_dest);
+                                ctx_ref.frames.push(frame);
+                                return ctor_closure_ptr;
+                            }
                         }
                     }
                     varn_types::Value::NativeFn(ref b) => {
@@ -152,9 +156,8 @@ pub(crate) extern "C" fn jit_prepare_call(
                 let actual_count = arg_count - 1;
                 if actual_count <= 8 {
                     let mut buf = [VmValue::null(); 8];
-                    buf[..actual_count].copy_from_slice(
-                        &ctx_ref.stack[(base + 1)..(base + 1 + actual_count)],
-                    );
+                    buf[..actual_count]
+                        .copy_from_slice(&ctx_ref.stack[(base + 1)..(base + 1 + actual_count)]);
                     ctx_ref.invoke_native(f, &buf[..actual_count])
                 } else {
                     let vargs: Vec<VmValue> = (1..=actual_count)

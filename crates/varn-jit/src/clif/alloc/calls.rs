@@ -9,8 +9,8 @@ use super::super::emit::{
 };
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
-    AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    store_home, AllocCtx,
 };
 
 pub(crate) fn emit_call(
@@ -75,7 +75,9 @@ pub(crate) fn emit_call(
     }
 
     let (callee_tag, callee_payload) = b.ins().isplit(callee);
-    let expected_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+    let expected_tag = b
+        .ins()
+        .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
     let same_tag = b.ins().icmp(IntCC::Equal, callee_tag, expected_tag);
     let expected_payload = b.ins().iconst(types::I64, t.expected_bits as i64);
     let same_payload = b.ins().icmp(IntCC::Equal, callee_payload, expected_payload);

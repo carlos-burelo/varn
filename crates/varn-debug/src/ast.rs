@@ -192,14 +192,14 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
             finally,
         } => {
             terminal::log(format!("{indent}{marker}{}", chalk("TryStmt").bold()));
-            print_stmt(block, &child_indent, catches.is_empty() && finally.is_none());
+            print_stmt(
+                block,
+                &child_indent,
+                catches.is_empty() && finally.is_none(),
+            );
             for (i, c) in catches.iter().enumerate() {
                 let is_last = i == catches.len() - 1 && finally.is_none();
-                let m = if is_last {
-                    "└── "
-                } else {
-                    "├── "
-                };
+                let m = if is_last { "└── " } else { "├── " };
                 let param_str = c
                     .param
                     .as_ref()
@@ -210,10 +210,7 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
                     chalk("Catch").bold(),
                     chalk(param_str).yellow()
                 ));
-                let c_ind = format!(
-                    "{child_indent}{}",
-                    if is_last { "    " } else { "│   " }
-                );
+                let c_ind = format!("{child_indent}{}", if is_last { "    " } else { "│   " });
                 print_stmt(&c.body, &c_ind, true);
             }
             if let Some(f) = finally {

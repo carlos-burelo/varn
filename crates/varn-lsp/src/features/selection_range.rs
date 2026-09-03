@@ -76,12 +76,7 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
     })
 }
 
-fn collect_enclosing_ranges(
-    program: &Program,
-    line: u32,
-    col: u32,
-    ranges: &mut Vec<Range>,
-) {
+fn collect_enclosing_ranges(program: &Program, line: u32, col: u32, ranges: &mut Vec<Range>) {
     for stmt in &program.body {
         collect_in_stmt(stmt, line, col, ranges);
     }

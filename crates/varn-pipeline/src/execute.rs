@@ -5,9 +5,9 @@ use std::rc::Rc;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
+use varn_types::capabilities::CapabilitySet;
 use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
-use varn_types::capabilities::CapabilitySet;
 use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -19,7 +19,14 @@ pub fn execute(
     path: &str,
     debug: &DebugFlags,
 ) -> PipelineResult<()> {
-    execute_with_caps(proto, precompiled, source, path, debug, CapabilitySet::allow_all())
+    execute_with_caps(
+        proto,
+        precompiled,
+        source,
+        path,
+        debug,
+        CapabilitySet::allow_all(),
+    )
 }
 
 pub fn execute_with_caps(
@@ -46,7 +53,10 @@ pub fn execute_with_caps(
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            varn_core::term::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
+            varn_core::term::terminal::tagged(
+                "pipeline:execute",
+                format_args!("running builtin {name}"),
+            );
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine

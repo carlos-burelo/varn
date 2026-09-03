@@ -365,13 +365,7 @@ impl<'r> Binder<'r> {
                             .type_ann
                             .as_ref()
                             .map(|ann| type_resolution::resolve_type_node(ann, Some(self)));
-                        self.bind_pattern(
-                            p,
-                            SymbolKind::Let,
-                            block.range.start.line,
-                            None,
-                            ty,
-                        );
+                        self.bind_pattern(p, SymbolKind::Let, block.range.start.line, None, ty);
                     }
                     self.bind_stmt(&clause.body);
                     self.finalize_array_watch(child);

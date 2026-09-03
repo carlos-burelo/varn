@@ -45,7 +45,11 @@ pub fn print_hotspots(h: &HotspotCounters) {
         if interp_only.len() > TOP_N {
             terminal::log(format!(
                 "  {}",
-                chalk(format!("… y {} fns más interpretadas", interp_only.len() - TOP_N)).dim()
+                chalk(format!(
+                    "… y {} fns más interpretadas",
+                    interp_only.len() - TOP_N
+                ))
+                .dim()
             ));
         }
         terminal::log(row_note(

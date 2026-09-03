@@ -70,7 +70,10 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                             parent_str, mem_res.member_name, params, ft.return_type
                         )
                     } else {
-                        format!("(method) {}.{}: {}", parent_str, mem_res.member_name, mem_res.member_ty)
+                        format!(
+                            "(method) {}.{}: {}",
+                            parent_str, mem_res.member_name, mem_res.member_ty
+                        )
                     }
                 }
                 varn_checker::ResolvedMemberKind::StaticMethod => {
@@ -114,16 +117,29 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                     )
                 }
                 varn_checker::ResolvedMemberKind::Getter => {
-                    format!("(getter) {}.{}: {}", parent_str, mem_res.member_name, mem_res.member_ty)
+                    format!(
+                        "(getter) {}.{}: {}",
+                        parent_str, mem_res.member_name, mem_res.member_ty
+                    )
                 }
                 varn_checker::ResolvedMemberKind::Setter => {
-                    format!("(setter) {}.{}: {}", parent_str, mem_res.member_name, mem_res.member_ty)
+                    format!(
+                        "(setter) {}.{}: {}",
+                        parent_str, mem_res.member_name, mem_res.member_ty
+                    )
                 }
                 varn_checker::ResolvedMemberKind::Property => {
-                    format!("(property) {}.{}: {}", parent_str, mem_res.member_name, mem_res.member_ty)
+                    format!(
+                        "(property) {}.{}: {}",
+                        parent_str, mem_res.member_name, mem_res.member_ty
+                    )
                 }
                 varn_checker::ResolvedMemberKind::Constructor => {
-                    format!("(constructor) {}({})", parent_str, format_member_params(&mem_res.member_ty))
+                    format!(
+                        "(constructor) {}({})",
+                        parent_str,
+                        format_member_params(&mem_res.member_ty)
+                    )
                 }
                 // A nested type reads as the declaration it is — `class A.B`,
                 // not `(property) A.B: B`.
@@ -227,7 +243,6 @@ fn format_fn_params(params: &[varn_checker::types::FunctionParam]) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
-
 
 /// The parameter list of a member whose type is a function, else empty.
 fn format_member_params(ty: &varn_checker::Type) -> String {

@@ -339,10 +339,7 @@ impl DocumentState {
     /// A type-shaped symbol (class, interface, enum, namespace, struct) is
     /// asked about *by name*: `sym.ty()` for a class is the type of the class
     /// itself, not of its instances.
-    pub fn members_of(
-        &self,
-        sym: SymbolView<'_>,
-    ) -> Vec<varn_checker::ResolvedMemberSummary> {
+    pub fn members_of(&self, sym: SymbolView<'_>) -> Vec<varn_checker::ResolvedMemberSummary> {
         let ty = match sym.kind() {
             SymbolKind::Class
             | SymbolKind::Interface

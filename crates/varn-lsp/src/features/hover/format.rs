@@ -1,6 +1,6 @@
 use crate::document::{DocumentState, SymbolView};
-use varn_checker::{ResolvedMemberKind, ResolvedMemberSummary};
 use varn_checker::SymbolKind;
+use varn_checker::{ResolvedMemberKind, ResolvedMemberSummary};
 use varn_core::TypeTag;
 
 pub fn format_type_params(type_params: &[String]) -> String {
@@ -59,12 +59,23 @@ fn format_fn(sym: SymbolView<'_>) -> String {
     if sym.is_arrow() {
         return format!(
             "{}{}{} {}{}: {}",
-            async_prefix, kw, gen_star, sym.name(), tp, sym.type_str()
+            async_prefix,
+            kw,
+            gen_star,
+            sym.name(),
+            tp,
+            sym.type_str()
         );
     }
     format!(
         "{}{}{}{}{}({}): {}",
-        async_prefix, kw, gen_star, sym.name(), tp, sym.params_str(), sym.type_str()
+        async_prefix,
+        kw,
+        gen_star,
+        sym.name(),
+        tp,
+        sym.params_str(),
+        sym.type_str()
     )
 }
 

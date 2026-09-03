@@ -76,9 +76,12 @@ impl<'r> Checker<'r> {
             StmtKind::Decl(decl) => self.check_decl(decl, bind),
 
             StmtKind::Block { stmts } => {
-                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
-                    checker.check_stmts(stmts, bind)
-                });
+                self.with_next_child_scope_span(
+                    bind,
+                    stmt.range.start.offset,
+                    stmt.range.end.offset,
+                    |checker| checker.check_stmts(stmts, bind),
+                );
             }
 
             StmtKind::Expr { expression } => {
@@ -193,23 +196,28 @@ impl<'r> Checker<'r> {
                 body,
             } => {
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
-                    if let Some(i) = init {
-                        match i.as_ref() {
-                            ForInit::Var { declarators, .. } => {
-                                checker.check_for_var_init(declarators, bind)
+                self.with_next_child_scope_span(
+                    bind,
+                    stmt.range.start.offset,
+                    stmt.range.end.offset,
+                    |checker| {
+                        if let Some(i) = init {
+                            match i.as_ref() {
+                                ForInit::Var { declarators, .. } => {
+                                    checker.check_for_var_init(declarators, bind)
+                                }
+                                ForInit::Expr(e) => checker.check_expr(e, bind),
                             }
-                            ForInit::Expr(e) => checker.check_expr(e, bind),
                         }
-                    }
-                    if let Some(t) = test {
-                        checker.check_expr(t, bind);
-                    }
-                    if let Some(u) = update {
-                        checker.check_expr(u, bind);
-                    }
-                    checker.check_stmt(body, bind);
-                });
+                        if let Some(t) = test {
+                            checker.check_expr(t, bind);
+                        }
+                        if let Some(u) = update {
+                            checker.check_expr(u, bind);
+                        }
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 
@@ -240,10 +248,15 @@ impl<'r> Checker<'r> {
                     _ => Type::Dynamic,
                 };
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
-                    checker.check_pattern(left, &elem_ty, bind);
-                    checker.check_stmt(body, bind);
-                });
+                self.with_next_child_scope_span(
+                    bind,
+                    stmt.range.start.offset,
+                    stmt.range.end.offset,
+                    |checker| {
+                        checker.check_pattern(left, &elem_ty, bind);
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 
@@ -252,10 +265,15 @@ impl<'r> Checker<'r> {
             } => {
                 self.check_expr(right, bind);
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
-                    checker.check_pattern(left, &Type::Str, bind);
-                    checker.check_stmt(body, bind);
-                });
+                self.with_next_child_scope_span(
+                    bind,
+                    stmt.range.start.offset,
+                    stmt.range.end.offset,
+                    |checker| {
+                        checker.check_pattern(left, &Type::Str, bind);
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 

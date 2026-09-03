@@ -5,11 +5,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_typeof_val(
-    ctx: *mut ExecCtx,
-    v_tag: u64,
-    v_payload: u64,
-) {
+pub(crate) extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let v = VmValue::from_raw_parts(v_tag, v_payload);
@@ -30,15 +26,15 @@ pub(crate) extern "C" fn jit_instanceof(
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
         let r = crate::exec::advanced::instanceof(a, b, &ctx_ref.heap);
-        if r { 1 } else { 0 }
+        if r {
+            1
+        } else {
+            0
+        }
     }
 }
 
-pub(crate) extern "C" fn jit_get_enum_tag(
-    ctx: *mut ExecCtx,
-    val_tag: u64,
-    val_payload: u64,
-) {
+pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
@@ -57,14 +53,15 @@ pub(crate) extern "C" fn jit_is_array_stub(
     unsafe {
         let ctx_ref = &*ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
-        if crate::exec::advanced::is_array(val, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::advanced::is_array(val, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
-pub(crate) extern "C" fn jit_make_enum_variant(
-    ctx: *mut ExecCtx,
-    ip_before: usize,
-) {
+pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;

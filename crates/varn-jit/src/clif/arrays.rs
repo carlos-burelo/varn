@@ -156,9 +156,18 @@ pub(super) fn emit_array_length(
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
-        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+        (
+            b.ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+            obj,
+        )
     };
-    call_helper_void(b, c.cc, c.helpers.array_length, &[c.exec_ctx, obj_tag, obj_payload]);
+    call_helper_void(
+        b,
+        c.cc,
+        c.helpers.array_length,
+        &[c.exec_ctx, obj_tag, obj_payload],
+    );
     let boxed = b.ins().load(
         types::I128,
         MemFlags::trusted(),
@@ -231,8 +240,12 @@ pub(super) fn emit_array_get_index(
             );
             let lay = &c.helpers.array_layout;
             let m = MemFlags::trusted();
-            let data = b.ins().load(types::I64, m, payload, (16 + lay.elems_ptr_off) as i32);
-            let len = b.ins().load(types::I64, m, payload, (16 + lay.elems_len_off) as i32);
+            let data = b
+                .ins()
+                .load(types::I64, m, payload, (16 + lay.elems_ptr_off) as i32);
+            let len = b
+                .ins()
+                .load(types::I64, m, payload, (16 + lay.elems_len_off) as i32);
             let disc = array_disc(b, payload, lay);
             (data, len, disc)
         }
@@ -279,7 +292,11 @@ pub(super) fn emit_array_get_index(
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
-        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+        (
+            b.ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+            obj,
+        )
     };
     let (key_tag, key_payload) = b.ins().isplit(boxed_key);
     call_helper_void(
@@ -355,7 +372,9 @@ pub(super) fn emit_array_set_index(
                 }
                 _ => {
                     let raw = use_boxed(b, c.vars, state, val_r)?;
-                    let tag_v = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                    let tag_v = b
+                        .ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
                     b.ins().iconcat(tag_v, raw)
                 }
             }
@@ -364,7 +383,11 @@ pub(super) fn emit_array_set_index(
         let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
             b.ins().isplit(obj)
         } else {
-            (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+            (
+                b.ins()
+                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+                obj,
+            )
         };
         let (key_tag, key_payload) = b.ins().isplit(boxed_key);
         let (val_tag, val_payload) = b.ins().isplit(val);
@@ -372,7 +395,15 @@ pub(super) fn emit_array_set_index(
             b,
             c.cc,
             c.helpers.jit_array_set_fast,
-            &[c.exec_ctx, obj_tag, obj_payload, key_tag, key_payload, val_tag, val_payload],
+            &[
+                c.exec_ctx,
+                obj_tag,
+                obj_payload,
+                key_tag,
+                key_payload,
+                val_tag,
+                val_payload,
+            ],
         );
         return Ok(());
     }
@@ -459,7 +490,11 @@ pub(super) fn emit_array_set_index(
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
-        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+        (
+            b.ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+            obj,
+        )
     };
     let (key_tag, key_payload) = b.ins().isplit(boxed_key);
     let (val_tag, val_payload) = b.ins().isplit(boxed_val);
@@ -467,7 +502,15 @@ pub(super) fn emit_array_set_index(
         b,
         c.cc,
         c.helpers.jit_array_set_fast,
-        &[c.exec_ctx, obj_tag, obj_payload, key_tag, key_payload, val_tag, val_payload],
+        &[
+            c.exec_ctx,
+            obj_tag,
+            obj_payload,
+            key_tag,
+            key_payload,
+            val_tag,
+            val_payload,
+        ],
     );
     b.ins().jump(merge, &[]);
 

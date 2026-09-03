@@ -94,7 +94,9 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         Var(HirBinding::Param(_)) | Var(HirBinding::Global(..)) => true,
         Var(HirBinding::Local(_)) | Var(HirBinding::Upvalue(..)) => false,
 
-        NonNull(x) | Cast { expr: x, .. } | Spread(x) | TypeTest { value: x, .. } => body_is_inlinable(x),
+        NonNull(x) | Cast { expr: x, .. } | Spread(x) | TypeTest { value: x, .. } => {
+            body_is_inlinable(x)
+        }
         Sequence(xs) => xs.iter().all(body_is_inlinable),
         Range { start, end, .. } => body_is_inlinable(start) && body_is_inlinable(end),
         Template(parts) => parts.iter().all(|p| match p {
@@ -125,9 +127,7 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         }
         Conditional {
             test, cons, alt, ..
-        } => {
-            body_is_inlinable(test) && body_is_inlinable(cons) && body_is_inlinable(alt)
-        }
+        } => body_is_inlinable(test) && body_is_inlinable(cons) && body_is_inlinable(alt),
         Array(els) | Tuple(els) => els.iter().all(|el| match el {
             HirArrayEl::Expr(x) | HirArrayEl::Spread(x) => body_is_inlinable(x),
             HirArrayEl::Hole => true,

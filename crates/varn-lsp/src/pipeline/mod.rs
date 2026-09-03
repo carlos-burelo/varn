@@ -3,9 +3,7 @@ mod params;
 use std::collections::HashMap;
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
-use crate::document::{
-    uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord,
-};
+use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
 use varn_checker::SymbolKind;
 use varn_core::ast::{Decl, Stmt, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};

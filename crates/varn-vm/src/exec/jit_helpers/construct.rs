@@ -38,6 +38,17 @@ pub(super) fn jit_construct_fast(
     Some(v)
 }
 
+struct ActiveCtorCache {
+    class_id: u32,
+    version: u32,
+    closure: std::rc::Rc<crate::closure::VmClosure>,
+    jit_fn: Option<varn_jit::JitFn>,
+}
+
+thread_local! {
+    static ACTIVE_CTOR: std::cell::RefCell<Option<ActiveCtorCache>> = const { std::cell::RefCell::new(None) };
+}
+
 /// `new cls(...)` with the arguments already staged as a contiguous window at
 /// `callee_base`, whose first slot is the callee placeholder the instance
 /// replaces. Returns `None` for any shape the fast path does not cover (async /
@@ -59,40 +70,66 @@ pub(crate) fn construct_staged_fast(
     let ver = cls
         .vtable_version
         .load(std::sync::atomic::Ordering::Relaxed);
-    let cached: Option<Option<std::rc::Rc<dyn std::any::Any>>> = match &*cls.ctor_rt_cache.borrow()
-    {
-        Some((cached_ver, entry)) if *cached_ver == ver => Some(entry.clone()),
-        _ => None,
-    };
-    let jit_ctor = match cached {
-        Some(None) => None,
-        Some(Some(any)) => {
-            let nc = any.downcast::<crate::closure::VmClosure>().ok()?;
-            let jit_fn = nc.jit_fn()?;
-            Some((nc, jit_fn))
-        }
-        None => {
-            let ctor = cls.constructor();
-            match &ctor {
-                Some(varn_types::Value::VmValue(payload)) => {
-                    let wrapper = payload
-                        .as_any()
-                        .downcast_ref::<crate::closure::VmClosurePayload>()?;
-                    let nc = &wrapper.0;
-                    if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
-                        return None;
-                    }
-                    let jit_fn = nc.jit_fn()?;
-                    *cls.ctor_rt_cache.borrow_mut() =
-                        Some((ver, Some(nc.clone() as std::rc::Rc<dyn std::any::Any>)));
-                    Some((nc.clone(), jit_fn))
-                }
-                Some(_) => return None,
-                None => {
-                    *cls.ctor_rt_cache.borrow_mut() = Some((ver, None));
-                    None
-                }
+    let cached_entry = ACTIVE_CTOR.with(|cell| {
+        let b = cell.borrow();
+        if let Some(ref c) = *b {
+            if c.class_id == cls.id && c.version == ver {
+                return Some((c.closure.clone(), c.jit_fn));
             }
+        }
+        None
+    });
+
+    let jit_ctor = match cached_entry {
+        Some((closure, jit_fn)) => jit_fn.map(|f| (closure, f)),
+        None => {
+            let cached: Option<Option<std::rc::Rc<dyn std::any::Any>>> =
+                match &*cls.ctor_rt_cache.borrow() {
+                    Some((cached_ver, entry)) if *cached_ver == ver => Some(entry.clone()),
+                    _ => None,
+                };
+            let resolved = match cached {
+                Some(None) => None,
+                Some(Some(any)) => {
+                    let nc = any.downcast::<crate::closure::VmClosure>().ok()?;
+                    let jit_fn = nc.jit_fn()?;
+                    Some((nc, jit_fn))
+                }
+                None => {
+                    let ctor = cls.constructor();
+                    match &ctor {
+                        Some(varn_types::Value::VmValue(payload)) => {
+                            let wrapper = payload
+                                .as_any()
+                                .downcast_ref::<crate::closure::VmClosurePayload>()?;
+                            let nc = &wrapper.0;
+                            if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
+                                return None;
+                            }
+                            let jit_fn = nc.jit_fn()?;
+                            *cls.ctor_rt_cache.borrow_mut() =
+                                Some((ver, Some(nc.clone() as std::rc::Rc<dyn std::any::Any>)));
+                            Some((nc.clone(), jit_fn))
+                        }
+                        Some(_) => return None,
+                        None => {
+                            *cls.ctor_rt_cache.borrow_mut() = Some((ver, None));
+                            None
+                        }
+                    }
+                }
+            };
+            if let Some((ref nc, jit_fn)) = resolved {
+                ACTIVE_CTOR.with(|cell| {
+                    *cell.borrow_mut() = Some(ActiveCtorCache {
+                        class_id: cls.id,
+                        version: ver,
+                        closure: nc.clone(),
+                        jit_fn: Some(jit_fn),
+                    });
+                });
+            }
+            resolved
         }
     };
 
@@ -139,7 +176,9 @@ pub(crate) fn construct_staged_fast(
 
     let final_instance = ctx_ref.stack[callee_base];
     ctx_ref.frames.pop();
-    ctx_ref.close_upvalues_above(callee_base);
+    if closure.proto.upvalue_count > 0 {
+        ctx_ref.close_upvalues_above(callee_base);
+    }
     if on {
         prof::record(prof::Seg::CtorFrame, t_frame, prof::read());
     }

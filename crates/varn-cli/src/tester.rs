@@ -79,54 +79,52 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         let results_store = Arc::clone(&results);
         let fail_fast = args.fail_fast;
 
-        handles.push(std::thread::spawn(move || {
-            loop {
-                if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
-                    break;
-                }
-
-                let item = {
-                    let mut guard = queue.lock().unwrap();
-                    guard.pop()
-                };
-                let Some((idx, path)) = item else { break };
-
-                let display_name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| path.to_string_lossy().to_string());
-
-                let t0 = Instant::now();
-                let run_res = pipeline::run(&RunOpts {
-                    file_path: path.to_string_lossy().to_string(),
-                    eval: None,
-                    verbose: false,
-                    no_run: false,
-                    debug: Default::default(),
-                    trace: false,
-                    strict: false,
-                    capabilities: Default::default(),
-                });
-                let elapsed = t0.elapsed();
-
-                let passed = run_res.is_ok();
-                let output = run_res.err().map(|e| format!("{e}")).unwrap_or_default();
-
-                if passed {
-                    suites_passed_cnt.fetch_add(1, Ordering::SeqCst);
-                } else {
-                    suites_failed_cnt.fetch_add(1, Ordering::SeqCst);
-                    has_failure_flag.store(true, Ordering::SeqCst);
-                }
-
-                results_store.lock().unwrap().push(TestResult {
-                    idx,
-                    display_name,
-                    passed,
-                    duration: elapsed,
-                    output,
-                });
+        handles.push(std::thread::spawn(move || loop {
+            if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
+                break;
             }
+
+            let item = {
+                let mut guard = queue.lock().unwrap();
+                guard.pop()
+            };
+            let Some((idx, path)) = item else { break };
+
+            let display_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.to_string_lossy().to_string());
+
+            let t0 = Instant::now();
+            let run_res = pipeline::run(&RunOpts {
+                file_path: path.to_string_lossy().to_string(),
+                eval: None,
+                verbose: false,
+                no_run: false,
+                debug: Default::default(),
+                trace: false,
+                strict: false,
+                capabilities: Default::default(),
+            });
+            let elapsed = t0.elapsed();
+
+            let passed = run_res.is_ok();
+            let output = run_res.err().map(|e| format!("{e}")).unwrap_or_default();
+
+            if passed {
+                suites_passed_cnt.fetch_add(1, Ordering::SeqCst);
+            } else {
+                suites_failed_cnt.fetch_add(1, Ordering::SeqCst);
+                has_failure_flag.store(true, Ordering::SeqCst);
+            }
+
+            results_store.lock().unwrap().push(TestResult {
+                idx,
+                display_name,
+                passed,
+                duration: elapsed,
+                output,
+            });
         }));
     }
 
@@ -190,7 +188,10 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         );
         println!();
         for r in all_results.iter().filter(|r| !r.passed) {
-            println!("  \x1b[31m✖\x1b[0m  {}  \x1b[2m({:.1?})\x1b[0m", r.display_name, r.duration);
+            println!(
+                "  \x1b[31m✖\x1b[0m  {}  \x1b[2m({:.1?})\x1b[0m",
+                r.display_name, r.duration
+            );
             if !r.output.is_empty() {
                 let first = r.output.lines().next().unwrap_or(&r.output);
                 println!("     \x1b[2m{first}\x1b[0m");
@@ -244,7 +245,12 @@ fn discover_test_files(path: Option<&str>) -> Result<Vec<PathBuf>, CliError> {
     }
 
     let mut files: Vec<PathBuf> = std::fs::read_dir(&base)
-        .map_err(|e| CliError::fatal(format!("Failed to read directory '{}': {e}", base.display())))?
+        .map_err(|e| {
+            CliError::fatal(format!(
+                "Failed to read directory '{}': {e}",
+                base.display()
+            ))
+        })?
         .filter_map(|entry| entry.ok())
         .map(|e| e.path())
         .filter(|p| p.extension().map(|ext| ext == "vn").unwrap_or(false))

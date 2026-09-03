@@ -49,7 +49,13 @@ impl<'a> Lowerer<'a> {
             tag += 1;
         }
 
-        type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a Modifiers);
+        type MethodAstTuple<'a> = (
+            Rc<str>,
+            &'a [Param],
+            &'a Stmt,
+            &'a [Decorator],
+            &'a Modifiers,
+        );
 
         let mut fields: Vec<Rc<str>> = Vec::new();
         let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();

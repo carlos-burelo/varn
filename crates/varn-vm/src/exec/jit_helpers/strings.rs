@@ -38,11 +38,7 @@ pub(crate) extern "C" fn jit_str_slice(
     }
 }
 
-pub(crate) extern "C" fn jit_str_length(
-    ctx: *mut ExecCtx,
-    v_tag: u64,
-    v_payload: u64,
-) {
+pub(crate) extern "C" fn jit_str_length(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let v = VmValue::from_raw_parts(v_tag, v_payload);
@@ -80,7 +76,8 @@ pub(crate) extern "C" fn jit_str_starts_with(
         let p_opt = if prefix_val.is_sso() {
             Some(prefix_val.sso_as_str(&mut buf_b))
         } else if prefix_val.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(hs)) = ctx_ref.heap.get(prefix_val.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Str(hs)) = ctx_ref.heap.get(prefix_val.as_heap_idx())
+            {
                 Some(hs.as_str())
             } else {
                 None
@@ -123,7 +120,8 @@ pub(crate) extern "C" fn jit_str_ends_with(
         let p_opt = if suffix_val.is_sso() {
             Some(suffix_val.sso_as_str(&mut buf_b))
         } else if suffix_val.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(hs)) = ctx_ref.heap.get(suffix_val.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Str(hs)) = ctx_ref.heap.get(suffix_val.as_heap_idx())
+            {
                 Some(hs.as_str())
             } else {
                 None
@@ -138,4 +136,3 @@ pub(crate) extern "C" fn jit_str_ends_with(
         ctx_ref.jit_native_result = VmValue::from_bool(res);
     }
 }
-

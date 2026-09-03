@@ -9,7 +9,6 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 
-use super::alloc;
 use super::emit;
 
 /// Block starts: jump targets, loop headers, and the fall-through after a
@@ -105,7 +104,7 @@ pub(super) fn loop_regions(
     proto: &varn_types::FunctionProto,
     code: &[u16],
     pool: &[PoolEntry],
-    has_alloc: bool,
+    _has_alloc: bool,
 ) -> Result<Vec<emit::Region>, String> {
     let mut regions: Vec<emit::Region> = Vec::new();
     let mut scan_ip = 0usize;
@@ -119,13 +118,7 @@ pub(super) fn loop_regions(
             // loop allocates nothing, and treating it as an allocation kept
             // BOTH caches — the array payloads and the string bytes — out of
             // exactly the loops that need them most.
-            let hoistable = header > 0
-                && (!has_alloc
-                    || !alloc::has_alloc_scan(
-                        &code[header..ip],
-                        pool,
-                        alloc::IntrinsicScan::ByWireByte,
-                    )?);
+            let hoistable = header > 0;
             if hoistable {
                 let mut receivers: Vec<usize> = Vec::new();
                 let mut string_sites: Vec<(usize, usize)> = Vec::new();
@@ -137,44 +130,39 @@ pub(super) fn loop_regions(
                     let jinfo = decode(code, j, pool).ok_or("clif: undecodable opcode")?;
                     let jop = OpCode::from_u8(code[j] as u8).ok_or("clif: unknown opcode")?;
                     let dest = (code[j] >> 8) as usize;
+                    if let Some(def_reg) = jinfo.def {
+                        redefined.push(def_reg as usize);
+                    }
                     match jop {
                         OpCode::ArrayGetIndex | OpCode::ArrayLength => {
                             receivers.push((code[j + 1] >> 8) as usize);
-                            redefined.push(dest);
                         }
                         OpCode::ArraySetIndex => {
                             receivers.push(dest);
                             written.push(dest);
                         }
+                        OpCode::SetIndex | OpCode::ArrayPush | OpCode::ArrayExtend => {
+                            let r = (code[j] >> 8) as usize;
+                            written.push(r);
+                        }
+                        OpCode::CallMethod | OpCode::InvokeVirtual => {
+                            let this_reg = (code[j + 1] & 0xFF) as usize;
+                            written.push(this_reg);
+                        }
                         OpCode::GetFixedField => {
                             let obj_r = (code[j + 1] >> 8) as usize;
                             objects.push(obj_r);
-                            redefined.push(dest);
                         }
                         OpCode::SetFixedField => {
                             let obj_r = dest;
                             objects.push(obj_r);
                         }
-                        OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
-                        // An `Intrinsic` stages its receiver in `dest` and its
-                        // arguments in the registers above it, so `dest` is
-                        // both the receiver and the result slot: it IS
-                        // redefined, and the fallthrough arm below records
-                        // that. The register the receiver was COPIED FROM is
-                        // what can be hoisted, and the bytecode does not name
-                        // it here — so string caching keys off the copy source
-                        // found by `str_receiver_source`.
                         OpCode::Intrinsic => {
                             if let Some(src) = str_receiver_source(code, pool, header, j)? {
                                 string_sites.push((j, src));
                             }
-                            redefined.push(dest);
                         }
-                        _ => {
-                            if jinfo.def.is_some() {
-                                redefined.push(dest);
-                            }
-                        }
+                        _ => {}
                     }
                     j += jinfo.len;
                 }

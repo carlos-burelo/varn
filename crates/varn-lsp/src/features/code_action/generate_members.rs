@@ -31,7 +31,10 @@ pub fn generate_class_member_actions(
     for member in &class.body {
         match member {
             ClassMember::Property { key, type_ann, .. } => {
-                let ty_str = type_ann.as_ref().map(|t| format!("{t:?}")).unwrap_or_else(|| "dynamic".to_string());
+                let ty_str = type_ann
+                    .as_ref()
+                    .map(|t| format!("{t:?}"))
+                    .unwrap_or_else(|| "dynamic".to_string());
                 fields.push((key.to_string(), ty_str));
             }
             ClassMember::Constructor { .. } => {
@@ -66,9 +69,7 @@ pub fn generate_class_member_actions(
             .map(|(n, _)| format!("        this.{n} = {n};\n"))
             .collect::<String>();
 
-        let ctor_code = format!(
-            "    constructor({params}) {{\n{assignments}    }}\n\n"
-        );
+        let ctor_code = format!("    constructor({params}) {{\n{assignments}    }}\n\n");
 
         let edit = TextEdit {
             range: Range {

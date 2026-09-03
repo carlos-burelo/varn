@@ -13,7 +13,10 @@ fn test_postfix_completions() {
     let src = "let x = user.name.\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
     let items = build_postfix_completions(&state, 0, 18);
-    assert!(!items.is_empty(), "Should generate postfix completion items");
+    assert!(
+        !items.is_empty(),
+        "Should generate postfix completion items"
+    );
 
     let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
     assert!(labels.contains(&"let"), "Should have .let postfix");
@@ -31,8 +34,14 @@ fn test_extract_variable_action() {
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
     let uri = Url::parse("file:///test.vn").unwrap();
     let range = Range {
-        start: Position { line: 0, character: 12 },
-        end: Position { line: 0, character: 24 },
+        start: Position {
+            line: 0,
+            character: 12,
+        },
+        end: Position {
+            line: 0,
+            character: 24,
+        },
     };
     let action = generate_extract_variable_action(&state, &uri, range);
     assert!(action.is_some(), "Should generate extract variable action");
@@ -44,8 +53,14 @@ fn test_extract_function_action() {
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
     let uri = Url::parse("file:///test.vn").unwrap();
     let range = Range {
-        start: Position { line: 1, character: 4 },
-        end: Position { line: 3, character: 18 },
+        start: Position {
+            line: 1,
+            character: 4,
+        },
+        end: Position {
+            line: 3,
+            character: 18,
+        },
     };
     let action = generate_extract_function_action(&state, &uri, range);
     assert!(action.is_some(), "Should generate extract function action");
@@ -57,7 +72,10 @@ fn test_generate_class_members() {
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
     let uri = Url::parse("file:///test.vn").unwrap();
     let actions = generate_class_member_actions(&state, &uri, 1);
-    assert!(!actions.is_empty(), "Should generate constructor and getter/setter actions");
+    assert!(
+        !actions.is_empty(),
+        "Should generate constructor and getter/setter actions"
+    );
 }
 
 #[test]
@@ -74,17 +92,25 @@ fn test_formatting_engine() {
     let edits = build_formatting(unformatted, options);
     assert!(edits.is_some(), "Should produce indentation edits");
     let edits_list = edits.unwrap();
-    assert!(!edits_list.is_empty(), "Should have edits for unindented lines");
+    assert!(
+        !edits_list.is_empty(),
+        "Should have edits for unindented lines"
+    );
 }
 
 #[test]
 fn test_reflection_colon_colon_completion() {
-    let src = "class SampleUser {\n    name: str;\n    age: int;\n}\nconst fields = SampleUser::;\n";
+    let src =
+        "class SampleUser {\n    name: str;\n    age: int;\n}\nconst fields = SampleUser::;\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    let receiver = varn_lsp::features::completion::reflection::colon_colon_receiver(&state, 4, 27, Some(":"));
+    let receiver =
+        varn_lsp::features::completion::reflection::colon_colon_receiver(&state, 4, 27, Some(":"));
     assert_eq!(receiver.as_deref(), Some("SampleUser"));
 
-    let items = varn_lsp::features::completion::reflection::build_reflection_completions(&state, "SampleUser");
+    let items = varn_lsp::features::completion::reflection::build_reflection_completions(
+        &state,
+        "SampleUser",
+    );
     assert!(!items.is_empty(), "Should generate reflection items");
 
     let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -103,30 +129,54 @@ fn test_reflection_colon_colon_completion() {
 fn test_root_scope_isolation_from_unreachable_type_parameters() {
     let src = "function compose<A, B, C>(f: (a: B) => C, g: (b: A) => B): (c: A) => C {\n    return (x: A) => f(g(x));\n}\nconst double: (n: int) => int = (n: int) => n * 2;\n\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    
+
     // At line 4 (top-level, root scope)
     let root_items = varn_lsp::features::completion::build_completions(&state, 4, 0);
     let root_labels: Vec<&str> = root_items.iter().map(|i| i.label.as_str()).collect();
 
-    assert!(root_labels.contains(&"compose"), "Root should contain top-level function compose");
-    assert!(root_labels.contains(&"double"), "Root should contain top-level const double");
-    
+    assert!(
+        root_labels.contains(&"compose"),
+        "Root should contain top-level function compose"
+    );
+    assert!(
+        root_labels.contains(&"double"),
+        "Root should contain top-level const double"
+    );
+
     // MUST NOT contain type parameters A, B, C or inner function parameters x, f, g
-    assert!(!root_labels.contains(&"A"), "Root scope must NOT contain unreachable type parameter A");
-    assert!(!root_labels.contains(&"B"), "Root scope must NOT contain unreachable type parameter B");
-    assert!(!root_labels.contains(&"C"), "Root scope must NOT contain unreachable type parameter C");
-    assert!(!root_labels.contains(&"x"), "Root scope must NOT contain inner closure variable x");
+    assert!(
+        !root_labels.contains(&"A"),
+        "Root scope must NOT contain unreachable type parameter A"
+    );
+    assert!(
+        !root_labels.contains(&"B"),
+        "Root scope must NOT contain unreachable type parameter B"
+    );
+    assert!(
+        !root_labels.contains(&"C"),
+        "Root scope must NOT contain unreachable type parameter C"
+    );
+    assert!(
+        !root_labels.contains(&"x"),
+        "Root scope must NOT contain inner closure variable x"
+    );
 }
 
 #[test]
 fn test_get_cfg_graph_json() {
     let src = "function max(a: int, b: int): int {\n    if a > b {\n        return a;\n    } else {\n        return b;\n    }\n}\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    
+
     let cfg_json = varn_lsp::features::compiler_inspect::compile_and_get_cfg_json(&state);
     assert!(cfg_json.is_ok(), "CFG compilation must succeed");
-    
+
     let json_val = cfg_json.unwrap();
-    assert!(json_val.get("functions").is_some(), "Must have functions array");
-    assert!(json_val.get("bytecode").is_some(), "Must have bytecode disassembly");
+    assert!(
+        json_val.get("functions").is_some(),
+        "Must have functions array"
+    );
+    assert!(
+        json_val.get("bytecode").is_some(),
+        "Must have bytecode disassembly"
+    );
 }

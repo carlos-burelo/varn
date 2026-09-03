@@ -118,9 +118,7 @@ fn summary_to_doc(m: &varn_checker::ResolvedMemberSummary) -> Option<DocumentSym
     })
 }
 
-fn summary_to_symbol_kind(
-    k: varn_checker::ResolvedMemberKind,
-) -> tower_lsp::lsp_types::SymbolKind {
+fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> tower_lsp::lsp_types::SymbolKind {
     use tower_lsp::lsp_types::SymbolKind as L;
     use varn_checker::ResolvedMemberKind as R;
     match k {
@@ -129,7 +127,6 @@ fn summary_to_symbol_kind(
         _ => L::PROPERTY,
     }
 }
-
 
 fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
     let name_end = sym.col() + sym.name().len() as u32;

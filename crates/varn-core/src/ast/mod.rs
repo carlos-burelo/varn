@@ -27,8 +27,6 @@ pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};
 use crate::source::SourceRange;
 use rustc_hash::FxHashMap;
 
-
-
 #[derive(Default, Clone, Debug)]
 pub struct AstMetadata {
     pub ranges: FxHashMap<AstId, SourceRange>,

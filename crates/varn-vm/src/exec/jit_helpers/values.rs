@@ -32,7 +32,11 @@ pub(crate) extern "C" fn jit_eq(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::eq(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::eq(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -47,7 +51,11 @@ pub(crate) extern "C" fn jit_neq(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::neq(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::neq(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -62,7 +70,11 @@ pub(crate) extern "C" fn jit_lt(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::lt_heap(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::lt_heap(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -77,7 +89,11 @@ pub(crate) extern "C" fn jit_lte(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::lte_heap(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::lte_heap(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -92,7 +108,11 @@ pub(crate) extern "C" fn jit_gt(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::gt_heap(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::gt_heap(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -107,7 +127,11 @@ pub(crate) extern "C" fn jit_gte(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        if crate::exec::compare::gte_heap(a, b, &ctx_ref.heap) { 1 } else { 0 }
+        if crate::exec::compare::gte_heap(a, b, &ctx_ref.heap) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -165,11 +189,7 @@ pub(crate) extern "C" fn jit_mul(
     }
 }
 
-pub(crate) extern "C" fn jit_to_string(
-    ctx: *mut ExecCtx,
-    v_tag: u64,
-    v_payload: u64,
-) {
+pub(crate) extern "C" fn jit_to_string(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let v = VmValue::from_raw_parts(v_tag, v_payload);

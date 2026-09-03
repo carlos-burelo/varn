@@ -1,7 +1,7 @@
 use tower_lsp::lsp_types::HoverContents;
+use varn_core::term::terminal;
 use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
 use varn_debug::flags::DebugFlags;
-use varn_core::term::terminal;
 
 pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     use varn_debug::colors::{footer, header};

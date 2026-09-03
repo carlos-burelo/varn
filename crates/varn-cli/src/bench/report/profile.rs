@@ -2,9 +2,9 @@
 
 use std::time::Duration;
 
-use varn_core::OpCode;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
+use varn_core::OpCode;
 use varn_vm::VmProfile;
 
 use super::fmt::{fmt_dur, fmt_num, fmt_pct, row, row_note, DurScale};

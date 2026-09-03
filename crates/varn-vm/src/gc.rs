@@ -102,8 +102,6 @@ impl TricolorMarker {
         self.marks.get_color(idx)
     }
 
-
-
     pub(crate) fn clear(&mut self) {
         self.marks.clear();
         self.gray_queue.clear();

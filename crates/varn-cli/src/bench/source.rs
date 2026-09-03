@@ -1,14 +1,14 @@
 //! Benchmarking a `.vn` source file through the full pipeline.
 
-use varn_checker::module_resolver::ImportResolver;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use varn_checker::module_resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
+use std::io::Write as IoWrite;
 use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
-use std::io::Write as IoWrite;
 
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
@@ -93,7 +93,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
                 .collect();
             CliError::fatal(format!("parse errors:\n{}", msgs.join("\n")))
         })?;
-
 
     let program_ref = &program;
     let check_samples = time_n(runs, || {
@@ -248,7 +247,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             } else {
                 format!("{:.1}ms", p50_ns as f64 / 1_000_000.0)
             };
-            print!("\r  \x1b[2mexecute\x1b[0m  [{bar}]  {done}/{runs}  \x1b[2mp50 {p50_str}\x1b[0m  ");
+            print!(
+                "\r  \x1b[2mexecute\x1b[0m  [{bar}]  {done}/{runs}  \x1b[2mp50 {p50_str}\x1b[0m  "
+            );
             let _ = std::io::stdout().flush();
         },
     )?;
@@ -357,7 +358,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     terminal::log(format!(
         "  {}{}  {}",
         chalk("precompilación: ").dim(),
-        chalk(super::report::fmt::fmt_dur(precompile_dur)).cyan().dim(),
+        chalk(super::report::fmt::fmt_dur(precompile_dur))
+            .cyan()
+            .dim(),
         chalk("(costo de arranque en frío)").dim()
     ));
     if !opts.show_output {
@@ -395,7 +398,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 }
 
 fn export_names_of(filename: &str) -> Vec<Rc<str>> {
-    let exports = varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
+    let exports =
+        varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
     let mut names: Vec<Rc<str>> = exports.keys().map(|k| Rc::from(k.as_str())).collect();
     names.sort();
     names

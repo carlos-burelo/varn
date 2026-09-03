@@ -270,8 +270,7 @@ impl ExecCtx {
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native(f, None);
-                let result =
-                    (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
                 self.stack.pop();
                 let nv = if result.is_null() {
                     instance_nv

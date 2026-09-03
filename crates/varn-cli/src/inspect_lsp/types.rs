@@ -1,7 +1,7 @@
 use varn_checker::SymbolKind;
-use varn_debug::flags::DebugFlags;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal::{Section, Table};
+use varn_debug::flags::DebugFlags;
 
 pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let uri = varn_modules::resolver::path_to_uri(path);

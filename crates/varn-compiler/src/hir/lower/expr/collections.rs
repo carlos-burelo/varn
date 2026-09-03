@@ -40,9 +40,7 @@ impl<'a> Lowerer<'a> {
                             PropKey::Identifier(s) | PropKey::Str(s) => {
                                 HirPropKey::Static(Rc::from(s.as_str()))
                             }
-                            PropKey::Int(n) => {
-                                HirPropKey::Static(Rc::from(n.to_string().as_str()))
-                            }
+                            PropKey::Int(n) => HirPropKey::Static(Rc::from(n.to_string().as_str())),
                         };
                         let val = self.lower_expr(value, scope)?;
                         props.push(HirObjectProp::Property { key: k, value: val });

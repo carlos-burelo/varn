@@ -23,7 +23,10 @@ pub fn build_prepare_rename(
             }
         }
         SymbolTarget::Global { origin, .. } => {
-            if origin.starts_with("std:") || origin.starts_with("core:") || origin.starts_with("runtime:") {
+            if origin.starts_with("std:")
+                || origin.starts_with("core:")
+                || origin.starts_with("runtime:")
+            {
                 return None;
             }
         }
@@ -102,4 +105,3 @@ fn find_ident_at(state: &DocumentState, line: u32, col: u32) -> Option<&TokenRec
             && (t.kind == TokenKind::Identifier || t.kind.can_be_identifier())
     })
 }
-

@@ -40,9 +40,7 @@ fn check_origin_module(
     key: &str,
 ) -> bool {
     let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(ext_bind) =
-        resolver.find_bind_for_type(name, &origin_modules)
-    {
+    if let Some(ext_bind) = resolver.find_bind_for_type(name, &origin_modules) {
         if check_in_bind(name, key, &ext_bind) {
             return true;
         }
@@ -124,15 +122,10 @@ impl<'r> Checker<'r> {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(self.resolver.stdlib_exports(
-                                origin_path,
-                            ))
+                            Some(self.resolver.stdlib_exports(origin_path))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(self.resolver.module_exports(
-                                origin_path,
-                                &mut visiting,
-                            ))
+                            Some(self.resolver.module_exports(origin_path, &mut visiting))
                         };
                         if let Some(exports) = exports {
                             if exports.contains_key(key) {
@@ -164,8 +157,7 @@ impl<'r> Checker<'r> {
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
-                    if let Some(ext_bind) =
-                        self.resolver.find_bind_for_type(name, &origin_modules)
+                    if let Some(ext_bind) = self.resolver.find_bind_for_type(name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -181,10 +173,7 @@ impl<'r> Checker<'r> {
                             }
                         }
                         if let Some(ext_bind) =
-                            self.resolver.find_bind_for_type(
-                                name,
-                                &origin_modules,
-                            )
+                            self.resolver.find_bind_for_type(name, &origin_modules)
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if fields.iter().any(|(fname, _)| fname.as_ref() == key) {

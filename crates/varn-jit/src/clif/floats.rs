@@ -20,7 +20,7 @@
 //! generic `dispatch_intrinsic` helper (and its register flush/reload).
 
 use cranelift_codegen::ir::{
-    condcodes::FloatCC, types, InstructionData, InstBuilder, MemFlags, Value, ValueDef,
+    condcodes::FloatCC, types, InstBuilder, InstructionData, MemFlags, Value, ValueDef,
 };
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -30,7 +30,9 @@ use varn_core::OpCode;
 use varn_types::register_meta::RegisterMeta;
 
 use super::alloc::{self, def_result, AllocCtx};
-use super::emit::{box_f64, box_or_pass, call_helper_void, meta_is_float, unbox_f64_coerce, use_f64};
+use super::emit::{
+    box_f64, box_or_pass, call_helper_void, meta_is_float, unbox_f64_coerce, use_f64,
+};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -92,7 +94,8 @@ pub(super) fn emit_intrinsic_direct(
             b.def_var(vars[dest], res);
             let boxed = box_f64(b, res);
             let fb = super::alloc::frame_base_addr(b, actx);
-            b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+            b.ins()
+                .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
         } else {
             let boxed = box_f64(b, res);
             def_result(b, actx, dest, boxed);
@@ -256,7 +259,8 @@ pub(super) fn emit_math_intrinsic_native(
             b.def_var(vars[dest], res);
             let boxed = box_f64(b, res);
             let fb = super::alloc::frame_base_addr(b, actx);
-            b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+            b.ins()
+                .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
         } else {
             let boxed = box_f64(b, res);
             def_result(b, actx, dest, boxed);
@@ -340,12 +344,20 @@ pub(super) fn emit_float_op(
                 let (a_tag, a_payload) = if b.func.dfg.value_type(a) == types::I128 {
                     b.ins().isplit(a)
                 } else {
-                    (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), a)
+                    (
+                        b.ins()
+                            .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+                        a,
+                    )
                 };
                 let (b_tag, b_payload) = if b.func.dfg.value_type(bb) == types::I128 {
                     b.ins().isplit(bb)
                 } else {
-                    (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), bb)
+                    (
+                        b.ins()
+                            .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+                        bb,
+                    )
                 };
                 let helper = match op {
                     OpCode::AddFloat => helpers.add,
@@ -353,7 +365,12 @@ pub(super) fn emit_float_op(
                     OpCode::MulFloat => helpers.mul,
                     _ => helpers.div,
                 };
-                call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+                call_helper_void(
+                    b,
+                    cc,
+                    helper,
+                    &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+                );
                 let boxed = b.ins().load(
                     types::I128,
                     MemFlags::trusted(),
@@ -374,19 +391,32 @@ pub(super) fn emit_float_op(
             let (a_tag, a_payload) = if b.func.dfg.value_type(a) == types::I128 {
                 b.ins().isplit(a)
             } else {
-                (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), a)
+                (
+                    b.ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+                    a,
+                )
             };
             let (b_tag, b_payload) = if b.func.dfg.value_type(bb) == types::I128 {
                 b.ins().isplit(bb)
             } else {
-                (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), bb)
+                (
+                    b.ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64),
+                    bb,
+                )
             };
             let helper = if op == OpCode::ModFloat {
                 helpers.modulo
             } else {
                 helpers.pow
             };
-            call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+            call_helper_void(
+                b,
+                cc,
+                helper,
+                &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+            );
             let boxed = b.ins().load(
                 types::I128,
                 MemFlags::trusted(),
@@ -467,7 +497,12 @@ fn emit_fdiv(
     let bd = box_f64(b, bb);
     let (a_tag, a_payload) = b.ins().isplit(ba);
     let (b_tag, b_payload) = b.ins().isplit(bd);
-    call_helper_void(b, cc, div_helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    call_helper_void(
+        b,
+        cc,
+        div_helper,
+        &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+    );
     let dummy = b.ins().f64const(0.0);
     b.ins().jump(cont, &[dummy.into()]);
 

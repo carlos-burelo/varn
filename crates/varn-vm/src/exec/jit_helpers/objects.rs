@@ -5,11 +5,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_object_keys_stub(
-    ctx: *mut ExecCtx,
-    val_tag: u64,
-    val_payload: u64,
-) {
+pub(crate) extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);

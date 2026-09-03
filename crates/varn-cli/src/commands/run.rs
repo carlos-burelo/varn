@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::{cli::RunArgs, error::CliError, pipeline};
+use std::path::PathBuf;
 use varn_pipeline::{CapabilitySet, RunOpts};
 use varn_types::capabilities::*;
 
@@ -48,14 +48,24 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
     if let Some(ref read_spec) = args.allow_read {
         mask |= CAP_FS_READ;
         if read_spec != "*" && !read_spec.is_empty() {
-            fs_read_paths = Some(read_spec.split(',').map(|s| PathBuf::from(s.trim())).collect());
+            fs_read_paths = Some(
+                read_spec
+                    .split(',')
+                    .map(|s| PathBuf::from(s.trim()))
+                    .collect(),
+            );
         }
     }
 
     if let Some(ref write_spec) = args.allow_write {
         mask |= CAP_FS_WRITE;
         if write_spec != "*" && !write_spec.is_empty() {
-            fs_write_paths = Some(write_spec.split(',').map(|s| PathBuf::from(s.trim())).collect());
+            fs_write_paths = Some(
+                write_spec
+                    .split(',')
+                    .map(|s| PathBuf::from(s.trim()))
+                    .collect(),
+            );
         }
     }
 

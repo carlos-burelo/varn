@@ -38,11 +38,7 @@ pub fn transform_suspend_func(func: &mut SsaFunc, points: &[SuspendPoint]) -> u1
 /// Splits the block containing suspension point `k` into two blocks:
 /// the prefix ending in the suspend instruction jumping to continuation `C_k`,
 /// and the continuation `C_k` containing the suffix instructions and original terminator.
-fn split_at_suspend_point(
-    func: &mut SsaFunc,
-    _k: usize,
-    pt: &SuspendPoint,
-) {
+fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
     // 1. Locate the block and instruction containing this suspension point.
     let (target_bid, inst_idx) = find_suspend_inst(func, pt.operand)
         .expect("suspend point instruction must exist in func blocks");
@@ -186,7 +182,9 @@ fn reorder_blocks_rpo(func: &mut SsaFunc) {
             Terminator::Jump { target, .. } => {
                 *target = old_to_new[target.0 as usize];
             }
-            Terminator::Branch { then_blk, else_blk, .. } => {
+            Terminator::Branch {
+                then_blk, else_blk, ..
+            } => {
                 *then_blk = old_to_new[then_blk.0 as usize];
                 *else_blk = old_to_new[else_blk.0 as usize];
             }

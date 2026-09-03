@@ -1,8 +1,8 @@
 use varn_core::ast::{
     Arg, ArrayEl, ArrowBody, AstId, ClassDecl, ClassMember, Decl, EnumDecl, ExportDecl,
-    ExportDefaultDecl, ExtensionDecl, ExtensionMember, Expr, ExprKind, ForInit, FunctionDecl,
-    MatchBody, MatchCase, NamespaceDecl, ObjectProp, Program, PropKey, Stmt, StmtKind,
-    StructDecl, SwitchCase, TemplatePart, VarDeclarator,
+    ExportDefaultDecl, Expr, ExprKind, ExtensionDecl, ExtensionMember, ForInit, FunctionDecl,
+    MatchBody, MatchCase, NamespaceDecl, ObjectProp, Program, PropKey, Stmt, StmtKind, StructDecl,
+    SwitchCase, TemplatePart, VarDeclarator,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -79,7 +79,11 @@ fn collect_stmt(stmt: &Stmt, out: &mut Vec<SpatialEntry>) {
                 collect_stmt(s, out);
             }
         }
-        StmtKind::Empty | StmtKind::Error | StmtKind::Debugger | StmtKind::Break { .. } | StmtKind::Continue { .. } => {}
+        StmtKind::Empty
+        | StmtKind::Error
+        | StmtKind::Debugger
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. } => {}
         StmtKind::Expr { expression } => {
             collect_expr(expression, out);
         }
@@ -241,7 +245,9 @@ fn collect_class_decl(c: &ClassDecl, out: &mut Vec<SpatialEntry>) {
                 }
                 collect_stmt(body, out);
             }
-            ClassMember::Property { init: Some(init), .. } => {
+            ClassMember::Property {
+                init: Some(init), ..
+            } => {
                 collect_expr(init, out);
             }
             ClassMember::Getter {
@@ -350,29 +356,55 @@ fn collect_expr(expr: &Expr, out: &mut Vec<SpatialEntry>) {
                 collect_object_prop(prop, out);
             }
         }
-        ExprKind::Tuple { elements } | ExprKind::Sequence { expressions: elements } => {
+        ExprKind::Tuple { elements }
+        | ExprKind::Sequence {
+            expressions: elements,
+        } => {
             for el in elements {
                 collect_expr(el, out);
             }
         }
         ExprKind::Unary { operand, .. }
         | ExprKind::Update { operand, .. }
-        | ExprKind::Paren { expression: operand }
+        | ExprKind::Paren {
+            expression: operand,
+        }
         | ExprKind::Await { argument: operand }
         | ExprKind::Spawn { argument: operand }
         | ExprKind::Spread { argument: operand }
-        | ExprKind::NonNull { expression: operand }
-        | ExprKind::Try { expression: operand }
-        | ExprKind::As { expression: operand, .. }
-        | ExprKind::Satisfies { expression: operand, .. }
-        | ExprKind::Is { expression: operand, .. } => {
+        | ExprKind::NonNull {
+            expression: operand,
+        }
+        | ExprKind::Try {
+            expression: operand,
+        }
+        | ExprKind::As {
+            expression: operand,
+            ..
+        }
+        | ExprKind::Satisfies {
+            expression: operand,
+            ..
+        }
+        | ExprKind::Is {
+            expression: operand,
+            ..
+        } => {
             collect_expr(operand, out);
         }
         ExprKind::Binary { left, right, .. }
         | ExprKind::Logical { left, right, .. }
-        | ExprKind::Assign { target: left, value: right, .. }
+        | ExprKind::Assign {
+            target: left,
+            value: right,
+            ..
+        }
         | ExprKind::Pipeline { left, right }
-        | ExprKind::Range { start: left, end: right, .. } => {
+        | ExprKind::Range {
+            start: left,
+            end: right,
+            ..
+        } => {
             collect_expr(left, out);
             collect_expr(right, out);
         }
@@ -420,7 +452,10 @@ fn collect_expr(expr: &Expr, out: &mut Vec<SpatialEntry>) {
                 ArrowBody::Block(s) => collect_stmt(s, out),
             }
         }
-        ExprKind::Yield { argument: Some(arg), .. } => {
+        ExprKind::Yield {
+            argument: Some(arg),
+            ..
+        } => {
             collect_expr(arg, out);
         }
         ExprKind::ClassExpr { declaration } => {
@@ -453,7 +488,9 @@ fn collect_object_prop(prop: &ObjectProp, out: &mut Vec<SpatialEntry>) {
             }
             collect_expr(value, out);
         }
-        ObjectProp::Method { key, params, body, .. } => {
+        ObjectProp::Method {
+            key, params, body, ..
+        } => {
             if let PropKey::Computed(e) = key {
                 collect_expr(e, out);
             }
@@ -470,7 +507,9 @@ fn collect_object_prop(prop: &ObjectProp, out: &mut Vec<SpatialEntry>) {
             }
             collect_stmt(body, out);
         }
-        ObjectProp::Setter { key, param, body, .. } => {
+        ObjectProp::Setter {
+            key, param, body, ..
+        } => {
             if let PropKey::Computed(e) = key {
                 collect_expr(e, out);
             }

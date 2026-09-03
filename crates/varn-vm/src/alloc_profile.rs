@@ -129,7 +129,10 @@ pub fn report() {
     }
 
     eprintln!("\n  Atribución de la creación de objetos (ciclos por muestra)");
-    eprintln!("  overhead de medición descontado: {} ciclos/tramo", OVERHEAD.with(|o| o.get()));
+    eprintln!(
+        "  overhead de medición descontado: {} ciclos/tramo",
+        OVERHEAD.with(|o| o.get())
+    );
     eprintln!("  ─────────────────────────────────────────────────────────");
     for i in 0..N {
         let n = HITS.with(|h| h[i].get());
@@ -150,7 +153,12 @@ pub fn report() {
     if ht > 0 {
         let total = CYCLES.with(|c| c[Seg::HelperTotal as usize].get()) as f64 / ht as f64;
         let mut parts = 0.0;
-        for s in [Seg::ShapeLookup, Seg::ClosureScan, Seg::ObjDataAlloc, Seg::HeapPush] {
+        for s in [
+            Seg::ShapeLookup,
+            Seg::ClosureScan,
+            Seg::ObjDataAlloc,
+            Seg::HeapPush,
+        ] {
             let n = HITS.with(|h| h[s as usize].get());
             if n > 0 {
                 parts += CYCLES.with(|c| c[s as usize].get()) as f64 / n as f64;
@@ -158,7 +166,8 @@ pub fn report() {
         }
         eprintln!(
             "  {:<18} {:>8.1} ciclos   (total menos tramos: cruce y no instrumentado)",
-            "  resto", total - parts
+            "  resto",
+            total - parts
         );
     }
 }

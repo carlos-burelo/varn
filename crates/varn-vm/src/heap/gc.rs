@@ -115,25 +115,53 @@ impl HeapInner {
             }
         };
 
-        if self.object_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .object_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.object_interner.retain(|_, p| update_interner(p));
         }
-        if self.map_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .map_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.map_interner.retain(|_, p| update_interner(p));
         }
-        if self.set_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .set_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.set_interner.retain(|_, p| update_interner(p));
         }
-        if self.array_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .array_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.array_interner.retain(|_, p| update_interner(p));
         }
-        if self.string_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .string_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.string_interner.retain(|_, p| update_interner(p));
         }
-        if self.symbol_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .symbol_interner
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.symbol_interner.retain(|_, p| update_interner(p));
         }
-        if self.identity_index.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+        if self
+            .identity_index
+            .values()
+            .any(|&p| crate::nursery::is_nursery_idx(p))
+        {
             self.identity_index.retain(|_, p| update_interner(p));
         }
     }

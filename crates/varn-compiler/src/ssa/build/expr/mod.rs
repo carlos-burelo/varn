@@ -104,7 +104,13 @@ impl Builder {
                 if self.values[v.0 as usize].ty == *ty {
                     Ok(v)
                 } else {
-                    Ok(self.emit(InstKind::Cast { operand: v, ty: *ty }, *ty))
+                    Ok(self.emit(
+                        InstKind::Cast {
+                            operand: v,
+                            ty: *ty,
+                        },
+                        *ty,
+                    ))
                 }
             }
 

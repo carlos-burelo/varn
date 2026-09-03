@@ -178,7 +178,10 @@ fn get_word_prefix(source: &str, line: u32, col: u32) -> Option<String> {
     let line_str = source.lines().nth(line as usize)?;
     let col_idx = (col as usize).min(line_str.len());
     let prefix = &line_str[..col_idx];
-    let word = prefix.rsplit(|c: char| !c.is_alphanumeric() && c != '_').next()?.trim();
+    let word = prefix
+        .rsplit(|c: char| !c.is_alphanumeric() && c != '_')
+        .next()?
+        .trim();
     if word.is_empty() {
         None
     } else {

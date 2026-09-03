@@ -383,8 +383,9 @@ impl<'r> super::Binder<'r> {
                             .map(|ann| resolve_type_node(ann, Some(self)))
                             .unwrap_or(Type::Dynamic);
 
-                        let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
-                            .with_type(ty.clone());
+                        let mut sym =
+                            Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
+                                .with_type(ty.clone());
                         sym.col = p.range.start.column;
                         sym.offset = p.range.start.offset;
                         sym.has_explicit_type = p.type_ann.is_some()
@@ -453,8 +454,8 @@ impl<'r> super::Binder<'r> {
                     is_readonly: modifiers.is_readonly,
                     is_override: modifiers.is_override,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             ClassMember::Method {
                 key,
@@ -536,8 +537,8 @@ impl<'r> super::Binder<'r> {
                     is_readonly: false,
                     is_override: modifiers.is_override,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             ClassMember::Getter {
                 key,
@@ -576,8 +577,8 @@ impl<'r> super::Binder<'r> {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             ClassMember::Setter {
                 key,

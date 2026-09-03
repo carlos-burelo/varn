@@ -55,11 +55,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
         if receiver.is_sso() {
             let mut buf = [0u8; 5];
             let len = receiver.sso_copy_bytes(&mut buf);
-            return if idx < len {
-                buf[idx] as i64
-            } else {
-                -1
-            };
+            return if idx < len { buf[idx] as i64 } else { -1 };
         }
 
         if receiver.is_heap() {
@@ -146,14 +142,26 @@ pub(crate) extern "C" fn jit_str_substring_intrinsic(
                 let s = h.as_str();
                 let len = if ascii { s.len() } else { h.char_len() };
                 let st = heap.as_int(start);
-                let en = if end.is_null() { len } else { (heap.as_int(end).max(0) as usize).min(len) };
+                let en = if end.is_null() {
+                    len
+                } else {
+                    (heap.as_int(end).max(0) as usize).min(len)
+                };
                 let st_clamped = (st.max(0) as usize).min(len);
-                let (si, ei) = if st_clamped <= en { (st_clamped, en) } else { (en, st_clamped) };
+                let (si, ei) = if st_clamped <= en {
+                    (st_clamped, en)
+                } else {
+                    (en, st_clamped)
+                };
                 if si == 0 && ei == s.len() {
                     ctx_ref.jit_native_result = receiver;
                     return;
                 }
-                let (bs, be) = if ascii { (si, ei) } else { varn_types::str_util::char_range_to_bytes(s, false, si, ei) };
+                let (bs, be) = if ascii {
+                    (si, ei)
+                } else {
+                    varn_types::str_util::char_range_to_bytes(s, false, si, ei)
+                };
                 let sub = &s[bs..be];
                 if let Some(sso) = VmValue::try_from_sso(sub) {
                     ctx_ref.jit_native_result = sso;
@@ -199,18 +207,31 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
                 let s = h.as_str();
                 let len = if ascii { s.len() } else { h.char_len() };
                 let st = heap.as_int(start);
-                let si = if st < 0 { (len as i64 + st).max(0) as usize } else { (st as usize).min(len) };
+                let si = if st < 0 {
+                    (len as i64 + st).max(0) as usize
+                } else {
+                    (st as usize).min(len)
+                };
                 let ei = if end.is_null() {
                     len
                 } else {
                     let e = heap.as_int(end);
-                    if e < 0 { (len as i64 + e).max(0) as usize } else { (e as usize).min(len) }
-                }.max(si);
+                    if e < 0 {
+                        (len as i64 + e).max(0) as usize
+                    } else {
+                        (e as usize).min(len)
+                    }
+                }
+                .max(si);
                 if si == 0 && ei == s.len() {
                     ctx_ref.jit_native_result = receiver;
                     return;
                 }
-                let (bs, be) = if ascii { (si, ei) } else { varn_types::str_util::char_range_to_bytes(s, false, si, ei) };
+                let (bs, be) = if ascii {
+                    (si, ei)
+                } else {
+                    varn_types::str_util::char_range_to_bytes(s, false, si, ei)
+                };
                 let sub = &s[bs..be];
                 if let Some(sso) = VmValue::try_from_sso(sub) {
                     ctx_ref.jit_native_result = sso;
@@ -218,6 +239,37 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
                 }
                 let h_clone = h.clone();
                 ctx_ref.jit_native_result = heap.alloc_substring(&h_clone, bs, be);
+                return;
+            }
+        }
+        if receiver.is_sso() {
+            let mut buf = [0u8; 5];
+            let s = receiver.sso_as_str(&mut buf);
+            let len = s.len();
+            let st = heap.as_int(start);
+            let si = if st < 0 {
+                (len as i64 + st).max(0) as usize
+            } else {
+                (st as usize).min(len)
+            };
+            let ei = if end.is_null() {
+                len
+            } else {
+                let e = heap.as_int(end);
+                if e < 0 {
+                    (len as i64 + e).max(0) as usize
+                } else {
+                    (e as usize).min(len)
+                }
+            }
+            .max(si);
+            if si == 0 && ei == len {
+                ctx_ref.jit_native_result = receiver;
+                return;
+            }
+            let sub = &s[si..ei];
+            if let Some(sso) = VmValue::try_from_sso(sub) {
+                ctx_ref.jit_native_result = sso;
                 return;
             }
         }
@@ -234,11 +286,7 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
 }
 
 #[inline(always)]
-unsafe fn borrow_str_fast<'a>(
-    v: VmValue,
-    heap: &'a Heap,
-    buf: &'a mut [u8; 5],
-) -> Option<&'a str> {
+unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'a str> {
     if v.is_sso() {
         return Some(v.sso_as_str(buf));
     }
@@ -263,6 +311,27 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
         let heap = &(*ctx).heap;
         let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
         let search = VmValue::from_raw_parts(search_tag, search_payload);
+        if receiver.is_sso() && search.is_sso() {
+            let r_len = receiver.sso_len();
+            let s_len = search.sso_len();
+            if s_len == 0 {
+                return 1;
+            }
+            if r_len < s_len {
+                return 0;
+            }
+            let shift = (s_len * 8) as u32;
+            let mask = if shift >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << shift) - 1
+            };
+            return if (receiver.raw_payload() & mask) == (search.raw_payload() & mask) {
+                1
+            } else {
+                0
+            };
+        }
         if receiver.is_heap() && search.is_sso() {
             if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
                 let n_len = search.sso_len();
@@ -270,7 +339,11 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
                 if s_bytes.len() >= n_len {
                     let mut b2 = [0u8; 5];
                     search.sso_copy_bytes(&mut b2);
-                    return if s_bytes[..n_len] == b2[..n_len] { 1 } else { 0 };
+                    return if s_bytes[..n_len] == b2[..n_len] {
+                        1
+                    } else {
+                        0
+                    };
                 }
                 return 0;
             }
@@ -280,7 +353,11 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
                 heap.get(receiver.as_heap_idx()),
                 heap.get(search.as_heap_idx()),
             ) {
-                return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) { 1 } else { 0 };
+                return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) {
+                    1
+                } else {
+                    0
+                };
             }
         }
         let mut b1 = [0u8; 5];
@@ -289,7 +366,11 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
         ) {
-            return if s.as_bytes().starts_with(n.as_bytes()) { 1 } else { 0 };
+            return if s.as_bytes().starts_with(n.as_bytes()) {
+                1
+            } else {
+                0
+            };
         }
         let ctx_ref = &mut *ctx;
         let args = [receiver, search];
@@ -298,7 +379,13 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
             &args,
             &mut ctx_ref.heap,
         ) {
-            Ok(v) => if v.is_truthy() { 1 } else { 0 },
+            Ok(v) => {
+                if v.is_truthy() {
+                    1
+                } else {
+                    0
+                }
+            }
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
@@ -317,6 +404,29 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
         let heap = &(*ctx).heap;
         let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
         let search = VmValue::from_raw_parts(search_tag, search_payload);
+        if receiver.is_sso() && search.is_sso() {
+            let r_len = receiver.sso_len();
+            let s_len = search.sso_len();
+            if s_len == 0 {
+                return 1;
+            }
+            if r_len < s_len {
+                return 0;
+            }
+            let r_offset = (r_len - s_len) * 8;
+            let r_shifted = receiver.raw_payload() >> r_offset;
+            let shift = (s_len * 8) as u32;
+            let mask = if shift >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << shift) - 1
+            };
+            return if (r_shifted & mask) == (search.raw_payload() & mask) {
+                1
+            } else {
+                0
+            };
+        }
         if receiver.is_heap() && search.is_sso() {
             if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
                 let n_len = search.sso_len();
@@ -324,7 +434,11 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
                 if s_bytes.len() >= n_len {
                     let mut b2 = [0u8; 5];
                     search.sso_copy_bytes(&mut b2);
-                    return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] { 1 } else { 0 };
+                    return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] {
+                        1
+                    } else {
+                        0
+                    };
                 }
                 return 0;
             }
@@ -334,7 +448,11 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
                 heap.get(receiver.as_heap_idx()),
                 heap.get(search.as_heap_idx()),
             ) {
-                return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) { 1 } else { 0 };
+                return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) {
+                    1
+                } else {
+                    0
+                };
             }
         }
         let mut b1 = [0u8; 5];
@@ -343,7 +461,11 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
         ) {
-            return if s.as_bytes().ends_with(n.as_bytes()) { 1 } else { 0 };
+            return if s.as_bytes().ends_with(n.as_bytes()) {
+                1
+            } else {
+                0
+            };
         }
         let ctx_ref = &mut *ctx;
         let args = [receiver, search];
@@ -352,7 +474,13 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
             &args,
             &mut ctx_ref.heap,
         ) {
-            Ok(v) => if v.is_truthy() { 1 } else { 0 },
+            Ok(v) => {
+                if v.is_truthy() {
+                    1
+                } else {
+                    0
+                }
+            }
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
@@ -377,7 +505,11 @@ pub(crate) extern "C" fn jit_str_includes_intrinsic(
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
         ) {
-            return if varn_types::str_util::find_bytes(s, n).is_some() { 1 } else { 0 };
+            return if varn_types::str_util::find_bytes(s, n).is_some() {
+                1
+            } else {
+                0
+            };
         }
         let ctx_ref = &mut *ctx;
         let args = [receiver, search];
@@ -386,7 +518,13 @@ pub(crate) extern "C" fn jit_str_includes_intrinsic(
             &args,
             &mut ctx_ref.heap,
         ) {
-            Ok(v) => if v.is_truthy() { 1 } else { 0 },
+            Ok(v) => {
+                if v.is_truthy() {
+                    1
+                } else {
+                    0
+                }
+            }
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
@@ -487,4 +625,3 @@ pub(crate) extern "C" fn jit_str_last_index_of_intrinsic(
         }
     }
 }
-

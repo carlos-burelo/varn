@@ -30,7 +30,12 @@ impl Builder {
         let landing_pad = self.new_block();
         let exit_b = self.new_block();
 
-        let try_val = self.emit(InstKind::Try { handler: landing_pad }, HirType::Dynamic);
+        let try_val = self.emit(
+            InstKind::Try {
+                handler: landing_pad,
+            },
+            HirType::Dynamic,
+        );
 
         self.open_try_regions.push(Vec::new());
         self.lower_block(block)?;
@@ -263,12 +268,8 @@ impl Builder {
 
     fn emit_single_type_test(&mut self, test: &HirTypeTest, operand: Value) -> Value {
         match test {
-            HirTypeTest::IsNull => {
-                self.emit(InstKind::IsNull { operand }, HirType::Bool)
-            }
-            HirTypeTest::IsArray => {
-                self.emit(InstKind::IsArray { operand }, HirType::Bool)
-            }
+            HirTypeTest::IsNull => self.emit(InstKind::IsNull { operand }, HirType::Bool),
+            HirTypeTest::IsArray => self.emit(InstKind::IsArray { operand }, HirType::Bool),
             HirTypeTest::TypeofEq(name) => {
                 let t = self.emit(
                     InstKind::Unary {
@@ -301,9 +302,7 @@ impl Builder {
                     HirType::Bool,
                 )
             }
-            HirTypeTest::AlwaysFalse => {
-                self.emit(InstKind::ConstBool(false), HirType::Bool)
-            }
+            HirTypeTest::AlwaysFalse => self.emit(InstKind::ConstBool(false), HirType::Bool),
         }
     }
 

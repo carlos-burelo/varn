@@ -29,7 +29,10 @@ pub(super) fn infer_member_type(
     };
 
     let ExprKind::Identifier { name: prop_name } = &property.kind else {
-        return crate::binder::infer_expr_type(expr, Some(&crate::binder::BindView::new(bind, checker.resolver)));
+        return crate::binder::infer_expr_type(
+            expr,
+            Some(&crate::binder::BindView::new(bind, checker.resolver)),
+        );
     };
 
     match &obj_ty.0 {
@@ -84,18 +87,23 @@ pub(super) fn infer_member_type(
         }
     }
 
-    crate::binder::infer_expr_type(expr, Some(&crate::binder::BindView::new(bind, checker.resolver)))
+    crate::binder::infer_expr_type(
+        expr,
+        Some(&crate::binder::BindView::new(bind, checker.resolver)),
+    )
 }
 
 pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
-    if let TypeKind::Named(name, _) = &ty.0 { match name.as_ref() {
-        n if n == varn_core::IntrinsicType::Str.as_str() => return Type::Str,
-        n if n == varn_core::IntrinsicType::Int.as_str() => return Type::Int,
-        n if n == varn_core::IntrinsicType::Float.as_str() => return Type::Float,
-        n if n == varn_core::IntrinsicType::Bool.as_str() => return Type::Bool,
-        n if n == varn_core::IntrinsicType::Decimal.as_str() => return Type::Decimal,
-        _ => {}
-    } }
+    if let TypeKind::Named(name, _) = &ty.0 {
+        match name.as_ref() {
+            n if n == varn_core::IntrinsicType::Str.as_str() => return Type::Str,
+            n if n == varn_core::IntrinsicType::Int.as_str() => return Type::Int,
+            n if n == varn_core::IntrinsicType::Float.as_str() => return Type::Float,
+            n if n == varn_core::IntrinsicType::Bool.as_str() => return Type::Bool,
+            n if n == varn_core::IntrinsicType::Decimal.as_str() => return Type::Decimal,
+            _ => {}
+        }
+    }
     ty.clone()
 }
 

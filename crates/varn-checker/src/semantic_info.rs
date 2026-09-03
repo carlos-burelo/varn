@@ -1,6 +1,6 @@
+use crate::types::Type;
 use std::rc::Rc;
 use varn_core::source::SourceRange;
-use crate::types::Type;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResolvedMemberKind {
@@ -110,4 +110,3 @@ pub struct ResolvedMemberSummary {
     pub is_async: bool,
     pub is_generator: bool,
 }
-

@@ -22,11 +22,7 @@ use std::path::Path;
 /// this one crate. The frontend, compiler, VM and CLI crates stay independent
 /// of each other; only the three schema crates pull the graph. That is the
 /// price of the guarantee the doc comment above already claimed.
-const FINGERPRINTED_CRATES: &[&str] = &[
-    "varn-types",
-    "varn-modules",
-    "varn-checker",
-];
+const FINGERPRINTED_CRATES: &[&str] = &["varn-types", "varn-modules", "varn-checker"];
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();

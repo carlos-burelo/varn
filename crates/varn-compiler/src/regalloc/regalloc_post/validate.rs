@@ -3,8 +3,8 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 
-use crate::regalloc::liveness::LiveRange;
 use super::scan::ScanResult;
+use crate::regalloc::liveness::LiveRange;
 
 /// The colouring contract, re-checked against the mapping that is about to be
 /// written: two registers whose live ranges overlap must not land on the same
@@ -46,7 +46,10 @@ pub(crate) fn verify_call_constraints(
     true
 }
 
-pub(crate) fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashMap<u8, u8>) -> bool {
+pub(crate) fn verify_callee_frame_constraints(
+    scan: &ScanResult,
+    mapping: &HashMap<u8, u8>,
+) -> bool {
     let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
     for &(call_idx, arg_start, arg_count) in &scan.call_sites {
         let mapped_start = m(arg_start);

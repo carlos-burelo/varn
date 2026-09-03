@@ -423,9 +423,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             let res_ty = get_expr_type(expr, ctx);
             record_cg_ty_at(AnnKey::expr(expr.id), &res_ty, ann, ctx);
         }
-        ExprKind::Try { expression } => {
-            annotate_expr(expression, ann, ctx)
-        }
+        ExprKind::Try { expression } => annotate_expr(expression, ann, ctx),
         ExprKind::Pipeline { left, right } => {
             annotate_expr(left, ann, ctx);
             annotate_expr(right, ann, ctx);

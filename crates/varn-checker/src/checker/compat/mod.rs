@@ -41,11 +41,7 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
     }
 }
 
-pub(crate) fn types_compatible(
-    declared: &Type,
-    inferred: &Type,
-    bind: Option<&BindView>,
-) -> bool {
+pub(crate) fn types_compatible(declared: &Type, inferred: &Type, bind: Option<&BindView>) -> bool {
     let mut cache = FxHashMap::default();
     types_compatible_with_cache(declared, inferred, bind, &mut cache)
 }

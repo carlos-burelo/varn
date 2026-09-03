@@ -1,7 +1,6 @@
 use tower_lsp::lsp_types::{CompletionItemKind, SymbolKind as LspSymbolKind};
 use varn_checker::SymbolKind;
 
-
 pub fn to_lsp_symbol_kind(kind: SymbolKind) -> LspSymbolKind {
     match kind {
         SymbolKind::Let | SymbolKind::Var => LspSymbolKind::VARIABLE,
@@ -41,9 +40,6 @@ pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
         SymbolKind::EnumMember => CompletionItemKind::ENUM_MEMBER,
     }
 }
-
-
-
 
 pub fn is_container_symbol_kind(kind: SymbolKind) -> bool {
     matches!(

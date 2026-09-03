@@ -11,7 +11,8 @@ impl<'r> super::Binder<'r> {
             || self.source_file.starts_with("std:")
             || self.source_file.starts_with("runtime:")
             || varn_modules::std_root::in_source_tree(self.source_file.as_ref());
-        if (i.source.starts_with("core:") || i.source.starts_with("runtime:")) && !in_stdlib_context {
+        if (i.source.starts_with("core:") || i.source.starts_with("runtime:")) && !in_stdlib_context
+        {
             let kind = if i.source.starts_with("core:") {
                 "an intrinsic"
             } else {
@@ -50,18 +51,13 @@ impl<'r> super::Binder<'r> {
 
         let relative_exports = if let Some(abs) = &resolved_target {
             let mut visiting = vec![self.source_file.to_string()];
-            Some(self.resolver.module_exports(
-                abs,
-                &mut visiting,
-            ))
+            Some(self.resolver.module_exports(abs, &mut visiting))
         } else {
             None
         };
 
         let stdlib_exports = if is_stdlib {
-            Some(self.resolver.stdlib_exports(
-                &i.source,
-            ))
+            Some(self.resolver.stdlib_exports(&i.source))
         } else {
             None
         };

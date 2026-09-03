@@ -1,7 +1,7 @@
-use varn_checker::module_resolver::ImportResolver;
 use crate::hash::fnv1a64;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
+use varn_checker::module_resolver::ImportResolver;
 
 use varn_compiler::FunctionProto;
 use varn_core::ast::Program;
@@ -184,14 +184,9 @@ pub fn build_module_graph(
             continue;
         };
 
-        let check =
-            crate::resolver::with_resolver(|r| {
-                varn_checker::Checker::check_with(
-                    program,
-                    r,
-                    varn_checker::CheckOptions::compile(),
-                )
-            });
+        let check = crate::resolver::with_resolver(|r| {
+            varn_checker::Checker::check_with(program, r, varn_checker::CheckOptions::compile())
+        });
         // The source was already sitting here, bound to `_`, while the
         // diagnostics this produced went unread — which is what made a type
         // error invisible as soon as the file was reached through `import`

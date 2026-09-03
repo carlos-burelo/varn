@@ -121,8 +121,6 @@ impl DiskResolver {
         *self.core_members.borrow_mut() = None;
     }
 
-
-
     pub fn types_cache_dir(&self) -> std::path::PathBuf {
         // Clone the root and drop the borrow before calling out. Resolution is
         // re-entrant, and a borrow spanning a call into another crate is the
@@ -218,7 +216,13 @@ impl DiskResolver {
     ) -> ExportMap {
         let mut exports = ExportMap::default();
         super::exports::collect_exports(
-            self, &program.body, bind, key, base_dir, visiting, &mut exports,
+            self,
+            &program.body,
+            bind,
+            key,
+            base_dir,
+            visiting,
+            &mut exports,
         );
         super::exports::assign_slots(&mut exports);
         exports
@@ -290,7 +294,13 @@ impl DiskResolver {
             return Rc::new(ExportMap::default());
         };
         let bind = self.bind_and_cache(&program, Vec::new(), virtual_id);
-        let exports = self.collect(&program, bind.as_ref(), virtual_id, Path::new("."), visiting);
+        let exports = self.collect(
+            &program,
+            bind.as_ref(),
+            virtual_id,
+            Path::new("."),
+            visiting,
+        );
 
         super::cache::save_to_cache(self, virtual_id, source, &exports, bind.as_ref());
         visiting.pop();
@@ -348,7 +358,13 @@ impl ImportResolver for DiskResolver {
         let bind = self.bind_and_cache(&program, lex_errs, &canonical);
 
         let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
-        let exports = self.collect(&program, bind.as_ref(), &canonical, base_dir, &mut Vec::new());
+        let exports = self.collect(
+            &program,
+            bind.as_ref(),
+            &canonical,
+            base_dir,
+            &mut Vec::new(),
+        );
         super::cache::save_to_cache(self, &canonical, &source, &exports, bind.as_ref());
 
         Some(bind)
@@ -392,9 +408,9 @@ impl ImportResolver for DiskResolver {
         }
 
         match super::stdlib::stdlib_carrier(specifier)? {
-            super::stdlib::Carrier::Blob => {
-                self.load_from_interface_blob(specifier, &key).map(|(_, b)| b)
-            }
+            super::stdlib::Carrier::Blob => self
+                .load_from_interface_blob(specifier, &key)
+                .map(|(_, b)| b),
             super::stdlib::Carrier::Embedded(source) => self.bind_from_embedded(specifier, source),
             super::stdlib::Carrier::File(abs) => self.module_bind(&abs),
         }
@@ -407,9 +423,9 @@ impl ImportResolver for DiskResolver {
         }
 
         let result = match super::stdlib::stdlib_carrier(specifier) {
-            Some(super::stdlib::Carrier::Blob) => {
-                self.load_from_interface_blob(specifier, &key).map(|(e, _)| e)
-            }
+            Some(super::stdlib::Carrier::Blob) => self
+                .load_from_interface_blob(specifier, &key)
+                .map(|(e, _)| e),
             Some(super::stdlib::Carrier::Embedded(source)) => {
                 Some(self.exports_from_embedded(specifier, source, &mut Vec::new()))
             }

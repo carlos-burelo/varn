@@ -1,8 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
+use tower_lsp::lsp_types::HoverContents;
 use varn_lsp::features::hover::build_hover;
 use varn_lsp::pipeline::run_pipeline;
-use tower_lsp::lsp_types::HoverContents;
 
 #[test]
 fn test_receiver_method_and_property_hover() {
@@ -24,10 +24,17 @@ const res = c.get_value();
     // Hover over get_value call on line 10
     // "const res = c.get_value();" -> line 10, col 16
     let hover = build_hover(&state, 10, 16);
-    assert!(hover.is_some(), "Hover over c.get_value() should return Some");
+    assert!(
+        hover.is_some(),
+        "Hover over c.get_value() should return Some"
+    );
     let hover_val = hover.unwrap();
     if let HoverContents::Markup(markup) = hover_val.contents {
-        assert!(markup.value.contains("get_value"), "Hover should describe get_value method: {}", markup.value);
+        assert!(
+            markup.value.contains("get_value"),
+            "Hover should describe get_value method: {}",
+            markup.value
+        );
     } else {
         panic!("Expected markup hover content");
     }

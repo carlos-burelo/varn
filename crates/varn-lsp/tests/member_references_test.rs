@@ -31,7 +31,10 @@ const b = acc.balance;
 
     // Find references for `balance` property (line 2, col 5)
     let refs = build_references(&doc, &workspace, 2, 5);
-    assert!(refs.is_some(), "Should find references for property balance");
+    assert!(
+        refs.is_some(),
+        "Should find references for property balance"
+    );
     let locs = refs.unwrap();
     // balance appears at:
     // 1. declaration: line 2, balance
@@ -40,7 +43,12 @@ const b = acc.balance;
     // 4. ... + amount: line 9
     // 5. acc.balance = 100: line 14
     // 6. acc.balance: line 15
-    assert_eq!(locs.len(), 6, "Expected 6 references for balance property, got: {:?}", locs);
+    assert_eq!(
+        locs.len(),
+        6,
+        "Expected 6 references for balance property, got: {:?}",
+        locs
+    );
 
     // Test rename on balance property
     let edit = build_rename(&doc, &workspace, None, 2, 5, "total_balance".to_string());

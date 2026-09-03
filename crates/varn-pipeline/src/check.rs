@@ -2,8 +2,8 @@ use varn_checker::Checker;
 use varn_core::ast::Program;
 
 use crate::PipelineError;
-use varn_debug::flags::DebugFlags;
 use varn_core::term::chalk::chalk;
+use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -64,9 +64,7 @@ pub fn check(
     if strict {
         options = options.strict();
     }
-    let check_result = crate::resolver::with_resolver(|r| {
-        Checker::check_with(program, r, options)
-    });
+    let check_result = crate::resolver::with_resolver(|r| Checker::check_with(program, r, options));
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {

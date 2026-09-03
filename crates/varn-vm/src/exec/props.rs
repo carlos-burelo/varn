@@ -163,24 +163,24 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
             None => {}
         }
     }
-        let details = if obj.is_heap() {
-            match heap.get(obj.as_heap_idx()) {
-                Some(HeapObj::Object(o)) => format!(
-                    "Object[inline_len={}, slot_count={}, props={:?}]",
-                    o.inline_len(),
-                    o.slot_count(),
-                    o.shape().property_names
-                ),
-                Some(other) => format!("{:?}", other),
-                None => "None".to_string(),
-            }
-        } else {
-            format!("{:?}", obj)
-        };
-        Err(RuntimeError::new(format!(
-            "OpGetFixedField: slot {} out of range on obj {:?} (details: {})",
-            slot, obj, details
-        )))
+    let details = if obj.is_heap() {
+        match heap.get(obj.as_heap_idx()) {
+            Some(HeapObj::Object(o)) => format!(
+                "Object[inline_len={}, slot_count={}, props={:?}]",
+                o.inline_len(),
+                o.slot_count(),
+                o.shape().property_names
+            ),
+            Some(other) => format!("{:?}", other),
+            None => "None".to_string(),
+        }
+    } else {
+        format!("{:?}", obj)
+    };
+    Err(RuntimeError::new(format!(
+        "OpGetFixedField: slot {} out of range on obj {:?} (details: {})",
+        slot, obj, details
+    )))
 }
 
 #[inline(always)]
@@ -596,17 +596,17 @@ pub(crate) fn resolve_meta_property(
                     .keys()
                     .map(|k| Value::Str(Rc::clone(k)))
                     .collect(),
-                Value::Object(o) => o
-                    .0
-                    .class()
-                    .map(|c| {
-                        c.method_map
-                            .borrow()
-                            .keys()
-                            .map(|k| Value::Str(Rc::clone(k)))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
+                Value::Object(o) => {
+                    o.0.class()
+                        .map(|c| {
+                            c.method_map
+                                .borrow()
+                                .keys()
+                                .map(|k| Value::Str(Rc::clone(k)))
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                }
                 _ => Vec::new(),
             };
             Ok(ResolvedProperty::Built(Value::Array(
@@ -665,11 +665,11 @@ fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVal
         .ok_or("meta.values: missing receiver")?;
     let val = ctx.extract(recv);
     let values: Vec<Value> = match &val {
-        Value::Object(o) => o
-            .0
-            .keys()
-            .filter_map(|k| o.0.get(&k).map(|nv| ctx.extract(nv)))
-            .collect(),
+        Value::Object(o) => {
+            o.0.keys()
+                .filter_map(|k| o.0.get(&k).map(|nv| ctx.extract(nv)))
+                .collect()
+        }
         Value::Array(a) => a.read().clone(),
         Value::Map(m) => m.0.borrow().values().map(|v| ctx.extract(*v)).collect(),
         _ => Vec::new(),
@@ -684,17 +684,17 @@ fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVa
         .ok_or("meta.entries: missing receiver")?;
     let val = ctx.extract(recv);
     let entries: Vec<Value> = match &val {
-        Value::Object(o) => o
-            .0
-            .keys()
-            .filter_map(|k| {
-                let v = o.0.get(&k).map(|nv| ctx.extract(nv))?;
-                Some(Value::Array(varn_types::value::ArrayRef::new(vec![
-                    Value::Str(k),
-                    v,
-                ])))
-            })
-            .collect(),
+        Value::Object(o) => {
+            o.0.keys()
+                .filter_map(|k| {
+                    let v = o.0.get(&k).map(|nv| ctx.extract(nv))?;
+                    Some(Value::Array(varn_types::value::ArrayRef::new(vec![
+                        Value::Str(k),
+                        v,
+                    ])))
+                })
+                .collect()
+        }
         Value::Array(a) => a
             .read()
             .iter()
@@ -706,17 +706,17 @@ fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVa
                 ]))
             })
             .collect(),
-        Value::Map(m) => m
-            .0
-            .borrow()
-            .iter()
-            .map(|(k, v)| {
-                Value::Array(varn_types::value::ArrayRef::new(vec![
-                    ctx.extract(k.0),
-                    ctx.extract(*v),
-                ]))
-            })
-            .collect(),
+        Value::Map(m) => {
+            m.0.borrow()
+                .iter()
+                .map(|(k, v)| {
+                    Value::Array(varn_types::value::ArrayRef::new(vec![
+                        ctx.extract(k.0),
+                        ctx.extract(*v),
+                    ]))
+                })
+                .collect()
+        }
         _ => Vec::new(),
     };
     Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(entries))))
@@ -744,5 +744,3 @@ fn meta_has_own_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVa
     };
     Ok(VmValue::from_bool(exists))
 }
-
-

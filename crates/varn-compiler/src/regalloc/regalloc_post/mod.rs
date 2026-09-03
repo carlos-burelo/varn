@@ -22,7 +22,6 @@ thread_local! {
     pub static OPTIMIZE_ENABLED: Cell<bool> = const { Cell::new(true) };
 }
 
-
 pub fn optimize_function(proto: &mut FunctionProto) {
     let start = if OPTIMIZE_ENABLED.with(|e| e.get()) {
         Some(Instant::now())

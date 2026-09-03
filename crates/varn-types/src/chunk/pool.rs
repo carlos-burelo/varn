@@ -88,9 +88,7 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
                     ))),
                     2 => {
                         let strs = variant.newtype_variant::<Vec<String>>()?;
-                        Ok(PoolEntry::Shape(
-                            strs.into_iter().map(Rc::from).collect(),
-                        ))
+                        Ok(PoolEntry::Shape(strs.into_iter().map(Rc::from).collect()))
                     }
                     _ => Err(de::Error::unknown_variant(
                         &idx.to_string(),

@@ -1,10 +1,10 @@
 use crate::cli::RemoveArgs;
 use crate::error::CliError;
+use varn_core::term::terminal;
 use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
-use varn_core::term::terminal;
 
 pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let cwd =
@@ -24,9 +24,7 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     }
 
     manifest.dependencies.remove(&args.alias);
-    manifest
-        .save(&manifest_path)
-        .map_err(CliError::fatal)?;
+    manifest.save(&manifest_path).map_err(CliError::fatal)?;
 
     let local_pkg = varn_pm::cache::local_package_path(&project_root, &args.alias);
     if local_pkg.exists() {
@@ -48,10 +46,7 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
         };
         let result = installer::resolve_and_install(&project_root, &deps, existing.as_ref(), false)
             .map_err(CliError::fatal)?;
-        result
-            .lock
-            .save(&lock_path)
-            .map_err(CliError::fatal)?;
+        result.lock.save(&lock_path).map_err(CliError::fatal)?;
     }
 
     terminal::log(format!("Removed '{}'", args.alias));

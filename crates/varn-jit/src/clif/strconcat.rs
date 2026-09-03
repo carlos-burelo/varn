@@ -41,4 +41,3 @@ pub(super) fn emit_str_concat(
     );
     def_result(b, actx, dest, res);
 }
-

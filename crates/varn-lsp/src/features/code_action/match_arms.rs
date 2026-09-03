@@ -43,11 +43,20 @@ pub fn generate_match_arms_action(
     let mut new_cases = String::new();
     for variant in &missing {
         if variant == "true" || variant == "false" {
-            new_cases.push_str(&format!("\n{}{} => {{\n{}    // TODO\n{}}}", indent, variant, indent, indent));
+            new_cases.push_str(&format!(
+                "\n{}{} => {{\n{}    // TODO\n{}}}",
+                indent, variant, indent, indent
+            ));
         } else if !type_name.is_empty() {
-            new_cases.push_str(&format!("\n{}{}.{} => {{\n{}    // TODO\n{}}}", indent, type_name, variant, indent, indent));
+            new_cases.push_str(&format!(
+                "\n{}{}.{} => {{\n{}    // TODO\n{}}}",
+                indent, type_name, variant, indent, indent
+            ));
         } else {
-            new_cases.push_str(&format!("\n{}{} => {{\n{}    // TODO\n{}}}", indent, variant, indent, indent));
+            new_cases.push_str(&format!(
+                "\n{}{} => {{\n{}    // TODO\n{}}}",
+                indent, variant, indent, indent
+            ));
         }
     }
 
@@ -231,7 +240,10 @@ fn resolve_variants(
     if let Some(ty) = subject_ty {
         match &ty.0 {
             TypeKind::Intrinsic(varn_core::TypeTag::Bool) => {
-                return Some(("".to_string(), vec!["true".to_string(), "false".to_string()]));
+                return Some((
+                    "".to_string(),
+                    vec!["true".to_string(), "false".to_string()],
+                ));
             }
             TypeKind::Named(name, _) => {
                 // Check if enum declaration exists in AST for this name

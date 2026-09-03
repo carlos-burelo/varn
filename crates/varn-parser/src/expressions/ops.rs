@@ -140,8 +140,5 @@ pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<Expr, String> {
         None
     };
     let full_range = s.span_from(start_range);
-    Ok(s.expr(
-        full_range,
-        ExprKind::Yield { argument, delegate },
-    ))
+    Ok(s.expr(full_range, ExprKind::Yield { argument, delegate }))
 }

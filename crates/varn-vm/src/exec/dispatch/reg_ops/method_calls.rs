@@ -63,14 +63,22 @@ impl ExecCtx {
         }
 
         // Direct fast-paths for high-frequency intrinsic String methods (startsWith, indexOf).
-        if this_val.is_sso() || (this_val.is_heap() && matches!(self.heap.get(this_val.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)))) {
+        if this_val.is_sso()
+            || (this_val.is_heap()
+                && matches!(
+                    self.heap.get(this_val.as_heap_idx()),
+                    Some(crate::heap::HeapObj::Str(_))
+                ))
+        {
             if name.as_ref() == varn_core::MemberKey::StartsWith.as_str() && arg_count == 1 {
                 let mut buf_a = [0u8; 5];
                 let mut buf_b = [0u8; 5];
                 let arg_val = self.stack[base + arg_start];
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
-                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                } else if let Some(crate::heap::HeapObj::Str(hs)) =
+                    self.heap.get(this_val.as_heap_idx())
+                {
                     Some(hs.as_str())
                 } else {
                     None
@@ -78,7 +86,9 @@ impl ExecCtx {
                 let p_opt = if arg_val.is_sso() {
                     Some(arg_val.sso_as_str(&mut buf_b))
                 } else if arg_val.is_heap() {
-                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                    if let Some(crate::heap::HeapObj::Str(hs)) =
+                        self.heap.get(arg_val.as_heap_idx())
+                    {
                         Some(hs.as_str())
                     } else {
                         None
@@ -97,7 +107,9 @@ impl ExecCtx {
                 let arg_val = self.stack[base + arg_start];
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
-                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                } else if let Some(crate::heap::HeapObj::Str(hs)) =
+                    self.heap.get(this_val.as_heap_idx())
+                {
                     Some(hs.as_str())
                 } else {
                     None
@@ -105,7 +117,9 @@ impl ExecCtx {
                 let p_opt = if arg_val.is_sso() {
                     Some(arg_val.sso_as_str(&mut buf_b))
                 } else if arg_val.is_heap() {
-                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                    if let Some(crate::heap::HeapObj::Str(hs)) =
+                        self.heap.get(arg_val.as_heap_idx())
+                    {
                         Some(hs.as_str())
                     } else {
                         None
@@ -124,7 +138,9 @@ impl ExecCtx {
                 let arg_val = self.stack[base + arg_start];
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
-                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                } else if let Some(crate::heap::HeapObj::Str(hs)) =
+                    self.heap.get(this_val.as_heap_idx())
+                {
                     Some(hs.as_str())
                 } else {
                     None
@@ -132,7 +148,9 @@ impl ExecCtx {
                 let p_opt = if arg_val.is_sso() {
                     Some(arg_val.sso_as_str(&mut buf_b))
                 } else if arg_val.is_heap() {
-                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                    if let Some(crate::heap::HeapObj::Str(hs)) =
+                        self.heap.get(arg_val.as_heap_idx())
+                    {
                         Some(hs.as_str())
                     } else {
                         None
@@ -254,11 +272,16 @@ impl ExecCtx {
         }
 
         if let Some(ref cls) = receiver_class {
-            if let Some((method_val, owner_cls)) = varn_types::find_method_with_owner(cls, name.as_ref()) {
+            if let Some((method_val, owner_cls)) =
+                varn_types::find_method_with_owner(cls, name.as_ref())
+            {
                 match method_val {
                     Value::VmValue(payload) => {
                         if let Some(nc) = VmClosurePayload::downcast_from(&*payload) {
-                            if !nc.proto.is_generator && !nc.proto.is_async && arg_count <= nc.proto.arity {
+                            if !nc.proto.is_generator
+                                && !nc.proto.is_async
+                                && arg_count <= nc.proto.arity
+                            {
                                 return self.invoke_vm_method_fast(
                                     nc.clone(),
                                     Some(owner_cls),
@@ -275,7 +298,8 @@ impl ExecCtx {
                     Value::NativeFn(b) => {
                         let f = b.0;
                         self.record_call_native(f, Some(name.as_ref()));
-                        let result = self.call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
+                        let result = self
+                            .call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
                         self.stack[base + dest] = result;
                         return Ok(false);
                     }
@@ -313,49 +337,47 @@ impl ExecCtx {
             crate::exec::props::ResolvedProperty::Built(v) => self.heap.intern(v),
         };
 
-        if receiver_class.is_some()
-            && cs < cache_len && method_nv.is_heap() && !is_megamorphic {
-                if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
-                    self.heap.get(method_nv.as_heap_idx())
-                {
-                    match &bm.target {
-                        varn_types::value::BoundMethodTarget::Native { func: f, .. } => {
-                            let val = Value::NativeFn(Box::new((*f, "")));
-                            self.populate_method_ic(
-                                closure,
-                                cs,
-                                cache_len,
-                                is_megamorphic,
-                                &receiver_class,
-                                name.as_ref(),
-                                val,
-                                ICKind::NATIVE_VTABLE_METHOD,
-                            );
-                        }
-                        varn_types::value::BoundMethodTarget::Vm {
-                            closure: method_closure,
-                            ..
-                        } => {
-                            if let Some(nc) = VmClosurePayload::downcast_from(&**method_closure) {
-                                if !nc.proto.is_generator && !nc.proto.is_async {
-                                    let val =
-                                        Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
-                                    self.populate_method_ic(
-                                        closure,
-                                        cs,
-                                        cache_len,
-                                        is_megamorphic,
-                                        &receiver_class,
-                                        name.as_ref(),
-                                        val,
-                                        ICKind::VM_VTABLE_METHOD,
-                                    );
-                                }
+        if receiver_class.is_some() && cs < cache_len && method_nv.is_heap() && !is_megamorphic {
+            if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
+                self.heap.get(method_nv.as_heap_idx())
+            {
+                match &bm.target {
+                    varn_types::value::BoundMethodTarget::Native { func: f, .. } => {
+                        let val = Value::NativeFn(Box::new((*f, "")));
+                        self.populate_method_ic(
+                            closure,
+                            cs,
+                            cache_len,
+                            is_megamorphic,
+                            &receiver_class,
+                            name.as_ref(),
+                            val,
+                            ICKind::NATIVE_VTABLE_METHOD,
+                        );
+                    }
+                    varn_types::value::BoundMethodTarget::Vm {
+                        closure: method_closure,
+                        ..
+                    } => {
+                        if let Some(nc) = VmClosurePayload::downcast_from(&**method_closure) {
+                            if !nc.proto.is_generator && !nc.proto.is_async {
+                                let val = Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
+                                self.populate_method_ic(
+                                    closure,
+                                    cs,
+                                    cache_len,
+                                    is_megamorphic,
+                                    &receiver_class,
+                                    name.as_ref(),
+                                    val,
+                                    ICKind::VM_VTABLE_METHOD,
+                                );
                             }
                         }
                     }
                 }
             }
+        }
 
         let native_call: Option<(varn_types::NativeFn, VmValue)> = if method_nv.is_heap() {
             match self.heap.get(method_nv.as_heap_idx()) {

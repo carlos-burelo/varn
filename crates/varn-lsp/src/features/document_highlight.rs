@@ -73,9 +73,7 @@ pub fn build_document_highlights(
             (t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) && t.lexeme == name
         })
         .map(|t| {
-            let kind = if decl_positions.contains(&(t.line, t.col))
-                || is_assignment_lhs(state, t)
-            {
+            let kind = if decl_positions.contains(&(t.line, t.col)) || is_assignment_lhs(state, t) {
                 DocumentHighlightKind::WRITE
             } else {
                 DocumentHighlightKind::READ

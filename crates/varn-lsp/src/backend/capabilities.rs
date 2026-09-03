@@ -62,14 +62,14 @@ pub fn server_capabilities() -> ServerCapabilities {
             work_done_progress_options: Default::default(),
         })),
         document_symbol_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(
-            SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
                 range: Some(false),
                 full: Some(SemanticTokensFullOptions::Bool(true)),
                 legend: LEGEND.clone(),
                 ..Default::default()
-            }),
-        ),
+            },
+        )),
         document_highlight_provider: Some(OneOf::Left(true)),
         folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),

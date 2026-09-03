@@ -76,7 +76,6 @@ pub(super) fn assign_registers(
         }
     }
 
-
     // Kind-aware linear scan: each `SlotKind` draws from its own free-register
     // pool, so a physical register is not shared between values of different
     // kinds while there is room to avoid it.

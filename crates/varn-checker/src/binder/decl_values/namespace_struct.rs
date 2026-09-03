@@ -356,8 +356,8 @@ impl<'r> super::super::Binder<'r> {
                 is_readonly: false,
                 is_override: false,
                 symbol_id: Some(symbol_id),
-                        ..Default::default()
-                        });
+                ..Default::default()
+            });
         }
         let struct_info = ClassMemberInfo {
             name: s.id.clone(),

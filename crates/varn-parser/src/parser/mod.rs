@@ -81,9 +81,7 @@ impl Parser {
                     // Preserve the unparseable span instead of dropping it, so
                     // every byte of source stays reachable from the tree.
                     let recovered = self.stream.span_from(stmt_start);
-                    let stmt = self
-                        .stream
-                        .stmt(recovered, varn_core::ast::StmtKind::Error);
+                    let stmt = self.stream.stmt(recovered, varn_core::ast::StmtKind::Error);
                     body.push(stmt);
                 }
             }
@@ -173,10 +171,7 @@ impl Parser {
         let s = &mut self.stream;
         while s.eat(TokenKind::Semicolon) {}
         if s.is_eof() {
-            return Ok(s.stmt(
-                s.range(),
-                varn_core::ast::StmtKind::Empty,
-            ));
+            return Ok(s.stmt(s.range(), varn_core::ast::StmtKind::Empty));
         }
         let parsed = stmts::parse_stmt_or_decl_inner(s);
         #[cfg(feature = "profiling")]

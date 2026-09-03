@@ -55,7 +55,13 @@ pub fn enrich_call_returns(
                 is_async,
             } => {
                 let stmt: &Stmt = unsafe { &**body };
-                let inferred = collect_inferred_return_types_raw(&ctx, &sym_map, stmt, &BindView::new(bind, resolver), None);
+                let inferred = collect_inferred_return_types_raw(
+                    &ctx,
+                    &sym_map,
+                    stmt,
+                    &BindView::new(bind, resolver),
+                    None,
+                );
                 let ret_ty = types::join_types(inferred);
                 if !ret_ty.is_dynamic() {
                     let final_ret = crate::types::async_fn_return(ret_ty, *is_async);

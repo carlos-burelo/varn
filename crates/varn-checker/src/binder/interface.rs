@@ -101,8 +101,8 @@ impl<'r> super::Binder<'r> {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             InterfaceMember::Method {
                 key,
@@ -180,8 +180,8 @@ impl<'r> super::Binder<'r> {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             InterfaceMember::Index {
                 param,

@@ -6,11 +6,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_negate(
-    ctx: *mut ExecCtx,
-    v_tag: u64,
-    v_payload: u64,
-) {
+pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let v = VmValue::from_raw_parts(v_tag, v_payload);
@@ -21,13 +17,13 @@ pub(crate) extern "C" fn jit_negate(
     }
 }
 
-pub(crate) extern "C" fn jit_logical_not(
-    _ctx: *mut ExecCtx,
-    v_tag: u64,
-    v_payload: u64,
-) -> u64 {
+pub(crate) extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) -> u64 {
     let v = VmValue::from_raw_parts(v_tag, v_payload);
-    if crate::exec::compare::logical_not(v).is_truthy() { 1 } else { 0 }
+    if crate::exec::compare::logical_not(v).is_truthy() {
+        1
+    } else {
+        0
+    }
 }
 
 pub(crate) extern "C" fn jit_div(

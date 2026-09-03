@@ -1,10 +1,10 @@
 use crate::cli::AddArgs;
 use crate::error::CliError;
+use varn_core::term::terminal;
 use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, DepOrigin, ProjectManifest},
 };
-use varn_core::term::terminal;
 
 pub fn execute(args: AddArgs) -> Result<(), CliError> {
     let cwd =
@@ -21,9 +21,7 @@ pub fn execute(args: AddArgs) -> Result<(), CliError> {
     manifest
         .dependencies
         .insert(args.alias.clone(), args.origin.clone());
-    manifest
-        .save(&manifest_path)
-        .map_err(CliError::fatal)?;
+    manifest.save(&manifest_path).map_err(CliError::fatal)?;
 
     let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
 
@@ -40,10 +38,7 @@ pub fn execute(args: AddArgs) -> Result<(), CliError> {
         installer::resolve_and_install(&project_root, &deps, existing_lock.as_ref(), false)
             .map_err(CliError::fatal)?;
 
-    result
-        .lock
-        .save(&lock_path)
-        .map_err(CliError::fatal)?;
+    result.lock.save(&lock_path).map_err(CliError::fatal)?;
 
     terminal::log(format!("Added {} → {}", args.alias, args.origin));
     Ok(())

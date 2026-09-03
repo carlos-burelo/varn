@@ -352,10 +352,11 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                                 "let",
                             ]
                             .contains(&kw.as_str())
-                                && keyword_idx + 1 < words.len() {
-                                    let name = &words[keyword_idx + 1];
-                                    exports.push(name.clone());
-                                }
+                                && keyword_idx + 1 < words.len()
+                            {
+                                let name = &words[keyword_idx + 1];
+                                exports.push(name.clone());
+                            }
                         }
                     }
                 }

@@ -94,8 +94,7 @@ impl ObjData {
     /// so a constructor's writes all land inline. This is the path the object
     /// allocation benchmark exercises.
     pub fn new_instance(class: Rc<ClassObj>) -> Rc<ObjData> {
-        let shape = class.root_shape.borrow().clone();
-        let n = shape.property_names.len();
+        let (shape, n) = class.instance_shape();
         Self::alloc(shape, n)
     }
 

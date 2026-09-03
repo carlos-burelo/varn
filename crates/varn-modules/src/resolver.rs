@@ -45,9 +45,7 @@ impl ModuleResolver {
                     referrer,
                     ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_)
                 ) || match referrer {
-                    ModuleId::Local(ref_path) => {
-                        super::std_root::in_source_tree(ref_path.as_ref())
-                    }
+                    ModuleId::Local(ref_path) => super::std_root::in_source_tree(ref_path.as_ref()),
                     _ => false,
                 };
                 if !in_intrinsic_context {

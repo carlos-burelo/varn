@@ -207,7 +207,15 @@ impl ExecCtx {
                 self.frames[frame_idx].ip = *ip;
                 let this_val = self.stack[base + this_reg];
                 let jumped = self.exec_call_method_reg(
-                    this_val, base, name_idx, usize::MAX, arg_start, arg_count, dest, frame_idx, closure,
+                    this_val,
+                    base,
+                    name_idx,
+                    usize::MAX,
+                    arg_start,
+                    arg_count,
+                    dest,
+                    frame_idx,
+                    closure,
                 )?;
                 if jumped {
                     return Ok(Some(ControlCallFlow::ContinueFrame));

@@ -8,9 +8,7 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{
-    call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48,
-};
+use super::super::emit::{call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48};
 use super::super::kinds::K;
 use super::super::liveness::Liveness;
 use crate::JitHelpers;
