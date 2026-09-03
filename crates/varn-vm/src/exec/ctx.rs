@@ -105,6 +105,7 @@ pub struct ExecCtx {
     pub gc_inhibited: bool,
     pub capabilities: varn_types::capabilities::CapabilitySet,
     pub metadata: FxHashMap<String, FxHashMap<String, VmValue>>,
+    pub gc_root_scratch: Vec<VmValue>,
 }
 
 impl ExecCtx {
@@ -153,6 +154,7 @@ impl ExecCtx {
             gc_inhibited: false,
             capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
             metadata: FxHashMap::default(),
+            gc_root_scratch: Vec::with_capacity(1024),
         };
 
         if fresh {
@@ -321,6 +323,7 @@ impl ExecCtx {
             gc_inhibited: false,
             capabilities: self.capabilities.clone(),
             metadata: FxHashMap::default(),
+            gc_root_scratch: Vec::with_capacity(1024),
         }
     }
 
@@ -335,16 +338,19 @@ impl ExecCtx {
             self.stack.resize(active_stack_len, VmValue::null());
         }
 
-        let mut all_vals: Vec<VmValue> = Vec::with_capacity(
-            active_stack_len
-                + self.globals.values.len()
-                + self.modules.len()
-                + self.module_exports.len()
-                + self.static_closures.len()
-                + self.pending_constructors.len()
-                + self.pending_setters.len()
-                + 1,
-        );
+        let mut all_vals = std::mem::take(&mut self.gc_root_scratch);
+        all_vals.clear();
+        let needed_cap = active_stack_len
+            + self.globals.values.len()
+            + self.modules.len()
+            + self.module_exports.len()
+            + self.static_closures.len()
+            + self.pending_constructors.len()
+            + self.pending_setters.len()
+            + 1;
+        if all_vals.capacity() < needed_cap {
+            all_vals.reserve(needed_cap - all_vals.capacity());
+        }
 
         all_vals.extend_from_slice(&self.stack[..active_stack_len]);
         let globals_start = all_vals.len();
@@ -424,6 +430,8 @@ impl ExecCtx {
         }
 
         self.jit_native_result = all_vals[jit_native_result_start];
+        all_vals.clear();
+        self.gc_root_scratch = all_vals;
     }
 
     /// Loop back-edge GC safepoint shared by the interpreter and the JIT.

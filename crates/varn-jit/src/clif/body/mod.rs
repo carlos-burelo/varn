@@ -97,15 +97,16 @@ pub(super) fn lower_raw(
     let has_round = floats::has_round_support(isa);
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
 
-    let has_boxed_slots = proto
-        .param_kinds
-        .iter()
-        .any(|k| !matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool))
-        || proto
-            .register_meta
+    let has_boxed_slots = has_alloc
+        && (proto
+            .param_kinds
             .iter()
-            .skip(1)
-            .any(|m| !matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool));
+            .any(|k| !matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool))
+            || proto
+                .register_meta
+                .iter()
+                .skip(1)
+                .any(|m| !matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool)));
 
     let mirror_home = proto.has_this
         || has_alloc

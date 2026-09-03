@@ -282,6 +282,19 @@ impl ExecCtx {
                                 && !nc.proto.is_async
                                 && arg_count <= nc.proto.arity
                             {
+                                if cs < cache_len && !is_megamorphic {
+                                    let val = Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
+                                    self.populate_method_ic(
+                                        closure,
+                                        cs,
+                                        cache_len,
+                                        is_megamorphic,
+                                        &receiver_class,
+                                        name.as_ref(),
+                                        val,
+                                        ICKind::VM_VTABLE_METHOD,
+                                    );
+                                }
                                 return self.invoke_vm_method_fast(
                                     nc.clone(),
                                     Some(owner_cls),
@@ -297,6 +310,19 @@ impl ExecCtx {
                     }
                     Value::NativeFn(b) => {
                         let f = b.0;
+                        if cs < cache_len && !is_megamorphic {
+                            let val = Value::NativeFn(Box::new((f, "")));
+                            self.populate_method_ic(
+                                closure,
+                                cs,
+                                cache_len,
+                                is_megamorphic,
+                                &receiver_class,
+                                name.as_ref(),
+                                val,
+                                ICKind::NATIVE_VTABLE_METHOD,
+                            );
+                        }
                         self.record_call_native(f, Some(name.as_ref()));
                         let result = self
                             .call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
@@ -555,7 +581,7 @@ impl ExecCtx {
         name: &str,
     ) -> VmResult<bool> {
         self.record_call_vm_fast();
-        {
+        if self.hotspot_counters.is_some() {
             let method_key = format!(
                 "{}.{}",
                 owner_class.as_ref().map(|c| c.name.as_str()).unwrap_or("?"),

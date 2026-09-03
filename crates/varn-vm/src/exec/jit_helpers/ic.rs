@@ -49,14 +49,14 @@ pub(crate) fn try_fast_jit_method(
                 && c.class_id == class_rc.id
                 && c.name_idx == name_idx
             {
-                return Some((c.closure.clone(), c.jit_fn));
+                return Some(c.closure.clone());
             }
         }
         None
     });
 
-    let (nc, jit_fn) = match hit {
-        Some((c, j)) => (c, j?),
+    let nc = match hit {
+        Some(c) => c,
         None => {
             let name_nv = *closure_ref.constants.get(name_idx)?;
             let name = ctx_ref.heap.str_val(name_nv)?;
@@ -78,19 +78,20 @@ pub(crate) fn try_fast_jit_method(
             {
                 return None;
             }
-            let jit_fn = nc.jit_fn();
             ACTIVE_METHOD.with(|cell| {
                 *cell.borrow_mut() = Some(ActiveMethodCache {
                     caller_proto,
                     class_id: class_rc.id,
                     name_idx,
                     closure: nc.clone(),
-                    jit_fn,
+                    jit_fn: None,
                 });
             });
-            (nc, jit_fn?)
+            nc
         }
     };
+
+    let jit_fn = nc.hot_jit_fn()?;
 
     let orig_len = ctx_ref.stack.len();
     let callee_base = orig_len;

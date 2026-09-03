@@ -224,8 +224,31 @@ pub(crate) fn store_home(
     fb: cranelift_codegen::ir::Value,
     reg: usize,
 ) {
-    let v = box_or_load_home(b, actx, state, reg);
-    b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+    let Some(&var) = actx.vars.get(reg) else {
+        let null_val = super::super::emit::box_null(b);
+        b.ins().store(MemFlags::trusted(), null_val, fb, (reg * 16) as i32);
+        return;
+    };
+    let raw = b.use_var(var);
+    if b.func.dfg.value_type(raw) == types::F64 {
+        let v = super::super::emit::box_f64(b, raw);
+        b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+    } else {
+        match state.get(reg).copied().unwrap_or(K::Unset) {
+            K::Int => {
+                let v = super::super::emit::box_int(b, raw);
+                b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+            }
+            K::Bool => {
+                let v = super::super::emit::box_bool(b, raw);
+                b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+            }
+            _ => {
+                // The slot on `ctx.stack` already holds the boxed value (stored on
+                // def_result, Move, or entry). Redundant load + store to same slot is skipped.
+            }
+        }
+    }
 }
 
 pub(crate) fn def_result(

@@ -404,9 +404,6 @@ pub(crate) fn dispatch_opcode(
             return Ok(true);
         }
         OpCode::CallSelf => {
-            if frame_aware {
-                return Err("clif: CallSelf in frame_aware function not supported in machine-code direct recursion".into());
-            }
             let w1 = code[ip + 1];
             let w2 = code[ip + 2];
             let dest = (w1 >> 8) as usize;
