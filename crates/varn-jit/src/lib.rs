@@ -1,3 +1,4 @@
+pub mod aot;
 pub mod clif;
 mod helper_abi;
 pub(crate) mod loop_hoist;

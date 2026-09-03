@@ -51,7 +51,8 @@ pub(crate) extern "C" fn jit_call(
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
                 let is_eligible = !closure.proto.is_async
                     && !closure.proto.is_generator
-                    && !closure.proto.has_rest;
+                    && !closure.proto.has_rest
+                    && !closure.proto.has_try();
 
                 if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
@@ -140,11 +141,21 @@ pub(crate) extern "C" fn jit_call(
         match res {
             Ok(true) => {
                 if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    while ctx_ref.frames.len() > caller_depth {
+                        let f = ctx_ref.frames.pop().unwrap();
+                        ctx_ref.close_upvalues_above(f.base);
+                    }
                     jit_propagate_error(ctx_ref, e);
                 }
             }
             Ok(false) => {}
-            Err(e) => jit_propagate_error(ctx_ref, e),
+            Err(e) => {
+                while ctx_ref.frames.len() > caller_depth {
+                    let f = ctx_ref.frames.pop().unwrap();
+                    ctx_ref.close_upvalues_above(f.base);
+                }
+                jit_propagate_error(ctx_ref, e);
+            }
         }
 
         ctx_ref.stack[base + args.dest]
@@ -245,11 +256,21 @@ pub(crate) extern "C" fn jit_call_method_flat(
         match res {
             Ok(true) => {
                 if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    while ctx_ref.frames.len() > caller_depth {
+                        let f = ctx_ref.frames.pop().unwrap();
+                        ctx_ref.close_upvalues_above(f.base);
+                    }
                     jit_propagate_error(ctx_ref, e);
                 }
             }
             Ok(false) => {}
-            Err(e) => jit_propagate_error(ctx_ref, e),
+            Err(e) => {
+                while ctx_ref.frames.len() > caller_depth {
+                    let f = ctx_ref.frames.pop().unwrap();
+                    ctx_ref.close_upvalues_above(f.base);
+                }
+                jit_propagate_error(ctx_ref, e);
+            }
         }
 
         ctx_ref.jit_native_result = ctx_ref.stack[base + dest];

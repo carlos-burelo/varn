@@ -142,8 +142,18 @@ pub(super) unsafe fn run_compiled_frame(
                 let err_obj = (*ctx).jit_panic_exception_err_obj.take();
 
                 if let Some(handler) = handler {
-                    unwind_to_handler(&mut *ctx, handler, error);
-                    return JitFrameOutcome::Continue;
+                    if handler.frame_depth > depth {
+                        unwind_to_handler(&mut *ctx, handler, error);
+                        return JitFrameOutcome::Continue;
+                    } else {
+                        (*ctx).jit_panic_exception_handler = Some(handler);
+                        (*ctx).jit_panic_exception_error = Some(error);
+                        let err = err_obj.unwrap_or_else(|| {
+                            crate::error::RuntimeError::new(format!("unhandled exception: {error}"))
+                        });
+                        (*ctx).jit_panic_exception_err_obj = Some(err.clone());
+                        return JitFrameOutcome::Failed(err);
+                    }
                 } else {
                     return JitFrameOutcome::Failed(err_obj.unwrap());
                 }

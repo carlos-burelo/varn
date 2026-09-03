@@ -147,9 +147,19 @@ Que el camino sea uno solo es de corrección, no de estilo. La búsqueda vivía 
 Dos detalles que el camino tiene que respetar:
 
 * **Sincronizar el `ip`.** El bucle lleva `ip` en una variable local y sólo lo escribe al frame en puntos concretos. La `exception_table` se indexa por el ip de la instrucción que falló, así que el camino de error lo sincroniza antes de buscar; sin eso encuentra el rango equivocado, o ninguno.
-* **Respetar el fondo (`depth`).** Por debajo del fondo de la invocación hay frames de un llamador de Rust, que no puede reanudarse desde el intérprete: ahí el error se propaga como `Err` en vez de desmontarlos.
+* **Respetar el fondo (`depth`).** Por debajo del fondo de la invocación hay frames de un llamador de Rust o de un llamador JIT nativo, que no puede reanudarse desde el intérprete: ahí el error se propaga como `Err` en vez de desmontarlos (`h.frame_depth > depth`).
 
 Un error nativo no traía valor lanzado, así que se materializa como instancia de `Error` con su mensaje y `e.message` funciona igual que con uno lanzado a mano.
+
+#### Excepciones en la Frontera JIT / Intérprete y Diferencias entre `run` y `bench`
+
+En `vn run`, el código se ejecuta una sola vez; la mayoría de funciones de control o helpers auxiliares permanecen por debajo del umbral de invocaciones del tiered JIT y corren en el intérprete. En cambio, `vn bench` calienta la VM y ejecuta múltiples repeticiones completas (10 runs por defecto), provocando que funciones callee secundarias superen los umbrales de tiering y se compilen con Cranelift.
+
+Esto exige una paridad estricta en el desenrollado de excepciones entre marcos JIT e intérprete:
+1. **Invariante `h.frame_depth > depth` en `run_compiled_frame`**:
+   Cuando una función compilada por JIT atrapa una excepción (`longjmp` con código 1), no debe desenrollar handlers pertenecientes a marcos llamadores (`h.frame_depth <= depth`). Si el handler pertenece a un llamador, el marco JIT actual se declara fallido (`JitFrameOutcome::Failed`) y preserva el handler en `ctx.jit_panic_exception_handler` para que el marco llamador sea quien efectúe el desenrollado.
+2. **Desenlace de Frames Callee en `jit_call` y `jit_call_method`**:
+   Cuando un marco JIT invoca a un callee que falla (`run_until_inner(caller_depth)` devuelve `Err`), los frames intermedios por encima de `caller_depth` deben desapilarse explícitamente (`while ctx.frames.len() > caller_depth { ctx.frames.pop(); }`) antes de llamar a `jit_propagate_error`, asegurando que la pila de frames coincida exactamente con la profundidad del llamador que capturará el error.
 
 ---
 

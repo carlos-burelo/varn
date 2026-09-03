@@ -32,6 +32,7 @@ varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-pm       = { path = "../varn-pm" }
 varn-modules  = { path = "../varn-modules" }
+varn-jit      = { path = "../varn-jit" }
 tower-lsp     = { workspace = true }
 postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }

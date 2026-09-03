@@ -10,6 +10,7 @@ use crate::value::VmValue;
 use varn_types::chunk::ICKind;
 
 struct ActiveMethodCache {
+    caller_proto: usize,
     class_id: u32,
     name_idx: usize,
     closure: std::rc::Rc<crate::closure::VmClosure>,
@@ -40,10 +41,14 @@ pub(crate) fn try_fast_jit_method(
         _ => return None,
     };
 
+    let caller_proto = &closure_ref.proto as *const _ as usize;
     let hit = ACTIVE_METHOD.with(|cell| {
         let b = cell.borrow();
         if let Some(ref c) = *b {
-            if c.class_id == class_rc.id && c.name_idx == name_idx {
+            if c.caller_proto == caller_proto
+                && c.class_id == class_rc.id
+                && c.name_idx == name_idx
+            {
                 return Some((c.closure.clone(), c.jit_fn));
             }
         }
@@ -66,12 +71,17 @@ pub(crate) fn try_fast_jit_method(
                 }
                 _ => return None,
             };
-            if nc.proto.is_generator || nc.proto.is_async || arg_count > nc.proto.arity {
+            if nc.proto.is_generator
+                || nc.proto.is_async
+                || arg_count > nc.proto.arity
+                || nc.proto.has_try()
+            {
                 return None;
             }
             let jit_fn = nc.jit_fn();
             ACTIVE_METHOD.with(|cell| {
                 *cell.borrow_mut() = Some(ActiveMethodCache {
+                    caller_proto,
                     class_id: class_rc.id,
                     name_idx,
                     closure: nc.clone(),

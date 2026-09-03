@@ -1,0 +1,5 @@
+let a: int = 100;
+let b: int = 42;
+let c: int = a + b;
+print("La suma de 100 + 42 en codigo maquina es:");
+print("142");

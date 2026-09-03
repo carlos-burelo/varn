@@ -10,7 +10,7 @@ use crate::value::VmValue;
 
 #[inline(always)]
 pub(crate) unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::RuntimeError) -> ! {
-    let handler = ctx.try_handlers.pop();
+    let handler = ctx.jit_panic_exception_handler.take().or_else(|| ctx.try_handlers.pop());
     ctx.jit_panic_exception_handler = handler;
     ctx.jit_panic_exception_error = Some(e.thrown.unwrap_or(VmValue::null()));
     ctx.jit_panic_exception_err_obj = Some(e);

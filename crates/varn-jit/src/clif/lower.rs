@@ -184,12 +184,23 @@ pub fn try_compile(
     // OSR `raw` out of `clif_raw`: `compile` publishes a direct clif→clif
     // entry only for non-frame-aware lowerings, and a raw that resumes
     // mid-loop is the last thing a call site should reach.
+    let has_boxed_slots = proto
+        .param_kinds
+        .iter()
+        .any(|k| !matches!(k, varn_types::register_meta::SlotKind::Int | varn_types::register_meta::SlotKind::Float | varn_types::register_meta::SlotKind::Bool))
+        || proto
+            .register_meta
+            .iter()
+            .skip(1)
+            .any(|m| !matches!(m.kind, varn_types::register_meta::SlotKind::Int | varn_types::register_meta::SlotKind::Float | varn_types::register_meta::SlotKind::Bool));
+
     let frame_aware = osr_ip.is_some()
         || proto.has_this
         || has_alloc
         || proto.upvalue_count > 0
         || proto.is_generator
-        || proto.is_async;
+        || proto.is_async
+        || has_boxed_slots;
     let raw = lower_raw(
         proto,
         constants,

@@ -330,6 +330,21 @@ impl FunctionProto {
         found
     }
 
+    pub fn has_try(&self) -> bool {
+        let code = &self.chunk.code;
+        let mut ip = 0;
+        while ip < code.len() {
+            let Some(info) = crate::bytecode::decode(code, ip, &self.chunk.constants) else {
+                return true;
+            };
+            if OpCode::from_u16(code[ip]) == Some(OpCode::Try) {
+                return true;
+            }
+            ip += info.len.max(1);
+        }
+        false
+    }
+
     pub fn ensure_ic(&self) {
         let n = self.cache_count;
         if n == 0 {

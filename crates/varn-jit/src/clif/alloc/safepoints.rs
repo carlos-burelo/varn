@@ -72,6 +72,18 @@ pub(crate) fn has_alloc_scan(
                     | OpCode::BuildStr
                     | OpCode::CallNativeOp
                     | OpCode::Add
+                    | OpCode::Sub
+                    | OpCode::Mul
+                    | OpCode::Div
+                    | OpCode::DivInt
+                    | OpCode::Mod
+                    | OpCode::Pow
+                    | OpCode::BitAnd
+                    | OpCode::BitOr
+                    | OpCode::BitXor
+                    | OpCode::Shl
+                    | OpCode::Shr
+                    | OpCode::Ushr
                     | OpCode::GetProperty
                     | OpCode::SetProperty
                     | OpCode::Call

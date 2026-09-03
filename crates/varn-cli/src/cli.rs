@@ -215,6 +215,10 @@ pub struct BuildArgs {
     #[arg(short, long, default_value = "bytecode", value_name = "TARGET")]
     pub target: String,
 
+    /// Compilar a ejecutable nativo puro (código máquina AOT)
+    #[arg(long)]
+    pub native: bool,
+
     #[arg(short, long)]
     pub verbose: bool,
 }
