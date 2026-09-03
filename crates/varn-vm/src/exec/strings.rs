@@ -3,11 +3,6 @@ use crate::strbuf::StrBuf;
 use crate::value::VmValue;
 use std::rc::Rc;
 
-/// Left operands at or above this length seed an extensible buffer, so a
-/// `s = s + x` accumulation appends in place from then on. Shorter results
-/// stay `Shared` — one-off concats (e.g. map keys) shouldn't pay the
-/// copy-on-materialize of a buffer view.
-
 /// `.length` for the property fast paths: str (char count) and Array
 /// (element count), matching the native getters in varn-builtins. `None`
 /// for any other receiver, which then takes the generic getter path.

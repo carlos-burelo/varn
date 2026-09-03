@@ -66,7 +66,7 @@ thread_local! {
     static CYCLES: [Cell<u64>; N] = Default::default();
     static HITS: [Cell<u64>; N] = Default::default();
     /// Coste de un par `read()`/`read()` vacío, para restarlo de cada tramo.
-    static OVERHEAD: Cell<u64> = Cell::new(0);
+    static OVERHEAD: Cell<u64> = const { Cell::new(0) };
 }
 
 #[inline(always)]

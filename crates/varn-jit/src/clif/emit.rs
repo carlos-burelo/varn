@@ -843,7 +843,7 @@ pub(super) fn wrap_i48(
 pub(super) fn i64_const_fits(b: &FunctionBuilder, v: Value, threshold: u64) -> bool {
     if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
         if let InstructionData::UnaryImm { imm, .. } = b.func.dfg.insts[inst] {
-            return (imm.bits() as i64).unsigned_abs() < threshold;
+            return imm.bits().unsigned_abs() < threshold;
         }
     }
     false

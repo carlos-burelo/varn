@@ -124,12 +124,7 @@ pub(crate) unsafe fn dispatch_to_handler(
     thrown_val: VmValue,
     depth: usize,
 ) -> bool {
-    if (*ctx)
-        .try_handlers
-        .last()
-        .is_some_and(|h| h.frame_depth > depth)
-    {
-        let handler = (*ctx).try_handlers.pop().unwrap();
+    if let Some(handler) = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) {
         crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val);
         return true;
     }

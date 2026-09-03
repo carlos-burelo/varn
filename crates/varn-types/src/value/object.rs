@@ -42,7 +42,7 @@ const WORDS_PER_VALUE: usize = size_of::<Cell<VmValue>>() / size_of::<u64>();
 const _: () = {
     // The tail is carved out of a `u64` slice, so a value must be a whole
     // number of words and must not need stricter alignment than one.
-    assert!(size_of::<Cell<VmValue>>() % size_of::<u64>() == 0);
+    assert!(size_of::<Cell<VmValue>>().is_multiple_of(size_of::<u64>()));
     assert!(align_of::<VmValue>() == 8);
     assert!(align_of::<Cell<VmValue>>() == 8);
     assert!(size_of::<Cell<VmValue>>() == size_of::<VmValue>());

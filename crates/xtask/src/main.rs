@@ -745,13 +745,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             let rt_pad = 7_usize.saturating_sub(rt.name.len());
             let bar_pad = 26_usize.saturating_sub(bar_len);
+            let rt_colored = term.rt_color(&rt.name, &rt.name);
+            let spaces = " ".repeat(rt_pad);
             println!(
-                "    {}{:>6.1} ms  {}{}{}",
-                format!(
-                    "{}{}",
-                    term.rt_color(&rt.name, &rt.name),
-                    " ".repeat(rt_pad)
-                ),
+                "    {rt_colored}{spaces}{:>6.1} ms  {}{}{}",
                 st.median,
                 bar_str,
                 " ".repeat(bar_pad),

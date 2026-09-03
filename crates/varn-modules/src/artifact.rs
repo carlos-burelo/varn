@@ -139,7 +139,7 @@ pub fn prune_superseded(current: &Path) {
     if siblings.len() <= ARTIFACT_GENERATIONS {
         return;
     }
-    siblings.sort_by(|a, b| b.0.cmp(&a.0));
+    siblings.sort_by_key(|b| std::cmp::Reverse(b.0));
     for (_, path) in siblings.drain(ARTIFACT_GENERATIONS..) {
         let _ = std::fs::remove_file(path);
     }
