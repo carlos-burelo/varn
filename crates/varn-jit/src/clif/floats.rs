@@ -19,7 +19,9 @@
 //! intrinsics that ARE a single ISA instruction, keeping them out of the
 //! generic `dispatch_intrinsic` helper (and its register flush/reload).
 
-use cranelift_codegen::ir::{condcodes::FloatCC, types, InstructionData, InstBuilder, Value, ValueDef};
+use cranelift_codegen::ir::{
+    condcodes::FloatCC, types, InstructionData, InstBuilder, MemFlags, Value, ValueDef,
+};
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::intrinsic_ops::math::MathOp;
@@ -27,8 +29,8 @@ use varn_core::intrinsic_ops::{intrinsic_decode, IntrinsicDomain};
 use varn_core::OpCode;
 use varn_types::register_meta::RegisterMeta;
 
-use super::alloc::{self, AllocCtx};
-use super::emit::{box_f64, box_or_pass, call_helper, meta_is_float, unbox_f64_coerce, use_f64};
+use super::alloc::{self, def_result, AllocCtx};
+use super::emit::{box_f64, box_or_pass, call_helper_void, meta_is_float, unbox_f64_coerce, use_f64};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -45,6 +47,7 @@ use crate::JitHelpers;
 /// emits this for the four ops that ARE a single instruction.
 pub(super) fn emit_intrinsic_direct(
     b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
     vars: &[Variable],
     meta: &[RegisterMeta],
     code: &[u16],
@@ -84,11 +87,22 @@ pub(super) fn emit_intrinsic_direct(
         _ => return Err("clif: IntrinsicDirect op needs SSE4.1".into()),
     };
 
-    if meta_is_float(meta, dest) {
+    if let Some(actx) = actx {
+        if meta_is_float(meta, dest) {
+            b.def_var(vars[dest], res);
+            let boxed = box_f64(b, res);
+            let fb = super::alloc::frame_base_addr(b, actx);
+            b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+        } else {
+            let boxed = box_f64(b, res);
+            def_result(b, actx, dest, boxed);
+        }
+    } else if meta_is_float(meta, dest) {
         b.def_var(vars[dest], res);
     } else {
         let boxed = box_f64(b, res);
-        b.def_var(vars[dest], boxed);
+        let (_tag, payload) = b.ins().isplit(boxed);
+        b.def_var(vars[dest], payload);
     }
     Ok(())
 }
@@ -112,9 +126,9 @@ pub(super) fn emit_intrinsic_op(
     has_round: bool,
 ) -> Result<(), String> {
     if op == OpCode::IntrinsicDirect {
-        return emit_intrinsic_direct(b, vars, meta, code, ip, has_round);
+        return emit_intrinsic_direct(b, actx, vars, meta, code, ip, has_round);
     }
-    if emit_math_intrinsic_native(b, vars, state, meta, code, ip, has_round) {
+    if emit_math_intrinsic_native(b, actx, vars, state, meta, code, ip, has_round) {
         return Ok(());
     }
     // String intrinsics: CharCodeAt, Substring, Slice — dedicated helpers
@@ -177,6 +191,7 @@ pub(super) fn has_round_support(isa: &OwnedTargetIsa) -> bool {
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_math_intrinsic_native(
     b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
     vars: &[Variable],
     state: &[K],
     meta: &[RegisterMeta],
@@ -236,16 +251,22 @@ pub(super) fn emit_math_intrinsic_native(
         _ => return false,
     };
 
-    // `dest` is usually NOT float-typed: the free-function call form stages a
-    // null receiver into this same register, so the allocator types the slot
-    // `Dynamic` and `kinds` records `Boxed`. Match whichever representation
-    // the register actually has — `box_f64` reproduces `VmValue::from_f64`
-    // bit for bit, which is precisely what the helper returned here.
-    if meta_is_float(meta, dest) {
+    if let Some(actx) = actx {
+        if meta_is_float(meta, dest) {
+            b.def_var(vars[dest], res);
+            let boxed = box_f64(b, res);
+            let fb = super::alloc::frame_base_addr(b, actx);
+            b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+        } else {
+            let boxed = box_f64(b, res);
+            def_result(b, actx, dest, boxed);
+        }
+    } else if meta_is_float(meta, dest) {
         b.def_var(vars[dest], res);
     } else {
         let boxed = box_f64(b, res);
-        b.def_var(vars[dest], boxed);
+        let (_tag, payload) = b.ins().isplit(boxed);
+        b.def_var(vars[dest], payload);
     }
     true
 }
@@ -285,34 +306,60 @@ pub(super) fn emit_float_op(
         // runtime helper on boxed operands and unbox the result back to f64.
         OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat if dest_float => {
             let res = if operands_native(state, a_r, b_r) {
-                let a = use_f64(b, vars, state, a_r)?;
-                let bb = use_f64(b, vars, state, b_r)?;
+                let a = match state[a_r] {
+                    K::Float => use_f64(b, vars, state, a_r)?,
+                    _ => {
+                        let i = super::emit::use_int(b, vars, state, a_r)?;
+                        if b.func.dfg.value_type(i) == types::F64 {
+                            i
+                        } else {
+                            b.ins().fcvt_from_sint(types::F64, i)
+                        }
+                    }
+                };
+                let bb = match state[b_r] {
+                    K::Float => use_f64(b, vars, state, b_r)?,
+                    _ => {
+                        let i = super::emit::use_int(b, vars, state, b_r)?;
+                        if b.func.dfg.value_type(i) == types::F64 {
+                            i
+                        } else {
+                            b.ins().fcvt_from_sint(types::F64, i)
+                        }
+                    }
+                };
                 match op {
                     OpCode::AddFloat => b.ins().fadd(a, bb),
                     OpCode::SubFloat => b.ins().fsub(a, bb),
                     OpCode::MulFloat => b.ins().fmul(a, bb),
-                    OpCode::DivFloat => emit_fdiv(b, cc, exec_ctx, helpers.div, a, bb),
-                    _ => unreachable!(),
+                    _ => emit_fdiv(b, cc, exec_ctx, helpers.div, a, bb),
                 }
             } else {
                 let a = box_or_pass(b, vars, state, a_r);
                 let bb = box_or_pass(b, vars, state, b_r);
+                let (a_tag, a_payload) = if b.func.dfg.value_type(a) == types::I128 {
+                    b.ins().isplit(a)
+                } else {
+                    (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), a)
+                };
+                let (b_tag, b_payload) = if b.func.dfg.value_type(bb) == types::I128 {
+                    b.ins().isplit(bb)
+                } else {
+                    (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), bb)
+                };
                 let helper = match op {
                     OpCode::AddFloat => helpers.add,
                     OpCode::SubFloat => helpers.sub,
                     OpCode::MulFloat => helpers.mul,
                     _ => helpers.div,
                 };
-                let boxed = call_helper(b, cc, helper, &[exec_ctx, a, bb]);
-                // `_coerce`, not the pure bitcast: these helpers return an
-                // INT VmValue whenever both operands were int-tagged and the
-                // result is integral — which a `*Float` opcode reaches
-                // whenever its operands are boxed ints, e.g. two math
-                // intrinsics on int arguments (`abs(-3) + sqrt(4)`), whose
-                // helper results the interpreter re-boxes back to `int`.
-                // Bitcasting those bits yields the int's QNAN tag as an f64,
-                // which `box_f64` then canonicalizes to `null` at the next
-                // boundary — a silent wrong answer, not a crash.
+                call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+                let boxed = b.ins().load(
+                    types::I128,
+                    MemFlags::trusted(),
+                    exec_ctx,
+                    helpers.jit_native_result_offset as i32,
+                );
                 unbox_f64_coerce(b, boxed)
             };
             b.def_var(vars[dest], res);
@@ -324,13 +371,28 @@ pub(super) fn emit_float_op(
         OpCode::ModFloat | OpCode::PowFloat if dest_float => {
             let a = box_or_pass(b, vars, state, a_r);
             let bb = box_or_pass(b, vars, state, b_r);
+            let (a_tag, a_payload) = if b.func.dfg.value_type(a) == types::I128 {
+                b.ins().isplit(a)
+            } else {
+                (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), a)
+            };
+            let (b_tag, b_payload) = if b.func.dfg.value_type(bb) == types::I128 {
+                b.ins().isplit(bb)
+            } else {
+                (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), bb)
+            };
             let helper = if op == OpCode::ModFloat {
                 helpers.modulo
             } else {
                 helpers.pow
             };
-            let boxed = call_helper(b, cc, helper, &[exec_ctx, a, bb]);
-            // Same int-result hazard as the arithmetic arm above.
+            call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+            let boxed = b.ins().load(
+                types::I128,
+                MemFlags::trusted(),
+                exec_ctx,
+                helpers.jit_native_result_offset as i32,
+            );
             let f = unbox_f64_coerce(b, boxed);
             b.def_var(vars[dest], f);
             Ok(true)
@@ -403,7 +465,9 @@ fn emit_fdiv(
     b.switch_to_block(trap_blk);
     let ba = box_f64(b, a);
     let bd = box_f64(b, bb);
-    let _ = call_helper(b, cc, div_helper, &[exec_ctx, ba, bd]);
+    let (a_tag, a_payload) = b.ins().isplit(ba);
+    let (b_tag, b_payload) = b.ins().isplit(bd);
+    call_helper_void(b, cc, div_helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
     let dummy = b.ins().f64const(0.0);
     b.ins().jump(cont, &[dummy.into()]);
 

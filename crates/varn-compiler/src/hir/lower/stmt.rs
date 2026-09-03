@@ -283,7 +283,8 @@ impl<'a> Lowerer<'a> {
                     }
                     let binding = match &target.kind {
                         ExprKind::Identifier { name } => {
-                            self.resolve(name, scope, HirType::Dynamic)
+                            let ty = self.value_ty(AnnKey::expr(target.id));
+                            self.resolve(name, scope, ty)
                         }
                         _ => {
                             return Err(OptError::Unsupported("hir: non-identifier assign target"))
@@ -332,7 +333,7 @@ impl<'a> Lowerer<'a> {
                             out.push(HirStmt::Let {
                                 local,
                                 value,
-                                ty: HirType::Dynamic,
+                                ty: HirType::Ref,
                             });
                         } else {
                             let value = match &d.init {
@@ -390,7 +391,7 @@ impl<'a> Lowerer<'a> {
                             value: HirExpr::Member {
                                 object: Box::new(HirExpr::Var(HirBinding::Local(local))),
                                 name: v.name.clone(),
-                                ty: HirType::Dynamic,
+                                ty: HirType::Ref,
                             },
                             ty: HirType::Ref,
                         });

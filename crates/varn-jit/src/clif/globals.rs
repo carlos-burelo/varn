@@ -6,6 +6,14 @@
 //!
 //! The indexed forms are the ONLY ones lowered, and that is an invariant, not a
 //! subset: `varn_vm::globals::resolve_in_proto` rewrites every name-keyed
+//! Global-slot access lowering for CLIF: `LoadGlobalIdx` / `StoreGlobalIdx`.
+//! Globals live in `ExecCtx.globals` (a non-`repr(C)` `GlobalStore`), whose
+//! `values` Vec data pointer sits at `globals_offset + 8`. Globals are always
+//! GC roots, so a store needs no write barrier. Split out of `lower.rs` for the
+//! file-size governance limit.
+//!
+//! The indexed forms are the ONLY ones lowered, and that is an invariant, not a
+//! subset: `varn_vm::globals::resolve_in_proto` rewrites every name-keyed
 //! `LoadGlobal`/`StoreGlobal`/`DefineGlobal` before the proto can run, in every
 //! VM. A name-keyed global reaching here is a bug in that pass, and it bails —
 //! the function silently drops to the interpreter. If that ever needs
@@ -16,16 +24,18 @@ use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
-use super::emit::{box_bool, box_f64, box_int, state_meta_int};
+use super::alloc::{box_or_load_home, def_result, AllocCtx};
+use super::emit::{box_or_pass, meta_is_float, state_meta_int, unbox_f64_coerce, wrap_i48};
 use super::kinds::K;
 use crate::JitHelpers;
 
 /// Shared context for the global-access arms.
 pub(crate) struct GblCtx<'a> {
     pub vars: &'a [Variable],
-    pub helpers: &'a JitHelpers,
-    pub exec_ctx: cranelift_codegen::ir::Value,
     pub register_meta: &'a [RegisterMeta],
+    pub exec_ctx: cranelift_codegen::ir::Value,
+    pub helpers: &'a JitHelpers,
+    pub actx: Option<&'a AllocCtx<'a>>,
 }
 
 fn globals_base(b: &mut FunctionBuilder, c: &GblCtx) -> cranelift_codegen::ir::Value {
@@ -33,7 +43,7 @@ fn globals_base(b: &mut FunctionBuilder, c: &GblCtx) -> cranelift_codegen::ir::V
         types::I64,
         MemFlags::trusted(),
         c.exec_ctx,
-        (c.helpers.globals_offset + 8) as i32,
+        c.helpers.globals_offset as i32,
     )
 }
 
@@ -50,13 +60,18 @@ pub(super) fn emit_load_global_idx(
     let gbase = globals_base(b, c);
     let v = b
         .ins()
-        .load(types::I64, MemFlags::trusted(), gbase, (idx * 8) as i32);
-    if state_meta_int(c.register_meta, first_reg) {
-        let s = b.ins().ishl_imm(v, 16);
-        let un = b.ins().sshr_imm(s, 16);
+        .load(types::I128, MemFlags::trusted(), gbase, (idx * 16) as i32);
+    if let Some(actx) = c.actx {
+        def_result(b, actx, first_reg, v);
+    } else if meta_is_float(c.register_meta, first_reg) {
+        let f = unbox_f64_coerce(b, v);
+        b.def_var(c.vars[first_reg], f);
+    } else if state_meta_int(c.register_meta, first_reg) {
+        let un = wrap_i48(b, v);
         b.def_var(c.vars[first_reg], un);
     } else {
-        b.def_var(c.vars[first_reg], v);
+        let (_tag, payload) = b.ins().isplit(v);
+        b.def_var(c.vars[first_reg], payload);
     }
 }
 
@@ -71,23 +86,19 @@ pub(super) fn emit_store_global_idx(
 ) -> Result<(), String> {
     let src = (code[ip + 1] >> 8) as usize;
     let idx = code[ip + 2] as usize;
-    let v = match state[src] {
-        K::Int => {
-            let raw = b.use_var(c.vars[src]);
-            box_int(b, raw)
+    let v = if let Some(actx) = c.actx {
+        box_or_load_home(b, actx, state, src)
+    } else {
+        let raw = box_or_pass(b, c.vars, state, src);
+        if b.func.dfg.value_type(raw) == types::I128 {
+            raw
+        } else {
+            let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            b.ins().iconcat(tag, raw)
         }
-        K::Bool => {
-            let raw = b.use_var(c.vars[src]);
-            box_bool(b, raw)
-        }
-        K::Float => {
-            let f = b.use_var(c.vars[src]);
-            box_f64(b, f)
-        }
-        _ => b.use_var(c.vars[src]),
     };
     let gbase = globals_base(b, c);
     b.ins()
-        .store(MemFlags::trusted(), v, gbase, (idx * 8) as i32);
+        .store(MemFlags::trusted(), v, gbase, (idx * 16) as i32);
     Ok(())
 }

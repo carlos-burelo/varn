@@ -205,7 +205,9 @@ impl Nursery {
     /// dedup happens once per collection instead of O(n) per store.
     #[inline(always)]
     pub(crate) fn remember(&mut self, packed_old_idx: u32) {
-        self.remembered.push(packed_old_idx);
+        if self.remembered.last().copied() != Some(packed_old_idx) {
+            self.remembered.push(packed_old_idx);
+        }
     }
 
     pub(crate) fn collect(
@@ -371,6 +373,8 @@ impl Nursery {
             Some(HeapObj::Generator(g)) => Container::Generator(g.0.clone()),
             Some(HeapObj::Map(m)) => Container::Map(m.clone()),
             Some(HeapObj::Set(s)) => Container::Set(s.clone()),
+            Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => Container::Array(a.clone()),
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => Container::Object(o.clone()),
             Some(obj) => {
                 Self::scan_children(obj, old_gen, fixups);
                 Container::None
@@ -386,6 +390,26 @@ impl Nursery {
                 driver.trace_vm_values_mut(&mut |val| {
                     self.update_value(val, old_gen, worklist);
                 });
+                return;
+            }
+            Container::Array(arr) => {
+                if let Some(items) = arr.as_boxed_mut() {
+                    for v in items.iter_mut() {
+                        self.update_value(v, old_gen, worklist);
+                    }
+                }
+                return;
+            }
+            Container::Object(o) => {
+                let slot_count = o.slot_count();
+                for i in 0..slot_count {
+                    if let Some(mut v) = o.field_at(i) {
+                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                            self.update_value(&mut v, old_gen, worklist);
+                            o.set_field_at(i, v);
+                        }
+                    }
+                }
                 return;
             }
             // Map/Set entries are raw VmValues mutated through interior
@@ -445,20 +469,6 @@ impl Nursery {
                 continue;
             };
             match (slot, obj) {
-                (ChildSlot::ArrayItem(i), HeapObj::Array(arr)) => {
-                    // `ArrayItem` fixups are only ever pushed for a `Boxed`
-                    // array (see the scan above), but use the total accessor
-                    // rather than `borrow_mut()` anyway — never assume a
-                    // repr invariant here that isn't locally re-checked.
-                    if let Some(v) = arr.as_boxed_mut() {
-                        if let Some(s) = v.get_mut(i) {
-                            *s = new_val;
-                        }
-                    }
-                }
-                (ChildSlot::ObjField(i), HeapObj::Object(obj_ref)) => {
-                    obj_ref.set_field_at(i, new_val);
-                }
                 (ChildSlot::Upvalue(i), HeapObj::VmClosure(clos)) => {
                     if let Some(uv) = clos.upvalues.get(i) {
                         if let Ok(mut inner) = uv.inner.try_borrow_mut() {
@@ -564,25 +574,6 @@ impl Nursery {
 
     fn scan_children(obj: &HeapObj, old_gen: &HeapInner, fixups: &mut Vec<(ChildSlot, u32)>) {
         match obj {
-            HeapObj::Array(arr) | HeapObj::Tuple(arr) => {
-                // Variant-aware: I64/F64 elements are raw numeric words,
-                // never a nursery heap ref, so there is nothing to scan
-                // or fix up. Only `Boxed` can hold a moved child.
-                if let Some(items) = arr.as_boxed() {
-                    for (i, &v) in items.iter().enumerate() {
-                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                            fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
-                        }
-                    }
-                }
-            }
-            HeapObj::Object(obj_ref) | HeapObj::Record(obj_ref) => {
-                obj_ref.borrow().for_each_field(|i, v| {
-                    if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                        fixups.push((ChildSlot::ObjField(i), v.as_heap_idx()));
-                    }
-                });
-            }
             HeapObj::VmClosure(clos) => {
                 for (i, uv) in clos.upvalues.iter().enumerate() {
                     if let Ok(inner) = uv.inner.try_borrow() {
@@ -647,13 +638,13 @@ enum Container {
     Generator(Rc<dyn varn_types::generator::GeneratorDriver>),
     Map(varn_types::value::MapRef),
     Set(varn_types::value::SetRef),
+    Array(varn_types::VmArray),
+    Object(varn_types::value::ObjRef),
     None,
 }
 
 #[derive(Clone)]
 enum ChildSlot {
-    ArrayItem(usize),
-    ObjField(usize),
     Upvalue(usize),
     Spread,
     BoundMethodReceiver,

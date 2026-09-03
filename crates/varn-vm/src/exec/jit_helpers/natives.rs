@@ -96,17 +96,19 @@ pub(crate) extern "C" fn jit_call_native_op(
     op_id: u64,
     args_start: usize,
     total: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let f = match varn_builtins::native_op_fn(op_id) {
-            Some(f) => f,
-            None => jit_propagate_error(
-                ctx_ref,
-                crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
-            ),
+        let res = match varn_builtins::native_op_fn(op_id) {
+            Some(f) => call_native_from_stack(ctx_ref, f, args_start, total),
+            None => {
+                jit_propagate_error(
+                    ctx_ref,
+                    crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
+                );
+            }
         };
-        call_native_from_stack(ctx_ref, f, args_start, total)
+        ctx_ref.jit_native_result = res;
     }
 }
 
@@ -117,11 +119,12 @@ pub(crate) extern "C" fn jit_call_native_fnptr(
     fn_addr: usize,
     args_start: usize,
     total: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let f: varn_types::NativeFn = std::mem::transmute(fn_addr);
-        call_native_from_stack(ctx_ref, f, args_start, total)
+        let res = call_native_from_stack(ctx_ref, f, args_start, total);
+        ctx_ref.jit_native_result = res;
     }
 }
 

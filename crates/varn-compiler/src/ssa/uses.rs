@@ -45,6 +45,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         // One operand.
         Unary { operand, .. }
         | IsNull { operand }
+        | Cast { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }
@@ -190,6 +191,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
 
         Unary { operand, .. }
         | IsNull { operand }
+        | Cast { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }

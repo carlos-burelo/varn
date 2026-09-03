@@ -1,5 +1,6 @@
 use super::stmts::annotate_stmt;
 use super::AnnotateCtx;
+use crate::binder::resolve_type_node;
 use crate::types::{Type, TypeContext};
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{Arg, ArrayEl, Expr, ExprKind};
@@ -78,10 +79,14 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
         ExprKind::Logical { left, right, .. } => {
             annotate_expr(left, ann, ctx);
             annotate_expr(right, ann, ctx);
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
         }
         ExprKind::Assign { value, target, .. } => {
             annotate_expr(target, ann, ctx);
             annotate_expr(value, ann, ctx);
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
         }
         ExprKind::Conditional {
             test,
@@ -91,6 +96,8 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             annotate_expr(test, ann, ctx);
             annotate_expr(consequent, ann, ctx);
             annotate_expr(alternate, ann, ctx);
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
         }
         ExprKind::Call { callee, args, .. } => {
             annotate_expr(callee, ann, ctx);
@@ -153,17 +160,15 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             }
 
             let result_ty = get_expr_type(expr, ctx);
-            let result_key = if let ExprKind::Member {
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
+            if let ExprKind::Member {
                 property,
                 computed: false,
                 ..
             } = &callee.kind
             {
-                AnnKey::expr(property.id)
-            } else {
-                AnnKey::expr(expr.id)
-            };
-            record_cg_ty_at(result_key, &result_ty, ann, ctx);
+                record_cg_ty_at(AnnKey::expr(property.id), &result_ty, ann, ctx);
+            }
         }
         ExprKind::Member {
             object,
@@ -312,13 +317,55 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 }
             }
         }
-        ExprKind::Function { body, .. } => {
-            annotate_stmt(body, ann, ctx);
+        ExprKind::Function { params, body, .. } => {
+            let mut local_ctx = ctx.clone();
+            for p in params {
+                let name_opt = match &p.pattern {
+                    varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                    _ => None,
+                };
+                if let Some(name) = name_opt {
+                    let type_ann = p.type_ann.as_ref().or(match &p.pattern {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    });
+                    let ty = if let Some(ann_node) = type_ann {
+                        resolve_type_node(ann_node, Some(ctx))
+                    } else {
+                        Type::Dynamic
+                    };
+                    record_cg_ty_at(AnnKey::decl(p.range.start.offset), &ty, ann, ctx);
+                    local_ctx.locals.insert(name, ty);
+                }
+            }
+            annotate_stmt(body, ann, &mut local_ctx);
         }
-        ExprKind::Arrow { body, .. } => match body.as_ref() {
-            varn_core::ast::ArrowBody::Expr(e) => annotate_expr(e, ann, ctx),
-            varn_core::ast::ArrowBody::Block(b) => annotate_stmt(b, ann, ctx),
-        },
+        ExprKind::Arrow { params, body, .. } => {
+            let mut local_ctx = ctx.clone();
+            for p in params {
+                let name_opt = match &p.pattern {
+                    varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                    _ => None,
+                };
+                if let Some(name) = name_opt {
+                    let type_ann = p.type_ann.as_ref().or(match &p.pattern {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    });
+                    let ty = if let Some(ann_node) = type_ann {
+                        resolve_type_node(ann_node, Some(ctx))
+                    } else {
+                        Type::Dynamic
+                    };
+                    record_cg_ty_at(AnnKey::decl(p.range.start.offset), &ty, ann, ctx);
+                    local_ctx.locals.insert(name, ty);
+                }
+            }
+            match body.as_ref() {
+                varn_core::ast::ArrowBody::Expr(e) => annotate_expr(e, ann, &mut local_ctx),
+                varn_core::ast::ArrowBody::Block(b) => annotate_stmt(b, ann, &mut local_ctx),
+            }
+        }
         ExprKind::Match { subject, cases } => {
             annotate_expr(subject, ann, ctx);
             for c in cases {
@@ -330,11 +377,29 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                     varn_core::ast::MatchBody::Block(b) => annotate_stmt(b, ann, ctx),
                 }
             }
+            let res_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &res_ty, ann, ctx);
         }
         ExprKind::Is { expression, .. } => {
             annotate_expr(expression, ann, ctx);
+            let bool_ty = Type(TypeKind::Intrinsic(varn_core::TypeTag::Bool), false);
+            record_cg_ty_at(AnnKey::expr(expr.id), &bool_ty, ann, ctx);
         }
-        ExprKind::Update { operand, .. } => annotate_expr(operand, ann, ctx),
+        ExprKind::Update { operand, .. } => {
+            annotate_expr(operand, ann, ctx);
+            let op_ty = get_expr_type(operand, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &op_ty, ann, ctx);
+            use varn_core::{NumericKind, TypeTag};
+            let k = match &op_ty.0 {
+                TypeKind::Intrinsic(TypeTag::Int) => Some(NumericKind::Int),
+                TypeKind::Intrinsic(TypeTag::Float) => Some(NumericKind::Float),
+                TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericKind::Decimal),
+                _ => None,
+            };
+            if let Some(k) = k {
+                ann.record_numeric(AnnKey::expr(expr.id), k);
+            }
+        }
         ExprKind::Await { argument } => {
             annotate_expr(argument, ann, ctx);
             // The checker already unwrapped the task: this is `T`, not
@@ -353,12 +418,19 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             annotate_expr(e, ann, ctx);
         }
         ExprKind::Yield { argument: None, .. } => {}
-        ExprKind::NonNull { expression } | ExprKind::Try { expression } => {
+        ExprKind::NonNull { expression } => {
+            annotate_expr(expression, ann, ctx);
+            let res_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &res_ty, ann, ctx);
+        }
+        ExprKind::Try { expression } => {
             annotate_expr(expression, ann, ctx)
         }
         ExprKind::Pipeline { left, right } => {
             annotate_expr(left, ann, ctx);
             annotate_expr(right, ann, ctx);
+            let res_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &res_ty, ann, ctx);
         }
         ExprKind::Range { start, end, .. } => {
             annotate_expr(start, ann, ctx);
@@ -367,6 +439,10 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
         ExprKind::Sequence { expressions } => {
             for e in expressions {
                 annotate_expr(e, ann, ctx);
+            }
+            if let Some(last) = expressions.last() {
+                let last_ty = get_expr_type(last, ctx);
+                record_cg_ty_at(AnnKey::expr(expr.id), &last_ty, ann, ctx);
             }
         }
         ExprKind::Identifier { .. } => {
@@ -428,18 +504,7 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
         TypeKind::Intrinsic(TypeTag::Decimal) => CgTy::Decimal,
         TypeKind::Intrinsic(TypeTag::BigInt) => CgTy::BigInt,
         TypeKind::Array(el) => CgTy::Array(Box::new(project_cg_ty(el, ctx))),
-        TypeKind::Generic(name, args, _) => {
-            // `Task<T>` is deliberately NOT projected to `T`. It used to be,
-            // and that typed the RESULT OF THE CALL — a live task handle, a
-            // heap object — as whatever the task will eventually resolve to.
-            // `Task<int>` became `Int`, which is `SlotKind::Int`, which the
-            // backend treats as an immediate: `is_root_kind` excludes it, so
-            // the safepoint never flushes it and the collector never sees the
-            // reference. `T` belongs to the `await` EXPRESSION, which is
-            // annotated with it directly (see `ExprKind::Await` above).
-            //
-            // A task handle has no `CgTy`, so it stays `Dynamic`:
-            // conservative, never wrong.
+        TypeKind::Generic(name, args, origin) => {
             if name.as_ref() == varn_core::IntrinsicType::Array.as_str() {
                 if let [el] = args.as_slice() {
                     return CgTy::Array(Box::new(project_cg_ty(el, ctx)));
@@ -455,6 +520,13 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
                 if let [el] = args.as_slice() {
                     return CgTy::Set(Box::new(project_cg_ty(el, ctx)));
                 }
+            } else if ctx
+                .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
+                .is_some()
+                || ctx.bind.get_enum_members_local(name).is_some()
+                || ctx.bind.is_user_class(name.as_ref())
+            {
+                return CgTy::Class(name.clone());
             }
             CgTy::Dynamic
         }
@@ -468,15 +540,21 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
                     .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
                     .is_some()
                     || ctx.bind.get_enum_members_local(name).is_some()
+                    || ctx.bind.is_user_class(name.as_ref())
                 {
                     CgTy::Class(name.clone())
+                } else if ctx.bind.get_class_entry(name).is_some()
+                    || ctx.bind.get_namespace_members_local(name).is_some()
+                    || ctx.bind.get_interface_members_local(name).is_some()
+                {
+                    CgTy::Fn
                 } else {
                     CgTy::Dynamic
                 }
             }
         },
         TypeKind::EnumVariant { enum_name, .. } => CgTy::Class(enum_name.clone()),
-        TypeKind::Fn(_) => CgTy::Fn,
+        TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::Object(_) => CgTy::Fn,
         TypeKind::Union(members) => {
             let non_null: Vec<&Type> = members.iter().filter(|m| !m.is_nullable()).collect();
             let has_null = non_null.len() < members.len();

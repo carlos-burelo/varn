@@ -229,7 +229,7 @@ pub(crate) extern "C" fn jit_load_static_fn(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
     proto_idx: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
@@ -240,7 +240,8 @@ pub(crate) extern "C" fn jit_load_static_fn(
 
         let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
         if let Some(&(_, cached_val)) = ctx_ref.static_closures.get(&proto_ptr) {
-            return cached_val;
+            ctx_ref.jit_native_result = cached_val;
+            return;
         }
         let constants = ctx_ref
             .proto_constants
@@ -264,6 +265,6 @@ pub(crate) extern "C" fn jit_load_static_fn(
         ctx_ref
             .static_closures
             .insert(proto_ptr, (proto.clone(), val));
-        val
+        ctx_ref.jit_native_result = val;
     }
 }

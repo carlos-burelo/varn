@@ -67,6 +67,8 @@ macro_rules! jit_helper_abi {
             str_concat => jit_str_concat,
             str_slice => jit_str_slice,
             str_length => jit_str_length,
+            str_starts_with => jit_str_starts_with,
+            str_ends_with => jit_str_ends_with,
             bit_and => jit_bitand,
             bit_or => jit_bitor,
             bit_xor => jit_bitxor,

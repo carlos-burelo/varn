@@ -305,7 +305,7 @@ pub struct Compiled {
 ///    SysV and must be declared per target.
 /// 4. The inline fast paths (fields, arrays, SSO, strconcat) test the tag word
 ///    and read the payload word, instead of masking one word.
-pub(crate) const PAIR_MIGRATION_PENDING: bool = true;
+pub(crate) const PAIR_MIGRATION_PENDING: bool = false;
 
 /// The bail reason reported while [`PAIR_MIGRATION_PENDING`] stands. Shows up
 /// in `vn debug -p bails` and in `VARN_CLIF_TRACE=1`, so the reason a function

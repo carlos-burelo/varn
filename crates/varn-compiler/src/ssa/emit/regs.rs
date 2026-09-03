@@ -191,7 +191,7 @@ fn pool_index(k: varn_types::register_meta::SlotKind) -> usize {
         SlotKind::Float => 1,
         SlotKind::Bool => 2,
         SlotKind::Str => 3,
-        SlotKind::Ref => 4,
-        SlotKind::Dynamic => 5,
+        SlotKind::Ref | SlotKind::Class(_) | SlotKind::Array(_) => 4,
+        SlotKind::Nullable(_) | SlotKind::Dynamic => 5,
     }
 }

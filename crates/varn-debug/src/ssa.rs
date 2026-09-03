@@ -39,10 +39,28 @@ pub fn debug_ssa(
                 );
             }
 
+            let mut total_typed = 0usize;
+            let mut total_dynamic = 0usize;
             for func in &funcs {
+                for vdef in &func.values {
+                    match vdef.ty {
+                        varn_compiler::hir::HirType::Dynamic => total_dynamic += 1,
+                        _ => total_typed += 1,
+                    }
+                }
                 let dump = varn_compiler::ssa::dump::dump(func);
                 eprint!("{dump}");
             }
+
+            let total = total_typed + total_dynamic;
+            let pct = if total > 0 {
+                (total_dynamic as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+            eprintln!(
+                "\n  {DIM}── SSA type coverage: typed={total_typed} dynamic={total_dynamic} ({pct:.1}% dynamic) ──{R}"
+            );
 
             if !skipped.is_empty() {
                 eprintln!(

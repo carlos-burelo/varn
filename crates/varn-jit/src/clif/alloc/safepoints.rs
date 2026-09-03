@@ -9,7 +9,7 @@ use varn_types::bytecode::decode;
 use varn_types::register_meta::RegisterMeta;
 
 use super::super::emit::{
-    box_or_pass, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48,
+    call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48,
 };
 use super::super::kinds::K;
 use super::super::liveness::Liveness;
@@ -165,7 +165,7 @@ pub(crate) fn frame_base_addr(
         actx.exec_ctx,
         actx.helpers.stack_data_offset as i32,
     );
-    let base_bytes = b.ins().ishl_imm(actx.base, 3);
+    let base_bytes = b.ins().ishl_imm(actx.base, 4);
     b.ins().iadd(sp, base_bytes)
 }
 
@@ -183,7 +183,28 @@ pub(crate) fn load_home(
 ) -> cranelift_codegen::ir::Value {
     let fb = frame_base_addr(b, actx);
     b.ins()
-        .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32)
+        .load(types::I128, MemFlags::trusted(), fb, (r * 16) as i32)
+}
+
+pub(crate) fn box_or_load_home(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    r: usize,
+) -> cranelift_codegen::ir::Value {
+    let Some(&var) = actx.vars.get(r) else {
+        return super::super::emit::box_null(b);
+    };
+    let raw = b.use_var(var);
+    if b.func.dfg.value_type(raw) == types::F64 {
+        super::super::emit::box_f64(b, raw)
+    } else {
+        match state.get(r).copied().unwrap_or(K::Unset) {
+            K::Int => super::super::emit::box_int(b, raw),
+            K::Bool => super::super::emit::box_bool(b, raw),
+            _ => load_home(b, actx, r),
+        }
+    }
 }
 
 pub(crate) fn store_home(
@@ -193,8 +214,8 @@ pub(crate) fn store_home(
     fb: cranelift_codegen::ir::Value,
     reg: usize,
 ) {
-    let v = box_or_pass(b, actx.vars, state, reg);
-    b.ins().store(MemFlags::trusted(), v, fb, (reg * 8) as i32);
+    let v = box_or_load_home(b, actx, state, reg);
+    b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
 }
 
 pub(crate) fn def_result(
@@ -208,25 +229,16 @@ pub(crate) fn def_result(
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
     } else {
-        b.def_var(actx.vars[dest], res);
+        let payload = if b.func.dfg.value_type(res) == types::I128 {
+            let (_tag, payload) = b.ins().isplit(res);
+            payload
+        } else {
+            res
+        };
+        b.def_var(actx.vars[dest], payload);
     }
     b.ins()
-        .store(MemFlags::trusted(), res, fb, (dest * 8) as i32);
-}
-
-pub(crate) fn args_struct(
-    b: &mut FunctionBuilder,
-    words: &[cranelift_codegen::ir::Value],
-) -> cranelift_codegen::ir::Value {
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        (words.len() * 8) as u32,
-        3,
-    ));
-    for (i, w) in words.iter().enumerate() {
-        b.ins().stack_store(*w, slot, (i * 8) as i32);
-    }
-    b.ins().stack_addr(types::I64, slot, 0)
+        .store(MemFlags::trusted(), res, fb, (dest * 16) as i32);
 }
 
 pub(crate) fn emit_backedge_safepoint(
@@ -300,7 +312,7 @@ pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]
     for &r in regs {
         let v = b
             .ins()
-            .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32);
+            .load(types::I128, MemFlags::trusted(), fb, (r * 16) as i32);
         if meta_is_float(actx.register_meta, r) {
             let f = unbox_f64_coerce(b, v);
             b.def_var(actx.vars[r], f);
@@ -308,11 +320,10 @@ pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]
             let restored = match state[r] {
                 K::Int => wrap_i48(b, v),
                 K::Bool => unbox_bool(b, v),
-                K::Float => {
-                    let f = unbox_f64_coerce(b, v);
-                    super::super::emit::box_f64(b, f)
+                _ => {
+                    let (_tag, payload) = b.ins().isplit(v);
+                    payload
                 }
-                _ => v,
             };
             b.def_var(actx.vars[r], restored);
         }

@@ -5,12 +5,12 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
-    box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce,
-    use_f64, use_int,
+    call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, use_f64, use_int,
 };
 use super::super::kinds::K;
 use super::safepoints::{
-    def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
+    AllocCtx,
 };
 
 pub(crate) fn emit_call(
@@ -28,7 +28,7 @@ pub(crate) fn emit_call(
     let total = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
 
-    let callee = box_or_pass(b, actx.vars, state, callee_reg);
+    let callee = box_or_load_home(b, actx, state, callee_reg);
 
     let direct = target.filter(|t| {
         t.raw_slot != 0
@@ -58,24 +58,28 @@ pub(crate) fn emit_call(
             use_int(b, actx.vars, state, r)?
         } else if *k == SlotKind::Float {
             if meta_is_float(actx.register_meta, r) || state[r] == K::Float {
-                let f = use_f64(b, actx.vars, state, r)?;
-                b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                use_f64(b, actx.vars, state, r)?
             } else {
-                let boxed = box_or_pass(b, actx.vars, state, r);
-                let f = unbox_f64_coerce(b, boxed);
-                b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                let boxed = box_or_load_home(b, actx, state, r);
+                unbox_f64_coerce(b, boxed)
             }
         } else if *k == SlotKind::Bool {
-            let boxed = box_or_pass(b, actx.vars, state, r);
+            let boxed = box_or_load_home(b, actx, state, r);
             unbox_bool(b, boxed)
         } else {
-            box_or_pass(b, actx.vars, state, r)
+            let boxed = box_or_load_home(b, actx, state, r);
+            let (_tag, payload) = b.ins().isplit(boxed);
+            payload
         };
         raw_args.push(v);
     }
 
-    let expected = b.ins().iconst(types::I64, t.expected_bits as i64);
-    let same = b.ins().icmp(IntCC::Equal, callee, expected);
+    let (callee_tag, callee_payload) = b.ins().isplit(callee);
+    let expected_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+    let same_tag = b.ins().icmp(IntCC::Equal, callee_tag, expected_tag);
+    let expected_payload = b.ins().iconst(types::I64, t.expected_bits as i64);
+    let same_payload = b.ins().icmp(IntCC::Equal, callee_payload, expected_payload);
+    let same = b.ins().band(same_tag, same_payload);
     let slot = b.ins().iconst(types::I64, t.raw_slot as i64);
     let raw = b.ins().load(types::I64, MemFlags::trusted(), slot, 0);
     let published = b.ins().icmp_imm(IntCC::NotEqual, raw, 0);
@@ -84,23 +88,51 @@ pub(crate) fn emit_call(
     let fast = b.create_block();
     let slow = b.create_block();
     let merge = b.create_block();
-    b.append_block_param(merge, types::I64);
+    b.append_block_param(merge, types::I128);
     b.ins().brif(take_direct, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
     let raw_sig = {
         let mut s = cranelift_codegen::ir::Signature::new(actx.cc);
-        for _ in 0..raw_args.len() {
-            s.params
-                .push(cranelift_codegen::ir::AbiParam::new(types::I64));
-        }
-        s.returns
+        s.params
             .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        for k in &t.param_kinds {
+            if *k == SlotKind::Float {
+                s.params
+                    .push(cranelift_codegen::ir::AbiParam::new(types::F64));
+            } else {
+                s.params
+                    .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+            }
+        }
+        if t.return_kind == SlotKind::Int || t.return_kind == SlotKind::Bool {
+            s.returns
+                .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        } else if t.return_kind == SlotKind::Float {
+            s.returns
+                .push(cranelift_codegen::ir::AbiParam::new(types::F64));
+        }
         b.import_signature(s)
     };
-    let call = b.ins().call_indirect(raw_sig, raw, &raw_args);
-    let raw_res = b.inst_results(call)[0];
-    let boxed_fast = super::super::emit::retag_raw_return(b, raw_res, t.return_kind);
+    let boxed_fast = if t.return_kind == SlotKind::Int
+        || t.return_kind == SlotKind::Bool
+        || t.return_kind == SlotKind::Float
+    {
+        let call = b.ins().call_indirect(raw_sig, raw, &raw_args);
+        let raw_res = b.inst_results(call)[0];
+        super::super::emit::retag_raw_return(b, raw_res, t.return_kind)
+    } else {
+        b.ins().call_indirect(raw_sig, raw, &raw_args);
+        b.ins().load(
+            types::I128,
+            MemFlags::trusted(),
+            actx.exec_ctx,
+            actx.helpers.jit_native_result_offset as i32,
+        )
+    };
+    reload_boxed(b, actx, state, &regs);
     b.ins().jump(merge, &[boxed_fast.into()]);
 
     b.switch_to_block(slow);
@@ -128,16 +160,22 @@ fn emit_vm_call(
         store_home(b, actx, state, fb, r);
     }
 
+    let (callee_tag, callee_payload) = b.ins().isplit(callee);
     let src = b.ins().iadd_imm(actx.base, arg_start as i64);
     let n = b.ins().iconst(types::I64, total as i64);
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.clif_call_fallback,
-        &[actx.exec_ctx, callee, src, n],
+        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
     );
     reload_boxed(b, actx, state, &regs);
-    res
+    b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    )
 }
 
 pub(crate) fn emit_get_property(
@@ -154,7 +192,8 @@ pub(crate) fn emit_get_property(
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
-    let obj = box_or_pass(b, actx.vars, state, obj_r);
+    let obj = box_or_load_home(b, actx, state, obj_r);
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -162,15 +201,31 @@ pub(crate) fn emit_get_property(
     let ci = b.ins().iconst(types::I64, cs_idx as i64);
     let de = b.ins().iconst(types::I64, dest as i64);
     let ipv = b.ins().iconst(types::I64, next_ip as i64);
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.get_property_flat,
-        &[actx.exec_ctx, actx.closure, actx.base, obj, ni, ci, de, ipv],
+        &[
+            actx.exec_ctx,
+            actx.closure,
+            actx.base,
+            obj_tag,
+            obj_payload,
+            ni,
+            ci,
+            de,
+            ipv,
+        ],
     );
 
     reload_boxed(b, actx, state, &regs);
 
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
     def_result(b, actx, dest, res);
 }
 
@@ -187,8 +242,10 @@ pub(crate) fn emit_set_property(
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
-    let obj = box_or_pass(b, actx.vars, state, obj_r);
-    let val = box_or_pass(b, actx.vars, state, val_r);
+    let obj = box_or_load_home(b, actx, state, obj_r);
+    let val = box_or_load_home(b, actx, state, val_r);
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
+    let (val_tag, val_payload) = b.ins().isplit(val);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -199,7 +256,17 @@ pub(crate) fn emit_set_property(
         b,
         actx.cc,
         actx.helpers.set_property_flat,
-        &[actx.exec_ctx, actx.closure, obj, val, ni, ci, ipv],
+        &[
+            actx.exec_ctx,
+            actx.closure,
+            obj_tag,
+            obj_payload,
+            val_tag,
+            val_payload,
+            ni,
+            ci,
+            ipv,
+        ],
     );
 
     reload_boxed(b, actx, state, &regs);

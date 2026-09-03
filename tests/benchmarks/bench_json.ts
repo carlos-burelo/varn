@@ -12,4 +12,4 @@ let jsonStr = JSON.stringify(items);
 let parsed = JSON.parse(jsonStr) as any[];
 
 console.log(parsed.length);
-console.log(jsonStr.length);
+console.log("bytes: " + jsonStr.length);

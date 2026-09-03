@@ -5,40 +5,66 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_typeof_val(
+    ctx: *mut ExecCtx,
+    v_tag: u64,
+    v_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let v = VmValue::from_raw_parts(v_tag, v_payload);
         let s = crate::exec::advanced::typeof_val(v, &ctx_ref.heap);
-        ctx_ref.heap.alloc_str(s)
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str(s);
     }
 }
 
-pub(crate) extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_instanceof(
+    ctx: *mut ExecCtx,
+    a_tag: u64,
+    a_payload: u64,
+    b_tag: u64,
+    b_payload: u64,
+) -> u64 {
     unsafe {
         let ctx_ref = &*ctx;
+        let a = VmValue::from_raw_parts(a_tag, a_payload);
+        let b = VmValue::from_raw_parts(b_tag, b_payload);
         let r = crate::exec::advanced::instanceof(a, b, &ctx_ref.heap);
-        VmValue::from_bool(r)
+        if r { 1 } else { 0 }
     }
 }
 
-pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_get_enum_tag(
+    ctx: *mut ExecCtx,
+    val_tag: u64,
+    val_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
         match crate::exec::advanced::get_enum_tag(val, &ctx_ref.heap) {
-            Ok(tag_val) => tag_val,
+            Ok(tag_val) => ctx_ref.jit_native_result = tag_val,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
 
-pub(crate) extern "C" fn jit_is_array_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_is_array_stub(
+    ctx: *mut ExecCtx,
+    val_tag: u64,
+    val_payload: u64,
+) -> u64 {
     unsafe {
         let ctx_ref = &*ctx;
-        VmValue::from_bool(crate::exec::advanced::is_array(val, &ctx_ref.heap))
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
+        if crate::exec::advanced::is_array(val, &ctx_ref.heap) { 1 } else { 0 }
     }
 }
 
-pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+pub(crate) extern "C" fn jit_make_enum_variant(
+    ctx: *mut ExecCtx,
+    ip_before: usize,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -78,6 +104,6 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
                 fields,
                 payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
             }));
-        ctx_ref.heap.intern(variant)
+        ctx_ref.jit_native_result = ctx_ref.heap.intern(variant);
     }
 }

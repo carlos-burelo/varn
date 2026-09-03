@@ -75,7 +75,7 @@ impl VmClosure {
     /// without the OSR arm it runs interpreted start to finish. If OSR is ever
     /// disabled or proves unsound, this constant goes back to 1 in the same
     /// change — leaving it raised is the 20x regression above.
-    const JIT_TIER_THRESHOLD: u32 = 128;
+    const JIT_TIER_THRESHOLD: u32 = 1;
 
     /// Threshold for a function with NO back edge. Straight-line code that has
     /// only ever been entered a couple of times is not worth ~2 ms of

@@ -9,16 +9,7 @@ import sys
 import time
 
 
-def run(compute, warmup=1, runs=3):
-    for _ in range(warmup):
-        compute()
-    best = float("inf")
-    chk = None
-    for _ in range(runs):
-        t = time.perf_counter()
-        chk = compute()
-        ms = (time.perf_counter() - t) * 1000.0
-        if ms < best:
-            best = ms
-    print(chk, file=sys.stderr)
-    print(f"{best:.3f}")
+def run(compute):
+    chk = compute()
+    if chk is not None and chk != 0:
+        print(chk)

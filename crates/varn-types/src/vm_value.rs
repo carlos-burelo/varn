@@ -273,6 +273,14 @@ impl VmValue {
     }
 
     #[inline(always)]
+    pub fn from_sso_raw(len: usize, packed: u64) -> Self {
+        Self {
+            tag: KIND_SSO | ((len as u64) << SSO_LEN_SHIFT),
+            payload: packed,
+        }
+    }
+
+    #[inline(always)]
     pub fn sso_len(self) -> usize {
         ((self.tag >> SSO_LEN_SHIFT) & 0xFF) as usize
     }

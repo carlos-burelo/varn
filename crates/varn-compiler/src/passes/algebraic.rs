@@ -74,6 +74,11 @@ pub fn run(func: &mut SsaFunc) -> bool {
 
     let mut changed = !to_const.is_empty();
     for (b, i, kind) in to_const {
+        if let Some(dest) = func.blocks[b].insts[i].dest {
+            if let Some(ty) = const_inst_ty(&kind) {
+                func.values[dest.0 as usize].ty = ty;
+            }
+        }
         func.blocks[b].insts[i].kind = kind;
     }
     changed |= replace_uses_with_map(func, &rewrites);
@@ -152,6 +157,17 @@ fn simplify(
                 _ => None,
             }
         }
+        _ => None,
+    }
+}
+
+fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
+    match kind {
+        InstKind::ConstInt(_) => Some(HirType::Int),
+        InstKind::ConstFloat(_) => Some(HirType::Float),
+        InstKind::ConstBool(_) => Some(HirType::Bool),
+        InstKind::ConstStr(_) => Some(HirType::Str),
+        InstKind::ConstNull => Some(HirType::Dynamic),
         _ => None,
     }
 }

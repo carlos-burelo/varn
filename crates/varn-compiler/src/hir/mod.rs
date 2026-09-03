@@ -136,7 +136,7 @@ pub enum HirBinding {
     /// On an assignment TARGET the type is the declared type of the global,
     /// and consumers of the store path ignore it.
     Global(Rc<str>, HirType),
-    Upvalue(u32),
+    Upvalue(u32, HirType),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -268,6 +268,10 @@ pub enum HirExpr {
     Null,
 
     NonNull(Box<HirExpr>),
+    Cast {
+        expr: Box<HirExpr>,
+        ty: HirType,
+    },
 
     TryOp(Box<HirExpr>),
 
@@ -346,18 +350,21 @@ pub enum HirExpr {
         op: HirLogicalOp,
         lhs: Box<HirExpr>,
         rhs: Box<HirExpr>,
+        ty: HirType,
     },
 
     Conditional {
         test: Box<HirExpr>,
         cons: Box<HirExpr>,
         alt: Box<HirExpr>,
+        ty: HirType,
     },
 
     Update {
         target: Box<HirAssignTarget>,
         op: HirUpdateOp,
         prefix: bool,
+        ty: HirType,
     },
 
     Array(Vec<HirArrayEl>),

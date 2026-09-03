@@ -8,6 +8,7 @@ use varn_types::{value::ObjRef, Value};
 /// pre-resolved shape (see `FunctionProto::resolved_shape`), avoiding the
 /// per-key shape-transition lookups of the generic `build_object` path.
 /// Values are read in slot order, which matches the shape's key order.
+#[allow(dead_code)]
 pub(crate) fn build_object_with_shape(
     stack: &[VmValue],
     values_start: usize,
@@ -17,6 +18,7 @@ pub(crate) fn build_object_with_shape(
     build_with_shape(stack, values_start, shape, heap, true, false)
 }
 
+#[allow(dead_code)]
 pub(crate) fn build_record_with_shape(
     stack: &[VmValue],
     values_start: usize,
@@ -111,8 +113,10 @@ fn build_shaped(
 pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
-        let idx = if heap.is_int(key) {
-            heap.as_int(key) as usize
+        let idx = if key.is_int() {
+            key.as_int() as usize
+        } else if key.is_f64() {
+            key.as_f64() as usize
         } else {
             heap.to_f64_val(key) as usize
         };
@@ -133,8 +137,10 @@ pub(crate) fn array_set_index(
 ) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
-        let idx = if heap.is_int(key) {
-            heap.as_int(key) as usize
+        let idx = if key.is_int() {
+            key.as_int() as usize
+        } else if key.is_f64() {
+            key.as_f64() as usize
         } else {
             heap.to_f64_val(key) as usize
         };
@@ -163,8 +169,12 @@ pub(crate) fn array_set_index(
 pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(obj.as_heap_idx()) {
-            let idx = heap.as_int(key);
-            let val = a.get_vm(idx as usize).unwrap_or(VmValue::null());
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                heap.as_int(key) as usize
+            };
+            let val = a.get_vm(idx).unwrap_or(VmValue::null());
             return Ok(val);
         }
     }

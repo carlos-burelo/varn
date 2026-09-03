@@ -101,6 +101,7 @@ pub(super) fn capture_kinds(
 }
 
 /// Record the textual CLIF IR of the raw function.
+#[allow(dead_code)]
 pub(super) fn capture_ir(debug: &mut Option<&mut ClifDebugSink>, func: &Function) {
     if let Some(sink) = debug.as_deref_mut() {
         sink.clif_ir = Some(func.display().to_string());

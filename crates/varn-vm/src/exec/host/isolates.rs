@@ -26,7 +26,7 @@ impl ExecCtx {
         callee: VmValue,
         src: usize,
         arg_count: usize,
-    ) -> Result<VmValue, String> {
+    ) -> crate::error::VmResult<VmValue> {
         // The window is inside the caller's register file, which is allocated
         // on frame entry — but a proto whose trailing registers were never
         // written can leave the stack short of it.
@@ -56,20 +56,20 @@ impl ExecCtx {
             Ok(p) => p,
             Err(e) => {
                 self.stack.truncate(orig_len);
-                return Err(e.message);
+                return Err(e);
             }
         };
         let res = match prepared {
             PreparedCall::NativeImmediate(f, n) => {
                 let args_start = self.stack.len() - n;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
-                (f)(self as &mut dyn NativeCtx, &vm_args)
+                (f)(self as &mut dyn NativeCtx, &vm_args).map_err(crate::error::RuntimeError::new)
             }
             PreparedCall::RawNativeImmediate(f, n) => {
                 let args_start = self.stack.len() - n;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
                 let slice = if n > 0 { &vm_args[1..] } else { &vm_args[..] };
-                (f)(self as &mut dyn NativeCtx, slice)
+                (f)(self as &mut dyn NativeCtx, slice).map_err(crate::error::RuntimeError::new)
             }
             PreparedCall::Frame(frame) => {
                 let depth = self.frames.len();
@@ -78,7 +78,7 @@ impl ExecCtx {
                     self.stack.resize(required, VmValue::null());
                 }
                 self.frames.push(frame);
-                self.run_until(depth).map_err(|e| e.message)
+                self.run_until(depth)
             }
             PreparedCall::PushValue(nv) => Ok(nv),
             PreparedCall::Generator {
@@ -94,11 +94,11 @@ impl ExecCtx {
                 }
                 self.frames.push(frame);
                 self.pending_constructors.push((depth, instance_nv));
-                let _ = self.run_until(depth).map_err(|e| e.message)?;
+                let _ = self.run_until(depth)?;
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(crate::error::RuntimeError::new)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {

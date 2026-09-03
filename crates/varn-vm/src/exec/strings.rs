@@ -7,7 +7,6 @@ use std::rc::Rc;
 /// `s = s + x` accumulation appends in place from then on. Shorter results
 /// stay `Shared` — one-off concats (e.g. map keys) shouldn't pay the
 /// copy-on-materialize of a buffer view.
-const EXT_SEED_LEN: usize = 8;
 
 /// `.length` for the property fast paths: str (char count) and Array
 /// (element count), matching the native getters in varn-builtins. `None`
@@ -31,6 +30,18 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
 }
 
 pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    // Fast path: two SSO strings whose combined length fits in SSO (<= 5 bytes).
+    // Assembles the bytes in CPU registers with 0 allocations, 0 memory access.
+    if a.is_sso() && b.is_sso() {
+        let la = a.sso_len();
+        let lb = b.sso_len();
+        let total = la + lb;
+        if total <= varn_types::vm_value::SSO_MAX_LEN {
+            let packed = a.raw_payload() | (b.raw_payload() << (la * 8));
+            return VmValue::from_sso_raw(total, packed);
+        }
+    }
+
     // Accumulation fast path: `a` is the tip view of an extensible buffer.
     // Appending never disturbs shorter views of the same buffer, so this is
     // safe regardless of aliasing; the result is a longer view, O(1) amortized.
@@ -75,33 +86,20 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         return v;
     }
 
-    // Render both operands into one buffer that starts on the stack: strings
-    // borrow, scalars format in place. A short result (the common
-    // `"prefix" + int`) therefore costs a single allocation — the `Rc<str>`
-    // handed back — where it used to cost a scratch `String` plus a copy into
-    // that `Rc<str>`.
     let mut out = StrBuf::new();
     heap.str_repr_into(a, &mut out);
-    let a_len = out.len();
     heap.str_repr_into(b, &mut out);
-    let total = out.len();
-    if a_len >= EXT_SEED_LEN {
-        // Seeding an extensible buffer: this one has to be owned and growable.
-        let flag = if out.as_str().is_ascii() {
-            crate::heap::ascii_flag::YES
-        } else {
-            crate::heap::ascii_flag::NO
-        };
-        let mut owned = out.into_string();
-        let seed_cap = (total * 2).max(64);
-        owned.reserve(seed_cap.saturating_sub(total));
-        return heap.alloc_str_view(HeapStr::ext(
-            Rc::new(std::cell::UnsafeCell::new(owned)),
-            total,
-            flag,
-        ));
-    }
-    heap.alloc_str_dynamic(out.as_str())
+    let s = out.into_string();
+    let len = s.len();
+    let flag = if s.is_ascii() {
+        crate::heap::ascii_flag::YES
+    } else {
+        crate::heap::ascii_flag::NO
+    };
+    let mut st = String::with_capacity((len * 2).max(64));
+    st.push_str(&s);
+    let buf = Rc::new(std::cell::UnsafeCell::new(st));
+    heap.alloc_str_view(HeapStr::ext(buf, len, flag))
 }
 
 pub(crate) fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {

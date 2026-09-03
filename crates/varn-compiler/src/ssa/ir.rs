@@ -231,6 +231,11 @@ pub enum InstKind {
         operand: Value,
     },
 
+    Cast {
+        operand: Value,
+        ty: HirType,
+    },
+
     BuildArray {
         elements: Vec<Value>,
     },

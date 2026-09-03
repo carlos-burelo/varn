@@ -248,6 +248,7 @@ fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
         | SuperMember { .. } => {}
         Var(b) => act(b, n),
         NonNull(x)
+        | Cast { expr: x, .. }
         | TryOp(x)
         | Spread(x)
         | Await(x, _)
@@ -310,7 +311,9 @@ fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
                 walk_expr(x, n, act);
             }
         }
-        Conditional { test, cons, alt } => {
+        Conditional {
+            test, cons, alt, ..
+        } => {
             walk_expr(test, n, act);
             walk_expr(cons, n, act);
             walk_expr(alt, n, act);

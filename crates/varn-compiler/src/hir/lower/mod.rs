@@ -116,15 +116,15 @@ impl Scope {
         lookup_in_frame(self.frames.last().unwrap(), name)
     }
 
-    fn resolve(&mut self, name: &str) -> Option<HirBinding> {
+    fn resolve(&mut self, name: &str, ty: HirType) -> Option<HirBinding> {
         let top = self.frames.len() - 1;
         if let Some(b) = lookup_in_frame(&self.frames[top], name) {
             return Some(b);
         }
-        self.resolve_upvalue(top, name)
+        self.resolve_upvalue(top, name, ty)
     }
 
-    fn resolve_upvalue(&mut self, frame_idx: usize, name: &str) -> Option<HirBinding> {
+    fn resolve_upvalue(&mut self, frame_idx: usize, name: &str, ty: HirType) -> Option<HirBinding> {
         if frame_idx == 0 {
             return None;
         }
@@ -147,16 +147,20 @@ impl Scope {
                     self.frames[parent_idx].captured[bi].push(CaptureTarget::Local(id));
                     HirUpvalueSrc::ParentLocal(id)
                 }
-                HirBinding::Upvalue(uv) => HirUpvalueSrc::ParentUpvalue(uv),
+                HirBinding::Upvalue(uv, _) => HirUpvalueSrc::ParentUpvalue(uv),
                 HirBinding::Global(..) => return None,
             };
             let idx = self.add_upvalue(frame_idx, src);
-            return Some(HirBinding::Upvalue(idx));
+            let b = HirBinding::Upvalue(idx, ty);
+            self.frames[frame_idx].blocks[0].insert(Rc::from(name), b.clone());
+            return Some(b);
         }
 
-        if let Some(HirBinding::Upvalue(parent_uv)) = self.resolve_upvalue(parent_idx, name) {
+        if let Some(HirBinding::Upvalue(parent_uv, _)) = self.resolve_upvalue(parent_idx, name, ty) {
             let idx = self.add_upvalue(frame_idx, HirUpvalueSrc::ParentUpvalue(parent_uv));
-            return Some(HirBinding::Upvalue(idx));
+            let b = HirBinding::Upvalue(idx, ty);
+            self.frames[frame_idx].blocks[0].insert(Rc::from(name), b.clone());
+            return Some(b);
         }
         None
     }
@@ -224,6 +228,44 @@ impl<'a> Lowerer<'a> {
         match self.ann.get_cg_ty(key) {
             Some(cg) => self.ty_table.from_cg(cg),
             None => HirType::Dynamic,
+        }
+    }
+
+    pub(super) fn expr_ty(&self, expr: &HirExpr) -> HirType {
+        match expr {
+            HirExpr::Int(_) => HirType::Int,
+            HirExpr::Float(_) => HirType::Float,
+            HirExpr::Bool(_) => HirType::Bool,
+            HirExpr::Str(_) => HirType::Str,
+            HirExpr::Char(_) => HirType::Int,
+            HirExpr::Decimal(_) | HirExpr::BigInt(_) | HirExpr::Null => HirType::Dynamic,
+            HirExpr::Closure { .. }
+            | HirExpr::Class { .. }
+            | HirExpr::Enum { .. }
+            | HirExpr::Array { .. }
+            | HirExpr::Tuple { .. }
+            | HirExpr::Object { .. }
+            | HirExpr::Record { .. } => HirType::Ref,
+            HirExpr::Cast { ty, .. } => *ty,
+            HirExpr::Binary { op, ty, .. } => crate::hir::binary_result_ty(*op, *ty),
+            HirExpr::Unary { op, ty, .. } => match op {
+                crate::hir::HirUnOp::Not => HirType::Bool,
+                crate::hir::HirUnOp::Typeof => HirType::Str,
+                crate::hir::HirUnOp::Neg | crate::hir::HirUnOp::BitNot => *ty,
+            },
+            HirExpr::Update { ty, .. } => *ty,
+            HirExpr::Call { ty, .. }
+            | HirExpr::SelfCall { ty, .. }
+            | HirExpr::Member { ty, .. }
+            | HirExpr::MemberMaybe { ty, .. }
+            | HirExpr::ModuleSlot { ty, .. }
+            | HirExpr::Logical { ty, .. }
+            | HirExpr::Conditional { ty, .. } => *ty,
+            HirExpr::Index { ty, .. } => *ty,
+            HirExpr::Var(HirBinding::Global(_, ty)) => *ty,
+            HirExpr::Var(HirBinding::Upvalue(_, ty)) => *ty,
+            HirExpr::NonNull(inner) => self.expr_ty(inner),
+            _ => HirType::Dynamic,
         }
     }
 }
@@ -347,7 +389,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Class(cl) => {
                     let name = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                     let hir_class = lo.lower_class(cl, &mut module_scope)?;
-                    let target = lo.global_binding(name, HirType::Dynamic);
+                    let target = lo.global_binding(name, HirType::Ref);
                     top_body.push(HirStmt::Assign {
                         target,
                         value: HirExpr::Class(Box::new(hir_class)),
@@ -355,7 +397,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 }
                 Decl::Enum(en) => {
                     let hir_enum = lo.lower_enum(en, &mut module_scope)?;
-                    let target = lo.global_binding(en.id.clone(), HirType::Dynamic);
+                    let target = lo.global_binding(en.id.clone(), HirType::Ref);
                     top_body.push(HirStmt::Assign {
                         target,
                         value: HirExpr::Enum(Box::new(hir_enum)),
@@ -491,12 +533,18 @@ impl<'a> Lowerer<'a> {
         out: &mut Vec<HirStmt>,
     ) -> R<()> {
         match pat {
-            Pattern::Identifier { name, .. } => {
+            Pattern::Identifier { name, range, .. } => {
                 let local = scope.alloc_local(name.clone());
+                let decl_ty = self.value_ty(AnnKey::decl(range.start.offset));
+                let ty = if decl_ty != HirType::Dynamic {
+                    decl_ty
+                } else {
+                    self.expr_ty(&src)
+                };
                 out.push(HirStmt::Let {
                     local,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty,
                 });
             }
             Pattern::Array { elements, rest, .. } => {
@@ -504,15 +552,21 @@ impl<'a> Lowerer<'a> {
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: HirType::Ref,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 for (i, el) in elements.iter().enumerate() {
                     if let Some(elem) = el {
+                        let elem_ty = match &elem.pattern {
+                            Pattern::Identifier { range, .. } => {
+                                self.value_ty(AnnKey::decl(range.start.offset))
+                            }
+                            _ => HirType::Dynamic,
+                        };
                         let index_expr = HirExpr::Index {
                             object: Box::new(tmp_expr.clone()),
                             index: Box::new(HirExpr::Int(i as i64)),
-                            ty: HirType::Dynamic,
+                            ty: elem_ty,
                             is_array: true,
                         };
                         self.desugar_pattern_local(&elem.pattern, index_expr, scope, out)?;
@@ -523,7 +577,7 @@ impl<'a> Lowerer<'a> {
                         recv: Box::new(tmp_expr),
                         name: Rc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![HirExpr::Int(elements.len() as i64)],
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     };
                     self.desugar_pattern_local(r, slice_expr, scope, out)?;
                 }
@@ -535,14 +589,20 @@ impl<'a> Lowerer<'a> {
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: HirType::Ref,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 for prop in properties {
+                    let prop_ty = match &prop.value {
+                        Pattern::Identifier { range, .. } => {
+                            self.value_ty(AnnKey::decl(range.start.offset))
+                        }
+                        _ => HirType::Dynamic,
+                    };
                     let prop_expr = HirExpr::MemberMaybe {
                         object: Box::new(tmp_expr.clone()),
                         name: prop.key.clone(),
-                        ty: HirType::Dynamic,
+                        ty: prop_ty,
                     };
                     self.desugar_pattern_local(&prop.value, prop_expr, scope, out)?;
                 }
@@ -556,10 +616,11 @@ impl<'a> Lowerer<'a> {
             }
             Pattern::Assignment { left, right, .. } => {
                 let tmp = scope.alloc_temp();
+                let src_ty = self.expr_ty(&src);
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: src_ty,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 let is_null = HirExpr::TypeTest {
@@ -593,8 +654,14 @@ impl<'a> Lowerer<'a> {
         out: &mut Vec<HirStmt>,
     ) -> R<()> {
         match pat {
-            Pattern::Identifier { name, .. } => {
-                let target = self.global_binding(name.clone(), HirType::Dynamic);
+            Pattern::Identifier { name, range, .. } => {
+                let decl_ty = self.value_ty(AnnKey::decl(range.start.offset));
+                let ty = if decl_ty != HirType::Dynamic {
+                    decl_ty
+                } else {
+                    self.expr_ty(&src)
+                };
+                let target = self.global_binding(name.clone(), ty);
                 out.push(HirStmt::Assign { target, value: src });
             }
             Pattern::Array { elements, rest, .. } => {
@@ -602,15 +669,21 @@ impl<'a> Lowerer<'a> {
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: HirType::Ref,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 for (i, el) in elements.iter().enumerate() {
                     if let Some(elem) = el {
+                        let elem_ty = match &elem.pattern {
+                            Pattern::Identifier { range, .. } => {
+                                self.value_ty(AnnKey::decl(range.start.offset))
+                            }
+                            _ => HirType::Dynamic,
+                        };
                         let index_expr = HirExpr::Index {
                             object: Box::new(tmp_expr.clone()),
                             index: Box::new(HirExpr::Int(i as i64)),
-                            ty: HirType::Dynamic,
+                            ty: elem_ty,
                             is_array: true,
                         };
                         self.desugar_pattern_global(&elem.pattern, index_expr, scope, out)?;
@@ -621,7 +694,7 @@ impl<'a> Lowerer<'a> {
                         recv: Box::new(tmp_expr),
                         name: Rc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![HirExpr::Int(elements.len() as i64)],
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     };
                     self.desugar_pattern_global(r, slice_expr, scope, out)?;
                 }
@@ -633,14 +706,20 @@ impl<'a> Lowerer<'a> {
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: HirType::Ref,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 for prop in properties {
+                    let prop_ty = match &prop.value {
+                        Pattern::Identifier { range, .. } => {
+                            self.value_ty(AnnKey::decl(range.start.offset))
+                        }
+                        _ => HirType::Dynamic,
+                    };
                     let prop_expr = HirExpr::MemberMaybe {
                         object: Box::new(tmp_expr.clone()),
                         name: prop.key.clone(),
-                        ty: HirType::Dynamic,
+                        ty: prop_ty,
                     };
                     self.desugar_pattern_global(&prop.value, prop_expr, scope, out)?;
                 }
@@ -654,10 +733,11 @@ impl<'a> Lowerer<'a> {
             }
             Pattern::Assignment { left, right, .. } => {
                 let tmp = scope.alloc_temp();
+                let src_ty = self.expr_ty(&src);
                 out.push(HirStmt::Let {
                     local: tmp,
                     value: src,
-                    ty: HirType::Dynamic,
+                    ty: src_ty,
                 });
                 let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
                 let is_null = HirExpr::TypeTest {

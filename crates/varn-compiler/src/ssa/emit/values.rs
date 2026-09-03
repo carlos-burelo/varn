@@ -177,24 +177,37 @@ pub(super) fn emit_value(
 
         InstKind::MethodCall { recv, name, args } => {
             let name_idx = chunk.add_str(name);
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
             for (i, a) in args.iter().enumerate() {
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], line);
             }
             let argc = args.len() as u8;
-            chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), line);
-            chunk.write(Chunk::pack(d, reg[recv.0 as usize]), line);
-            chunk.write(name_idx, line);
-            chunk.write(Chunk::pack(argc, call_base), line);
+            if matches!(value_tys.get(recv.0 as usize), Some(crate::hir::HirType::Class(_))) {
+                chunk.emit(OpCode::InvokeVirtual, line);
+                chunk.write(Chunk::pack(d, reg[recv.0 as usize]), line);
+                chunk.write(name_idx, line);
+                chunk.write(Chunk::pack(argc, call_base), line);
+            } else {
+                if *cache_count > 255 {
+                    return Err(OptError::Unsupported(
+                        "ssa-emit: too many inline-cache sites",
+                    ));
+                }
+                let cs = *cache_count as u8;
+                *cache_count += 1;
+                chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), line);
+                chunk.write(Chunk::pack(d, reg[recv.0 as usize]), line);
+                chunk.write(name_idx, line);
+                chunk.write(Chunk::pack(argc, call_base), line);
+            }
         }
         InstKind::IsNull { operand } => {
             chunk.emit_rr(OpCode::IsNull, d, reg[operand.0 as usize], line);
+        }
+        InstKind::Cast { operand, .. } => {
+            let src = reg[operand.0 as usize];
+            if d != src {
+                chunk.emit_rr(OpCode::Move, d, src, line);
+            }
         }
 
         InstKind::BuildArray { elements } => {

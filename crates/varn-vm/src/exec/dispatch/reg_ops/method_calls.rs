@@ -91,6 +91,33 @@ impl ExecCtx {
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
+            } else if name.as_ref() == varn_core::MemberKey::EndsWith.as_str() && arg_count == 1 {
+                let mut buf_a = [0u8; 5];
+                let mut buf_b = [0u8; 5];
+                let arg_val = self.stack[base + arg_start];
+                let s_opt = if this_val.is_sso() {
+                    Some(this_val.sso_as_str(&mut buf_a))
+                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                    Some(hs.as_str())
+                } else {
+                    None
+                };
+                let p_opt = if arg_val.is_sso() {
+                    Some(arg_val.sso_as_str(&mut buf_b))
+                } else if arg_val.is_heap() {
+                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                        Some(hs.as_str())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let (Some(s), Some(p)) = (s_opt, p_opt) {
+                    self.stack[base + dest] = VmValue::from_bool(s.ends_with(p));
+                    self.record_ic_hit_callmethod();
+                    return Ok(false);
+                }
             } else if name.as_ref() == varn_core::MemberKey::IndexOf.as_str() && arg_count == 1 {
                 let mut buf_a = [0u8; 5];
                 let mut buf_b = [0u8; 5];
@@ -224,6 +251,37 @@ impl ExecCtx {
             }
 
             self.record_ic_miss_callmethod();
+        }
+
+        if let Some(ref cls) = receiver_class {
+            if let Some((method_val, owner_cls)) = varn_types::find_method_with_owner(cls, name.as_ref()) {
+                match method_val {
+                    Value::VmValue(payload) => {
+                        if let Some(nc) = VmClosurePayload::downcast_from(&*payload) {
+                            if !nc.proto.is_generator && !nc.proto.is_async && arg_count <= nc.proto.arity {
+                                return self.invoke_vm_method_fast(
+                                    nc.clone(),
+                                    Some(owner_cls),
+                                    this_val,
+                                    base,
+                                    arg_start,
+                                    arg_count,
+                                    dest,
+                                    name.as_ref(),
+                                );
+                            }
+                        }
+                    }
+                    Value::NativeFn(b) => {
+                        let f = b.0;
+                        self.record_call_native(f, Some(name.as_ref()));
+                        let result = self.call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
+                        self.stack[base + dest] = result;
+                        return Ok(false);
+                    }
+                    _ => {}
+                }
+            }
         }
 
         let resolved = crate::exec::props::resolve_property(this_val, &name, &mut self.heap)?;
@@ -463,7 +521,7 @@ impl ExecCtx {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn invoke_vm_method_fast(
+    pub(crate) fn invoke_vm_method_fast(
         &mut self,
         nc: Rc<VmClosure>,
         owner_class: Option<Rc<varn_types::value::ClassObj>>,

@@ -6,7 +6,7 @@
 //! out `base` anyway, aliasing it onto a register that was still live.
 
 use std::collections::HashMap;
-use crate::regalloc::liveness::LiveRange;
+use crate::regalloc::liveness::{DefSites, LiveRange};
 use crate::regalloc::regalloc_post::*;
 
 fn range(vreg: u16, start: usize, end: usize, interference: &[u16]) -> LiveRange {
@@ -33,9 +33,15 @@ fn infeasible_case() -> (Vec<LiveRange>, ScanResult, Vec<(u8, u8)>) {
         range(8, 6, 12, &[1, 2, 3, 7]),
     ];
     let scan = ScanResult {
-        defs: [(1, 0), (2, 3), (3, 4), (7, 6), (8, 6)]
-            .into_iter()
-            .collect(),
+        defs: [
+            (1, DefSites::at(0)),
+            (2, DefSites::at(3)),
+            (3, DefSites::at(4)),
+            (7, DefSites::at(6)),
+            (8, DefSites::at(6)),
+        ]
+        .into_iter()
+        .collect(),
         uses: [
             (1, vec![7]),
             (2, vec![12]),

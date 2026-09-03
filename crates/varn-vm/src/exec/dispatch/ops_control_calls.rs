@@ -206,15 +206,9 @@ impl ExecCtx {
                 let (arg_count, arg_start) = (hi(w3), lo(w3));
                 self.frames[frame_idx].ip = *ip;
                 let this_val = self.stack[base + this_reg];
-                let method_name_nv = closure.constants[name_idx];
-                let method_name = self
-                    .heap
-                    .str_val(method_name_nv)
-                    .expect("InvokeVirtual: not a string const");
-                let method_nv =
-                    crate::exec::props::get_property(this_val, &method_name, &mut self.heap)?;
-                let jumped =
-                    self.exec_call_reg(method_nv, base, arg_start, arg_count, dest, frame_idx)?;
+                let jumped = self.exec_call_method_reg(
+                    this_val, base, name_idx, usize::MAX, arg_start, arg_count, dest, frame_idx, closure,
+                )?;
                 if jumped {
                     return Ok(Some(ControlCallFlow::ContinueFrame));
                 }

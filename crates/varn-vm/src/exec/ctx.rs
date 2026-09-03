@@ -325,19 +325,28 @@ impl ExecCtx {
     }
 
     pub fn run_minor_gc(&mut self) {
-        let stack_len = self.stack.len();
+        let frame_top = self
+            .frames
+            .last()
+            .map(|f| f.base + f.closure().proto.register_count as usize)
+            .unwrap_or(0);
+        let active_stack_len = self.stack.len().max(frame_top);
+        if self.stack.len() < active_stack_len {
+            self.stack.resize(active_stack_len, VmValue::null());
+        }
 
         let mut all_vals: Vec<VmValue> = Vec::with_capacity(
-            stack_len
+            active_stack_len
                 + self.globals.values.len()
                 + self.modules.len()
                 + self.module_exports.len()
                 + self.static_closures.len()
                 + self.pending_constructors.len()
-                + self.pending_setters.len(),
+                + self.pending_setters.len()
+                + 1,
         );
 
-        all_vals.extend_from_slice(&self.stack);
+        all_vals.extend_from_slice(&self.stack[..active_stack_len]);
         let globals_start = all_vals.len();
         all_vals.extend_from_slice(&self.globals.values);
         let modules_start = all_vals.len();
@@ -370,10 +379,12 @@ impl ExecCtx {
                 all_vals.push(v);
             }
         }
+        let jit_native_result_start = all_vals.len();
+        all_vals.push(self.jit_native_result);
 
         self.heap.minor_gc(&mut all_vals, &[]);
 
-        self.stack.copy_from_slice(&all_vals[..stack_len]);
+        self.stack[..active_stack_len].copy_from_slice(&all_vals[..active_stack_len]);
 
         let globals_slice = &all_vals[globals_start..modules_start];
         self.globals.values.copy_from_slice(globals_slice);
@@ -411,6 +422,8 @@ impl ExecCtx {
                 }
             }
         }
+
+        self.jit_native_result = all_vals[jit_native_result_start];
     }
 
     /// Loop back-edge GC safepoint shared by the interpreter and the JIT.
@@ -436,11 +449,23 @@ impl ExecCtx {
             return;
         }
         self.run_minor_gc();
+        let frame_top = self
+            .frames
+            .last()
+            .map(|f| f.base + f.closure().proto.register_count as usize)
+            .unwrap_or(0);
+        let active_stack_len = self.stack.len().max(frame_top);
+        if self.stack.len() < active_stack_len {
+            self.stack.resize(active_stack_len, VmValue::null());
+        }
         let mut roots: Vec<u32> = Vec::with_capacity(256);
-        for v in &self.stack {
+        for v in &self.stack[..active_stack_len] {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }
+        }
+        if self.jit_native_result.is_heap() {
+            roots.push(self.jit_native_result.as_heap_idx());
         }
         for v in &self.globals.values {
             if v.is_heap() {

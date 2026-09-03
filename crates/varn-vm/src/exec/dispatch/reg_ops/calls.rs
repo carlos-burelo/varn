@@ -33,8 +33,45 @@ impl ExecCtx {
         frame_idx: usize,
     ) -> VmResult<bool> {
         if callee.is_heap() {
+            let heap_idx = callee.as_heap_idx();
+            if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx) {
+                if !nc.proto.is_generator && !nc.proto.is_async {
+                    let arity = nc.proto.arity;
+                    if !nc.proto.has_rest && arg_count <= arity {
+                        let nc = nc.clone();
+                        if self.hotspot_counters.is_some() {
+                            let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                            let is_jit = nc.jit_fn().is_some();
+                            self.record_hotspot_fn(fn_name, is_jit);
+                        }
+                        let new_base = self.stack.len();
+                        if self.frames.len() >= 10000 {
+                            return Err(crate::error::RuntimeError::new(
+                                "stack overflow: call depth exceeded 10000",
+                            ));
+                        }
+                        let required = new_base + nc.proto.register_count as usize;
+                        if self.stack.len() < required {
+                            self.stack.resize(required, VmValue::null());
+                        }
+                        if arg_count > 0 {
+                            unsafe {
+                                let src = self.stack.as_ptr().add(base + arg_start);
+                                let dst = self.stack.as_mut_ptr().add(new_base);
+                                std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                            }
+                        }
+                        let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                        frame.return_reg = Some(dest as u16);
+                        self.record_call_vm_fast();
+                        self.frames.push(frame);
+                        return Ok(true);
+                    }
+                }
+            }
+
             let mut bound_method = None;
-            if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(callee.as_heap_idx())
+            if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(heap_idx)
             {
                 bound_method = Some((**bm).clone());
             }

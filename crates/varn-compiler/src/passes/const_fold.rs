@@ -19,6 +19,9 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 }
 
                 if let Some(folded_kind) = fold_inst(&inst.kind, &const_map) {
+                    if let Some(ty) = const_inst_ty(&folded_kind) {
+                        func.values[dest.0 as usize].ty = ty;
+                    }
                     func.blocks[b_id.0 as usize].insts[inst_idx].kind = folded_kind.clone();
                     const_map.insert(dest, folded_kind);
                     changed = true;
@@ -254,6 +257,17 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
                 None
             }
         }
+        _ => None,
+    }
+}
+
+fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
+    match kind {
+        InstKind::ConstInt(_) => Some(HirType::Int),
+        InstKind::ConstFloat(_) => Some(HirType::Float),
+        InstKind::ConstBool(_) => Some(HirType::Bool),
+        InstKind::ConstStr(_) => Some(HirType::Str),
+        InstKind::ConstNull => Some(HirType::Dynamic),
         _ => None,
     }
 }

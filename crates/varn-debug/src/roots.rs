@@ -112,6 +112,8 @@ pub fn debug_roots(
     let mut reg_roots_max = 0usize;
     let mut unboxed_total = 0usize;
     let mut unmatched = 0usize;
+    let mut lost_total = 0usize;
+    let mut lost_points: Vec<(String, usize, String, usize)> = Vec::new();
     let mut rendered = Vec::new();
 
     for f in &fns {
@@ -125,6 +127,29 @@ pub fn debug_roots(
             // no heap index and are not roots the cutover would have to cover.
             let in_reg = p.cranelift.unwrap_or(0).saturating_sub(p.unboxed.len());
             unboxed_total += p.unboxed.len();
+            // Raíces PERDIDAS: las que Cranelift declara vivas y que ni
+            // volcamos (`ours`) ni descartamos por kind (`unboxed`). Si esto
+            // no es cero, hay un valor que el GC no verá.
+            //
+            // No es lo mismo que `in_reg`, que cuenta lo que vive en registro
+            // ESTANDO cubierto por el flush: eso es trabajo pendiente del
+            // cutover, no un fallo.
+            //
+            // LÍMITE de esta métrica: resta `unboxed` dando por hecho que un
+            // registro con kind `Int`/`Bool` no puede llevar una referencia.
+            // Si un kind está mal inferido, ese registro ES una raíz, no se
+            // vuelca, y esto lo cuenta como seguro. La comprobación que
+            // cerraría esa vía es dinámica —verificar en el safepoint que
+            // ningún registro tenido por escalar contiene un patrón de
+            // referencia— y no está hecha.
+            let lost = p
+                .cranelift
+                .unwrap_or(0)
+                .saturating_sub(p.ours.len() + p.unboxed.len());
+            if lost > 0 {
+                lost_total += lost;
+                lost_points.push((f.name.clone(), p.ip, p.op.clone(), lost));
+            }
             if in_reg == 0 {
                 fully_flushed += 1;
             } else {
@@ -202,6 +227,12 @@ pub fn debug_roots(
         eprintln!(
             "  {RED}✗ {unmatched} stack maps sin correlacionar{R}\
              {DIM} — su PC no cayó tras ningún srcloc; la unión ip↔offset está incompleta{R}"
+        );
+    }
+    if lost_total > 0 {
+        eprintln!(
+            "  {RED}✗ {lost_total} raíces potencialmente perdidas en {} puntos{R}",
+            lost_points.len()
         );
     }
 }

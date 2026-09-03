@@ -82,20 +82,29 @@ fn expected_disc_for_receiver(
 /// Declare the whole file. `want_roots` marks the I64 Variables as needing
 /// stack maps, which Cranelift requires BEFORE any use — it explicitly does
 /// not retrofit pre-existing ones.
+/// Declare the whole file. `want_roots` marks the I64 Variables as needing
+/// stack maps, which Cranelift requires BEFORE any use — it explicitly does
+/// not retrofit pre-existing ones.
 pub(super) fn declare(
     b: &mut FunctionBuilder,
-    nregs: usize,
-    register_meta: &[RegisterMeta],
+    proto: &varn_types::FunctionProto,
     regions: &[emit::Region],
     code: &[u16],
     pool: &[PoolEntry],
     want_roots: bool,
 ) -> VarFile {
-    // A float-typed register (`register_meta[r] == Float`) is an unboxed f64
+    let nregs = proto.register_count as usize;
+    let register_meta = &proto.register_meta;
+    // A float-typed register (`register_meta[r] == Float` or float param) is an unboxed f64
     // in an `F64` Variable; every other register is a boxed/unboxed i64.
     let vars: Vec<Variable> = (0..nregs)
         .map(|r| {
-            let ty = if meta_is_float(register_meta, r) {
+            let is_param_float = if r >= 1 && r <= proto.param_kinds.len() {
+                proto.param_kinds.get(r - 1) == Some(&varn_types::register_meta::SlotKind::Float)
+            } else {
+                false
+            };
+            let ty = if is_param_float || meta_is_float(&proto.register_meta, r) {
                 types::F64
             } else {
                 types::I64

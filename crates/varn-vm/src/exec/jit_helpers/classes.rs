@@ -15,7 +15,7 @@ pub struct JitClassMemberArgs {
     pub kind: u8,
 }
 
-pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -32,7 +32,7 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> Vm
             .expect("GetSuper: 'this' has no class");
         let class_nv = ctx_ref.heap.intern(varn_types::Value::Class(cls));
         match crate::exec::class::op_get_super(class_nv, &name, this_val, &mut ctx_ref.heap) {
-            Ok(v) => v,
+            Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
@@ -41,7 +41,8 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> Vm
 pub(crate) extern "C" fn jit_declare_field(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    class_val: VmValue,
+    class_tag: u64,
+    class_payload: u64,
     name_idx: usize,
 ) {
     unsafe {
@@ -49,6 +50,7 @@ pub(crate) extern "C" fn jit_declare_field(
         let closure_ref = &*closure;
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
         if let Err(e) = crate::exec::class::op_declare_field(class_val, &key, &mut ctx_ref.heap) {
             jit_propagate_error(ctx_ref, e);
         }
@@ -58,27 +60,37 @@ pub(crate) extern "C" fn jit_declare_field(
 pub(crate) extern "C" fn jit_make_class(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    super_val: VmValue,
+    super_tag: u64,
+    super_payload: u64,
     name_idx: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
+        let super_val = VmValue::from_raw_parts(super_tag, super_payload);
         if !super_val.is_null() {
             if let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap) {
                 jit_propagate_error(ctx_ref, e);
             }
         }
-        cls
+        ctx_ref.jit_native_result = cls;
     }
 }
 
-pub(crate) extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: VmValue) {
+pub(crate) extern "C" fn jit_inherit(
+    ctx: *mut ExecCtx,
+    class_tag: u64,
+    class_payload: u64,
+    super_tag: u64,
+    super_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
+        let super_val = VmValue::from_raw_parts(super_tag, super_payload);
         if let Err(e) = crate::exec::class::op_inherit(class_val, super_val, &mut ctx_ref.heap) {
             jit_propagate_error(ctx_ref, e);
         }

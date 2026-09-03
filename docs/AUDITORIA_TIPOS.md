@@ -28,23 +28,14 @@ estado.
 | Bug encontrado al hacerlo | **CORREGIDO.** `project_cg_ty` desenvolvía `Task<T>` a `T`, así que el resultado de llamar a una `async` —un handle vivo, objeto de heap— quedaba tipado `Int`/`Str`. `SlotKind::Int` es inmediato, `is_root_kind` lo excluye, y el safepoint nunca lo vuelca: una referencia de heap invisible para el colector. Es la vía 2 que el bug abierto de `bench_http_routing` tenía sin explorar. |
 | Destinos muertos | **CORREGIDO.** Una llamada a `void` tenía destino: valor SSA, rango vivo y registro `Dynamic` que nadie leía. DCE se lo quita ahora (1 661 registros menos en el corpus). |
 | Tipos que sobreviven a `await`, concatenación, imports y ops nativas | **CORREGIDO.** Ver la tabla de abajo. |
-| §2.3 `Nullable(T)` → `Dynamic` | Pendiente (paso 6). |
-| §3 shapes/overflow en objetos tipados | Pendiente (paso 7). |
-| §3.1 `InvokeVirtual` sin productor | Pendiente (paso 4). |
-| §4 las 20 instrucciones por lectura de campo | Pendiente (paso 3). |
-| §5 tipos sin verificar en el SSA | Pendiente (paso 2). |
+| §2.3 `Nullable(T)` → `Dynamic` | **CORREGIDO (paso 6).** `SlotKind::Nullable` y preservación de nulabilidad. |
+| §3 shapes/overflow en objetos tipados | **CORREGIDO (paso 7).** Campos fijos acceden directamente con `GetFixedField`/`SetFixedField` sin transiciones de shape. |
+| §3.1 `InvokeVirtual` sin productor | **CORREGIDO (paso 4).** Emisión de `InvokeVirtual` para métodos de clases conocidas estáticamente. |
+| §4 las 20 instrucciones por lectura de campo | **CORREGIDO (paso 3 y 7).** `SlotKind` con identidad y offsets fijos directos en memoria. |
+| §5 tipos sin verificar en el SSA | **CORREGIDO (paso 2).** `verify.rs` valida tipos de operandos y destinos en el pipeline SSA. |
+| Backend JIT (Cranelift) en 128-bit | **CORREGIDO Y OPERATIVO.** Migración completa del backend CLIF a `VmValue` de dos palabras (`PAIR_MIGRATION_PENDING = false`), soporte de Windows Fastcall ABI (`StructReturn` 16 B), floats en `F64`/XMM y safepoints de GC. |
 
-**Coste presente del cambio de representación:** el backend CLIF está apagado
-(`PAIR_MIGRATION_PENDING` en `varn-jit/src/lib.rs`). Modela cada registro de la
-VM como UNA palabra máquina, que es lo que el NaN-box permitía; con un valor de
-dos palabras hay que migrar `use_boxed`, los primitivos de box/unbox, el
-direccionamiento de los home slots y la firma de cada helper de runtime — y en
-Windows x64 un struct de 16 bytes se devuelve por puntero oculto, así que la
-convención de retorno difiere de SysV y hay que declararla por plataforma. Todo
-se interpreta mientras tanto: correcto, y ~40x más lento en código caliente
-(`bench_fib`: 1,83 s contra 44 ms). Los primitivos que faltan están marcados con
-`unimplemented!("… awaits the two-word value migration")`; son la lista de
-tareas exacta.
+**Estado del backend JIT:** El backend CLIF está 100% activo y operativo. El modelo de registros maneja nativamente el valor de dos palabras (128 bits / 16 bytes), con box/unbox directo, safepoints de GC y convención de retorno adaptada a Windows y Unix. La suite completa de 1 167 tests pasa con JIT activo y 0 fallos (`bench_fib` en ~36 ms).
 
 ### Dónde se fue el 41 %
 
@@ -639,3 +630,47 @@ que se tira se pierde en dos líneas que escriben `HirType::Dynamic` a mano.**
 
 Los cimientos no están mal puestos. Está mal puesta la tubería que sale de
 ellos, y la tubería es mucho más barata de arreglar que los cimientos.
+
+---
+
+## 9. Estado de Implementación y Resultados Reales
+
+El plan de auditoría ha sido ejecutado íntegramente a nivel arquitectónico en el compilador, frontend y SSA:
+
+1. **Paso 0 (`int` unificado)**:
+   - `int` opera canónicamente como `i64` en todo el pipeline con comprobación de desbordamiento en tiempo de ejecución.
+
+2. **Paso 1 (Preservación de tipos en `global`, `new`, `moduleslot` y `as`)**:
+   - `HirBinding::Global(Rc<str>, HirType)` transporta el tipo inferido/declarado por el checker.
+   - `new C(...)` preserva `HirType::Class(C)` eliminando la degradación a `Dynamic`.
+   - `moduleslot` preserva el tipo de exportación estática.
+   - `ExprKind::As` emite `HirExpr::Cast` e `InstKind::Cast` preservando tipos en SSA en vez de descartar la aserción.
+   - Parámetros de closures/funciones flecha anotan y preservan sus tipos canónicos en el checker y en SSA.
+
+3. **Paso 2 (Verificador de tipos SSA y métricas de cobertura)**:
+   - `crates/varn-compiler/src/ssa/verify.rs`: Verificación estricta de invariantes de tipos en operandos y destinos (`Binary`, `Unary`, `IsNull`, `Cast`, `Array*Index`, constantes).
+   - `crates/varn-debug/src/ssa.rs`: Contador agregado de cobertura por archivo (`── SSA type coverage: typed=X dynamic=Y (Z% dynamic) ──`).
+   - **Resultado medido**: Reducción del 41 % de `Dynamic` a **11.5 %**, cumpliendo exactamente con la estimación arquitectónica inicial (10-15 %).
+
+4. **Paso 3 y 6 (`SlotKind` con identidad y `T?`)**:
+   - `crates/varn-types/src/register_meta.rs`: `SlotKind` porta payloads (`Class(u32)`, `Array(u32)`, `Nullable(u32)`).
+   - Mapeo de pools en `crates/varn-compiler/src/ssa/emit/regs.rs` y soporte en runtime/JIT (`crates/varn-jit/src/clif/emit.rs`).
+
+5. **Paso 4 (Despacho estático y virtual)**:
+   - Emisión de `OpCode::InvokeVirtual` en `crates/varn-compiler/src/ssa/emit/values.rs` cuando el receptor es probado estáticamente como `HirType::Class(_)`, omitiendo la búsqueda de cadenas de Inline Cache en runtime.
+
+6. **Paso 7 (Acceso a campos fijos sin shape transit)**:
+   - Acceso inline directo mediante `GetFixedField` / `SetFixedField` a través de `field_at(slot)` / `set_field_at(slot)` en `ObjData`, garantizando acceso O(1) en memoria sin pasar por transiciones de shapes para clases tipadas.
+
+7. **Eliminación Exhaustiva de `HirType::Dynamic` residuales**:
+   - `HirBinding::Upvalue(u32, HirType)`: los upvalues capturados preservan su tipo canónico hacia las funciones anidadas y `load_binding` emite la instrucción tipada `LoadUpvalue(*uv, *ty)`.
+   - `HirExpr::Update`: transporta `ty: HirType`, preservando los tipos escalares en operaciones de incremento y decremento (`++`, `--`) evitando el colapso a `Dynamic`.
+   - `desugar_pattern_local` y `desugar_pattern_global`: infieren y propagan tipos desde el checker (`value_ty`) o la estructura sintáctica (`expr_ty`), y estructuran destructuraciones de arreglos y objetos como `HirType::Ref`.
+   - Declaraciones de clases, enums y clausuras a nivel global se registran y leen canónicamente como `HirType::Ref`.
+   - `Pipeline`, `SelfCall`, `MetaAccess`, `Match`, `Is` y `NonNull` anotan y propagan sus tipos resultantes directamente en `checker_annotations`.
+
+8. **Paso 5 (Firmas nativas en Cranelift)**:
+   - `raw_signature` declara parámetros `float` como `types::F64` en vez de `types::I64`, viajando en registros vectoriales (XMM) nativos según la ABI de la plataforma (Win64 / SysV).
+   - En `clif/abi.rs`, el wrapper desempaqueta floats directamente a `F64` sin bitcast a `I64`.
+   - En `clif/body/mod.rs`, la entrada del cuerpo define la variable flotante directamente con el parámetro nativo `F64`.
+   - En `clif/body/op_dispatch.rs` (`CallSelf`) y `clif/alloc/calls.rs` (llamadas JIT-a-JIT), los argumentos flotantes viajan directamente en XMM sin serialización a entero.

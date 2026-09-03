@@ -6,20 +6,14 @@
 //! allocation never triggers a collection), so they work in ANY routed
 //! function. Comparison results are unboxed to 0/1 so branches read them
 //! directly; arithmetic results stay boxed (unboxed at an int use).
-
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
-use varn_types::VmValue;
-
-use super::emit::{box_int, box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce};
+use super::alloc::AllocCtx;
+use super::emit::{box_int, box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
 use super::kinds::K;
 use crate::JitHelpers;
-
-/// Kind test for an inline (SSO) string, applied to a value's TAG WORD.
-const SSO_TAG_MASK: u64 = varn_types::vm_value::KIND_MASK;
-const SSO_TAG_BITS: u64 = varn_types::vm_value::KIND_SSO;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
@@ -28,17 +22,45 @@ pub(crate) struct GenCtx<'a> {
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,
     pub register_meta: &'a [varn_types::register_meta::RegisterMeta],
+    pub jit_native_result_offset: usize,
+    pub actx: Option<&'a AllocCtx<'a>>,
+}
+
+fn box_operand(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    r: usize,
+) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
+    let v = if let Some(actx) = g.actx {
+        super::alloc::box_or_load_home(b, actx, state, r)
+    } else {
+        box_or_pass(b, g.vars, state, r)
+    };
+    if b.func.dfg.value_type(v) == types::I128 {
+        b.ins().isplit(v)
+    } else {
+        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), v)
+    }
 }
 
 /// Define `dest` from a helper's boxed `VmValue` result, coercing when the
 /// register is float-typed — its Variable is `F64`, so the raw bits would be
 /// a Cranelift type error. Matches the kind `apply_kinds` assigns.
 fn def_boxed(b: &mut FunctionBuilder, g: &GenCtx, dest: usize, res: cranelift_codegen::ir::Value) {
-    if meta_is_float(g.register_meta, dest) {
+    if let Some(actx) = g.actx {
+        super::alloc::def_result(b, actx, dest, res);
+    } else if meta_is_float(g.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(g.vars[dest], f);
     } else {
-        b.def_var(g.vars[dest], res);
+        let payload = if b.func.dfg.value_type(res) == types::I128 {
+            let (_tag, payload) = b.ins().isplit(res);
+            payload
+        } else {
+            res
+        };
+        b.def_var(g.vars[dest], payload);
     }
 }
 
@@ -55,9 +77,15 @@ pub(super) fn emit_binop(
     let dest = (code[ip] >> 8) as usize;
     let a_r = (code[ip + 1] >> 8) as usize;
     let b_r = (code[ip + 1] & 0xFF) as usize;
-    let a = box_or_pass(b, g.vars, state, a_r);
-    let bb = box_or_pass(b, g.vars, state, b_r);
-    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, a, bb]);
+    let (a_tag, a_payload) = box_operand(b, g, state, a_r);
+    let (b_tag, b_payload) = box_operand(b, g, state, b_r);
+    call_helper_void(b, g.cc, helper, &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        g.exec_ctx,
+        g.jit_native_result_offset as i32,
+    );
     def_boxed(b, g, dest, res);
 }
 
@@ -74,14 +102,19 @@ pub(super) fn emit_is_null(
     let is_null = match state[src] {
         K::Int | K::Float | K::Bool => b.ins().iconst(types::I64, 0),
         _ => {
-            let v = box_or_pass(b, g.vars, state, src);
+            let (tag, _payload) = box_operand(b, g, state, src);
             let cmp = b
                 .ins()
-                .icmp_imm(IntCC::Equal, v, VmValue::null().raw_tag() as i64);
+                .icmp_imm(IntCC::Equal, tag, varn_types::vm_value::KIND_NULL as i64);
             b.ins().uextend(types::I64, cmp)
         }
     };
-    b.def_var(g.vars[dest], is_null);
+    if let Some(actx) = g.actx {
+        let boxed = super::emit::box_bool(b, is_null);
+        super::alloc::def_result(b, actx, dest, boxed);
+    } else {
+        b.def_var(g.vars[dest], is_null);
+    }
 }
 
 /// Dispatch a generic (helper-based) op. Returns `true` if `op` was one of
@@ -120,13 +153,12 @@ pub(super) fn try_emit(
             | OpCode::IsArray
             | OpCode::IsNull
     );
-    if bool_result && meta_is_float(g.register_meta, (code[ip] >> 8) as usize) {
+    let dest = (code[ip] >> 8) as usize;
+    if bool_result && meta_is_float(g.register_meta, dest) {
         return false;
     }
+
     match op {
-        // Numeric/string/float arithmetic — the runtime helpers dispatch by
-        // operand type, so the typed *Float variants share them (operands are
-        // boxed float VmValues here; native f64 is a future perf lever).
         OpCode::Add | OpCode::AddFloat => emit_binop(b, g, state, code, ip, h.add),
         OpCode::Sub | OpCode::SubFloat => emit_binop(b, g, state, code, ip, h.sub),
         OpCode::Mul | OpCode::MulFloat => emit_binop(b, g, state, code, ip, h.mul),
@@ -141,10 +173,6 @@ pub(super) fn try_emit(
         OpCode::Gte | OpCode::GteFloat => emit_compare(b, g, state, code, ip, h.gte),
         OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof),
         OpCode::In => emit_compare(b, g, state, code, ip, h.op_in),
-        // NB: DivInt is deliberately NOT routed. It is int/int -> float, but
-        // stdlib code (`int_div`) relies on the interpreter coercing the
-        // whole-number float back to an int at an `int` return; clif's typed
-        // int-return unbox would misread the float bits. Let it bail.
         OpCode::BitAnd => emit_binop(b, g, state, code, ip, h.bit_and),
         OpCode::BitOr => emit_binop(b, g, state, code, ip, h.bit_or),
         OpCode::BitXor => emit_binop(b, g, state, code, ip, h.bit_xor),
@@ -178,8 +206,14 @@ pub(super) fn emit_unary(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
-    let v = box_or_pass(b, g.vars, state, src);
-    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    let (v_tag, v_payload) = box_operand(b, g, state, src);
+    call_helper_void(b, g.cc, helper, &[g.exec_ctx, v_tag, v_payload]);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        g.exec_ctx,
+        g.jit_native_result_offset as i32,
+    );
     def_boxed(b, g, dest, res);
 }
 
@@ -194,28 +228,32 @@ pub(super) fn emit_str_length(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
-    let v = box_or_pass(b, g.vars, state, src);
+    let (tag, payload) = box_operand(b, g, state, src);
 
-    let tag_mask = b.ins().iconst(types::I64, SSO_TAG_MASK as i64);
-    let tag_bits = b.ins().iconst(types::I64, SSO_TAG_BITS as i64);
-    let v_tag = b.ins().band(v, tag_mask);
-    let is_sso = b.ins().icmp(IntCC::Equal, v_tag, tag_bits);
+    let kind = b.ins().band_imm(tag, varn_types::vm_value::KIND_MASK as i64);
+    let is_sso = b.ins().icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
 
     let fast = b.create_block();
     let slow = b.create_block();
     let merge = b.create_block();
-    b.append_block_param(merge, types::I64);
+    b.append_block_param(merge, types::I128);
 
     b.ins().brif(is_sso, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
-    let s = b.ins().ushr_imm(v, 45);
-    let sso_len = b.ins().band_imm(s, 0x7);
+    let s = b.ins().ushr_imm(tag, 8);
+    let sso_len = b.ins().band_imm(s, 0xFF);
     let boxed_len = box_int(b, sso_len);
     b.ins().jump(merge, &[boxed_len.into()]);
 
     b.switch_to_block(slow);
-    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    call_helper_void(b, g.cc, helper, &[g.exec_ctx, tag, payload]);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        g.exec_ctx,
+        g.jit_native_result_offset as i32,
+    );
     b.ins().jump(merge, &[res.into()]);
 
     b.switch_to_block(merge);
@@ -223,8 +261,7 @@ pub(super) fn emit_str_length(
     def_boxed(b, g, dest, res);
 }
 
-/// `dest, src` unary producing a boxed bool (`Not` = logical_not); unboxed to
-/// 0/1 (`K::Bool`).
+/// `dest, src` unary producing a bool (0/1).
 pub(super) fn emit_unary_bool(
     b: &mut FunctionBuilder,
     g: &GenCtx,
@@ -235,10 +272,14 @@ pub(super) fn emit_unary_bool(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
-    let v = box_or_pass(b, g.vars, state, src);
-    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
-    let cond = unbox_bool(b, res);
-    b.def_var(g.vars[dest], cond);
+    let (v_tag, v_payload) = box_operand(b, g, state, src);
+    let cond = call_helper(b, g.cc, helper, &[g.exec_ctx, v_tag, v_payload]);
+    if let Some(actx) = g.actx {
+        let boxed = super::emit::box_bool(b, cond);
+        super::alloc::def_result(b, actx, dest, boxed);
+    } else {
+        b.def_var(g.vars[dest], cond);
+    }
 }
 
 /// `GetSymbol dest, obj, sym_idx` — well-known symbol property access;
@@ -254,14 +295,20 @@ pub(super) fn emit_get_symbol(
     let dest = (code[ip] >> 8) as usize;
     let obj_r = (code[ip + 1] >> 8) as usize;
     let sym_idx = code[ip + 2] as usize;
-    let obj = box_or_pass(b, g.vars, state, obj_r);
+    let (obj_tag, obj_payload) = box_operand(b, g, state, obj_r);
     let sym = b.ins().iconst(types::I64, sym_idx as i64);
-    let res = call_helper(b, g.cc, get_symbol, &[g.exec_ctx, obj, sym]);
+    call_helper_void(b, g.cc, get_symbol, &[g.exec_ctx, obj_tag, obj_payload, sym]);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        g.exec_ctx,
+        g.jit_native_result_offset as i32,
+    );
     def_boxed(b, g, dest, res);
 }
 
-/// `dest, a, b` generic comparison via `helper(ctx, a, b) -> boxed bool`;
-/// the result is unboxed to 0/1 (`K::Bool`).
+/// `dest, a, b` generic comparison via `helper(ctx, a, b) -> bool (0/1)`;
+/// the result is 0/1 (`K::Bool`).
 pub(super) fn emit_compare(
     b: &mut FunctionBuilder,
     g: &GenCtx,
@@ -273,9 +320,13 @@ pub(super) fn emit_compare(
     let dest = (code[ip] >> 8) as usize;
     let a_r = (code[ip + 1] >> 8) as usize;
     let b_r = (code[ip + 1] & 0xFF) as usize;
-    let a = box_or_pass(b, g.vars, state, a_r);
-    let bb = box_or_pass(b, g.vars, state, b_r);
-    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, a, bb]);
-    let cond = unbox_bool(b, res);
-    b.def_var(g.vars[dest], cond);
+    let (a_tag, a_payload) = box_operand(b, g, state, a_r);
+    let (b_tag, b_payload) = box_operand(b, g, state, b_r);
+    let cond = call_helper(b, g.cc, helper, &[g.exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    if let Some(actx) = g.actx {
+        let boxed = super::emit::box_bool(b, cond);
+        super::alloc::def_result(b, actx, dest, boxed);
+    } else {
+        b.def_var(g.vars[dest], cond);
+    }
 }

@@ -19,11 +19,10 @@ mod match_expr;
 impl<'a> Lowerer<'a> {
     fn lower_assign_target(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirAssignTarget> {
         match &expr.kind {
-            ExprKind::Identifier { name } => Ok(HirAssignTarget::Var(self.resolve(
-                name,
-                scope,
-                HirType::Dynamic,
-            ))),
+            ExprKind::Identifier { name } => {
+                let ty = self.value_ty(AnnKey::expr(expr.id));
+                Ok(HirAssignTarget::Var(self.resolve(name, scope, ty)))
+            }
             ExprKind::Member {
                 object,
                 property,
@@ -159,10 +158,12 @@ impl<'a> Lowerer<'a> {
             ExprKind::Logical { op, left, right } => {
                 let lhs = Box::new(self.lower_expr(left, scope)?);
                 let rhs = Box::new(self.lower_expr(right, scope)?);
+                let ty = self.value_ty(key);
                 Ok(HirExpr::Logical {
                     op: logical_op(*op),
                     lhs,
                     rhs,
+                    ty,
                 })
             }
             ExprKind::Conditional {
@@ -173,7 +174,8 @@ impl<'a> Lowerer<'a> {
                 let test = Box::new(self.lower_expr(test, scope)?);
                 let cons = Box::new(self.lower_expr(consequent, scope)?);
                 let alt = Box::new(self.lower_expr(alternate, scope)?);
-                Ok(HirExpr::Conditional { test, cons, alt })
+                let ty = self.value_ty(key);
+                Ok(HirExpr::Conditional { test, cons, alt, ty })
             }
             ExprKind::Match { subject, cases } => self.lower_match(subject, cases, scope),
             ExprKind::CharLiteral { value } => Ok(HirExpr::Char(*value)),
@@ -232,16 +234,23 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
+                if target_ty != HirType::Dynamic {
+                    return Ok(HirExpr::Cast {
+                        expr: Box::new(inner),
+                        ty: target_ty,
+                    });
+                }
                 Ok(inner)
             }
             ExprKind::Satisfies { expression, .. } => self.lower_expr(expression, scope),
             ExprKind::MetaAccess { target, property } => {
                 let inner = self.lower_expr(target, scope)?;
                 let prop_mangled = format!("::{}", property);
+                let ty = self.value_ty(key);
                 Ok(HirExpr::Member {
                     object: Box::new(inner),
                     name: std::rc::Rc::from(prop_mangled.as_str()),
-                    ty: HirType::Dynamic,
+                    ty,
                 })
             }
             ExprKind::NonNull { expression } => Ok(HirExpr::NonNull(Box::new(
@@ -365,7 +374,7 @@ impl<'a> Lowerer<'a> {
     /// resolved NAME (an assignment target, an `instanceof` test) pass
     /// `HirType::Dynamic`; nothing downstream reads the type on those paths.
     pub(super) fn resolve(&self, name: &Rc<str>, scope: &mut Scope, ty: HirType) -> HirBinding {
-        if let Some(b) = scope.resolve(name) {
+        if let Some(b) = scope.resolve(name, ty) {
             b
         } else {
             self.global_binding(name.clone(), ty)

@@ -5,38 +5,56 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_object_keys_stub(
+    ctx: *mut ExecCtx,
+    val_tag: u64,
+    val_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
         match crate::exec::collections::object_keys(val, &mut ctx_ref.heap) {
-            Ok(keys_val) => keys_val,
+            Ok(keys_val) => ctx_ref.jit_native_result = keys_val,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
 
-pub(crate) extern "C" fn jit_op_in_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_op_in_stub(
+    ctx: *mut ExecCtx,
+    a_tag: u64,
+    a_payload: u64,
+    b_tag: u64,
+    b_payload: u64,
+) {
     unsafe {
-        let ctx_ref = &*ctx;
-        VmValue::from_bool(crate::exec::advanced::op_in(a, b, &ctx_ref.heap))
+        let ctx_ref = &mut *ctx;
+        let a = VmValue::from_raw_parts(a_tag, a_payload);
+        let b = VmValue::from_raw_parts(b_tag, b_payload);
+        ctx_ref.jit_native_result =
+            VmValue::from_bool(crate::exec::advanced::op_in(a, b, &ctx_ref.heap));
     }
 }
 
 pub(crate) extern "C" fn jit_object_merge_stub(
     ctx: *mut ExecCtx,
-    a: VmValue,
-    b: VmValue,
-) -> VmValue {
+    a_tag: u64,
+    a_payload: u64,
+    b_tag: u64,
+    b_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let a = VmValue::from_raw_parts(a_tag, a_payload);
+        let b = VmValue::from_raw_parts(b_tag, b_payload);
         match crate::exec::collections::object_merge(a, b, &mut ctx_ref.heap) {
-            Ok(res) => res,
+            Ok(res) => ctx_ref.jit_native_result = res,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
 
-pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -65,7 +83,7 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) ->
         }
         let obj = ctx_ref.stack[base + src];
         match ctx_ref.exec_object_rest(obj, &skip_keys) {
-            Ok(v) => v,
+            Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }

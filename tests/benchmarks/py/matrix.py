@@ -17,7 +17,9 @@ def compute():
             for k in range(n):
                 s = s + a[row * n + k] * b[k * n + col]
             c[row * n + col] = s
-    return c[0] + c[size - 1]
+    print(f"c[0] = {c[0]}")
+    print(f"c[last] = {c[size - 1]}")
+    return 0
 
 
 run(compute)

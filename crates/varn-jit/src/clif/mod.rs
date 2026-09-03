@@ -80,7 +80,7 @@ pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     flags
         .set("preserve_frame_pointers", "true")
         .map_err(|e| e.to_string())?;
-    let isa_builder = cranelift_native::builder().map_err(|e| e.to_string())?;
+    let isa_builder = cranelift_native::builder_with_options(true).map_err(|e| e.to_string())?;
     isa_builder
         .finish(settings::Flags::new(flags))
         .map_err(|e| e.to_string())
@@ -134,10 +134,26 @@ fn compile_in<R>(
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
+    if std::env::var("VARN_CLIF_PRINT_IR").is_ok() {
+        eprintln!("=== CLIF IR ===\n{}", ctx.func.display());
+    }
     let start = std::time::Instant::now();
-    let res = ctx.compile(isa, &mut ControlPlane::default());
+    let mut take_opt = Some(take);
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let compiled = ctx.compile(isa, &mut ControlPlane::default());
+        match compiled {
+            Ok(c) => {
+                let take_fn = take_opt.take().unwrap();
+                take_fn(c)
+            }
+            Err(e) => Err(format!("clif compile: {e:?}")),
+        }
+    }));
     crate::stats::JIT_STATS
         .backend_time_ns
         .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-    take(res.map_err(|e| format!("clif compile: {e:?}"))?)
+    match res {
+        Ok(r) => r,
+        Err(_) => Err("clif backend compile panicked".to_string()),
+    }
 }

@@ -243,13 +243,8 @@ impl Builder {
             HirBinding::Global(name, ty) => {
                 return Ok(self.emit(InstKind::LoadGlobal(name.clone()), *ty));
             }
-            // An upvalue's type is not carried yet: the binding is a capture
-            // INDEX, and reconstructing the captured variable's type means
-            // walking `HirUpvalueSrc` back to the enclosing function's locals.
-            // Worth doing — it is the same class of loss as globals were — but
-            // it is a separate change, and it is only 0.5 % of the corpus.
-            HirBinding::Upvalue(uv) => {
-                return Ok(self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic));
+            HirBinding::Upvalue(uv, ty) => {
+                return Ok(self.emit(InstKind::LoadUpvalue(*uv), *ty));
             }
         };
         if self.pinned_vars.contains(&var) {
@@ -271,7 +266,7 @@ impl Builder {
                 });
                 return;
             }
-            HirBinding::Upvalue(uv) => {
+            HirBinding::Upvalue(uv, _) => {
                 self.emit_effect(InstKind::StoreUpvalue { index: *uv, value });
                 return;
             }

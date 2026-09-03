@@ -24,9 +24,10 @@ pub(crate) extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
     }
 }
 
-pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
+pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, err_tag: u64, err_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let error = VmValue::from_raw_parts(err_tag, err_payload);
         let err =
             crate::exec::exceptions::build_thrown_error(error, &ctx_ref.heap, &ctx_ref.frames);
         let handler = ctx_ref.try_handlers.pop();

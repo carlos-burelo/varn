@@ -1,22 +1,29 @@
-use cranelift_codegen::ir::{types, InstBuilder};
+use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
-use varn_types::register_meta::{RegisterMeta, SlotKind};
+use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{box_or_pass, call_helper, call_helper_void};
+use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home,
+    AllocCtx,
 };
 
 pub(crate) fn emit_load_upvalue(b: &mut FunctionBuilder, actx: &AllocCtx, code: &[u16], ip: usize) {
     let dest = (code[ip + 1] >> 8) as usize;
     let uv_idx = (code[ip + 1] & 0xFF) as usize;
     let uv_v = b.ins().iconst(types::I64, uv_idx as i64);
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.load_upvalue,
         &[actx.exec_ctx, actx.closure, uv_v],
+    );
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
     );
     def_result(b, actx, dest, res);
 }
@@ -31,12 +38,13 @@ pub(crate) fn emit_store_upvalue(
     let uv_idx = (code[ip + 1] >> 8) as usize;
     let src_r = (code[ip + 1] & 0xFF) as usize;
     let uv_v = b.ins().iconst(types::I64, uv_idx as i64);
-    let val = box_or_pass(b, actx.vars, state, src_r);
+    let val = box_or_load_home(b, actx, state, src_r);
+    let (val_tag, val_payload) = b.ins().isplit(val);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.store_upvalue,
-        &[actx.exec_ctx, actx.closure, uv_v, val],
+        &[actx.exec_ctx, actx.closure, uv_v, val_tag, val_payload],
     );
 }
 
@@ -80,13 +88,19 @@ pub(crate) fn emit_make_closure(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let ip_v = b.ins().iconst(types::I64, ip as i64);
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.make_closure,
         &[actx.exec_ctx, actx.closure, ip_v, actx.base],
     );
     reload_boxed(b, actx, state, &regs);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
     def_result(b, actx, dest, res);
 }
 
@@ -102,13 +116,19 @@ pub(crate) fn emit_load_static_fn(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let idx_v = b.ins().iconst(types::I64, proto_idx as i64);
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.load_static_fn,
         &[actx.exec_ctx, actx.closure, idx_v],
     );
     reload_boxed(b, actx, state, &regs);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
     def_result(b, actx, dest, res);
 }
 
@@ -116,7 +136,7 @@ pub(crate) fn emit_call_spread(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    meta: &[RegisterMeta],
+    _meta: &[RegisterMeta],
     code: &[u16],
     ip: usize,
 ) {
@@ -127,11 +147,12 @@ pub(crate) fn emit_call_spread(
     let argc = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
 
-    let callee = box_or_pass(b, actx.vars, state, callee_reg);
+    let callee = box_or_load_home(b, actx, state, callee_reg);
+    let (callee_tag, callee_payload) = b.ins().isplit(callee);
     let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
         cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        40,
-        0,
+        48,
+        3,
     ));
 
     let arg_start_v = b.ins().iconst(types::I64, arg_start as i64);
@@ -139,11 +160,12 @@ pub(crate) fn emit_call_spread(
     let dest_v = b.ins().iconst(types::I64, dest as i64);
     let next_ip_v = b.ins().iconst(types::I64, (ip + 3) as i64);
 
-    b.ins().stack_store(callee, slot, 0);
-    b.ins().stack_store(arg_start_v, slot, 8);
-    b.ins().stack_store(argc_v, slot, 16);
-    b.ins().stack_store(dest_v, slot, 24);
-    b.ins().stack_store(next_ip_v, slot, 32);
+    b.ins().stack_store(callee_tag, slot, 0);
+    b.ins().stack_store(callee_payload, slot, 8);
+    b.ins().stack_store(arg_start_v, slot, 16);
+    b.ins().stack_store(argc_v, slot, 24);
+    b.ins().stack_store(dest_v, slot, 32);
+    b.ins().stack_store(next_ip_v, slot, 40);
 
     let slot_addr = b.ins().stack_addr(types::I64, slot, 0);
 
@@ -154,7 +176,7 @@ pub(crate) fn emit_call_spread(
         store_home(b, actx, state, fb, r);
     }
 
-    let res = call_helper(
+    call_helper_void(
         b,
         actx.cc,
         actx.helpers.call_spread,
@@ -163,11 +185,11 @@ pub(crate) fn emit_call_spread(
 
     reload_boxed(b, actx, state, &regs);
 
-    if meta.get(dest).is_some_and(|m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
-    } else {
-        b.def_var(actx.vars[dest], res);
-    }
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
+    def_result(b, actx, dest, res);
 }

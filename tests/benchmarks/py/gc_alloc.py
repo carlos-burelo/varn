@@ -26,7 +26,7 @@ def compute():
         aa += a.x
         b = GcVtB(i)
         bb += b.y
-    return aa + bb + len(junk)
+    return f"check={aa}/{bb}/{len(junk)}"
 
 
 run(compute)

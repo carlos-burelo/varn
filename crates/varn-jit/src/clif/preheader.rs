@@ -201,8 +201,9 @@ fn emit_str_caches(
         if state[r] != K::Boxed {
             continue;
         }
-        let recv = b.use_var(vars[r]);
-        let bytes = call_helper(b, cc, helpers.str_ascii_bytes, &[exec_ctx, recv]);
+        let recv = emit::box_or_pass(b, vars, state, r);
+        let (recv_tag, recv_payload) = b.ins().isplit(recv);
+        let bytes = call_helper(b, cc, helpers.str_ascii_bytes, &[exec_ctx, recv_tag, recv_payload]);
 
         let resolved = b.create_block();
         let rejected = b.create_block();
@@ -211,7 +212,7 @@ fn emit_str_caches(
         b.ins().brif(bytes, resolved, &[], rejected, &[]);
 
         b.switch_to_block(resolved);
-        let len = call_helper(b, cc, helpers.str_ascii_len, &[exec_ctx, recv]);
+        let len = call_helper(b, cc, helpers.str_ascii_len, &[exec_ctx, recv_tag, recv_payload]);
         b.ins().jump(done, &[len.into()]);
 
         b.switch_to_block(rejected);

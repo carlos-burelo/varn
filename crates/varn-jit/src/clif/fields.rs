@@ -13,9 +13,10 @@ use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
+use super::alloc::AllocCtx;
 use super::emit::{
-    self, box_or_pass, call_helper, call_helper_void, meta_is_float, state_meta_int,
-    unbox_f64_coerce, use_boxed, wrap_i48, HEAP_KIND, KIND_MASK,
+    self, box_or_pass, call_helper_void, meta_is_float, state_meta_int,
+    unbox_f64_coerce, use_boxed, wrap_i48, HEAP_KIND,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -52,14 +53,21 @@ fn emit_object_field_addr(
     let m = MemFlags::trusted();
 
     // 1. Heap-pointer tag check.
-    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let (tag, raw_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (
+            b.ins().iconst(types::I64, HEAP_KIND),
+            obj,
+        )
+    };
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
     // 2. Heap index + generation select → the slot's machine address.
-    let raw = b.ins().band_imm(obj, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm(raw_payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, c.exec_ctx, heap_off as i32);
     let old_bit = b.ins().band_imm(raw, 0x8000_0000);
     let (base, idx) = if nursery_only {
@@ -116,9 +124,9 @@ fn emit_object_field_addr(
     b.ins().brif(in_bounds, ok2, &[], slow, &[]);
     b.switch_to_block(ok2);
 
-    // 6. The field is inline in the same allocation: one constant displacement.
+    // 6. The field is inline in the same allocation: one constant displacement (16 bytes per field).
     b.ins()
-        .iadd_imm(objdata, (olay.values_off + slot * 8) as i64)
+        .iadd_imm(objdata, (olay.values_off + slot * 16) as i64)
 }
 
 /// `GetFixedField first_reg, obj, slot` — inline slot read, helper fallback;
@@ -126,6 +134,7 @@ fn emit_object_field_addr(
 pub(super) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
     c: &FldCtx,
+    actx: Option<&AllocCtx>,
     state: &[K],
     code: &[u16],
     ip: usize,
@@ -137,9 +146,9 @@ pub(super) fn emit_get_fixed_field(
 
     let slow = b.create_block();
     let cont = b.create_block();
-    b.append_block_param(cont, types::I64);
+    b.append_block_param(cont, types::I128);
 
-    let slot_off = (slot * 8) as i32;
+    let slot_off = (slot * 16) as i32;
     if let Some(cache) = c.loop_caches.object(ip, obj_r) {
         let base = b.use_var(cache.data_base);
         let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
@@ -150,36 +159,50 @@ pub(super) fn emit_get_fixed_field(
         b.switch_to_block(fast_blk);
         let val = b
             .ins()
-            .load(types::I64, MemFlags::trusted(), base, slot_off);
+            .load(types::I128, MemFlags::trusted(), base, slot_off);
         b.ins().jump(cont, &[val.into()]);
 
         b.switch_to_block(unhoisted_blk);
     }
 
     let field = emit_object_field_addr(b, c, obj, slot, slow, false);
-    let val = b.ins().load(types::I64, MemFlags::trusted(), field, 0);
+    let val = b.ins().load(types::I128, MemFlags::trusted(), field, 0);
     b.ins().jump(cont, &[val.into()]);
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    let res = call_helper(
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
+    call_helper_void(
         b,
         c.cc,
         c.helpers.get_fixed_field,
-        &[c.exec_ctx, obj, slot_v],
+        &[c.exec_ctx, obj_tag, obj_payload, slot_v],
+    );
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        c.exec_ctx,
+        c.helpers.jit_native_result_offset as i32,
     );
     b.ins().jump(cont, &[res.into()]);
 
     b.switch_to_block(cont);
     let v = b.block_params(cont)[0];
-    if meta_is_float(c.register_meta, first_reg) {
+    if let Some(actx) = actx {
+        super::alloc::def_result(b, actx, first_reg, v);
+    } else if meta_is_float(c.register_meta, first_reg) {
         let f = unbox_f64_coerce(b, v);
         b.def_var(c.vars[first_reg], f);
     } else if state_meta_int(c.register_meta, first_reg) {
         let i = wrap_i48(b, v);
         b.def_var(c.vars[first_reg], i);
     } else {
-        b.def_var(c.vars[first_reg], v);
+        let (_tag, payload) = b.ins().isplit(v);
+        b.def_var(c.vars[first_reg], payload);
     }
     Ok(())
 }
@@ -190,6 +213,7 @@ pub(super) fn emit_get_fixed_field(
 pub(super) fn emit_set_fixed_field(
     b: &mut FunctionBuilder,
     c: &FldCtx,
+    actx: Option<&AllocCtx>,
     state: &[K],
     code: &[u16],
     ip: usize,
@@ -198,37 +222,38 @@ pub(super) fn emit_set_fixed_field(
     let val_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
     let obj = use_boxed(b, c.vars, state, first_reg)?;
-    let val = box_or_pass(b, c.vars, state, val_r);
+    let val = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, val_r)
+    } else {
+        box_or_pass(b, c.vars, state, val_r)
+    };
+    let val128 = if b.func.dfg.value_type(val) == types::I128 {
+        val
+    } else {
+        let tag_v = b.ins().iconst(types::I64, HEAP_KIND);
+        b.ins().iconcat(tag_v, val)
+    };
 
     let slow = b.create_block();
     let cont = b.create_block();
 
-    let slot_off = (slot * 8) as i32;
-    if let Some(cache) = c.loop_caches.object(ip, first_reg) {
-        let base = b.use_var(cache.data_base);
-        let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
-        let fast_blk = b.create_block();
-        let unhoisted_blk = b.create_block();
-        b.ins().brif(ok_cache, fast_blk, &[], unhoisted_blk, &[]);
-
-        b.switch_to_block(fast_blk);
-        b.ins().store(MemFlags::trusted(), val, base, slot_off);
-        b.ins().jump(cont, &[]);
-
-        b.switch_to_block(unhoisted_blk);
-    }
-
     let field = emit_object_field_addr(b, c, obj, slot, slow, true);
-    b.ins().store(MemFlags::trusted(), val, field, 0);
+    b.ins().store(MemFlags::trusted(), val128, field, 0);
     b.ins().jump(cont, &[]);
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
+    let (val_tag, val_payload) = b.ins().isplit(val128);
     call_helper_void(
         b,
         c.cc,
         c.helpers.set_fixed_field,
-        &[c.exec_ctx, obj, slot_v, val],
+        &[c.exec_ctx, obj_tag, obj_payload, slot_v, val_tag, val_payload],
     );
     b.ins().jump(cont, &[]);
 

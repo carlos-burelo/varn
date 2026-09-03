@@ -6,7 +6,6 @@
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 use varn_types::chunk::ICKind;
 
@@ -25,57 +24,19 @@ pub(crate) extern "C" fn jit_invoke_virtual(
 
         ctx_ref.frames[frame_idx].ip = args.ip;
 
-        let method_name_nv = closure_ref.constants[args.name_idx];
-        let method_name = ctx_ref
-            .heap
-            .str_val(method_name_nv)
-            .expect("InvokeVirtual: not a string const");
-
-        let method_nv =
-            crate::exec::props::get_property(args.this_val, &method_name, &mut ctx_ref.heap)
-                .unwrap();
-
-        if method_nv.is_heap() {
-            let heap_obj = ctx_ref.heap.get(method_nv.as_heap_idx());
-            if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
-                let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
-                if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
-                    let callee_base = base + args.arg_start;
-                    let required = callee_base + closure.proto.register_count as usize + 32;
-                    if ctx_ref.stack.len() < required {
-                        ctx_ref.stack.resize(required, VmValue::null());
-                    }
-                    ctx_ref
-                        .frames
-                        .push(crate::frame::CallFrame::new(closure, callee_base));
-                    ctx_ref.jit_frame_prepushed = 1;
-                    let res = (jit_fn)(
-                        ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        &**closure as *const crate::closure::VmClosure as *const std::ffi::c_void,
-                        callee_base,
-                        ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-                    );
-                    let returning_frame_idx = ctx_ref.frames.len() - 1;
-                    ctx_ref.frames.pop();
-                    ctx_ref.close_upvalues_above(callee_base);
-                    let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res);
-                    ctx_ref.stack[base + args.dest] = final_val;
-                    ctx_ref.record_call_vm_fast();
-                    return final_val;
-                }
-            }
-        }
-
-        let jumped = ctx_ref.exec_call_reg(
-            method_nv,
+        let res = ctx_ref.exec_call_method_reg(
+            args.this_val,
             base,
+            args.name_idx,
+            usize::MAX,
             args.arg_start,
             args.arg_count,
             args.dest,
             frame_idx,
+            closure_ref,
         );
 
-        match jumped {
+        match res {
             Ok(true) => {
                 if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
                     jit_propagate_error(ctx_ref, e);
@@ -94,13 +55,15 @@ pub(crate) extern "C" fn jit_invoke_virtual(
 pub(crate) extern "C" fn jit_invoke_virtual_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    this_val: VmValue,
+    this_tag: u64,
+    this_payload: u64,
     name_idx: usize,
     arg_start: usize,
     arg_count: usize,
     dest: usize,
     ip: usize,
-) -> VmValue {
+) {
+    let this_val = VmValue::from_raw_parts(this_tag, this_payload);
     let args = varn_jit::JitInvokeVirtualArgs {
         this_val,
         name_idx,
@@ -109,7 +72,10 @@ pub(crate) extern "C" fn jit_invoke_virtual_flat(
         dest,
         ip,
     };
-    jit_invoke_virtual(ctx, closure, &args)
+    let val = jit_invoke_virtual(ctx, closure, &args);
+    unsafe {
+        (*ctx).jit_native_result = val;
+    }
 }
 
 pub(crate) extern "C" fn jit_get_property_ic_fast(

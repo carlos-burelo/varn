@@ -40,7 +40,7 @@ impl<'a> Lowerer<'a> {
                                 let current_val = HirExpr::Index {
                                     object: Box::new(HirExpr::Super),
                                     index: Box::new(index.clone()),
-                                    ty: HirType::Dynamic,
+                                    ty,
                                     is_array: false,
                                 };
                                 let new_val = HirExpr::Binary {
@@ -120,10 +120,34 @@ impl<'a> Lowerer<'a> {
                                 target: Box::new(tgt),
                                 value: Box::new(value),
                             };
+                            let ty = self.value_ty(AnnKey::expr(target.id));
                             return Ok(HirExpr::Logical {
                                 op: lop,
                                 lhs: Box::new(current_val),
                                 rhs: Box::new(assign),
+                                ty,
+                            });
+                        } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::GetFixedField {
+                                object: Box::new(object_hir.clone()),
+                                slot,
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::SetFixedField {
+                                object: object_hir,
+                                slot,
+                            };
+                            let assign = HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(value),
+                            };
+                            let ty = self.value_ty(AnnKey::expr(target.id));
+                            return Ok(HirExpr::Logical {
+                                op: lop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(assign),
+                                ty,
                             });
                         } else {
                             let name = match &property.kind {
@@ -148,10 +172,12 @@ impl<'a> Lowerer<'a> {
                                 target: Box::new(tgt),
                                 value: Box::new(value),
                             };
+                            let ty = self.value_ty(AnnKey::expr(target.id));
                             return Ok(HirExpr::Logical {
                                 op: lop,
                                 lhs: Box::new(current_val),
                                 rhs: Box::new(assign),
+                                ty,
                             });
                         }
                     }
@@ -179,6 +205,27 @@ impl<'a> Lowerer<'a> {
                                 object: object_hir,
                                 index,
                                 is_array: is_arr,
+                            };
+                            return Ok(HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(new_val),
+                            });
+                        } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::GetFixedField {
+                                object: Box::new(object_hir.clone()),
+                                slot,
+                                ty,
+                            };
+                            let new_val = HirExpr::Binary {
+                                op: bop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(value),
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::SetFixedField {
+                                object: object_hir,
+                                slot,
                             };
                             return Ok(HirExpr::Assign {
                                 target: Box::new(tgt),
@@ -224,6 +271,11 @@ impl<'a> Lowerer<'a> {
                             index,
                             is_array,
                         }
+                    } else if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                        HirAssignTarget::SetFixedField {
+                            object: object_hir,
+                            slot,
+                        }
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
@@ -245,7 +297,10 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 let binding = match &target.kind {
-                    ExprKind::Identifier { name } => self.resolve(name, scope, HirType::Dynamic),
+                    ExprKind::Identifier { name } => {
+                        let id_ty = self.value_ty(AnnKey::expr(target.id));
+                        self.resolve(name, scope, id_ty)
+                    }
                     _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
                 };
                 let val_expr = self.lower_expr(value, scope)?;
@@ -259,6 +314,7 @@ impl<'a> Lowerer<'a> {
                         AssignOp::NullishAssign => HirLogicalOp::Nullish,
                         _ => unreachable!(),
                     };
+                    let ty = self.value_ty(AnnKey::expr(target.id));
                     let lhs = HirExpr::Var(binding.clone());
                     let assign = HirExpr::Assign {
                         target: Box::new(HirAssignTarget::Var(binding)),
@@ -268,6 +324,7 @@ impl<'a> Lowerer<'a> {
                         op: lop,
                         lhs: Box::new(lhs),
                         rhs: Box::new(assign),
+                        ty,
                     });
                 }
                 let value = match op {
@@ -294,10 +351,12 @@ impl<'a> Lowerer<'a> {
                 operand,
             } => {
                 let target = self.lower_assign_target(operand, scope)?;
+                let ty = numeric_ty(self.ann, AnnKey::expr(expr.id));
                 Ok(HirExpr::Update {
                     target: Box::new(target),
                     op: update_op(*op),
                     prefix: *prefix,
+                    ty,
                 })
             }
             other => unreachable!("lower_assign_expr: {other:?} is not handled here"),

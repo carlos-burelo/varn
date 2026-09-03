@@ -94,6 +94,7 @@ impl HeapInner {
 
     pub(crate) fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
         self.alloc_count += 1;
+        self.gc_alloc_since_collect += 1;
         let track = Self::needs_minor_scan(&obj);
         let identity = Self::identity_key(&obj);
         let idx = if let Some(idx) = self.free.pop() {

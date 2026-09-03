@@ -262,7 +262,7 @@ impl Builder {
                 op: HirBinOp::Lt,
                 lhs: idx,
                 rhs: len,
-                ty: HirType::Bool,
+                ty: HirType::Int,
             },
             HirType::Bool,
         );

@@ -444,6 +444,7 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         BuildArraySpread { .. } => "build_array_spread [...]".to_string(),
         BuildObjectSpread { .. } => "build_object_spread {...}".to_string(),
         ObjectRest { .. } => "object_rest".to_string(),
+        Cast { operand, ty } => format!("cast v{} as {:?}", operand.0, ty),
     }
 }
 

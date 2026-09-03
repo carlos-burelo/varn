@@ -137,11 +137,12 @@ pub(crate) fn construct_staged_fast(
         )
     };
 
+    let final_instance = ctx_ref.stack[callee_base];
     ctx_ref.frames.pop();
     ctx_ref.close_upvalues_above(callee_base);
     if on {
         prof::record(prof::Seg::CtorFrame, t_frame, prof::read());
     }
 
-    Some(if res.is_null() { instance_nv } else { res })
+    Some(if res.is_null() { final_instance } else { res })
 }

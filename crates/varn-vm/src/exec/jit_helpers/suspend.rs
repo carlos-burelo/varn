@@ -27,21 +27,24 @@ pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_
     crate::exec::ctx::my_longjmp(buf, 2)
 }
 
-pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_tag: u64, task_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        ctx_ref.exec_spawn(task_val).unwrap()
+        let task_val = VmValue::from_raw_parts(task_tag, task_payload);
+        ctx_ref.jit_native_result = ctx_ref.exec_spawn(task_val).unwrap();
     }
 }
 
 pub(crate) extern "C" fn jit_await(
     ctx: *mut ExecCtx,
-    fut: VmValue,
+    fut_tag: u64,
+    fut_payload: u64,
     dest_reg: u32,
     resume_ip: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let fut = VmValue::from_raw_parts(fut_tag, fut_payload);
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
         ctx_ref.frames[frame_idx].ip = resume_ip;
@@ -63,12 +66,14 @@ pub(crate) extern "C" fn jit_await(
 
 pub(crate) extern "C" fn jit_yield(
     ctx: *mut ExecCtx,
-    val: VmValue,
+    val_tag: u64,
+    val_payload: u64,
     dest_reg: u32,
     resume_ip: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
         ctx_ref.frames[frame_idx].ip = resume_ip;

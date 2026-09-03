@@ -14,4 +14,4 @@ let jsonStr = JSON.stringify(items);
 let parsed = JSON.parse(jsonStr) as dynamic[];
 
 print(parsed.length);
-print(jsonStr.length);
+print("bytes: " + jsonStr.length.toString());

@@ -38,18 +38,19 @@ impl HeapInner {
 
     #[inline(always)]
     pub(crate) fn needs_gc(&self) -> bool {
-        let live_count = (self.objects.len() - self.free.len()) as u64;
-        self.gc_alloc_since_collect >= 16384.max(live_count)
+        self.gc_alloc_since_collect >= self.gc_threshold
     }
 
     pub(crate) fn compact_interners(&mut self) {
-        self.string_interner.retain(|_, &mut packed| {
-            let raw = old_idx_raw(packed);
-            self.objects
-                .get(raw as usize)
-                .map(|o| o.is_some())
-                .unwrap_or(false)
-        });
+        if !self.string_interner.is_empty() {
+            self.string_interner.retain(|_, &mut packed| {
+                let raw = old_idx_raw(packed);
+                self.objects
+                    .get(raw as usize)
+                    .map(|o| o.is_some())
+                    .unwrap_or(false)
+            });
+        }
 
         let check = |packed: u32, objects: &Vec<Option<HeapObj>>| -> bool {
             let raw = old_idx_raw(packed);
@@ -59,27 +60,48 @@ impl HeapInner {
                 .unwrap_or(false)
         };
 
-        self.symbol_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.char_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.bigint_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.decimal_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.array_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.object_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.map_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.set_interner
-            .retain(|_, &mut packed| check(packed, &self.objects));
-        self.identity_index
-            .retain(|_, &mut packed| check(packed, &self.objects));
+        if !self.symbol_interner.is_empty() {
+            self.symbol_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.char_interner.is_empty() {
+            self.char_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.bigint_interner.is_empty() {
+            self.bigint_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.decimal_interner.is_empty() {
+            self.decimal_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.array_interner.is_empty() {
+            self.array_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.object_interner.is_empty() {
+            self.object_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.map_interner.is_empty() {
+            self.map_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.set_interner.is_empty() {
+            self.set_interner
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
+        if !self.identity_index.is_empty() {
+            self.identity_index
+                .retain(|_, &mut packed| check(packed, &self.objects));
+        }
     }
 
     pub(crate) fn update_interners_after_minor_gc(&mut self, fwd: &[Option<u32>]) {
+        if fwd.is_empty() {
+            return;
+        }
         let update_interner = |packed: &mut u32| -> bool {
             if crate::nursery::is_nursery_idx(*packed) {
                 if let Some(Some(new_packed)) = fwd.get(*packed as usize) {
@@ -93,13 +115,27 @@ impl HeapInner {
             }
         };
 
-        self.object_interner.retain(|_, p| update_interner(p));
-        self.map_interner.retain(|_, p| update_interner(p));
-        self.set_interner.retain(|_, p| update_interner(p));
-        self.array_interner.retain(|_, p| update_interner(p));
-        self.string_interner.retain(|_, p| update_interner(p));
-        self.symbol_interner.retain(|_, p| update_interner(p));
-        self.identity_index.retain(|_, p| update_interner(p));
+        if self.object_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.object_interner.retain(|_, p| update_interner(p));
+        }
+        if self.map_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.map_interner.retain(|_, p| update_interner(p));
+        }
+        if self.set_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.set_interner.retain(|_, p| update_interner(p));
+        }
+        if self.array_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.array_interner.retain(|_, p| update_interner(p));
+        }
+        if self.string_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.string_interner.retain(|_, p| update_interner(p));
+        }
+        if self.symbol_interner.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.symbol_interner.retain(|_, p| update_interner(p));
+        }
+        if self.identity_index.values().any(|&p| crate::nursery::is_nursery_idx(p)) {
+            self.identity_index.retain(|_, p| update_interner(p));
+        }
     }
 
     /// Run a full collection, returning how many slots were freed.
@@ -121,6 +157,8 @@ impl HeapInner {
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
         self.gc_alloc_since_collect = 0;
+        let live = self.live_count() as u64;
+        self.gc_threshold = (live * 2).max(65536);
         freed
     }
 

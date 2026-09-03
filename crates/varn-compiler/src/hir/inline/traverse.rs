@@ -25,6 +25,7 @@ pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
         | Super
         | SuperMember { .. } => {}
         NonNull(x)
+        | Cast { expr: x, .. }
         | TryOp(x)
         | Spread(x)
         | Await(x, _)
@@ -84,7 +85,9 @@ pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
                 walk_exprs(x, f);
             }
         }
-        Conditional { test, cons, alt } => {
+        Conditional {
+            test, cons, alt, ..
+        } => {
             walk_exprs(test, f);
             walk_exprs(cons, f);
             walk_exprs(alt, f);
@@ -149,6 +152,7 @@ pub(crate) fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut H
         | Super
         | SuperMember { .. } => {}
         NonNull(x)
+        | Cast { expr: x, .. }
         | TryOp(x)
         | Spread(x)
         | Await(x, _)
@@ -211,7 +215,9 @@ pub(crate) fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut H
                 f(x);
             }
         }
-        Conditional { test, cons, alt } => {
+        Conditional {
+            test, cons, alt, ..
+        } => {
             f(test);
             f(cons);
             f(alt);

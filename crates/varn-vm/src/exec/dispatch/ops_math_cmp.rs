@@ -146,9 +146,9 @@ impl ExecCtx {
             // Integer-specialized arithmetic
             OpCode::AddInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     match varn_core::add_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("+", a_val, b_val)),
@@ -159,9 +159,9 @@ impl ExecCtx {
             }
             OpCode::SubInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     match varn_core::sub_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("-", a_val, b_val)),
@@ -172,9 +172,9 @@ impl ExecCtx {
             }
             OpCode::MulInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     match varn_core::mul_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("*", a_val, b_val)),
@@ -185,9 +185,9 @@ impl ExecCtx {
             }
             OpCode::DivInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     if b_val == 0 {
                         return Err(crate::error::RuntimeError::new("division by zero"));
                     }
@@ -198,22 +198,22 @@ impl ExecCtx {
             }
             OpCode::ModInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     if b_val == 0 {
                         return Err(crate::error::RuntimeError::new("modulo by zero"));
                     }
-                    self.heap.make_int(a_val % b_val)
+                    VmValue::from_int(a_val % b_val)
                 } else {
                     arith::modulo(a, b, &mut self.heap)?
                 };
             }
             OpCode::PowInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
-                    let a_val = self.heap.as_int(a);
-                    let b_val = self.heap.as_int(b);
+                self.stack[base + first_reg] = if a.is_int() && b.is_int() {
+                    let a_val = a.as_int();
+                    let b_val = b.as_int();
                     if b_val < 0 {
                         return Err(crate::error::RuntimeError::new(
                             "negative exponent in integer power",
@@ -232,48 +232,48 @@ impl ExecCtx {
             // Integer comparisons
             OpCode::LtInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) < self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() < b.as_int()
                 } else {
                     compare::lt_heap(a, b, &self.heap)
                 });
             }
             OpCode::GtInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) > self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() > b.as_int()
                 } else {
                     compare::gt_heap(a, b, &self.heap)
                 });
             }
             OpCode::LteInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) <= self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() <= b.as_int()
                 } else {
                     compare::lte_heap(a, b, &self.heap)
                 });
             }
             OpCode::GteInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) >= self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() >= b.as_int()
                 } else {
                     compare::gte_heap(a, b, &self.heap)
                 });
             }
             OpCode::EqInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) == self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() == b.as_int()
                 } else {
                     compare::eq(a, b, &self.heap)
                 });
             }
             OpCode::NeqInt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
-                    self.heap.as_int(a) != self.heap.as_int(b)
+                self.stack[base + first_reg] = VmValue::from_bool(if a.is_int() && b.is_int() {
+                    a.as_int() != b.as_int()
                 } else {
                     compare::neq(a, b, &self.heap)
                 });
@@ -282,68 +282,86 @@ impl ExecCtx {
             // Float-specialized arithmetic
             OpCode::AddFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b))
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    VmValue::from_f64(a.as_f64() + b.as_f64())
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    VmValue::from_f64(av + bv)
                 } else {
                     arith::add(a, b, &mut self.heap)?
                 };
             }
             OpCode::SubFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b))
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    VmValue::from_f64(a.as_f64() - b.as_f64())
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    VmValue::from_f64(av - bv)
                 } else {
                     arith::sub(a, b, &mut self.heap)?
                 };
             }
             OpCode::MulFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b))
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    VmValue::from_f64(a.as_f64() * b.as_f64())
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    VmValue::from_f64(av * bv)
                 } else {
                     arith::mul(a, b, &mut self.heap)?
                 };
             }
             OpCode::DivFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    let bv = self.heap.to_f64_val(b);
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    let bv = b.as_f64();
                     if bv == 0.0 {
                         return Err(crate::error::RuntimeError::new("division by zero"));
                     }
-                    VmValue::from_f64(self.heap.to_f64_val(a) / bv)
+                    VmValue::from_f64(a.as_f64() / bv)
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    if bv == 0.0 {
+                        return Err(crate::error::RuntimeError::new("division by zero"));
+                    }
+                    VmValue::from_f64(av / bv)
                 } else {
                     arith::div(a, b, &mut self.heap)?
                 };
             }
             OpCode::ModFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    let bv = self.heap.to_f64_val(b);
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    let bv = b.as_f64();
                     if bv == 0.0 {
                         return Err(crate::error::RuntimeError::new("modulo by zero"));
                     }
-                    VmValue::from_f64(self.heap.to_f64_val(a) % bv)
+                    VmValue::from_f64(a.as_f64() % bv)
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    if bv == 0.0 {
+                        return Err(crate::error::RuntimeError::new("modulo by zero"));
+                    }
+                    VmValue::from_f64(av % bv)
                 } else {
                     arith::modulo(a, b, &mut self.heap)?
                 };
             }
             OpCode::PowFloat => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b)))
+                self.stack[base + first_reg] = if a.is_f64() && b.is_f64() {
+                    VmValue::from_f64(a.as_f64().powf(b.as_f64()))
+                } else if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                    let av = if a.is_f64() { a.as_f64() } else { a.as_int() as f64 };
+                    let bv = if b.is_f64() { b.as_f64() } else { b.as_int() as f64 };
+                    VmValue::from_f64(av.powf(bv))
                 } else {
                     arith::pow(a, b, &mut self.heap)?
                 };

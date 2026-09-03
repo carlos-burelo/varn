@@ -11,7 +11,7 @@ use varn_types::{FunctionProto, VmValue};
 use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
-    box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool, def_const_int,
+    box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool, def_const_int,
     emit_return_value, guard_overflow, i64_const_fits, meta_is_float, state_meta_int, unbox_bool,
     unbox_f64_coerce, use_boxed, use_f64, use_int,
 };
@@ -54,14 +54,14 @@ pub(crate) fn dispatch_opcode(
     nparams: usize,
 ) -> Result<bool, String> {
     match op {
-        OpCode::LoadIntZero => def_const_int(b, &proto.register_meta, vars, first_reg, 0),
-        OpCode::LoadIntOne => def_const_int(b, &proto.register_meta, vars, first_reg, 1),
-        OpCode::LoadIntMinusOne => def_const_int(b, &proto.register_meta, vars, first_reg, -1),
-        OpCode::LoadTrue => def_const_bool(b, vars, first_reg, true),
-        OpCode::LoadFalse => def_const_bool(b, vars, first_reg, false),
+        OpCode::LoadIntZero => def_const_int(b, actx, &proto.register_meta, vars, first_reg, 0),
+        OpCode::LoadIntOne => def_const_int(b, actx, &proto.register_meta, vars, first_reg, 1),
+        OpCode::LoadIntMinusOne => def_const_int(b, actx, &proto.register_meta, vars, first_reg, -1),
+        OpCode::LoadTrue => def_const_bool(b, actx, vars, first_reg, true),
+        OpCode::LoadFalse => def_const_bool(b, actx, vars, first_reg, false),
         OpCode::LoadInt => {
             let v = code[ip + 1] as i16 as i64;
-            def_const_int(b, &proto.register_meta, vars, first_reg, v);
+            def_const_int(b, actx, &proto.register_meta, vars, first_reg, v);
         }
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;
@@ -82,9 +82,21 @@ pub(crate) fn dispatch_opcode(
             } else {
                 def_const(b, vars, first_reg, c.raw_payload() as i64);
             }
+            if let Some(actx) = actx {
+                let fb = alloc::frame_base_addr(b, actx);
+                let tag_v = b.ins().iconst(types::I64, c.raw_tag() as i64);
+                let payload_v = b.ins().iconst(types::I64, c.raw_payload() as i64);
+                let val128 = b.ins().iconcat(tag_v, payload_v);
+                b.ins().store(MemFlags::trusted(), val128, fb, (first_reg * 16) as i32);
+            }
         }
         OpCode::LoadNull => {
-            def_const(b, vars, first_reg, VmValue::null().raw_tag() as i64);
+            def_const(b, vars, first_reg, 0);
+            if let Some(actx) = actx {
+                let fb = alloc::frame_base_addr(b, actx);
+                let null_val = super::super::emit::box_null(b);
+                b.ins().store(MemFlags::trusted(), null_val, fb, (first_reg * 16) as i32);
+            }
         }
         OpCode::Move => {
             let src = (code[ip + 1] >> 8) as usize;
@@ -96,14 +108,19 @@ pub(crate) fn dispatch_opcode(
                 // functions don't emit dead boxing instructions.
                 let preboxed: Option<cranelift_codegen::ir::Value> =
                     if dest_is_float && !src_is_float {
-                        let v = box_or_pass(b, vars, state, src);
+                        let v = if let Some(actx) = actx {
+                            alloc::box_or_load_home(b, actx, state, src)
+                        } else {
+                            box_or_pass(b, vars, state, src)
+                        };
                         let f = unbox_f64_coerce(b, v);
                         b.def_var(vars[first_reg], f);
                         Some(v)
                     } else if !dest_is_float && src_is_float {
                         let f = b.use_var(vars[src]);
                         let boxed = box_f64(b, f);
-                        b.def_var(vars[first_reg], boxed);
+                        let (_tag, payload) = b.ins().isplit(boxed);
+                        b.def_var(vars[first_reg], payload);
                         Some(boxed)
                     } else {
                         let v = b.use_var(vars[src]);
@@ -112,9 +129,9 @@ pub(crate) fn dispatch_opcode(
                     };
                 if let Some(actx) = actx {
                     let fb = alloc::frame_base_addr(b, actx);
-                    let val = preboxed.unwrap_or_else(|| box_or_pass(b, vars, state, src));
+                    let val = preboxed.unwrap_or_else(|| alloc::box_or_load_home(b, actx, state, src));
                     b.ins()
-                        .store(MemFlags::trusted(), val, fb, (first_reg * 8) as i32);
+                        .store(MemFlags::trusted(), val, fb, (first_reg * 16) as i32);
                 }
             }
         }
@@ -169,7 +186,8 @@ pub(crate) fn dispatch_opcode(
                     b.def_var(vars[first_reg], neg);
                 } else {
                     let boxed = box_f64(b, neg);
-                    b.def_var(vars[first_reg], boxed);
+                    let (_tag, payload) = b.ins().isplit(boxed);
+                    b.def_var(vars[first_reg], payload);
                 }
             } else if state[src] == K::Int || state_meta_int(&proto.register_meta, first_reg) {
                 let i = use_int(b, vars, state, src)?;
@@ -180,21 +198,30 @@ pub(crate) fn dispatch_opcode(
                 b.ins().brif(fits, cont, &[], raise, &[]);
                 b.switch_to_block(raise);
                 let boxed = box_int(b, i);
-                let _ = call_helper(b, cc, helpers.negate, &[exec_ctx, boxed]);
+                let (v_tag, v_payload) = b.ins().isplit(boxed);
+                call_helper_void(b, cc, helpers.negate, &[exec_ctx, v_tag, v_payload]);
                 b.ins().jump(cont, &[]);
                 b.switch_to_block(cont);
                 if state_meta_int(&proto.register_meta, first_reg) {
                     b.def_var(vars[first_reg], neg);
                 } else {
                     let boxed = box_int(b, neg);
-                    b.def_var(vars[first_reg], boxed);
+                    let (_tag, payload) = b.ins().isplit(boxed);
+                    b.def_var(vars[first_reg], payload);
                 }
             } else {
                 let actx = actx.ok_or("clif: Negate outside alloc fn")?;
                 let regs = alloc::live_boxed(actx, state);
                 alloc::flush_boxed(b, actx, state, &regs);
                 let v = box_or_pass(b, vars, state, src);
-                let res = call_helper(b, cc, helpers.negate, &[exec_ctx, v]);
+                let (v_tag, v_payload) = b.ins().isplit(v);
+                call_helper_void(b, cc, helpers.negate, &[exec_ctx, v_tag, v_payload]);
+                let res = b.ins().load(
+                    types::I128,
+                    cranelift_codegen::ir::MemFlags::trusted(),
+                    exec_ctx,
+                    actx.helpers.jit_native_result_offset as i32,
+                );
                 alloc::reload_boxed(b, actx, state, &regs);
                 alloc::def_result(b, actx, first_reg, res);
             }
@@ -231,7 +258,8 @@ pub(crate) fn dispatch_opcode(
                 b.def_var(vars[first_reg], r);
             } else {
                 let boxed = box_int(b, r);
-                b.def_var(vars[first_reg], boxed);
+                let (_tag, payload) = b.ins().isplit(boxed);
+                b.def_var(vars[first_reg], payload);
             }
         }
         OpCode::AddImm | OpCode::SubImm => {
@@ -274,7 +302,9 @@ pub(crate) fn dispatch_opcode(
             b.switch_to_block(raise);
             let ba = box_int(b, a);
             let bd = box_int(b, d);
-            let _ = call_helper(b, cc, helpers.modulo, &[exec_ctx, ba, bd]);
+            let (a_tag, a_payload) = b.ins().isplit(ba);
+            let (d_tag, d_payload) = b.ins().isplit(bd);
+            call_helper_void(b, cc, helpers.modulo, &[exec_ctx, a_tag, a_payload, d_tag, d_payload]);
             let z = b.ins().iconst(types::I64, 0);
             b.ins().jump(merge, &[z.into()]);
             b.switch_to_block(ok);
@@ -323,11 +353,48 @@ pub(crate) fn dispatch_opcode(
 
         OpCode::Return => {
             let src = (code[ip + 1] & 0xFF) as usize;
-            let v = emit_return_value(b, vars, state, proto.return_kind, src)?;
-            b.ins().return_(&[v]);
+            if proto.return_kind == SlotKind::Int
+                || proto.return_kind == SlotKind::Bool
+                || proto.return_kind == SlotKind::Float
+            {
+                let v = if let Some(actx) = actx {
+                    let boxed = super::super::alloc::box_or_load_home(b, actx, state, src);
+                    match proto.return_kind {
+                        SlotKind::Int => super::super::emit::wrap_i48(b, boxed),
+                        SlotKind::Float => super::super::emit::unbox_f64_coerce(b, boxed),
+                        SlotKind::Bool => super::super::emit::unbox_bool(b, boxed),
+                        _ => unreachable!(),
+                    }
+                } else {
+                    emit_return_value(b, vars, state, proto.return_kind, src)?
+                };
+                b.ins().return_(&[v]);
+            } else {
+                let v = if let Some(actx) = actx {
+                    super::super::alloc::box_or_load_home(b, actx, state, src)
+                } else {
+                    let raw = super::super::emit::box_or_pass(b, vars, state, src);
+                    if b.func.dfg.value_type(raw) == types::I128 {
+                        raw
+                    } else {
+                        let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                        b.ins().iconcat(tag, raw)
+                    }
+                };
+                b.ins().store(
+                    MemFlags::trusted(),
+                    v,
+                    exec_ctx,
+                    helpers.jit_native_result_offset as i32,
+                );
+                b.ins().return_(&[]);
+            }
             return Ok(true);
         }
         OpCode::CallSelf => {
+            if frame_aware {
+                return Err("clif: CallSelf in frame_aware function not supported in machine-code direct recursion".into());
+            }
             let w1 = code[ip + 1];
             let w2 = code[ip + 2];
             let dest = (w1 >> 8) as usize;
@@ -355,26 +422,74 @@ pub(crate) fn dispatch_opcode(
                     use_int(b, vars, state, r)?
                 } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
                     if meta_is_float(&proto.register_meta, r) || state[r] == K::Float {
-                        let f = use_f64(b, vars, state, r)?;
-                        b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                        use_f64(b, vars, state, r)?
                     } else {
                         let boxed = use_boxed(b, vars, state, r)?;
-                        let f = unbox_f64_coerce(b, boxed);
-                        b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                        unbox_f64_coerce(b, boxed)
                     }
                 } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
                     let boxed = use_boxed(b, vars, state, r)?;
                     unbox_bool(b, boxed)
                 } else {
-                    use_boxed(b, vars, state, r)?
+                    b.use_var(vars[r])
                 };
                 args.push(v);
             }
-            let call = b.ins().call(self_ref, &args);
-            let res = b.inst_results(call)[0];
-            if meta_is_float(&proto.register_meta, dest) {
+            let res = if proto.return_kind == SlotKind::Int
+                || proto.return_kind == SlotKind::Bool
+                || proto.return_kind == SlotKind::Float
+            {
+                let call = b.ins().call(self_ref, &args);
+                b.inst_results(call)[0]
+            } else {
+                b.ins().call(self_ref, &args);
+                b.ins().load(
+                    types::I128,
+                    MemFlags::trusted(),
+                    exec_ctx,
+                    helpers.jit_native_result_offset as i32,
+                )
+            };
+            if let Some(actx) = actx {
+                if meta_is_float(&proto.register_meta, dest) {
+                    let f = unbox_f64_coerce(b, res);
+                    b.def_var(vars[dest], f);
+                    state[dest] = K::Float;
+                    let boxed = super::super::emit::box_f64(b, f);
+                    let fb = alloc::frame_base_addr(b, actx);
+                    b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                } else if proto.return_kind == SlotKind::Float {
+                    let f = unbox_f64_coerce(b, res);
+                    let boxed = super::super::emit::box_f64(b, f);
+                    let (_tag, payload) = b.ins().isplit(boxed);
+                    b.def_var(vars[dest], payload);
+                    state[dest] = K::Float;
+                    let fb = alloc::frame_base_addr(b, actx);
+                    b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                } else if proto.return_kind == SlotKind::Int {
+                    b.def_var(vars[dest], res);
+                    state[dest] = K::Int;
+                    let boxed = super::super::emit::box_int(b, res);
+                    let fb = alloc::frame_base_addr(b, actx);
+                    b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                } else if proto.return_kind == SlotKind::Bool {
+                    b.def_var(vars[dest], res);
+                    state[dest] = K::Bool;
+                    let boxed = super::super::emit::box_bool(b, res);
+                    let fb = alloc::frame_base_addr(b, actx);
+                    b.ins().store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                } else {
+                    alloc::def_result(b, actx, dest, res);
+                    state[dest] = K::Boxed;
+                }
+            } else if meta_is_float(&proto.register_meta, dest) {
                 let f = unbox_f64_coerce(b, res);
                 b.def_var(vars[dest], f);
+                state[dest] = K::Float;
+            } else if proto.return_kind == SlotKind::Float {
+                let f = unbox_f64_coerce(b, res);
+                let bits = b.ins().bitcast(types::I64, MemFlags::trusted(), f);
+                b.def_var(vars[dest], bits);
                 state[dest] = K::Float;
             } else if proto.return_kind == SlotKind::Int {
                 b.def_var(vars[dest], res);
@@ -383,7 +498,8 @@ pub(crate) fn dispatch_opcode(
                 b.def_var(vars[dest], res);
                 state[dest] = K::Bool;
             } else {
-                b.def_var(vars[dest], res);
+                let (_tag, payload) = b.ins().isplit(res);
+                b.def_var(vars[dest], payload);
                 state[dest] = K::Boxed;
             }
         }
@@ -395,16 +511,16 @@ pub(crate) fn dispatch_opcode(
             globals::emit_store_global_idx(b, gbl, state, code, ip)?;
         }
         OpCode::ArrayLength => {
-            arrays::emit_array_length(b, arr, state, code, ip, first_reg)?;
+            arrays::emit_array_length(b, arr, actx, state, code, ip, first_reg)?;
         }
         OpCode::ArrayGetIndex => {
-            arrays::emit_array_get_index(b, arr, state, code, ip, first_reg)?;
+            arrays::emit_array_get_index(b, arr, actx, state, code, ip, first_reg)?;
         }
         OpCode::ArraySetIndex => {
-            arrays::emit_array_set_index(b, arr, state, code, ip, first_reg)?;
+            arrays::emit_array_set_index(b, arr, actx, state, code, ip, first_reg)?;
         }
         OpCode::GetFixedField => {
-            fields::emit_get_fixed_field(b, fld, state, code, ip, first_reg)?;
+            fields::emit_get_fixed_field(b, fld, actx, state, code, ip, first_reg)?;
         }
         OpCode::GetProperty => {
             let actx = actx.ok_or("clif: GetProperty outside frame-aware fn")?;
@@ -415,7 +531,7 @@ pub(crate) fn dispatch_opcode(
             alloc::emit_set_property(b, actx, state, code, ip);
         }
         OpCode::SetFixedField => {
-            fields::emit_set_fixed_field(b, fld, state, code, ip, first_reg)?;
+            fields::emit_set_fixed_field(b, fld, actx, state, code, ip, first_reg)?;
         }
         OpCode::Call => {
             let actx = actx.ok_or("clif: call in non-frame-aware fn")?;

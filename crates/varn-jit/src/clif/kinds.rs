@@ -122,12 +122,13 @@ pub(crate) fn apply_kinds(
         //         return s + repeatStr(s, n - 1)   // "ab" + 52
         //     }
         //
-        // The mirror of `op_dispatch`'s `CallSelf` arm, which unboxes the
-        // result to an `f64` whenever the destination's meta is float and
-        // otherwise defines the variable with the returned bits verbatim.
         OpCode::CallSelf => {
-            state[dest] = if !meta_float(dest) && return_kind == SlotKind::Int {
+            state[dest] = if meta_float(dest) || return_kind == SlotKind::Float {
+                K::Float
+            } else if return_kind == SlotKind::Int {
                 K::Int
+            } else if return_kind == SlotKind::Bool {
+                K::Bool
             } else {
                 boxed(dest)
             }
@@ -324,6 +325,7 @@ pub(crate) fn kind_flow(
             entry0[r] = match *pk {
                 SlotKind::Int => K::Int,
                 SlotKind::Bool => K::Bool,
+                SlotKind::Float => K::Float,
                 _ => K::Boxed,
             };
         }

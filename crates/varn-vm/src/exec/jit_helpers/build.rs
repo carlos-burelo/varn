@@ -9,7 +9,7 @@ pub(crate) extern "C" fn jit_build_array(
     base: usize,
     start_reg: usize,
     count: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let mut elems = Vec::with_capacity(count);
@@ -17,7 +17,7 @@ pub(crate) extern "C" fn jit_build_array(
             let nv = ctx_ref.stack[base + start_reg + i];
             elems.push(nv);
         }
-        ctx_ref.heap.alloc_array_vm(elems)
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_vm(elems);
     }
 }
 
@@ -25,37 +25,25 @@ pub(crate) extern "C" fn jit_build_str(
     ctx: *mut ExecCtx,
     parts_ptr: *const VmValue,
     count: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        // Stack-first buffer, exactly as the interpreter's `BuildStr` — a
-        // template whose result fits inline never reaches the allocator, and
-        // one that does not pays a single `Rc<str>` instead of a scratch
-        // `String` plus a copy into it.
         let mut out = crate::strbuf::StrBuf::new();
         for &v in parts {
             ctx_ref.heap.str_repr_into(v, &mut out);
         }
-        ctx_ref.heap.alloc_str_dynamic(out.as_str())
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_dynamic(out.as_str());
     }
 }
 
-/// `shape` llega ya resuelto por el compilador JIT y `may_hold_closure` dice si
-/// algún campo puede serlo. Antes se pasaba el índice de la shape y se resolvía
-/// aquí —`RefCell`, búsqueda, `Rc::clone`— y el barrido de closures recorría
-/// los campos siempre: 5,9 ns por objeto que el sitio de llamada ya sabía.
-///
-/// # Safety
-/// `shape` apunta a un `Shape` que vive en `proto.resolved_shapes`, y este
-/// código compilado pertenece a ese proto.
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
     start_reg: usize,
     shape: *const varn_types::Shape,
     may_hold_closure: usize,
-) -> VmValue {
+) {
     unsafe {
         use crate::alloc_profile as prof;
         let on = prof::enabled();
@@ -64,7 +52,7 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
         if on {
             prof::record(prof::Seg::HelperTotal, t_all, prof::read());
         }
-        out
+        (*ctx).jit_native_result = out;
     }
 }
 
@@ -74,8 +62,11 @@ pub(crate) extern "C" fn jit_build_record_with_shape(
     start_reg: usize,
     shape: *const varn_types::Shape,
     may_hold_closure: usize,
-) -> VmValue {
-    unsafe { build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, true) }
+) {
+    unsafe {
+        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, true);
+        (*ctx).jit_native_result = out;
+    }
 }
 
 #[inline(always)]
@@ -88,7 +79,6 @@ unsafe fn build_shaped_from_ptr(
     is_record: bool,
 ) -> VmValue {
     let ctx_ref = &mut *ctx;
-    // Re-crea un `Rc` sin tomar propiedad: el dueño es `proto.resolved_shapes`.
     let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
     let count = shape.property_names.len();
 
@@ -108,12 +98,16 @@ unsafe fn build_shaped_from_ptr(
 
 pub(crate) extern "C" fn jit_range(
     ctx: *mut ExecCtx,
-    start_val: VmValue,
-    end_val: VmValue,
+    start_tag: u64,
+    start_payload: u64,
+    end_tag: u64,
+    end_payload: u64,
     flag: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let start_val = VmValue::from_raw_parts(start_tag, start_payload);
+        let end_val = VmValue::from_raw_parts(end_tag, end_payload);
         let mut temp = vec![start_val, end_val];
         match crate::exec::advanced::invoke_runtime_static(
             "__range__",
@@ -121,19 +115,24 @@ pub(crate) extern "C" fn jit_range(
             &mut ctx_ref.heap,
             flag as u16,
         ) {
-            Ok(v) => v,
+            Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => panic!("JIT range failed: {:?}", e),
         }
     }
 }
 
-pub(crate) extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_wrap_spread_stub(
+    ctx: *mut ExecCtx,
+    val_tag: u64,
+    val_payload: u64,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
         let extracted = ctx_ref.heap.extract(val);
-        ctx_ref
+        ctx_ref.jit_native_result = ctx_ref
             .heap
-            .intern(varn_types::Value::Spread(Box::new(extracted)))
+            .intern(varn_types::Value::Spread(Box::new(extracted)));
     }
 }
 
@@ -142,7 +141,7 @@ pub(crate) extern "C" fn jit_build_object(
     closure: *const crate::closure::VmClosure,
     base: usize,
     ip_before: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
@@ -175,6 +174,6 @@ pub(crate) extern "C" fn jit_build_object(
                 jit_propagate_error(ctx_ref, e);
             }
         }
-        obj_nv
+        ctx_ref.jit_native_result = obj_nv;
     }
 }

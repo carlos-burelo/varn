@@ -92,9 +92,9 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         | Null
         | Regex { .. } => true,
         Var(HirBinding::Param(_)) | Var(HirBinding::Global(..)) => true,
-        Var(HirBinding::Local(_)) | Var(HirBinding::Upvalue(_)) => false,
+        Var(HirBinding::Local(_)) | Var(HirBinding::Upvalue(..)) => false,
 
-        NonNull(x) | Spread(x) | TypeTest { value: x, .. } => body_is_inlinable(x),
+        NonNull(x) | Cast { expr: x, .. } | Spread(x) | TypeTest { value: x, .. } => body_is_inlinable(x),
         Sequence(xs) => xs.iter().all(body_is_inlinable),
         Range { start, end, .. } => body_is_inlinable(start) && body_is_inlinable(end),
         Template(parts) => parts.iter().all(|p| match p {
@@ -123,7 +123,9 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         NativeMethodCall { object, args, .. } | IntrinsicCall { object, args, .. } => {
             body_is_inlinable(object) && args.iter().all(body_is_inlinable)
         }
-        Conditional { test, cons, alt } => {
+        Conditional {
+            test, cons, alt, ..
+        } => {
             body_is_inlinable(test) && body_is_inlinable(cons) && body_is_inlinable(alt)
         }
         Array(els) | Tuple(els) => els.iter().all(|el| match el {

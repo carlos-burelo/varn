@@ -186,13 +186,13 @@ impl<'a> Lowerer<'a> {
                 }
 
                 let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                let call_ty = self.value_ty(key);
                 if !has_spread && self.is_self_call(callee, scope) {
                     return Ok(HirExpr::SelfCall {
                         args: hargs,
-                        ty: HirType::Dynamic,
+                        ty: call_ty,
                     });
                 }
-                let call_ty = self.value_ty(key);
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
@@ -328,6 +328,7 @@ impl<'a> Lowerer<'a> {
                 Ok(HirExpr::Member { object, name, ty })
             }
             ExprKind::Pipeline { left, right } => {
+                let call_ty = self.value_ty(key);
                 if pipeline_has_placeholder(right) {
                     let range = varn_core::SourceRange::default();
                     let param = varn_core::ast::Param {
@@ -355,7 +356,7 @@ impl<'a> Lowerer<'a> {
                         expr.range.start.line,
                         body_ref,
                         &[],
-                        HirType::Dynamic,
+                        call_ty,
                         scope,
                     )?;
                     let callee = HirExpr::Closure {
@@ -366,7 +367,7 @@ impl<'a> Lowerer<'a> {
                     Ok(HirExpr::Call {
                         callee: Box::new(callee),
                         args: vec![arg],
-                        ty: HirType::Dynamic,
+                        ty: call_ty,
                     })
                 } else {
                     let callee = Box::new(self.lower_expr(right, scope)?);
@@ -374,7 +375,7 @@ impl<'a> Lowerer<'a> {
                     Ok(HirExpr::Call {
                         callee,
                         args: vec![arg],
-                        ty: HirType::Dynamic,
+                        ty: call_ty,
                     })
                 }
             }

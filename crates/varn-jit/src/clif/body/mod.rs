@@ -16,7 +16,7 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
-    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_bool, wrap_i48,
+    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, wrap_i48,
 };
 use super::fields;
 use super::floats;
@@ -61,9 +61,9 @@ pub(super) fn lower_raw(
 
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
-        raw_signature(sig_nparams, isa, frame_aware),
+        raw_signature(proto, sig_nparams, isa, frame_aware),
     );
-    let self_sig_ref = func.import_signature(raw_signature(sig_nparams, isa, frame_aware));
+    let self_sig_ref = func.import_signature(raw_signature(proto, sig_nparams, isa, frame_aware));
     let self_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let self_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -83,8 +83,7 @@ pub(super) fn lower_raw(
         all_caches,
     } = vars::declare(
         &mut b,
-        nregs,
-        &proto.register_meta,
+        proto,
         &regions,
         code,
         pool,
@@ -98,7 +97,12 @@ pub(super) fn lower_raw(
     let zero = b.ins().iconst(types::I64, 0);
     let zero_f = b.ins().f64const(0.0);
     for (r, v) in vars.iter().enumerate() {
-        if meta_is_float(&proto.register_meta, r) {
+        let is_param_float = if r >= 1 && r <= proto.param_kinds.len() {
+            proto.param_kinds.get(r - 1) == Some(&SlotKind::Float)
+        } else {
+            false
+        };
+        if is_param_float || meta_is_float(&proto.register_meta, r) {
             b.def_var(*v, zero_f);
         } else {
             b.def_var(*v, zero);
@@ -160,11 +164,10 @@ pub(super) fn lower_raw(
         let r = reg_offset + i;
         let param_idx = if frame_aware { 4 + i } else { 1 + i };
         let p = b.block_params(entry)[param_idx];
-        if meta_is_float(&proto.register_meta, r) {
-            // The ABI wrapper already ran unbox_f64_coerce on the VmValue and
-            // passed raw f64 bits as i64. A plain bitcast suffices here.
-            let f = b.ins().bitcast(types::F64, MemFlags::new(), p);
-            b.def_var(vars[r], f);
+        let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
+            || meta_is_float(&proto.register_meta, r);
+        if is_float {
+            b.def_var(vars[r], p);
         } else if proto.param_kinds.get(i) == Some(&SlotKind::Int) && actx.is_some() {
             let un = wrap_i48(&mut b, p);
             b.def_var(vars[r], un);
@@ -173,24 +176,25 @@ pub(super) fn lower_raw(
         }
         if let Some(ref actx) = actx {
             let fb = alloc::frame_base_addr(&mut b, actx);
-            let boxed_p = if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
-                super::emit::box_int(&mut b, p)
+            if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
+                let boxed_p = super::emit::box_int(&mut b, p);
+                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
-                super::emit::box_bool(&mut b, p)
+                let boxed_p = super::emit::box_bool(&mut b, p);
+                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
                 let f = b.use_var(vars[r]);
-                super::emit::box_f64(&mut b, f)
-            } else {
-                p
-            };
-            b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 8) as i32);
+                let boxed_p = super::emit::box_f64(&mut b, f);
+                b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+            }
         }
     }
 
     if proto.has_this && !osr {
         if let Some(actx) = actx.as_ref() {
             let this = alloc::load_receiver(&mut b, actx);
-            b.def_var(vars[0], this);
+            let (_tag, payload) = b.ins().isplit(this);
+            b.def_var(vars[0], payload);
         }
     }
 
@@ -222,12 +226,15 @@ pub(super) fn lower_raw(
         helpers,
         exec_ctx,
         register_meta: &proto.register_meta,
+        actx: actx.as_ref(),
     };
     let gen = generic::GenCtx {
         vars: vars.as_slice(),
         cc,
         exec_ctx,
         register_meta: &proto.register_meta,
+        jit_native_result_offset: helpers.jit_native_result_offset,
+        actx: actx.as_ref(),
     };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
@@ -373,20 +380,28 @@ pub(super) fn lower_raw(
                 let cond = match state[first_reg] {
                     K::Bool | K::Int => b.use_var(vars[first_reg]),
                     k if is_boxed_kind(k) => {
-                        let v = b.use_var(vars[first_reg]);
-                        let falsy_boxed =
-                            call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
-                        let falsy = unbox_bool(&mut b, falsy_boxed);
+                        let v = if let Some(ref actx) = actx {
+                            alloc::box_or_load_home(&mut b, actx, &state, first_reg)
+                        } else {
+                            box_or_pass(&mut b, &vars, &state, first_reg)
+                        };
+                        let (v_tag, v_payload) = b.ins().isplit(v);
+                        let falsy =
+                            call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v_tag, v_payload]);
                         b.ins().bxor_imm(falsy, 1)
                     }
                     _ => {
                         if meta_is_int(&proto.register_meta, first_reg) {
                             b.use_var(vars[first_reg])
                         } else {
-                            let v = box_or_pass(&mut b, &vars, &state, first_reg);
-                            let falsy_boxed =
-                                call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
-                            let falsy = unbox_bool(&mut b, falsy_boxed);
+                            let v = if let Some(ref actx) = actx {
+                                alloc::box_or_load_home(&mut b, actx, &state, first_reg)
+                            } else {
+                                box_or_pass(&mut b, &vars, &state, first_reg)
+                            };
+                            let (v_tag, v_payload) = b.ins().isplit(v);
+                            let falsy =
+                                call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v_tag, v_payload]);
                             b.ins().bxor_imm(falsy, 1)
                         }
                     }
@@ -487,7 +502,30 @@ pub(super) fn lower_raw(
     b.seal_all_blocks();
     b.finalize();
 
-    super::debug::capture_ir(&mut debug, &func);
+    for block in func.layout.blocks() {
+        for inst in func.layout.block_insts(block) {
+            match func.dfg.insts[inst] {
+                cranelift_codegen::ir::InstructionData::StackStore { arg, .. } => {
+                    if func.dfg.value_type(arg) == cranelift_codegen::ir::types::I128 {
+                        eprintln!("[CLIF VALIDATION] In fn {:?}, inst {:?}: stack_store on i128 value {:?}", proto.name, inst, arg);
+                    }
+                }
+                cranelift_codegen::ir::InstructionData::CallIndirect { sig_ref, .. } => {
+                    let sig = &func.dfg.signatures[sig_ref];
+                    let args = &func.dfg.inst_args(inst)[1..];
+                    for (i, (&arg, param)) in args.iter().zip(&sig.params).enumerate() {
+                        let arg_ty = func.dfg.value_type(arg);
+                        if arg_ty != param.value_type {
+                            eprintln!("[CLIF VALIDATION] In fn {:?}, inst {:?}: param {} expected {:?}, got {:?} (val {:?}) in {:?}", proto.name, inst, i, param.value_type, arg_ty, arg, func.dfg.insts[inst]);
+                            eprintln!("Function IR:\n{}", func.display());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     let piece = compile_piece(func, isa)?;
     if let Some(rec) = actx.as_ref().and_then(|a| a.safepoints.as_ref()) {
         super::debug::capture_roots(

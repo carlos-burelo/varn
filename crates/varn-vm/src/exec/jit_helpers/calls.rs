@@ -198,19 +198,21 @@ pub(crate) extern "C" fn jit_call_method_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
     base: usize,
-    this_val: VmValue,
+    this_tag: u64,
+    this_payload: u64,
     name_idx: usize,
     cs: usize,
     arg_start: usize,
     arg_count: usize,
     dest: usize,
     ip: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
+        let this_val = VmValue::from_raw_parts(this_tag, this_payload);
 
         ctx_ref.frames[frame_idx].ip = ip;
 
@@ -236,35 +238,23 @@ pub(crate) extern "C" fn jit_call_method_flat(
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
-        ctx_ref.stack[base + dest]
+        ctx_ref.jit_native_result = ctx_ref.stack[base + dest];
     }
 }
 
-/// CLIF call path for everything the direct clif→clif call can't take: an
-/// unlinkable callee, a callee with no published entry yet, or a guard miss
-/// (rebound global, GC-moved closure).
-///
-/// `src` is the ABSOLUTE index in `ctx.stack` of the call window the caller
-/// flushed — `argc` consecutive slots starting with the callee/receiver
-/// placeholder. Passing the window by address rather than by value is what
-/// lifts the site's old three-argument ceiling: the previous signature took
-/// four `VmValue`s and declared `argc` separately, so any call with four or
-/// more real parameters staged too few and `prepare_call` read the frame one
-/// slot low.
-///
-/// Errors propagate through the same longjmp path as every other JIT
-/// helper, unwinding to the outer `setjmp` in `execute_jit_frame`.
 pub(crate) extern "C" fn clif_call_fallback(
     ctx: *mut ExecCtx,
-    callee: VmValue,
+    callee_tag: u64,
+    callee_payload: u64,
     src: usize,
     argc: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let callee = VmValue::from_raw_parts(callee_tag, callee_payload);
         match ctx_ref.call_vm_window(callee, src, argc) {
-            Ok(v) => v,
-            Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(err) => jit_propagate_error(ctx_ref, err),
         }
     }
 }
@@ -272,7 +262,7 @@ pub(crate) extern "C" fn clif_call_fallback(
 pub(crate) extern "C" fn jit_call_spread(
     ctx: *mut ExecCtx,
     args: *const std::ffi::c_void,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*(args as *const varn_jit::JitCallArgs);
@@ -301,6 +291,6 @@ pub(crate) extern "C" fn jit_call_spread(
             }
         }
 
-        ctx_ref.stack[base + args.dest]
+        ctx_ref.jit_native_result = ctx_ref.stack[base + args.dest];
     }
 }

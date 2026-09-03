@@ -26,13 +26,14 @@
 //! register's representation loads raw, the `Boxed` arm converts, and anything
 //! else falls to the generic helper.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Type};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
+use super::alloc::{box_or_load_home, def_result, AllocCtx};
 use super::emit::{
-    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper, meta_is_float,
+    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper_void, meta_is_float,
     state_meta_int, unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48,
 };
 use super::kinds::K;
@@ -71,14 +72,6 @@ impl ElemRepr {
             ElemRepr::Float => 2,
         }
     }
-
-    /// The Cranelift type a value in this representation has.
-    fn ty(self) -> Type {
-        match self {
-            ElemRepr::Float => types::F64,
-            _ => types::I64,
-        }
-    }
 }
 
 /// The representation register `r` holds, from the register meta (which is
@@ -93,40 +86,6 @@ fn reg_repr(meta: &[RegisterMeta], r: usize) -> ElemRepr {
     }
 }
 
-/// Element byte address: every repr stores 8-byte elements, so this is shared.
-fn elem_addr(
-    b: &mut FunctionBuilder,
-    payload: cranelift_codegen::ir::Value,
-    key: cranelift_codegen::ir::Value,
-    lay: &crate::JitArrayLayout,
-) -> cranelift_codegen::ir::Value {
-    let data = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        payload,
-        (16 + lay.elems_ptr_off) as i32,
-    );
-    let off = b.ins().ishl_imm(key, 3);
-    b.ins().iadd(data, off)
-}
-
-/// Load the element at `addr` out of an array whose repr is `from`, converted
-/// into the `want` representation.
-fn load_elem_as(
-    b: &mut FunctionBuilder,
-    addr: cranelift_codegen::ir::Value,
-    from: ElemRepr,
-    want: ElemRepr,
-) -> cranelift_codegen::ir::Value {
-    let raw = b.ins().load(from.ty(), MemFlags::trusted(), addr, 0);
-    convert(b, raw, from, want)
-}
-
-/// Reinterpret a value that is in representation `from` as representation
-/// `want`. Every conversion here is exact: `box_int`/`wrap_i48` round-trip an
-/// i48 payload, and `box_f64` reproduces `VmValue::from_f64` (including its
-/// quiet-NaN canonicalization), so an element read back through a typed repr
-/// is bit-identical to the `VmValue` that was stored.
 fn convert(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -135,43 +94,35 @@ fn convert(
 ) -> cranelift_codegen::ir::Value {
     match (from, want) {
         (a, w) if a == w => v,
-        // Boxed VmValue bits → unboxed. The float case coerces, since a boxed
-        // int can legitimately sit in a float-typed slot (`takesFloat(5)`).
         (ElemRepr::Boxed, ElemRepr::Int) => wrap_i48(b, v),
         (ElemRepr::Boxed, ElemRepr::Float) => unbox_f64_coerce(b, v),
-        // Unboxed → boxed VmValue bits.
         (ElemRepr::Int, ElemRepr::Boxed) => box_int(b, v),
         (ElemRepr::Float, ElemRepr::Boxed) => box_f64(b, v),
-        // Cross-typed (an I64 array read into an F64 register, or vice versa)
-        // is never emitted: those arms route to the generic helper instead, so
-        // the interpreter's own widening rules stay the single source of truth.
         (a, w) => unreachable!("clif: no direct {a:?} -> {w:?} element conversion"),
     }
 }
 
-/// `ArrayLength first_reg, src` — a heap array's length is a single Vec-len
-/// load, unboxed; non-array receivers fall to the generic helper.
-///
-/// No repr branch: `elems_len_off` lands on the `Vec` length word of every
-/// variant (checked at startup by `Heap::jit_array_layout`'s typed probe), so
-/// one load serves all three.
 pub(super) fn emit_array_length(
     b: &mut FunctionBuilder,
     c: &ArrCtx,
+    actx: Option<&AllocCtx>,
     state: &[K],
     code: &[u16],
     ip: usize,
     first_reg: usize,
 ) -> Result<(), String> {
     let src = (code[ip + 1] >> 8) as usize;
-    let obj = use_boxed(b, c.vars, state, src)?;
+    let obj = if let Some(actx) = actx {
+        box_or_load_home(b, actx, state, src)
+    } else {
+        use_boxed(b, c.vars, state, src)?
+    };
     let slow = b.create_block();
     let merge = b.create_block();
     b.append_block_param(merge, types::I64); // unboxed len
+
     let cache = c.loops.array(ip, src);
     let len = match cache.and_then(|c| c.view) {
-        // Hoisted length: `.length` inside a read-only region is one variable
-        // read (see `RegionCache`).
         Some(view) => {
             let data = b.use_var(view[0]);
             let resolved = b.ins().icmp_imm(IntCC::NotEqual, data, 0);
@@ -202,27 +153,35 @@ pub(super) fn emit_array_length(
     b.ins().jump(merge, &[len.into()]);
     // slow: generic helper returns a boxed int; unbox.
     b.switch_to_block(slow);
-    let boxed = call_helper(b, c.cc, c.helpers.array_length, &[c.exec_ctx, obj]);
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+    };
+    call_helper_void(b, c.cc, c.helpers.array_length, &[c.exec_ctx, obj_tag, obj_payload]);
+    let boxed = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        c.exec_ctx,
+        c.helpers.jit_native_result_offset as i32,
+    );
     let un = wrap_i48(b, boxed);
     b.ins().jump(merge, &[un.into()]);
     b.switch_to_block(merge);
     let res = b.block_params(merge)[0];
-    b.def_var(c.vars[first_reg], res);
+    if let Some(actx) = actx {
+        let boxed = box_int(b, res);
+        def_result(b, actx, first_reg, boxed);
+    } else {
+        b.def_var(c.vars[first_reg], res);
+    }
     Ok(())
 }
 
-/// `ArrayGetIndex first_reg, obj, key` — bounds-checked inline element load;
-/// out-of-bounds / non-array falls to the generic (allocation-free) helper.
-///
-/// The destination register's representation picks which repr is served raw:
-/// an `Int` register reads an `I64` array with a bare `i64` load (no box, no
-/// unbox), an `F64` register reads an `F64` array with a bare `f64` load. The
-/// `Boxed` arm is always emitted too, so an array that never specialized —
-/// or migrated back — keeps its inline path. The remaining cross-typed
-/// combination goes to the helper.
 pub(super) fn emit_array_get_index(
     b: &mut FunctionBuilder,
     c: &ArrCtx,
+    actx: Option<&AllocCtx>,
     state: &[K],
     code: &[u16],
     ip: usize,
@@ -231,81 +190,25 @@ pub(super) fn emit_array_get_index(
     let w1 = code[ip + 1];
     let obj_r = (w1 >> 8) as usize;
     let key_r = (w1 & 0xFF) as usize;
-    let obj = use_boxed(b, c.vars, state, obj_r)?;
+    let obj = if let Some(actx) = actx {
+        box_or_load_home(b, actx, state, obj_r)
+    } else {
+        use_boxed(b, c.vars, state, obj_r)?
+    };
     let key = use_int(b, c.vars, state, key_r)?;
     let want = reg_repr(c.register_meta, first_reg);
 
     let slow = b.create_block();
     b.set_cold_block(slow);
     let merge = b.create_block();
-    b.append_block_param(merge, want.ty());
+    let merge_ty = match want {
+        ElemRepr::Int => types::I64,
+        ElemRepr::Float => types::F64,
+        ElemRepr::Boxed => types::I128,
+    };
+    b.append_block_param(merge, merge_ty);
+
     let cache = c.loops.array(ip, obj_r);
-    let lay = &c.helpers.array_layout;
-
-    // Repr-validated fast path: the preheader already checked disc == expected
-    // and zeroed `data` on mismatch. `data != 0` guarantees both "resolved"
-    // AND "disc matches expected repr", so the access is just:
-    //   sentinel check → bounds check → raw load
-    // No repr branching at all — 2 branches instead of 4.
-    let repr_validated = cache.is_some_and(|c| c.repr_validated_disc.is_some());
-    let bounds_guaranteed = cache.is_some_and(|c| c.bounds_guaranteed);
-    if repr_validated {
-        if let Some(view) = cache.and_then(|c| c.view) {
-            let data = b.use_var(view[0]);
-            let len = b.use_var(view[1]);
-
-            if bounds_guaranteed {
-                // Bounds guaranteed by preheader — data != 0 already implies
-                // all induction-variable-based indices are within len.
-                // Skip the cmp+jae and go straight to the raw load.
-                // Still need to check data != 0 (sentinel for repr mismatch
-                // OR bounds failure), which is handled by the caller's
-                // existing sentinel check on the view cache.
-                let off = b.ins().ishl_imm(key, 3);
-                let addr = b.ins().iadd(data, off);
-                let v = load_elem_as(b, addr, want, want);
-                b.ins().jump(merge, &[v.into()]);
-            } else {
-                // Bounds check (unsigned also rejects negative keys and len=0 sentinel).
-                let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-                let inb = b.create_block();
-                b.set_cold_block(slow);
-                b.ins().brif(oob, slow, &[], inb, &[]);
-                b.switch_to_block(inb);
-
-                // Direct raw load — repr is guaranteed by the preheader.
-                let off = b.ins().ishl_imm(key, 3);
-                let addr = b.ins().iadd(data, off);
-                let v = load_elem_as(b, addr, want, want);
-                b.ins().jump(merge, &[v.into()]);
-            }
-
-            // slow: generic helper (always correct, handles every repr).
-            b.switch_to_block(slow);
-            let boxed_key = box_int(b, key);
-            let r = call_helper(
-                b,
-                c.cc,
-                c.helpers.jit_array_get_fast,
-                &[c.exec_ctx, obj, boxed_key],
-            );
-            let r = convert(b, r, ElemRepr::Boxed, want);
-            b.ins().jump(merge, &[r.into()]);
-
-            b.switch_to_block(merge);
-            let res = b.block_params(merge)[0];
-            b.def_var(c.vars[first_reg], res);
-            return Ok(());
-        }
-    }
-
-    // Standard path: resolve payload, bounds-check, repr-branch per access.
-    // A read-only receiver in an allocation-free region had its data pointer,
-    // length and repr hoisted into the region's preheader, so the whole
-    // resolve chain and all three loads collapse to variable reads here. The
-    // `data == 0` sentinel means the preheader's guard chain rejected the
-    // receiver; the generic helper answers for it, as it does for every other
-    // rejection.
     let (data, len, disc) = match cache.and_then(|c| c.view) {
         Some(view) => {
             let data = b.use_var(view[0]);
@@ -320,155 +223,160 @@ pub(super) fn emit_array_get_index(
                 b,
                 c.exec_ctx,
                 obj,
-                lay,
+                &c.helpers.array_layout,
                 c.helpers.heap_field_offset,
                 slow,
                 cache.map(|c| c.payload),
                 !c.has_alloc,
             );
-            let data = b.ins().load(
-                types::I64,
-                MemFlags::trusted(),
-                payload,
-                (16 + lay.elems_ptr_off) as i32,
-            );
-            let len = b.ins().load(
-                types::I64,
-                MemFlags::trusted(),
-                payload,
-                (16 + lay.elems_len_off) as i32,
-            );
-            (data, len, array_disc(b, payload, lay))
+            let lay = &c.helpers.array_layout;
+            let m = MemFlags::trusted();
+            let data = b.ins().load(types::I64, m, payload, (16 + lay.elems_ptr_off) as i32);
+            let len = b.ins().load(types::I64, m, payload, (16 + lay.elems_len_off) as i32);
+            let disc = array_disc(b, payload, lay);
+            (data, len, disc)
         }
     };
 
-    // Unsigned compare also rejects negative keys.
-    let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-    let inb = b.create_block();
-    b.ins().brif(oob, slow, &[], inb, &[]);
-    b.switch_to_block(inb);
+    let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
+    let hit = b.create_block();
+    b.ins().brif(in_bounds, hit, &[], slow, &[]);
 
-    let off = b.ins().ishl_imm(key, 3);
+    b.switch_to_block(hit);
+    let matched = b.create_block();
+    let boxed_arm = b.create_block();
+
+    let target_disc = want.disc();
+    let is_match = b.ins().icmp_imm(IntCC::Equal, disc, target_disc);
+    b.ins().brif(is_match, matched, &[], boxed_arm, &[]);
+
+    b.switch_to_block(matched);
+    let elem_ty = match want {
+        ElemRepr::Int => types::I64,
+        ElemRepr::Float => types::F64,
+        ElemRepr::Boxed => types::I128,
+    };
+    let scale = if want == ElemRepr::Boxed { 4 } else { 3 };
+    let off = b.ins().ishl_imm(key, scale);
     let addr = b.ins().iadd(data, off);
-    // Raw arm first (the expected repr for this destination), then the Boxed
-    // arm, then the helper. When the destination is already boxed the two
-    // coincide and only one arm is emitted.
-    if want != ElemRepr::Boxed {
-        let raw_blk = b.create_block();
-        let not_raw = b.create_block();
-        let is_raw = b.ins().icmp_imm(IntCC::Equal, disc, want.disc());
-        b.ins().brif(is_raw, raw_blk, &[], not_raw, &[]);
-        b.switch_to_block(raw_blk);
-        let v = load_elem_as(b, addr, want, want);
-        b.ins().jump(merge, &[v.into()]);
-        b.switch_to_block(not_raw);
-    }
-    let boxed_blk = b.create_block();
-    let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
-    b.ins().brif(is_boxed, boxed_blk, &[], slow, &[]);
-    b.switch_to_block(boxed_blk);
-    let raw = b.ins().load(types::I64, MemFlags::trusted(), addr, 0);
-    if want == ElemRepr::Int {
-        let tag_mask = b.ins().iconst(types::I64, 0x7FFF_0000_0000_0000i64);
-        let int_expect = b.ins().iconst(types::I64, 0x7FFC_0000_0000_0000i64);
-        let masked = b.ins().band(raw, tag_mask);
-        let is_int_elem = b.ins().icmp(IntCC::Equal, masked, int_expect);
-        let int_blk = b.create_block();
-        b.ins().brif(is_int_elem, int_blk, &[], slow, &[]);
-        b.switch_to_block(int_blk);
-        let v = wrap_i48(b, raw);
-        b.ins().jump(merge, &[v.into()]);
-    } else if want == ElemRepr::Float {
-        let num_blk = b.create_block();
-        let qnan = b.ins().iconst(types::I64, 0x7FF8_0000_0000_0000i64);
-        let masked = b.ins().band(raw, qnan);
-        let is_f64_elem = b.ins().icmp(IntCC::NotEqual, masked, qnan);
-        let tag_mask = b.ins().iconst(types::I64, 0x7FFF_0000_0000_0000i64);
-        let int_expect = b.ins().iconst(types::I64, 0x7FFC_0000_0000_0000i64);
-        let masked_int = b.ins().band(raw, tag_mask);
-        let is_int_elem = b.ins().icmp(IntCC::Equal, masked_int, int_expect);
-        let is_num = b.ins().bor(is_f64_elem, is_int_elem);
-        b.ins().brif(is_num, num_blk, &[], slow, &[]);
-        b.switch_to_block(num_blk);
-        let v = unbox_f64_coerce(b, raw);
-        b.ins().jump(merge, &[v.into()]);
-    } else {
-        b.ins().jump(merge, &[raw.into()]);
-    }
+    let v = b.ins().load(elem_ty, MemFlags::trusted(), addr, 0);
+    b.ins().jump(merge, &[v.into()]);
 
-    // slow: same generic helper as the template (returns null out of bounds;
-    // allocates nothing). It answers for every repr, so a cross-typed access
-    // lands here rather than bailing the function out of clif.
+    b.switch_to_block(boxed_arm);
+    let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
+    let do_boxed = b.create_block();
+    b.ins().brif(is_boxed, do_boxed, &[], slow, &[]);
+
+    b.switch_to_block(do_boxed);
+    let off_b = b.ins().ishl_imm(key, 4);
+    let addr_b = b.ins().iadd(data, off_b);
+    let raw = b.ins().load(types::I128, MemFlags::trusted(), addr_b, 0);
+    let v = convert(b, raw, ElemRepr::Boxed, want);
+    b.ins().jump(merge, &[v.into()]);
+
     b.switch_to_block(slow);
     let boxed_key = box_int(b, key);
-    let r = call_helper(
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+    };
+    let (key_tag, key_payload) = b.ins().isplit(boxed_key);
+    call_helper_void(
         b,
         c.cc,
         c.helpers.jit_array_get_fast,
-        &[c.exec_ctx, obj, boxed_key],
+        &[c.exec_ctx, obj_tag, obj_payload, key_tag, key_payload],
+    );
+    let r = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        c.exec_ctx,
+        c.helpers.jit_native_result_offset as i32,
     );
     let r = convert(b, r, ElemRepr::Boxed, want);
     b.ins().jump(merge, &[r.into()]);
 
     b.switch_to_block(merge);
     let res = b.block_params(merge)[0];
-    b.def_var(c.vars[first_reg], res);
+    if let Some(actx) = actx {
+        let boxed = match want {
+            ElemRepr::Int => box_int(b, res),
+            ElemRepr::Float => box_f64(b, res),
+            ElemRepr::Boxed => res,
+        };
+        def_result(b, actx, first_reg, boxed);
+    } else {
+        let payload = if b.func.dfg.value_type(res) == types::I128 {
+            let (_tag, payload) = b.ins().isplit(res);
+            payload
+        } else {
+            res
+        };
+        b.def_var(c.vars[first_reg], payload);
+    }
     Ok(())
 }
 
-/// `ArraySetIndex obj(=first_reg), idx, val` — bounds-checked inline store on
-/// a proven-numeric value (`K::Int` / `K::Float`). An unboxed number is never
-/// a heap reference, so no write barrier is needed on any of these arms: an
-/// `I64` array takes a bare `i64` store, an `F64` array a bare `f64` store,
-/// and a `Boxed` array takes the boxed value. Append/OOB/non-array/cross-typed
-/// falls to the helper.
-///
-/// Any other value kind — proven boxed/bool, or a flow-merge the dataflow
-/// couldn't resolve to one representation — skips the inline path entirely:
-/// storing a value that might be a heap reference needs the write barrier only
-/// the helper carries, so this one instruction routes straight to the same
-/// helper instead of bailing the whole function out of clif.
 pub(super) fn emit_array_set_index(
     b: &mut FunctionBuilder,
     c: &ArrCtx,
+    actx: Option<&AllocCtx>,
     state: &[K],
     code: &[u16],
     ip: usize,
     first_reg: usize,
 ) -> Result<(), String> {
     let w1 = code[ip + 1];
-    let idx_r = (w1 >> 8) as usize;
-    let val_r = (w1 & 0xFF) as usize;
     let obj_r = first_reg;
-    let obj = use_boxed(b, c.vars, state, obj_r)?;
-    let key = use_int(b, c.vars, state, idx_r)?;
+    let key_r = (w1 >> 8) as usize;
+    let val_r = (w1 & 0xFF) as usize;
 
-    let src = match state[val_r] {
-        K::Int => ElemRepr::Int,
-        K::Float => ElemRepr::Float,
-        _ => ElemRepr::Boxed,
+    let obj = if let Some(actx) = actx {
+        box_or_load_home(b, actx, state, obj_r)
+    } else {
+        use_boxed(b, c.vars, state, obj_r)?
     };
+    let key = use_int(b, c.vars, state, key_r)?;
+    let src = reg_repr(c.register_meta, val_r);
+
     if src == ElemRepr::Boxed {
-        // Unproven kind: box it (bool needs re-tagging; boxed/global kinds
-        // are already the right bits — `use_boxed` still bails on a truly
-        // unrepresentable merge, same as it would for any other read) and
-        // hand the whole store to the generic helper, no inline attempt.
-        let val = match state[val_r] {
-            K::Bool => {
-                let raw = b.use_var(c.vars[val_r]);
-                box_bool(b, raw)
+        let val = if let Some(actx) = actx {
+            box_or_load_home(b, actx, state, val_r)
+        } else {
+            match state[val_r] {
+                K::Int => {
+                    let raw = b.use_var(c.vars[val_r]);
+                    box_int(b, raw)
+                }
+                K::Bool => {
+                    let raw = b.use_var(c.vars[val_r]);
+                    box_bool(b, raw)
+                }
+                _ => {
+                    let raw = use_boxed(b, c.vars, state, val_r)?;
+                    let tag_v = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                    b.ins().iconcat(tag_v, raw)
+                }
             }
-            _ => use_boxed(b, c.vars, state, val_r)?,
         };
         let boxed_key = box_int(b, key);
-        let _ = call_helper(
+        let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+            b.ins().isplit(obj)
+        } else {
+            (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+        };
+        let (key_tag, key_payload) = b.ins().isplit(boxed_key);
+        let (val_tag, val_payload) = b.ins().isplit(val);
+        call_helper_void(
             b,
             c.cc,
             c.helpers.jit_array_set_fast,
-            &[c.exec_ctx, obj, boxed_key, val],
+            &[c.exec_ctx, obj_tag, obj_payload, key_tag, key_payload, val_tag, val_payload],
         );
         return Ok(());
     }
+
     let raw_val = if src == ElemRepr::Float {
         use_f64(b, c.vars, state, val_r)?
     } else {
@@ -496,44 +404,73 @@ pub(super) fn emit_array_set_index(
         payload,
         (16 + lay.elems_len_off) as i32,
     );
-    let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-    let inb = b.create_block();
-    b.ins().brif(oob, slow, &[], inb, &[]);
-    b.switch_to_block(inb);
+    let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
+    let hit = b.create_block();
+    b.ins().brif(in_bounds, hit, &[], slow, &[]);
 
+    b.switch_to_block(hit);
+    let data = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        payload,
+        (16 + lay.elems_ptr_off) as i32,
+    );
     let disc = array_disc(b, payload, lay);
-    let addr = elem_addr(b, payload, key, lay);
-    // Raw arm (matching typed repr), then the Boxed arm, then the helper.
-    let raw_blk = b.create_block();
-    let not_raw = b.create_block();
-    let is_raw = b.ins().icmp_imm(IntCC::Equal, disc, src.disc());
-    b.ins().brif(is_raw, raw_blk, &[], not_raw, &[]);
-    b.switch_to_block(raw_blk);
+    let matched = b.create_block();
+    let boxed_arm = b.create_block();
+    let target_disc = src.disc();
+    let is_match = b.ins().icmp_imm(IntCC::Equal, disc, target_disc);
+    b.ins().brif(is_match, matched, &[], boxed_arm, &[]);
+
+    // 1. Matching repr: bare store into the buffer.
+    b.switch_to_block(matched);
+    let off = b.ins().ishl_imm(key, 3);
+    let addr = b.ins().iadd(data, off);
     b.ins().store(MemFlags::trusted(), raw_val, addr, 0);
     b.ins().jump(merge, &[]);
-    b.switch_to_block(not_raw);
 
-    let boxed_blk = b.create_block();
+    // 2. Boxed arm: the array holds `VmValue`s; store boxed value.
+    b.switch_to_block(boxed_arm);
     let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
-    b.ins().brif(is_boxed, boxed_blk, &[], slow, &[]);
-    b.switch_to_block(boxed_blk);
-    let boxed_val = convert(b, raw_val, src, ElemRepr::Boxed);
-    b.ins().store(MemFlags::trusted(), boxed_val, addr, 0);
+    let do_boxed = b.create_block();
+    b.ins().brif(is_boxed, do_boxed, &[], slow, &[]);
+
+    b.switch_to_block(do_boxed);
+    let off_b = b.ins().ishl_imm(key, 4);
+    let addr_b = b.ins().iadd(data, off_b);
+    let boxed_val = match src {
+        ElemRepr::Float => box_f64(b, raw_val),
+        _ => box_int(b, raw_val),
+    };
+    b.ins().store(MemFlags::trusted(), boxed_val, addr_b, 0);
     b.ins().jump(merge, &[]);
 
-    // slow: append/OOB/non-array/cross-typed semantics live in the helper (it
-    // grows the Rust vec and migrates the repr when needed — no VM-heap
-    // allocation, no GC).
+    // 3. Fallback: out-of-bounds, cross-typed write, or non-array receiver.
     b.switch_to_block(slow);
+    let boxed_val = if let Some(actx) = actx {
+        box_or_load_home(b, actx, state, val_r)
+    } else {
+        match src {
+            ElemRepr::Float => box_f64(b, raw_val),
+            _ => box_int(b, raw_val),
+        }
+    };
     let boxed_key = box_int(b, key);
-    let boxed_val = convert(b, raw_val, src, ElemRepr::Boxed);
-    let _ = call_helper(
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64), obj)
+    };
+    let (key_tag, key_payload) = b.ins().isplit(boxed_key);
+    let (val_tag, val_payload) = b.ins().isplit(boxed_val);
+    call_helper_void(
         b,
         c.cc,
         c.helpers.jit_array_set_fast,
-        &[c.exec_ctx, obj, boxed_key, boxed_val],
+        &[c.exec_ctx, obj_tag, obj_payload, key_tag, key_payload, val_tag, val_payload],
     );
     b.ins().jump(merge, &[]);
+
     b.switch_to_block(merge);
     Ok(())
 }

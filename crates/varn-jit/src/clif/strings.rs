@@ -21,10 +21,9 @@ use varn_core::intrinsic_ops::intrinsic_decode;
 use varn_core::intrinsic_ops::str::StrOp;
 use varn_core::intrinsic_ops::wire::IntrinsicDomain;
 use varn_types::register_meta::RegisterMeta;
-use varn_types::VmValue;
 
-use super::alloc::AllocCtx;
-use super::emit::{box_int, box_or_pass, call_helper, use_int, LoopCaches};
+use super::alloc::{box_or_load_home, def_result, AllocCtx};
+use super::emit::{box_bool, box_int, call_helper, call_helper_void, use_int, LoopCaches};
 use super::kinds::K;
 
 /// Try to lower a `Str`-domain intrinsic natively. Returns `true` when
@@ -56,131 +55,187 @@ pub(super) fn emit_str_intrinsic_native(
         if emit_char_code_inline(b, actx, loops, vars, state, ip, dest) {
             return true;
         }
-        let receiver = box_or_pass(b, vars, state, dest);
-        let pos = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let pos = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (pos_tag, pos_payload) = b.ins().isplit(pos);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_char_code_at,
-            &[actx.exec_ctx, receiver, pos],
+            &[actx.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_int(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
     // Substring: 2 or 3 args (receiver + start [+ end]), result is heap str.
     if op == StrOp::Substring as u8 && (arg_count == 2 || arg_count == 3) {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let start = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let start = box_or_load_home(b, actx, state, dest + 1);
         let end = if arg_count == 3 {
-            box_or_pass(b, vars, state, dest + 2)
+            box_or_load_home(b, actx, state, dest + 2)
         } else {
-            b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64)
+            let null_v = b.ins().iconst(types::I64, 0);
+            let null_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            b.ins().iconcat(null_tag, null_v)
         };
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (st_tag, st_payload) = b.ins().isplit(start);
+        let (en_tag, en_payload) = b.ins().isplit(end);
 
-        let res = call_helper(
+        call_helper_void(
             b,
             actx.cc,
             actx.helpers.str_substring_intrinsic,
-            &[actx.exec_ctx, receiver, start, end],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                st_tag,
+                st_payload,
+                en_tag,
+                en_payload,
+            ],
         );
-        b.def_var(vars[dest], res);
+        let res = b.ins().load(
+            types::I128,
+            MemFlags::trusted(),
+            actx.exec_ctx,
+            actx.helpers.jit_native_result_offset as i32,
+        );
+        def_result(b, actx, dest, res);
         return true;
     }
 
     // Slice: 2 or 3 args (receiver + start [+ end]), result is heap str.
     if op == StrOp::Slice as u8 && (arg_count == 2 || arg_count == 3) {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let start = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let start = box_or_load_home(b, actx, state, dest + 1);
         let end = if arg_count == 3 {
-            box_or_pass(b, vars, state, dest + 2)
+            box_or_load_home(b, actx, state, dest + 2)
         } else {
-            b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64)
+            let null_v = b.ins().iconst(types::I64, 0);
+            let null_tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            b.ins().iconcat(null_tag, null_v)
         };
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (st_tag, st_payload) = b.ins().isplit(start);
+        let (en_tag, en_payload) = b.ins().isplit(end);
 
-        let res = call_helper(
+        call_helper_void(
             b,
             actx.cc,
             actx.helpers.str_slice_intrinsic,
-            &[actx.exec_ctx, receiver, start, end],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                st_tag,
+                st_payload,
+                en_tag,
+                en_payload,
+            ],
         );
-        b.def_var(vars[dest], res);
+        let res = b.ins().load(
+            types::I128,
+            MemFlags::trusted(),
+            actx.exec_ctx,
+            actx.helpers.jit_native_result_offset as i32,
+        );
+        def_result(b, actx, dest, res);
         return true;
     }
 
     // StartsWith: 2 args (receiver + search), result is bool.
     if op == StrOp::StartsWith as u8 && arg_count == 2 {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let search = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let search = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (search_tag, search_payload) = b.ins().isplit(search);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_starts_with_intrinsic,
-            &[actx.exec_ctx, receiver, search],
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_bool(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
     // EndsWith: 2 args (receiver + search), result is bool.
     if op == StrOp::EndsWith as u8 && arg_count == 2 {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let search = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let search = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (search_tag, search_payload) = b.ins().isplit(search);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_ends_with_intrinsic,
-            &[actx.exec_ctx, receiver, search],
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_bool(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
     // Includes: 2 args (receiver + search), result is bool.
     if op == StrOp::Includes as u8 && arg_count == 2 {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let search = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let search = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (search_tag, search_payload) = b.ins().isplit(search);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_includes_intrinsic,
-            &[actx.exec_ctx, receiver, search],
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_bool(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
     // IndexOf: 2 args (receiver + search), result is int.
     if op == StrOp::IndexOf as u8 && arg_count == 2 {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let search = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let search = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (search_tag, search_payload) = b.ins().isplit(search);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_index_of_intrinsic,
-            &[actx.exec_ctx, receiver, search],
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_int(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
     // LastIndexOf: 2 args (receiver + search), result is int.
     if op == StrOp::LastIndexOf as u8 && arg_count == 2 {
-        let receiver = box_or_pass(b, vars, state, dest);
-        let search = box_or_pass(b, vars, state, dest + 1);
+        let receiver = box_or_load_home(b, actx, state, dest);
+        let search = box_or_load_home(b, actx, state, dest + 1);
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (search_tag, search_payload) = b.ins().isplit(search);
 
         let res = call_helper(
             b,
             actx.cc,
             actx.helpers.str_last_index_of_intrinsic,
-            &[actx.exec_ctx, receiver, search],
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
         );
-        b.def_var(vars[dest], res);
+        let boxed = box_int(b, res);
+        def_result(b, actx, dest, boxed);
         return true;
     }
 
@@ -188,21 +243,6 @@ pub(super) fn emit_str_intrinsic_native(
 }
 
 /// `charCodeAt` served from the region's hoisted byte view, when there is one.
-///
-/// The emitted shape is
-///
-/// ```text
-/// bytes = <hoisted>;  if bytes == 0 -> helper
-/// if (u64)pos >= len  -> -1
-/// else                -> zext u8 [bytes + pos]
-/// ```
-///
-/// The bounds test is UNSIGNED, which is what makes a negative position fall
-/// out of range instead of wrapping to a valid index — the same answer
-/// `char_code_at` gives, and the reason the interpreter's `.max(0)` had to go.
-///
-/// Returns `false` when nothing was emitted: no cache for this receiver, or a
-/// register whose kind cannot supply an unboxed index.
 #[allow(clippy::too_many_arguments)]
 fn emit_char_code_inline(
     b: &mut FunctionBuilder,
@@ -228,7 +268,7 @@ fn emit_char_code_inline(
     let in_range = b.create_block();
     let out_of_range = b.create_block();
     let done = b.create_block();
-    b.append_block_param(done, types::I64);
+    b.append_block_param(done, types::I128);
 
     b.ins().brif(bytes, inline_path, &[], helper_path, &[]);
 
@@ -248,21 +288,23 @@ fn emit_char_code_inline(
     b.ins().jump(done, &[boxed.into()]);
 
     // Unresolved receiver: the general implementation, which handles SSO,
-    // non-ASCII and non-string receivers. It takes the boxed operands, so the
-    // position is re-boxed here rather than reusing the unboxed `pos`.
+    // non-ASCII and non-string receivers.
     b.switch_to_block(helper_path);
-    let receiver = box_or_pass(b, vars, state, dest);
-    let boxed_pos = box_or_pass(b, vars, state, dest + 1);
+    let receiver = box_or_load_home(b, actx, state, dest);
+    let boxed_pos = box_or_load_home(b, actx, state, dest + 1);
+    let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+    let (pos_tag, pos_payload) = b.ins().isplit(boxed_pos);
     let res = call_helper(
         b,
         actx.cc,
         actx.helpers.str_char_code_at,
-        &[actx.exec_ctx, receiver, boxed_pos],
+        &[actx.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
     );
-    b.ins().jump(done, &[res.into()]);
+    let boxed = box_int(b, res);
+    b.ins().jump(done, &[boxed.into()]);
 
     b.switch_to_block(done);
     let res = b.block_params(done)[0];
-    b.def_var(vars[dest], res);
+    def_result(b, actx, dest, res);
     true
 }

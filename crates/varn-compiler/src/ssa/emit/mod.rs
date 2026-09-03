@@ -215,14 +215,13 @@ fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind 
         HirType::Float => SlotKind::Float,
         HirType::Bool => SlotKind::Bool,
         HirType::Str => SlotKind::Str,
+        HirType::Class(id) => SlotKind::Class(id.0),
+        HirType::Array(id) => SlotKind::Array(id.0),
         HirType::Ref
-        | HirType::Array(_)
         | HirType::Map(_, _)
-        | HirType::Set(_)
-        | HirType::Class(_) => SlotKind::Ref,
-        // A nullable slot can hold null (an immediate) or the payload; no
-        // single kind is always true of it.
-        HirType::Nullable(_) | HirType::Dynamic => SlotKind::Dynamic,
+        | HirType::Set(_) => SlotKind::Ref,
+        HirType::Nullable(id) => SlotKind::Nullable(id.0),
+        HirType::Dynamic => SlotKind::Dynamic,
     }
 }
 

@@ -379,6 +379,7 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Var(b) => dump_binding(b),
 
         HirExpr::NonNull(e) => format!("{}!", dump_expr(e)),
+        HirExpr::Cast { expr, ty } => format!("({} as {ty:?})", dump_expr(expr)),
         HirExpr::TryOp(e) => format!("{}?", dump_expr(e)),
         HirExpr::Await(e, _) => format!("{YELLOW}await{R} {}", dump_expr(e)),
         HirExpr::Spawn(e) => format!("{YELLOW}spawn{R} {}", dump_expr(e)),
@@ -413,7 +414,7 @@ fn dump_expr(expr: &HirExpr) -> String {
                 dump_expr(operand)
             )
         }
-        HirExpr::Logical { op, lhs, rhs } => {
+        HirExpr::Logical { op, lhs, rhs, .. } => {
             let sym = match op {
                 HirLogicalOp::And => "&&",
                 HirLogicalOp::Or => "||",
@@ -421,7 +422,7 @@ fn dump_expr(expr: &HirExpr) -> String {
             };
             format!("({} {sym} {})", dump_expr(lhs), dump_expr(rhs))
         }
-        HirExpr::Conditional { test, cons, alt } => {
+        HirExpr::Conditional { test, cons, alt, .. } => {
             format!(
                 "({} ? {} : {})",
                 dump_expr(test),
@@ -429,7 +430,7 @@ fn dump_expr(expr: &HirExpr) -> String {
                 dump_expr(alt)
             )
         }
-        HirExpr::Update { target, op, prefix } => {
+        HirExpr::Update { target, op, prefix, .. } => {
             let sym = match op {
                 HirUpdateOp::Inc => "++",
                 HirUpdateOp::Dec => "--",
@@ -683,7 +684,7 @@ fn dump_binding(b: &HirBinding) -> String {
         HirBinding::Param(i) => format!("{CYAN}p{i}{R}"),
         HirBinding::Local(id) => format!("{CYAN}l{}{R}", id.0),
         HirBinding::Global(n, _) => format!("{CYAN}g:{n}{R}"),
-        HirBinding::Upvalue(i) => format!("{CYAN}uv{i}{R}"),
+        HirBinding::Upvalue(i, _) => format!("{CYAN}uv{i}{R}"),
     }
 }
 

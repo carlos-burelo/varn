@@ -55,17 +55,19 @@ pub(crate) extern "C" fn jit_get_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
     base: usize,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     name_idx: usize,
     cs_idx: usize,
     dest: usize,
     ip: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
 
         ctx_ref.frames[frame_idx].ip = ip;
 
@@ -89,7 +91,7 @@ pub(crate) extern "C" fn jit_get_property_flat(
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
-        ctx_ref.stack[base + dest]
+        ctx_ref.jit_native_result = ctx_ref.stack[base + dest];
     }
 }
 
@@ -99,12 +101,16 @@ pub(crate) extern "C" fn jit_get_property_flat(
 pub(crate) extern "C" fn jit_set_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    obj: VmValue,
-    val: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
+    val_tag: u64,
+    val_payload: u64,
     name_idx: usize,
     cs_idx: usize,
     ip: usize,
 ) {
+    let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
+    let val = VmValue::from_raw_parts(val_tag, val_payload);
     let args = varn_jit::JitSetPropertyArgs {
         obj,
         val,
@@ -154,13 +160,15 @@ pub(crate) extern "C" fn jit_set_property(
 
 pub(crate) extern "C" fn jit_get_fixed_field(
     ctx: *mut ExecCtx,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     slot: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
         match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
-            Ok(val) => val,
+            Ok(val) => ctx_ref.jit_native_result = val,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
@@ -168,12 +176,16 @@ pub(crate) extern "C" fn jit_get_fixed_field(
 
 pub(crate) extern "C" fn jit_set_fixed_field(
     ctx: *mut ExecCtx,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     slot: usize,
-    val: VmValue,
+    val_tag: u64,
+    val_payload: u64,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
         if let Err(e) = crate::exec::props::set_fixed_field(obj, slot, val, &mut ctx_ref.heap) {
             jit_propagate_error(ctx_ref, e);
         }
@@ -182,26 +194,31 @@ pub(crate) extern "C" fn jit_set_fixed_field(
 
 pub(crate) extern "C" fn jit_get_property_maybe_stub(
     ctx: *mut ExecCtx,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     name_idx: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
         let frame_idx = ctx_ref.frames.len() - 1;
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        crate::exec::props::get_property_maybe(obj, &name, &mut ctx_ref.heap)
+        ctx_ref.jit_native_result =
+            crate::exec::props::get_property_maybe(obj, &name, &mut ctx_ref.heap);
     }
 }
 
 pub(crate) extern "C" fn jit_get_symbol(
     ctx: *mut ExecCtx,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     sym_idx: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
         let frame_idx = ctx_ref.frames.len() - 1;
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let sym_nv = closure_ref.constants[sym_idx];
@@ -209,7 +226,7 @@ pub(crate) extern "C" fn jit_get_symbol(
         match sym_val {
             varn_types::Value::Symbol(s) => {
                 match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
-                    Ok(v) => v,
+                    Ok(v) => ctx_ref.jit_native_result = v,
                     Err(e) => jit_propagate_error(ctx_ref, e),
                 }
             }
@@ -220,11 +237,13 @@ pub(crate) extern "C" fn jit_get_symbol(
 
 pub(crate) extern "C" fn jit_bind_method(
     ctx: *mut ExecCtx,
-    obj: VmValue,
+    obj_tag: u64,
+    obj_payload: u64,
     name_idx: usize,
-) -> VmValue {
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
         let frame_idx = ctx_ref.frames.len() - 1;
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let key_nv = closure_ref.constants[name_idx];
@@ -234,7 +253,7 @@ pub(crate) extern "C" fn jit_bind_method(
             Err(e) => jit_propagate_error(ctx_ref, e),
         };
         match crate::exec::advanced::bind_method(obj, method, &mut ctx_ref.heap) {
-            Ok(v) => v,
+            Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }

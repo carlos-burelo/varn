@@ -12,8 +12,8 @@ use cranelift_codegen::ir::{
 };
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::SlotKind;
-use varn_types::VmValue;
 
+use super::alloc::AllocCtx;
 use super::kinds::{is_boxed_kind, K};
 
 // Tag tests, re-emitted inline. These apply to a value's TAG WORD; the
@@ -21,7 +21,6 @@ use super::kinds::{is_boxed_kind, K};
 // these were 64-bit constants that had to come from a constant pool — as
 // small immediates they now fold into the compare.
 pub(super) const KIND_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
-pub(super) const INT_KIND: i64 = varn_types::vm_value::KIND_INT as i64;
 pub(super) const HEAP_KIND: i64 = varn_types::vm_value::KIND_HEAP as i64;
 
 /// `site` is the buffer offset of the rel32 field; `target` the buffer
@@ -43,6 +42,7 @@ pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, 
 
 pub(super) fn def_const_int(
     b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
     meta: &[varn_types::register_meta::RegisterMeta],
     vars: &[Variable],
     reg: usize,
@@ -51,15 +51,36 @@ pub(super) fn def_const_int(
     if meta_is_float(meta, reg) {
         let f = b.ins().f64const(v as f64);
         b.def_var(vars[reg], f);
+        if let Some(actx) = actx {
+            let fb = super::alloc::frame_base_addr(b, actx);
+            let boxed = box_f64(b, f);
+            b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+        }
     } else {
         let c = b.ins().iconst(types::I64, v);
         b.def_var(vars[reg], c);
+        if let Some(actx) = actx {
+            let fb = super::alloc::frame_base_addr(b, actx);
+            let boxed = box_int(b, c);
+            b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+        }
     }
 }
 
-pub(super) fn def_const_bool(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: bool) {
+pub(super) fn def_const_bool(
+    b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
+    vars: &[Variable],
+    reg: usize,
+    v: bool,
+) {
     let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
     b.def_var(vars[reg], c);
+    if let Some(actx) = actx {
+        let fb = super::alloc::frame_base_addr(b, actx);
+        let boxed = box_bool(b, c);
+        b.ins().store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+    }
 }
 
 /// Read a register as an unboxed int. `Int` vars are already raw; `Boxed`
@@ -109,7 +130,11 @@ pub(super) fn emit_return_value(
     src: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
     if state[src] == K::Poison {
-        return Ok(b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64));
+        return Ok(match return_kind {
+            SlotKind::Float => b.ins().f64const(0.0),
+            SlotKind::Int | SlotKind::Bool => b.ins().iconst(types::I64, 0),
+            _ => box_null(b),
+        });
     }
     Ok(match return_kind {
         SlotKind::Int => match state[src] {
@@ -128,24 +153,39 @@ pub(super) fn emit_return_value(
         },
         SlotKind::Float => match state[src] {
             K::Float => {
-                let f = b.use_var(vars[src]);
-                box_f64(b, f)
+                let raw = b.use_var(vars[src]);
+                if b.func.dfg.value_type(raw) == types::F64 {
+                    raw
+                } else {
+                    b.ins().bitcast(types::F64, MemFlags::trusted(), raw)
+                }
             }
             K::Int => {
                 let iv = b.use_var(vars[src]);
-                let f = b.ins().fcvt_from_sint(types::F64, iv);
-                box_f64(b, f)
+                if b.func.dfg.value_type(iv) == types::F64 {
+                    iv
+                } else {
+                    b.ins().fcvt_from_sint(types::F64, iv)
+                }
             }
-            _ => box_or_pass(b, vars, state, src),
+            _ => {
+                let v = box_or_pass(b, vars, state, src);
+                unbox_f64_coerce(b, v)
+            }
         },
-        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
         SlotKind::Bool => match state[src] {
-            K::Bool => {
-                let raw = b.use_var(vars[src]);
-                box_bool(b, raw)
+            K::Bool => b.use_var(vars[src]),
+            _ => {
+                let v = box_or_pass(b, vars, state, src);
+                unbox_bool(b, v)
             }
-            _ => box_or_pass(b, vars, state, src),
         },
+        SlotKind::Str
+        | SlotKind::Ref
+        | SlotKind::Class(_)
+        | SlotKind::Array(_)
+        | SlotKind::Nullable(_)
+        | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
     })
 }
 
@@ -157,49 +197,41 @@ pub(super) fn box_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: box_int awaits the two-word value migration")
+    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
+    b.ins().iconcat(tag, v)
 }
 
 /// Box an unboxed 0/1 bool as a VmValue: `false` = 0x7FFA…, `true` = 0x7FFB…
 /// (`0x7FFA_0000_0000_0000 | (v << 48)`, valid because v ∈ {0,1}).
 // Parameters kept, unused: they document the signature the migrated
 // version has to satisfy.
-#[allow(unused_variables)]
 pub(super) fn box_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: box_bool awaits the two-word value migration")
+    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_BOOL as i64);
+    let payload = if b.func.dfg.value_type(v) == types::I64 {
+        v
+    } else {
+        b.ins().uextend(types::I64, v)
+    };
+    b.ins().iconcat(tag, payload)
 }
 
 /// Unbox a boxed bool VmValue (TAG_TRUE=0x7FFB…, TAG_FALSE=0x7FFA…) to 0/1:
 /// the two tags differ only in bit 48, so `(v >> 48) & 1`.
 // Parameters kept, unused: they document the signature the migrated
 // version has to satisfy.
-#[allow(unused_variables)]
 pub(super) fn unbox_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: unbox_bool awaits the two-word value migration")
+    if b.func.dfg.value_type(v) == types::I128 {
+        let (_tag, payload) = b.ins().isplit(v);
+        payload
+    } else {
+        v
+    }
 }
 
 /// Box an unboxed `f64` as a VmValue, replicating `VmValue::from_f64`: a
@@ -209,22 +241,15 @@ pub(super) fn unbox_bool(
 /// through `from_f64`.
 // Parameters kept, unused: they document the signature the migrated
 // version has to satisfy.
-#[allow(unused_variables)]
 pub(super) fn box_f64(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: box_f64 awaits the two-word value migration")
+    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
+    let payload = b.ins().bitcast(types::I64, MemFlags::trusted(), v);
+    b.ins().iconcat(tag, payload)
 }
 
-/// Mask isolating a value's kind, for an int-kind test.
-pub(super) const INT_CHECK_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 
 /// Unbox a VmValue a float slot may hold as EITHER float bits OR an int
 /// VmValue — the latter arises when a widening int argument is passed to a
@@ -234,18 +259,29 @@ pub(super) const INT_CHECK_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 /// reinterpreted as its f64 bits.
 // Parameters kept, unused: they document the signature the migrated
 // version has to satisfy.
-#[allow(unused_variables)]
 pub(super) fn unbox_f64_coerce(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: unbox_f64_coerce awaits the two-word value migration")
+    let ty = b.func.dfg.value_type(v);
+    if ty == types::F64 {
+        v
+    } else if ty == types::I128 {
+        let (tag, payload) = b.ins().isplit(v);
+        let is_float = b.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            tag,
+            varn_types::vm_value::KIND_FLOAT as i64,
+        );
+        let f_direct = b.ins().bitcast(types::F64, MemFlags::trusted(), payload);
+        let f_from_int = b.ins().fcvt_from_sint(types::F64, payload);
+        b.ins().select(is_float, f_direct, f_from_int)
+    } else if ty == types::I64 {
+        b.ins().fcvt_from_sint(types::F64, v)
+    } else {
+        let ext = b.ins().sextend(types::I64, v);
+        b.ins().fcvt_from_sint(types::F64, ext)
+    }
 }
 
 /// Read a register as a raw `f64`: a `Float` var is already `F64`; an `Int`
@@ -267,12 +303,16 @@ pub(super) fn use_f64(
             if b.func.dfg.value_type(raw) == types::F64 {
                 Ok(raw)
             } else {
-                Ok(unbox_f64_coerce(b, raw))
+                Ok(b.ins().bitcast(types::F64, MemFlags::trusted(), raw))
             }
         }
         K::Int => {
             let iv = b.use_var(var);
-            Ok(b.ins().fcvt_from_sint(types::F64, iv))
+            if b.func.dfg.value_type(iv) == types::F64 {
+                Ok(iv)
+            } else {
+                Ok(b.ins().fcvt_from_sint(types::F64, iv))
+            }
         }
         k => Err(format!("clif: f64 use of {k:?} register")),
     }
@@ -287,6 +327,12 @@ pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r:
 /// int → `box_int`, bool → `box_bool`, float → `box_f64`, already-boxed (or
 /// any other tracked kind) → the raw bits. Callers pass registers whose
 /// lattice kind the flow has already proven to hold a real value.
+pub(super) fn box_null(b: &mut FunctionBuilder) -> cranelift_codegen::ir::Value {
+    let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+    let zero = b.ins().iconst(types::I64, 0);
+    b.ins().iconcat(tag, zero)
+}
+
 pub(super) fn box_or_pass(
     b: &mut FunctionBuilder,
     vars: &[Variable],
@@ -294,16 +340,23 @@ pub(super) fn box_or_pass(
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let Some(&var) = vars.get(r) else {
-        return b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64);
+        return box_null(b);
     };
     let raw = b.use_var(var);
     if b.func.dfg.value_type(raw) == types::F64 {
-        b.ins().bitcast(types::I64, MemFlags::new(), raw)
+        box_f64(b, raw)
     } else {
         match state.get(r).copied().unwrap_or(K::Unset) {
             K::Int => box_int(b, raw),
             K::Bool => box_bool(b, raw),
-            _ => raw,
+            K::Float => {
+                let f = b.ins().bitcast(types::F64, MemFlags::trusted(), raw);
+                box_f64(b, f)
+            }
+            _ => {
+                let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                b.ins().iconcat(tag, raw)
+            }
         }
     }
 }
@@ -321,12 +374,17 @@ pub(super) fn box_for_target(
         }
         if is_boxed_kind(target_state[r]) && !is_boxed_kind(state[r]) {
             let boxed = box_or_pass(b, vars, state, r);
-            b.def_var(vars[r], boxed);
+            let payload = if b.func.dfg.value_type(boxed) == cranelift_codegen::ir::types::I128 {
+                let (_tag, payload) = b.ins().isplit(boxed);
+                payload
+            } else {
+                boxed
+            };
+            b.def_var(vars[r], payload);
         } else if !is_boxed_kind(target_state[r]) && is_boxed_kind(state[r]) {
             if target_state[r] == K::Int {
                 let v = b.use_var(vars[r]);
-                let s = b.ins().ishl_imm(v, 16);
-                let un = b.ins().sshr_imm(s, 16);
+                let un = wrap_i48(b, v);
                 b.def_var(vars[r], un);
             } else if target_state[r] == K::Bool {
                 let v = b.use_var(vars[r]);
@@ -378,6 +436,7 @@ pub(crate) struct RegionCache {
     /// indices into this array are within bounds (max_index < len).
     /// The per-iteration bounds check can be skipped entirely — `data != 0`
     /// already guarantees both repr match AND bounds safety.
+    #[allow(dead_code)]
     pub bounds_guaranteed: bool,
 }
 
@@ -565,10 +624,12 @@ pub(super) fn retag_raw_return(
     raw_res: cranelift_codegen::ir::Value,
     return_kind: SlotKind,
 ) -> cranelift_codegen::ir::Value {
-    if return_kind != SlotKind::Int {
-        return raw_res;
+    match return_kind {
+        SlotKind::Int => box_int(b, raw_res),
+        SlotKind::Float => box_f64(b, raw_res),
+        SlotKind::Bool => box_bool(b, raw_res),
+        _ => raw_res,
     }
-    box_int(b, raw_res)
 }
 
 pub(super) fn call_helper(
@@ -665,13 +726,18 @@ pub(super) fn emit_array_payload(
     // Vec's data/len words are never readonly — an out-of-bounds store's
     // append path reallocates them.
     let ro = MemFlags::trusted();
-    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
+    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let raw = b.ins().band_imm(obj, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, ro, exec_ctx, heap_off as i32);
     let old_bit = b.ins().band_imm(raw, 0x8000_0000);
 
@@ -747,20 +813,16 @@ pub(super) fn array_disc(
 /// `(v << 16) >> 16` — sign-extend the low 48 bits. This is the unboxing of an
 /// int-tagged VmValue payload (`varn_core::numeric::wrap_i48`), NOT an
 /// overflow policy; see [`guard_i48`].
-// Parameters kept, unused: they document the signature the migrated
-// version has to satisfy.
-#[allow(unused_variables)]
 pub(super) fn wrap_i48(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    // NOT YET MIGRATED to the two-word value. This primitive encodes or
-    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
-    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
-    // pair of Cranelift values and a caller that threads both. `jit::compile`
-    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
-    // so this is unreachable rather than wrong.
-    unimplemented!("clif: wrap_i48 awaits the two-word value migration")
+    if b.func.dfg.value_type(v) == types::I128 {
+        let (_tag, payload) = b.ins().isplit(v);
+        payload
+    } else {
+        v
+    }
 }
 
 /// Returns `true` when `v` is an `iconst` whose absolute value is below `threshold`.
@@ -793,7 +855,9 @@ pub(super) fn guard_overflow(
     b.switch_to_block(raise);
     let ba = box_int(b, lhs);
     let bb = box_int(b, rhs);
-    let _ = call_helper(b, cc, helper, &[exec_ctx, ba, bb]);
+    let (a_tag, a_payload) = b.ins().isplit(ba);
+    let (b_tag, b_payload) = b.ins().isplit(bb);
+    call_helper_void(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
     b.ins().jump(cont, &[]);
 
     b.switch_to_block(cont);
@@ -812,16 +876,21 @@ pub(super) fn emit_object_data_base(
     invalid: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
     let m = MemFlags::trusted();
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
 
     // 1. Heap-pointer tag check.
-    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], invalid, &[]);
     b.switch_to_block(chk);
 
     // 2. Heap index + generation select → slot address.
-    let raw = b.ins().band_imm(obj, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
     let old_bit = b.ins().band_imm(raw, 0x8000_0000);
     let base_old = b.ins().load(
