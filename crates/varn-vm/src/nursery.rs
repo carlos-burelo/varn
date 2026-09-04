@@ -403,9 +403,9 @@ impl Nursery {
             }
             Container::Instance(inst) => {
                 let payload_size = inst.payload_size as usize;
-                let num_words = payload_size / 8;
-                for word_idx in 0..num_words {
-                    let offset = word_idx * 8;
+                let num_slots = payload_size / 16;
+                for slot in 0..num_slots {
+                    let offset = slot * 16;
                     let mut val = unsafe { inst.read_vm_value(offset) };
                     if val.is_heap() && is_nursery_idx(val.as_heap_idx()) {
                         self.update_value(&mut val, old_gen, worklist);
@@ -573,9 +573,9 @@ impl Nursery {
             },
             HeapObj::Instance(inst) => {
                 let payload_size = inst.payload_size as usize;
-                let num_words = payload_size / 8;
-                for word_idx in 0..num_words {
-                    let offset = word_idx * 8;
+                let num_slots = payload_size / 16;
+                for slot in 0..num_slots {
+                    let offset = slot * 16;
                     let val = unsafe { inst.read_vm_value(offset) };
                     if nursery_val(&val) {
                         return true;
