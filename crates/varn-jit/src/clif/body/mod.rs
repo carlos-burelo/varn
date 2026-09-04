@@ -185,8 +185,8 @@ pub(super) fn lower_raw(
         let exec_ctx = b.block_params(entry)[3];
         (exec_ctx, Some((base, closure)))
     } else {
-        let exec_ctx = b.block_params(entry)[0];
-        (exec_ctx, None)
+        let dummy_ctx = b.ins().iconst(types::I64, 0);
+        (dummy_ctx, None)
     };
 
     let live = if alloc_env.is_some() {
@@ -219,7 +219,7 @@ pub(super) fn lower_raw(
     let reg_offset = 1;
     for i in 0..sig_nparams {
         let r = reg_offset + i;
-        let param_idx = if frame_aware { 4 + i } else { 1 + i };
+        let param_idx = if frame_aware { 4 + i } else { i };
         let p = b.block_params(entry)[param_idx];
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
             || meta_is_float(&proto.register_meta, r);

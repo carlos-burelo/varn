@@ -419,8 +419,8 @@ pub(crate) fn dispatch_opcode(
                 args.push(stack_ptr);
                 args.push(closure_val);
                 args.push(base_val);
+                args.push(exec_ctx);
             }
-            args.push(exec_ctx);
             for i in 0..nparams {
                 let r = arg_start + 1 + i;
                 let v = if proto.param_kinds.get(i) == Some(&SlotKind::Int) {

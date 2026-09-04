@@ -136,8 +136,7 @@ pub(crate) fn emit_call(
         return Ok(());
     };
 
-    let mut raw_args = Vec::with_capacity(1 + t.param_kinds.len());
-    raw_args.push(actx.exec_ctx);
+    let mut raw_args = Vec::with_capacity(t.param_kinds.len());
     for (i, k) in t.param_kinds.iter().enumerate() {
         let r = arg_start + 1 + i;
         let v = if *k == SlotKind::Int {
@@ -184,8 +183,6 @@ pub(crate) fn emit_call(
     flush_boxed(b, actx, state, &regs);
     let raw_sig = {
         let mut s = cranelift_codegen::ir::Signature::new(actx.cc);
-        s.params
-            .push(cranelift_codegen::ir::AbiParam::new(types::I64));
         for k in &t.param_kinds {
             if *k == SlotKind::Float {
                 s.params

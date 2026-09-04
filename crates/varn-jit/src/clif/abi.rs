@@ -36,9 +36,10 @@ pub(super) fn raw_signature(
     frame_aware: bool,
 ) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
-    let extra = if frame_aware { 3 } else { 0 };
-    for _ in 0..(1 + extra) {
-        sig.params.push(AbiParam::new(types::I64));
+    if frame_aware {
+        for _ in 0..4 {
+            sig.params.push(AbiParam::new(types::I64));
+        }
     }
     for i in 0..nparams {
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
@@ -137,8 +138,8 @@ pub(super) fn build_wrapper(
         args.push(stack_ptr);
         args.push(closure);
         args.push(base);
+        args.push(exec_ctx);
     }
-    args.push(exec_ctx);
     for i in 0..nparams {
         let boxed = b.ins().load(
             types::I128,
