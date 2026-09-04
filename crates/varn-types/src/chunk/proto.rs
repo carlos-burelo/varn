@@ -345,6 +345,54 @@ impl FunctionProto {
         false
     }
 
+    /// Checks if this constructor proto is a trivial field-initializer:
+    /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
+    /// instructions ending in Return.
+    ///
+    /// Returns `Some(Vec<(u16, u16)>)` where each element is `(param_index_1_based, slot_index)`.
+    pub fn trivial_field_init_plan(&self) -> Option<Vec<(usize, usize)>> {
+        if self.is_async || self.is_generator || self.has_rest || self.upvalue_count > 0 {
+            return None;
+        }
+        let code = &self.chunk.code;
+        let mut ip = 0;
+        let mut plan = Vec::new();
+
+        while ip < code.len() {
+            let op = OpCode::from_u16(code[ip])?;
+            match op {
+                OpCode::SetFixedField => {
+                    // Instruction format:
+                    // code[ip]: opcode in lo byte, dest (this register = 0) in hi byte
+                    // code[ip+1]: value register in hi byte
+                    // code[ip+2]: slot index
+                    let this_r = (code[ip] >> 8) as usize;
+                    if this_r != 0 {
+                        return None;
+                    }
+                    let val_r = (code[ip + 1] >> 8) as usize;
+                    let slot = code[ip + 2] as usize;
+                    // In constructor calling convention, parameters occupy registers 1..=arity
+                    if val_r == 0 || val_r > self.arity {
+                        return None;
+                    }
+                    let param_idx = val_r - 1;
+                    plan.push((param_idx, slot));
+                    ip += 3;
+                }
+                OpCode::Return => {
+                    // A return at the end of constructor is valid
+                    return Some(plan);
+                }
+                OpCode::Nop => {
+                    ip += 1;
+                }
+                _ => return None,
+            }
+        }
+        Some(plan)
+    }
+
     pub fn ensure_ic(&self) {
         let n = self.cache_count;
         if n == 0 {

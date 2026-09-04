@@ -145,6 +145,27 @@ pub(crate) fn construct_staged_fast(
     if on {
         prof::record(prof::Seg::ObjDataAlloc, t_alloc, prof::read());
     }
+    if let Some((ref closure, _)) = jit_ctor {
+        if let Some(plan) = closure.proto.trivial_field_init_plan() {
+            // Fast inlining: directly assign arguments into object slots
+            // Arguments are staged at `callee_base + 1 + param_idx`.
+            for (param_idx, slot) in plan {
+                let arg_idx = callee_base + 1 + param_idx;
+                if arg_idx < ctx_ref.stack.len() {
+                    let val = ctx_ref.stack[arg_idx];
+                    oref.set_field_at(slot, val);
+                }
+            }
+            let t_push = if on { prof::read() } else { 0 };
+            let instance_nv =
+                VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+            if on {
+                prof::record(prof::Seg::HeapPush, t_push, prof::read());
+            }
+            return Some(instance_nv);
+        }
+    }
+
     let t_push = if on { prof::read() } else { 0 };
     let instance_nv =
         VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
