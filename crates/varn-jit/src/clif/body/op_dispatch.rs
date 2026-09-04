@@ -545,11 +545,22 @@ pub(crate) fn dispatch_opcode(
         OpCode::Call => {
             let actx = actx.ok_or("clif: call in non-frame-aware fn")?;
             let callee_reg = (code[ip + 1] & 0xFF) as usize;
-            let target = match state[callee_reg] {
-                K::Global(i) => linker.static_target(i as usize),
-                _ => None,
+            let (target, class_target) = match state[callee_reg] {
+                K::Global(i) => (
+                    linker.static_target(i as usize),
+                    linker.static_class_target(i as usize),
+                ),
+                _ => (None, None),
             };
-            alloc::emit_call(b, actx, state, code, ip, target.as_ref())?;
+            alloc::emit_call(
+                b,
+                actx,
+                state,
+                code,
+                ip,
+                target.as_ref(),
+                class_target.as_ref(),
+            )?;
         }
         OpCode::BuildArray | OpCode::BuildTuple => {
             let actx = actx.ok_or("clif: BuildArray outside alloc fn")?;

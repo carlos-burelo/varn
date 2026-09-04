@@ -231,4 +231,42 @@ impl ClifLinker for CtxLinker {
             return_kind: proto.return_kind,
         })
     }
+
+    fn static_class_target(
+        &self,
+        global_idx: usize,
+    ) -> Option<varn_jit::clif::lower::ClifClassTarget> {
+        if self.0.is_null() {
+            return None;
+        }
+        let ctx = unsafe { &*self.0 };
+        let gv = *ctx.globals.values.get(global_idx)?;
+        if !gv.is_heap() {
+            return None;
+        }
+        let cls = match ctx.heap.get(gv.as_heap_idx()) {
+            Some(crate::heap::HeapObj::Class(c)) => c,
+            _ => return None,
+        };
+        let layout = cls.get_or_compute_layout();
+        let trivial_plan = if let Some(ctor_val) = cls.constructor() {
+            match ctor_val {
+                varn_types::Value::VmValue(payload) => {
+                    let wrapper = payload
+                        .as_any()
+                        .downcast_ref::<crate::closure::VmClosurePayload>()?;
+                    wrapper.0.proto.trivial_field_init_plan()
+                }
+                _ => None,
+            }
+        } else {
+            Some(Vec::new())
+        };
+        Some(varn_jit::clif::lower::ClifClassTarget {
+            class_id: cls.id,
+            expected_bits: gv.raw_payload(),
+            payload_size: layout.payload_size,
+            trivial_plan,
+        })
+    }
 }

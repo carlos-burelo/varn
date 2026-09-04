@@ -154,6 +154,9 @@ macro_rules! jit_helper_abi {
             /// — the CLIF static-call IC miss path: dispatch the (rebound or
             /// GC-moved) callee through the interpreter/JIT with boxed args.
             clif_call_fallback => clif_call_fallback,
+            /// `extern "C" fn(*mut ExecCtx, class_id: u32) -> VmValue`
+            /// — Fast allocator for class instances without interpreter frame overhead.
+            alloc_instance_fast => jit_alloc_instance_fast,
         }
     };
 }

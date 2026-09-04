@@ -209,3 +209,17 @@ pub(crate) fn construct_staged_fast(
 
     Some(if res.is_null() { final_instance } else { res })
 }
+
+pub(crate) extern "C" fn jit_alloc_instance_fast(ctx: *mut ExecCtx, class_id: u32) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let Some(cls) = varn_types::ClassObj::find_by_id(class_id) else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new(format!("invalid class id {}", class_id)),
+            );
+        };
+        let inst = varn_types::value::InstanceRef::alloc(cls);
+        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)))
+    }
+}

@@ -82,11 +82,22 @@ pub struct ClifTarget {
     pub return_kind: SlotKind,
 }
 
+#[derive(Clone, Debug)]
+pub struct ClifClassTarget {
+    pub class_id: u32,
+    pub expected_bits: u64,
+    pub payload_size: u32,
+    pub trivial_plan: Option<Vec<(usize, usize)>>,
+}
+
 /// VM-side resolver for clif→clif static calls. Implemented over the live
 /// `ExecCtx` at compile time (globals are runtime state, so the JIT crate
 /// cannot see them itself).
 pub trait ClifLinker {
     fn static_target(&self, global_idx: usize) -> Option<ClifTarget>;
+    fn static_class_target(&self, _global_idx: usize) -> Option<ClifClassTarget> {
+        None
+    }
 }
 
 /// Linker that never links — used by paths without a VM context.

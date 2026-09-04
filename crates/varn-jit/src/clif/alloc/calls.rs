@@ -20,6 +20,7 @@ pub(crate) fn emit_call(
     code: &[u16],
     ip: usize,
     target: Option<&crate::clif::lower::ClifTarget>,
+    class_target: Option<&crate::clif::lower::ClifClassTarget>,
 ) -> Result<(), String> {
     let w1 = code[ip + 1];
     let w2 = code[ip + 2];
@@ -29,6 +30,90 @@ pub(crate) fn emit_call(
     let arg_start = (w2 & 0xFF) as usize;
 
     let callee = box_or_load_home(b, actx, state, callee_reg);
+
+    if let Some(ct) = class_target {
+        if let Some(ref plan) = ct.trivial_plan {
+            let valid_plan = plan.iter().all(|&(param_idx, _)| {
+                1 + param_idx < total && arg_start + 1 + param_idx < actx.nregs
+            });
+            if valid_plan && arg_start + total <= actx.nregs {
+                let fast_blk = b.create_block();
+                let slow_blk = b.create_block();
+                let cont_blk = b.create_block();
+
+                let (callee_tag, callee_payload) = b.ins().isplit(callee);
+                let expected_tag =
+                    b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                let expected_payload = b.ins().iconst(types::I64, ct.expected_bits as i64);
+                let tag_matches = b.ins().icmp(IntCC::Equal, callee_tag, expected_tag);
+                let payload_matches = b.ins().icmp(IntCC::Equal, callee_payload, expected_payload);
+                let callee_ok = b.ins().band(tag_matches, payload_matches);
+                b.ins().brif(callee_ok, fast_blk, &[], slow_blk, &[]);
+
+                b.switch_to_block(fast_blk);
+                let cid_val = b.ins().iconst(types::I64, ct.class_id as i64);
+                let raw_idx = super::super::emit::call_helper(
+                    b,
+                    actx.cc,
+                    actx.helpers.alloc_instance_fast,
+                    &[actx.exec_ctx, cid_val],
+                );
+                let inst_tag = b
+                    .ins()
+                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                let instance_nv = b.ins().iconcat(inst_tag, raw_idx);
+
+                let data_base = super::super::emit::emit_object_data_base(
+                    b,
+                    actx.exec_ctx,
+                    instance_nv,
+                    &actx.helpers.object_layout,
+                    &actx.helpers.array_layout,
+                    actx.helpers.heap_field_offset,
+                    slow_blk,
+                );
+
+                for &(param_idx, slot) in plan {
+                    let arg_r = arg_start + 1 + param_idx;
+                    let val = box_or_load_home(b, actx, state, arg_r);
+                    let val128 = if b.func.dfg.value_type(val) == types::I128 {
+                        val
+                    } else if b.func.dfg.value_type(val) == types::F64 {
+                        super::super::emit::box_f64(b, val)
+                    } else {
+                        match state.get(arg_r).copied().unwrap_or(K::Unset) {
+                            K::Int => super::super::emit::box_int(b, val),
+                            K::Bool => super::super::emit::box_bool(b, val),
+                            K::Float => {
+                                let f = b.ins().bitcast(types::F64, MemFlags::new(), val);
+                                super::super::emit::box_f64(b, f)
+                            }
+                            _ => {
+                                let tag_v = b.ins().iconst(
+                                    types::I64,
+                                    varn_types::vm_value::KIND_HEAP as i64,
+                                );
+                                b.ins().iconcat(tag_v, val)
+                            }
+                        }
+                    };
+                    let slot_off = (slot * 16) as i32;
+                    b.ins().store(MemFlags::trusted(), val128, data_base, slot_off);
+                }
+
+                def_result(b, actx, dest, instance_nv);
+                b.ins().jump(cont_blk, &[]);
+
+                b.switch_to_block(slow_blk);
+                let slow_res = emit_vm_call(b, actx, state, callee, arg_start, total);
+                def_result(b, actx, dest, slow_res);
+                b.ins().jump(cont_blk, &[]);
+
+                b.switch_to_block(cont_blk);
+                return Ok(());
+            }
+        }
+    }
 
     let direct = target.filter(|t| {
         t.raw_slot != 0
