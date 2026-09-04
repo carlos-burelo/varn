@@ -555,12 +555,14 @@ pub fn value_to_nv(v: &Value) -> VmValue {
 /// - Has NO `overflow` store (no dynamic property additions).
 /// - Has a compact 8-byte header (`class_id: u32`, `payload_size: u32`).
 /// - Stores primitive fields packed at native offsets without 16-byte VmValue boxing.
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
-    pub class: Rc<crate::value::ClassObj>,
+    pub class_id: u32,
     pub payload_size: u32,
     payload: T,
 }
+
+const INSTANCE_HEADER_WORDS: usize = 1;
 
 impl InstanceData {
     /// Allocates an `InstanceData` on the heap with the specified layout.
@@ -568,15 +570,14 @@ impl InstanceData {
         let layout = class.get_or_compute_layout();
         let payload_bytes = layout.payload_size as usize;
         let payload_words = (payload_bytes + 7) / 8;
-        let header_words = (std::mem::size_of::<InstanceData<[UnsafeCell<u8>; 0]>>() + 7) / 8;
-        let total_words = header_words + payload_words;
+        let total_words = INSTANCE_HEADER_WORDS + payload_words;
 
         let backing: Rc<[MaybeUninit<u64>]> = Rc::new_uninit_slice(total_words);
         let base = Rc::into_raw(backing) as *const MaybeUninit<u64> as *mut UnsafeCell<u8>;
         let data = ptr::slice_from_raw_parts_mut(base, payload_bytes) as *mut InstanceData;
 
         unsafe {
-            ptr::write(ptr::addr_of_mut!((*data).class), class);
+            ptr::write(ptr::addr_of_mut!((*data).class_id), class.id);
             ptr::write(ptr::addr_of_mut!((*data).payload_size), layout.payload_size);
 
             let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
@@ -629,34 +630,6 @@ impl InstanceData {
     pub unsafe fn read_vm_value(&self, offset: usize) -> VmValue {
         let ptr = self.raw_payload_ptr().add(offset) as *const VmValue;
         ptr.read()
-    }
-
-    #[inline(always)]
-    pub fn get(&self, key: &str) -> Option<VmValue> {
-        let layout = self.class.get_or_compute_layout();
-        let f = layout.get_field(key)?;
-        let offset = f.offset as usize;
-        if offset + 16 <= self.payload_size as usize {
-            Some(unsafe { self.read_vm_value(offset) })
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
-    pub fn set(&self, key: &str, val: VmValue) -> bool {
-        let layout = self.class.get_or_compute_layout();
-        let f = match layout.get_field(key) {
-            Some(f) => f,
-            None => return false,
-        };
-        let offset = f.offset as usize;
-        if offset + 16 <= self.payload_size as usize {
-            unsafe { self.write_vm_value(offset, val) };
-            true
-        } else {
-            false
-        }
     }
 
     #[inline(always)]
@@ -719,14 +692,6 @@ impl InstanceData {
     }
 }
 
-impl<T: ?Sized> Drop for InstanceData<T> {
-    fn drop(&mut self) {
-        unsafe {
-            ptr::drop_in_place(&mut self.class);
-        }
-    }
-}
-
 /// Reference-counted wrapper around [`InstanceData`].
 #[derive(Clone)]
 pub struct InstanceRef(pub Rc<InstanceData>);
@@ -754,7 +719,7 @@ impl std::ops::Deref for InstanceRef {
 impl std::fmt::Debug for InstanceData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstanceData")
-            .field("class", &self.class.name)
+            .field("class_id", &self.class_id)
             .field("payload_size", &self.payload_size)
             .finish()
     }
@@ -762,7 +727,7 @@ impl std::fmt::Debug for InstanceData {
 
 impl std::fmt::Debug for InstanceRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InstanceRef(class={}, size={})", self.0.class.name, self.0.payload_size)
+        write!(f, "InstanceRef(class_id={}, size={})", self.0.class_id, self.0.payload_size)
     }
 }
 

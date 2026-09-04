@@ -212,11 +212,28 @@ impl Heap {
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
 
+        // Probe HeapObj::Instance layout facts
+        let dummy_cls = varn_types::ClassObj::new_rc("__probe_class");
+        let inst_ref = varn_types::value::InstanceRef::alloc(dummy_cls);
+        let inst_rcbox = Rc::as_ptr(&inst_ref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+        let inst_slot: Option<HeapObj> = Some(HeapObj::Instance(inst_ref.clone()));
+        let inst_bytes = unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
+        let instance_tag = inst_bytes[0] as usize;
+        let instance_payload_off = (0..=size - 8)
+            .find(|&off| usize::from_ne_bytes(inst_bytes[off..off + 8].try_into().unwrap()) == inst_rcbox)
+            .expect("instance payload probe failed");
+
+        let raw_payload_ptr = inst_ref.raw_payload_ptr() as usize;
+        let instance_values_off = raw_payload_ptr - inst_rcbox;
+
         varn_jit::JitObjectLayout {
             object_tag,
+            instance_tag,
             payload_off,
+            instance_payload_off,
             len_off,
             values_off,
+            instance_values_off,
             shape_off,
             shape_id_off,
         }

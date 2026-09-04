@@ -207,7 +207,7 @@ pub(super) fn declare(
                     .entry(obj_r)
                     .or_insert_with(|| b.declare_var(types::I64));
             } else if op == Some(OpCode::SetFixedField) {
-                let obj_r = (code[scan_ip + 1] & 0xFF) as usize;
+                let obj_r = (code[scan_ip] >> 8) as usize;
                 local_obj_bases
                     .entry(obj_r)
                     .or_insert_with(|| b.declare_var(types::I64));

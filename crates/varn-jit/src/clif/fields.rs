@@ -100,34 +100,47 @@ fn emit_object_field_addr(
     let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base, byte_off);
 
-    // 3. Slot discriminant must be HeapObj::Object.
+    // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_inst = b.ins().icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
     let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let is_valid = b.ins().bor(is_inst, is_obj);
     let ok = b.create_block();
-    b.ins().brif(is_obj, ok, &[], slow, &[]);
+    b.ins().brif(is_valid, ok, &[], slow, &[]);
     b.switch_to_block(ok);
 
-    // 4. Load the object's ObjData pointer.
-    let objdata = b
-        .ins()
-        .load(types::I64, m, slot_addr, olay.payload_off as i32);
+    // 4. Load the payload pointer:
+    // For Instance, payload is at instance_payload_off, and fields start at instance_values_off.
+    // For Object, payload is at payload_off, and fields start at values_off.
+    let c_inst_pay = b.ins().iconst(types::I64, olay.instance_payload_off as i64);
+    let c_obj_pay = b.ins().iconst(types::I64, olay.payload_off as i64);
+    let payload_off = b.ins().select(is_inst, c_inst_pay, c_obj_pay);
+    let obj_ptr = b.ins().iadd(slot_addr, payload_off);
+    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
 
-    // 5. slot < inline_len — fields past the inline tail spilled to the
-    //    overflow store. Fixed fields proven by the type checker are within
-    //    inline fields of the class shape.
+    // 5. If it's an Object (not Instance), check slot < inline_len for overflow spill.
+    // Instances have fixed layout and no overflow store.
     if slot >= 8 {
-        let len = b.ins().load(types::I32, m, objdata, olay.len_off as i32);
+        let check_len_blk = b.create_block();
+        let pass_blk = b.create_block();
+        b.ins().brif(is_inst, pass_blk, &[], check_len_blk, &[]);
+
+        b.switch_to_block(check_len_blk);
+        let len = b.ins().load(types::I32, m, data_ptr, olay.len_off as i32);
         let in_bounds = b
             .ins()
             .icmp_imm(IntCC::UnsignedGreaterThan, len, slot as i64);
-        let ok2 = b.create_block();
-        b.ins().brif(in_bounds, ok2, &[], slow, &[]);
-        b.switch_to_block(ok2);
+        b.ins().brif(in_bounds, pass_blk, &[], slow, &[]);
+
+        b.switch_to_block(pass_blk);
     }
 
-    // 6. The field is inline in the same allocation: one constant displacement (16 bytes per field).
-    b.ins()
-        .iadd_imm(objdata, (olay.values_off + slot * 16) as i64)
+    // 6. Base address for inline values:
+    let c_inst_val = b.ins().iconst(types::I64, olay.instance_values_off as i64);
+    let c_obj_val = b.ins().iconst(types::I64, olay.values_off as i64);
+    let values_off = b.ins().select(is_inst, c_inst_val, c_obj_val);
+    let base_values = b.ins().iadd(data_ptr, values_off);
+    b.ins().iadd_imm(base_values, (slot * 16) as i64)
 }
 
 /// `GetFixedField first_reg, obj, slot` — inline slot read, helper fallback;
@@ -340,9 +353,21 @@ pub(super) fn emit_set_fixed_field(
     };
     let val128 = if b.func.dfg.value_type(val) == types::I128 {
         val
+    } else if b.func.dfg.value_type(val) == types::F64 {
+        super::emit::box_f64(b, val)
     } else {
-        let tag_v = b.ins().iconst(types::I64, HEAP_KIND);
-        b.ins().iconcat(tag_v, val)
+        match state.get(val_r).copied().unwrap_or(K::Unset) {
+            K::Int => super::emit::box_int(b, val),
+            K::Bool => super::emit::box_bool(b, val),
+            K::Float => {
+                let f = b.ins().bitcast(types::F64, MemFlags::new(), val);
+                super::emit::box_f64(b, f)
+            }
+            _ => {
+                let tag_v = b.ins().iconst(types::I64, HEAP_KIND);
+                b.ins().iconcat(tag_v, val)
+            }
+        }
     };
 
     let slow = b.create_block();
@@ -361,9 +386,17 @@ pub(super) fn emit_set_fixed_field(
         b.ins().jump(cont, &[]);
 
         b.switch_to_block(miss_local);
-        let field = emit_object_field_addr(b, c, obj, 0, slow, true);
-        b.def_var(local_var, field);
-        b.ins().store(MemFlags::trusted(), val128, field, slot_off);
+        let computed_base = emit::emit_object_data_base(
+            b,
+            c.exec_ctx,
+            obj,
+            &c.helpers.object_layout,
+            &c.helpers.array_layout,
+            c.helpers.heap_field_offset,
+            slow,
+        );
+        b.def_var(local_var, computed_base);
+        b.ins().store(MemFlags::trusted(), val128, computed_base, slot_off);
         b.ins().jump(cont, &[]);
     } else {
         let field = emit_object_field_addr(b, c, obj, slot, slow, true);

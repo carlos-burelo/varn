@@ -6,6 +6,11 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 static NEXT_CLASS_ID: AtomicU32 = AtomicU32::new(1);
 
+thread_local! {
+    static CLASS_REGISTRY: RefCell<HashMap<u32, std::rc::Weak<ClassObj>>> =
+        RefCell::new(HashMap::new());
+}
+
 #[derive(Debug)]
 pub struct ClassObj {
     pub id: u32,
@@ -81,13 +86,25 @@ impl ClassObj {
     pub fn new_rc(name: impl Into<String>) -> Rc<Self> {
         let cls = Rc::new(Self::new(name));
         cls.init_root_shape();
+        CLASS_REGISTRY.with(|reg| {
+            reg.borrow_mut().insert(cls.id, Rc::downgrade(&cls));
+        });
         cls
     }
 
     pub fn new_native_rc(name: impl Into<String>) -> Rc<Self> {
         let cls = Rc::new(Self::new_native(name));
         cls.init_root_shape();
+        CLASS_REGISTRY.with(|reg| {
+            reg.borrow_mut().insert(cls.id, Rc::downgrade(&cls));
+        });
         cls
+    }
+
+    pub fn find_by_id(id: u32) -> Option<Rc<Self>> {
+        CLASS_REGISTRY.with(|reg| {
+            reg.borrow().get(&id).and_then(|w| w.upgrade())
+        })
     }
 
     pub fn init_root_shape(self: &Rc<Self>) {

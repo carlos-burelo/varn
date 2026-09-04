@@ -90,10 +90,15 @@ pub struct JitArrayLayout {
 pub struct JitObjectLayout {
     /// Discriminant byte value of `HeapObj::Object`.
     pub object_tag: usize,
+    /// Discriminant byte value of `HeapObj::Instance`.
+    pub instance_tag: usize,
     /// Slot base → the object's `Rc<ObjData>` data pointer. `ObjRef` is a fat
     /// pointer, so the slot also carries a length word; the fast paths read the
     /// tail length from the header instead and ignore it.
     pub payload_off: usize,
+    /// Slot base → the instance's `Rc<InstanceData>` pointer. `InstanceRef` is
+    /// a thin pointer (Rc<InstanceData>), so offset in the slot matches payload_off.
+    pub instance_payload_off: usize,
     /// Data pointer → `ObjData.inline_len` (u32): how many fields live in the
     /// tail. Fields past it spilled to the overflow store, which the JIT does
     /// not know how to read — the bounds check against this value is what sends
@@ -101,6 +106,8 @@ pub struct JitObjectLayout {
     pub len_off: usize,
     /// Data pointer → `ObjData.values[0]`. Constant, because the tail is inline.
     pub values_off: usize,
+    /// Data pointer → `InstanceData.payload`.
+    pub instance_values_off: usize,
     /// Data pointer → `ObjData.shape` (an `Rc<Shape>`).
     pub shape_off: usize,
     /// Shape pointer → `Shape.id` (u32).

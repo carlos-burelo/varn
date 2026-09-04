@@ -929,18 +929,25 @@ pub(super) fn emit_object_data_base(
     let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base, byte_off);
 
-    // 3. Slot discriminant must be HeapObj::Object.
+    // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_inst = b.ins().icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
     let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let is_valid = b.ins().bor(is_inst, is_obj);
     let ok = b.create_block();
-    b.ins().brif(is_obj, ok, &[], invalid, &[]);
+    b.ins().brif(is_valid, ok, &[], invalid, &[]);
     b.switch_to_block(ok);
 
-    // 4. Load the object's ObjData pointer.
-    let objdata = b
-        .ins()
-        .load(types::I64, m, slot_addr, olay.payload_off as i32);
+    // 4. Load the payload pointer:
+    let c_inst_pay = b.ins().iconst(types::I64, olay.instance_payload_off as i64);
+    let c_obj_pay = b.ins().iconst(types::I64, olay.payload_off as i64);
+    let payload_off = b.ins().select(is_inst, c_inst_pay, c_obj_pay);
+    let obj_ptr = b.ins().iadd(slot_addr, payload_off);
+    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
 
-    // 5. Compute the inline values base: objdata + values_off
-    b.ins().iadd_imm(objdata, olay.values_off as i64)
+    // 5. Compute the inline values base: data_ptr + values_off
+    let c_inst_val = b.ins().iconst(types::I64, olay.instance_values_off as i64);
+    let c_obj_val = b.ins().iconst(types::I64, olay.values_off as i64);
+    let values_off = b.ins().select(is_inst, c_inst_val, c_obj_val);
+    b.ins().iadd(data_ptr, values_off)
 }
