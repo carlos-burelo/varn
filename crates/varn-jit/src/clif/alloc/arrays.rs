@@ -55,17 +55,12 @@ pub(crate) fn emit_array_push(
     let val = box_or_load_home(b, actx, state, val_r);
     let (arr_tag, arr_payload) = b.ins().isplit(arr);
     let (val_tag, val_payload) = b.ins().isplit(val);
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
-
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.array_push,
         &[actx.exec_ctx, arr_tag, arr_payload, val_tag, val_payload],
     );
-
-    reload_boxed(b, actx, state, &regs);
 }
 
 pub(crate) fn emit_array_extend(

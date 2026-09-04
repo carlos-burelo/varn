@@ -52,11 +52,12 @@ pub(crate) fn emit_call(
 
                 b.switch_to_block(fast_blk);
                 let cid_val = b.ins().iconst(types::I64, ct.class_id as i64);
+                let psize_val = b.ins().iconst(types::I64, ct.payload_size as i64);
                 let raw_idx = super::super::emit::call_helper(
                     b,
                     actx.cc,
                     actx.helpers.alloc_instance_fast,
-                    &[actx.exec_ctx, cid_val],
+                    &[actx.exec_ctx, cid_val, psize_val],
                 );
                 let inst_tag = b
                     .ins()

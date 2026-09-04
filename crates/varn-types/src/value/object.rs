@@ -568,7 +568,13 @@ impl InstanceData {
     /// Allocates an `InstanceData` on the heap with the specified layout.
     pub fn alloc(class: Rc<crate::value::ClassObj>) -> Rc<InstanceData> {
         let layout = class.get_or_compute_layout();
-        let payload_bytes = layout.payload_size as usize;
+        Self::alloc_with_layout(class.id, layout.payload_size)
+    }
+
+    /// Fast allocation of `InstanceData` when `class_id` and `payload_size` are already known.
+    #[inline]
+    pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Rc<InstanceData> {
+        let payload_bytes = payload_size as usize;
         let payload_words = (payload_bytes + 7) / 8;
         let total_words = INSTANCE_HEADER_WORDS + payload_words;
 
@@ -577,8 +583,8 @@ impl InstanceData {
         let data = ptr::slice_from_raw_parts_mut(base, payload_bytes) as *mut InstanceData;
 
         unsafe {
-            ptr::write(ptr::addr_of_mut!((*data).class_id), class.id);
-            ptr::write(ptr::addr_of_mut!((*data).payload_size), layout.payload_size);
+            ptr::write(ptr::addr_of_mut!((*data).class_id), class_id);
+            ptr::write(ptr::addr_of_mut!((*data).payload_size), payload_size);
 
             let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
             if payload_bytes > 0 {
@@ -700,6 +706,11 @@ impl InstanceRef {
     #[inline]
     pub fn alloc(class: Rc<crate::value::ClassObj>) -> Self {
         Self(InstanceData::alloc(class))
+    }
+
+    #[inline]
+    pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Self {
+        Self(InstanceData::alloc_with_layout(class_id, payload_size))
     }
 
     #[inline(always)]
