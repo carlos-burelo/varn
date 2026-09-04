@@ -171,6 +171,18 @@ impl TricolorMarker {
                         }
                     }
                 }
+                HeapObj::Instance(inst) => {
+                    // Statically-typed InstanceData: trace GC references according to class layout gc_mask
+                    let payload_size = inst.payload_size as usize;
+                    let num_words = payload_size / 8;
+                    for word_idx in 0..num_words {
+                        let offset = word_idx * 8;
+                        let val = unsafe { inst.read_vm_value(offset) };
+                        if let Some(child_idx) = heap.get_heap_idx(val) {
+                            self.mark_gray(child_idx);
+                        }
+                    }
+                }
                 HeapObj::VmClosure(clos) => {
                     for upval in &clos.upvalues {
                         if let Ok(upval_inner) = upval.inner.try_borrow() {

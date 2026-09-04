@@ -18,6 +18,7 @@ pub use chunk::{
     Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
 };
 pub use class_layout::{ClassLayout, FieldLayout};
+pub use value::{InstanceData, InstanceRef};
 pub use generator::{GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};

@@ -45,6 +45,7 @@ impl HeapInner {
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Object(_)
+            | HeapObj::Instance(_)
             | HeapObj::VmClosure(_)
             | HeapObj::BoundMethod(_)
             | HeapObj::EnumVariant(_)

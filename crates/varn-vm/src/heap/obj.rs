@@ -7,7 +7,7 @@ use varn_core::VmValuePayload;
 use varn_types::{
     generator::GeneratorObj,
     value::{
-        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
+        BoundMethod, EnumVariantData, FrozenModuleObj, InstanceRef, MapRef, ModuleObj, ObjRef, RangeData,
         RuntimeSymbol, SetRef,
     },
     AsyncTask, ClassObj, LazyTask, NativeFn, VmArray,
@@ -22,6 +22,7 @@ pub enum HeapObj {
     Array(VmArray),
     Tuple(VmArray),
     Object(ObjRef),
+    Instance(InstanceRef),
     Record(ObjRef),
     Buffer(varn_types::VmBuffer),
 
@@ -58,6 +59,7 @@ impl HeapObj {
             HeapObj::Str(_) => TypeTag::Str,
             HeapObj::Array(_) | HeapObj::Tuple(_) => TypeTag::Array,
             HeapObj::Object(_)
+            | HeapObj::Instance(_)
             | HeapObj::Record(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_) => TypeTag::Object,

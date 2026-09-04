@@ -545,3 +545,239 @@ pub fn value_to_nv(v: &Value) -> VmValue {
         }
     }
 }
+
+// ── Native Static Class Instance (InstanceData) ─────────────────────────
+
+/// Native static struct representation of a user class instance.
+///
+/// Unlike dynamic `ObjData`, an `InstanceData`:
+/// - Has NO `Shape` pointer (classes have static layout).
+/// - Has NO `overflow` store (no dynamic property additions).
+/// - Has a compact 8-byte header (`class_id: u32`, `payload_size: u32`).
+/// - Stores primitive fields packed at native offsets without 16-byte VmValue boxing.
+#[repr(C)]
+pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
+    pub class: Rc<crate::value::ClassObj>,
+    pub payload_size: u32,
+    payload: T,
+}
+
+impl InstanceData {
+    /// Allocates an `InstanceData` on the heap with the specified layout.
+    pub fn alloc(class: Rc<crate::value::ClassObj>) -> Rc<InstanceData> {
+        let layout = class.get_or_compute_layout();
+        let payload_bytes = layout.payload_size as usize;
+        let payload_words = (payload_bytes + 7) / 8;
+        let header_words = (std::mem::size_of::<InstanceData<[UnsafeCell<u8>; 0]>>() + 7) / 8;
+        let total_words = header_words + payload_words;
+
+        let backing: Rc<[MaybeUninit<u64>]> = Rc::new_uninit_slice(total_words);
+        let base = Rc::into_raw(backing) as *const MaybeUninit<u64> as *mut UnsafeCell<u8>;
+        let data = ptr::slice_from_raw_parts_mut(base, payload_bytes) as *mut InstanceData;
+
+        unsafe {
+            ptr::write(ptr::addr_of_mut!((*data).class), class);
+            ptr::write(ptr::addr_of_mut!((*data).payload_size), layout.payload_size);
+
+            let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
+            if payload_bytes > 0 {
+                ptr::write_bytes(payload_ptr, 0, payload_bytes);
+            }
+
+            Rc::from_raw(data as *const InstanceData)
+        }
+    }
+
+    #[inline(always)]
+    pub fn raw_payload_ptr(&self) -> *mut u8 {
+        self.payload.as_ptr() as *mut u8
+    }
+
+    // ── Field Read Methods ──────────────────────────────────────────────
+
+    #[inline(always)]
+    pub unsafe fn read_i64(&self, offset: usize) -> i64 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const i64;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_f64(&self, offset: usize) -> f64 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const f64;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_bool(&self, offset: usize) -> bool {
+        let ptr = self.raw_payload_ptr().add(offset);
+        *ptr != 0
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_u8(&self, offset: usize) -> u8 {
+        let ptr = self.raw_payload_ptr().add(offset);
+        *ptr
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_u32(&self, offset: usize) -> u32 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const u32;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_vm_value(&self, offset: usize) -> VmValue {
+        let ptr = self.raw_payload_ptr().add(offset) as *const VmValue;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub fn get(&self, key: &str) -> Option<VmValue> {
+        let layout = self.class.get_or_compute_layout();
+        let f = layout.get_field(key)?;
+        let offset = f.offset as usize;
+        if offset + 16 <= self.payload_size as usize {
+            Some(unsafe { self.read_vm_value(offset) })
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    pub fn set(&self, key: &str, val: VmValue) -> bool {
+        let layout = self.class.get_or_compute_layout();
+        let f = match layout.get_field(key) {
+            Some(f) => f,
+            None => return false,
+        };
+        let offset = f.offset as usize;
+        if offset + 16 <= self.payload_size as usize {
+            unsafe { self.write_vm_value(offset, val) };
+            true
+        } else {
+            false
+        }
+    }
+
+    #[inline(always)]
+    pub fn field_at(&self, slot: usize) -> Option<VmValue> {
+        let offset = slot * 16;
+        if offset + 16 <= self.payload_size as usize {
+            Some(unsafe { self.read_vm_value(offset) })
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    pub fn set_field_at(&self, slot: usize, val: VmValue) -> bool {
+        let offset = slot * 16;
+        if offset + 16 <= self.payload_size as usize {
+            unsafe { self.write_vm_value(offset, val) };
+            true
+        } else {
+            false
+        }
+    }
+
+    // ── Field Write Methods ─────────────────────────────────────────────
+
+    #[inline(always)]
+    pub unsafe fn write_i64(&self, offset: usize, val: i64) {
+        let ptr = self.raw_payload_ptr().add(offset) as *mut i64;
+        ptr.write(val);
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_f64(&self, offset: usize, val: f64) {
+        let ptr = self.raw_payload_ptr().add(offset) as *mut f64;
+        ptr.write(val);
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_bool(&self, offset: usize, val: bool) {
+        let ptr = self.raw_payload_ptr().add(offset);
+        *ptr = val as u8;
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_u8(&self, offset: usize, val: u8) {
+        let ptr = self.raw_payload_ptr().add(offset);
+        *ptr = val;
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_u32(&self, offset: usize, val: u32) {
+        let ptr = self.raw_payload_ptr().add(offset) as *mut u32;
+        ptr.write(val);
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_vm_value(&self, offset: usize, val: VmValue) {
+        let ptr = self.raw_payload_ptr().add(offset) as *mut VmValue;
+        ptr.write(val);
+    }
+}
+
+impl<T: ?Sized> Drop for InstanceData<T> {
+    fn drop(&mut self) {
+        unsafe {
+            ptr::drop_in_place(&mut self.class);
+        }
+    }
+}
+
+/// Reference-counted wrapper around [`InstanceData`].
+#[derive(Clone)]
+pub struct InstanceRef(pub Rc<InstanceData>);
+
+impl InstanceRef {
+    #[inline]
+    pub fn alloc(class: Rc<crate::value::ClassObj>) -> Self {
+        Self(InstanceData::alloc(class))
+    }
+
+    #[inline(always)]
+    pub fn read(&self) -> &InstanceData {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for InstanceRef {
+    type Target = InstanceData;
+    #[inline(always)]
+    fn deref(&self) -> &InstanceData {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for InstanceData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InstanceData")
+            .field("class", &self.class.name)
+            .field("payload_size", &self.payload_size)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for InstanceRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InstanceRef(class={}, size={})", self.0.class.name, self.0.payload_size)
+    }
+}
+
+impl PartialEq for InstanceRef {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for InstanceRef {}
+
+impl std::hash::Hash for InstanceRef {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Rc::as_ptr(&self.0).hash(state);
+    }
+}

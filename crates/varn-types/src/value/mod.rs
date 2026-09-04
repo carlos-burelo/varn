@@ -22,7 +22,7 @@ pub use class::{find_method_with_owner, ClassObj};
 pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
-pub use object::{nv_to_value, value_to_nv, ObjData};
+pub use object::{nv_to_value, value_to_nv, InstanceData, InstanceRef, ObjData};
 use rust_decimal::Decimal;
 pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
 pub use shape::{root_shape, Shape};

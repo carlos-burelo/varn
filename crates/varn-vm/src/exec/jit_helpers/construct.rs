@@ -141,7 +141,7 @@ pub(crate) fn construct_staged_fast(
     }
 
     let t_alloc = if on { prof::read() } else { 0 };
-    let oref = varn_types::value::ObjRef::instance(cls);
+    let inst = varn_types::value::InstanceRef::alloc(cls.clone());
     if on {
         prof::record(prof::Seg::ObjDataAlloc, t_alloc, prof::read());
     }
@@ -153,12 +153,12 @@ pub(crate) fn construct_staged_fast(
                 let arg_idx = callee_base + 1 + param_idx;
                 if arg_idx < ctx_ref.stack.len() {
                     let val = ctx_ref.stack[arg_idx];
-                    oref.set_field_at(slot, val);
+                    inst.set_field_at(slot, val);
                 }
             }
             let t_push = if on { prof::read() } else { 0 };
             let instance_nv =
-                VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+                VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
             if on {
                 prof::record(prof::Seg::HeapPush, t_push, prof::read());
             }
@@ -168,7 +168,7 @@ pub(crate) fn construct_staged_fast(
 
     let t_push = if on { prof::read() } else { 0 };
     let instance_nv =
-        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
     if on {
         prof::record(prof::Seg::HeapPush, t_push, prof::read());
     }

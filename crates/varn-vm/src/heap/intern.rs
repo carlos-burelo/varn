@@ -181,6 +181,7 @@ impl HeapInner {
                     Value::Array(varn_types::value::ArrayRef::new(val_items))
                 }
                 HeapObj::Object(o) | HeapObj::Record(o) => Value::Object(o.clone()),
+                HeapObj::Instance(_i) => Value::VmValue(Box::new(VmValueRef(nv))),
                 HeapObj::VmClosure(c) => Value::VmValue(Box::new(VmClosurePayload(c.clone()))),
                 HeapObj::Class(c) => Value::Class(c.clone()),
                 HeapObj::NativeFn(f, name) => Value::NativeFn(Box::new((*f, *name))),

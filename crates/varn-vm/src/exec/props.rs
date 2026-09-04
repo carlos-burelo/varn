@@ -100,6 +100,17 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
     }
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
+        Some(HeapObj::Instance(inst)) => {
+            if inst.set(key, val) {
+                heap.write_barrier(idx, val);
+                Ok(())
+            } else {
+                Err(RuntimeError::new(format!(
+                    "cannot set property '{}': no such field on class {}",
+                    key, inst.class.name
+                )))
+            }
+        }
         Some(HeapObj::Object(o)) => {
             o.set_field_nv(Rc::from(key), val);
             heap.write_barrier(idx, val);
@@ -136,6 +147,7 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
         }
 
         let found = match heap.get(idx) {
+            Some(HeapObj::Instance(inst)) => inst.field_at(slot).map(FoundField::Vm),
             Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => {
                 o.field_at(slot).map(FoundField::Vm)
             }
@@ -194,11 +206,13 @@ pub(crate) fn set_fixed_field(
         let heap_idx = obj.as_heap_idx();
 
         enum Target {
+            Instance(varn_types::value::InstanceRef),
             Obj(varn_types::value::ObjRef),
             Class(Rc<ClassObj>),
         }
 
         let target = match heap.get(heap_idx) {
+            Some(HeapObj::Instance(inst)) => Some(Target::Instance(inst.clone())),
             Some(HeapObj::Object(o)) => Some(Target::Obj(o.clone())),
             Some(HeapObj::EnumVariant(ev)) => {
                 if let Value::Object(o) = &ev.payload {
@@ -212,6 +226,12 @@ pub(crate) fn set_fixed_field(
         };
 
         match target {
+            Some(Target::Instance(inst)) => {
+                if inst.set_field_at(slot, val) {
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
             Some(Target::Obj(o)) => {
                 if o.set_field_at(slot, val) {
                     heap.write_barrier(heap_idx, val);
@@ -259,6 +279,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     }
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
+        Some(HeapObj::Instance(inst)) => inst.get(key),
         Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
         Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a))
             if key == varn_core::MemberKey::Length.as_str() =>
@@ -439,6 +460,7 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, 
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if val.is_heap() {
         match heap.get(val.as_heap_idx()) {
+            Some(HeapObj::Instance(inst)) => return Some(inst.class.clone()),
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => return o.borrow().class(),
             Some(HeapObj::Class(cls)) => return Some(cls.clone()),
             Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => {

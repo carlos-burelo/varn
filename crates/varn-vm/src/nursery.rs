@@ -374,6 +374,7 @@ impl Nursery {
             Some(HeapObj::Map(m)) => Container::Map(m.clone()),
             Some(HeapObj::Set(s)) => Container::Set(s.clone()),
             Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => Container::Array(a.clone()),
+            Some(HeapObj::Instance(inst)) => Container::Instance(inst.clone()),
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => Container::Object(o.clone()),
             Some(obj) => {
                 Self::scan_children(obj, old_gen, fixups);
@@ -396,6 +397,19 @@ impl Nursery {
                 if let Some(items) = arr.as_boxed_mut() {
                     for v in items.iter_mut() {
                         self.update_value(v, old_gen, worklist);
+                    }
+                }
+                return;
+            }
+            Container::Instance(inst) => {
+                let payload_size = inst.payload_size as usize;
+                let num_words = payload_size / 8;
+                for word_idx in 0..num_words {
+                    let offset = word_idx * 8;
+                    let mut val = unsafe { inst.read_vm_value(offset) };
+                    if val.is_heap() && is_nursery_idx(val.as_heap_idx()) {
+                        self.update_value(&mut val, old_gen, worklist);
+                        unsafe { inst.write_vm_value(offset, val) };
                     }
                 }
                 return;
@@ -529,6 +543,7 @@ impl Nursery {
             HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
+                | HeapObj::Instance(_)
                 | HeapObj::Record(_)
                 | HeapObj::VmClosure(_)
                 | HeapObj::Spread(_)
@@ -556,6 +571,18 @@ impl Nursery {
                 Some(items) => items.iter().any(nursery_val),
                 None => false,
             },
+            HeapObj::Instance(inst) => {
+                let payload_size = inst.payload_size as usize;
+                let num_words = payload_size / 8;
+                for word_idx in 0..num_words {
+                    let offset = word_idx * 8;
+                    let val = unsafe { inst.read_vm_value(offset) };
+                    if nursery_val(&val) {
+                        return true;
+                    }
+                }
+                false
+            }
             HeapObj::Object(o) | HeapObj::Record(o) => {
                 let mut found = false;
                 o.borrow().for_each_field(|_, v| {
@@ -640,6 +667,7 @@ enum Container {
     Set(varn_types::value::SetRef),
     Array(varn_types::VmArray),
     Object(varn_types::value::ObjRef),
+    Instance(varn_types::value::InstanceRef),
     None,
 }
 
