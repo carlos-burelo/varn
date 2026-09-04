@@ -141,6 +141,7 @@ pub(super) fn lower_raw(
         str_caches,
         obj_caches,
         all_caches,
+        local_obj_bases,
     } = vars::declare(&mut b, proto, &regions, code, pool, want_roots);
 
     let entry = b.create_block();
@@ -173,6 +174,9 @@ pub(super) fn lower_raw(
     }
     for c in obj_caches.values() {
         b.def_var(c.data_base, zero);
+    }
+    for &var in local_obj_bases.values() {
+        b.def_var(var, zero);
     }
 
     let (exec_ctx, alloc_env) = if frame_aware {
@@ -276,6 +280,7 @@ pub(super) fn lower_raw(
         exec_ctx,
         register_meta: &proto.register_meta,
         loop_caches: loops,
+        local_obj_bases: &local_obj_bases,
     };
     let gbl = globals::GblCtx {
         vars: vars.as_slice(),
@@ -363,6 +368,10 @@ pub(super) fn lower_raw(
                     filled.push(ip);
                     state = e.clone();
                     terminated = false;
+                    let zero = b.ins().iconst(types::I64, 0);
+                    for &v in local_obj_bases.values() {
+                        b.def_var(v, zero);
+                    }
                 }
                 None => {
                     terminated = true;
@@ -532,6 +541,14 @@ pub(super) fn lower_raw(
             &proto.register_meta,
             proto.return_kind,
         );
+
+        // Invalidate cached object field base if this instruction redefined the register.
+        if let Some(def_r) = info.def {
+            if let Some(&cache_var) = local_obj_bases.get(&(def_r as usize)) {
+                let zero = b.ins().iconst(types::I64, 0);
+                b.def_var(cache_var, zero);
+            }
+        }
 
         ip = next_ip;
     }

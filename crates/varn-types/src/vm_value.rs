@@ -72,12 +72,6 @@ pub const KIND_SYMBOL: u64 = 6;
 /// Bit position, inside the tag word, of the SSO length.
 const SSO_LEN_SHIFT: u32 = 8;
 
-/// Longest string that fits inline.
-///
-/// The payload is now a full 64-bit word, so 8 bytes would fit. It stays at 5
-/// because every caller passes a `[u8; 5]` buffer and widening SSO is a
-/// separate, independently testable change — not something to smuggle into a
-/// representation swap.
 pub const SSO_MAX_LEN: usize = 5;
 
 impl VmValue {

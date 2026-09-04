@@ -12,7 +12,7 @@ use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
     box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool, def_const_int,
-    emit_return_value, guard_overflow, i64_const_fits, meta_is_float, state_meta_int, unbox_bool,
+    emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool,
     unbox_f64_coerce, use_boxed, use_f64, use_int,
 };
 use super::super::fields;
@@ -156,11 +156,7 @@ pub(crate) fn dispatch_opcode(
             } else if op == OpCode::SubInt && both_int {
                 let v = b.ins().isub(s1, s2);
                 b.def_var(vars[first_reg], v);
-            } else if op == OpCode::MulInt
-                && both_int
-                && (i64_const_fits(b, s1, 1 << 16) || i64_const_fits(b, s2, 1 << 16))
-            {
-                // k * i48 where |k| < 2^16 fits in i64: (2^16-1)*(2^47-1) < 2^63-1.
+            } else if op == OpCode::MulInt && both_int {
                 let v = b.ins().imul(s1, s2);
                 b.def_var(vars[first_reg], v);
             } else {
@@ -501,7 +497,7 @@ pub(crate) fn dispatch_opcode(
                 state[dest] = K::Float;
             } else if proto.return_kind == SlotKind::Float {
                 let f = unbox_f64_coerce(b, res);
-                let bits = b.ins().bitcast(types::I64, MemFlags::trusted(), f);
+                let bits = b.ins().bitcast(types::I64, MemFlags::new(), f);
                 b.def_var(vars[dest], bits);
                 state[dest] = K::Float;
             } else if proto.return_kind == SlotKind::Int {

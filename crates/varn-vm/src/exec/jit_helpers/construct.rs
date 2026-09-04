@@ -71,9 +71,12 @@ pub(crate) fn construct_staged_fast(
         .vtable_version
         .load(std::sync::atomic::Ordering::Relaxed);
     let cached_entry = ACTIVE_CTOR.with(|cell| {
-        let b = cell.borrow();
-        if let Some(ref c) = *b {
+        let mut b = cell.borrow_mut();
+        if let Some(ref mut c) = *b {
             if c.class_id == cls.id && c.version == ver {
+                if c.jit_fn.is_none() {
+                    c.jit_fn = c.closure.hot_jit_fn();
+                }
                 return Some((c.closure.clone(), c.jit_fn));
             }
         }
@@ -92,7 +95,7 @@ pub(crate) fn construct_staged_fast(
                 Some(None) => None,
                 Some(Some(any)) => {
                     let nc = any.downcast::<crate::closure::VmClosure>().ok()?;
-                    let jit_fn = nc.jit_fn()?;
+                    let jit_fn = nc.hot_jit_fn()?;
                     Some((nc, jit_fn))
                 }
                 None => {
@@ -106,7 +109,7 @@ pub(crate) fn construct_staged_fast(
                             if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
                                 return None;
                             }
-                            let jit_fn = nc.jit_fn()?;
+                            let jit_fn = nc.hot_jit_fn()?;
                             *cls.ctor_rt_cache.borrow_mut() =
                                 Some((ver, Some(nc.clone() as std::rc::Rc<dyn std::any::Any>)));
                             Some((nc.clone(), jit_fn))

@@ -29,6 +29,8 @@ pub(super) struct VarFile {
     /// invalidates all of them at once and has no way to tell which region it
     /// sits in.
     pub all_caches: Vec<Variable>,
+    /// Cache variables for inline object field bases per object register.
+    pub local_obj_bases: HashMap<usize, Variable>,
 }
 
 /// Determine the expected `ArrayRepr` disc for a read-only receiver in a
@@ -192,6 +194,30 @@ pub(super) fn declare(
             )
         })
         .collect();
+    // Variables for caching the object's inline field data base pointer across
+    // multiple GetFixedField accesses to the same register.
+    let mut local_obj_bases: HashMap<usize, Variable> = HashMap::new();
+    let mut scan_ip = 0usize;
+    while scan_ip < code.len() {
+        if let Some(info) = decode(code, scan_ip, pool) {
+            let op = OpCode::from_u8((code[scan_ip] & 0xFF) as u8);
+            if op == Some(OpCode::GetFixedField) {
+                let obj_r = (code[scan_ip + 1] >> 8) as usize;
+                local_obj_bases
+                    .entry(obj_r)
+                    .or_insert_with(|| b.declare_var(types::I64));
+            } else if op == Some(OpCode::SetFixedField) {
+                let obj_r = (code[scan_ip + 1] & 0xFF) as usize;
+                local_obj_bases
+                    .entry(obj_r)
+                    .or_insert_with(|| b.declare_var(types::I64));
+            }
+            scan_ip += info.len;
+        } else {
+            break;
+        }
+    }
+
     // The back-edge safepoint zeroes every cache after a collection. A string
     // cache holds a raw interior pointer, so leaving it out would be the one
     // way this survives a GC — it must be in the same list as the payloads.
@@ -200,6 +226,7 @@ pub(super) fn declare(
         .flat_map(|c| std::iter::once(c.payload).chain(c.view.into_iter().flatten()))
         .chain(str_caches.values().flat_map(|c| [c.bytes, c.len]))
         .chain(obj_caches.values().map(|c| c.data_base))
+        .chain(local_obj_bases.values().copied())
         .collect();
     VarFile {
         vars,
@@ -207,5 +234,6 @@ pub(super) fn declare(
         str_caches,
         obj_caches,
         all_caches,
+        local_obj_bases,
     }
 }

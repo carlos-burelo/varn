@@ -160,7 +160,7 @@ pub(super) fn emit_return_value(
                 if b.func.dfg.value_type(raw) == types::F64 {
                     raw
                 } else {
-                    b.ins().bitcast(types::F64, MemFlags::trusted(), raw)
+                    b.ins().bitcast(types::F64, MemFlags::new(), raw)
                 }
             }
             K::Int => {
@@ -255,7 +255,7 @@ pub(super) fn box_f64(
     let tag = b
         .ins()
         .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
-    let payload = b.ins().bitcast(types::I64, MemFlags::trusted(), v);
+    let payload = b.ins().bitcast(types::I64, MemFlags::new(), v);
     b.ins().iconcat(tag, payload)
 }
 
@@ -281,7 +281,7 @@ pub(super) fn unbox_f64_coerce(
             tag,
             varn_types::vm_value::KIND_FLOAT as i64,
         );
-        let f_direct = b.ins().bitcast(types::F64, MemFlags::trusted(), payload);
+        let f_direct = b.ins().bitcast(types::F64, MemFlags::new(), payload);
         let f_from_int = b.ins().fcvt_from_sint(types::F64, payload);
         b.ins().select(is_float, f_direct, f_from_int)
     } else if ty == types::I64 {
@@ -311,7 +311,7 @@ pub(super) fn use_f64(
             if b.func.dfg.value_type(raw) == types::F64 {
                 Ok(raw)
             } else {
-                Ok(b.ins().bitcast(types::F64, MemFlags::trusted(), raw))
+                Ok(b.ins().bitcast(types::F64, MemFlags::new(), raw))
             }
         }
         K::Int => {
@@ -360,7 +360,7 @@ pub(super) fn box_or_pass(
             K::Int => box_int(b, raw),
             K::Bool => box_bool(b, raw),
             K::Float => {
-                let f = b.ins().bitcast(types::F64, MemFlags::trusted(), raw);
+                let f = b.ins().bitcast(types::F64, MemFlags::new(), raw);
                 box_f64(b, f)
             }
             _ => {
@@ -840,6 +840,7 @@ pub(super) fn wrap_i48(
 /// Returns `true` when `v` is an `iconst` whose absolute value is below `threshold`.
 /// Used to prove that `v * i48_value` cannot overflow i64: choose `threshold = 2^16`
 /// since `(2^16 - 1) * (2^47 - 1) < 2^63 - 1`.
+#[allow(dead_code)]
 pub(super) fn i64_const_fits(b: &FunctionBuilder, v: Value, threshold: u64) -> bool {
     if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
         if let InstructionData::UnaryImm { imm, .. } = b.func.dfg.insts[inst] {

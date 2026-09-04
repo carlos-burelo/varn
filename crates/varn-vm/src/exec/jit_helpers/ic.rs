@@ -9,6 +9,8 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_types::chunk::ICKind;
 
+const METHOD_CACHE_SIZE: usize = 64;
+
 struct ActiveMethodCache {
     caller_proto: usize,
     class_id: u32,
@@ -18,7 +20,9 @@ struct ActiveMethodCache {
 }
 
 thread_local! {
-    static ACTIVE_METHOD: std::cell::RefCell<Option<ActiveMethodCache>> = const { std::cell::RefCell::new(None) };
+    static ACTIVE_METHODS: std::cell::RefCell<[Option<ActiveMethodCache>; METHOD_CACHE_SIZE]> = const {
+        std::cell::RefCell::new([const { None }; METHOD_CACHE_SIZE])
+    };
 }
 
 #[inline(always)]
@@ -42,21 +46,25 @@ pub(crate) fn try_fast_jit_method(
     };
 
     let caller_proto = &closure_ref.proto as *const _ as usize;
-    let hit = ACTIVE_METHOD.with(|cell| {
-        let b = cell.borrow();
-        if let Some(ref c) = *b {
+    let slot_idx = (class_rc.id as usize ^ name_idx ^ (caller_proto >> 4)) & (METHOD_CACHE_SIZE - 1);
+    let hit = ACTIVE_METHODS.with(|cell| {
+        let mut b = cell.borrow_mut();
+        if let Some(ref mut c) = b[slot_idx] {
             if c.caller_proto == caller_proto
                 && c.class_id == class_rc.id
                 && c.name_idx == name_idx
             {
-                return Some(c.closure.clone());
+                if c.jit_fn.is_none() {
+                    c.jit_fn = c.closure.hot_jit_fn();
+                }
+                return Some((c.closure.clone(), c.jit_fn));
             }
         }
         None
     });
 
-    let nc = match hit {
-        Some(c) => c,
+    let (nc, jit_fn) = match hit {
+        Some(pair) => pair,
         None => {
             let name_nv = *closure_ref.constants.get(name_idx)?;
             let name = ctx_ref.heap.str_val(name_nv)?;
@@ -78,20 +86,21 @@ pub(crate) fn try_fast_jit_method(
             {
                 return None;
             }
-            ACTIVE_METHOD.with(|cell| {
-                *cell.borrow_mut() = Some(ActiveMethodCache {
+            let jit_fn = nc.hot_jit_fn();
+            ACTIVE_METHODS.with(|cell| {
+                cell.borrow_mut()[slot_idx] = Some(ActiveMethodCache {
                     caller_proto,
                     class_id: class_rc.id,
                     name_idx,
                     closure: nc.clone(),
-                    jit_fn: None,
+                    jit_fn,
                 });
             });
-            nc
+            (nc, jit_fn)
         }
     };
 
-    let jit_fn = nc.hot_jit_fn()?;
+    let jit_fn = jit_fn?;
 
     let orig_len = ctx_ref.stack.len();
     let callee_base = orig_len;

@@ -251,19 +251,17 @@ pub(super) fn emit_array_get_index(
         }
     };
 
-    let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
-    let hit = b.create_block();
-    b.ins().brif(in_bounds, hit, &[], slow, &[]);
-
-    b.switch_to_block(hit);
-    let matched = b.create_block();
-    let boxed_arm = b.create_block();
-
     let target_disc = want.disc();
-    let is_match = b.ins().icmp_imm(IntCC::Equal, disc, target_disc);
-    b.ins().brif(is_match, matched, &[], boxed_arm, &[]);
+    let skip_disc_check = cache.and_then(|ca| ca.repr_validated_disc) == Some(target_disc);
+    let skip_bounds_check = cache.map(|ca| ca.bounds_guaranteed).unwrap_or(false);
 
-    b.switch_to_block(matched);
+    if !skip_bounds_check {
+        let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
+        let hit = b.create_block();
+        b.ins().brif(in_bounds, hit, &[], slow, &[]);
+        b.switch_to_block(hit);
+    }
+
     let elem_ty = match want {
         ElemRepr::Int => types::I64,
         ElemRepr::Float => types::F64,
@@ -272,20 +270,33 @@ pub(super) fn emit_array_get_index(
     let scale = if want == ElemRepr::Boxed { 4 } else { 3 };
     let off = b.ins().ishl_imm(key, scale);
     let addr = b.ins().iadd(data, off);
-    let v = b.ins().load(elem_ty, MemFlags::trusted(), addr, 0);
-    b.ins().jump(merge, &[v.into()]);
 
-    b.switch_to_block(boxed_arm);
-    let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
-    let do_boxed = b.create_block();
-    b.ins().brif(is_boxed, do_boxed, &[], slow, &[]);
+    if skip_disc_check {
+        let v = b.ins().load(elem_ty, MemFlags::trusted(), addr, 0);
+        b.ins().jump(merge, &[v.into()]);
+    } else {
+        let matched = b.create_block();
+        let boxed_arm = b.create_block();
 
-    b.switch_to_block(do_boxed);
-    let off_b = b.ins().ishl_imm(key, 4);
-    let addr_b = b.ins().iadd(data, off_b);
-    let raw = b.ins().load(types::I128, MemFlags::trusted(), addr_b, 0);
-    let v = convert(b, raw, ElemRepr::Boxed, want);
-    b.ins().jump(merge, &[v.into()]);
+        let is_match = b.ins().icmp_imm(IntCC::Equal, disc, target_disc);
+        b.ins().brif(is_match, matched, &[], boxed_arm, &[]);
+
+        b.switch_to_block(matched);
+        let v = b.ins().load(elem_ty, MemFlags::trusted(), addr, 0);
+        b.ins().jump(merge, &[v.into()]);
+
+        b.switch_to_block(boxed_arm);
+        let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
+        let do_boxed = b.create_block();
+        b.ins().brif(is_boxed, do_boxed, &[], slow, &[]);
+
+        b.switch_to_block(do_boxed);
+        let off_b = b.ins().ishl_imm(key, 4);
+        let addr_b = b.ins().iadd(data, off_b);
+        let raw = b.ins().load(types::I128, MemFlags::trusted(), addr_b, 0);
+        let v = convert(b, raw, ElemRepr::Boxed, want);
+        b.ins().jump(merge, &[v.into()]);
+    }
 
     b.switch_to_block(slow);
     let boxed_key = box_int(b, key);

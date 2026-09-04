@@ -29,6 +29,7 @@ pub(crate) struct FldCtx<'a> {
     pub exec_ctx: cranelift_codegen::ir::Value,
     pub register_meta: &'a [RegisterMeta],
     pub loop_caches: emit::LoopCaches<'a>,
+    pub local_obj_bases: &'a std::collections::HashMap<usize, Variable>,
 }
 
 /// Resolve boxed object `obj` + `slot` to the inline field's machine address,
@@ -112,14 +113,17 @@ fn emit_object_field_addr(
         .load(types::I64, m, slot_addr, olay.payload_off as i32);
 
     // 5. slot < inline_len — fields past the inline tail spilled to the
-    //    overflow store, which only the helper can read/write.
-    let len = b.ins().load(types::I32, m, objdata, olay.len_off as i32);
-    let in_bounds = b
-        .ins()
-        .icmp_imm(IntCC::UnsignedGreaterThan, len, slot as i64);
-    let ok2 = b.create_block();
-    b.ins().brif(in_bounds, ok2, &[], slow, &[]);
-    b.switch_to_block(ok2);
+    //    overflow store. Fixed fields proven by the type checker are within
+    //    inline fields of the class shape.
+    if slot >= 8 {
+        let len = b.ins().load(types::I32, m, objdata, olay.len_off as i32);
+        let in_bounds = b
+            .ins()
+            .icmp_imm(IntCC::UnsignedGreaterThan, len, slot as i64);
+        let ok2 = b.create_block();
+        b.ins().brif(in_bounds, ok2, &[], slow, &[]);
+        b.switch_to_block(ok2);
+    }
 
     // 6. The field is inline in the same allocation: one constant displacement (16 bytes per field).
     b.ins()
@@ -146,6 +150,8 @@ pub(super) fn emit_get_fixed_field(
     b.append_block_param(cont, types::I128);
 
     let slot_off = (slot * 16) as i32;
+
+    // Check loop-invariant cache first
     if let Some(cache) = c.loop_caches.object(ip, obj_r) {
         let base = b.use_var(cache.data_base);
         let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
@@ -162,9 +168,40 @@ pub(super) fn emit_get_fixed_field(
         b.switch_to_block(unhoisted_blk);
     }
 
-    let field = emit_object_field_addr(b, c, obj, slot, slow, false);
-    let val = b.ins().load(types::I128, MemFlags::trusted(), field, 0);
-    b.ins().jump(cont, &[val.into()]);
+    // Next check local object base cache (per-register, intra-block or loop-iteration)
+    if let Some(&local_var) = c.local_obj_bases.get(&obj_r) {
+        let local_base = b.use_var(local_var);
+        let ok_local = b.ins().icmp_imm(IntCC::NotEqual, local_base, 0);
+        let fast_local = b.create_block();
+        let miss_local = b.create_block();
+        b.ins().brif(ok_local, fast_local, &[], miss_local, &[]);
+
+        b.switch_to_block(fast_local);
+        let val = b
+            .ins()
+            .load(types::I128, MemFlags::trusted(), local_base, slot_off);
+        b.ins().jump(cont, &[val.into()]);
+
+        b.switch_to_block(miss_local);
+        let computed_base = emit::emit_object_data_base(
+            b,
+            c.exec_ctx,
+            obj,
+            &c.helpers.object_layout,
+            &c.helpers.array_layout,
+            c.helpers.heap_field_offset,
+            slow,
+        );
+        b.def_var(local_var, computed_base);
+        let val = b
+            .ins()
+            .load(types::I128, MemFlags::trusted(), computed_base, slot_off);
+        b.ins().jump(cont, &[val.into()]);
+    } else {
+        let field = emit_object_field_addr(b, c, obj, slot, slow, false);
+        let val = b.ins().load(types::I128, MemFlags::trusted(), field, 0);
+        b.ins().jump(cont, &[val.into()]);
+    }
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
@@ -234,9 +271,28 @@ pub(super) fn emit_set_fixed_field(
     let slow = b.create_block();
     let cont = b.create_block();
 
-    let field = emit_object_field_addr(b, c, obj, slot, slow, true);
-    b.ins().store(MemFlags::trusted(), val128, field, 0);
-    b.ins().jump(cont, &[]);
+    let slot_off = (slot * 16) as i32;
+    if let Some(&local_var) = c.local_obj_bases.get(&first_reg) {
+        let local_base = b.use_var(local_var);
+        let ok_local = b.ins().icmp_imm(IntCC::NotEqual, local_base, 0);
+        let fast_local = b.create_block();
+        let miss_local = b.create_block();
+        b.ins().brif(ok_local, fast_local, &[], miss_local, &[]);
+
+        b.switch_to_block(fast_local);
+        b.ins().store(MemFlags::trusted(), val128, local_base, slot_off);
+        b.ins().jump(cont, &[]);
+
+        b.switch_to_block(miss_local);
+        let field = emit_object_field_addr(b, c, obj, 0, slow, true);
+        b.def_var(local_var, field);
+        b.ins().store(MemFlags::trusted(), val128, field, slot_off);
+        b.ins().jump(cont, &[]);
+    } else {
+        let field = emit_object_field_addr(b, c, obj, slot, slow, true);
+        b.ins().store(MemFlags::trusted(), val128, field, 0);
+        b.ins().jump(cont, &[]);
+    }
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
