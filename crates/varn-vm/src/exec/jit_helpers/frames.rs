@@ -64,7 +64,7 @@ pub(crate) extern "C" fn jit_prepare_call(
             }
         } else if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(heap_idx) {
             let cls = cls.clone();
-            let oref = varn_types::value::ObjRef::instance(cls.clone());
+            let oref = varn_types::value::ObjRef::instance(&cls);
             let instance_nv =
                 VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
             ctx_ref.stack[callee_base] = instance_nv;

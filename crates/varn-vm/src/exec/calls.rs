@@ -295,7 +295,7 @@ pub(crate) fn prepare_call(
             }
             HeapObj::Class(cls) => {
                 let cls = cls.clone();
-                let oref = varn_types::value::ObjRef::instance(cls.clone());
+                let oref = varn_types::value::ObjRef::instance(&cls);
                 let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)));
                 if let Some(ctor) = cls.constructor() {
                     let mut full_arg_count = arg_count;

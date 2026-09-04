@@ -77,8 +77,9 @@ impl ObjData {
             ptr::write(ptr::addr_of_mut!((*data).overflow), UnsafeCell::new(None));
 
             let vals = ptr::addr_of_mut!((*data).values) as *mut Cell<VmValue>;
-            for i in 0..n {
-                ptr::write(vals.add(i), Cell::new(VmValue::null()));
+            if n > 0 {
+                // VmValue::null() is bitwise identical to all-zeros (tag: 0, payload: 0).
+                ptr::write_bytes(vals, 0, n);
             }
 
             Rc::from_raw(data as *const ObjData)
@@ -93,7 +94,7 @@ impl ObjData {
     /// Instance of `class`: the tail is sized to the class's declared fields,
     /// so a constructor's writes all land inline. This is the path the object
     /// allocation benchmark exercises.
-    pub fn new_instance(class: Rc<ClassObj>) -> Rc<ObjData> {
+    pub fn new_instance(class: &ClassObj) -> Rc<ObjData> {
         let (shape, n) = class.instance_shape();
         Self::alloc(shape, n)
     }

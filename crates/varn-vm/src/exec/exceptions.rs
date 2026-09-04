@@ -107,7 +107,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         // globals): el mensaje suelto sigue siendo capturable e imprimible.
         return msg;
     };
-    let oref = varn_types::value::ObjRef::instance(cls);
+    let oref = varn_types::value::ObjRef::instance(&cls);
     oref.set_field_nv(std::rc::Rc::from("message"), msg);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }

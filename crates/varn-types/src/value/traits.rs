@@ -35,7 +35,7 @@ impl Value {
     }
 
     pub fn instance(class: Rc<super::ClassObj>) -> Self {
-        let obj_ref = ObjRef::instance(class);
+        let obj_ref = ObjRef::instance(&class);
         Value::Object(obj_ref)
     }
 

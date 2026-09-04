@@ -101,8 +101,9 @@ impl ClassObj {
         if let Some(ref cached) = *self.instance_shape_cache.borrow() {
             return (Rc::clone(&cached.0), cached.1);
         }
-        let shape = self.root_shape.borrow().clone();
-        let n = shape.property_names.len();
+        let root = self.root_shape.borrow();
+        let n = root.property_names.len();
+        let shape = Rc::clone(&*root);
         *self.instance_shape_cache.borrow_mut() = Some((Rc::clone(&shape), n));
         (shape, n)
     }

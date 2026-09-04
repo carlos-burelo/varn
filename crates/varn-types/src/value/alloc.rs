@@ -41,8 +41,12 @@ impl ObjRef {
         Self(super::ObjData::new())
     }
 
-    pub fn instance(class: Rc<super::ClassObj>) -> Self {
+    pub fn instance(class: &super::ClassObj) -> Self {
         Self(super::ObjData::new_instance(class))
+    }
+
+    pub fn instance_rc(class: Rc<super::ClassObj>) -> Self {
+        Self(super::ObjData::new_instance(&class))
     }
 
     pub fn with_shape(shape: Rc<super::Shape>, values: Vec<crate::vm_value::VmValue>) -> Self {

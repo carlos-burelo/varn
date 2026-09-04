@@ -141,7 +141,7 @@ pub(crate) fn construct_staged_fast(
     }
 
     let t_alloc = if on { prof::read() } else { 0 };
-    let oref = varn_types::value::ObjRef::instance(cls.clone());
+    let oref = varn_types::value::ObjRef::instance(cls);
     if on {
         prof::record(prof::Seg::ObjDataAlloc, t_alloc, prof::read());
     }
