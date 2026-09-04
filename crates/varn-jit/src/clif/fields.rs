@@ -132,6 +132,14 @@ fn emit_object_field_addr(
 
 /// `GetFixedField first_reg, obj, slot` — inline slot read, helper fallback;
 /// result unboxed to int when the register meta proves it.
+///
+/// **Narrow-load optimisation** (static-typing exploitation):
+/// When `register_meta[first_reg]` proves the destination is a primitive type
+/// (`Int`, `Float`, `Bool`), every fast path loads ONLY the 8-byte payload
+/// word at `slot*16 + 8`, skipping the tag word at `slot*16 + 0`. This
+/// replaces a 16-byte i128 load + isplit + unbox with a single 8-byte i64
+/// load — typically 3× fewer CLIF instructions on the hot path, which is the
+/// inner loop of the DTO benchmark.
 pub(super) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
     c: &FldCtx,
@@ -141,17 +149,37 @@ pub(super) fn emit_get_fixed_field(
     ip: usize,
     first_reg: usize,
 ) -> Result<(), String> {
+    use varn_types::register_meta::SlotKind;
+
     let obj_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
     let obj = use_boxed(b, c.vars, state, obj_r)?;
 
+    // ── Narrow-load decision ────────────────────────────────────────────
+    // When the register meta statically proves the field is a primitive,
+    // load only the i64 payload (offset +8 within each 16-byte VmValue
+    // slot), avoiding the i128 load + isplit + unbox chain.
+    let dest_kind = c.register_meta.get(first_reg).map(|m| m.kind);
+    let narrow = matches!(
+        dest_kind,
+        Some(SlotKind::Int) | Some(SlotKind::Float) | Some(SlotKind::Bool)
+    );
+
     let slow = b.create_block();
     let cont = b.create_block();
-    b.append_block_param(cont, types::I128);
+
+    let (cont_ty, load_ty) = if narrow {
+        (types::I64, types::I64)
+    } else {
+        (types::I128, types::I128)
+    };
+    b.append_block_param(cont, cont_ty);
 
     let slot_off = (slot * 16) as i32;
+    // For narrow loads: skip the 8-byte tag word, read the payload directly.
+    let load_off = if narrow { slot_off + 8 } else { slot_off };
 
-    // Check loop-invariant cache first
+    // ── Fast path: loop-invariant cache ─────────────────────────────────
     if let Some(cache) = c.loop_caches.object(ip, obj_r) {
         let base = b.use_var(cache.data_base);
         let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
@@ -162,13 +190,13 @@ pub(super) fn emit_get_fixed_field(
         b.switch_to_block(fast_blk);
         let val = b
             .ins()
-            .load(types::I128, MemFlags::trusted(), base, slot_off);
+            .load(load_ty, MemFlags::trusted(), base, load_off);
         b.ins().jump(cont, &[val.into()]);
 
         b.switch_to_block(unhoisted_blk);
     }
 
-    // Next check local object base cache (per-register, intra-block or loop-iteration)
+    // ── Fast path: local object-base cache ──────────────────────────────
     if let Some(&local_var) = c.local_obj_bases.get(&obj_r) {
         let local_base = b.use_var(local_var);
         let ok_local = b.ins().icmp_imm(IntCC::NotEqual, local_base, 0);
@@ -179,7 +207,7 @@ pub(super) fn emit_get_fixed_field(
         b.switch_to_block(fast_local);
         let val = b
             .ins()
-            .load(types::I128, MemFlags::trusted(), local_base, slot_off);
+            .load(load_ty, MemFlags::trusted(), local_base, load_off);
         b.ins().jump(cont, &[val.into()]);
 
         b.switch_to_block(miss_local);
@@ -195,14 +223,19 @@ pub(super) fn emit_get_fixed_field(
         b.def_var(local_var, computed_base);
         let val = b
             .ins()
-            .load(types::I128, MemFlags::trusted(), computed_base, slot_off);
+            .load(load_ty, MemFlags::trusted(), computed_base, load_off);
         b.ins().jump(cont, &[val.into()]);
     } else {
         let field = emit_object_field_addr(b, c, obj, slot, slow, false);
-        let val = b.ins().load(types::I128, MemFlags::trusted(), field, 0);
+        // `field` points to the VmValue start; +8 reaches the payload.
+        let fld_off = if narrow { 8i32 } else { 0i32 };
+        let val = b
+            .ins()
+            .load(load_ty, MemFlags::trusted(), field, fld_off);
         b.ins().jump(cont, &[val.into()]);
     }
 
+    // ── Slow path: runtime helper ───────────────────────────────────────
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
@@ -222,11 +255,55 @@ pub(super) fn emit_get_fixed_field(
         c.exec_ctx,
         c.helpers.jit_native_result_offset as i32,
     );
-    b.ins().jump(cont, &[res.into()]);
+    if narrow {
+        // Helper returns a full i128 VmValue; extract only the payload.
+        let (_tag, payload) = b.ins().isplit(res);
+        b.ins().jump(cont, &[payload.into()]);
+    } else {
+        b.ins().jump(cont, &[res.into()]);
+    }
 
+    // ── Result definition ───────────────────────────────────────────────
     b.switch_to_block(cont);
     let v = b.block_params(cont)[0];
-    if let Some(actx) = actx {
+
+    if narrow {
+        // `v` is the raw i64 payload — no unboxing needed.
+        match dest_kind {
+            Some(SlotKind::Float) => {
+                let f = b.ins().bitcast(types::F64, MemFlags::new(), v);
+                b.def_var(c.vars[first_reg], f);
+            }
+            _ => {
+                // Int or Bool: the payload IS the native value.
+                b.def_var(c.vars[first_reg], v);
+            }
+        }
+        // When the allocator context tracks GC roots, we must still write
+        // a full VmValue (tag + payload) into the frame so the collector
+        // can distinguish heap refs from scalars. For known primitives the
+        // tag is a compile-time constant — one `iconcat` + one store.
+        if let Some(actx) = actx {
+            let kind_const = match dest_kind {
+                Some(SlotKind::Int) => varn_types::vm_value::KIND_INT,
+                Some(SlotKind::Float) => varn_types::vm_value::KIND_FLOAT,
+                Some(SlotKind::Bool) => varn_types::vm_value::KIND_BOOL,
+                _ => unreachable!(),
+            };
+            let tag_v = b.ins().iconst(types::I64, kind_const as i64);
+            let payload_for_frame = if dest_kind == Some(SlotKind::Float) {
+                // Float variable is F64; bitcast back to I64 for the frame.
+                let f = b.use_var(c.vars[first_reg]);
+                b.ins().bitcast(types::I64, MemFlags::new(), f)
+            } else {
+                v
+            };
+            let boxed = b.ins().iconcat(tag_v, payload_for_frame);
+            let fb = super::alloc::frame_base_addr(b, actx);
+            b.ins()
+                .store(MemFlags::trusted(), boxed, fb, (first_reg * 16) as i32);
+        }
+    } else if let Some(actx) = actx {
         super::alloc::def_result(b, actx, first_reg, v);
     } else if meta_is_float(c.register_meta, first_reg) {
         let f = unbox_f64_coerce(b, v);

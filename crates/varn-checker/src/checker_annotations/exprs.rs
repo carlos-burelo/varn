@@ -213,6 +213,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                         }
 
                         let mut slot = 0u16;
+                        let mut cur_offset = 0u32;
                         let mut known_props: rustc_hash::FxHashSet<std::rc::Rc<str>> =
                             rustc_hash::FxHashSet::default();
                         let mut found = false;
@@ -225,10 +226,33 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                             || m.kind == crate::types::ClassMemberKind::Variable)
                                         && known_props.insert(m.name.clone())
                                     {
+                                        let tag = m.ty.to_type_tag();
+                                        let (size, align) = match tag {
+                                            varn_core::TypeTag::Bool => (1u32, 1u32),
+                                            varn_core::TypeTag::Char => (4u32, 4u32),
+                                            varn_core::TypeTag::Int | varn_core::TypeTag::Float => (8u32, 8u32),
+                                            varn_core::TypeTag::Str
+                                            | varn_core::TypeTag::Array
+                                            | varn_core::TypeTag::Map
+                                            | varn_core::TypeTag::Set
+                                            | varn_core::TypeTag::Object
+                                            | varn_core::TypeTag::Class
+                                            | varn_core::TypeTag::Function
+                                            | varn_core::TypeTag::Task
+                                            | varn_core::TypeTag::Generator => (8u32, 8u32),
+                                            _ => (16u32, 8u32),
+                                        };
+                                        let padding = (align - (cur_offset % align)) % align;
+                                        cur_offset += padding;
+                                        let offset = cur_offset;
+                                        cur_offset += size;
+
                                         if m.name.as_ref() == prop_name.as_ref() {
-                                            ann.record_fixed_field_slot(
+                                            ann.record_fixed_field_layout(
                                                 AnnKey::expr(property.id),
                                                 slot,
+                                                offset,
+                                                tag,
                                             );
                                             found = true;
                                             break;

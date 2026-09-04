@@ -158,6 +158,19 @@ impl Type {
         matches!(self.0, TypeKind::Intrinsic(TypeTag::Void))
     }
 
+    pub fn to_type_tag(&self) -> TypeTag {
+        match &self.0 {
+            TypeKind::Intrinsic(tag) => *tag,
+            TypeKind::Array(_) => TypeTag::Array,
+            TypeKind::Object(_) => TypeTag::Object,
+            TypeKind::Named(..) => TypeTag::Class,
+            TypeKind::Generic(..) => TypeTag::Class,
+            TypeKind::Fn(_) => TypeTag::Function,
+            TypeKind::Tuple(_) => TypeTag::Tuple,
+            _ => TypeTag::Dynamic,
+        }
+    }
+
     pub fn is_nullable(&self) -> bool {
         match &self.0 {
             TypeKind::Intrinsic(TypeTag::Null) => true,

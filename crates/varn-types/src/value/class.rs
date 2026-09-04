@@ -38,6 +38,8 @@ pub struct ClassObj {
     /// Cached instance shape and inline field count. In Varn, classes have
     /// fixed, immutable field layouts once declared.
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
+    /// Static memory layout of instances of this class.
+    pub layout: RefCell<Option<Rc<crate::class_layout::ClassLayout>>>,
 }
 
 pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
@@ -67,6 +69,7 @@ impl ClassObj {
             ctor_cache: RefCell::new(None),
             ctor_rt_cache: RefCell::new(None),
             instance_shape_cache: RefCell::new(None),
+            layout: RefCell::new(None),
         }
     }
     pub fn new_native(name: impl Into<String>) -> Self {
@@ -106,6 +109,7 @@ impl ClassObj {
 
     pub fn declare_field(&self, name: RuntimeString) -> usize {
         *self.instance_shape_cache.borrow_mut() = None;
+        *self.layout.borrow_mut() = None;
         let mut root = self.root_shape.borrow_mut();
         if let Some(&slot) = root.property_names.get(&name) {
             return slot;
@@ -114,6 +118,34 @@ impl ClassObj {
         let slot = new_shape.property_names.len() - 1;
         *root = new_shape;
         slot
+    }
+
+    /// Returns the static memory layout of this class, computing it if not yet cached.
+    pub fn get_or_compute_layout(&self) -> Rc<crate::class_layout::ClassLayout> {
+        if let Some(ref lay) = *self.layout.borrow() {
+            return Rc::clone(lay);
+        }
+        let shape = self.root_shape.borrow();
+        let mut ordered: Vec<(usize, RuntimeString)> = shape
+            .property_names
+            .iter()
+            .map(|(k, &slot)| (slot, Rc::clone(k)))
+            .collect();
+        ordered.sort_unstable_by_key(|(slot, _)| *slot);
+
+        // Map fields assuming dynamic/ref fallback unless annotated
+        let fields_in: Vec<(Rc<str>, varn_core::TypeTag)> = ordered
+            .into_iter()
+            .map(|(_, name)| (Rc::from(name.as_ref()), varn_core::TypeTag::Dynamic))
+            .collect();
+
+        let layout = Rc::new(crate::class_layout::ClassLayout::from_fields(
+            &*self.name,
+            self.id,
+            &fields_in,
+        ));
+        *self.layout.borrow_mut() = Some(Rc::clone(&layout));
+        layout
     }
 
     pub fn add_method(&self, name: impl Into<Rc<str>>, value: Value) {

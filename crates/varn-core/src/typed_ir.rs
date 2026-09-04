@@ -10,6 +10,10 @@ pub struct ExprAnnotation {
     pub slot_idx: Option<usize>,
     pub exported_slot_idx: Option<usize>,
     pub fixed_field_slot: Option<u16>,
+    /// Byte offset within the instance payload for statically typed struct fields.
+    pub fixed_field_offset: Option<u32>,
+    /// Static TypeTag of the field (e.g. Int, Float, Bool, Str).
+    pub fixed_field_tag: Option<crate::type_tag::TypeTag>,
     pub intrinsic: Option<u8>,
     pub native_op: Option<u64>,
     /// Set when the object of a computed-member expression is a statically-known Array type.
@@ -177,8 +181,29 @@ impl TypeAnnotations {
         self.inner.entry(key).or_default().fixed_field_slot = Some(slot);
     }
 
+    pub fn record_fixed_field_layout(
+        &mut self,
+        key: AnnKey,
+        slot: u16,
+        offset: u32,
+        tag: crate::type_tag::TypeTag,
+    ) {
+        let entry = self.inner.entry(key).or_default();
+        entry.fixed_field_slot = Some(slot);
+        entry.fixed_field_offset = Some(offset);
+        entry.fixed_field_tag = Some(tag);
+    }
+
     pub fn get_fixed_field_slot(&self, key: AnnKey) -> Option<u16> {
         self.inner.get(&key)?.fixed_field_slot
+    }
+
+    pub fn get_fixed_field_offset(&self, key: AnnKey) -> Option<u32> {
+        self.inner.get(&key)?.fixed_field_offset
+    }
+
+    pub fn get_fixed_field_tag(&self, key: AnnKey) -> Option<crate::type_tag::TypeTag> {
+        self.inner.get(&key)?.fixed_field_tag
     }
 
     pub fn is_empty(&self) -> bool {
