@@ -57,10 +57,13 @@ pub(crate) extern "C" fn jit_call(
                 if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
 
-                    let required = callee_base + closure.proto.register_count as usize + 32;
-
-                    if ctx_ref.stack.len() < required {
-                        ctx_ref.stack.resize(required, VmValue::null());
+                    let required_len = callee_base + closure.proto.register_count as usize;
+                    let required_cap = required_len + 32;
+                    if ctx_ref.stack.capacity() < required_cap {
+                        ctx_ref.stack.reserve(required_cap - ctx_ref.stack.len());
+                    }
+                    if ctx_ref.stack.len() < required_len {
+                        ctx_ref.stack.resize(required_len, VmValue::null());
                     }
 
                     ctx_ref
@@ -302,9 +305,13 @@ pub(crate) extern "C" fn clif_call_fallback(
                         let orig_len = ctx_ref.stack.len();
                         ctx_ref.stack.extend_from_within(src..src + argc);
                         let callee_base = orig_len;
-                        let required = callee_base + closure.proto.register_count as usize + 32;
-                        if ctx_ref.stack.len() < required {
-                            ctx_ref.stack.resize(required, VmValue::null());
+                        let required_len = callee_base + closure.proto.register_count as usize;
+                        let required_cap = required_len + 32;
+                        if ctx_ref.stack.capacity() < required_cap {
+                            ctx_ref.stack.reserve(required_cap - ctx_ref.stack.len());
+                        }
+                        if ctx_ref.stack.len() < required_len {
+                            ctx_ref.stack.resize(required_len, VmValue::null());
                         }
                         ctx_ref
                             .frames

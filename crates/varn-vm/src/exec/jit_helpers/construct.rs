@@ -214,10 +214,10 @@ pub(crate) extern "C" fn jit_alloc_instance_fast(
     ctx: *mut ExecCtx,
     class_id: u32,
     payload_size: u32,
-) -> VmValue {
+) -> u64 {
     unsafe {
         let ctx_ref = &mut *ctx;
         let inst = varn_types::value::InstanceRef::alloc_with_layout(class_id, payload_size);
-        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)))
+        ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)) as u64
     }
 }

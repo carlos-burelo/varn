@@ -42,6 +42,9 @@ pub(crate) fn try_fast_jit_method(
         Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
             o.borrow().class()?
         }
+        Some(crate::heap::HeapObj::Instance(inst)) => {
+            varn_types::value::ClassObj::find_by_id(inst.class_id)?
+        }
         _ => return None,
     };
 
@@ -104,9 +107,13 @@ pub(crate) fn try_fast_jit_method(
 
     let orig_len = ctx_ref.stack.len();
     let callee_base = orig_len;
-    let required = callee_base + nc.proto.register_count as usize + 32;
-    if ctx_ref.stack.len() < required {
-        ctx_ref.stack.resize(required, VmValue::null());
+    let required_len = callee_base + nc.proto.register_count as usize;
+    let required_cap = required_len + 32;
+    if ctx_ref.stack.capacity() < required_cap {
+        ctx_ref.stack.reserve(required_cap - orig_len);
+    }
+    if ctx_ref.stack.len() < required_len {
+        ctx_ref.stack.resize(required_len, VmValue::null());
     }
     ctx_ref.stack[callee_base] = this_val;
     let src_start = base + arg_start;

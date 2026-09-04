@@ -34,11 +34,6 @@ pub(super) fn emit_call_method(
     let arg_start = (code[ip + 3] & 0xFF) as usize;
     let next_ip = ip + 4;
 
-    let fb = frame_base_addr(b, actx);
-    for i in 0..argc {
-        store_home(b, actx, state, fb, arg_start + i);
-    }
-
     // Fast path: known intrinsic Array push / pop methods
     if let Some(name) = proto.chunk.constants.get(name_idx).and_then(|p| p.as_str()) {
         if name == varn_core::MemberKey::Push.as_str() && argc == 1 {
@@ -107,6 +102,11 @@ pub(super) fn emit_call_method(
             def_result(b, actx, dest, boxed);
             return;
         }
+    }
+
+    let fb = frame_base_addr(b, actx);
+    for i in 0..argc {
+        store_home(b, actx, state, fb, arg_start + i);
     }
 
     let this_val = box_or_load_home(b, actx, state, this_reg);
@@ -215,44 +215,28 @@ pub(super) fn emit_invoke_virtual(
             let val = box_or_load_home(b, actx, state, arg_start);
             let (this_tag, this_payload) = b.ins().isplit(this_val);
             let (val_tag, val_payload) = b.ins().isplit(val);
-            let regs = live_boxed(actx, state);
-            flush_boxed(b, actx, state, &regs);
-            call_helper_void(
+            let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_starts_with,
+                actx.helpers.str_starts_with_intrinsic,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
-            reload_boxed(b, actx, state, &regs);
-            let res = b.ins().load(
-                types::I128,
-                cranelift_codegen::ir::MemFlags::trusted(),
-                actx.exec_ctx,
-                actx.helpers.jit_native_result_offset as i32,
-            );
-            def_result(b, actx, dest, res);
+            let boxed = box_bool(b, res);
+            def_result(b, actx, dest, boxed);
             return;
         } else if name == varn_core::MemberKey::EndsWith.as_str() && argc == 1 {
             let this_val = box_or_load_home(b, actx, state, this_reg);
             let val = box_or_load_home(b, actx, state, arg_start);
             let (this_tag, this_payload) = b.ins().isplit(this_val);
             let (val_tag, val_payload) = b.ins().isplit(val);
-            let regs = live_boxed(actx, state);
-            flush_boxed(b, actx, state, &regs);
-            call_helper_void(
+            let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_ends_with,
+                actx.helpers.str_ends_with_intrinsic,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
-            reload_boxed(b, actx, state, &regs);
-            let res = b.ins().load(
-                types::I128,
-                cranelift_codegen::ir::MemFlags::trusted(),
-                actx.exec_ctx,
-                actx.helpers.jit_native_result_offset as i32,
-            );
-            def_result(b, actx, dest, res);
+            let boxed = box_bool(b, res);
+            def_result(b, actx, dest, boxed);
             return;
         }
     }

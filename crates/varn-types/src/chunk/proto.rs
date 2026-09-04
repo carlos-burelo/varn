@@ -380,8 +380,8 @@ impl FunctionProto {
                 OpCode::Move => {
                     let dst = (code[ip] >> 8) as usize;
                     let src = (code[ip + 1] >> 8) as usize;
-                    if dst < sources.len() && src < sources.len() {
-                        sources[dst] = sources[src];
+                    if dst < sources.len() {
+                        sources[dst] = if src < sources.len() { sources[src] } else { None };
                     }
                     ip += 2;
                 }
@@ -400,6 +400,13 @@ impl FunctionProto {
                     };
                     plan.push((param_idx, slot));
                     ip += 3;
+                }
+                OpCode::LoadNull => {
+                    let dst = (code[ip] >> 8) as usize;
+                    if dst < sources.len() {
+                        sources[dst] = None;
+                    }
+                    ip += 1;
                 }
                 OpCode::Return => {
                     return Some(plan);

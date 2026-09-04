@@ -99,33 +99,22 @@ pub(crate) fn emit_get_index(
     let idx_r = (code[ip + 1] & 0xFF) as usize;
     let obj = box_or_load_home(b, actx, state, obj_r);
     let idx = box_or_load_home(b, actx, state, idx_r);
-    let dest_v = b.ins().iconst(types::I64, dest as i64);
 
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let (idx_tag, idx_payload) = b.ins().isplit(idx);
 
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        48,
-        3,
-    ));
-    b.ins().stack_store(obj_tag, slot, 0);
-    b.ins().stack_store(obj_payload, slot, 8);
-    b.ins().stack_store(idx_tag, slot, 16);
-    b.ins().stack_store(idx_payload, slot, 24);
-    b.ins().stack_store(dest_v, slot, 32);
-    let args = b.ins().stack_addr(types::I64, slot, 0);
-
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
-    call_helper_void(b, actx.cc, actx.helpers.get_index, &[actx.exec_ctx, args]);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.jit_array_get_fast,
+        &[actx.exec_ctx, obj_tag, obj_payload, idx_tag, idx_payload],
+    );
     let res = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_native_result_offset as i32,
     );
-    reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
 }
 
@@ -146,22 +135,22 @@ pub(crate) fn emit_set_index(
     let (idx_tag, idx_payload) = b.ins().isplit(idx);
     let (val_tag, val_payload) = b.ins().isplit(val);
 
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        48,
-        3,
-    ));
-    b.ins().stack_store(obj_tag, slot, 0);
-    b.ins().stack_store(obj_payload, slot, 8);
-    b.ins().stack_store(idx_tag, slot, 16);
-    b.ins().stack_store(idx_payload, slot, 24);
-    b.ins().stack_store(val_tag, slot, 32);
-    b.ins().stack_store(val_payload, slot, 40);
-    let args = b.ins().stack_addr(types::I64, slot, 0);
-
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    call_helper_void(b, actx.cc, actx.helpers.set_index, &[actx.exec_ctx, args]);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.jit_array_set_fast,
+        &[
+            actx.exec_ctx,
+            obj_tag,
+            obj_payload,
+            idx_tag,
+            idx_payload,
+            val_tag,
+            val_payload,
+        ],
+    );
     reload_boxed(b, actx, state, &regs);
 }
 

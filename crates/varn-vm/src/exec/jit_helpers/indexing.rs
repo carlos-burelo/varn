@@ -38,21 +38,41 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
 ) {
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
     let key = VmValue::from_raw_parts(key_tag, key_payload);
-    // Fast path: heap array with integer key — no string allocation, no dispatch table
+    // Fast path: heap array or object
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
         let ctx_ref = &*ctx;
-        if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get(heap_idx) {
-            let idx = if key.is_int() {
-                key.as_int() as usize
-            } else {
-                key.to_i32() as usize
-            };
-            (*ctx).jit_native_result = a.get_vm(idx).unwrap_or(VmValue::null());
-            return;
+        match ctx_ref.heap.get(heap_idx) {
+            Some(crate::heap::HeapObj::Array(a)) => {
+                let idx = if key.is_int() {
+                    key.as_int() as usize
+                } else {
+                    key.to_i32() as usize
+                };
+                (*ctx).jit_native_result = a.get_vm(idx).unwrap_or(VmValue::null());
+                return;
+            }
+            Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
+                let mut buf = [0u8; 5];
+                let key_str = if key.is_sso() {
+                    Some(key.sso_as_str(&mut buf))
+                } else if key.is_heap() {
+                    match ctx_ref.heap.get(key.as_heap_idx()) {
+                        Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                if let Some(ks) = key_str {
+                    (*ctx).jit_native_result = o.read().get(ks).unwrap_or(VmValue::null());
+                    return;
+                }
+            }
+            _ => {}
         }
     }
-    // Slow path: objects, strings, ranges, SSO strings — fall back to handler
+    // Slow path: strings, ranges, SSO strings — fall back to handler
     let ctx_ref = &mut *ctx;
     match crate::exec::collections::array_get_index(obj, key, &mut ctx_ref.heap) {
         Ok(v) => ctx_ref.jit_native_result = v,
@@ -72,7 +92,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
     let key = VmValue::from_raw_parts(key_tag, key_payload);
     let val = VmValue::from_raw_parts(val_tag, val_payload);
-    // Fast path: heap array with integer key — no string allocation, no dispatch
+    // Fast path: heap array or object
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
         let ctx_ref = &mut *ctx;
@@ -95,6 +115,25 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             }
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;
+        }
+        if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(heap_idx) {
+            let o = o.clone();
+            let mut buf = [0u8; 5];
+            let key_str = if key.is_sso() {
+                Some(key.sso_as_str(&mut buf))
+            } else if key.is_heap() {
+                match ctx_ref.heap.get(key.as_heap_idx()) {
+                    Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Some(ks) = key_str {
+                o.set_field_str(ks, val);
+                ctx_ref.heap.write_barrier(heap_idx, val);
+                return;
+            }
         }
     }
     // Slow path: objects and other types
