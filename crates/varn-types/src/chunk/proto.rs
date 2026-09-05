@@ -275,6 +275,11 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_failed: std::cell::Cell<bool>,
+
+    /// Cached plan for trivial field initialization constructors.
+    #[serde(skip)]
+    #[serde(default)]
+    pub trivial_init_memo: std::cell::RefCell<Option<Option<Rc<[(usize, usize)]>>>>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
@@ -348,9 +353,16 @@ impl FunctionProto {
     /// Checks if this constructor proto is a trivial field-initializer:
     /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
     /// instructions ending in Return.
-    ///
-    /// Returns `Some(Vec<(u16, u16)>)` where each element is `(param_index_1_based, slot_index)`.
-    pub fn trivial_field_init_plan(&self) -> Option<Vec<(usize, usize)>> {
+    pub fn trivial_field_init_plan(&self) -> Option<Rc<[(usize, usize)]>> {
+        if let Some(ref cached) = *self.trivial_init_memo.borrow() {
+            return cached.clone();
+        }
+        let plan = self.compute_trivial_field_init_plan().map(|p| p.into());
+        *self.trivial_init_memo.borrow_mut() = Some(plan.clone());
+        plan
+    }
+
+    fn compute_trivial_field_init_plan(&self) -> Option<Vec<(usize, usize)>> {
         if self.is_async || self.is_generator || self.has_rest || self.upvalue_count > 0 {
             return None;
         }

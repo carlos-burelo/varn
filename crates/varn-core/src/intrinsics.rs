@@ -132,6 +132,13 @@ pub enum MemberKey {
     End,
     StartsWith,
     EndsWith,
+    CharCodeAt,
+    CodePointAt,
+    Substring,
+    Substr,
+    At,
+    LastIndexOf,
+    CharCode,
 }
 
 impl MemberKey {
@@ -175,6 +182,13 @@ impl MemberKey {
             Self::End => "end",
             Self::StartsWith => "startsWith",
             Self::EndsWith => "endsWith",
+            Self::CharCodeAt => "charCodeAt",
+            Self::CodePointAt => "codePointAt",
+            Self::Substring => "substring",
+            Self::Substr => "substr",
+            Self::At => "at",
+            Self::LastIndexOf => "lastIndexOf",
+            Self::CharCode => "charCode",
         }
     }
 
@@ -218,6 +232,13 @@ impl MemberKey {
             "end" => Some(Self::End),
             "startsWith" => Some(Self::StartsWith),
             "endsWith" => Some(Self::EndsWith),
+            "charCodeAt" => Some(Self::CharCodeAt),
+            "codePointAt" => Some(Self::CodePointAt),
+            "substring" => Some(Self::Substring),
+            "substr" => Some(Self::Substr),
+            "at" => Some(Self::At),
+            "lastIndexOf" => Some(Self::LastIndexOf),
+            "charCode" => Some(Self::CharCode),
             _ => None,
         }
     }

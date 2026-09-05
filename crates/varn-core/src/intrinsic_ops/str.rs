@@ -18,6 +18,7 @@ pub enum StrOp {
     EndsWith = 0x9,
     Includes = 0xA,
     CharCode = 0xB,
+    Split = 0xC,
 }
 
 impl StrOp {
@@ -28,17 +29,17 @@ impl StrOp {
 
 /// `str` method name -> wire byte, for receivers statically typed `str`.
 pub const METHOD_ENTRIES: &[(&str, u8)] = &[
-    ("charCodeAt", StrOp::CharCodeAt.wire()),
-    ("codePointAt", StrOp::CodePointAt.wire()),
-    ("substring", StrOp::Substring.wire()),
-    ("slice", StrOp::Slice.wire()),
-    ("substr", StrOp::Substr.wire()),
-    ("at", StrOp::At.wire()),
-    ("indexOf", StrOp::IndexOf.wire()),
-    ("lastIndexOf", StrOp::LastIndexOf.wire()),
-    ("startsWith", StrOp::StartsWith.wire()),
-    ("endsWith", StrOp::EndsWith.wire()),
-    ("includes", StrOp::Includes.wire()),
-    ("contains", StrOp::Includes.wire()),
-    ("charCode", StrOp::CharCode.wire()),
+    (crate::MemberKey::CharCodeAt.as_str(), StrOp::CharCodeAt.wire()),
+    (crate::MemberKey::CodePointAt.as_str(), StrOp::CodePointAt.wire()),
+    (crate::MemberKey::Substring.as_str(), StrOp::Substring.wire()),
+    (crate::MemberKey::Slice.as_str(), StrOp::Slice.wire()),
+    (crate::MemberKey::Substr.as_str(), StrOp::Substr.wire()),
+    (crate::MemberKey::At.as_str(), StrOp::At.wire()),
+    (crate::MemberKey::IndexOf.as_str(), StrOp::IndexOf.wire()),
+    (crate::MemberKey::LastIndexOf.as_str(), StrOp::LastIndexOf.wire()),
+    (crate::MemberKey::StartsWith.as_str(), StrOp::StartsWith.wire()),
+    (crate::MemberKey::EndsWith.as_str(), StrOp::EndsWith.wire()),
+    (crate::MemberKey::Includes.as_str(), StrOp::Includes.wire()),
+    (crate::MemberKey::CharCode.as_str(), StrOp::CharCode.wire()),
+    (crate::MemberKey::Split.as_str(), StrOp::Split.wire()),
 ];

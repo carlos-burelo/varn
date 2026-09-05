@@ -282,6 +282,26 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
+        o if o == StrOp::Split as u8 => {
+            let sep_val = arg(args, 1);
+            if sep_val.is_null() {
+                let parts: Vec<&str> = s.split("").filter(|p| !p.is_empty()).collect();
+                let items: Vec<VmValue> = parts.into_iter().map(|p| heap.alloc_str(p)).collect();
+                return Ok(heap.alloc_array_vm(items));
+            }
+            let (sep, _) = view(sep_val, heap, &mut needle_buf)?;
+            if sep.is_empty() {
+                let parts: Vec<&str> = s.split("").filter(|p| !p.is_empty()).collect();
+                let items: Vec<VmValue> = parts.into_iter().map(|p| heap.alloc_str(p)).collect();
+                return Ok(heap.alloc_array_vm(items));
+            }
+            let parts: Vec<&str> = s.split(sep).collect();
+            let mut items = Vec::with_capacity(parts.len());
+            for p in parts {
+                items.push(heap.alloc_str(p));
+            }
+            Ok(heap.alloc_array_vm(items))
+        }
         _ => Err(RuntimeError::new(format!("str intrinsic: unknown op {op}"))),
     }
 }

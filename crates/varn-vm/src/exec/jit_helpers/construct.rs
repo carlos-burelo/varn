@@ -83,21 +83,17 @@ pub(crate) fn construct_staged_fast(
         None
     });
 
-    let jit_ctor = match cached_entry {
-        Some((closure, jit_fn)) => jit_fn.map(|f| (closure, f)),
+    let (ctor_closure, jit_fn) = match cached_entry {
+        Some((closure, jit_fn)) => (Some(closure), jit_fn),
         None => {
             let cached: Option<Option<std::rc::Rc<dyn std::any::Any>>> =
                 match &*cls.ctor_rt_cache.borrow() {
                     Some((cached_ver, entry)) if *cached_ver == ver => Some(entry.clone()),
                     _ => None,
                 };
-            let resolved = match cached {
+            let closure_opt = match cached {
                 Some(None) => None,
-                Some(Some(any)) => {
-                    let nc = any.downcast::<crate::closure::VmClosure>().ok()?;
-                    let jit_fn = nc.hot_jit_fn()?;
-                    Some((nc, jit_fn))
-                }
+                Some(Some(any)) => any.downcast::<crate::closure::VmClosure>().ok(),
                 None => {
                     let ctor = cls.constructor();
                     match &ctor {
@@ -109,10 +105,9 @@ pub(crate) fn construct_staged_fast(
                             if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
                                 return None;
                             }
-                            let jit_fn = nc.hot_jit_fn()?;
                             *cls.ctor_rt_cache.borrow_mut() =
                                 Some((ver, Some(nc.clone() as std::rc::Rc<dyn std::any::Any>)));
-                            Some((nc.clone(), jit_fn))
+                            Some(nc.clone())
                         }
                         Some(_) => return None,
                         None => {
@@ -122,17 +117,20 @@ pub(crate) fn construct_staged_fast(
                     }
                 }
             };
-            if let Some((ref nc, jit_fn)) = resolved {
+            if let Some(ref nc) = closure_opt {
+                let jit_fn = nc.hot_jit_fn();
                 ACTIVE_CTOR.with(|cell| {
                     *cell.borrow_mut() = Some(ActiveCtorCache {
                         class_id: cls.id,
                         version: ver,
                         closure: nc.clone(),
-                        jit_fn: Some(jit_fn),
+                        jit_fn,
                     });
                 });
+                (Some(nc.clone()), jit_fn)
+            } else {
+                (None, None)
             }
-            resolved
         }
     };
 
@@ -145,11 +143,11 @@ pub(crate) fn construct_staged_fast(
     if on {
         prof::record(prof::Seg::ObjDataAlloc, t_alloc, prof::read());
     }
-    if let Some((ref closure, _)) = jit_ctor {
+    if let Some(ref closure) = ctor_closure {
         if let Some(plan) = closure.proto.trivial_field_init_plan() {
             // Fast inlining: directly assign arguments into object slots
             // Arguments are staged at `callee_base + 1 + param_idx`.
-            for (param_idx, slot) in plan {
+            for &(param_idx, slot) in &*plan {
                 let arg_idx = callee_base + 1 + param_idx;
                 if arg_idx < ctx_ref.stack.len() {
                     let val = ctx_ref.stack[arg_idx];
@@ -174,8 +172,8 @@ pub(crate) fn construct_staged_fast(
     }
     let t_frame = if on { prof::read() } else { 0 };
 
-    let Some((closure, jit_fn)) = jit_ctor else {
-        return Some(instance_nv);
+    let (Some(closure), Some(jit_fn)) = (ctor_closure, jit_fn) else {
+        return None;
     };
 
     let required = callee_base + closure.proto.register_count as usize + 32;

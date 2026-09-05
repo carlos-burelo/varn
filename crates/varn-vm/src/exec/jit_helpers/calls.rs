@@ -47,8 +47,8 @@ pub(crate) extern "C" fn jit_call(
 
         if args.callee.is_heap() {
             let heap_obj = ctx_ref.heap.get(args.callee.as_heap_idx());
-
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
+                let closure = closure.clone();
                 let is_eligible = !closure.proto.is_async
                     && !closure.proto.is_generator
                     && !closure.proto.has_rest
@@ -60,7 +60,7 @@ pub(crate) extern "C" fn jit_call(
                     let required_len = callee_base + closure.proto.register_count as usize;
                     let required_cap = required_len + 32;
                     if ctx_ref.stack.capacity() < required_cap {
-                        ctx_ref.stack.reserve(required_cap - ctx_ref.stack.len());
+                        ctx_ref.stack.reserve((required_cap - ctx_ref.stack.len()).max(256));
                     }
                     if ctx_ref.stack.len() < required_len {
                         ctx_ref.stack.resize(required_len, VmValue::null());
@@ -68,12 +68,12 @@ pub(crate) extern "C" fn jit_call(
 
                     ctx_ref
                         .frames
-                        .push(crate::frame::CallFrame::new(closure, callee_base));
+                        .push(crate::frame::CallFrame::new(&closure, callee_base));
 
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        &**closure as *const crate::closure::VmClosure as *const std::ffi::c_void,
+                        &*closure as *const crate::closure::VmClosure as *const std::ffi::c_void,
                         callee_base,
                         ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
                     );
@@ -82,7 +82,9 @@ pub(crate) extern "C" fn jit_call(
 
                     ctx_ref.frames.pop();
 
-                    ctx_ref.close_upvalues_above(callee_base);
+                    if closure.proto.upvalue_count > 0 {
+                        ctx_ref.close_upvalues_above(callee_base);
+                    }
 
                     let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res);
 
@@ -308,7 +310,7 @@ pub(crate) extern "C" fn clif_call_fallback(
                         let required_len = callee_base + closure.proto.register_count as usize;
                         let required_cap = required_len + 32;
                         if ctx_ref.stack.capacity() < required_cap {
-                            ctx_ref.stack.reserve(required_cap - ctx_ref.stack.len());
+                            ctx_ref.stack.reserve((required_cap - ctx_ref.stack.len()).max(256));
                         }
                         if ctx_ref.stack.len() < required_len {
                             ctx_ref.stack.resize(required_len, VmValue::null());

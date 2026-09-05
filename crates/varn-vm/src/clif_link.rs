@@ -255,7 +255,7 @@ impl ClifLinker for CtxLinker {
                     let wrapper = payload
                         .as_any()
                         .downcast_ref::<crate::closure::VmClosurePayload>()?;
-                    wrapper.0.proto.trivial_field_init_plan()
+                    wrapper.0.proto.trivial_field_init_plan().map(|p| p.to_vec())
                 }
                 _ => None,
             }

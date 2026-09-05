@@ -38,23 +38,22 @@ pub(crate) fn try_fast_jit_method(
     if !this_val.is_heap() {
         return None;
     }
-    let class_rc = match ctx_ref.heap.get(this_val.as_heap_idx()) {
+    let (class_id, inst_cls) = match ctx_ref.heap.get(this_val.as_heap_idx()) {
+        Some(crate::heap::HeapObj::Instance(inst)) => (inst.class_id, None),
         Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
-            o.borrow().class()?
-        }
-        Some(crate::heap::HeapObj::Instance(inst)) => {
-            varn_types::value::ClassObj::find_by_id(inst.class_id)?
+            let cls = o.borrow().class()?;
+            (cls.id, Some(cls))
         }
         _ => return None,
     };
 
     let caller_proto = &closure_ref.proto as *const _ as usize;
-    let slot_idx = (class_rc.id as usize ^ name_idx ^ (caller_proto >> 4)) & (METHOD_CACHE_SIZE - 1);
+    let slot_idx = (class_id as usize ^ name_idx ^ (caller_proto >> 4)) & (METHOD_CACHE_SIZE - 1);
     let hit = ACTIVE_METHODS.with(|cell| {
         let mut b = cell.borrow_mut();
         if let Some(ref mut c) = b[slot_idx] {
             if c.caller_proto == caller_proto
-                && c.class_id == class_rc.id
+                && c.class_id == class_id
                 && c.name_idx == name_idx
             {
                 if c.jit_fn.is_none() {
@@ -69,6 +68,10 @@ pub(crate) fn try_fast_jit_method(
     let (nc, jit_fn) = match hit {
         Some(pair) => pair,
         None => {
+            let class_rc = match inst_cls {
+                Some(cls) => cls,
+                None => varn_types::value::ClassObj::find_by_id(class_id)?,
+            };
             let name_nv = *closure_ref.constants.get(name_idx)?;
             let name = ctx_ref.heap.str_val(name_nv)?;
             let (method_val, _owner) =
@@ -93,7 +96,7 @@ pub(crate) fn try_fast_jit_method(
             ACTIVE_METHODS.with(|cell| {
                 cell.borrow_mut()[slot_idx] = Some(ActiveMethodCache {
                     caller_proto,
-                    class_id: class_rc.id,
+                    class_id,
                     name_idx,
                     closure: nc.clone(),
                     jit_fn,
@@ -110,7 +113,7 @@ pub(crate) fn try_fast_jit_method(
     let required_len = callee_base + nc.proto.register_count as usize;
     let required_cap = required_len + 32;
     if ctx_ref.stack.capacity() < required_cap {
-        ctx_ref.stack.reserve(required_cap - orig_len);
+        ctx_ref.stack.reserve((required_cap - orig_len).max(256));
     }
     if ctx_ref.stack.len() < required_len {
         ctx_ref.stack.resize(required_len, VmValue::null());
