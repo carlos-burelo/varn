@@ -147,11 +147,15 @@ pub(crate) fn construct_staged_fast(
         if let Some(plan) = closure.proto.trivial_field_init_plan() {
             // Fast inlining: directly assign arguments into object slots
             // Arguments are staged at `callee_base + 1 + param_idx`.
+            let max_payload = inst.payload_size as usize;
             for &(param_idx, slot) in &*plan {
-                let arg_idx = callee_base + 1 + param_idx;
-                if arg_idx < ctx_ref.stack.len() {
-                    let val = ctx_ref.stack[arg_idx];
-                    inst.set_field_at(slot, val);
+                let offset = slot * 16;
+                if offset + 16 <= max_payload {
+                    let arg_idx = callee_base + 1 + param_idx;
+                    if arg_idx < ctx_ref.stack.len() {
+                        let val = ctx_ref.stack[arg_idx];
+                        unsafe { inst.write_vm_value(offset, val) };
+                    }
                 }
             }
             let t_push = if on { prof::read() } else { 0 };
