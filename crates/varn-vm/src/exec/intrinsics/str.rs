@@ -295,10 +295,17 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
                 let items: Vec<VmValue> = parts.into_iter().map(|p| heap.alloc_str(p)).collect();
                 return Ok(heap.alloc_array_vm(items));
             }
-            let parts: Vec<&str> = s.split(sep).collect();
-            let mut items = Vec::with_capacity(parts.len());
-            for p in parts {
-                items.push(heap.alloc_str(p));
+            let base_ptr = s.as_ptr() as usize;
+            let ranges: Vec<(usize, usize)> = s
+                .split(sep)
+                .map(|p| {
+                    let st = p.as_ptr() as usize - base_ptr;
+                    (st, st + p.len())
+                })
+                .collect();
+            let mut items = Vec::with_capacity(ranges.len());
+            for (bs, be) in ranges {
+                items.push(alloc_sub(heap, recv, &this, s, bs, be));
             }
             Ok(heap.alloc_array_vm(items))
         }
