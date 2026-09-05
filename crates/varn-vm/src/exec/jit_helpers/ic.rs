@@ -239,20 +239,37 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
         let closure_ref = &*closure;
         if cs_idx < closure_ref.ic_cache_len() {
             if obj.is_heap() {
-                if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx()) {
-                    let guard = o.read();
-                    let slot_cache = &*closure_ref.ic_cache.as_ptr();
-                    let poly_slot = &slot_cache[cs_idx];
-                    for entry in &poly_slot.entries {
-                        if entry.id != 0
-                            && entry.is_class == ICKind::SHAPE_PROP
-                            && guard.shape().id == entry.id
-                        {
-                            if let Some(v) = guard.field_at(entry.slot as usize) {
-                                return v;
+                match ctx_ref.heap.get(obj.as_heap_idx()) {
+                    Some(crate::heap::HeapObj::Instance(inst)) => {
+                        let slot_cache = &*closure_ref.ic_cache.as_ptr();
+                        let poly_slot = &slot_cache[cs_idx];
+                        for entry in &poly_slot.entries {
+                            if entry.id != 0
+                                && entry.is_class == ICKind::INSTANCE_FIELD
+                                && inst.class_id == entry.id
+                            {
+                                if let Some(v) = inst.field_at(entry.slot as usize) {
+                                    return v;
+                                }
                             }
                         }
                     }
+                    Some(crate::heap::HeapObj::Object(o)) => {
+                        let guard = o.read();
+                        let slot_cache = &*closure_ref.ic_cache.as_ptr();
+                        let poly_slot = &slot_cache[cs_idx];
+                        for entry in &poly_slot.entries {
+                            if entry.id != 0
+                                && entry.is_class == ICKind::SHAPE_PROP
+                                && guard.shape().id == entry.id
+                            {
+                                if let Some(v) = guard.field_at(entry.slot as usize) {
+                                    return v;
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
 

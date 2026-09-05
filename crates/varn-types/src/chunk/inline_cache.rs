@@ -24,6 +24,8 @@ impl ICKind {
     pub const ARRAY_LENGTH: u8 = 8;
     /// String `.length` property access
     pub const STR_LENGTH: u8 = 9;
+    /// Class instance field access by slot (GetProperty / SetProperty)
+    pub const INSTANCE_FIELD: u8 = 10;
 }
 
 #[derive(Clone, Copy, Default, Debug, serde::Serialize, serde::Deserialize)]
