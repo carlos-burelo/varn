@@ -569,11 +569,35 @@ impl VmArray {
         if items.is_empty() {
             return Self::new(items);
         }
-        if items.iter().all(|v| v.is_int()) {
-            return Self::new_i64(items.iter().map(|v| v.as_int()).collect());
-        }
-        if items.iter().all(|v| v.is_f64()) {
-            return Self::new_f64(items.iter().map(|v| v.as_f64()).collect());
+        let first = items[0];
+        if first.is_int() {
+            let mut ints = Vec::with_capacity(items.len());
+            let mut all_ints = true;
+            for &v in &items {
+                if v.is_int() {
+                    ints.push(v.as_int());
+                } else {
+                    all_ints = false;
+                    break;
+                }
+            }
+            if all_ints {
+                return Self::new_i64(ints);
+            }
+        } else if first.is_f64() {
+            let mut floats = Vec::with_capacity(items.len());
+            let mut all_floats = true;
+            for &v in &items {
+                if v.is_f64() {
+                    floats.push(v.as_f64());
+                } else {
+                    all_floats = false;
+                    break;
+                }
+            }
+            if all_floats {
+                return Self::new_f64(floats);
+            }
         }
         Self::new(items)
     }
