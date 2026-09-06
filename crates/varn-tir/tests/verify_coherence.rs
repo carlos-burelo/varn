@@ -294,6 +294,7 @@ fn let_type_mismatch_is_rejected() {
 #[test]
 fn let_with_matching_type_verifies() {
     let mut m = module_with_point();
+    m.top_level.locals.push(BackendTy::Int);
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(1),
         ty: BackendTy::Int,
@@ -391,7 +392,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
             sig: SigId(0),
             params: vec![],
             return_ty: BackendTy::Void,
-            locals: vec![],
+            locals: vec![nullable_int],
             body: vec![],
             has_this: false,
             this_class: None,
@@ -762,7 +763,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
             sig: SigId(0),
             params: vec![],
             return_ty: BackendTy::Void,
-            locals: vec![],
+            locals: vec![deeply_nullable],
             body: vec![],
             has_this: false,
             this_class: None,

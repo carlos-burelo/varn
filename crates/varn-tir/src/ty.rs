@@ -98,7 +98,10 @@ impl BackendTy {
         // unconditionally), so we need a depth bound just as assignable does.
         const DEPTH_LIMIT: usize = 32;
         match self {
-            BackendTy::Nullable(inner) if depth < DEPTH_LIMIT => {
+            // A dangling handle here means wellformed already found (or
+            // will find) the real problem; give up safely and hand back
+            // the type unchanged, same as hitting the depth limit.
+            BackendTy::Nullable(inner) if depth < DEPTH_LIMIT && t.contains(inner) => {
                 t.get(inner).non_nullable_with_depth(t, depth + 1)
             }
             other => other,

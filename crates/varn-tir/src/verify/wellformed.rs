@@ -3,7 +3,7 @@
 use super::VerifyError;
 use crate::node::{TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
 use crate::resolution::Resolution;
-use crate::ty::{BackendTy, TyId};
+use crate::ty::{BackendTy, TyId, TyListId};
 use std::collections::HashSet;
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
@@ -30,6 +30,20 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
     for class in &m.classes {
         for field in &class.fields {
             check_ty(m, field.ty, &dummy_expr, errors);
+        }
+        // Every vtable entry must name a real signature — a dangling SigId
+        // here silently disables check_method_call's arity/type coherence
+        // rule (it looks up the signature and just returns if absent).
+        for entry in &class.vtable {
+            if m.signature(entry.sig).is_none() {
+                errors.push(VerifyError::new(
+                    format!(
+                        "vtable entry `{}` names SigId({}), which has no entry",
+                        entry.name, entry.sig.0
+                    ),
+                    dummy_expr.span,
+                ));
+            }
         }
     }
 
@@ -82,7 +96,7 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
 fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<VerifyError>) {
     match s {
         TirStmt::Expr(e) | TirStmt::Throw(e) => check_expr(m, f, e, errors),
-        TirStmt::Let { ty, init, .. } => {
+        TirStmt::Let { ty, init, local, .. } => {
             let dummy_expr = TirExpr {
                 kind: TirExprKind::NullLit,
                 ty: BackendTy::Void,
@@ -90,6 +104,12 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 span: crate::node::Span::EMPTY,
             };
             check_ty(m, *ty, &dummy_expr, errors);
+            if local.0 as usize >= f.locals.len() {
+                errors.push(VerifyError::new(
+                    format!("Let binds LocalId({}), which is out of range", local.0),
+                    crate::node::Span::EMPTY,
+                ));
+            }
             if let Some(e) = init {
                 check_expr(m, f, e, errors);
             }
@@ -111,7 +131,16 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 check_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Try { body, catch_body, .. } => {
+        TirStmt::Try { body, catch_local, catch_body } => {
+            if catch_local.0 as usize >= f.locals.len() {
+                errors.push(VerifyError::new(
+                    format!(
+                        "Try binds catch LocalId({}), which is out of range",
+                        catch_local.0
+                    ),
+                    crate::node::Span::EMPTY,
+                ));
+            }
             for s in body.iter().chain(catch_body) {
                 check_stmt(m, f, s, errors);
             }
@@ -197,7 +226,8 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
 /// Every handle inside a type points at an entry that exists, and types do not form cycles.
 fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     let mut visited = HashSet::new();
-    check_ty_recursive(m, ty, e, errors, &mut visited);
+    let mut visited_lists = HashSet::new();
+    check_ty_recursive(m, ty, e, errors, &mut visited, &mut visited_lists);
 }
 
 fn check_ty_recursive(
@@ -206,6 +236,7 @@ fn check_ty_recursive(
     e: &TirExpr,
     errors: &mut Vec<VerifyError>,
     visited: &mut HashSet<TyId>,
+    visited_lists: &mut HashSet<TyListId>,
 ) {
     let bad = |what: &str, errors: &mut Vec<VerifyError>| {
         errors.push(VerifyError::new(
@@ -225,7 +256,7 @@ fn check_ty_recursive(
             } else if visited.insert(t) {
                 // First time seeing this TyId, recurse into it
                 let inner_ty = m.types.get(t);
-                check_ty_recursive(m, inner_ty, e, errors, visited);
+                check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
             // If already visited, stop to break cycles
         }
@@ -234,24 +265,29 @@ fn check_ty_recursive(
                 bad(&format!("TyId({})", k.0), errors);
             } else if visited.insert(k) {
                 let inner_ty = m.types.get(k);
-                check_ty_recursive(m, inner_ty, e, errors, visited);
+                check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
             if !m.types.contains(v) {
                 bad(&format!("TyId({})", v.0), errors);
             } else if visited.insert(v) {
                 let inner_ty = m.types.get(v);
-                check_ty_recursive(m, inner_ty, e, errors, visited);
+                check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
         }
         BackendTy::Tuple(l) => {
             if !m.types.contains_list(l) {
                 bad(&format!("TyListId({})", l.0), errors);
-            } else {
-                // Recurse into each element of the tuple, using the same visited set
+            } else if visited_lists.insert(l) {
+                // First time seeing this TyListId — recurse into its
+                // elements. A Tuple can point back at its own TyListId
+                // (e.g. `intern_list(&[Tuple(TyListId(0))])` on an empty
+                // table), which is a genuine self-reference distinct from
+                // any TyId cycle, so it needs its own visited set.
                 for &elem_ty in m.types.get_list(l) {
-                    check_ty_recursive(m, elem_ty, e, errors, visited);
+                    check_ty_recursive(m, elem_ty, e, errors, visited, visited_lists);
                 }
             }
+            // If already visited, stop to break cycles
         }
         _ => {}
     }

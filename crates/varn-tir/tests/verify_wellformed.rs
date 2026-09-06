@@ -236,3 +236,111 @@ fn cyclic_tuple_does_not_hang() {
     let _ = verify_module(&m);
 }
 
+/// A `Field` expression whose object type is a dangling nullable handle
+/// (`Nullable(TyId(999))` with no entry at 999) used to panic the verifier:
+/// `wellformed` reports the dangling handle, but `coherence` runs
+/// unconditionally afterwards and `non_nullable`/`assignable_with_depth`
+/// indexed the table without checking `contains` first. This asserts it now
+/// reports an error instead of panicking.
+#[test]
+fn a_dangling_type_handle_on_a_field_object_does_not_panic() {
+    let mut m = empty_module();
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Nullable(TyId(999)),
+        Resolution::Local(LocalId(0)),
+    );
+    m.top_level.locals.push(BackendTy::Nullable(TyId(999)));
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        BackendTy::Int,
+        Resolution::FieldSlot(0),
+    )));
+    // Must return an error, not panic.
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("TyId(999)")),
+        "expected a dangling-TyId error, got: {:?}",
+        errs
+    );
+}
+
+/// A genuine self-reference through `TyListId` alone (no `TyId` involved):
+/// `intern_list(&[Tuple(TyListId(0))])` on an empty table produces
+/// `TyListId(0)` holding a `Tuple` that points back at itself. Distinct from
+/// `cyclic_tuple_does_not_hang` above, which cycles through a `TyId`
+/// indirection and never re-visits the same `TyListId` — this one hits the
+/// same `TyListId` on the very first recursive step, and `wellformed` used
+/// to track only `TyId` in its `visited` set, overflowing the stack.
+#[test]
+fn self_referential_tuple_list_does_not_overflow() {
+    let mut m = empty_module();
+    let mut types = TyTable::default();
+    let list_id = types.intern_list(&[BackendTy::Tuple(TyListId(0))]);
+    assert_eq!(list_id, TyListId(0), "must be genuinely self-referential");
+    m.types = types;
+
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::IntLit(42),
+        BackendTy::Tuple(list_id),
+        Resolution::None,
+    )));
+
+    // Should complete without stack-overflowing.
+    let _ = verify_module(&m);
+}
+
+/// `TirStmt::Let`'s bound local must be in range of the function's locals.
+#[test]
+fn out_of_range_let_local_is_rejected() {
+    let mut m = empty_module();
+    m.top_level.body.push(TirStmt::Let {
+        local: LocalId(5), // top_level has no locals
+        ty: BackendTy::Int,
+        init: None,
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        "expected an out-of-range Let local error, got: {:?}",
+        errs
+    );
+}
+
+/// `TirStmt::Try`'s bound catch local must be in range of the function's locals.
+#[test]
+fn out_of_range_try_catch_local_is_rejected() {
+    let mut m = empty_module();
+    m.top_level.body.push(TirStmt::Try {
+        body: vec![],
+        catch_local: LocalId(5), // top_level has no locals
+        catch_body: vec![],
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        "expected an out-of-range Try catch local error, got: {:?}",
+        errs
+    );
+}
+
+/// A vtable entry naming a dangling `SigId` is rejected: `check_method_call`
+/// silently returns when the signature lookup fails, which disabled the
+/// arity/type coherence rule for any class whose vtable got corrupted.
+#[test]
+fn a_dangling_vtable_sig_is_rejected() {
+    let mut m = empty_module();
+    m.classes = vec![ClassInfo::new_with_methods(
+        Rc::from("P"),
+        None,
+        vec![("x".into(), BackendTy::Int)],
+        vec![("m".into(), SigId(99))], // no entry 99 in m.signatures
+    )];
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("SigId(99)")),
+        "expected a dangling vtable SigId error, got: {:?}",
+        errs
+    );
+}
+

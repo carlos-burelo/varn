@@ -178,6 +178,12 @@ fn assignable_with_depth(
     }
     // T is assignable to T?; the reverse is not.
     if let BackendTy::Nullable(inner) = to {
+        // A dangling handle means wellformed already reported the real
+        // problem elsewhere; return true (the same safe direction as the
+        // depth bound above) rather than indexing blindly.
+        if !m.types.contains(inner) {
+            return true;
+        }
         return assignable_with_depth(m, from, m.types.get(inner), depth + 1);
     }
     false
