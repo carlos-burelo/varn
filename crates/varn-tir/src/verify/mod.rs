@@ -6,6 +6,7 @@
 //! verifying the 191 modules of the corpus catches incoherence over real code
 //! with nothing running.
 
+mod coherence;
 mod wellformed;
 
 use crate::node::{Span, TirModule};
@@ -28,5 +29,6 @@ impl VerifyError {
 pub fn verify_module(m: &TirModule) -> Result<(), Vec<VerifyError>> {
     let mut errors = Vec::new();
     wellformed::check(m, &mut errors);
+    coherence::check(m, &mut errors);
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
