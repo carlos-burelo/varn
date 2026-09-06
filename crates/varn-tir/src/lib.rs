@@ -16,3 +16,4 @@ mod node;
 pub use node::{Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirBinOp, TirUnOp};
 
 mod tables;
+pub use tables::{ClassInfo, FieldInfo, VtableEntry, EnumInfo, VariantInfo, Signature};
