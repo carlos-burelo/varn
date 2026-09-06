@@ -140,7 +140,7 @@ impl Builder {
                     let tag = self.emit(
                         InstKind::GetProperty {
                             object: subj,
-                            name: Rc::from("__variant_name__"),
+                            name: Rc::from(varn_core::MemberKey::VariantName.as_str()),
                         },
                         HirType::Str,
                     );

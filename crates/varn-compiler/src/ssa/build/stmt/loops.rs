@@ -162,7 +162,7 @@ impl Builder {
         let next_fn = self.emit(
             InstKind::GetProperty {
                 object: iterator,
-                name: Rc::from("next"),
+                name: Rc::from(varn_core::MemberKey::IterNext.as_str()),
             },
             HirType::Ref,
         );
@@ -179,7 +179,7 @@ impl Builder {
         let done = self.emit(
             InstKind::GetProperty {
                 object: result,
-                name: Rc::from("done"),
+                name: Rc::from(varn_core::MemberKey::IterDone.as_str()),
             },
             HirType::Bool,
         );
@@ -206,7 +206,7 @@ impl Builder {
         let value = self.emit(
             InstKind::GetProperty {
                 object: result,
-                name: Rc::from("value"),
+                name: Rc::from(varn_core::MemberKey::IterValue.as_str()),
             },
             HirType::Dynamic,
         );
