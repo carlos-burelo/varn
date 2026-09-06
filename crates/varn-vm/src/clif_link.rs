@@ -127,7 +127,14 @@ pub(crate) fn current_epoch() -> u64 {
 /// avoid.
 #[inline(always)]
 pub(crate) fn current_ctx_ptr() -> *mut ExecCtx {
-    CURRENT_CTX.with(|c| c.get()) as *mut ExecCtx
+    let ptr = CURRENT_CTX.with(|c| c.get()) as *mut ExecCtx;
+    debug_assert!(
+        !ptr.is_null(),
+        "current_ctx_ptr: CURRENT_CTX is null — this is only called from JIT-compiled \
+         code running synchronously inside a CtxGuard's dynamic extent (see the doc \
+         comment above), so a null here means that guard invariant broke."
+    );
+    ptr
 }
 
 /// Record that `proto` now holds code built for the running context, retiring
