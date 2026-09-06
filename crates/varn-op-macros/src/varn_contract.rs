@@ -119,6 +119,21 @@ fn classify(t: &TypeNode) -> Mapped {
     }
 }
 
+/// The `TypeTag` a contract property is laid out by. `Opt` keeps no unboxed
+/// representation of its own, so it reads as `Dynamic`.
+fn mapped_tag_path(m: &Mapped) -> TS2 {
+    let name = match m {
+        Mapped::Int => quote! { Int },
+        Mapped::Float => quote! { Float },
+        Mapped::Bool => quote! { Bool },
+        Mapped::Char => quote! { Char },
+        Mapped::Str => quote! { Str },
+        Mapped::Array => quote! { Array },
+        Mapped::Dynamic | Mapped::Void | Mapped::Opt(_) => quote! { Dynamic },
+    };
+    quote! { ::varn_core::TypeTag::#name }
+}
+
 fn receiver_mapped(class: &str) -> Mapped {
     if class == IntrinsicType::Array.as_str() {
         return Mapped::Array;
@@ -415,8 +430,9 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     for m in &members {
         let sym = &m.symbol;
         if m.kind == Kind::Property {
+            let tag = mapped_tag_path(&m.ret);
             setup_calls.push(quote! {
-                cls.declare_field(::std::rc::Rc::from(#sym));
+                cls.declare_field(::std::rc::Rc::from(#sym), #tag);
             });
             continue;
         }

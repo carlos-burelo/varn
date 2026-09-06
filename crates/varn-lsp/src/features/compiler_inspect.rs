@@ -348,7 +348,9 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         LoadCaptured { var } => format!("load_captured {var:?}"),
         StoreCaptured { var, value } => format!("store_captured {var:?} = v{}", value.0),
         MakeClass { name, .. } => format!("make_class \"{name}\""),
-        DeclareField { class, name } => format!("declare_field v{}.{name}", class.0),
+        DeclareField { class, name, tag } => {
+            format!("declare_field v{}.{name}: {tag}", class.0)
+        }
         DefineStatic { class, name, value } => {
             format!("define_static v{}.{name} = v{}", class.0, value.0)
         }

@@ -613,7 +613,8 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = const_hint(c);
                 }
-                format!("r{} field[{}]", hi(w1), name_idx)
+                let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
+                format!("r{} field[{}]: {}", hi(w1), name_idx, tag)
             }
 
             OpCode::MakeEnumVariant => {

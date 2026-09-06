@@ -41,4 +41,26 @@ impl CgTy {
             other => other,
         }
     }
+
+    /// The tag a consumer lays this type out by. `Nullable` keeps no unboxed
+    /// representation of its own — it has to hold null too — so it answers
+    /// `Dynamic` rather than its payload's tag.
+    pub fn to_type_tag(&self) -> crate::TypeTag {
+        use crate::TypeTag;
+        match self {
+            CgTy::Int => TypeTag::Int,
+            CgTy::Float => TypeTag::Float,
+            CgTy::Bool => TypeTag::Bool,
+            CgTy::Str => TypeTag::Str,
+            CgTy::Char => TypeTag::Char,
+            CgTy::Decimal => TypeTag::Decimal,
+            CgTy::BigInt => TypeTag::BigInt,
+            CgTy::Array(_) => TypeTag::Array,
+            CgTy::Map(_, _) => TypeTag::Map,
+            CgTy::Set(_) => TypeTag::Set,
+            CgTy::Class(_) => TypeTag::Class,
+            CgTy::Fn => TypeTag::Function,
+            CgTy::Nullable(_) | CgTy::Dynamic => TypeTag::Dynamic,
+        }
+    }
 }

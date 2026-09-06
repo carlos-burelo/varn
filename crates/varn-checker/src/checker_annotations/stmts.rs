@@ -297,6 +297,52 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                 class_name.clone(),
                 TypeContext::source_file(ctx).map(std::rc::Rc::from),
             );
+            // A field's declared type is a fact about its DECLARATION, and the
+            // only channel to the compiler is this map, so it is published
+            // here — keyed by the same AST node the lowerer reads it back
+            // from. Constructor-parameter properties already ride
+            // `annotate_method_body` below.
+            if let Some(entry) = ctx.bind.get_class_entry(class_name.as_ref()) {
+                let field_ty = |name: &str| {
+                    entry
+                        .members
+                        .iter()
+                        .find(|m| {
+                            !m.is_static
+                                && m.name.as_ref() == name
+                                && matches!(
+                                    m.kind,
+                                    crate::types::ClassMemberKind::Property
+                                        | crate::types::ClassMemberKind::Variable
+                                )
+                        })
+                        .map(|m| m.ty.clone())
+                };
+                let mut publish = |name: &str, offset: u32, ann: &mut TypeAnnotations| {
+                    if let Some(ty) = field_ty(name) {
+                        record_cg_ty_at(AnnKey::decl(offset), &ty, ann, ctx);
+                    }
+                };
+                for p in c.primary_params.iter().flatten() {
+                    if let varn_core::ast::Pattern::Identifier { name, .. } = &p.pattern {
+                        publish(name, p.range.start.offset, ann);
+                    }
+                }
+                for member in &c.body {
+                    if let varn_core::ast::ClassMember::Property {
+                        key,
+                        modifiers,
+                        range,
+                        ..
+                    } = member
+                    {
+                        if !modifiers.is_static {
+                            publish(key, range.start.offset, ann);
+                        }
+                    }
+                }
+            }
+
             for member in &c.body {
                 match member {
                     varn_core::ast::ClassMember::Constructor { params, body, .. } => {

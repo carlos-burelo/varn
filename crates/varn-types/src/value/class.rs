@@ -45,6 +45,9 @@ pub struct ClassObj {
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
     /// Static memory layout of instances of this class.
     pub layout: RefCell<Option<Rc<crate::class_layout::ClassLayout>>>,
+    /// Declared static type of each instance field, by slot. Comes down with
+    /// the declaration; the layout is built from it rather than from a guess.
+    pub field_tags: RefCell<Vec<varn_core::TypeTag>>,
 }
 
 pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
@@ -75,6 +78,7 @@ impl ClassObj {
             ctor_rt_cache: RefCell::new(None),
             instance_shape_cache: RefCell::new(None),
             layout: RefCell::new(None),
+            field_tags: RefCell::new(Vec::new()),
         }
     }
     pub fn new_native(name: impl Into<String>) -> Self {
@@ -125,16 +129,20 @@ impl ClassObj {
         (shape, n)
     }
 
-    pub fn declare_field(&self, name: RuntimeString) -> usize {
+    pub fn declare_field(&self, name: RuntimeString, tag: varn_core::TypeTag) -> usize {
         *self.instance_shape_cache.borrow_mut() = None;
         *self.layout.borrow_mut() = None;
         let mut root = self.root_shape.borrow_mut();
         if let Some(&slot) = root.property_names.get(&name) {
+            self.field_tags.borrow_mut()[slot] = tag;
             return slot;
         }
         let new_shape = root.extend_property(name);
         let slot = new_shape.property_names.len() - 1;
         *root = new_shape;
+        let mut tags = self.field_tags.borrow_mut();
+        tags.resize(slot + 1, varn_core::TypeTag::Dynamic);
+        tags[slot] = tag;
         slot
     }
 
@@ -151,10 +159,16 @@ impl ClassObj {
             .collect();
         ordered.sort_unstable_by_key(|(slot, _)| *slot);
 
-        // Map fields assuming dynamic/ref fallback unless annotated
+        let tags = self.field_tags.borrow();
         let fields_in: Vec<(Rc<str>, varn_core::TypeTag)> = ordered
             .into_iter()
-            .map(|(_, name)| (Rc::from(name.as_ref()), varn_core::TypeTag::Dynamic))
+            .map(|(slot, name)| {
+                let tag = tags
+                    .get(slot)
+                    .copied()
+                    .unwrap_or(varn_core::TypeTag::Dynamic);
+                (Rc::from(name.as_ref()), tag)
+            })
             .collect();
 
         let layout = Rc::new(crate::class_layout::ClassLayout::from_fields(

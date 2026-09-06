@@ -168,11 +168,11 @@ pub(super) fn emit_effect(
             chunk.emit(OpCode::PopTry, line);
             return Ok(true);
         }
-        InstKind::DeclareField { class, name } => {
+        InstKind::DeclareField { class, name, tag } => {
             let class_reg = reg[class.0 as usize];
             let key_idx = chunk.add_str(name);
             chunk.emit(OpCode::DeclareField, line);
-            chunk.write(Chunk::pack(class_reg, 0), line);
+            chunk.write(Chunk::pack(class_reg, *tag as u8), line);
             chunk.write(key_idx, line);
             return Ok(true);
         }

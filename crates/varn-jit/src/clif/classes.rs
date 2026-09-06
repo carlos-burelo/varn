@@ -82,12 +82,21 @@ pub(super) fn emit_class_member_op(
 
     if op == OpCode::DeclareField {
         let (class_tag, class_payload) = b.ins().isplit(class_val);
+        // The field's static type rides the spare low byte of the operand word.
+        let field_tag = b.ins().iconst(types::I64, (code[ip + 1] & 0xFF) as i64);
         flush_boxed(b, actx, state, &regs);
         call_helper_void(
             b,
             actx.cc,
             actx.helpers.declare_field,
-            &[actx.exec_ctx, actx.closure, class_tag, class_payload, idx_v],
+            &[
+                actx.exec_ctx,
+                actx.closure,
+                class_tag,
+                class_payload,
+                idx_v,
+                field_tag,
+            ],
         );
         reload_boxed(b, actx, state, &regs);
         return Ok(());

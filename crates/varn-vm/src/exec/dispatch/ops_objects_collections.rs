@@ -193,7 +193,8 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = hi(w1);
                 let obj = self.stack[base + obj_reg];
-                self.exec_declare_field(obj, name_idx, frame_idx, closure)?;
+                let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
+                self.exec_declare_field(obj, name_idx, tag, frame_idx, closure)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::GetIndex => {

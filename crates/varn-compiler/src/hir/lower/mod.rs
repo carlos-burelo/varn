@@ -232,6 +232,15 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// The static tag the runtime lays a declared field out by, from the type
+    /// the checker published at that declaration.
+    pub(super) fn field_tag(&self, key: AnnKey) -> varn_core::TypeTag {
+        match self.ann.get_cg_ty(key) {
+            Some(cg) => cg.to_type_tag(),
+            None => varn_core::TypeTag::Dynamic,
+        }
+    }
+
     pub(super) fn expr_ty(&self, expr: &HirExpr) -> HirType {
         match expr {
             HirExpr::Int(_) => HirType::Int,

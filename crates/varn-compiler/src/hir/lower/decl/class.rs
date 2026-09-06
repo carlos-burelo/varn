@@ -32,7 +32,7 @@ impl<'a> Lowerer<'a> {
             &'a Modifiers,
         );
 
-        let mut fields: Vec<Rc<str>> = Vec::new();
+        let mut fields: Vec<HirField> = Vec::new();
         let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();
         let mut static_fields: Vec<(Rc<str>, Option<HirExpr>)> = Vec::new();
         let mut ctor_member: Option<(&[Param], &Stmt)> = None;
@@ -43,12 +43,20 @@ impl<'a> Lowerer<'a> {
         let mut static_blocks_ast: Vec<&Stmt> = Vec::new();
         let mut destructor_ast: Option<&Stmt> = None;
 
+        let mut push_field = |fields: &mut Vec<HirField>, name: &Rc<str>, tag| {
+            if !fields.iter().any(|f| &f.name == name) {
+                fields.push(HirField {
+                    name: name.clone(),
+                    tag,
+                });
+            }
+        };
+
         if let Some(primary_params) = &decl.primary_params {
             for p in primary_params {
                 if let varn_core::ast::Pattern::Identifier { name, .. } = &p.pattern {
-                    if !fields.contains(name) {
-                        fields.push(name.clone());
-                    }
+                    let tag = self.field_tag(AnnKey::decl(p.range.start.offset));
+                    push_field(&mut fields, name, tag);
                 }
             }
         }
@@ -59,6 +67,7 @@ impl<'a> Lowerer<'a> {
                     key,
                     init,
                     modifiers,
+                    range,
                     ..
                 } => {
                     if modifiers.is_static {
@@ -68,9 +77,8 @@ impl<'a> Lowerer<'a> {
                         };
                         static_fields.push((key.clone(), val));
                     } else {
-                        if !fields.contains(key) {
-                            fields.push(key.clone());
-                        }
+                        let tag = self.field_tag(AnnKey::decl(range.start.offset));
+                        push_field(&mut fields, key, tag);
                         if let Some(e) = init {
                             field_inits.push((key.clone(), e));
                         }
@@ -80,9 +88,8 @@ impl<'a> Lowerer<'a> {
                     for p in params {
                         if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                             if let varn_core::ast::Pattern::Identifier { name, .. } = &p.pattern {
-                                if !fields.contains(name) {
-                                    fields.push(name.clone());
-                                }
+                                let tag = self.field_tag(AnnKey::decl(p.range.start.offset));
+                                push_field(&mut fields, name, tag);
                             }
                         }
                     }

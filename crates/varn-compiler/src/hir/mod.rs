@@ -548,11 +548,20 @@ pub struct HirEnumVariant {
     pub const_args: Vec<HirExpr>,
 }
 
+/// A declared instance field. The tag is the static type the runtime lays the
+/// field out by; it rides the declaration rather than being looked up again,
+/// because nothing downstream of the checker can re-derive it.
+#[derive(Debug, Clone)]
+pub struct HirField {
+    pub name: Rc<str>,
+    pub tag: varn_core::TypeTag,
+}
+
 #[derive(Debug, Clone)]
 pub struct HirEnum {
     pub name: Rc<str>,
     pub variants: Vec<HirEnumVariant>,
-    pub fields: Vec<Rc<str>>,
+    pub fields: Vec<HirField>,
     pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
     pub ctor: HirMethod,
     pub methods: Vec<HirMethod>,
@@ -613,7 +622,7 @@ pub struct HirClass {
 
     pub super_class: Option<HirExpr>,
 
-    pub fields: Vec<Rc<str>>,
+    pub fields: Vec<HirField>,
 
     pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
 

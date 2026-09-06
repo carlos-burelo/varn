@@ -23,7 +23,8 @@ impl Builder {
         for field in &cls.fields {
             self.emit_effect(InstKind::DeclareField {
                 class: class_val,
-                name: field.clone(),
+                name: field.name.clone(),
+                tag: field.tag,
             });
         }
 
@@ -125,7 +126,8 @@ impl Builder {
         for field in &en.fields {
             self.emit_effect(InstKind::DeclareField {
                 class: class_val,
-                name: field.clone(),
+                name: field.name.clone(),
+                tag: field.tag,
             });
         }
 

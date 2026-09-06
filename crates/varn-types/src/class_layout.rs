@@ -42,6 +42,10 @@ pub struct ClassLayout {
     pub gc_mask: u64,
 }
 
+/// Bytes one field occupies in an instance payload today, and its alignment.
+const SLOT_SIZE: u32 = 16;
+const SLOT_ALIGN: u32 = 8;
+
 impl ClassLayout {
     /// Creates a new empty class layout with default alignment of 8.
     pub fn new(name: impl Into<Rc<str>>, class_id: u32) -> Self {
@@ -75,11 +79,13 @@ impl ClassLayout {
         let mut gc_mask = 0u64;
 
         for (field_name, tag) in fields_in {
-            let varn_core::FieldRepr {
-                size,
-                align,
-                is_gc_ref: is_gc,
-            } = tag.field_repr();
+            let is_gc = tag.field_repr().is_gc_ref;
+            // Instances still address fields by whole `VmValue` slots: every
+            // read and write path — `InstanceData::field_at`, the JIT's
+            // fixed-field emission, the collector's payload walk — moves
+            // sixteen bytes. `FieldLayout::type_tag` carries the declared type
+            // through so the layout can pack once those paths read it.
+            let (size, align) = (SLOT_SIZE, SLOT_ALIGN);
 
             max_align = max_align.max(align);
             // Align current offset up to field's required alignment

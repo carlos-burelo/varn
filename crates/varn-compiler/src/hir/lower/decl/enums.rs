@@ -57,7 +57,7 @@ impl<'a> Lowerer<'a> {
             &'a Modifiers,
         );
 
-        let mut fields: Vec<Rc<str>> = Vec::new();
+        let mut fields: Vec<HirField> = Vec::new();
         let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();
         let mut static_fields: Vec<(Rc<str>, Option<HirExpr>)> = Vec::new();
         let mut ctor_member: Option<(&[Param], &Stmt)> = None;
@@ -73,6 +73,7 @@ impl<'a> Lowerer<'a> {
                     key,
                     init,
                     modifiers,
+                    range,
                     ..
                 } => {
                     if modifiers.is_static {
@@ -82,7 +83,10 @@ impl<'a> Lowerer<'a> {
                         };
                         static_fields.push((key.clone(), val));
                     } else {
-                        fields.push(key.clone());
+                        fields.push(HirField {
+                            name: key.clone(),
+                            tag: self.field_tag(AnnKey::decl(range.start.offset)),
+                        });
                         if let Some(e) = init {
                             field_inits.push((key.clone(), e));
                         }

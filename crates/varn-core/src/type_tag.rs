@@ -156,6 +156,19 @@ impl TypeTag {
     /// would let a compiled access address a field the runtime placed
     /// elsewhere.
     ///
+    /// The tag whose discriminant is `raw`, or `Dynamic` when `raw` names
+    /// none — the conservative reading, and the one a truncated or
+    /// forward-version operand must get.
+    pub const fn from_u8(raw: u8) -> Self {
+        if raw <= Self::UUID as u8 {
+            // SAFETY: `TypeTag` is `#[repr(u8)]` with contiguous discriminants
+            // from `Null = 0` through `UUID`, and `raw` is inside that range.
+            unsafe { std::mem::transmute::<u8, Self>(raw) }
+        } else {
+            Self::Dynamic
+        }
+    }
+
     /// A tag with no unboxed representation falls back to a whole `VmValue`.
     pub const fn field_repr(self) -> FieldRepr {
         let (size, align, is_gc_ref) = match self {

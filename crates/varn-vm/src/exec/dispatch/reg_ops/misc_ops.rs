@@ -77,6 +77,7 @@ impl ExecCtx {
         &mut self,
         obj: VmValue,
         name_idx: usize,
+        tag: varn_core::TypeTag,
         _frame_idx: usize,
         closure: &VmClosure,
     ) -> VmResult<()> {
@@ -85,7 +86,7 @@ impl ExecCtx {
             .heap
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("DeclareField: non-string const"))?;
-        crate::exec::class::op_declare_field(obj, &name, &mut self.heap)
+        crate::exec::class::op_declare_field(obj, &name, tag, &mut self.heap)
     }
 
     pub(in crate::exec::dispatch) fn exec_get_index_nv(

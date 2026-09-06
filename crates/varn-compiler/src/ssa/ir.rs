@@ -288,6 +288,8 @@ pub enum InstKind {
     DeclareField {
         class: Value,
         name: Rc<str>,
+        /// Static type the runtime lays this field out by.
+        tag: varn_core::TypeTag,
     },
     DefineStatic {
         class: Value,

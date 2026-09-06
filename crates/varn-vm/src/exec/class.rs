@@ -81,10 +81,15 @@ pub(crate) fn op_inherit(
     Err(RuntimeError::new("OpInherit: not a class"))
 }
 
-pub(crate) fn op_declare_field(class_nv: VmValue, name: &str, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn op_declare_field(
+    class_nv: VmValue,
+    name: &str,
+    tag: varn_core::TypeTag,
+    heap: &mut Heap,
+) -> VmResult<()> {
     if class_nv.is_heap() {
         if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap_idx()) {
-            cls.declare_field(Rc::from(name));
+            cls.declare_field(Rc::from(name), tag);
             return Ok(());
         }
     }
