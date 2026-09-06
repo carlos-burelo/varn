@@ -377,12 +377,29 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
     if !target.is_heap() {
         return Ok(target);
     }
-    let spread_val = heap.extract(spread);
     let target_obj = match heap.get(target.as_heap_idx()) {
         Some(HeapObj::Object(o)) => o.clone(),
         _ => return Ok(target),
     };
-    if let Value::Object(src) = spread_val {
+    // An `Instance` has no `ObjData` to iterate: its fields live in a flat
+    // payload addressed by the class layout, which is also their name order.
+    if spread.is_heap() {
+        if let Some(HeapObj::Instance(inst)) = heap.get(spread.as_heap_idx()) {
+            let inst = inst.clone();
+            if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
+                for field in &cls.get_or_compute_layout().fields {
+                    let offset = field.offset as usize;
+                    if offset + 16 <= inst.payload_size as usize {
+                        target_obj.insert(field.name.clone(), unsafe {
+                            inst.read_vm_value(offset)
+                        });
+                    }
+                }
+            }
+            return Ok(target);
+        }
+    }
+    if let Value::Object(src) = heap.extract(spread) {
         let pairs: Vec<(Rc<str>, VmValue)> = src.borrow().iter().collect();
         for (k, nv) in pairs {
             target_obj.insert(k, nv);

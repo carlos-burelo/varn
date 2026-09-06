@@ -3,7 +3,7 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use varn_core::{IntrinsicType, TypeTag};
 use varn_types::value::RuntimeSymbol;
-use varn_types::{NativeCtx, Value};
+use varn_types::{ClassObj, NativeCtx, Value};
 
 pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     if val.is_null() {
@@ -67,7 +67,8 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
         return false;
     }
     let obj_class = match heap.get(obj.as_heap_idx()) {
-        Some(HeapObj::Object(o)) => o.borrow().class().clone(),
+        Some(HeapObj::Instance(inst)) => ClassObj::find_by_id(inst.class_id),
+        Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class().clone(),
         _ => return false,
     };
     let mut cur = obj_class;

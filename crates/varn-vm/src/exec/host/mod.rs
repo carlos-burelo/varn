@@ -153,6 +153,17 @@ impl NativeCtx for ExecCtx {
                 return o.borrow().get_field_nv(key);
             }
 
+            if let Some(HeapObj::Instance(inst)) = self.heap.get(obj.as_heap_idx()) {
+                let cls = ClassObj::find_by_id(inst.class_id)?;
+                let layout = cls.get_or_compute_layout();
+                let f = layout.get_field(key)?;
+                let offset = f.offset as usize;
+                if offset + 16 <= inst.payload_size as usize {
+                    return Some(unsafe { inst.read_vm_value(offset) });
+                }
+                return None;
+            }
+
             if let Some(HeapObj::Module(m)) = self.heap.get(obj.as_heap_idx()) {
                 let slot = m.export_map.get(key).copied()?;
                 return m.get_slot(slot);
@@ -163,10 +174,22 @@ impl NativeCtx for ExecCtx {
 
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+            let idx = obj.as_heap_idx();
+            if let Some(HeapObj::Object(o)) = self.heap.get(idx) {
                 o.set_field_nv(std::rc::Rc::from(key), val);
-                self.heap.write_barrier(obj.as_heap_idx(), val);
-            } else if let Some(HeapObj::Module(m)) = self.heap.get_mut(obj.as_heap_idx()) {
+                self.heap.write_barrier(idx, val);
+            } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
+                let maybe_field = ClassObj::find_by_id(inst.class_id)
+                    .map(|cls| cls.get_or_compute_layout())
+                    .and_then(|layout| layout.get_field(key).map(|f| f.offset as usize));
+                if let Some(offset) = maybe_field {
+                    let inst = inst.clone();
+                    if offset + 16 <= inst.payload_size as usize {
+                        unsafe { inst.write_vm_value(offset, val) };
+                        self.heap.write_barrier(idx, val);
+                    }
+                }
+            } else if let Some(HeapObj::Module(m)) = self.heap.get_mut(idx) {
                 if let Some(s) = m.export_map.get(key).copied() {
                     std::rc::Rc::make_mut(m).set_slot(s, val);
                 } else {
@@ -178,6 +201,7 @@ impl NativeCtx for ExecCtx {
             }
         }
     }
+
 
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
         self.heap.alloc_native_fn(f, name)

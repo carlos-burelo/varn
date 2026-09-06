@@ -327,6 +327,12 @@ fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
         Value::EnumVariant(ev) => heap.get_intrinsic_class(&ev.enum_name),
         Value::Object(o) => o.borrow().class(),
         Value::Class(cls) => Some(cls.clone()),
+        // An `Instance` extracts to an opaque handle onto its own heap slot;
+        // `get_class` is the single authority that reads the class off it.
+        Value::VmValue(payload) => {
+            let vref = payload.as_any().downcast_ref::<crate::closure::VmValueRef>()?;
+            get_class(vref.0, heap)
+        }
         _ => {
             let ty = match val {
                 Value::Null => IntrinsicType::Null,
@@ -542,14 +548,82 @@ pub(crate) fn bind_method_to_receiver(
     }
 }
 
+/// The reflective surface of an `Instance`, which extracts to an opaque handle
+/// and so answers none of the `Value`-shaped arms of [`resolve_meta_property`].
+/// Its class layout carries both the field names and their order, and a
+/// snapshot of it as an object lets the `::keys`/`::values`/`::entries`/
+/// `::hasOwn` natives stay single-implementation.
+fn resolve_instance_meta_property(
+    inst: &varn_types::value::InstanceRef,
+    cls: &Rc<ClassObj>,
+    key_enum: Option<varn_core::MemberKey>,
+) -> ResolvedProperty {
+    use varn_core::MemberKey;
+    match key_enum {
+        Some(MemberKey::Type) | Some(MemberKey::Name) => {
+            ResolvedProperty::Built(Value::Str(Rc::from(cls.name.as_str())))
+        }
+        Some(MemberKey::Class) => ResolvedProperty::Built(Value::Class(Rc::clone(cls))),
+        Some(MemberKey::Fields) => ResolvedProperty::Built(Value::Array(
+            varn_types::value::ArrayRef::new(
+                cls.root_shape
+                    .borrow()
+                    .ordered_names()
+                    .iter()
+                    .map(|k| Value::Str(Rc::clone(k)))
+                    .collect(),
+            ),
+        )),
+        Some(MemberKey::Methods) => ResolvedProperty::Built(Value::Array(
+            varn_types::value::ArrayRef::new(
+                cls.method_map
+                    .borrow()
+                    .keys()
+                    .map(|k| Value::Str(Rc::clone(k)))
+                    .collect(),
+            ),
+        )),
+        Some(key @ (MemberKey::Keys | MemberKey::Values | MemberKey::Entries | MemberKey::HasOwn)) => {
+            let snapshot = Value::Object(varn_types::value::ObjRef::from_pairs(
+                cls.get_or_compute_layout()
+                    .fields
+                    .iter()
+                    .filter(|f| f.offset as usize + 16 <= inst.payload_size as usize)
+                    .map(|f| {
+                        (
+                            Rc::clone(&f.name),
+                            unsafe { inst.read_vm_value(f.offset as usize) },
+                        )
+                    }),
+            ));
+            let native = match key {
+                MemberKey::Keys => meta_keys_native,
+                MemberKey::Values => meta_values_native,
+                MemberKey::Entries => meta_entries_native,
+                _ => meta_has_own_native,
+            };
+            ResolvedProperty::Built(Value::native_bound(snapshot, native, key.as_str()))
+        }
+        _ => ResolvedProperty::Built(Value::Null),
+    }
+}
+
 pub(crate) fn resolve_meta_property(
     obj: VmValue,
     meta_key: &str,
     heap: &mut Heap,
 ) -> VmResult<ResolvedProperty> {
     use varn_core::MemberKey;
-    let val = heap.extract(obj);
     let key_enum = MemberKey::from_str(meta_key);
+    if obj.is_heap() {
+        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
+            let inst = inst.clone();
+            if let Some(cls) = ClassObj::find_by_id(inst.class_id) {
+                return Ok(resolve_instance_meta_property(&inst, &cls, key_enum));
+            }
+        }
+    }
+    let val = heap.extract(obj);
     match key_enum {
         Some(MemberKey::Type) => {
             let type_str: &str = match &val {
