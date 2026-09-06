@@ -130,3 +130,244 @@ fn a_correct_field_read_verifies() {
     )));
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
+
+/// A method call's argument count must match the signature.
+#[test]
+fn method_call_arity_mismatch_is_rejected() {
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![ClassInfo::new_with_methods(
+            Rc::from("Point"),
+            None,
+            vec![],
+            vec![("move".into(), SigId(0))],
+        )],
+        enums: vec![],
+        signatures: vec![
+            Signature { params: vec![BackendTy::Int], return_ty: BackendTy::Void },
+            Signature { params: vec![], return_ty: BackendTy::Void },
+        ],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(1),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![BackendTy::Class(ClassId(0))],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
+    // Passing 0 args when signature expects 1
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "move".into(),
+            args: vec![],
+        },
+        BackendTy::Void,
+        Resolution::VtableSlot(0),
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("argument")), "got: {:?}", errs);
+}
+
+/// A method call with the right arity passes.
+#[test]
+fn method_call_with_correct_arity_verifies() {
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![ClassInfo::new_with_methods(
+            Rc::from("Point"),
+            None,
+            vec![],
+            vec![("move".into(), SigId(0))],
+        )],
+        enums: vec![],
+        signatures: vec![
+            Signature { params: vec![BackendTy::Int], return_ty: BackendTy::Void },
+            Signature { params: vec![], return_ty: BackendTy::Void },
+        ],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(1),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![BackendTy::Class(ClassId(0))],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "move".into(),
+            args: vec![int(42)],
+        },
+        BackendTy::Void,
+        Resolution::VtableSlot(0),
+    )));
+    assert!(verify_module(&m).is_ok());
+}
+
+/// An if condition must be Bool.
+#[test]
+fn if_condition_must_be_bool() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::If {
+        cond: int(42), // Int, not Bool
+        then_body: vec![],
+        else_body: vec![],
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("Bool")), "got: {:?}", errs);
+}
+
+/// An if condition that is Bool passes.
+#[test]
+fn if_with_bool_condition_verifies() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::If {
+        cond: expr(TirExprKind::BoolLit(true), BackendTy::Bool, Resolution::None),
+        then_body: vec![],
+        else_body: vec![],
+    });
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A loop condition must be Bool.
+#[test]
+fn loop_condition_must_be_bool() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Loop {
+        cond: int(1), // Int, not Bool
+        body: vec![],
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("Bool")), "got: {:?}", errs);
+}
+
+/// A loop condition that is Bool passes.
+#[test]
+fn loop_with_bool_condition_verifies() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Loop {
+        cond: expr(TirExprKind::BoolLit(true), BackendTy::Bool, Resolution::None),
+        body: vec![],
+    });
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A let binding's type must match the initializer's type.
+#[test]
+fn let_type_mismatch_is_rejected() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Let {
+        local: LocalId(1),
+        ty: BackendTy::Str, // declared Str
+        init: Some(int(42)), // initialized with Int
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+}
+
+/// A let binding with matching types verifies.
+#[test]
+fn let_with_matching_type_verifies() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Let {
+        local: LocalId(1),
+        ty: BackendTy::Int,
+        init: Some(int(42)),
+    });
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A return statement's type must match the function's return type.
+#[test]
+fn return_type_mismatch_is_rejected() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Return(Some(int(42)))); // Int, but function returns Void
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+}
+
+/// A return statement with the right type verifies.
+#[test]
+fn return_with_correct_type_verifies() {
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Int,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Return(Some(int(42))));
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A bare return in a function that returns Void passes.
+#[test]
+fn bare_return_in_void_function_verifies() {
+    let mut m = module_with_point();
+    m.top_level.body.push(TirStmt::Return(None));
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A bare return in a function that doesn't return Void is rejected.
+#[test]
+fn bare_return_in_non_void_function_is_rejected() {
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Int,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Return(None));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+}

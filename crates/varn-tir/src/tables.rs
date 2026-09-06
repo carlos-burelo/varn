@@ -5,7 +5,7 @@
 //! no consumer, which is the only reason the divergence has not yet produced a
 //! misaligned read.
 
-use crate::ty::{BackendTy, ClassId};
+use crate::ty::{BackendTy, ClassId, SigId};
 use std::rc::Rc;
 
 /// One field of a class instance.
@@ -21,10 +21,12 @@ pub struct FieldInfo {
 
 /// One entry of a class vtable. Its index IS the dispatch target, so the
 /// position in this vector is the whole payload — the name is kept for
-/// diagnostics and for the emitter to match overrides against.
+/// diagnostics and for the emitter to match overrides against. The signature
+/// is what a call through that slot will actually reach.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VtableEntry {
     pub name: Rc<str>,
+    pub sig: SigId,
 }
 
 #[derive(Debug, Clone)]
@@ -61,7 +63,7 @@ impl ClassInfo {
         name: Rc<str>,
         parent: Option<(ClassId, &ClassInfo)>,
         fields: Vec<(Rc<str>, BackendTy)>,
-        methods: Vec<Rc<str>>,
+        methods: Vec<(Rc<str>, SigId)>,
     ) -> Self {
         let parent_info = parent.map(|(_, info)| info);
 
@@ -81,12 +83,18 @@ impl ClassInfo {
 
         // Vtable: the parent's entries, then the new ones. A method the parent
         // already has keeps its index — that is what makes the index a valid
-        // dispatch target for a base-typed receiver.
+        // dispatch target for a base-typed receiver. The overriding class's
+        // signature wins, and that is the signature a call through that slot
+        // will actually reach when the receiver is that class.
         let mut vtable: Vec<VtableEntry> =
             parent_info.map(|p| p.vtable.clone()).unwrap_or_default();
-        for m in methods {
-            if !vtable.iter().any(|e| e.name == m) {
-                vtable.push(VtableEntry { name: m });
+        for (m_name, m_sig) in methods {
+            if let Some(entry) = vtable.iter_mut().find(|e| e.name == m_name) {
+                // Override: reuse the index but update the signature
+                entry.sig = m_sig;
+            } else {
+                // New method: append a new entry
+                vtable.push(VtableEntry { name: m_name, sig: m_sig });
             }
         }
 

@@ -7,7 +7,7 @@
 //! checker's packed offset has no consumer, which is the only reason the
 //! divergence is currently harmless.
 
-use varn_tir::{BackendTy, ClassId, ClassInfo};
+use varn_tir::{BackendTy, ClassId, ClassInfo, SigId};
 use std::rc::Rc;
 
 /// A subclass's fields come after its parent's, so a pointer to the derived
@@ -60,15 +60,20 @@ fn declared_types_reach_the_layout() {
 fn override_reuses_the_parent_slot() {
     let base = ClassInfo::new_with_methods(
         Rc::from("Animal"), None, vec![],
-        vec!["speak".into(), "name".into()],
+        vec![("speak".into(), SigId(0)), ("name".into(), SigId(1))],
     );
     let derived = ClassInfo::new_with_methods(
         Rc::from("Dog"), Some((ClassId(0), &base)), vec![],
-        vec!["speak".into(), "fetch".into()],
+        vec![("speak".into(), SigId(2)), ("fetch".into(), SigId(3))],
     );
 
     assert_eq!(base.method_slot("speak"), Some(0));
     assert_eq!(derived.method_slot("speak"), Some(0), "override reuses the slot");
     assert_eq!(derived.method_slot("name"), Some(1), "inherited keeps its slot");
     assert_eq!(derived.method_slot("fetch"), Some(2), "new method appends");
+
+    // The overriding class's signature wins
+    assert_eq!(derived.vtable[0].sig, SigId(2), "override updates the signature");
+    assert_eq!(derived.vtable[1].sig, SigId(1), "inherited keeps the signature");
+    assert_eq!(derived.vtable[2].sig, SigId(3), "new method has its signature");
 }

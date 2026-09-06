@@ -6,7 +6,7 @@
 use super::VerifyError;
 use crate::node::{TirBinOp, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
 use crate::resolution::Resolution;
-use crate::ty::BackendTy;
+use crate::ty::{BackendTy, SigId};
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
     check_function(m, &m.top_level, errors);
@@ -17,38 +17,45 @@ pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
 
 fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>) {
     for s in &f.body {
-        walk_stmt(m, s, errors);
+        walk_stmt(m, f, s, errors);
     }
 }
 
-fn walk_stmt(m: &TirModule, s: &TirStmt, errors: &mut Vec<VerifyError>) {
+fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<VerifyError>) {
     match s {
         TirStmt::Expr(e) | TirStmt::Throw(e) => walk_expr(m, e, errors),
-        TirStmt::Let { init, .. } => {
+        TirStmt::Let { ty, init, .. } => {
             if let Some(e) = init {
                 walk_expr(m, e, errors);
+                check_let(m, *ty, e, errors);
             }
         }
         TirStmt::Return(v) => {
             if let Some(e) = v {
                 walk_expr(m, e, errors);
+                check_return(m, f, e, errors);
+            } else {
+                // Bare Return(None) requires function to return Void
+                check_return_none(m, f, errors);
             }
         }
         TirStmt::If { cond, then_body, else_body } => {
             walk_expr(m, cond, errors);
+            check_condition(m, "if", cond, errors);
             for s in then_body.iter().chain(else_body) {
-                walk_stmt(m, s, errors);
+                walk_stmt(m, f, s, errors);
             }
         }
         TirStmt::Loop { cond, body } => {
             walk_expr(m, cond, errors);
+            check_condition(m, "loop", cond, errors);
             for s in body {
-                walk_stmt(m, s, errors);
+                walk_stmt(m, f, s, errors);
             }
         }
         TirStmt::Try { body, catch_body, .. } => {
             for s in body.iter().chain(catch_body) {
-                walk_stmt(m, s, errors);
+                walk_stmt(m, f, s, errors);
             }
         }
         TirStmt::Break | TirStmt::Continue => {}
@@ -86,6 +93,7 @@ fn walk_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
             for a in args {
                 walk_expr(m, a, errors);
             }
+            check_method_call(m, e, recv, args, errors);
         }
         TirExprKind::Assign { target, value } => {
             walk_expr(m, target, errors);
@@ -272,6 +280,158 @@ fn check_direct_call(
                 func.name, sig.return_ty, e.ty
             ),
             e.span,
+        ));
+    }
+}
+
+fn check_method_call(
+    m: &TirModule,
+    e: &TirExpr,
+    recv: &TirExpr,
+    args: &[TirExpr],
+    errors: &mut Vec<VerifyError>,
+) {
+    let Resolution::VtableSlot(slot) = &e.res else {
+        return;
+    };
+    let BackendTy::Class(c) = recv.ty.non_nullable(&m.types) else {
+        return; // well-formedness already reported this
+    };
+    let Some(class_info) = m.class(c) else {
+        return; // ditto
+    };
+    let Some(vtable_entry) = class_info.method_at(*slot) else {
+        return; // ditto
+    };
+    let Some(sig) = m.signature(vtable_entry.sig) else {
+        return; // ditto
+    };
+
+    // Check arity
+    if args.len() != sig.arity() {
+        errors.push(VerifyError::new(
+            format!(
+                "method call passes {} arguments, signature takes {}",
+                args.len(),
+                sig.arity()
+            ),
+            e.span,
+        ));
+        return;
+    }
+
+    // Check argument types
+    for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
+        if matches!(a.ty, BackendTy::Dynamic(_)) {
+            continue;
+        }
+        if a.ty != *p {
+            errors.push(VerifyError::new(
+                format!(
+                    "method call: argument {i} is {:?}, parameter is {:?}",
+                    a.ty, p
+                ),
+                e.span,
+            ));
+        }
+    }
+
+    // Check return type
+    if e.ty != sig.return_ty && !matches!(e.ty, BackendTy::Dynamic(_)) {
+        errors.push(VerifyError::new(
+            format!(
+                "method call returns {:?}, node says {:?}",
+                sig.return_ty, e.ty
+            ),
+            e.span,
+        ));
+    }
+}
+
+fn check_condition(
+    m: &TirModule,
+    context: &str,
+    cond: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
+    // Skip if condition is Dynamic
+    if matches!(cond.ty, BackendTy::Dynamic(_)) {
+        return;
+    }
+
+    if cond.ty != BackendTy::Bool {
+        errors.push(VerifyError::new(
+            format!("{context} condition must be Bool, node says {:?}", cond.ty),
+            cond.span,
+        ));
+    }
+}
+
+fn check_let(
+    m: &TirModule,
+    declared_ty: BackendTy,
+    init: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
+    // Skip if either type is Dynamic
+    if matches!(declared_ty, BackendTy::Dynamic(_))
+        || matches!(init.ty, BackendTy::Dynamic(_))
+    {
+        return;
+    }
+
+    if declared_ty != init.ty {
+        errors.push(VerifyError::new(
+            format!(
+                "let binding declares {:?}, initializer is {:?}",
+                declared_ty, init.ty
+            ),
+            init.span,
+        ));
+    }
+}
+
+fn check_return(
+    m: &TirModule,
+    f: &TirFunction,
+    returned: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
+    // Skip if either type is Dynamic
+    if matches!(f.return_ty, BackendTy::Dynamic(_))
+        || matches!(returned.ty, BackendTy::Dynamic(_))
+    {
+        return;
+    }
+
+    if f.return_ty != returned.ty {
+        errors.push(VerifyError::new(
+            format!(
+                "function `{}` declares return type {:?}, returned {:?}",
+                f.name, f.return_ty, returned.ty
+            ),
+            returned.span,
+        ));
+    }
+}
+
+fn check_return_none(
+    m: &TirModule,
+    f: &TirFunction,
+    errors: &mut Vec<VerifyError>,
+) {
+    // Skip if function return type is Dynamic
+    if matches!(f.return_ty, BackendTy::Dynamic(_)) {
+        return;
+    }
+
+    if f.return_ty != BackendTy::Void {
+        errors.push(VerifyError::new(
+            format!(
+                "function `{}` declares return type {:?}, bare return is Void",
+                f.name, f.return_ty
+            ),
+            crate::node::Span::EMPTY,
         ));
     }
 }
