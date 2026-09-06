@@ -120,26 +120,35 @@ impl BackendTy {
 /// Per-module interning table for the structured types.
 ///
 /// Entries are append-only: the only way to add one is [`TyTable::intern`],
-/// which pushes onto `entries` and hands back the index it landed at. Because
-/// the index is assigned *after* the push, a `BackendTy` can only ever
-/// reference `TyId`s that were already interned — i.e. strictly smaller than
-/// its own. That makes the type graph a DAG ordered by `TyId`, and a real
-/// cycle (some `TyId(n)` reachable from itself, e.g. through `Nullable`) is
-/// not constructible through this API today.
+/// which pushes onto `entries` and hands back the index it landed at. That
+/// stops an EXISTING entry from being retargeted after the fact — nothing can
+/// reach back in and rewrite `entries[k]` once it is written.
+///
+/// It does NOT stop a cycle. `TyId`'s field is `pub`, so a caller can name an
+/// index that does not exist yet — including its own, about to be assigned —
+/// before interning anything:
+///
+/// ```
+/// # use varn_tir::{BackendTy, TyId, TyTable};
+/// let mut t = TyTable::default();
+/// let id = t.intern(BackendTy::Nullable(TyId(0)));
+/// assert_eq!(id, TyId(0));
+/// assert_eq!(t.get(id), BackendTy::Nullable(TyId(0))); // points at itself
+/// ```
+///
+/// One line, no mutation, no deserialization — a real self-cycle. An earlier
+/// version of this comment claimed a cycle was "not constructible through
+/// this API today"; it was wrong, and a `TyListId` analogue of the same
+/// construction is exactly what one of this crate's own tests builds.
 ///
 /// Both `verify::wellformed::check_ty_recursive` and
 /// `verify::coherence::assignable` (and `BackendTy::non_nullable`) recurse
-/// through `Nullable` by resolving a `TyId` here, and their termination
-/// depends on this acyclicity. Adding a way to mutate an already-interned
-/// entry (a `get_mut`), or a deserialization path that can reconstruct a
-/// `TyTable` with a back-reference already baked in, would break the
-/// invariant and turn that recursion into a hang.
-///
-/// The depth bounds in `assignable` and `non_nullable` stay anyway, as
-/// defence in depth: the invariant above is upheld by convention, not by
-/// the type system, so nothing stops a future change from violating it
-/// silently. The bounds are what keeps that failure mode a wrong answer
-/// instead of a hang.
+/// through `Nullable` by resolving a `TyId` here. Their depth bounds are
+/// therefore **load-bearing, not defence in depth**: without them, the
+/// one-liner above hangs the verifier. Do not remove them on the strength of
+/// any future append-only argument — append-only bounds what an *existing*
+/// entry can point at; it says nothing about what a *fresh* handle can name
+/// before its own entry exists.
 #[derive(Debug, Default)]
 pub struct TyTable {
     entries: Vec<BackendTy>,
