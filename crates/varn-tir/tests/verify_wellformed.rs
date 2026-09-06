@@ -1,0 +1,94 @@
+//! Well-formedness: every handle points at something that exists, and every
+//! slot is in range of the table it claims to index. These are the checks
+//! that make a dangling ClassId or an out-of-range vtable slot impossible
+//! rather than improbable.
+
+use std::rc::Rc;
+use varn_tir::*;
+
+fn empty_module() -> TirModule {
+    TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![ClassInfo::new(Rc::from("P"), None, vec![("x".into(), BackendTy::Int)])],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    }
+}
+
+fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
+    TirExpr { kind, ty, res, span: Span::EMPTY }
+}
+
+/// A module with nothing wrong passes.
+#[test]
+fn an_empty_module_verifies() {
+    assert!(verify_module(&empty_module()).is_ok());
+}
+
+/// A ClassId with no entry is rejected. Today nothing checks this.
+#[test]
+fn a_dangling_class_id_is_rejected() {
+    let mut m = empty_module();
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::New { class: ClassId(99), args: vec![] },
+        BackendTy::Class(ClassId(99)),
+        Resolution::None,
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("ClassId")),
+        "expected a dangling-class error, got: {:?}",
+        errs
+    );
+}
+
+/// A field slot past the end of the class's layout is rejected.
+#[test]
+fn an_out_of_range_field_slot_is_rejected() {
+    let mut m = empty_module();
+    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    m.top_level.locals.push(BackendTy::Class(ClassId(0)));
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Field { object: Box::new(recv), name: "nope".into() },
+        BackendTy::Int,
+        Resolution::FieldSlot(7), // the class has one field
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("slot")),
+        "expected an out-of-range slot error, got: {:?}",
+        errs
+    );
+}
+
+/// A vtable slot past the end of the class's vtable is rejected.
+#[test]
+fn an_out_of_range_vtable_slot_is_rejected() {
+    let mut m = empty_module();
+    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    m.top_level.locals.push(BackendTy::Class(ClassId(0)));
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall { recv: Box::new(recv), name: "m".into(), args: vec![] },
+        BackendTy::Void,
+        Resolution::VtableSlot(3), // the class has no methods
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("vtable")),
+        "expected an out-of-range vtable error, got: {:?}",
+        errs
+    );
+}

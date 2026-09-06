@@ -17,3 +17,6 @@ pub use node::{Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirB
 
 mod tables;
 pub use tables::{ClassInfo, FieldInfo, VtableEntry, EnumInfo, VariantInfo, Signature};
+
+mod verify;
+pub use verify::{verify_module, VerifyError};
