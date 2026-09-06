@@ -136,6 +136,31 @@ fn walk_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     }
 }
 
+/// Whether a value of type `from` may be used where `to` is expected.
+///
+/// Not equality: `T` is assignable to `T?` — a non-null value is a valid
+/// nullable — while `T?` to `T` is not, because that needs narrowing. Both
+/// sides being Dynamic-tolerant keeps an honestly dynamic value from being
+/// reported anywhere.
+fn assignable(m: &TirModule, from: BackendTy, to: BackendTy) -> bool {
+    if matches!(from, BackendTy::Dynamic(_)) || matches!(to, BackendTy::Dynamic(_)) {
+        return true;
+    }
+    if from == to {
+        return true;
+    }
+    // Never inhabits every type: a call that always throws can stand in
+    // anywhere.
+    if from == BackendTy::Never {
+        return true;
+    }
+    // T is assignable to T?; the reverse is not.
+    if let BackendTy::Nullable(inner) = to {
+        return assignable(m, from, m.types.get(inner));
+    }
+    false
+}
+
 fn is_comparison(op: TirBinOp) -> bool {
     matches!(
         op,
@@ -209,6 +234,9 @@ fn check_field(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: &mut Vec<Ve
     let Some(field) = m.class(c).and_then(|ci| ci.field_at(*slot)) else {
         return; // ditto
     };
+    // Equality is deliberate here: a field read produces exactly the field's
+    // declared type. If the node claims a different type, the nullability or
+    // type itself was lost, and that is a real error to report.
     if e.ty != field.ty {
         errors.push(VerifyError::new(
             format!(
@@ -259,11 +287,9 @@ fn check_direct_call(
         ));
         return;
     }
+    // Each argument must be assignable TO its parameter
     for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if matches!(a.ty, BackendTy::Dynamic(_)) {
-            continue;
-        }
-        if a.ty != *p {
+        if !assignable(m, a.ty, *p) {
             errors.push(VerifyError::new(
                 format!(
                     "call to `{}`: argument {i} is {:?}, parameter is {:?}",
@@ -273,7 +299,8 @@ fn check_direct_call(
             ));
         }
     }
-    if e.ty != sig.return_ty && !matches!(e.ty, BackendTy::Dynamic(_)) {
+    // The signature's return type must be assignable TO what the node claims
+    if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
                 "call to `{}` returns {:?}, node says {:?}",
@@ -320,12 +347,9 @@ fn check_method_call(
         return;
     }
 
-    // Check argument types
+    // Each argument must be assignable TO its parameter
     for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if matches!(a.ty, BackendTy::Dynamic(_)) {
-            continue;
-        }
-        if a.ty != *p {
+        if !assignable(m, a.ty, *p) {
             errors.push(VerifyError::new(
                 format!(
                     "method call: argument {i} is {:?}, parameter is {:?}",
@@ -336,8 +360,8 @@ fn check_method_call(
         }
     }
 
-    // Check return type
-    if e.ty != sig.return_ty && !matches!(e.ty, BackendTy::Dynamic(_)) {
+    // The signature's return type must be assignable TO what the node claims
+    if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
                 "method call returns {:?}, node says {:?}",
@@ -349,7 +373,7 @@ fn check_method_call(
 }
 
 fn check_condition(
-    m: &TirModule,
+    _m: &TirModule,
     context: &str,
     cond: &TirExpr,
     errors: &mut Vec<VerifyError>,
@@ -373,14 +397,8 @@ fn check_let(
     init: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    // Skip if either type is Dynamic
-    if matches!(declared_ty, BackendTy::Dynamic(_))
-        || matches!(init.ty, BackendTy::Dynamic(_))
-    {
-        return;
-    }
-
-    if declared_ty != init.ty {
+    // The initializer must be assignable TO the declared type
+    if !assignable(m, init.ty, declared_ty) {
         errors.push(VerifyError::new(
             format!(
                 "let binding declares {:?}, initializer is {:?}",
@@ -397,14 +415,8 @@ fn check_return(
     returned: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    // Skip if either type is Dynamic
-    if matches!(f.return_ty, BackendTy::Dynamic(_))
-        || matches!(returned.ty, BackendTy::Dynamic(_))
-    {
-        return;
-    }
-
-    if f.return_ty != returned.ty {
+    // The returned value must be assignable TO the function's return_ty
+    if !assignable(m, returned.ty, f.return_ty) {
         errors.push(VerifyError::new(
             format!(
                 "function `{}` declares return type {:?}, returned {:?}",
@@ -416,7 +428,7 @@ fn check_return(
 }
 
 fn check_return_none(
-    m: &TirModule,
+    _m: &TirModule,
     f: &TirFunction,
     errors: &mut Vec<VerifyError>,
 ) {

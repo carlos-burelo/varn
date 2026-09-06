@@ -371,3 +371,276 @@ fn bare_return_in_non_void_function_is_rejected() {
     let errs = verify_module(&m).unwrap_err();
     assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
 }
+
+/// A let binding declared Nullable(T) initialized with T is valid (assignability).
+#[test]
+fn let_with_nullable_declared_and_nonnull_init_is_valid() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let nullable_int = BackendTy::Nullable(int_id);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Let {
+        local: LocalId(0),
+        ty: nullable_int,
+        init: Some(int(42)), // non-null Int goes into Nullable(Int)
+    });
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A let binding declared T initialized with Nullable(T) is rejected (needs narrowing).
+#[test]
+fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let nullable_int = BackendTy::Nullable(int_id);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Let {
+        local: LocalId(0),
+        ty: BackendTy::Int, // declared Int
+        init: Some(expr(
+            TirExprKind::IntLit(42),
+            nullable_int, // but init is Nullable(Int)
+            Resolution::None,
+        )),
+    });
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+}
+
+/// A return of Never is valid in any function (Never inhabits every type).
+#[test]
+fn return_of_never_type_is_valid_anywhere() {
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types: TyTable::default(),
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Int,
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Return(Some(expr(
+        TirExprKind::IntLit(0),
+        BackendTy::Never, // Never inhabits Int
+        Resolution::None,
+    ))));
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A return declared Nullable(T) with value T is valid (assignability).
+#[test]
+fn return_nonnull_when_function_returns_nullable_is_valid() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Nullable(int_id) }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Nullable(int_id), // function returns Int?
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Return(Some(int(42)))); // returning Int
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A return declared T with value Nullable(T) is rejected (needs narrowing).
+#[test]
+fn return_nullable_when_function_returns_nonnull_is_rejected() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![],
+        enums: vec![],
+        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Int, // function returns Int
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+    m.top_level.body.push(TirStmt::Return(Some(expr(
+        TirExprKind::IntLit(42),
+        BackendTy::Nullable(int_id), // returning Int?
+        Resolution::None,
+    ))));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+}
+
+/// A method call with argument T where parameter is Nullable(T) passes.
+#[test]
+fn method_call_arg_nonnull_into_nullable_param_passes() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![ClassInfo::new_with_methods(
+            Rc::from("Point"),
+            None,
+            vec![],
+            vec![("move".into(), SigId(0))],
+        )],
+        enums: vec![],
+        signatures: vec![
+            Signature {
+                params: vec![BackendTy::Nullable(int_id)],
+                return_ty: BackendTy::Void,
+            },
+            Signature { params: vec![], return_ty: BackendTy::Void },
+        ],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(1),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![BackendTy::Class(ClassId(0))],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "move".into(),
+            args: vec![int(42)], // Int goes into Nullable(Int)
+        },
+        BackendTy::Void,
+        Resolution::VtableSlot(0),
+    )));
+    assert!(verify_module(&m).is_ok());
+}
+
+/// A method call with argument Nullable(T) where parameter is T is rejected.
+#[test]
+fn method_call_arg_nullable_into_nonnull_param_rejected() {
+    let mut types = TyTable::default();
+    let int_id = types.intern(BackendTy::Int);
+    let mut m = TirModule {
+        source_file: Rc::from("test.vn"),
+        types,
+        classes: vec![ClassInfo::new_with_methods(
+            Rc::from("Point"),
+            None,
+            vec![],
+            vec![("move".into(), SigId(0))],
+        )],
+        enums: vec![],
+        signatures: vec![
+            Signature {
+                params: vec![BackendTy::Int],
+                return_ty: BackendTy::Void,
+            },
+            Signature { params: vec![], return_ty: BackendTy::Void },
+        ],
+        functions: vec![],
+        globals: vec![],
+        top_level: TirFunction {
+            name: Rc::from("<module>"),
+            sig: SigId(1),
+            params: vec![],
+            return_ty: BackendTy::Void,
+            locals: vec![BackendTy::Class(ClassId(0))],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+        },
+    };
+
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "move".into(),
+            args: vec![expr(
+                TirExprKind::IntLit(42),
+                BackendTy::Nullable(int_id), // Nullable(Int) goes into Int
+                Resolution::None,
+            )],
+        },
+        BackendTy::Void,
+        Resolution::VtableSlot(0),
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(errs.iter().any(|e| e.message.contains("argument")), "got: {:?}", errs);
+}
