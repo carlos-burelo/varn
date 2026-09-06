@@ -20,3 +20,6 @@ pub use tables::{ClassInfo, FieldInfo, VtableEntry, EnumInfo, VariantInfo, Signa
 
 mod verify;
 pub use verify::{verify_module, VerifyError};
+
+mod coverage;
+pub use coverage::Coverage;
