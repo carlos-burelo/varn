@@ -60,7 +60,43 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
     match s.kind() {
         TokenKind::Bang => prefix_unary!(UnaryOp::Not),
         TokenKind::Tilde => prefix_unary!(UnaryOp::BitNot),
-        TokenKind::Minus => prefix_unary!(UnaryOp::Minus),
+        TokenKind::Minus => {
+            // The lexer sees a magnitude, never a sign, so the magnitude of
+            // i64::MIN (2^63) does not fit the i64 it parses into and the
+            // literal is rejected before the minus is ever considered. Folding
+            // the sign here is what makes the lower bound of `int` writable.
+            //
+            // Deliberately narrow: only the one magnitude that is unspellable
+            // otherwise is folded, so every program that parses today keeps the
+            // exact same AST.
+            const I64_MIN_MAGNITUDE: &str = "9223372036854775808";
+            s.advance(); // consume the `-`
+            if s.kind() == TokenKind::IntegerLiteral
+                && s.lexeme().replace('_', "") == I64_MIN_MAGNITUDE
+            {
+                let raw = s.consume_lexeme();
+                let full_range = s.span_from(start_range);
+                return Ok(s.expr(
+                    full_range,
+                    ExprKind::IntLiteral {
+                        value: i64::MIN,
+                        raw: std::rc::Rc::from(format!("-{}", raw).as_str()),
+                    },
+                ));
+            }
+            // Not the special case: the same body `prefix_unary!` has, minus
+            // the `advance` already done above.
+            let o = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
+            Ok(s.expr(
+                full_range,
+                ExprKind::Unary {
+                    op: UnaryOp::Minus,
+                    prefix: true,
+                    operand: Box::new(o),
+                },
+            ))
+        }
         TokenKind::Plus => prefix_unary!(UnaryOp::Plus),
         TokenKind::Typeof => prefix_unary!(UnaryOp::Typeof),
         TokenKind::Void => Err("`void` is not supported; use `_` to discard values".to_owned()),
