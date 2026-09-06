@@ -59,6 +59,10 @@ pub fn compile(
         varn_debug::clif::debug_clif(&proto, debug, &helpers);
     }
 
+    if debug.typeloss {
+        varn_debug::typeloss::debug_typeloss(&proto, debug);
+    }
+
     if debug.summary {
         varn_debug::summary::debug_summary(&proto);
     }

@@ -20,6 +20,7 @@ pub(crate) mod fields;
 pub(crate) mod floats;
 pub(crate) mod generic;
 pub(crate) mod globals;
+pub mod invariants;
 pub(crate) mod kinds;
 pub(crate) mod liveness;
 pub mod lower;

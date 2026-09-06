@@ -26,7 +26,7 @@ use varn_core::ast::Program;
 /// Recomputed per call rather than through an index: this runs only under a
 /// debug flag, over one file, and a wrong line number in a baseline is worse
 /// than a slow one.
-fn line_col(source: &str, offset: u32) -> (u32, u32) {
+pub(crate) fn line_col(source: &str, offset: u32) -> (u32, u32) {
     let offset = offset as usize;
     let mut line = 1u32;
     let mut col = 1u32;

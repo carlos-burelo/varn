@@ -10,6 +10,15 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
         (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };
 
+    if args.compare_tiers {
+        if eval.is_some() {
+            return Err(CliError::usage(
+                "--compare-tiers needs a file: each tier runs as its own process",
+            ));
+        }
+        return crate::commands::compare_tiers::execute(&file_path, &args.script_args);
+    }
+
     let capabilities = build_capabilities(&args);
 
     pipeline::run(&RunOpts {

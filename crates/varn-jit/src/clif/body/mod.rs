@@ -163,10 +163,12 @@ pub(super) fn lower_raw(
     }
 
     let mut leaf_ctx = None;
+    let mut entry_base = None;
     let (exec_ctx, alloc_env) = if frame_aware {
         let closure = b.block_params(entry)[1];
         let base = b.block_params(entry)[2];
         let exec_ctx = b.block_params(entry)[3];
+        entry_base = Some(base);
         (exec_ctx, Some((base, closure)))
     } else {
         let dummy_ctx = b.ins().iconst(types::I64, 0);
@@ -567,29 +569,17 @@ pub(super) fn lower_raw(
         }
     }
 
-    for block in func.layout.blocks() {
-        for inst in func.layout.block_insts(block) {
-            match func.dfg.insts[inst] {
-                cranelift_codegen::ir::InstructionData::StackStore { arg, .. } => {
-                    if func.dfg.value_type(arg) == cranelift_codegen::ir::types::I128 {
-                        eprintln!("[CLIF VALIDATION] In fn {:?}, inst {:?}: stack_store on i128 value {:?}", proto.name, inst, arg);
-                    }
-                }
-                cranelift_codegen::ir::InstructionData::CallIndirect { sig_ref, .. } => {
-                    let sig = &func.dfg.signatures[sig_ref];
-                    let args = &func.dfg.inst_args(inst)[1..];
-                    for (i, (&arg, param)) in args.iter().zip(&sig.params).enumerate() {
-                        let arg_ty = func.dfg.value_type(arg);
-                        if arg_ty != param.value_type {
-                            eprintln!("[CLIF VALIDATION] In fn {:?}, inst {:?}: param {} expected {:?}, got {:?} (val {:?}) in {:?}", proto.name, inst, i, param.value_type, arg_ty, arg, func.dfg.insts[inst]);
-                            eprintln!("Function IR:\n{}", func.display());
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
+    super::debug::capture_ir(&mut debug, &func);
+
+    let violations = super::invariants::check(
+        &func,
+        &super::invariants::Context {
+            frame_aware,
+            caller_base: entry_base,
+            leaf_ctx,
+        },
+    );
+    super::debug::capture_invariants(&mut debug, &violations);
 
     let piece = compile_piece(func, isa)?;
     if let Some(rec) = actx.as_ref().and_then(|a| a.safepoints.as_ref()) {

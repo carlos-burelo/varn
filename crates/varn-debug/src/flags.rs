@@ -1,6 +1,6 @@
 use crate::error::CliError;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct DebugFlags {
     pub tokens: bool,
     pub ast: bool,
@@ -46,10 +46,19 @@ pub struct DebugFlags {
     pub clif_kinds: bool,
     pub clif_ir: bool,
     pub clif_asm: bool,
+    /// `clif:check` — lowering invariants Cranelift's verifier cannot express.
+    /// Reports only violations, so silence is the healthy answer. Deliberately
+    /// NOT part of `clif:all`: the other sub-phases are for reading one
+    /// function, this one is for sweeping a module.
+    pub clif_check: bool,
 
     pub tiers: bool,
     pub bails: bool,
     pub summary: bool,
+    /// `typeloss` — where a statically typed program stops being one: generic
+    /// opcodes that had a typed counterpart, and member reads the checker typed
+    /// but never published a slot for.
+    pub typeloss: bool,
 
     pub roots: bool,
     /// Only safepoints where the two root answers disagree.
@@ -75,7 +84,7 @@ pub const PHASES: &[(&str, &str)] = &[
         "suspend",
         "puntos de suspensión Await/Yield con su conjunto vivo, in_try, in_loop",
     ),
-    ("clif", "lowering Cranelift (route, kinds, ir, asm)"),
+    ("clif", "lowering Cranelift (route, kinds, ir, asm, check)"),
     ("tiers", "tier por función: clif / gate / bail"),
     (
         "roots",
@@ -83,6 +92,10 @@ pub const PHASES: &[(&str, &str)] = &[
     ),
     ("bails", "solo lo que no rutea, agrupado por causa"),
     ("summary", "tamaños, exports y top-10 de funciones"),
+    (
+        "typeloss",
+        "dónde deja de ser estático: opcodes genéricos con equivalente tipado",
+    ),
     ("graph", "grafo de módulos"),
     ("caps", "traza de capabilities"),
     ("info", "metadatos del módulo"),
@@ -96,7 +109,7 @@ pub fn print_phases() {
     }
     eprintln!("\nSub-fases:");
     eprintln!("  check:types  (volcado determinista y diffeable: tabla de tipos + anotaciones)");
-    eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:all");
+    eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:check  clif:all");
     eprintln!("  roots:diff  roots:summary  roots:all");
     eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
     eprintln!("  lsp:symbols  lsp:colorize  lsp:hints  lsp:all");
@@ -209,11 +222,12 @@ impl DebugFlags {
                         "kinds" => flags.clif_kinds = true,
                         "ir" => flags.clif_ir = true,
                         "asm" => flags.clif_asm = true,
+                        "check" => flags.clif_check = true,
                         "all" => flags.clif_all(),
                         unknown => {
                             return Err(CliError::usage(format!(
                                 "unknown clif debug sub-phase: '{unknown}'\n\
-                                 Valid sub-phases: route, kinds, ir, asm, all"
+                                 Valid sub-phases: route, kinds, ir, asm, check, all"
                             )));
                         }
                     }
@@ -252,6 +266,7 @@ impl DebugFlags {
                     "bails" => flags.bails = true,
                     "roots" => flags.roots = true,
                     "summary" => flags.summary = true,
+                    "typeloss" => flags.typeloss = true,
                     "clif" => flags.clif_all_on(),
                     "all" => {
                         flags.tokens = true;
@@ -291,33 +306,15 @@ impl DebugFlags {
         Ok(flags)
     }
 
+    /// Whether any phase is on.
+    ///
+    /// Derived from the whole value rather than from a list of fields. The list
+    /// was a second source of truth: a flag added after it was written silently
+    /// fell out, and the cost of falling out is total — `pipeline::run` takes
+    /// the cached compile path, which carries no flags, so the phase never runs
+    /// and prints nothing at all.
     pub fn any(&self) -> bool {
-        self.tokens
-            || self.ast
-            || self.bytecode
-            || self.symbols
-            || self.binds
-            || self.modules
-            || self.types
-            || self.expr
-            || self.errors
-            || self.trace
-            || self.calls
-            || self.consts
-            || self.scope
-            || self.graph
-            || self.cap_trace
-            || self.info
-            || self.lsp
-            || self.hir
-            || self.ssa
-            || self.suspend
-            || self.clif
-            || self.tiers
-            || self.bails
-            || self.summary
-            || self.roots
-            || self.check_types
+        *self != Self::default()
     }
 
     pub fn lsp_all(&mut self) {

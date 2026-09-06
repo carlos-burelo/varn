@@ -1,3 +1,4 @@
+pub mod compare_tiers;
 pub mod add;
 pub mod bench;
 pub mod build;

@@ -75,14 +75,31 @@ pub struct ClifDebugSink {
     /// production actually compiles.
     pub want_roots: bool,
     pub roots: Option<RootsReport>,
+    /// Lowering invariants this function broke — see `super::invariants`.
+    /// Always collected: they cost one pass and a violation is a compiler bug.
+    pub invariants: Vec<Violation>,
 }
 
 use std::collections::HashMap;
 
 use cranelift_codegen::ir::Function;
 
+use super::invariants::Violation;
 use super::kinds::K;
 use crate::mem::JitBuffer;
+
+/// Record broken lowering invariants into an active sink.
+pub(super) fn capture_invariants(
+    debug: &mut Option<&mut ClifDebugSink>,
+    violations: &[Violation],
+) {
+    if violations.is_empty() {
+        return;
+    }
+    if let Some(sink) = debug.as_deref_mut() {
+        sink.invariants.extend_from_slice(violations);
+    }
+}
 
 /// Record the kind lattice into an active sink.
 pub(super) fn capture_kinds(
@@ -101,7 +118,6 @@ pub(super) fn capture_kinds(
 }
 
 /// Record the textual CLIF IR of the raw function.
-#[allow(dead_code)]
 pub(super) fn capture_ir(debug: &mut Option<&mut ClifDebugSink>, func: &Function) {
     if let Some(sink) = debug.as_deref_mut() {
         sink.clif_ir = Some(func.display().to_string());
@@ -214,6 +230,9 @@ pub struct ClifInspection {
     pub fa_reasons: Vec<&'static str>,
     /// Populated only when the caller asked for roots — see `inspect_roots`.
     pub roots: Option<RootsReport>,
+    /// Lowering invariants this function broke. Empty is the only healthy
+    /// answer; anything here is a bug in the compiler, not in the program.
+    pub invariants: Vec<Violation>,
 }
 
 /// Run the clif lowering for `proto` with capture active, without executing.
@@ -272,6 +291,7 @@ fn inspect_with(
         kinds: sink.kinds,
         clif_ir: sink.clif_ir,
         code: sink.code,
+        invariants: sink.invariants,
         frame_aware,
         fa_reasons: super::lower::frame_aware_reasons(proto),
         roots: sink.roots,

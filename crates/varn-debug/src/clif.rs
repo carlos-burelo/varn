@@ -86,12 +86,37 @@ fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
+    // Asked for `clif:check` alone, the phase reports only what is broken and a
+    // clean module prints nothing — the same contract as `-p bails`, and what
+    // makes it usable as a sweep over every function in the corpus.
+    let check_only = flags.clif_check
+        && !(flags.clif_route || flags.clif_kinds || flags.clif_ir || flags.clif_asm);
+    if check_only {
+        if !insp.invariants.is_empty() {
+            eprintln!("\n  {BOLD}{}{R}", insp.name);
+            for v in &insp.invariants {
+                eprintln!("    {RED}{}{R}  {}", v.rule, v.detail);
+            }
+        }
+        return;
+    }
+
     let fa = if insp.frame_aware {
         " (frame-aware)"
     } else {
         ""
     };
     eprintln!("\n  {BOLD}{}{R}{DIM}{fa}{R}", insp.name);
+
+    if flags.clif_check {
+        if insp.invariants.is_empty() {
+            eprintln!("    {GREEN}invariants ok{R}");
+        } else {
+            for v in &insp.invariants {
+                eprintln!("    {RED}{}{R}  {}", v.rule, v.detail);
+            }
+        }
+    }
 
     if flags.clif_route {
         match &insp.route {

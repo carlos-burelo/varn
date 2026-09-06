@@ -18,6 +18,7 @@ pub mod summary;
 pub mod suspend;
 pub mod symbols;
 pub mod tiers;
+pub mod typeloss;
 pub mod tokens;
 
 pub use cap_trace::debug_cap_trace;

@@ -94,6 +94,11 @@ pub struct RunArgs {
     /// Restrict execution in a pure zero-permission sandbox (no fs, no net, no env, no ffi)
     #[arg(long = "sandbox")]
     pub sandbox: bool,
+
+    /// Run the program on every execution tier and report the first output
+    /// they disagree on. A disagreement is a code-generation bug.
+    #[arg(long = "compare-tiers")]
+    pub compare_tiers: bool,
 }
 
 #[derive(Args)]
