@@ -572,6 +572,27 @@ resultado es el enfoque A más el trabajo de D. Se detecta en la etapa 2, al
 comprobar si `match` con patrones, `for…of` y los genéricos se expresan sin
 residuo sintáctico.
 
+**El TIR sale incompleto.** El riesgo opuesto, encontrado al revisar la
+etapa 1 y no previsto al escribir esto. El conjunto de nodos de §4 no puede
+expresar todavía:
+
+* **generadores y `async`/`await`** — no hay `Yield` ni `Await`, y tampoco
+  estado de suspensión en `TirFunction`. Es el caso serio: exige forma nueva,
+  no una variante más;
+* **`match` con patrones, `?.` y `??`** — no hay primitiva de test de nulo
+  (`TirUnOp` carece de `IsNull`) ni accesor de discriminante para un valor
+  construido con `MakeVariant`;
+* **spread** — `Call`, `ArrayLit` y `ObjectLit` llevan `Vec<TirExpr>` planos.
+
+Deliberadamente no se cierran en la etapa 1: sin emisor, añadir nodos que
+nadie construye es el código especulativo que este plan existe para no
+producir, y el verificador se escribiría contra variantes muertas. `?.` en
+particular necesita cortocircuito, que no se diseña bien a ciegas.
+
+**Son, por tanto, la condición de entrada de la etapa 2**: el primer trabajo
+de esa etapa es decidir la forma de estos nodos contra el AST real, antes de
+emitir nada.
+
 **La rama no vuelve.** Entre las etapas 3 y 4 no hay ejecución. El verificador
 y el compilador de los 191 módulos son el único instrumento, y no ven
 divergencias de runtime. Es el precio aceptado de la decisión 3.
