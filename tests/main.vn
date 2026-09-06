@@ -98,6 +98,7 @@ import "./98-stdlib-test-framework.vn"
 import "./99-stdlib-net-urlsearchparams.vn"
 import "./100-stdlib-http-enrichments.vn"
 import "./101-self-recursion-return-kind.vn"
+import "./102-int-overflow.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

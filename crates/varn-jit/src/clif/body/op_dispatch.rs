@@ -146,18 +146,18 @@ pub(crate) fn dispatch_opcode(
             let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
             let s1 = use_int(b, vars, state, r1)?;
             let s2 = use_int(b, vars, state, r2)?;
-            // Two K::Int vars are sign-extended i48 payloads (range [-2^47, 2^47-1]).
-            // i48 ± i48 fits in i64 (|result| ≤ 2^48−1 ≪ 2^63−1), so the i64
-            // overflow flag is mathematically impossible — skip the guard.
-            let both_int = state[r1] == K::Int && state[r2] == K::Int;
-            if op == OpCode::AddInt && (arr.loops.is_bounds_safe_arith(ip) || both_int) {
+            // `int` is a native i64, so i64 ± i64 CAN overflow and the guard is
+            // mandatory. The register kind proves the operands are integers; it
+            // proves nothing about their range. (It said otherwise while a value
+            // was a NaN-box with a 48-bit payload — that premise died with the
+            // two-word VmValue, and the interpreter, which raises on overflow,
+            // never shared it.)
+            //
+            // `is_bounds_safe_arith` is a different claim: the loop analysis
+            // proved this arithmetic stays within an array's bounds, so the
+            // range IS known. That one stays.
+            if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
                 let v = b.ins().iadd(s1, s2);
-                b.def_var(vars[first_reg], v);
-            } else if op == OpCode::SubInt && both_int {
-                let v = b.ins().isub(s1, s2);
-                b.def_var(vars[first_reg], v);
-            } else if op == OpCode::MulInt && both_int {
-                let v = b.ins().imul(s1, s2);
                 b.def_var(vars[first_reg], v);
             } else {
                 let (r, overflow, helper) = match op {
@@ -268,8 +268,10 @@ pub(crate) fn dispatch_opcode(
             let src = (w1 >> 8) as usize;
             let imm = (w1 & 0xFF) as i8 as i64;
             let s = use_int(b, vars, state, src)?;
-            // K::Int ± i8 cannot overflow i64 (i48 + 128 ≪ 2^63). Skip the guard.
-            if arr.loops.is_induction_increment(ip) || state[src] == K::Int {
+            // Same correction as AddInt above: being a K::Int says the value is
+            // an integer, not that it is small. Only the induction-variable
+            // proof, which knows the loop's range, licenses skipping the guard.
+            if arr.loops.is_induction_increment(ip) {
                 let r = if op == OpCode::AddImm {
                     b.ins().iadd_imm(s, imm)
                 } else {
