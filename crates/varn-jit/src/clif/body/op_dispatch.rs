@@ -174,7 +174,14 @@ pub(crate) fn dispatch_opcode(
                         (res, ovf, helpers.mul)
                     }
                 };
-                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s1, s2);
+                // `actx` is `None` exactly when this lowering is a leaf: its raw
+                // ABI carries no `exec_ctx`, so `exec_ctx` here is `body::leaf_ctx`'s
+                // placeholder, not a real pointer. Handing the raise helper a
+                // getter instead of the placeholder keeps the placeholder
+                // unreferenced, which is what keeps the function a leaf — see
+                // `guard_overflow`.
+                let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
+                let w = guard_overflow(b, cc, exec_ctx, leaf_ctx_helper, helper, r, overflow, s1, s2);
                 b.def_var(vars[first_reg], w);
             }
         }
@@ -287,7 +294,11 @@ pub(crate) fn dispatch_opcode(
                     let (res, ovf) = b.ins().ssub_overflow(s, imm_v);
                     (res, ovf, helpers.sub)
                 };
-                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s, imm_v);
+                // See the AddInt/SubInt/MulInt arm above: `exec_ctx` is a
+                // placeholder in a leaf lowering, so the raise block must
+                // recover a real pointer through the getter instead.
+                let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
+                let w = guard_overflow(b, cc, exec_ctx, leaf_ctx_helper, helper, r, overflow, s, imm_v);
                 b.def_var(vars[first_reg], w);
             }
         }

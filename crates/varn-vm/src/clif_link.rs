@@ -112,6 +112,24 @@ pub(crate) fn current_epoch() -> u64 {
     CURRENT_EPOCH.with(|e| e.get())
 }
 
+/// The `ExecCtx` executing on this thread right now, null outside a run.
+///
+/// Covers the same dynamic extent `CtxLinker` relies on — anything reached
+/// synchronously from `run_until_inner`, interpreted or JIT-compiled, sees
+/// this live and correct, however many native frames of self-recursion deep
+/// it is called from, because `CtxGuard` is not popped until the whole run
+/// returns.
+///
+/// This is how `jit_current_exec_ctx` recovers a real pointer for a LEAF
+/// lowering's overflow-raise path: a leaf's raw signature carries no
+/// `exec_ctx` at all (see `varn_jit::clif::body`'s `leaf_ctx` placeholder) —
+/// putting one there is what forces the frame-aware retry the leaf exists to
+/// avoid.
+#[inline(always)]
+pub(crate) fn current_ctx_ptr() -> *mut ExecCtx {
+    CURRENT_CTX.with(|c| c.get()) as *mut ExecCtx
+}
+
 /// Record that `proto` now holds code built for the running context, retiring
 /// whatever code it held before.
 pub(crate) fn register_compiled(

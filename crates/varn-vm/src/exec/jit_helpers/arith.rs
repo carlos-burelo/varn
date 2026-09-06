@@ -6,6 +6,17 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+/// `extern "C" fn() -> u64` — the live `ExecCtx` pointer, recovered from the
+/// thread-local `clif_link::CtxGuard` sets for the run's whole dynamic
+/// extent. Zero arguments on purpose: any real parameter would have to be
+/// materialized on the caller's hot path, which is exactly the cost a LEAF
+/// lowering's overflow guard (`clif::emit::guard_overflow`) is calling this
+/// to avoid. Called only from the guard's cold `raise` block, so the extra
+/// indirection is paid on overflow, never on the arithmetic itself.
+pub(crate) extern "C" fn jit_current_exec_ctx() -> u64 {
+    crate::clif_link::current_ctx_ptr() as u64
+}
+
 pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;

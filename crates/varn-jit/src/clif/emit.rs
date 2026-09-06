@@ -851,10 +851,23 @@ pub(super) fn i64_const_fits(b: &FunctionBuilder, v: Value, threshold: u64) -> b
 }
 
 /// Raise `integer overflow` if the CPU's overflow flag was set, otherwise yield `r`.
+///
+/// `exec_ctx` is only ever consumed inside the cold `raise` block, and only
+/// when `leaf_ctx_helper` is `None` (a frame-aware lowering, where it is
+/// already a real pointer). When `leaf_ctx_helper` is `Some(getter)`, `exec_ctx`
+/// is the leaf placeholder from `body::leaf_ctx` — a leaf's raw ABI carries no
+/// `exec_ctx` — and using it directly would hand the raise helper a null
+/// `ExecCtx` AND (worse, for a value that turns out never to be dereferenced
+/// as a pointer within the deopt path but IS still passed to a call) trip the
+/// leaf's own dummy-use check, forcing the whole function frame-aware just to
+/// raise an error on a path most calls never take. `getter` is a zero-arg
+/// helper that recovers the live `ExecCtx` from a thread-local instead, so
+/// the placeholder is never referenced and the function stays a leaf.
 pub(super) fn guard_overflow(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
     exec_ctx: cranelift_codegen::ir::Value,
+    leaf_ctx_helper: Option<usize>,
     helper: usize,
     r: cranelift_codegen::ir::Value,
     overflow: cranelift_codegen::ir::Value,
@@ -866,6 +879,10 @@ pub(super) fn guard_overflow(
     b.ins().brif(overflow, raise, &[], cont, &[]);
 
     b.switch_to_block(raise);
+    let live_ctx = match leaf_ctx_helper {
+        Some(getter) => call_helper(b, cc, getter, &[]),
+        None => exec_ctx,
+    };
     let ba = box_int(b, lhs);
     let bb = box_int(b, rhs);
     let (a_tag, a_payload) = b.ins().isplit(ba);
@@ -874,7 +891,7 @@ pub(super) fn guard_overflow(
         b,
         cc,
         helper,
-        &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+        &[live_ctx, a_tag, a_payload, b_tag, b_payload],
     );
     b.ins().jump(cont, &[]);
 

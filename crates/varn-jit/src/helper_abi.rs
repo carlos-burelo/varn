@@ -162,6 +162,13 @@ macro_rules! jit_helper_abi {
             /// `extern "C" fn(*mut ExecCtx, class_id: u32, payload_size: u32) -> u64`
             /// — Fast allocator for class instances returning heap index without interpreter frame overhead.
             alloc_instance_fast => jit_alloc_instance_fast,
+            /// `extern "C" fn() -> u64` — the live `ExecCtx` pointer, recovered
+            /// from a thread-local rather than the callee's signature. Used
+            /// only by a LEAF lowering's overflow-raise cold path
+            /// (`clif::emit::guard_overflow`): a leaf's raw ABI carries no
+            /// `exec_ctx`, and adding one there is what forces the whole
+            /// function frame-aware, losing the direct clif→clif entry.
+            current_exec_ctx => jit_current_exec_ctx,
         }
     };
 }
