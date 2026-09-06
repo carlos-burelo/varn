@@ -108,9 +108,14 @@ impl ClifLinker for NoLinker {
     }
 }
 
-/// A register that is not `int`, `float` or `bool` holds a heap reference, and
-/// every op that walks one loads the heap base off `exec_ctx` — which only the
-/// frame-aware signature carries.
+/// `lower_raw` reports this when a leaf lowering turned out to need the
+/// `exec_ctx` a leaf signature does not carry. [`try_compile`] answers by
+/// lowering the same proto again, frame-aware. Observing the finished body
+/// beats predicting from the opcode stream: miss one heap-walking op in a
+/// prediction and the lowering dereferences a null `exec_ctx`.
+pub(super) const NEEDS_EXEC_CTX: &str = "clif: leaf lowering needs exec_ctx";
+
+/// A register that is not `int`, `float` or `bool` holds a heap reference.
 pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
@@ -122,16 +127,17 @@ pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
             .any(|m| !scalar(&m.kind))
 }
 
-/// The single authority on the calling convention a lowering gets. The raw body
-/// and its wrapper import the same signature from it, so the two must never
-/// compute it apart.
+/// The opening guess at the calling convention, and the single authority the
+/// raw body and its wrapper both import their signature from — the two must
+/// never compute it apart. A guess of `false` that turns out wrong comes back
+/// as [`NEEDS_EXEC_CTX`] and is retried; `true` is always safe.
 pub(super) fn is_frame_aware(proto: &FunctionProto, has_alloc: bool, osr: bool) -> bool {
     osr || proto.has_this
         || has_alloc
         || proto.upvalue_count > 0
         || proto.is_generator
         || proto.is_async
-        || has_boxed_slots(proto)
+        || (has_alloc && has_boxed_slots(proto))
 }
 
 /// Why a lowering came out frame-aware, in the order the flag tests them,
@@ -224,17 +230,34 @@ pub fn try_compile(
     // OSR `raw` out of `clif_raw`: `compile` publishes a direct clif→clif
     // entry only for non-frame-aware lowerings, and a raw that resumes
     // mid-loop is the last thing a call site should reach.
-    let frame_aware = is_frame_aware(proto, has_alloc, osr_ip.is_some());
-    let raw = lower_raw(
+    let mut frame_aware = is_frame_aware(proto, has_alloc, osr_ip.is_some());
+    let raw = match lower_raw(
         proto,
         constants,
         helpers,
         isa,
         linker,
         has_alloc,
+        frame_aware,
         osr_ip,
         debug.as_deref_mut(),
-    )?;
+    ) {
+        Err(e) if e == NEEDS_EXEC_CTX => {
+            frame_aware = true;
+            lower_raw(
+                proto,
+                constants,
+                helpers,
+                isa,
+                linker,
+                has_alloc,
+                frame_aware,
+                osr_ip,
+                debug.as_deref_mut(),
+            )?
+        }
+        other => other?,
+    };
     let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the

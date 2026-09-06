@@ -84,6 +84,7 @@ pub(super) fn lower_raw(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
     has_alloc: bool,
+    frame_aware: bool,
     osr_ip: Option<usize>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<CompiledPiece, String> {
@@ -97,7 +98,6 @@ pub(super) fn lower_raw(
     let has_round = floats::has_round_support(isa);
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
 
-    let frame_aware = super::lower::is_frame_aware(proto, has_alloc, osr);
 
     let block_starts = scan::block_starts(code, pool)?;
     let regions = scan::loop_regions(proto, code, pool, has_alloc)?;
@@ -162,6 +162,7 @@ pub(super) fn lower_raw(
         b.def_var(var, zero);
     }
 
+    let mut leaf_ctx = None;
     let (exec_ctx, alloc_env) = if frame_aware {
         let closure = b.block_params(entry)[1];
         let base = b.block_params(entry)[2];
@@ -169,6 +170,7 @@ pub(super) fn lower_raw(
         (exec_ctx, Some((base, closure)))
     } else {
         let dummy_ctx = b.ins().iconst(types::I64, 0);
+        leaf_ctx = Some(dummy_ctx);
         (dummy_ctx, None)
     };
 
@@ -551,6 +553,19 @@ pub(super) fn lower_raw(
 
     b.seal_all_blocks();
     b.finalize();
+
+    // A leaf signature carries no `exec_ctx`, so the placeholder standing in
+    // for it must reach no instruction. If it did, the lowering would read the
+    // heap off a null pointer; ask for a frame-aware retry instead.
+    if let Some(dummy) = leaf_ctx {
+        for block in func.layout.blocks() {
+            for inst in func.layout.block_insts(block) {
+                if func.dfg.inst_values(inst).any(|v| v == dummy) {
+                    return Err(super::lower::NEEDS_EXEC_CTX.to_owned());
+                }
+            }
+        }
+    }
 
     for block in func.layout.blocks() {
         for inst in func.layout.block_insts(block) {

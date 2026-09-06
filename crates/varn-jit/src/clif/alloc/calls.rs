@@ -230,11 +230,19 @@ pub(crate) fn emit_call(
     Ok(())
 }
 
-fn emit_vm_call(
+/// Hands `total` registers starting at `arg_start` to a VM-side call helper as
+/// a stack window, and reads the boxed result back out of `jit_native_result`.
+///
+/// `helper` is called as `(exec_ctx, ..callee, src, argc)`; `callee` is what
+/// distinguishes the variants, and everything around it — the safepoint flush,
+/// writing the argument window to its home slots, the reload — is identical and
+/// belongs in one place.
+fn emit_helper_call_window(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    callee: cranelift_codegen::ir::Value,
+    helper: usize,
+    callee: &[cranelift_codegen::ir::Value],
     arg_start: usize,
     total: usize,
 ) -> cranelift_codegen::ir::Value {
@@ -245,21 +253,61 @@ fn emit_vm_call(
         store_home(b, actx, state, fb, r);
     }
 
-    let (callee_tag, callee_payload) = b.ins().isplit(callee);
     let src = b.ins().iadd_imm(actx.base, arg_start as i64);
     let n = b.ins().iconst(types::I64, total as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.clif_call_fallback,
-        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
-    );
+    let mut args = Vec::with_capacity(3 + callee.len());
+    args.push(actx.exec_ctx);
+    args.extend_from_slice(callee);
+    args.push(src);
+    args.push(n);
+    call_helper_void(b, actx.cc, helper, &args);
     reload_boxed(b, actx, state, &regs);
     b.ins().load(
         types::I128,
         MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_native_result_offset as i32,
+    )
+}
+
+fn emit_vm_call(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    callee: cranelift_codegen::ir::Value,
+    arg_start: usize,
+    total: usize,
+) -> cranelift_codegen::ir::Value {
+    let (callee_tag, callee_payload) = b.ins().isplit(callee);
+    emit_helper_call_window(
+        b,
+        actx,
+        state,
+        actx.helpers.clif_call_fallback,
+        &[callee_tag, callee_payload],
+        arg_start,
+        total,
+    )
+}
+
+/// Direct self-recursion. A frame-aware lowering cannot pass its own `base` to
+/// the callee — the callee would write its home slots over the caller's — so
+/// the recursive call goes through the helper that pushes a frame of its own.
+pub(crate) fn emit_call_self(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    arg_start: usize,
+    total: usize,
+) -> cranelift_codegen::ir::Value {
+    emit_helper_call_window(
+        b,
+        actx,
+        state,
+        actx.helpers.clif_call_self,
+        &[],
+        arg_start,
+        total,
     )
 }
 

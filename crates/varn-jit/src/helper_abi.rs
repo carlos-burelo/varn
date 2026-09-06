@@ -154,6 +154,11 @@ macro_rules! jit_helper_abi {
             /// — the CLIF static-call IC miss path: dispatch the (rebound or
             /// GC-moved) callee through the interpreter/JIT with boxed args.
             clif_call_fallback => clif_call_fallback,
+            /// `extern "C" fn(*mut ExecCtx, src, argc)` — direct self-recursion
+            /// out of a frame-aware lowering, which cannot pass its own `base`
+            /// to the callee and has no boxed callee to route through
+            /// `clif_call_fallback`.
+            clif_call_self => clif_call_self,
             /// `extern "C" fn(*mut ExecCtx, class_id: u32, payload_size: u32) -> u64`
             /// — Fast allocator for class instances returning heap index without interpreter frame overhead.
             alloc_instance_fast => jit_alloc_instance_fast,

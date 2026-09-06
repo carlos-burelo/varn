@@ -300,40 +300,7 @@ pub(crate) extern "C" fn clif_call_fallback(
                     && !closure.proto.has_rest;
                 if is_eligible {
                     let closure = closure.clone();
-                    if let Some(jit_fn) = closure.hot_jit_fn() {
-                        if ctx_ref.stack.len() < src + argc {
-                            ctx_ref.stack.resize(src + argc, VmValue::null());
-                        }
-                        let orig_len = ctx_ref.stack.len();
-                        ctx_ref.stack.extend_from_within(src..src + argc);
-                        let callee_base = orig_len;
-                        let required_len = callee_base + closure.proto.register_count as usize;
-                        let required_cap = required_len + 32;
-                        if ctx_ref.stack.capacity() < required_cap {
-                            ctx_ref.stack.reserve((required_cap - ctx_ref.stack.len()).max(256));
-                        }
-                        if ctx_ref.stack.len() < required_len {
-                            ctx_ref.stack.resize(required_len, VmValue::null());
-                        }
-                        ctx_ref
-                            .frames
-                            .push(crate::frame::CallFrame::new(&closure, callee_base));
-                        ctx_ref.jit_frame_prepushed = 1;
-                        let res = (jit_fn)(
-                            ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                            &*closure as *const crate::closure::VmClosure
-                                as *const std::ffi::c_void,
-                            callee_base,
-                            ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-                        );
-                        let returning_frame_idx = ctx_ref.frames.len() - 1;
-                        ctx_ref.frames.pop();
-                        ctx_ref.close_upvalues_above(callee_base);
-                        let final_val =
-                            resolve_constructor_return(ctx_ref, returning_frame_idx, res);
-                        ctx_ref.stack.truncate(orig_len);
-                        ctx_ref.jit_native_result = final_val;
-                        ctx_ref.record_call_vm_fast();
+                    if invoke_compiled_closure(ctx_ref, &closure, src, argc) {
                         return;
                     }
                 }
@@ -353,6 +320,80 @@ pub(crate) extern "C" fn clif_call_fallback(
         match ctx_ref.call_vm_window(callee, src, argc) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(err) => jit_propagate_error(ctx_ref, err),
+        }
+    }
+}
+
+/// Calls `closure`'s compiled entry with `argc` values copied from `stack[src]`,
+/// on a frame of its own pushed above the caller's, and leaves the result in
+/// `ctx.jit_native_result`. Returns false — having done nothing — when the
+/// closure has no compiled entry yet.
+///
+/// The one place that knows the JIT frame protocol: every compiled caller
+/// reaches a compiled callee through it, whether the callee was resolved from a
+/// value or is the caller itself recursing.
+unsafe fn invoke_compiled_closure(
+    ctx: &mut ExecCtx,
+    closure: &crate::closure::VmClosure,
+    src: usize,
+    argc: usize,
+) -> bool {
+    let Some(jit_fn) = closure.hot_jit_fn() else {
+        return false;
+    };
+    if ctx.stack.len() < src + argc {
+        ctx.stack.resize(src + argc, VmValue::null());
+    }
+    let orig_len = ctx.stack.len();
+    ctx.stack.extend_from_within(src..src + argc);
+    let callee_base = orig_len;
+    let required_len = callee_base + closure.proto.register_count as usize;
+    let required_cap = required_len + 32;
+    if ctx.stack.capacity() < required_cap {
+        ctx.stack.reserve((required_cap - ctx.stack.len()).max(256));
+    }
+    if ctx.stack.len() < required_len {
+        ctx.stack.resize(required_len, VmValue::null());
+    }
+    ctx.frames
+        .push(crate::frame::CallFrame::new(closure, callee_base));
+    ctx.jit_frame_prepushed = 1;
+    let res = (jit_fn)(
+        ctx.stack.as_mut_ptr() as *mut std::ffi::c_void,
+        closure as *const crate::closure::VmClosure as *const std::ffi::c_void,
+        callee_base,
+        ctx as *mut ExecCtx as *mut std::ffi::c_void,
+    );
+    let returning_frame_idx = ctx.frames.len() - 1;
+    ctx.frames.pop();
+    ctx.close_upvalues_above(callee_base);
+    let final_val = resolve_constructor_return(ctx, returning_frame_idx, res);
+    ctx.stack.truncate(orig_len);
+    ctx.jit_native_result = final_val;
+    ctx.record_call_vm_fast();
+    true
+}
+
+/// Direct self-recursion out of a frame-aware lowering. The caller cannot hand
+/// the callee its own `base` — it would write its home slots over the caller's
+/// live ones — and it has no boxed callee to route through `clif_call_fallback`,
+/// so it names the closure it is already running.
+pub(crate) extern "C" fn clif_call_self(ctx: *mut ExecCtx, src: usize, argc: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        jit_guard_call_depth(ctx_ref);
+        // The frame's closure outlives the call, so the pointer is taken out
+        // before `ctx` is borrowed mutably.
+        let Some(closure_ptr) = ctx_ref.frames.last().map(|f| f.closure() as *const _) else {
+            return;
+        };
+        if !invoke_compiled_closure(ctx_ref, &*closure_ptr, src, argc) {
+            // Unreachable by construction: the caller is executing this very
+            // closure's compiled entry, so it is published.
+            let e = crate::error::RuntimeError::new(
+                "CallSelf: the running closure has no compiled entry",
+            );
+            jit_propagate_error(ctx_ref, e);
         }
     }
 }

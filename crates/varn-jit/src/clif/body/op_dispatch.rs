@@ -412,10 +412,14 @@ pub(crate) fn dispatch_opcode(
                 return Err("osr: CallSelf cannot target the resume entry".into());
             }
             // A frame-aware lowering mirrors its registers into `stack[base+r]`,
-            // and the direct self-call has no frame of its own to hand the
-            // callee — it would write its home slots over the caller's.
-            if frame_aware {
-                return Err("clif: CallSelf needs its own frame when frame-aware".into());
+            // so it cannot hand the callee its own `base`: the callee would
+            // write its home slots over the caller's live ones. It recurses
+            // through the helper that pushes a frame instead.
+            if let Some(actx) = actx {
+                let res = alloc::emit_call_self(b, actx, state, arg_start, arg_count);
+                alloc::def_result(b, actx, dest, res);
+                state[dest] = K::Boxed;
+                return Ok(false);
             }
             let mut args = Vec::with_capacity(4 + nparams);
             if frame_aware {
