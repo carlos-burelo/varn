@@ -108,6 +108,32 @@ impl ClifLinker for NoLinker {
     }
 }
 
+/// A register that is not `int`, `float` or `bool` holds a heap reference, and
+/// every op that walks one loads the heap base off `exec_ctx` — which only the
+/// frame-aware signature carries.
+pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
+    use varn_types::register_meta::SlotKind;
+    let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
+    proto.param_kinds.iter().any(|k| !scalar(k))
+        || proto
+            .register_meta
+            .iter()
+            .skip(1)
+            .any(|m| !scalar(&m.kind))
+}
+
+/// The single authority on the calling convention a lowering gets. The raw body
+/// and its wrapper import the same signature from it, so the two must never
+/// compute it apart.
+pub(super) fn is_frame_aware(proto: &FunctionProto, has_alloc: bool, osr: bool) -> bool {
+    osr || proto.has_this
+        || has_alloc
+        || proto.upvalue_count > 0
+        || proto.is_generator
+        || proto.is_async
+        || has_boxed_slots(proto)
+}
+
 /// Why a lowering came out frame-aware, in the order the flag tests them,
 /// plus `resume` when the body can hand control back to the INTERPRETER at a
 /// bytecode ip (`Try`'s catch, `Yield`/`Await`'s suspension), which is what
@@ -126,6 +152,9 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     }
     if alloc::has_alloc(code, pool).unwrap_or(true) {
         r.push("alloc");
+    }
+    if has_boxed_slots(proto) {
+        r.push("boxed");
     }
     if proto.upvalue_count > 0 {
         r.push("upvalue");
@@ -195,30 +224,7 @@ pub fn try_compile(
     // OSR `raw` out of `clif_raw`: `compile` publishes a direct clif→clif
     // entry only for non-frame-aware lowerings, and a raw that resumes
     // mid-loop is the last thing a call site should reach.
-    let has_boxed_slots = has_alloc
-        && (proto.param_kinds.iter().any(|k| {
-            !matches!(
-                k,
-                varn_types::register_meta::SlotKind::Int
-                    | varn_types::register_meta::SlotKind::Float
-                    | varn_types::register_meta::SlotKind::Bool
-            )
-        }) || proto.register_meta.iter().skip(1).any(|m| {
-            !matches!(
-                m.kind,
-                varn_types::register_meta::SlotKind::Int
-                    | varn_types::register_meta::SlotKind::Float
-                    | varn_types::register_meta::SlotKind::Bool
-            )
-        }));
-
-    let frame_aware = osr_ip.is_some()
-        || proto.has_this
-        || has_alloc
-        || proto.upvalue_count > 0
-        || proto.is_generator
-        || proto.is_async
-        || has_boxed_slots;
+    let frame_aware = is_frame_aware(proto, has_alloc, osr_ip.is_some());
     let raw = lower_raw(
         proto,
         constants,

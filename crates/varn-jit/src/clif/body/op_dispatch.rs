@@ -411,6 +411,12 @@ pub(crate) fn dispatch_opcode(
             if osr {
                 return Err("osr: CallSelf cannot target the resume entry".into());
             }
+            // A frame-aware lowering mirrors its registers into `stack[base+r]`,
+            // and the direct self-call has no frame of its own to hand the
+            // callee — it would write its home slots over the caller's.
+            if frame_aware {
+                return Err("clif: CallSelf needs its own frame when frame-aware".into());
+            }
             let mut args = Vec::with_capacity(4 + nparams);
             if frame_aware {
                 let stack_ptr = b.block_params(entry)[0];
@@ -435,11 +441,23 @@ pub(crate) fn dispatch_opcode(
                 } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
                     let boxed = use_boxed(b, vars, state, r)?;
                     unbox_bool(b, boxed)
+                } else if let Some(actx) = actx {
+                    let boxed = alloc::box_or_load_home(b, actx, state, r);
+                    let (_tag, payload) = b.ins().isplit(boxed);
+                    payload
                 } else {
                     b.use_var(vars[r])
                 };
                 args.push(v);
             }
+            // Recursing is a safepoint like any other call: the callee can
+            // allocate, and the collector only sees a boxed register through
+            // its home slot.
+            let live = actx.map(|actx| {
+                let regs = alloc::live_boxed(actx, state);
+                alloc::flush_boxed(b, actx, state, &regs);
+                regs
+            });
             let res = if proto.return_kind == SlotKind::Int
                 || proto.return_kind == SlotKind::Bool
                 || proto.return_kind == SlotKind::Float
@@ -455,6 +473,9 @@ pub(crate) fn dispatch_opcode(
                     helpers.jit_native_result_offset as i32,
                 )
             };
+            if let (Some(actx), Some(regs)) = (actx, live.as_ref()) {
+                alloc::reload_boxed(b, actx, state, regs);
+            }
             if let Some(actx) = actx {
                 if meta_is_float(&proto.register_meta, dest) {
                     let f = unbox_f64_coerce(b, res);

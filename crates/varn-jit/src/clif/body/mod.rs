@@ -97,24 +97,7 @@ pub(super) fn lower_raw(
     let has_round = floats::has_round_support(isa);
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
 
-    let has_boxed_slots = has_alloc
-        && (proto
-            .param_kinds
-            .iter()
-            .any(|k| !matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool))
-            || proto
-                .register_meta
-                .iter()
-                .skip(1)
-                .any(|m| !matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool)));
-
-    let mirror_home = proto.has_this
-        || has_alloc
-        || proto.upvalue_count > 0
-        || proto.is_generator
-        || proto.is_async
-        || has_boxed_slots;
-    let frame_aware = osr || mirror_home;
+    let frame_aware = super::lower::is_frame_aware(proto, has_alloc, osr);
 
     let block_starts = scan::block_starts(code, pool)?;
     let regions = scan::loop_regions(proto, code, pool, has_alloc)?;
