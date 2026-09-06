@@ -87,8 +87,9 @@ pub(super) fn def_const_bool(
 }
 
 /// Read a register as an unboxed int. `Int` vars are already raw; `Boxed`
-/// vars coerce via the i48 sign-extend — bit-identical to the
-/// interpreter's typed-op read of the payload.
+/// vars are read unchanged — a boxed `VmValue`'s payload word IS the raw
+/// i64 (VmValue moved off NaN-boxing, so there is no 48-bit range to
+/// sign-extend from anymore).
 pub(super) fn use_int(
     b: &mut FunctionBuilder,
     vars: &[Variable],
@@ -97,11 +98,11 @@ pub(super) fn use_int(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
         K::Int => Ok(b.use_var(vars[r])),
-        k if is_boxed_kind(k) => {
-            let v = b.use_var(vars[r]);
-            let s = b.ins().ishl_imm(v, 16);
-            Ok(b.ins().sshr_imm(s, 16))
-        }
+        // Boxed payload is already the full i64 — do NOT shl/shr by 16
+        // here. That used to sign-extend from a 48-bit NaN-boxed payload;
+        // it now silently drops the top 16 bits of any boxed integer whose
+        // magnitude needed them.
+        k if is_boxed_kind(k) => Ok(b.use_var(vars[r])),
         k => Err(format!("clif: int use of {k:?} register")),
     }
 }

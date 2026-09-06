@@ -1,0 +1,17 @@
+// A boxed int's payload is a full i64. This used to sign-extend from 16
+// bits short of that, silently truncating anything whose magnitude needed
+// the high 16 bits.
+
+const BIG: int = 1125899906842624   // 2^50
+
+function identity(x: int): int { return x }
+function wrapBig(): int { return BIG }
+
+let sink: int = 0
+let i: int = 0
+while (i < 500000) { sink = identity(wrapBig()); i = i + 1 }
+
+assert("boxed int keeps full range", wrapBig() === 1125899906842624)
+assert("boxed int through identity", identity(BIG) === 1125899906842624)
+
+print("[PASSED] 103. Boxed int keeps full i64 range across tiers ")
