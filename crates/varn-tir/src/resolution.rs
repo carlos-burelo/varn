@@ -49,8 +49,18 @@ pub enum Resolution {
 
 impl Resolution {
     /// Whether this resolves to a known entity at compile time.
+    ///
+    /// `None` is deliberately NOT static dispatch: a literal or a pure
+    /// arithmetic result resolves to no entity at all, so counting it as
+    /// static would inflate every ratio built on this method. The three
+    /// states are: resolves to nothing, resolves statically, resolves by name.
     pub fn is_static_dispatch(&self) -> bool {
-        !matches!(self, Resolution::ByName { .. })
+        !matches!(self, Resolution::None | Resolution::ByName { .. })
+    }
+
+    /// Whether this resolution is deferred to runtime by name.
+    pub fn is_dynamic_dispatch(&self) -> bool {
+        matches!(self, Resolution::ByName { .. })
     }
 
     /// The reason, when this resolution is dynamic.
