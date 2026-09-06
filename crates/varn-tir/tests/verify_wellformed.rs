@@ -185,3 +185,54 @@ fn out_of_range_param_is_rejected() {
         errs
     );
 }
+
+/// Tuple elements are checked for dangling types.
+#[test]
+fn dangling_type_in_tuple_is_rejected() {
+    let mut m = empty_module();
+    let mut types = TyTable::default();
+    // Create a tuple containing a dangling class: Tuple([Class(ClassId(99))])
+    let list_id = types.intern_list(&[BackendTy::Class(ClassId(99))]);
+    let _ = types.intern(BackendTy::Tuple(list_id));
+    m.types = types;
+
+    // Expression with the tuple type
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::IntLit(42),
+        BackendTy::Tuple(list_id),
+        Resolution::None,
+    )));
+
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("ClassId(99)") && e.message.contains("no entry")),
+        "expected a dangling class in tuple error, got: {:?}",
+        errs
+    );
+}
+
+/// Cyclic tuples do not cause the verifier to hang.
+#[test]
+fn cyclic_tuple_does_not_hang() {
+    let mut m = empty_module();
+    // Create a cycle through indirection:
+    // TyId(0) = Array(TyId(1))
+    // TyId(1) = Tuple([Array(TyId(1))])
+    // This cycles because Tuple's element is Array(TyId(1)), which is TyId(0)
+    let mut types = TyTable::default();
+    let _ = types.intern(BackendTy::Array(TyId(1))); // TyId(0)
+    let list_id = types.intern_list(&[BackendTy::Array(TyId(1))]); // TyListId(0)
+    let _ = types.intern(BackendTy::Tuple(list_id)); // TyId(1)
+    m.types = types;
+
+    // Expression with a type that eventually cycles back
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::IntLit(42),
+        BackendTy::Array(TyId(1)), // Array(Tuple([Array(TyId(1))]))... cycles
+        Resolution::None,
+    )));
+
+    // Should complete without hanging
+    let _ = verify_module(&m);
+}
+

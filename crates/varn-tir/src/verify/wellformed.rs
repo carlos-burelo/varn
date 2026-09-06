@@ -246,6 +246,11 @@ fn check_ty_recursive(
         BackendTy::Tuple(l) => {
             if !m.types.contains_list(l) {
                 bad(&format!("TyListId({})", l.0), errors);
+            } else {
+                // Recurse into each element of the tuple, using the same visited set
+                for &elem_ty in m.types.get_list(l) {
+                    check_ty_recursive(m, elem_ty, e, errors, visited);
+                }
             }
         }
         _ => {}
