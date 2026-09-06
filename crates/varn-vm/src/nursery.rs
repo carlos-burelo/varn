@@ -402,14 +402,13 @@ impl Nursery {
                 return;
             }
             Container::Instance(inst) => {
-                let payload_size = inst.payload_size as usize;
-                let num_slots = payload_size / 16;
-                for slot in 0..num_slots {
-                    let offset = slot * 16;
-                    let mut val = unsafe { inst.read_vm_value(offset) };
+                for slot in 0..inst.slot_count() {
+                    let Some(mut val) = inst.field_at(slot) else {
+                        break;
+                    };
                     if val.is_heap() && is_nursery_idx(val.as_heap_idx()) {
                         self.update_value(&mut val, old_gen, worklist);
-                        unsafe { inst.write_vm_value(offset, val) };
+                        inst.set_field_at(slot, val);
                     }
                 }
                 return;
@@ -571,18 +570,9 @@ impl Nursery {
                 Some(items) => items.iter().any(nursery_val),
                 None => false,
             },
-            HeapObj::Instance(inst) => {
-                let payload_size = inst.payload_size as usize;
-                let num_slots = payload_size / 16;
-                for slot in 0..num_slots {
-                    let offset = slot * 16;
-                    let val = unsafe { inst.read_vm_value(offset) };
-                    if nursery_val(&val) {
-                        return true;
-                    }
-                }
-                false
-            }
+            HeapObj::Instance(inst) => (0..inst.slot_count())
+                .filter_map(|slot| inst.field_at(slot))
+                .any(|v| nursery_val(&v)),
             HeapObj::Object(o) | HeapObj::Record(o) => {
                 let mut found = false;
                 o.borrow().for_each_field(|_, v| {

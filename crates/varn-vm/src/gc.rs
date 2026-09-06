@@ -172,12 +172,10 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Instance(inst) => {
-                    // Statically-typed InstanceData: trace GC references according to class layout gc_mask
-                    let payload_size = inst.payload_size as usize;
-                    let num_words = payload_size / 8;
-                    for word_idx in 0..num_words {
-                        let offset = word_idx * 8;
-                        let val = unsafe { inst.read_vm_value(offset) };
+                    for slot in 0..inst.slot_count() {
+                        let Some(val) = inst.field_at(slot) else {
+                            break;
+                        };
                         if let Some(child_idx) = heap.get_heap_idx(val) {
                             self.mark_gray(child_idx);
                         }

@@ -564,6 +564,9 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
 
 const INSTANCE_HEADER_WORDS: usize = 1;
 
+/// Bytes one field slot occupies in an instance payload.
+const SLOT_SIZE: usize = std::mem::size_of::<VmValue>();
+
 impl InstanceData {
     /// Allocates an `InstanceData` on the heap with the specified layout.
     pub fn alloc(class: Rc<crate::value::ClassObj>) -> Rc<InstanceData> {
@@ -638,10 +641,18 @@ impl InstanceData {
         ptr.read()
     }
 
+    /// Number of addressable field slots. The one authority on how far a
+    /// payload walk may go: reading past it is an out-of-bounds read, and
+    /// striding by anything but a whole slot splits a `VmValue` in half.
+    #[inline(always)]
+    pub fn slot_count(&self) -> usize {
+        self.payload_size as usize / SLOT_SIZE
+    }
+
     #[inline(always)]
     pub fn field_at(&self, slot: usize) -> Option<VmValue> {
-        let offset = slot * 16;
-        if offset + 16 <= self.payload_size as usize {
+        let offset = slot * SLOT_SIZE;
+        if offset + SLOT_SIZE <= self.payload_size as usize {
             Some(unsafe { self.read_vm_value(offset) })
         } else {
             None
@@ -650,8 +661,8 @@ impl InstanceData {
 
     #[inline(always)]
     pub fn set_field_at(&self, slot: usize, val: VmValue) -> bool {
-        let offset = slot * 16;
-        if offset + 16 <= self.payload_size as usize {
+        let offset = slot * SLOT_SIZE;
+        if offset + SLOT_SIZE <= self.payload_size as usize {
             unsafe { self.write_vm_value(offset, val) };
             true
         } else {
