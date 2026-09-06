@@ -11,3 +11,8 @@ pub use ty::{
 
 mod resolution;
 pub use resolution::Resolution;
+
+mod node;
+pub use node::{Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirBinOp, TirUnOp};
+
+mod tables;
