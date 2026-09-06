@@ -723,19 +723,31 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
     assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
 }
 
-/// A cyclic type does not cause the verifier to hang.
+/// A deeply nested chain of `Nullable` terminates and is not falsely
+/// reported.
 ///
-/// TyId(0) = Nullable(TyId(0)) is a self-referential cycle that would cause
-/// assignable to loop forever without a depth bound. Coherence runs
-/// unconditionally even when wellformed found errors, so the cycle can reach
-/// the assignability check.
+/// `TyTable` is append-only (see its doc comment in `ty.rs`): `intern`
+/// assigns an index only after pushing, so any entry can reference only
+/// strictly smaller `TyId`s. The type graph is therefore a DAG, and a real
+/// cycle is not constructible through the public API — this test does NOT
+/// build one. What it builds is a straight-line chain of `Nullable` wrapping
+/// `Nullable` wrapping ... `Int`, deep enough (deeper than the 32-level depth
+/// bound in `assignable` and `non_nullable`) to actually cross that bound
+/// rather than terminate on its own before reaching it. That exercises the
+/// depth-bound path itself, not just ordinary recursion: it asserts
+/// `verify_module` returns rather than hanging, and that saturating the
+/// bound on a type that is merely deep — not cyclic — does not produce a
+/// false positive.
 #[test]
-fn cyclic_type_does_not_hang_verifier() {
-    // Construct a cyclic type by using nested Nullables
+fn deeply_nested_nullable_chain_terminates_without_false_positive() {
+    // Build a chain of 40 Nullable levels, each interned from the previous,
+    // strictly increasing TyId by construction. 40 > the 32-level bound.
     let mut types = TyTable::default();
-    let tid0 = types.intern(BackendTy::Int);
-    let tid1 = types.intern(BackendTy::Nullable(tid0));
-    // tid1 = Nullable(Int), which exercises the recursion in assignable
+    let mut id = types.intern(BackendTy::Int);
+    for _ in 0..40 {
+        id = types.intern(BackendTy::Nullable(id));
+    }
+    let deeply_nullable = BackendTy::Nullable(id);
 
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
@@ -757,20 +769,16 @@ fn cyclic_type_does_not_hang_verifier() {
         },
     };
 
-    // Use the type in a Let that exercises assignable recursion
-    let nullable_nullable = BackendTy::Nullable(tid1);
+    // A non-null Int is assignable to any depth of Nullable(...Nullable(Int)).
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
-        ty: nullable_nullable,
-        init: Some(expr(
-            TirExprKind::IntLit(42),
-            BackendTy::Int,
-            Resolution::None,
-        )),
+        ty: deeply_nullable,
+        init: Some(expr(TirExprKind::IntLit(42), BackendTy::Int, Resolution::None)),
     });
 
-    // The key assertion: verify_module must RETURN, not hang
-    // This tests that the depth bound in assignable prevents infinite recursion
+    // The key assertion: verify_module must RETURN, not hang, and must not
+    // falsely reject a merely-deep (non-cyclic) chain once the bound
+    // saturates.
     let result = verify_module(&m);
-    assert!(result.is_ok(), "cyclic type caused verification failure: {:?}", result);
+    assert!(result.is_ok(), "deeply nested chain caused verification failure: {:?}", result);
 }

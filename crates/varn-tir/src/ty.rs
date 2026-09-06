@@ -115,6 +115,28 @@ impl BackendTy {
 }
 
 /// Per-module interning table for the structured types.
+///
+/// Entries are append-only: the only way to add one is [`TyTable::intern`],
+/// which pushes onto `entries` and hands back the index it landed at. Because
+/// the index is assigned *after* the push, a `BackendTy` can only ever
+/// reference `TyId`s that were already interned — i.e. strictly smaller than
+/// its own. That makes the type graph a DAG ordered by `TyId`, and a real
+/// cycle (some `TyId(n)` reachable from itself, e.g. through `Nullable`) is
+/// not constructible through this API today.
+///
+/// Both `verify::wellformed::check_ty_recursive` and
+/// `verify::coherence::assignable` (and `BackendTy::non_nullable`) recurse
+/// through `Nullable` by resolving a `TyId` here, and their termination
+/// depends on this acyclicity. Adding a way to mutate an already-interned
+/// entry (a `get_mut`), or a deserialization path that can reconstruct a
+/// `TyTable` with a back-reference already baked in, would break the
+/// invariant and turn that recursion into a hang.
+///
+/// The depth bounds in `assignable` and `non_nullable` stay anyway, as
+/// defence in depth: the invariant above is upheld by convention, not by
+/// the type system, so nothing stops a future change from violating it
+/// silently. The bounds are what keeps that failure mode a wrong answer
+/// instead of a hang.
 #[derive(Debug, Default)]
 pub struct TyTable {
     entries: Vec<BackendTy>,
