@@ -8,3 +8,6 @@ mod ty;
 pub use ty::{
     BackendTy, ClassId, DynReason, EnumId, FnId, LocalId, ModuleId, SigId, TyId, TyListId, TyTable,
 };
+
+mod resolution;
+pub use resolution::Resolution;
