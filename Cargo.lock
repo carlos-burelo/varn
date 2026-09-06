@@ -2518,6 +2518,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "varn-tir"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+]
+
+[[package]]
 name = "varn-types"
 version = "0.1.0"
 dependencies = [
