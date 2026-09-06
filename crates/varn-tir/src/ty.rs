@@ -90,8 +90,17 @@ impl BackendTy {
     /// The type with nullability stripped, for consumers that guard null
     /// separately. Needs the table because the payload is behind a handle.
     pub fn non_nullable(self, t: &TyTable) -> BackendTy {
+        self.non_nullable_with_depth(t, 0)
+    }
+
+    fn non_nullable_with_depth(self, t: &TyTable, depth: usize) -> BackendTy {
+        // Cyclic types can reach here from the verifier (coherence runs
+        // unconditionally), so we need a depth bound just as assignable does.
+        const DEPTH_LIMIT: usize = 32;
         match self {
-            BackendTy::Nullable(inner) => t.get(inner).non_nullable(t),
+            BackendTy::Nullable(inner) if depth < DEPTH_LIMIT => {
+                t.get(inner).non_nullable_with_depth(t, depth + 1)
+            }
             other => other,
         }
     }

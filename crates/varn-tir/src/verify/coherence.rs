@@ -6,7 +6,7 @@
 use super::VerifyError;
 use crate::node::{TirBinOp, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
 use crate::resolution::Resolution;
-use crate::ty::{BackendTy, SigId};
+use crate::ty::BackendTy;
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
     check_function(m, &m.top_level, errors);
@@ -142,7 +142,29 @@ fn walk_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
 /// nullable — while `T?` to `T` is not, because that needs narrowing. Both
 /// sides being Dynamic-tolerant keeps an honestly dynamic value from being
 /// reported anywhere.
+///
+/// Uses a depth bound because coherence runs unconditionally even after
+/// wellformed finds errors, so a cyclic type can reach here. Unlike check_ty,
+/// this helper cannot rely on wellformed having run first.
 fn assignable(m: &TirModule, from: BackendTy, to: BackendTy) -> bool {
+    assignable_with_depth(m, from, to, 0)
+}
+
+const ASSIGNABLE_DEPTH_LIMIT: usize = 32;
+
+fn assignable_with_depth(
+    m: &TirModule,
+    from: BackendTy,
+    to: BackendTy,
+    depth: usize,
+) -> bool {
+    if depth > ASSIGNABLE_DEPTH_LIMIT {
+        // Cycle detected or pathologically deep nesting. Return true so a
+        // cyclic type doesn't become a false positive; the real error is in
+        // wellformed if the cycle is wrong, not here.
+        return true;
+    }
+
     if matches!(from, BackendTy::Dynamic(_)) || matches!(to, BackendTy::Dynamic(_)) {
         return true;
     }
@@ -156,7 +178,7 @@ fn assignable(m: &TirModule, from: BackendTy, to: BackendTy) -> bool {
     }
     // T is assignable to T?; the reverse is not.
     if let BackendTy::Nullable(inner) = to {
-        return assignable(m, from, m.types.get(inner));
+        return assignable_with_depth(m, from, m.types.get(inner), depth + 1);
     }
     false
 }
