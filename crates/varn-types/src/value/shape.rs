@@ -109,6 +109,15 @@ impl Shape {
         child
     }
 
+    /// Appends `key` as a new slot without registering a transition edge:
+    /// static class layouts would only leave dead entries in the cache.
+    pub fn extend_property(&self, key: RuntimeString) -> Rc<Shape> {
+        let mut new_props = self.property_names.clone();
+        let slot = new_props.len();
+        new_props.insert(key, slot);
+        Shape::create(self.class.clone(), new_props)
+    }
+
     pub fn with_class(&self, class: Option<Rc<crate::value::ClassObj>>) -> Rc<Shape> {
         Shape::create(class, self.property_names.clone())
     }

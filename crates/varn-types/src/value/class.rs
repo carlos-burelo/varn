@@ -132,7 +132,7 @@ impl ClassObj {
         if let Some(&slot) = root.property_names.get(&name) {
             return slot;
         }
-        let new_shape = root.transition(name);
+        let new_shape = root.extend_property(name);
         let slot = new_shape.property_names.len() - 1;
         *root = new_shape;
         slot

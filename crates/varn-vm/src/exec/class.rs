@@ -3,7 +3,7 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::ClassObj;
+use varn_types::{ClassObj, Shape};
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
@@ -49,22 +49,21 @@ pub(crate) fn op_inherit(
             *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
             *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
-            let mut existing_sub_fields: Vec<(varn_types::RuntimeString, usize)> = sub
+            let mut properties = superclass.root_shape.borrow().property_names.clone();
+            let mut own_fields: Vec<(varn_types::RuntimeString, usize)> = sub
                 .root_shape
                 .borrow()
                 .property_names
                 .iter()
+                .filter(|(name, _)| !properties.contains_key(name.as_ref()))
                 .map(|(k, &v)| (k.clone(), v))
                 .collect();
-            existing_sub_fields.sort_by_key(|(_, slot)| *slot);
-
-            let mut new_root = superclass.root_shape.borrow().with_class(Some(sub.clone()));
-            for (name, _) in existing_sub_fields {
-                if !new_root.property_names.contains_key(&name) {
-                    new_root = new_root.transition(name);
-                }
+            own_fields.sort_unstable_by_key(|(_, slot)| *slot);
+            for (name, _) in own_fields {
+                let slot = properties.len();
+                properties.insert(name, slot);
             }
-            *sub.root_shape.borrow_mut() = new_root;
+            *sub.root_shape.borrow_mut() = Shape::create(Some(sub.clone()), properties);
 
             *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
             *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();
