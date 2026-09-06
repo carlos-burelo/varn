@@ -140,6 +140,47 @@ impl Clone for Box<dyn VmValuePayload> {
     }
 }
 
+/// How a value of a given static type occupies a class instance field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldRepr {
+    pub size: u32,
+    pub align: u32,
+    /// Whether the collector must trace this field.
+    pub is_gc_ref: bool,
+}
+
+impl TypeTag {
+    /// The single authority on how a statically-typed field is laid out. The
+    /// checker derives instance offsets from it while annotating field
+    /// accesses, and the runtime derives `ClassLayout` from it; two tables
+    /// would let a compiled access address a field the runtime placed
+    /// elsewhere.
+    ///
+    /// A tag with no unboxed representation falls back to a whole `VmValue`.
+    pub const fn field_repr(self) -> FieldRepr {
+        let (size, align, is_gc_ref) = match self {
+            TypeTag::Bool => (1, 1, false),
+            TypeTag::Char => (4, 4, false),
+            TypeTag::Int | TypeTag::Float => (8, 8, false),
+            TypeTag::Str
+            | TypeTag::Array
+            | TypeTag::Map
+            | TypeTag::Set
+            | TypeTag::Object
+            | TypeTag::Class
+            | TypeTag::Function
+            | TypeTag::Task
+            | TypeTag::Generator => (8, 8, true),
+            _ => (16, 8, true),
+        };
+        FieldRepr {
+            size,
+            align,
+            is_gc_ref,
+        }
+    }
+}
+
 impl std::fmt::Display for TypeTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())

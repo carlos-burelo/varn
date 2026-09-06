@@ -75,21 +75,11 @@ impl ClassLayout {
         let mut gc_mask = 0u64;
 
         for (field_name, tag) in fields_in {
-            let (size, align, is_gc) = match tag {
-                TypeTag::Bool => (1u32, 1u32, false),
-                TypeTag::Char => (4u32, 4u32, false),
-                TypeTag::Int | TypeTag::Float => (8u32, 8u32, false),
-                TypeTag::Str
-                | TypeTag::Array
-                | TypeTag::Map
-                | TypeTag::Set
-                | TypeTag::Object
-                | TypeTag::Class
-                | TypeTag::Function
-                | TypeTag::Task
-                | TypeTag::Generator => (8u32, 8u32, true),
-                _ => (16u32, 8u32, true), // Dynamic / VmValue fallback
-            };
+            let varn_core::FieldRepr {
+                size,
+                align,
+                is_gc_ref: is_gc,
+            } = tag.field_repr();
 
             max_align = max_align.max(align);
             // Align current offset up to field's required alignment

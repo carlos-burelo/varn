@@ -43,7 +43,7 @@ use std::rc::Rc;
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
-pub use type_tag::{TypeTag, VmValuePayload};
+pub use type_tag::{FieldRepr, TypeTag, VmValuePayload};
 pub use typed_ir::{AnnKey, ExprAnnotation, NumericKind, TypeAnnotations};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
