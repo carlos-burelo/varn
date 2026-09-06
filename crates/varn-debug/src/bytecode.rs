@@ -38,6 +38,27 @@ fn op_color(op: OpCode) -> &'static str {
     }
 }
 
+/// Global keys are `<module path>::<symbol>`, and the module part is an
+/// absolute path that buries the symbol the reader came for. Keep the module's
+/// file name so cross-module globals stay distinguishable, drop the rest.
+/// A string that is not a qualified key is left exactly as it is.
+fn short_global_key(s: &str) -> &str {
+    let Some((module, symbol)) = s.rsplit_once("::") else {
+        return s;
+    };
+    let is_sep = |c: char| c == '/' || c == '\\';
+    if !module.contains(is_sep) {
+        return s;
+    }
+    let file = module
+        .rsplit(is_sep)
+        .next()
+        .filter(|f| !f.is_empty())
+        .unwrap_or(module);
+    // `s` is contiguous, so the tail starting at the file name covers both.
+    &s[s.len() - (file.len() + 2 + symbol.len())..]
+}
+
 fn const_hint(entry: &PoolEntry) -> String {
     use varn_types::chunk::Literal;
     match entry {
@@ -46,7 +67,7 @@ fn const_hint(entry: &PoolEntry) -> String {
             Literal::Bool(b) => format!("{GREEN}{b}{R}"),
             Literal::Int(n) => format!("{GREEN}{n}{R}"),
             Literal::Float(f) => format!("{GREEN}{f}{R}"),
-            Literal::Str(s) => format!("{GREEN}\"{s}\"{R}"),
+            Literal::Str(s) => format!("{GREEN}\"{}\"{R}", short_global_key(s)),
             Literal::BigInt(n) => format!("{GREEN}{n}n{R}"),
             Literal::Decimal(d) => format!("{GREEN}{d}d{R}"),
             Literal::Char(c) => format!("{GREEN}'{c}'{R}"),

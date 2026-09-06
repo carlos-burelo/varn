@@ -1,5 +1,5 @@
 use super::RuntimeString;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -12,8 +12,10 @@ pub struct Shape {
     pub property_names: HashMap<RuntimeString, usize>,
     /// [`Self::property_names`] in slot order: `ordered[i]` names slot `i`.
     ordered: Vec<RuntimeString>,
-    /// Pre-rendered JSON property prefix for slot `i` (e.g. `"\"id\":"` for slot 0, `",\"name\":"` for slot 1).
-    json_prefixes: Vec<String>,
+    /// Rendered JSON property prefix per slot. Only object literals
+    /// serialize through a shape, so building these eagerly charged every
+    /// class root shape for strings nothing ever reads.
+    json_prefixes: OnceCell<Vec<String>>,
     transitions: RefCell<HashMap<RuntimeString, Rc<Shape>>>,
 }
 
@@ -38,29 +40,12 @@ impl Shape {
             .collect();
         by_slot.sort_unstable_by_key(|(slot, _)| *slot);
         let ordered: Vec<RuntimeString> = by_slot.into_iter().map(|(_, k)| k).collect();
-        let mut json_prefixes = Vec::with_capacity(ordered.len());
-        for (i, name) in ordered.iter().enumerate() {
-            let mut p = String::new();
-            if i > 0 {
-                p.push(',');
-            }
-            p.push('"');
-            for b in name.as_bytes() {
-                match b {
-                    b'"' => p.push_str("\\\""),
-                    b'\\' => p.push_str("\\\\"),
-                    _ => p.push(*b as char),
-                }
-            }
-            p.push_str("\":");
-            json_prefixes.push(p);
-        }
         Rc::new(Shape {
             id: NEXT_SHAPE_ID.fetch_add(1, Ordering::Relaxed),
             class,
             property_names,
             ordered,
-            json_prefixes,
+            json_prefixes: OnceCell::new(),
             transitions: RefCell::new(HashMap::new()),
         })
     }
@@ -72,9 +57,28 @@ impl Shape {
         &self.ordered
     }
 
-    #[inline]
     pub fn json_prefixes(&self) -> &[String] {
-        &self.json_prefixes
+        self.json_prefixes.get_or_init(|| {
+            let ordered = &self.ordered;
+            let mut json_prefixes = Vec::with_capacity(ordered.len());
+            for (i, name) in ordered.iter().enumerate() {
+                let mut p = String::new();
+                if i > 0 {
+                    p.push(',');
+                }
+                p.push('"');
+                for b in name.as_bytes() {
+                    match b {
+                        b'"' => p.push_str("\\\""),
+                        b'\\' => p.push_str("\\\\"),
+                        _ => p.push(*b as char),
+                    }
+                }
+                p.push_str("\":");
+                json_prefixes.push(p);
+            }
+            json_prefixes
+        })
     }
 
     pub fn create_root() -> Rc<Self> {

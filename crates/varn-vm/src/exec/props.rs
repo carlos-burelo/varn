@@ -495,7 +495,9 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::Range(_)) => {
                 return heap.get_intrinsic_class(IntrinsicType::Range.as_str())
             }
-            Some(HeapObj::Buffer(_)) => return heap.get_intrinsic_class("Buffer"),
+            Some(HeapObj::Buffer(_)) => {
+                return heap.get_intrinsic_class(IntrinsicType::Buffer.as_str())
+            }
             Some(HeapObj::Generator(_)) => {
                 return heap.get_intrinsic_class(IntrinsicType::Generator.as_str())
             }
