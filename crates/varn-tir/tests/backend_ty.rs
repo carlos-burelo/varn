@@ -34,16 +34,29 @@ fn type_lists_round_trip() {
 
 /// Nullable keeps its payload instead of collapsing. `int?` used to reach the
 /// backend as Dynamic, which is why a nullable scalar could never be a
-/// (value, bit) pair.
+/// (value, bit) pair. `non_nullable` is what every consumer calls to strip the
+/// nullability before comparing types, so it is the thing worth testing.
 #[test]
 fn nullable_keeps_its_payload() {
     let mut t = TyTable::default();
     let int_id = t.intern(BackendTy::Int);
     let n = BackendTy::Nullable(int_id);
-    match n {
-        BackendTy::Nullable(inner) => assert_eq!(t.get(inner), BackendTy::Int),
-        other => panic!("expected Nullable, got {:?}", other),
-    }
+
+    // The payload survives, and reading it back is the declared type.
+    assert_eq!(n.non_nullable(&t), BackendTy::Int);
+
+    // Nesting collapses all the way down, not one level.
+    let n_id = t.intern(n);
+    let nn = BackendTy::Nullable(n_id);
+    assert_eq!(nn.non_nullable(&t), BackendTy::Int);
+
+    // A non-nullable type is its own payload.
+    assert_eq!(BackendTy::Str.non_nullable(&t), BackendTy::Str);
+
+    // Stripping nullability off a structured type keeps the structure.
+    let arr = BackendTy::Array(int_id);
+    let arr_id = t.intern(arr);
+    assert_eq!(BackendTy::Nullable(arr_id).non_nullable(&t), arr);
 }
 
 /// Dynamic always says why. A count of dynamics is not actionable; a count per
