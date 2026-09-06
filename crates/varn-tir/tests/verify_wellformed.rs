@@ -68,8 +68,27 @@ fn an_out_of_range_field_slot_is_rejected() {
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("slot")),
-        "expected an out-of-range slot error, got: {:?}",
+        errs.iter().any(|e| e.message.contains("out of range")),
+        "expected an out-of-range field slot error, got: {:?}",
+        errs
+    );
+}
+
+/// A field slot on a non-class receiver is rejected.
+#[test]
+fn a_field_slot_on_non_class_receiver_is_rejected() {
+    let mut m = empty_module();
+    let recv = expr(TirExprKind::Var, BackendTy::Int, Resolution::Local(LocalId(0)));
+    m.top_level.locals.push(BackendTy::Int);
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Field { object: Box::new(recv), name: "nope".into() },
+        BackendTy::Int,
+        Resolution::FieldSlot(0),
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("not a class")),
+        "expected a non-class receiver error, got: {:?}",
         errs
     );
 }
@@ -87,8 +106,82 @@ fn an_out_of_range_vtable_slot_is_rejected() {
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("vtable")),
+        errs.iter().any(|e| e.message.contains("out of range")),
         "expected an out-of-range vtable error, got: {:?}",
+        errs
+    );
+}
+
+/// A vtable slot on a non-class receiver is rejected.
+#[test]
+fn a_vtable_slot_on_non_class_receiver_is_rejected() {
+    let mut m = empty_module();
+    let recv = expr(TirExprKind::Var, BackendTy::Int, Resolution::Local(LocalId(0)));
+    m.top_level.locals.push(BackendTy::Int);
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::MethodCall { recv: Box::new(recv), name: "m".into(), args: vec![] },
+        BackendTy::Void,
+        Resolution::VtableSlot(0),
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("not a class")),
+        "expected a non-class receiver error, got: {:?}",
+        errs
+    );
+}
+
+/// Self-referential types do not cause the verifier to hang.
+#[test]
+fn cyclic_types_are_handled() {
+    let mut m = empty_module();
+    // Create a cyclic type: TyId(0) = Array(TyId(1)), TyId(1) = Nullable(TyId(0))
+    let mut types = TyTable::default();
+    let _ = types.intern(BackendTy::Array(TyId(1)));
+    let _ = types.intern(BackendTy::Nullable(TyId(0)));
+    m.types = types;
+
+    // Expression with the cyclic type
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::IntLit(42),
+        BackendTy::Array(TyId(1)),
+        Resolution::None,
+    )));
+
+    // Should complete without hanging; the error doesn't matter for this test
+    let _ = verify_module(&m);
+}
+
+/// Local resolution is validated against the function's locals.
+#[test]
+fn out_of_range_local_is_rejected() {
+    let mut m = empty_module();
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Var,
+        BackendTy::Int,
+        Resolution::Local(LocalId(5)), // out of range
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        "expected an out-of-range local error, got: {:?}",
+        errs
+    );
+}
+
+/// Parameter resolution is validated against the function's parameters.
+#[test]
+fn out_of_range_param_is_rejected() {
+    let mut m = empty_module();
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Var,
+        BackendTy::Int,
+        Resolution::Param(5), // out of range
+    )));
+    let errs = verify_module(&m).unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.message.contains("parameter") && e.message.contains("out of range")),
+        "expected an out-of-range parameter error, got: {:?}",
         errs
     );
 }

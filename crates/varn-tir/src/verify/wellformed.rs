@@ -3,12 +3,51 @@
 use super::VerifyError;
 use crate::node::{TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
 use crate::resolution::Resolution;
-use crate::ty::BackendTy;
+use crate::ty::{BackendTy, TyId};
+use std::collections::HashSet;
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
+    check_declarations(m, errors);
     check_function(m, &m.top_level, errors);
     for f in &m.functions {
         check_function(m, f, errors);
+    }
+}
+
+fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
+    // Check globals
+    let dummy_expr = TirExpr {
+        kind: TirExprKind::NullLit,
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: crate::node::Span::EMPTY,
+    };
+    for ty in &m.globals {
+        check_ty(m, *ty, &dummy_expr, errors);
+    }
+
+    // Check class fields
+    for class in &m.classes {
+        for field in &class.fields {
+            check_ty(m, field.ty, &dummy_expr, errors);
+        }
+    }
+
+    // Check enum variants
+    for enum_info in &m.enums {
+        for variant in &enum_info.variants {
+            for ty in &variant.payload {
+                check_ty(m, *ty, &dummy_expr, errors);
+            }
+        }
+    }
+
+    // Check signatures
+    for sig in &m.signatures {
+        for param_ty in &sig.params {
+            check_ty(m, *param_ty, &dummy_expr, errors);
+        }
+        check_ty(m, sig.return_ty, &dummy_expr, errors);
     }
 }
 
@@ -19,86 +58,109 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
             crate::node::Span::EMPTY,
         ));
     }
+
+    // Check function's own type declarations
+    let dummy_expr = TirExpr {
+        kind: TirExprKind::NullLit,
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: crate::node::Span::EMPTY,
+    };
+    for param_ty in &f.params {
+        check_ty(m, *param_ty, &dummy_expr, errors);
+    }
+    check_ty(m, f.return_ty, &dummy_expr, errors);
+    for local_ty in &f.locals {
+        check_ty(m, *local_ty, &dummy_expr, errors);
+    }
+
     for s in &f.body {
-        check_stmt(m, s, errors);
+        check_stmt(m, f, s, errors);
     }
 }
 
-fn check_stmt(m: &TirModule, s: &TirStmt, errors: &mut Vec<VerifyError>) {
+fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<VerifyError>) {
     match s {
-        TirStmt::Expr(e) | TirStmt::Throw(e) => check_expr(m, e, errors),
-        TirStmt::Let { init, .. } => {
+        TirStmt::Expr(e) | TirStmt::Throw(e) => check_expr(m, f, e, errors),
+        TirStmt::Let { ty, init, .. } => {
+            let dummy_expr = TirExpr {
+                kind: TirExprKind::NullLit,
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: crate::node::Span::EMPTY,
+            };
+            check_ty(m, *ty, &dummy_expr, errors);
             if let Some(e) = init {
-                check_expr(m, e, errors);
+                check_expr(m, f, e, errors);
             }
         }
         TirStmt::Return(v) => {
             if let Some(e) = v {
-                check_expr(m, e, errors);
+                check_expr(m, f, e, errors);
             }
         }
         TirStmt::If { cond, then_body, else_body } => {
-            check_expr(m, cond, errors);
+            check_expr(m, f, cond, errors);
             for s in then_body.iter().chain(else_body) {
-                check_stmt(m, s, errors);
+                check_stmt(m, f, s, errors);
             }
         }
         TirStmt::Loop { cond, body } => {
-            check_expr(m, cond, errors);
+            check_expr(m, f, cond, errors);
             for s in body {
-                check_stmt(m, s, errors);
+                check_stmt(m, f, s, errors);
             }
         }
         TirStmt::Try { body, catch_body, .. } => {
             for s in body.iter().chain(catch_body) {
-                check_stmt(m, s, errors);
+                check_stmt(m, f, s, errors);
             }
         }
         TirStmt::Break | TirStmt::Continue => {}
     }
 }
 
-fn check_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
+fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     check_ty(m, e.ty, e, errors);
-    check_res(m, e, errors);
+    check_res(m, f, e, errors);
 
     match &e.kind {
         TirExprKind::Binary { lhs, rhs, .. } => {
-            check_expr(m, lhs, errors);
-            check_expr(m, rhs, errors);
+            check_expr(m, f, lhs, errors);
+            check_expr(m, f, rhs, errors);
         }
         TirExprKind::Unary { operand, .. } | TirExprKind::Cast { operand } => {
-            check_expr(m, operand, errors)
+            check_expr(m, f, operand, errors)
         }
-        TirExprKind::Field { object, .. } => check_expr(m, object, errors),
+        TirExprKind::Field { object, .. } => check_expr(m, f, object, errors),
         TirExprKind::Index { object, index } => {
-            check_expr(m, object, errors);
-            check_expr(m, index, errors);
+            check_expr(m, f, object, errors);
+            check_expr(m, f, index, errors);
         }
         TirExprKind::Call { callee, args } => {
-            check_expr(m, callee, errors);
+            check_expr(m, f, callee, errors);
             for a in args {
-                check_expr(m, a, errors);
+                check_expr(m, f, a, errors);
             }
         }
         TirExprKind::MethodCall { recv, args, .. } => {
-            check_expr(m, recv, errors);
+            check_expr(m, f, recv, errors);
             for a in args {
-                check_expr(m, a, errors);
+                check_expr(m, f, a, errors);
             }
         }
         TirExprKind::Assign { target, value } => {
-            check_expr(m, target, errors);
-            check_expr(m, value, errors);
+            check_expr(m, f, target, errors);
+            check_expr(m, f, value, errors);
         }
         TirExprKind::ArrayLit(xs) | TirExprKind::TupleLit(xs) => {
             for x in xs {
-                check_expr(m, x, errors);
+                check_expr(m, f, x, errors);
             }
         }
         TirExprKind::ObjectLit { fields } => {
             for (_, v) in fields {
-                check_expr(m, v, errors);
+                check_expr(m, f, v, errors);
             }
         }
         TirExprKind::New { class, args } => {
@@ -109,18 +171,18 @@ fn check_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
                 ));
             }
             for a in args {
-                check_expr(m, a, errors);
+                check_expr(m, f, a, errors);
             }
         }
         TirExprKind::MakeVariant { args } => {
             for a in args {
-                check_expr(m, a, errors);
+                check_expr(m, f, a, errors);
             }
         }
         TirExprKind::Select { cond, then_val, else_val } => {
-            check_expr(m, cond, errors);
-            check_expr(m, then_val, errors);
-            check_expr(m, else_val, errors);
+            check_expr(m, f, cond, errors);
+            check_expr(m, f, then_val, errors);
+            check_expr(m, f, else_val, errors);
         }
         TirExprKind::IntLit(_)
         | TirExprKind::FloatLit(_)
@@ -132,8 +194,19 @@ fn check_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     }
 }
 
-/// Every handle inside a type points at an entry that exists.
+/// Every handle inside a type points at an entry that exists, and types do not form cycles.
 fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyError>) {
+    let mut visited = HashSet::new();
+    check_ty_recursive(m, ty, e, errors, &mut visited);
+}
+
+fn check_ty_recursive(
+    m: &TirModule,
+    ty: BackendTy,
+    e: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+    visited: &mut HashSet<TyId>,
+) {
     let bad = |what: &str, errors: &mut Vec<VerifyError>| {
         errors.push(VerifyError::new(
             format!("type names {what}, which has no entry"),
@@ -149,14 +222,25 @@ fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyEr
         BackendTy::Array(t) | BackendTy::Set(t) | BackendTy::Nullable(t) => {
             if !m.types.contains(t) {
                 bad(&format!("TyId({})", t.0), errors);
+            } else if visited.insert(t) {
+                // First time seeing this TyId, recurse into it
+                let inner_ty = m.types.get(t);
+                check_ty_recursive(m, inner_ty, e, errors, visited);
             }
+            // If already visited, stop to break cycles
         }
         BackendTy::Map(k, v) => {
             if !m.types.contains(k) {
                 bad(&format!("TyId({})", k.0), errors);
+            } else if visited.insert(k) {
+                let inner_ty = m.types.get(k);
+                check_ty_recursive(m, inner_ty, e, errors, visited);
             }
             if !m.types.contains(v) {
                 bad(&format!("TyId({})", v.0), errors);
+            } else if visited.insert(v) {
+                let inner_ty = m.types.get(v);
+                check_ty_recursive(m, inner_ty, e, errors, visited);
             }
         }
         BackendTy::Tuple(l) => {
@@ -169,54 +253,58 @@ fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyEr
 }
 
 /// Every slot is in range of the table it claims to index.
-fn check_res(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
+fn check_res(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     let receiver_class = |recv: &TirExpr| match recv.ty.non_nullable(&m.types) {
         BackendTy::Class(c) => Some(c),
         _ => None,
     };
 
-    match (&e.res, &e.kind) {
-        (Resolution::FieldSlot(slot), TirExprKind::Field { object, .. }) => {
-            match receiver_class(object) {
-                Some(c) => {
-                    let ok = m.class(c).and_then(|ci| ci.field_at(*slot)).is_some();
-                    if !ok {
-                        errors.push(VerifyError::new(
-                            format!(
-                                "field slot {slot} is out of range for class ClassId({})",
-                                c.0
-                            ),
-                            e.span,
-                        ));
+    match &e.res {
+        Resolution::FieldSlot(slot) => {
+            if let TirExprKind::Field { object, .. } = &e.kind {
+                match receiver_class(object) {
+                    Some(c) => {
+                        let ok = m.class(c).and_then(|ci| ci.field_at(*slot)).is_some();
+                        if !ok {
+                            errors.push(VerifyError::new(
+                                format!(
+                                    "field slot {slot} is out of range for class ClassId({})",
+                                    c.0
+                                ),
+                                e.span,
+                            ));
+                        }
                     }
+                    None => errors.push(VerifyError::new(
+                        format!("field slot {slot} on a receiver that is not a class"),
+                        e.span,
+                    )),
                 }
-                None => errors.push(VerifyError::new(
-                    format!("field slot {slot} on a receiver that is not a class"),
-                    e.span,
-                )),
             }
         }
-        (Resolution::VtableSlot(slot), TirExprKind::MethodCall { recv, .. }) => {
-            match receiver_class(recv) {
-                Some(c) => {
-                    let ok = m.class(c).and_then(|ci| ci.method_at(*slot)).is_some();
-                    if !ok {
-                        errors.push(VerifyError::new(
-                            format!(
-                                "vtable slot {slot} is out of range for class ClassId({})",
-                                c.0
-                            ),
-                            e.span,
-                        ));
+        Resolution::VtableSlot(slot) => {
+            if let TirExprKind::MethodCall { recv, .. } = &e.kind {
+                match receiver_class(recv) {
+                    Some(c) => {
+                        let ok = m.class(c).and_then(|ci| ci.method_at(*slot)).is_some();
+                        if !ok {
+                            errors.push(VerifyError::new(
+                                format!(
+                                    "vtable slot {slot} is out of range for class ClassId({})",
+                                    c.0
+                                ),
+                                e.span,
+                            ));
+                        }
                     }
+                    None => errors.push(VerifyError::new(
+                        format!("vtable slot {slot} on a receiver that is not a class"),
+                        e.span,
+                    )),
                 }
-                None => errors.push(VerifyError::new(
-                    format!("vtable slot {slot} on a receiver that is not a class"),
-                    e.span,
-                )),
             }
         }
-        (Resolution::GlobalSlot(slot), _) => {
+        Resolution::GlobalSlot(slot) => {
             if *slot as usize >= m.globals.len() {
                 errors.push(VerifyError::new(
                     format!("global slot {slot} is out of range"),
@@ -224,15 +312,15 @@ fn check_res(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
                 ));
             }
         }
-        (Resolution::DirectFn(f), _) => {
-            if m.function(*f).is_none() {
+        Resolution::DirectFn(f_id) => {
+            if m.function(*f_id).is_none() {
                 errors.push(VerifyError::new(
-                    format!("DirectFn names FnId({}), which has no entry", f.0),
+                    format!("DirectFn names FnId({}), which has no entry", f_id.0),
                     e.span,
                 ));
             }
         }
-        (Resolution::EnumVariant { enum_id, tag }, _) => {
+        Resolution::EnumVariant { enum_id, tag } => {
             let ok = m
                 .enum_info(*enum_id)
                 .and_then(|ei| ei.variant_at(*tag))
@@ -244,6 +332,30 @@ fn check_res(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
                 ));
             }
         }
-        _ => {}
+        Resolution::Local(id) => {
+            if id.0 as usize >= f.locals.len() {
+                errors.push(VerifyError::new(
+                    format!("local LocalId({}) is out of range", id.0),
+                    e.span,
+                ));
+            }
+        }
+        Resolution::Param(id) => {
+            if *id as usize >= f.params.len() {
+                errors.push(VerifyError::new(
+                    format!("parameter at index {id} is out of range"),
+                    e.span,
+                ));
+            }
+        }
+        // StaticField, ModuleSlot, Intrinsic, NativeOp, Upvalue, ByName, and None
+        // have no backing tables in this crate and cannot be validated here
+        Resolution::StaticField(_)
+        | Resolution::ModuleSlot { .. }
+        | Resolution::Intrinsic(_)
+        | Resolution::NativeOp(_)
+        | Resolution::Upvalue(_)
+        | Resolution::ByName { .. }
+        | Resolution::None => {}
     }
 }
