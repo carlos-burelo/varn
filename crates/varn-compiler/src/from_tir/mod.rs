@@ -7,15 +7,7 @@
 //! Nothing is wired yet: the pipeline still compiles through HIR, so the
 //! corpus stays green while this fills in.
 
+pub mod build;
 pub mod ty;
 
-use crate::ssa::ir::SsaFunc;
-use crate::OptError;
-use varn_tir::TirModule;
-
-/// Build one SSA function per `TirFunction` in the module (top level first).
-/// Currently unimplemented — the translation is ported construct by construct
-/// in step 3.3 of the plan.
-pub fn build_module(_tir: &TirModule) -> Result<Vec<SsaFunc>, OptError> {
-    Err(OptError::Unsupported("from_tir: not yet implemented"))
-}
+pub use build::{build_function, build_module};
