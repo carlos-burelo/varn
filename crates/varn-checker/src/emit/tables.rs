@@ -57,8 +57,18 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
     // value type) and separately in `type_members.enums` (the variants).
     class_names.retain(|n| !bind.type_members.enums.contains_key(n));
 
-    let mut enum_names: Vec<Rc<str>> = bind.type_members.enums.keys().cloned().collect();
+    // Plain enums live in `type_members.enums`; payload ("sum type") enums
+    // live in `sum_type_variants` and their fields in `sum_variant_fields`.
+    let mut enum_names: Vec<Rc<str>> = bind
+        .type_members
+        .enums
+        .keys()
+        .chain(bind.sum_type_variants.keys())
+        .cloned()
+        .collect();
     enum_names.sort();
+    enum_names.dedup();
+    class_names.retain(|n| !bind.sum_type_variants.contains_key(n));
 
     let mut names = NameIndex::default();
     for (i, n) in class_names.iter().enumerate() {
@@ -188,23 +198,45 @@ fn build_enums(
     enum_names
         .iter()
         .map(|name| {
+            // A payload enum: variant names from `sum_type_variants`, fields
+            // from `sum_variant_fields`.
+            if let Some(vnames) = bind.sum_type_variants.get(name) {
+                let variants = vnames
+                    .iter()
+                    .enumerate()
+                    .map(|(tag, vn)| VariantInfo {
+                        name: vn.clone(),
+                        tag: tag as u16,
+                        payload: bind
+                            .sum_variant_fields
+                            .get(vn)
+                            .map(|fs| {
+                                fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect()
+                            })
+                            .unwrap_or_default(),
+                    })
+                    .collect();
+                return EnumInfo { name: name.clone(), variants };
+            }
+
+            // Payload variants of an `enum` decl: names and order from
+            // `type_members.enums`, fields from `sum_variant_fields` (keyed by
+            // the variant's own name).
             let variants = bind
                 .type_members
                 .enums
                 .get(name)
                 .map(|vs| vs.as_slice())
-                .unwrap_or(&[]);
-            let variants = variants
+                .unwrap_or(&[])
                 .iter()
                 .enumerate()
-                .map(|(tag, v)| VariantInfo {
-                    name: v.name.clone(),
-                    tag: tag as u16,
-                    payload: v
-                        .members
-                        .iter()
-                        .map(|f| lower_type(&f.ty, tt, names))
-                        .collect(),
+                .map(|(tag, v)| {
+                    let payload = bind
+                        .sum_variant_fields
+                        .get(&v.name)
+                        .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect())
+                        .unwrap_or_default();
+                    VariantInfo { name: v.name.clone(), tag: tag as u16, payload }
                 })
                 .collect();
             EnumInfo { name: name.clone(), variants }

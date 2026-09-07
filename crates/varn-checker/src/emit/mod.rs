@@ -90,12 +90,14 @@ pub fn emit_module(
         fns: &fn_index,
     };
 
-    // Module top level: every statement that is not a declaration.
+    // Module top level: every statement, plus module-level `let` / `const`
+    // (those are real statements). Function, class and enum declarations are
+    // lowered separately.
     let mut top = FnEmitter::new(expr_table, &mut types, ctx.as_module_ctx(), &mut signatures, vec![]);
     let mut top_body = Vec::new();
     for stmt in &program.body {
         match &stmt.kind {
-            StmtKind::Decl(_) => {}
+            StmtKind::Decl(d) if variable_decl(d).is_none() => {}
             _ => top_body.extend(top.lower_stmt_as_block(stmt)),
         }
     }
@@ -109,7 +111,8 @@ pub fn emit_module(
         body: top_body,
         has_this: false,
         this_class: None,
-        is_async: false,
+        // Module top level permits top-level `await`.
+        is_async: true,
         is_generator: false,
     };
 
@@ -179,6 +182,17 @@ fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
     }
 }
 
+fn variable_decl(decl: &Decl) -> Option<&varn_core::ast::VariableDecl> {
+    match decl {
+        Decl::Variable(v) => Some(v),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Variable(v) => Some(v),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
     match decl {
         Decl::Class(c) => Some(c),
@@ -204,15 +218,20 @@ fn emit_class_methods(
     let info = &ctx.classes[class_id.0 as usize];
 
     for member in &class.body {
-        let (key, params, body): (Rc<str>, &[Param], &Stmt) = match member {
-            ClassMember::Method { key, params, body: Some(body), .. } => {
-                (key.clone(), params.as_slice(), body)
-            }
-            ClassMember::Constructor { params, body, .. } => {
-                (Rc::from("constructor"), params.as_slice(), body)
-            }
-            _ => continue,
-        };
+        let (key, params, body, is_async, is_generator): (Rc<str>, &[Param], &Stmt, bool, bool) =
+            match member {
+                ClassMember::Method { key, params, body: Some(body), modifiers, .. } => (
+                    key.clone(),
+                    params.as_slice(),
+                    body,
+                    modifiers.is_async,
+                    modifiers.is_generator,
+                ),
+                ClassMember::Constructor { params, body, .. } => {
+                    (Rc::from("constructor"), params.as_slice(), body, false, false)
+                }
+                _ => continue,
+            };
 
         // A method reuses its vtable signature; a constructor gets a fresh one
         // (constructors are not dispatched).
@@ -248,8 +267,8 @@ fn emit_class_methods(
             body: body_stmts,
             has_this: true,
             this_class: Some(class_id),
-            is_async: false,
-            is_generator: false,
+            is_async,
+            is_generator,
         });
     }
 }

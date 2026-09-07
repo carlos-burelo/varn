@@ -348,6 +348,15 @@ impl<'a> FnEmitter<'a> {
         match pat {
             MatchPattern::Wildcard => (bool_lit(true), vec![]),
             MatchPattern::Identifier(name) => {
+                // A bare name against an enum subject is a nullary variant
+                // test, not a binding.
+                if let BackendTy::Enum(eid) = s.ty.non_nullable(self.tt) {
+                    if let Some(info) = self.m.enums.get(eid.0 as usize) {
+                        if info.variants.iter().any(|v| v.name.as_ref() == name.as_ref()) {
+                            return self.match_enum_variant(s, name, name, &[]);
+                        }
+                    }
+                }
                 let local = self.bind_local(name.clone(), s.ty);
                 (bool_lit(true), vec![TirStmt::Let { local, ty: s.ty, init: Some(s.clone()) }])
             }
@@ -461,11 +470,14 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn lower_decl_stmt(&mut self, decl: &varn_core::ast::Decl) -> Vec<TirStmt> {
-        use varn_core::ast::Decl;
-        let Decl::Variable(v) = decl else {
-            // Nested function/class/enum declarations are handled at module
-            // level, not as body statements.
-            return vec![];
+        use varn_core::ast::{Decl, ExportDecl};
+        let v = match decl {
+            Decl::Variable(v) => v,
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+                Decl::Variable(v) => v,
+                _ => return vec![], // nested fn/class/enum: handled at module level
+            },
+            _ => return vec![],
         };
         let mut out = Vec::new();
         for d in &v.declarators {
@@ -555,6 +567,26 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::Logical { op, left, right } => {
                 return self.lower_logical(*op, left, right, ty, span)
+            }
+
+            ExprKind::Await { argument } => {
+                let fut = self.lower_expr(argument);
+                return TirExpr {
+                    kind: TirExprKind::Await { future: Box::new(fut) },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Yield { argument, delegate } => {
+                let value = argument.as_ref().map(|a| Box::new(self.lower_expr(a)));
+                return TirExpr {
+                    kind: TirExprKind::Yield { value, delegate: *delegate },
+                    // The resume value is not typed yet.
+                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    res: Resolution::None,
+                    span,
+                };
             }
 
             ExprKind::Call { callee, args, optional: _, type_args: _ } => {

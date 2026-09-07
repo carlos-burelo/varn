@@ -38,6 +38,14 @@ fn not_supported() -> BackendTy {
     BackendTy::Dynamic(DynReason::NotYetSupported)
 }
 
+fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
+    names
+        .class_id(name)
+        .map(BackendTy::Class)
+        .or_else(|| names.enum_id(name).map(BackendTy::Enum))
+        .unwrap_or_else(not_supported)
+}
+
 fn lower_kind(
     kind: &crate::types::SemanticTypeKind,
     tt: &mut TyTable,
@@ -57,11 +65,11 @@ fn lower_kind(
             BackendTy::Tuple(tt.intern_list(&lowered))
         }
 
-        TypeKind::Named(name, _) => names
-            .class_id(name)
-            .map(BackendTy::Class)
-            .or_else(|| names.enum_id(name).map(BackendTy::Enum))
-            .unwrap_or_else(not_supported),
+        TypeKind::Named(name, _) => resolve_named(name, names),
+
+        // A generic reference with no type arguments is just a named type
+        // (an enum or class often carries an empty type-param list).
+        TypeKind::Generic(name, args, _) if args.is_empty() => resolve_named(name, names),
 
         TypeKind::EnumVariant { enum_name, .. } => {
             names.enum_id(enum_name).map(BackendTy::Enum).unwrap_or_else(not_supported)
@@ -78,7 +86,7 @@ fn lower_kind(
         // The rest need design against the emitter and are the redesign's
         // backlog until then.
         TypeKind::Fn(_)
-        | TypeKind::Generic(..)
+        | TypeKind::Generic(..) // with type arguments — not represented yet
         | TypeKind::Intersection(_)
         | TypeKind::This
         | TypeKind::TemplateLiteral(_)

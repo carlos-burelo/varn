@@ -178,14 +178,21 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
 6b. **`match` + temp hoisted** (hecho). `FnEmitter` gana buffer `pending`;
    `lower_stmt` pasa a `Vec<TirStmt>`. `match` en posición de sentencia,
    `return` y `let x = match` → sujeto hoisted + cadena de `If`. Patrones:
-   wildcard, identificador (binding), literal (`s == lit`), `T` (`TypeTest` +
-   binding), variante de enum (`Discriminant(s) == tag` + `VariantPayload`
-   por binding). Guarda pura → `&&` en la cond. `?.` / `??` con receptor con
-   efectos → hoist a temp. Pendiente: patrón `Name(binding)` sin prefijo de
-   enum (parser lo emite como algo que `pattern_supported` no acepta aún);
-   `match` como sub-expresión; patrones Record/Sequence.
-7. **`async` / generadores.** `is_async` / `is_generator` en `TirFunction`;
-   `Await` / `Yield`.
+   wildcard, identificador (binding, o test de variante nularia si el sujeto
+   es enum), literal (`s == lit`), `T` (`TypeTest` + binding), variante de
+   enum (`Discriminant(s) == tag` + `VariantPayload` por binding; el enum
+   sale del nombre del patrón o del tipo del sujeto). Guarda pura → `&&`.
+   `?.` / `??` con receptor con efectos → hoist a temp. Además: `let`/`const`
+   a nivel de módulo ahora entran en `top_level.body` (antes se saltaban
+   todos los `Decl`); tabla de enums lee payloads de `sum_variant_fields`;
+   `lower_type` resuelve `Generic` sin argumentos como nombre.
+   Pendiente: `match` como sub-expresión anidada; patrones Record/Sequence;
+   for/for-of/do-while.
+7. **`async` / generadores** (hecho). `is_async` / `is_generator` en
+   `TirFunction` desde los modifiers (funciones libres y métodos).
+   `ExprKind::Await` → `Await{future}`; `ExprKind::Yield` → `Yield{value,
+   delegate}` (valor de resume sin tipar todavía). El verificador exige
+   `Await` en función `is_async`, `Yield` en `is_generator`.
 8. **Spread y named args.** `TirArg::Spread` / `Named`.
 
 Cada sub-fase que aún no cubra una forma la emite como
