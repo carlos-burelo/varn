@@ -206,7 +206,7 @@ pub fn build_module_graph(
             .map(|k| std::rc::Rc::from(k.as_str()))
             .collect();
         export_names.sort();
-        let module_proto = if std::env::var_os("VN_FROM_TIR").is_some() {
+        let module_proto = if std::env::var_os("VN_LEGACY_HIR").is_none() {
             let tir = crate::resolver::with_resolver(|r| {
                 varn_checker::emit::emit_module(program, &check.bind, r, &check.expr_table)
             });

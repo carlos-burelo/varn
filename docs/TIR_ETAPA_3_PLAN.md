@@ -154,10 +154,21 @@ no se migra. `vn cache clean` en las notas de la etapa.
 - [~] 3.4 el corte. **`from_tir` compila los 188 módulos a `FunctionProto`.**
       `emit_function` partido en `emit_function_meta(ssa, &FnMeta, src)`;
       `MakeClosure::Tir` vía scope thread-local del módulo. `VN_FROM_TIR=1`
-      en `varn-pipeline/compile.rs` conmuta el camino (solo módulo de entrada;
-      imports siguen por HIR). **Validado por ejecución: 65 archivos
-      standalone corren por el camino TIR con salida IDÉNTICA a HIR, y JIT ==
-      intérprete en los 65.** Falta: cablear los imports (module_precompile),
-      volcar `-p bytecode` de los 188 sin ejecutar, luego los borrados
+      conmuta el camino en `compile.rs` (módulo de entrada) **y en
+      `module_precompile.rs` (imports)**. El emisor top-level corre
+      `as_top_level()`: un `let`/`const` de módulo que el binder hizo global
+      se baja como `Assign` a su `GlobalSlot`, el almacén que las funciones
+      libres del mismo módulo ya leen.
+      **Validado por ejecución:**
+      * 106/107 `tests/*.vn` standalone: salida byte-idéntica HIR vs TIR.
+      * `tests/main.vn` (suite de 100 módulos, imports densos, contadores
+        `std:test` compartidos): idéntica HIR vs TIR, exit 0.
+      * JIT == intérprete en los 107 por el camino TIR.
+      * `cargo test --workspace` verde.
+      (El "blocker" de resolución cross-módulo del resumen previo era un
+      diagnóstico falso: `assert("label", cond)` lanza al fallar y es
+      silencioso al pasar; `PASSED: 0 / ALL TESTS PASSED` es el estado verde
+      real, y HIR lo produce igual.)
+      Falta: volcar `-p bytecode` de los 188 sin ejecutar, luego los borrados
       (~6000 líneas), corpus rojo hasta etapa 4.
 - [ ] 3.5 caché de bytecode

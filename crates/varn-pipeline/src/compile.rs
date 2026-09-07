@@ -35,8 +35,9 @@ pub fn compile(
         .collect();
     export_names.sort();
 
-    let proto = if std::env::var_os("VN_FROM_TIR").is_some() {
-        // Stage 3: the TIR path. Opt-in until the cut.
+    let proto = if std::env::var_os("VN_LEGACY_HIR").is_none() {
+        // Stage 3: the TIR path is the default. `VN_LEGACY_HIR=1` falls back
+        // to the HIR lowering for one release, then it is deleted.
         let tir = crate::resolver::with_resolver(|r| {
             varn_checker::emit::emit_module(
                 program,
