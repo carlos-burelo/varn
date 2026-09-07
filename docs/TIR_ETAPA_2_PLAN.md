@@ -287,17 +287,20 @@ con los flags para no pagar el coste en cada `run`.
 
 ## 7. Controles y puntos de salida
 
-* **Control de etapa:** `vn debug -p tir:check` sobre el corpus (191
-  módulos) — cero errores del verificador, informe de cobertura publicado.
-* **Riesgo "TIR azucarado"** (contrato §11): se decide en la sub-fase 2 y 6.
-  Si `for…of`, `match` con patrones o los genéricos no bajan sin residuo
-  sintáctico, `hir/` no se puede borrar → caer al enfoque A. Nada borrado
-  todavía.
-* **Riesgo "TIR incompleto":** resuelto en `b2a1060`; los nodos existen, el
-  emisor solo tiene que construirlos.
-* **Punto de salida barato:** si tras la sub-fase 3 el informe muestra que
-  `NotYetSupported` domina sobre construcciones comunes del corpus, el diseño
-  falló y no se ha borrado una sola línea.
+* **Control de etapa: CUMPLIDO.** `vn debug -p tir:check` sobre el corpus
+  (188 módulos: 107 `tests/` + 81 `std/`) — cero errores del verificador,
+  informe de cobertura publicado. `NotYetSupported = 0`: todo el AST
+  ejecutable baja a nodos TIR verificables; un constructo sin forma TIR
+  precisa (parámetro de tipo, intrínseco host, protocolo iterador) emite
+  nodos reales tipados `Dynamic(Unannotated)`, nunca un placeholder opaco.
+  Ratio de despacho estático ~69 %, ~29.7k nodos.
+* **Riesgo "TIR azucarado"** (contrato §11): NO se materializó. `for`/`for…of`/
+  `match`/genéricos bajan sin residuo sintáctico — `for` es un `Loop` único,
+  `match` una cadena de `If`, `for…of` el desugar indexado o el protocolo de
+  iterador. `hir/` se puede borrar.
+* **Riesgo "TIR incompleto":** resuelto; todos los nodos existen y el emisor
+  los construye para el corpus entero.
+* **Punto de salida barato:** no se tomó. El diseño D funciona.
 
 ---
 
