@@ -18,8 +18,9 @@ use varn_core::ast::{
     StmtKind,
 };
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, Span,
-    TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp, TyTable,
+    BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, SigId, Span,
+    TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirFunction, TirObjectEntry, TirStmt,
+    TirUnOp, TyTable,
 };
 
 /// The module-wide handles a body emitter needs but does not own.
@@ -39,6 +40,11 @@ pub(super) struct FnEmitter<'a> {
     pub tt: &'a mut TyTable,
     m: ModuleCtx<'a>,
     pub signatures: &'a mut Vec<Signature>,
+    /// Closure bodies produced while lowering this function. Their `FnId` is
+    /// `closure_base + <index in this vector at push time>`; the caller
+    /// appends this whole vector to `TirModule::functions` at `closure_base`.
+    out_closures: &'a mut Vec<TirFunction>,
+    closure_base: u32,
     pub locals: Vec<BackendTy>,
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
@@ -47,6 +53,18 @@ pub(super) struct FnEmitter<'a> {
     /// desugaring). `lower_stmt` drains this in front of the statement it was
     /// lowering.
     pending: Vec<TirStmt>,
+}
+
+enum ClosureBody<'a> {
+    Expr(&'a Expr),
+    Stmt(&'a Stmt),
+}
+
+fn pattern_lead(p: &Pattern) -> Rc<str> {
+    match p {
+        Pattern::Identifier { name, .. } => name.clone(),
+        _ => Rc::from("_"),
+    }
 }
 
 /// What a `match` arm does with its value.
@@ -76,6 +94,8 @@ impl<'a> FnEmitter<'a> {
         tt: &'a mut TyTable,
         m: ModuleCtx<'a>,
         signatures: &'a mut Vec<Signature>,
+        out_closures: &'a mut Vec<TirFunction>,
+        closure_base: u32,
         params: Vec<Rc<str>>,
     ) -> Self {
         FnEmitter {
@@ -83,6 +103,8 @@ impl<'a> FnEmitter<'a> {
             tt,
             m,
             signatures,
+            out_closures,
+            closure_base,
             locals: Vec::new(),
             scopes: vec![FxHashMap::default()],
             params,
@@ -768,6 +790,17 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::Template { parts } => return self.lower_template(parts, span),
 
+            ExprKind::Function { params, body, is_async, is_generator, .. } => {
+                return self.lower_closure(params, ClosureBody::Stmt(body), *is_async, *is_generator, ty, span)
+            }
+            ExprKind::Arrow { params, body, is_async, .. } => {
+                let cb = match body.as_ref() {
+                    varn_core::ast::ArrowBody::Expr(e) => ClosureBody::Expr(e),
+                    varn_core::ast::ArrowBody::Block(s) => ClosureBody::Stmt(s),
+                };
+                return self.lower_closure(params, cb, *is_async, false, ty, span);
+            }
+
             ExprKind::Await { argument } => {
                 let fut = self.lower_expr(argument);
                 return TirExpr {
@@ -1095,6 +1128,78 @@ impl<'a> FnEmitter<'a> {
                 span,
             },
         }
+    }
+
+    /// Lower a function or arrow expression to a `Closure` node plus a
+    /// `TirFunction` for its body, appended to `out_closures`. Captures are not
+    /// resolved here — an outer-scope name in the body lands on `ByName`, which
+    /// is the honest state until upvalue analysis is a sub-phase.
+    fn lower_closure(
+        &mut self,
+        params: &[varn_core::ast::Param],
+        body: ClosureBody,
+        is_async: bool,
+        is_generator: bool,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let func_id = varn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
+        // Reserve the slot so a nested closure gets the next id.
+        self.out_closures.push(TirFunction {
+            name: Rc::from("<closure>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+            is_async,
+            is_generator,
+        });
+        let slot = self.out_closures.len() - 1;
+
+        let param_names: Vec<Rc<str>> =
+            params.iter().map(|p| pattern_lead(&p.pattern)).collect();
+        let param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()];
+
+        // The sub-emitter shares `out_closures`, and a closure's FnId is
+        // `closure_base + <its index in that shared vector>`, so the base is
+        // the same for nested closures.
+        let mut sub = FnEmitter::new(
+            self.expr_table,
+            &mut *self.tt,
+            self.m,
+            &mut *self.signatures,
+            &mut *self.out_closures,
+            self.closure_base,
+            param_names,
+        );
+        let stmts = match body {
+            ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
+            ClosureBody::Expr(e) => {
+                let te = sub.lower_expr(e);
+                let mut b = std::mem::take(&mut sub.pending);
+                b.push(TirStmt::Return(Some(te)));
+                b
+            }
+        };
+        let locals = sub.locals;
+
+        self.out_closures[slot] = TirFunction {
+            name: Rc::from("<closure>"),
+            sig: SigId(0),
+            params: param_tys,
+            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            locals,
+            body: stmts,
+            has_this: false,
+            this_class: None,
+            is_async,
+            is_generator,
+        };
+
+        TirExpr { kind: TirExprKind::Closure { func: func_id }, ty, res: Resolution::None, span }
     }
 
     /// A template string folds to `Str` concatenation. Each interpolation

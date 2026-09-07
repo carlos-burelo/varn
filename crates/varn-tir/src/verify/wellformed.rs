@@ -207,6 +207,14 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 }
             }
         }
+        TirExprKind::Closure { func } => {
+            if m.function(*func).is_none() {
+                errors.push(VerifyError::new(
+                    format!("Closure names FnId({}), which has no entry", func.0),
+                    e.span,
+                ));
+            }
+        }
         TirExprKind::New { class, args } => {
             if m.class(*class).is_none() {
                 errors.push(VerifyError::new(

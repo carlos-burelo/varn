@@ -209,6 +209,7 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
         | TirExprKind::StrLit(_)
         | TirExprKind::CharLit(_)
         | TirExprKind::NullLit
+        | TirExprKind::Closure { .. }
         | TirExprKind::Var => {}
     }
 }

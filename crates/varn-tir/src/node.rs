@@ -132,6 +132,10 @@ pub enum TirExprKind {
     /// operation would otherwise mix representations.
     Cast { operand: Box<TirExpr> },
 
+    /// A function value. `func` is the `TirFunction` holding its body; captures
+    /// are resolved by the backend against the parent frame, as HIR does.
+    Closure { func: FnId },
+
     /// Construction of a class instance.
     New { class: ClassId, args: Vec<TirArg> },
     /// Construction of an enum variant. Which variant lives in `res`.

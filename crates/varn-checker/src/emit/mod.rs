@@ -90,18 +90,44 @@ pub fn emit_module(
         fns: &fn_index,
     };
 
-    // Module top level: every statement, plus module-level `let` / `const`
-    // (those are real statements). Function, class and enum declarations are
-    // lowered separately.
-    let mut top = FnEmitter::new(expr_table, &mut types, ctx.as_module_ctx(), &mut signatures, vec![]);
-    let mut top_body = Vec::new();
-    for stmt in &program.body {
-        match &stmt.kind {
-            StmtKind::Decl(d) if variable_decl(d).is_none() => {}
-            _ => top_body.extend(top.lower_stmt_as_block(stmt)),
-        }
+    // `functions` holds the free functions at indices 0..N (matching
+    // `fn_index`), then every closure body, then class methods. A closure's
+    // FnId is `n_free + <its position among all closures>`.
+    let n_free = free_fns.len() as u32;
+    let mut functions: Vec<TirFunction> = Vec::new();
+    let mut closures: Vec<TirFunction> = Vec::new();
+
+    // A closure's FnId is `n_free + <its absolute index in `closures`>`, and
+    // `functions.extend(closures)` later places `closures[i]` at exactly that
+    // index, so every free function and the module top level share this base.
+    for f in &free_fns {
+        let tf = emit_function(
+            f, bind, expr_table, &mut types, &ctx, &mut signatures, &mut closures, n_free,
+        );
+        functions.push(tf);
     }
-    let top_locals = top.locals;
+
+    // Module top level: every statement, plus module-level `let` / `const`.
+    let tl_base = n_free;
+    let mut top_body = Vec::new();
+    let top_locals = {
+        let mut top = FnEmitter::new(
+            expr_table,
+            &mut types,
+            ctx.as_module_ctx(),
+            &mut signatures,
+            &mut closures,
+            tl_base,
+            vec![],
+        );
+        for stmt in &program.body {
+            match &stmt.kind {
+                StmtKind::Decl(d) if variable_decl(d).is_none() => {}
+                _ => top_body.extend(top.lower_stmt_as_block(stmt)),
+            }
+        }
+        std::mem::take(&mut top.locals)
+    };
     let top_level = TirFunction {
         name: Rc::from("<module>"),
         sig: SigId(0),
@@ -116,12 +142,9 @@ pub fn emit_module(
         is_generator: false,
     };
 
-    // Free-function bodies, in the same order FnId was assigned.
-    let mut functions = Vec::new();
-    for f in &free_fns {
-        functions.push(emit_function(f, bind, expr_table, &mut types, &ctx, &mut signatures));
-    }
-    // Then class methods and constructors.
+    functions.extend(closures);
+
+    // Class methods and constructors, after every closure.
     for stmt in &program.body {
         let StmtKind::Decl(decl) = &stmt.kind else { continue };
         if let Some(class) = class_decl(decl) {
@@ -249,14 +272,26 @@ fn emit_class_methods(
         let sig_snapshot = signatures[sig.0 as usize].clone();
 
         let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
-        let mut em =
-            FnEmitter::new(expr_table, types, ctx.as_module_ctx(), signatures, param_names)
-                .with_this(class_id);
-        let body_stmts = match &body.kind {
-            StmtKind::Block { stmts } => em.lower_block(stmts),
-            _ => em.lower_block(std::slice::from_ref(body)),
+        // Reserve one slot for the method itself; its closures follow.
+        let base = out.len() as u32 + 1;
+        let mut mcls: Vec<TirFunction> = Vec::new();
+        let (body_stmts, locals) = {
+            let mut em = FnEmitter::new(
+                expr_table,
+                types,
+                ctx.as_module_ctx(),
+                signatures,
+                &mut mcls,
+                base,
+                param_names,
+            )
+            .with_this(class_id);
+            let b = match &body.kind {
+                StmtKind::Block { stmts } => em.lower_block(stmts),
+                _ => em.lower_block(std::slice::from_ref(body)),
+            };
+            (b, std::mem::take(&mut em.locals))
         };
-        let locals = em.locals;
 
         out.push(TirFunction {
             name: Rc::from(format!("{class_name}.{key}")),
@@ -270,6 +305,7 @@ fn emit_class_methods(
             is_async,
             is_generator,
         });
+        out.extend(mcls);
     }
 }
 
@@ -280,6 +316,7 @@ fn param_name(p: &Param) -> Rc<str> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_function(
     f: &FunctionDecl,
     bind: &BindResult,
@@ -287,6 +324,8 @@ fn emit_function(
     types: &mut TyTable,
     ctx: &MCtx,
     signatures: &mut Vec<Signature>,
+    closures: &mut Vec<TirFunction>,
+    closure_base: u32,
 ) -> TirFunction {
     // The function's signature is on its global symbol as a `Fn` type. Its
     // arity is forced to the AST parameter count so the verifier's arity
@@ -310,12 +349,22 @@ fn emit_function(
     signatures.push(Signature { params: param_tys.clone(), return_ty });
 
     let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
-    let mut em = FnEmitter::new(expr_table, types, ctx.as_module_ctx(), signatures, param_names);
-    let body = match &f.body.kind {
-        StmtKind::Block { stmts } => em.lower_block(stmts),
-        _ => em.lower_block(std::slice::from_ref(&f.body)),
+    let (body, locals) = {
+        let mut em = FnEmitter::new(
+            expr_table,
+            types,
+            ctx.as_module_ctx(),
+            signatures,
+            closures,
+            closure_base,
+            param_names,
+        );
+        let b = match &f.body.kind {
+            StmtKind::Block { stmts } => em.lower_block(stmts),
+            _ => em.lower_block(std::slice::from_ref(&f.body)),
+        };
+        (b, std::mem::take(&mut em.locals))
     };
-    let locals = em.locals;
 
     TirFunction {
         name: f.id.clone(),

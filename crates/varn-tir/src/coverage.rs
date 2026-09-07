@@ -219,6 +219,7 @@ impl Coverage {
             | TirExprKind::StrLit(_)
             | TirExprKind::CharLit(_)
             | TirExprKind::NullLit
+            | TirExprKind::Closure { .. }
             | TirExprKind::Var => {}
         }
     }
