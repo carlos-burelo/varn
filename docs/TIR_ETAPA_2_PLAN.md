@@ -222,6 +222,12 @@ Extra. **Closures**: nuevo nodo `TirExprKind::Closure{func: FnId}`.
    añade a `functions` (esquema de `FnId`: libres 0..N, luego todas las
    closures, luego métodos). El verificador exige que el `FnId` exista.
 
+Extra. **Destructuring**: `let {a,b} = obj` / `let [x,y] = arr` y patrones
+   de parámetro → el source se hoista a un temp y `bind_pattern` recorre el
+   patrón emitiendo `Let` por binding (`Field` para objeto, `Index` para
+   array, `Select{IsNull}` para `= default`, hueco se salta). `Rest` →
+   placeholder.
+
 Extra. **Capturas de closure**: el emisor del cuerpo de una closure recibe
    el conjunto de nombres visibles en las funciones envolventes (outer del
    padre + sus scopes + sus params). Un `Identifier` que da en ese conjunto

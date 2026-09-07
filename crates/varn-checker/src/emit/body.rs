@@ -812,39 +812,150 @@ impl<'a> FnEmitter<'a> {
         };
         let mut out = Vec::new();
         for d in &v.declarators {
-            let Pattern::Identifier { name, .. } = &d.id else {
-                continue; // destructuring: later
-            };
+            match &d.id {
+                Pattern::Identifier { name, .. } => {
+                    // `let x = match … { … }` — declare `x`, then let the arms
+                    // assign it.
+                    if let Some(init) = &d.init {
+                        if let ExprKind::Match { subject, cases } = &init.kind {
+                            let ty = self
+                                .expr_table
+                                .get(&init.id)
+                                .map(|e| {
+                                    let names = self.m.names;
+                                    lower_type(&e.ty, self.tt, names)
+                                })
+                                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                            let local = self.bind_local(name.clone(), ty);
+                            out.push(TirStmt::Let { local, ty, init: None });
+                            out.extend(std::mem::take(&mut self.pending));
+                            out.extend(self.lower_match(
+                                subject,
+                                cases,
+                                MatchDest::Assign(local),
+                            ));
+                            continue;
+                        }
+                    }
 
-            // `let x = match … { … }` — declare `x`, then let the match arms
-            // assign it.
-            if let Some(init) = &d.init {
-                if let ExprKind::Match { subject, cases } = &init.kind {
-                    let ty = self
-                        .expr_table
-                        .get(&init.id)
-                        .map(|e| {
-                            let names = self.m.names;
-                            lower_type(&e.ty, self.tt, names)
-                        })
+                    let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                    let ty = init
+                        .as_ref()
+                        .map(|e| e.ty)
                         .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                     let local = self.bind_local(name.clone(), ty);
-                    out.push(TirStmt::Let { local, ty, init: None });
                     out.extend(std::mem::take(&mut self.pending));
-                    out.extend(self.lower_match(subject, cases, MatchDest::Assign(local)));
-                    continue;
+                    out.push(TirStmt::Let { local, ty, init });
+                }
+                // Destructuring: `let {a,b} = obj` / `let [x,y] = arr`.
+                pat => {
+                    let Some(init) = &d.init else {
+                        out.push(TirStmt::Expr(placeholder(DynReason::NotYetSupported)));
+                        continue;
+                    };
+                    let src = self.lower_expr(init);
+                    out.extend(std::mem::take(&mut self.pending));
+                    let src = self.hoist(src);
+                    out.extend(std::mem::take(&mut self.pending));
+                    self.bind_pattern(pat, src, &mut out);
                 }
             }
-
-            let init = d.init.as_ref().map(|e| self.lower_expr(e));
-            let ty = init
-                .as_ref()
-                .map(|e| e.ty)
-                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-            let local = self.bind_local(name.clone(), ty);
-            out.push(TirStmt::Let { local, ty, init });
         }
         out
+    }
+
+    /// Statements that unpack every non-trivial parameter pattern
+    /// (`fn f({a, b})`) into locals, to run before the body.
+    pub fn destructure_params(&mut self, params: &[varn_core::ast::Param]) -> Vec<TirStmt> {
+        let mut out = Vec::new();
+        for (i, p) in params.iter().enumerate() {
+            if matches!(p.pattern, Pattern::Identifier { .. }) {
+                continue;
+            }
+            let src = TirExpr {
+                kind: TirExprKind::Var,
+                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                res: Resolution::Param(i as u32),
+                span: Span::EMPTY,
+            };
+            self.bind_pattern(&p.pattern, src, &mut out);
+        }
+        out
+    }
+
+    /// Bind a (possibly nested) destructuring pattern against an
+    /// already-lowered, side-effect-free source expression.
+    fn bind_pattern(&mut self, pat: &Pattern, src: TirExpr, out: &mut Vec<TirStmt>) {
+        match pat {
+            Pattern::Identifier { name, .. } => {
+                let local = self.bind_local(name.clone(), src.ty);
+                out.push(TirStmt::Let { local, ty: src.ty, init: Some(src) });
+            }
+            Pattern::Object { properties, .. } => {
+                for prop in properties {
+                    let field = self.field_access(
+                        src.clone(),
+                        prop.key.clone(),
+                        BackendTy::Dynamic(DynReason::Unannotated),
+                        src.span,
+                    );
+                    self.bind_pattern(&prop.value, field, out);
+                }
+            }
+            Pattern::Array { elements, .. } => {
+                // The verifier pins an array index's type to the element type.
+                let elem_ty = match src.ty.non_nullable(self.tt) {
+                    BackendTy::Array(e) => self.tt.get(e),
+                    _ => BackendTy::Dynamic(DynReason::Unannotated),
+                };
+                for (i, slot) in elements.iter().enumerate() {
+                    let Some(el) = slot else { continue }; // hole
+                    let idx = TirExpr {
+                        kind: TirExprKind::Index {
+                            object: Box::new(src.clone()),
+                            index: Box::new(int_lit(i as i64)),
+                        },
+                        ty: elem_ty,
+                        res: Resolution::None,
+                        span: src.span,
+                    };
+                    self.bind_pattern(&el.pattern, idx, out);
+                }
+            }
+            Pattern::Assignment { left, right, .. } => {
+                // `{ a = default }` — a null subject falls back to the default.
+                let def = self.lower_expr(right);
+                out.extend(std::mem::take(&mut self.pending));
+                let value = if def.ty == src.ty || matches!(src.ty, BackendTy::Dynamic(_)) {
+                    let is_null = TirExpr {
+                        kind: TirExprKind::Unary {
+                            op: TirUnOp::IsNull,
+                            operand: Box::new(src.clone()),
+                        },
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span: src.span,
+                    };
+                    TirExpr {
+                        kind: TirExprKind::Select {
+                            cond: Box::new(is_null),
+                            then_val: Box::new(def),
+                            else_val: Box::new(src.clone()),
+                        },
+                        ty: src.ty,
+                        res: Resolution::None,
+                        span: src.span,
+                    }
+                } else {
+                    src.clone() // arm types disagree; skip the default
+                };
+                self.bind_pattern(left, value, out);
+            }
+            // Rest patterns need a slice primitive.
+            Pattern::Rest { .. } => {
+                out.push(TirStmt::Expr(placeholder(DynReason::NotYetSupported)));
+            }
+        }
     }
 
     /// A condition the verifier will require to be `Bool`. If the checker
@@ -1349,7 +1460,8 @@ impl<'a> FnEmitter<'a> {
             param_names,
         );
         sub.outer_names = outer_names;
-        let stmts = match body {
+        let mut stmts = sub.destructure_params(params);
+        stmts.extend(match body {
             ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
             ClosureBody::Expr(e) => {
                 let te = sub.lower_expr(e);
@@ -1357,7 +1469,7 @@ impl<'a> FnEmitter<'a> {
                 b.push(TirStmt::Return(Some(te)));
                 b
             }
-        };
+        });
         let locals = sub.locals;
 
         self.out_closures[slot] = TirFunction {

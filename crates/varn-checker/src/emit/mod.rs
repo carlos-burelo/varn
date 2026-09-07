@@ -286,10 +286,11 @@ fn emit_class_methods(
                 param_names,
             )
             .with_this(class_id);
-            let b = match &body.kind {
+            let mut b = em.destructure_params(params);
+            b.extend(match &body.kind {
                 StmtKind::Block { stmts } => em.lower_block(stmts),
                 _ => em.lower_block(std::slice::from_ref(body)),
-            };
+            });
             (b, std::mem::take(&mut em.locals))
         };
 
@@ -359,10 +360,11 @@ fn emit_function(
             closure_base,
             param_names,
         );
-        let b = match &f.body.kind {
+        let mut b = em.destructure_params(&f.params);
+        b.extend(match &f.body.kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
             _ => em.lower_block(std::slice::from_ref(&f.body)),
-        };
+        });
         (b, std::mem::take(&mut em.locals))
     };
 
