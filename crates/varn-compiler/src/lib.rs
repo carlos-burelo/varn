@@ -7,6 +7,7 @@ use varn_core::TypeAnnotations;
 pub use varn_types::chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
 
 /// Varn core AST-to-bytecode optimization and compilation pipeline.
+pub mod from_tir;
 pub mod hir;
 pub mod lower;
 pub mod passes;

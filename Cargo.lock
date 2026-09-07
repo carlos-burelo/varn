@@ -2375,6 +2375,7 @@ dependencies = [
  "rust_decimal",
  "rustc-hash 1.1.0",
  "varn-core",
+ "varn-tir",
  "varn-types",
 ]
 
