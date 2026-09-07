@@ -222,6 +222,13 @@ Extra. **Closures**: nuevo nodo `TirExprKind::Closure{func: FnId}`.
    añade a `functions` (esquema de `FnId`: libres 0..N, luego todas las
    closures, luego métodos). El verificador exige que el `FnId` exista.
 
+Extra. **Expresiones menores**: `x!` (NonNull) → inner con tipo no-nulo;
+   `x as T` → `Cast`; `x satisfies T` → identidad; `(a,b,c)` (Sequence) →
+   los previos como sentencias pendientes, devuelve el último; `x |> f` →
+   `Call{f, [x]}`; `{...obj, k:v}` (With) → `ObjectLit` con spread inicial.
+   `is`, `Spawn`, `Range`, `Super` bare, `MetaAccess`, regex, tagged
+   template → placeholder.
+
 Extra. **Destructuring**: `let {a,b} = obj` / `let [x,y] = arr` y patrones
    de parámetro → el source se hoista a un temp y `bind_pattern` recorre el
    patrón emitiendo `Let` por binding (`Field` para objeto, `Index` para

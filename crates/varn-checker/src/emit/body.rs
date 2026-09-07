@@ -1098,6 +1098,84 @@ impl<'a> FnEmitter<'a> {
             }
             ExprKind::New { callee, args, .. } => return self.lower_new(callee, args, ty, span),
 
+            // `x!` — a non-null assertion. A `Cast` carries the type change
+            // without disturbing the inner node's `res` (a `FieldSlot` read
+            // must keep the field's declared type).
+            ExprKind::NonNull { expression } => {
+                let inner = self.lower_expr(expression);
+                let nn = inner.ty.non_nullable(self.tt);
+                if inner.ty == nn {
+                    return inner;
+                }
+                return TirExpr {
+                    kind: TirExprKind::Cast { operand: Box::new(inner) },
+                    ty: nn,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            // `x as T` — an explicit representation change. `x satisfies T` is
+            // an identity check, so it is just the inner expression.
+            ExprKind::As { expression, .. } => {
+                let inner = self.lower_expr(expression);
+                return TirExpr {
+                    kind: TirExprKind::Cast { operand: Box::new(inner) },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Satisfies { expression, .. } => return self.lower_expr(expression),
+            // `(a, b, c)` — run the leading expressions for effect, yield the
+            // last.
+            ExprKind::Sequence { expressions } => {
+                let Some((last, lead)) = expressions.split_last() else {
+                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                };
+                for e in lead {
+                    let te = self.lower_expr(e);
+                    self.pending.push(TirStmt::Expr(te));
+                }
+                return self.lower_expr(last);
+            }
+            // `x |> f` -> `f(x)`.
+            ExprKind::Pipeline { left, right } => {
+                let arg = self.lower_expr(left);
+                let callee = self.lower_expr(right);
+                return TirExpr {
+                    kind: TirExprKind::Call {
+                        callee: Box::new(callee),
+                        args: vec![TirArg::Expr(arg)],
+                    },
+                    ty,
+                    res: Resolution::ByName {
+                        name: Rc::from("<pipeline>"),
+                        why: DynReason::Unannotated,
+                    },
+                    span,
+                };
+            }
+            // `{ ...obj, k: v }` -> an ObjectLit with a leading spread.
+            ExprKind::With { object, properties } => {
+                let mut entries = vec![TirObjectEntry::Spread(self.lower_expr(object))];
+                for p in properties {
+                    if let ObjectProp::Property { key, value, .. } = p {
+                        if let Some(name) = prop_key_name(key) {
+                            entries.push(TirObjectEntry::Field {
+                                name,
+                                value: self.lower_expr(value),
+                            });
+                        }
+                    }
+                }
+                return TirExpr {
+                    kind: TirExprKind::ObjectLit { entries },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+
             // Assignment to an identifier or a field: plain `=` directly,
             // compound `+=` … as `t = t <op> v`. Destructuring targets later.
             ExprKind::Assign { op, target, value }
