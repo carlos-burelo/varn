@@ -41,5 +41,11 @@ pub fn debug_tir(
         }
         let coverage = varn_tir::Coverage::of(&module);
         eprint!("{}", coverage.report());
+
+        // Stage 3: how far `from_tir` gets building SSA from this module.
+        match varn_compiler::from_tir::build_module(&module) {
+            Ok(fns) => eprintln!("  from_tir: OK ({} ssa fn(s))", fns.len()),
+            Err(e) => eprintln!("  from_tir: {e:?}"),
+        }
     }
 }

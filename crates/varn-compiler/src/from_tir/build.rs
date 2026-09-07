@@ -494,7 +494,40 @@ impl<'m> Builder<'m> {
 
             TirExprKind::Await { future } => {
                 let v = self.lower_expr(future)?;
-                Ok(self.emit(InstKind::MethodCall { recv: v, name: Rc::from("await"), args: vec![] }, ty))
+                Ok(self.emit(InstKind::Await { operand: v }, ty))
+            }
+            TirExprKind::Yield { value, .. } => {
+                let v = match value {
+                    Some(e) => self.lower_expr(e)?,
+                    None => self.emit(InstKind::ConstNull, HirType::Dynamic),
+                };
+                Ok(self.emit(InstKind::Yield { operand: v }, ty))
+            }
+
+            TirExprKind::Discriminant { value } => {
+                let v = self.lower_expr(value)?;
+                Ok(self.emit(InstKind::GetEnumTag { operand: v }, HirType::Int))
+            }
+            TirExprKind::VariantPayload { value, field, .. } => {
+                let v = self.lower_expr(value)?;
+                Ok(self.emit(InstKind::GetFixedField { object: v, slot: *field }, ty))
+            }
+            TirExprKind::TypeTest { value, class } => {
+                let v = self.lower_expr(value)?;
+                let cname = self
+                    .tir
+                    .class(*class)
+                    .map(|ci| ci.name.clone())
+                    .unwrap_or_else(|| Rc::from("?"));
+                let name_v = self.emit(InstKind::ConstStr(cname), HirType::Str);
+                Ok(self.emit(
+                    InstKind::MethodCall {
+                        recv: v,
+                        name: Rc::from("__instanceof"),
+                        args: vec![name_v],
+                    },
+                    HirType::Bool,
+                ))
             }
 
             _ => Err(OptError::Unsupported("from_tir: expression kind")),
@@ -530,6 +563,15 @@ impl<'m> Builder<'m> {
                 }
                 Resolution::ByName { name, .. } => {
                     self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value });
+                }
+                Resolution::GlobalSlot(n) => {
+                    let name = self
+                        .tir
+                        .global_names
+                        .get(*n as usize)
+                        .cloned()
+                        .ok_or(OptError::Unsupported("from_tir: assign global slot"))?;
+                    self.emit_effect(InstKind::StoreGlobal { name, value });
                 }
                 _ => return Err(OptError::Unsupported("from_tir: assign target var")),
             },
@@ -574,6 +616,8 @@ impl<'m> Builder<'m> {
                 Err(OptError::Unsupported("from_tir: module slot"))
             }
             Resolution::ByName { name, .. } => Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty)),
+            // A `Var` node with no resolution is `this`.
+            Resolution::None => Ok(self.emit(InstKind::This, ty)),
             _ => Err(OptError::Unsupported("from_tir: var resolution")),
         }
     }
@@ -788,10 +832,7 @@ mod tests {
     #[test]
     fn an_unsupported_expression_is_reported() {
         let m = module(
-            vec![TirStmt::Expr(e(
-                K::Discriminant { value: Box::new(e(K::IntLit(0), B::Int)) },
-                B::Int,
-            ))],
+            vec![TirStmt::Expr(e(K::Closure { func: varn_tir::FnId(0) }, B::Dynamic(varn_tir::DynReason::Unannotated)))],
             vec![],
         );
         assert!(build_function(&m, &m.top_level).is_err());

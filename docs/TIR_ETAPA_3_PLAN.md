@@ -137,7 +137,13 @@ no se migra. `vn cache clean` en las notas de la etapa.
       `MethodCall`, `New`/`MakeVariant` (`LoadGlobal`+`Call`), `ArrayLit`/
       `TupleLit`/`ObjectLit`, `Assign` (var/field/index), `Await`. Sentencias
       `Expr`/`Let`/`Return`/`Throw`/`Break`/`Continue`/`If`/`Loop`. 9 tests.
-      Falta: `Closure`, `Discriminant`/`VariantPayload`/`TypeTest`, `Yield`,
-      `Try`, spread/named args, `ModuleSlot`.
+      + `Discriminant`→`GetEnumTag`, `VariantPayload`→`GetFixedField`,
+      `TypeTest`→`MethodCall("__instanceof")`, `Yield`→`InstKind::Yield`,
+      `Var`+`None`→`This`, `Assign` a `GlobalSlot`.
+      **`vn debug -p tir:check` reporta `from_tir: OK (N ssa fn)` por módulo.
+      144/188 del corpus construyen SSA desde TIR.** Falta (44 módulos):
+      `Closure` (27 — necesita cambiar `InstKind::MakeClosure.func` de
+      `Rc<HirFunction>` a algo TIR-side, parte del corte 3.4), `Try` (11),
+      spread/named args (6).
 - [ ] 3.4 el corte + borrados (~6000 líneas), corpus rojo
 - [ ] 3.5 caché de bytecode
