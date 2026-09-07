@@ -44,8 +44,16 @@ pub fn debug_tir(
 
         // Stage 3: how far `from_tir` gets building SSA from this module.
         match varn_compiler::from_tir::build_module(&module) {
-            Ok(fns) => eprintln!("  from_tir: OK ({} ssa fn(s))", fns.len()),
-            Err(e) => eprintln!("  from_tir: {e:?}"),
+            Ok(fns) => eprintln!("  from_tir(ssa): OK ({} ssa fn(s))", fns.len()),
+            Err(e) => eprintln!("  from_tir(ssa): {e:?}"),
+        }
+        // ...and compiling it all the way to a proto (panics are caught).
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            varn_compiler::from_tir::compile_module(&module, vec![])
+        })) {
+            Ok(Ok(_)) => eprintln!("  from_tir(proto): OK"),
+            Ok(Err(e)) => eprintln!("  from_tir(proto): {e:?}"),
+            Err(_) => eprintln!("  from_tir(proto): PANIC"),
         }
     }
 }

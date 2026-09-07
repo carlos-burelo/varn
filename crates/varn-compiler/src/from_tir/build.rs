@@ -372,20 +372,36 @@ impl<'m> Builder<'m> {
     fn lower_expr(&mut self, e: &TirExpr) -> Result<Value> {
         let ty = self.ty(e.ty);
         match &e.kind {
-            TirExprKind::IntLit(n) => Ok(self.emit(InstKind::ConstInt(*n), ty)),
-            TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), ty)),
-            TirExprKind::BoolLit(b) => Ok(self.emit(InstKind::ConstBool(*b), ty)),
-            TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), ty)),
-            TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), ty)),
-            TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, ty)),
+            // Constants take their canonical SSA type — `ssa/verify` checks it
+            // exactly (the TIR node type can be wider, e.g. a template piece).
+            TirExprKind::IntLit(n) => Ok(self.emit(InstKind::ConstInt(*n), HirType::Int)),
+            TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), HirType::Float)),
+            TirExprKind::BoolLit(b) => Ok(self.emit(InstKind::ConstBool(*b), HirType::Bool)),
+            TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
+            TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Int)),
+            TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
 
             TirExprKind::Var => self.lower_var(&e.res, ty),
 
             TirExprKind::Binary { op, lhs, rhs } => {
                 let l = self.lower_expr(lhs)?;
                 let r = self.lower_expr(rhs)?;
+                // `InstKind::Binary.ty` picks the typed opcode (`EqInt`,
+                // `AddFloat`, …), which `ssa/verify` then holds both operands
+                // to exactly. Only use a typed op when the lowered operands
+                // agree on a scalar; otherwise the generic op (ty = Dynamic).
+                let (lt, rt) = (self.value_ty(l), self.value_ty(r));
+                let op_ty = if lt == rt
+                    && matches!(
+                        lt,
+                        HirType::Int | HirType::Float | HirType::Bool | HirType::Str
+                    ) {
+                    lt
+                } else {
+                    HirType::Dynamic
+                };
                 Ok(self.emit(
-                    InstKind::Binary { op: bin_op(*op), lhs: l, rhs: r, ty },
+                    InstKind::Binary { op: bin_op(*op), lhs: l, rhs: r, ty: op_ty },
                     ty,
                 ))
             }
@@ -788,8 +804,18 @@ fn un_op(op: TirUnOp) -> HirUnOp {
     }
 }
 
-/// Build one `SsaFunc` from a `TirFunction`.
+/// Build one `SsaFunc` from a `TirFunction`. `register_module_fns` is set for
+/// the module top level, which stores every free function / method as a
+/// global by qualified name (the convention the callee side reads back).
 pub fn build_function(tir: &TirModule, func: &TirFunction) -> Result<SsaFunc> {
+    build_inner(tir, func, false)
+}
+
+pub fn build_top_level(tir: &TirModule) -> Result<SsaFunc> {
+    build_inner(tir, &tir.top_level, true)
+}
+
+fn build_inner(tir: &TirModule, func: &TirFunction, register_module_fns: bool) -> Result<SsaFunc> {
     let mut b = Builder::new(tir);
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
@@ -799,6 +825,23 @@ pub fn build_function(tir: &TirModule, func: &TirFunction) -> Result<SsaFunc> {
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
         b.write_var(VarId::Param(i as u32), entry, v);
+    }
+
+    if register_module_fns {
+        let src = tir.source_file.replace('\\', "/");
+        for (i, f) in tir.functions.iter().enumerate() {
+            let fv = b.emit(
+                InstKind::MakeClosure {
+                    func: crate::ssa::ir::ClosureBody::Tir(i as u32),
+                    upvalues_src: vec![],
+                },
+                HirType::Ref,
+            );
+            b.emit_effect(InstKind::StoreGlobal {
+                name: Rc::from(format!("{src}::{}", f.name)),
+                value: fv,
+            });
+        }
     }
 
     b.lower_block(&func.body)?;

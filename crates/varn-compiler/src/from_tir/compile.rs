@@ -1,0 +1,114 @@
+//! `TirModule` -> `FunctionProto` (step 3.4 wiring).
+//!
+//! Runs each `SsaFunc` from `build_module` through the same optimisation,
+//! state-machine and emission pipeline the HIR path uses. Closures reference
+//! their body by TIR index (`ClosureBody::Tir`); `ssa/emit` calls back here
+//! to compile them.
+
+use std::rc::Rc;
+
+use varn_tir::{BackendTy, TirFunction, TirModule};
+use varn_types::chunk::FunctionProto;
+
+use crate::hir::{HirType, TyTable as SsaTyTable};
+use crate::ssa::emit::{emit_function_meta, slot_kind_of, FnMeta};
+use crate::OptError;
+
+use super::build::{build_function, build_top_level};
+use super::ty::lower as lower_ty;
+
+type Result<T> = std::result::Result<T, OptError>;
+
+// The `TirModule` currently being compiled, so `ssa/emit`'s `ClosureBody::Tir`
+// arm can call back to compile the referenced body. Same raw-pointer scope
+// guard pattern as `hir::ctor_summary::Scope` / the VM's `clif_link::CtxGuard`
+// — the pointer is only live for the duration of `with_module`, which owns
+// the borrow.
+thread_local! {
+    static CUR_TIR: std::cell::Cell<*const TirModule> = const { std::cell::Cell::new(std::ptr::null()) };
+}
+
+struct ModuleScope(*const TirModule);
+impl Drop for ModuleScope {
+    fn drop(&mut self) {
+        CUR_TIR.with(|c| c.set(self.0));
+    }
+}
+fn enter_module(tir: &TirModule) -> ModuleScope {
+    let prev = CUR_TIR.with(|c| c.replace(tir as *const TirModule));
+    ModuleScope(prev)
+}
+
+/// Compile the closure body a `ClosureBody::Tir(idx)` names, using the module
+/// set by the enclosing `enter_module`. Panics if called outside one — that
+/// only happens if a `from_tir` SSA function reached emission without going
+/// through `compile_module` / `compile_closure`.
+pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> FunctionProto {
+    let ptr = CUR_TIR.with(|c| c.get());
+    assert!(!ptr.is_null(), "from_tir: closure emitted outside a module scope");
+    // SAFETY: `ptr` was set by `enter_module` from a live `&TirModule` whose
+    // borrow outlives this call (it is on the stack of `compile_module`).
+    let tir: &TirModule = unsafe { &*ptr };
+    match compile_closure(tir, idx, source_file) {
+        Ok(p) => p,
+        Err(e) => panic!("from_tir: closure {idx} failed: {e:?}"),
+    }
+}
+
+fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
+    let mut tt = SsaTyTable::default();
+    let mut ty = |bt: BackendTy| -> HirType { lower_ty(bt, tir, &mut tt) };
+    FnMeta {
+        name: f.name.clone(),
+        start_line: 1,
+        nparams: f.params.len(),
+        param_kinds: f.params.iter().map(|p| slot_kind_of(ty(*p))).collect(),
+        return_kind: slot_kind_of(ty(f.return_ty)),
+        has_rest: false,
+        is_async: f.is_async,
+        is_generator: f.is_generator,
+        has_this: f.has_this,
+        upvalue_count: 0,
+    }
+}
+
+fn compile_one(
+    tir: &TirModule,
+    f: &TirFunction,
+    is_top_level: bool,
+    source_file: Rc<str>,
+) -> Result<FunctionProto> {
+    let mut ssa = if is_top_level { build_top_level(tir)? } else { build_function(tir, f)? };
+    crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
+    let state_size = crate::passes::state_machine::run(&mut ssa);
+    if let Err(why) = crate::ssa::verify::verify(&ssa) {
+        panic!("from_tir: ssa verify failed for {}: {}", f.name, why);
+    }
+    let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file)?;
+    proto.state_size = state_size;
+    Ok(proto)
+}
+
+/// Compile the body a `ClosureBody::Tir(idx)` refers to. Called from
+/// `ssa/emit` while emitting a `MakeClosure`.
+pub(crate) fn compile_closure(
+    tir: &TirModule,
+    idx: u32,
+    source_file: Rc<str>,
+) -> Result<FunctionProto> {
+    let f = tir
+        .functions
+        .get(idx as usize)
+        .ok_or(OptError::Unsupported("from_tir: closure index out of range"))?;
+    compile_one(tir, f, false, source_file)
+}
+
+/// Compile a whole module: the top-level proto, with every free function and
+/// method stored as a global by name (the HIR path's convention).
+pub fn compile_module(tir: &TirModule, export_names: Vec<Rc<str>>) -> Result<FunctionProto> {
+    let _scope = enter_module(tir);
+    let source_file = tir.source_file.clone();
+    let mut proto = compile_one(tir, &tir.top_level, true, source_file)?;
+    proto.export_names = export_names;
+    Ok(proto)
+}

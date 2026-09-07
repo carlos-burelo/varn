@@ -24,20 +24,60 @@ use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
 
+/// What `emit_function` needs about a function beyond its SSA body. Built from
+/// a `HirFunction` (current path) or a `varn_tir::TirFunction` (`from_tir`).
+pub struct FnMeta {
+    pub name: Rc<str>,
+    pub start_line: u32,
+    pub nparams: usize,
+    pub param_kinds: Vec<varn_types::register_meta::SlotKind>,
+    pub return_kind: varn_types::register_meta::SlotKind,
+    pub has_rest: bool,
+    pub is_async: bool,
+    pub is_generator: bool,
+    pub has_this: bool,
+    pub upvalue_count: u32,
+}
+
+impl FnMeta {
+    pub fn from_hir(f: &HirFunction) -> Self {
+        FnMeta {
+            name: f.name.clone(),
+            start_line: f.start_line,
+            nparams: f.params.len(),
+            param_kinds: f.params.iter().map(|p| slot_kind_of(p.ty)).collect(),
+            return_kind: slot_kind_of(f.return_ty),
+            has_rest: f.has_rest,
+            is_async: f.is_async,
+            is_generator: f.is_generator,
+            has_this: f.has_this,
+            upvalue_count: f.upvalue_count,
+        }
+    }
+}
+
 pub fn emit_function(
-    mut ssa: SsaFunc,
+    ssa: SsaFunc,
     f: &HirFunction,
+    source_file: Rc<str>,
+) -> Result<FunctionProto> {
+    emit_function_meta(ssa, &FnMeta::from_hir(f), source_file)
+}
+
+pub fn emit_function_meta(
+    mut ssa: SsaFunc,
+    f: &FnMeta,
     source_file: Rc<str>,
 ) -> Result<FunctionProto> {
     phi_edges::split_phi_edges(&mut ssa);
 
     let fn_line = if f.start_line > 0 { f.start_line } else { 1 };
-    let nparams = f.params.len();
+    let nparams = f.nparams;
     let (reg, scratch, null_reg, call_base, register_count) =
         regs::assign_registers(&ssa, nparams)?;
-    let param_kinds: Vec<_> = f.params.iter().map(|p| slot_kind_of(p.ty)).collect();
+    let param_kinds = f.param_kinds.clone();
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
-    let return_kind = slot_kind_of(f.return_ty);
+    let return_kind = f.return_kind;
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -208,7 +248,7 @@ fn derive_register_meta(
         .collect()
 }
 
-fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
+pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
     use crate::hir::HirType;
     use varn_types::register_meta::SlotKind;
     match ty {

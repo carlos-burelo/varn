@@ -8,6 +8,8 @@
 //! corpus stays green while this fills in.
 
 pub mod build;
+pub mod compile;
 pub mod ty;
 
 pub use build::{build_function, build_module};
+pub use compile::compile_module;

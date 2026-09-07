@@ -289,13 +289,14 @@ pub(super) fn emit_value(
         }
 
         InstKind::MakeClosure { func, upvalues_src } => {
-            let func = match func {
-                crate::ssa::ir::ClosureBody::Hir(f) => f,
-                crate::ssa::ir::ClosureBody::Tir(_) => {
-                    unreachable!("from_tir SSA does not reach bytecode emission yet")
+            let proto = match func {
+                crate::ssa::ir::ClosureBody::Hir(f) => {
+                    crate::lower::lower_function(f, source_file.clone())
+                }
+                crate::ssa::ir::ClosureBody::Tir(idx) => {
+                    crate::from_tir::compile::emit_tir_closure(*idx, source_file.clone())
                 }
             };
-            let proto = crate::lower::lower_function(func, source_file.clone());
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
             if upvalues_src.is_empty() {
                 chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), line);
