@@ -1,0 +1,206 @@
+# TIR · Etapa 2 — el checker emite TIR en paralelo
+
+Continúa `TIR_CONTRATO_TIPADO.md` §10. Etapas 0 y 1 cerradas (`b2a1060`).
+Esta etapa produce un `varn_tir::TirModule` por cada módulo del corpus, lo
+pasa por el verificador y lo **descarta**. El pipeline sigue compilando por el
+camino de HIR. Cuando termina: 191 módulos emiten TIR verde y sale el primer
+informe de cobertura.
+
+El corpus sigue verde durante toda la etapa.
+
+---
+
+## 1. La frontera: qué consume el emisor
+
+`checker_annotations::collect_type_annotations` recibe hoy, y produce
+`TypeAnnotations`:
+
+```rust
+program:    &Program                                  // el AST
+bind:       &BindResult                               // símbolos + jerarquía + imports
+resolver:   &dyn ImportResolver                       // sigue imports
+expr_table: &FxHashMap<AstId, checker::TypeEntry>     // el tipo de cada expr
+```
+
+`checker/emit/` toma **exactamente** esas cuatro entradas y devuelve
+`TirModule`. Ni una más: si el emisor necesita un dato que el checker no
+expone, ese dato es una laguna del checker y se arregla ahí, no se recalcula
+en `emit/`.
+
+`TypeEntry` trae dos carriles — `ty` (contra el que se comprobó) y `refined`
+(lo más fuerte demostrado, "consumed only by codegen"). **El emisor usa
+`refined.unwrap_or(ty)`**: es el consumidor de codegen para el que ese carril
+existe.
+
+### Dónde se engancha
+
+Nueva fase paralela a `collect_type_annotations` en `checker/mod.rs`. El
+`CheckResult` gana un campo `tir: Option<TirModule>` que el pipeline verifica
+(`verify_module`) y, con `-p tir` / `-p tir:check`, vuelca o informa. En
+compilación normal el campo se construye, se verifica con `panic!` como el
+verificador SSA, y se tira.
+
+`varn-checker` gana dependencia de `varn-tir`. `varn-tir` NO depende de
+`varn-checker` — la traducción `Type → BackendTy` vive en `checker/emit/`,
+del lado del productor.
+
+---
+
+## 2. `Type → BackendTy`
+
+`Type(SemanticTypeKind, tainted)` donde
+`SemanticTypeKind = TypeKind<Box<Type>, Rc<str>, Vec<Type>, FunctionType, Vec<ObjectTypeMember>, ()>`.
+
+| `TypeKind` variante | `BackendTy` |
+|---|---|
+| `Intrinsic(Int/Float/Bool/Char)` | escalar homónimo |
+| `Intrinsic(Str/Decimal/BigInt)` | `Str` / `Decimal` / `BigInt` |
+| `Intrinsic(Void/Never)` | `Void` / `Never` |
+| `Intrinsic(Null)` | `Nullable` de `Never` — "solo null" |
+| `Intrinsic(Dynamic)` | `Dynamic(Unannotated)` salvo que el sitio sepa mejor (§2.1) |
+| `Intrinsic(Object)` | `Dynamic(IndexSignature)` |
+| `Array(t)` | `Array(intern(lower(t)))` |
+| `Tuple(ts)` | `Tuple(intern_list(ts.map(lower)))` |
+| `Named(n, _)` clase | `Class(class_id(n))` |
+| `Named(n, _)` enum | `Enum(enum_id(n))` |
+| `Named(n, _)` alias | `lower` del alias resuelto (`get_alias_node`) |
+| `Named("Map"/"Set", args)` vía `Generic` | `Map` / `Set` |
+| `Fn(FunctionType)` | `Fn(sig_id(...))` |
+| `Union(ts)` con `null` ∈ ts | `Nullable(intern(lower(union sin null)))` |
+| `Union(ts)` no discriminada | `Dynamic(Union)` |
+| `Object(members)` | `Dynamic(IndexSignature)` |
+| `EnumVariant{..}` | `Enum(enum_id(enum_name))` |
+| `Generic`, `KeyOf`, `Mapped`, `Conditional`, `Infer`, `IndexedAccess`, `TypePredicate`, `Typeof`, `TemplateLiteral`, `Intersection`, `This` no resuelto | `Dynamic(NotYetSupported)` |
+
+`tainted == true` no cambia el `BackendTy` — es señal de que el checker ya
+reportó un error; el emisor no añade ruido.
+
+### 2.1 De dónde sale `DynReason`
+
+* Retorno de función nativa / `JSON.parse` / valor que cruza el host →
+  `HostBoundary`. Lo marca el sitio del `Call`, no el mapa de tipos.
+* `Intrinsic(Dynamic)` en una posición con anotación explícita del autor que
+  dijo `dynamic` → `Unannotated` igual (el autor renunció).
+* `Intrinsic(Dynamic)` sin anotación y con inferencia fallida → `Unannotated`.
+* Lista de §11 del contrato → `NotYetSupported`.
+
+Es la métrica que decide el punto de salida barato: si el informe sale
+dominado por `NotYetSupported` sobre construcciones comunes, el TIR no sirve
+y no se ha borrado nada.
+
+---
+
+## 3. Las tablas del módulo
+
+Se construyen **antes** de emitir cuerpos, porque `Class(ClassId)` y
+`Enum(EnumId)` necesitan el índice.
+
+* **Clases.** `bind` da la jerarquía (`class_parents`) y los miembros
+  (`ClassMemberInfo`: `kind`, `is_static`, `is_override`, `ty`). `ClassInfo`
+  vía `ClassInfo::new_with_methods`, recorrido base→derivada. Los campos en
+  orden de declaración; `override` reusa el slot del padre (ya lo hace
+  `new_with_methods`).
+* **Vtables.** El checker no las calcula hoy (§6.1 del contrato). El emisor
+  las construye del mismo recorrido: un índice por nombre de método de
+  instancia, `override` comparte índice. Getters/setters entran como métodos
+  con nombre decorado (`get x` / `set x`) — a decidir en la primera sub-fase
+  contra el AST real.
+* **Clases nativas** (`Error` y compañía) en una tabla fija, con layout y
+  vtable conocidos. Una subclase reserva el prefijo del ancestro. Esto es lo
+  que mata la puerta todo-o-nada de `checker_annotations/exprs.rs:211`.
+* **Enums.** `EnumInfo` con `VariantInfo{ name, tag, payload }`. El tag es el
+  orden de declaración.
+* **Firmas.** `Signature{ params, return_ty }` interned; funciones libres y
+  entradas de vtable la referencian por `SigId`.
+
+---
+
+## 4. Los cuerpos
+
+Recorrido del AST guiado por `expr_table`. Cada `ExprKind` / `StmtKind` →
+nodo TIR con `ty` de `refined.unwrap_or(ty)` y `res` de lo que el checker
+probó (`semantic_info`: `CallResolution`, `MemberResolution`).
+
+Orden de las sub-fases (cada una es un commit, verificador verde al final):
+
+1. **Esqueleto + tablas.** `emit_module` produce `TirModule` con tablas
+   llenas y todos los cuerpos = un único `TirStmt::Expr` con
+   `Dynamic(NotYetSupported)`. `-p tir` vuelca. `-p tir:check` verifica los
+   191 módulos e informa (cobertura ~0 %, es la línea base).
+2. **Literales, `Var`, aritmética, `if`/`loop`/`return`.** Desugar de `for`,
+   `for…of`, `while`, `do…while` al único `Loop`. Aquí se prueba el riesgo
+   "TIR azucarado": si `for…of` no baja sin residuo, D falló.
+3. **Campos y métodos.** `Field` + `Resolution::FieldSlot` / `ByName`;
+   `MethodCall` + `VtableSlot` / `Intrinsic` / `DirectFn` / `ByName`. Primer
+   informe de cobertura con señal real.
+4. **Globales y llamadas libres.** `Var` + `GlobalSlot`; `Call` + `DirectFn`.
+5. **Colecciones y `New`.** `ArrayLit` (+ `Hole`/`Spread`), `ObjectLit`,
+   `TupleLit`, `New`, `MakeVariant`.
+6. **`match`, `?.`, `??`.** Desugar a `If` + `Discriminant` /
+   `VariantPayload` / `TypeTest` / `IsNull` + `Select`. La forma del desugar
+   de `?.` (temp local hoisted) se fija aquí contra el AST.
+7. **`async` / generadores.** `is_async` / `is_generator` en `TirFunction`;
+   `Await` / `Yield`.
+8. **Spread y named args.** `TirArg::Spread` / `Named`.
+
+Cada sub-fase que aún no cubra una forma la emite como
+`Dynamic(NotYetSupported)` con un `TirStmt::Expr` placeholder — nunca un
+nodo a medias que el verificador no pueda comprobar.
+
+---
+
+## 5. D-2 — asignación definitiva
+
+"Qué vale un campo/local sin inicializar." Hoy el checker lo acepta, el
+intérprete devuelve `null`, el JIT `0`. Es análisis de flujo, no de tipos, y
+es trabajo del checker nuevo — entra en esta etapa, no en la 0.
+
+Alcance mínimo: un local o campo leído en un camino donde no se le asignó es
+error del checker. No se persigue el caso intra-expresión ni el flujo
+complejo; lo justo para que el emisor no tenga que inventar un valor.
+
+Va como sub-fase propia entre la 2 y la 3, con sus propios `tests/*.vn` en
+la carpeta de errores del checker.
+
+---
+
+## 6. Comandos
+
+```
+vn debug -p tir       --fn F     vuelca el TIR de una función
+vn debug -p tir:check            verifica los 191 módulos e informa cobertura
+```
+
+`tir:check` reporta silencio si todo verifica; el informe de cobertura sale
+siempre, desglosado por `DynReason`, función y archivo (ya lo produce
+`varn_tir::Coverage::report`). No es parte de `-p all` ni de `-p check`: es
+para barrer un corpus, como `clif:check`.
+
+`DebugFlags` gana `tir: bool` y `tir_check: bool`. La construcción del
+`TirModule` en `check.rs` se dispara con `debug.tir || debug.tir_check` o en
+cada compilación una vez la etapa 3 lo haga obligatorio — en la etapa 2 basta
+con los flags para no pagar el coste en cada `run`.
+
+---
+
+## 7. Controles y puntos de salida
+
+* **Control de etapa:** `vn debug -p tir:check` sobre el corpus (191
+  módulos) — cero errores del verificador, informe de cobertura publicado.
+* **Riesgo "TIR azucarado"** (contrato §11): se decide en la sub-fase 2 y 6.
+  Si `for…of`, `match` con patrones o los genéricos no bajan sin residuo
+  sintáctico, `hir/` no se puede borrar → caer al enfoque A. Nada borrado
+  todavía.
+* **Riesgo "TIR incompleto":** resuelto en `b2a1060`; los nodos existen, el
+  emisor solo tiene que construirlos.
+* **Punto de salida barato:** si tras la sub-fase 3 el informe muestra que
+  `NotYetSupported` domina sobre construcciones comunes del corpus, el diseño
+  falló y no se ha borrado una sola línea.
+
+---
+
+## 8. Fuera de alcance de la etapa 2
+
+`ssa/build` sigue enganchado a HIR. `register_meta` sigue siendo
+`SlotKind`. Nada de §9.1 del contrato se borra todavía — eso es la etapa 3,
+el corte, en rama larga.
