@@ -49,6 +49,10 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// This emitter is the module top level: a `let x` whose name is a module
+    /// global becomes a store to that global slot, not a `<module>` local, so
+    /// the other functions in the module (which see it as a global) agree.
+    top_level: bool,
     /// Names visible in an enclosing function (this emitter is a closure body).
     /// A reference to one of them resolves to an `Upvalue` rather than
     /// `ByName`.
@@ -115,6 +119,7 @@ impl<'a> FnEmitter<'a> {
             scopes: vec![FxHashMap::default()],
             params,
             this_class: None,
+            top_level: false,
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
             pending: Vec::new(),
@@ -141,6 +146,11 @@ impl<'a> FnEmitter<'a> {
 
     pub fn with_this(mut self, class: ClassId) -> Self {
         self.this_class = Some(class);
+        self
+    }
+
+    pub fn as_top_level(mut self) -> Self {
+        self.top_level = true;
         self
     }
 
@@ -928,8 +938,38 @@ impl<'a> FnEmitter<'a> {
                         .as_ref()
                         .map(|e| e.ty)
                         .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                    let local = self.bind_local(name.clone(), ty);
                     out.extend(std::mem::take(&mut self.pending));
+
+                    // A module-level binding that is a module global: store it
+                    // to the slot, not to a `<module>` local.
+                    if self.top_level {
+                        if let Some(&slot) = self.m.globals.get(name.as_ref()) {
+                            let value = init.unwrap_or_else(|| TirExpr {
+                                kind: TirExprKind::NullLit,
+                                ty,
+                                res: Resolution::None,
+                                span: Span::EMPTY,
+                            });
+                            let target = TirExpr {
+                                kind: TirExprKind::Var,
+                                ty,
+                                res: Resolution::GlobalSlot(slot),
+                                span: Span::EMPTY,
+                            };
+                            out.push(TirStmt::Expr(TirExpr {
+                                kind: TirExprKind::Assign {
+                                    target: Box::new(target),
+                                    value: Box::new(value),
+                                },
+                                ty: BackendTy::Void,
+                                res: Resolution::None,
+                                span: Span::EMPTY,
+                            }));
+                            continue;
+                        }
+                    }
+
+                    let local = self.bind_local(name.clone(), ty);
                     out.push(TirStmt::Let { local, ty, init });
                 }
                 // Destructuring: `let {a,b} = obj` / `let [x,y] = arr`.

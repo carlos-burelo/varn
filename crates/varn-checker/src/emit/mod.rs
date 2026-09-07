@@ -125,7 +125,8 @@ pub fn emit_module(
             &mut closures,
             tl_base,
             vec![],
-        );
+        )
+        .as_top_level();
         for stmt in &program.body {
             match &stmt.kind {
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
