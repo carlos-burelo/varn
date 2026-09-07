@@ -8,6 +8,7 @@ varn-core    = { path = "../varn-core" }
 varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 varn-modules = { path = "../varn-modules" }
+varn-tir     = { path = "../varn-tir" }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }
 postcard     = { workspace = true }

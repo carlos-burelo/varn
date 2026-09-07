@@ -2339,6 +2339,7 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-tir",
 ]
 
 [[package]]
@@ -2395,6 +2396,7 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-jit",
+ "varn-tir",
  "varn-types",
  "varn-vm",
 ]

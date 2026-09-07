@@ -38,6 +38,12 @@ pub struct DebugFlags {
 
     pub hir: bool,
 
+    /// `tir` — dump the typed IR the checker emits (stage 2). `tir:check`
+    /// verifies it and reports coverage over the module, like `clif:check`
+    /// sweeps a module rather than reading one function.
+    pub tir: bool,
+    pub tir_check: bool,
+
     pub ssa: bool,
     pub suspend: bool,
 
@@ -79,6 +85,7 @@ pub const PHASES: &[(&str, &str)] = &[
     ("check", "símbolos, binds, tipos y expresiones"),
     ("bytecode", "bytecode por función"),
     ("hir", "HIR previo a SSA"),
+    ("tir", "IR tipado que emite el checker (etapa 2)"),
     ("ssa", "forma SSA"),
     (
         "suspend",
@@ -109,6 +116,7 @@ pub fn print_phases() {
     }
     eprintln!("\nSub-fases:");
     eprintln!("  check:types  (volcado determinista y diffeable: tabla de tipos + anotaciones)");
+    eprintln!("  tir:check    (verifica el TIR emitido e informa cobertura sobre el módulo)");
     eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:check  clif:all");
     eprintln!("  roots:diff  roots:summary  roots:all");
     eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
@@ -154,7 +162,17 @@ impl DebugFlags {
             if phase.is_empty() {
                 continue;
             }
-            if let Some(sub) = phase.strip_prefix("check:") {
+            if let Some(sub) = phase.strip_prefix("tir:") {
+                match sub {
+                    "check" => flags.tir_check = true,
+                    unknown => {
+                        return Err(CliError::usage(format!(
+                            "unknown tir debug sub-phase: '{unknown}'\n\
+                             Valid sub-phases: check"
+                        )));
+                    }
+                }
+            } else if let Some(sub) = phase.strip_prefix("check:") {
                 match sub {
                     "types" => flags.check_types = true,
                     unknown => {
@@ -260,6 +278,7 @@ impl DebugFlags {
                     "info" => flags.info = true,
                     "lsp" => flags.lsp = true,
                     "hir" => flags.hir = true,
+                    "tir" => flags.tir = true,
                     "ssa" => flags.ssa = true,
                     "suspend" => flags.suspend = true,
                     "tiers" => flags.tiers = true,

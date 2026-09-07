@@ -90,6 +90,18 @@ pub fn compile(
         );
     }
 
+    if debug.tir || debug.tir_check {
+        crate::resolver::with_resolver(|r| {
+            varn_debug::tir::debug_tir(
+                program,
+                &check_result.checker_result.bind,
+                r,
+                &check_result.checker_result.expr_table,
+                debug,
+            )
+        });
+    }
+
     if debug.ssa {
         varn_debug::ssa::debug_ssa(
             program,

@@ -123,10 +123,16 @@ probó (`semantic_info`: `CallResolution`, `MemberResolution`).
 
 Orden de las sub-fases (cada una es un commit, verificador verde al final):
 
-1. **Esqueleto + tablas.** `emit_module` produce `TirModule` con tablas
-   llenas y todos los cuerpos = un único `TirStmt::Expr` con
-   `Dynamic(NotYetSupported)`. `-p tir` vuelca. `-p tir:check` verifica los
-   191 módulos e informa (cobertura ~0 %, es la línea base).
+1. **Esqueleto** (hecho). `emit_module` produce `TirModule` con tablas
+   vacías y el cuerpo = un `TirStmt::Expr` con `Dynamic(NotYetSupported)`.
+   `varn-tir` dep en `varn-checker`; `checker/emit/` con `lower_type`
+   (escalares, `Array`, `Tuple`, `T|null`→`Nullable`, uniones→`Dynamic(Union)`,
+   `Named`→`NotYetSupported` sin tabla). `DebugFlags{tir,tir_check}`,
+   `varn_debug::tir`, wiring en `compile.rs`. `-p tir` vuelca, `-p tir:check`
+   verifica e informa (línea base: cobertura estática 100 % sobre 1 nodo
+   `NotYetSupported`).
+1b. **Tablas.** Clases, enums, vtables y firmas reales desde `bind`;
+   `NameResolver` deja de ser `NoNames`.
 2. **Literales, `Var`, aritmética, `if`/`loop`/`return`.** Desugar de `for`,
    `for…of`, `while`, `do…while` al único `Loop`. Aquí se prueba el riesgo
    "TIR azucarado": si `for…of` no baja sin residuo, D falló.

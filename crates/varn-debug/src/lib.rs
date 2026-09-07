@@ -18,6 +18,7 @@ pub mod summary;
 pub mod suspend;
 pub mod symbols;
 pub mod tiers;
+pub mod tir;
 pub mod typeloss;
 pub mod tokens;
 

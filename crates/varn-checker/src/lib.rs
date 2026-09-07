@@ -6,6 +6,7 @@ pub(crate) mod checker_enrichment;
 pub(crate) mod checker_expressions;
 pub(crate) mod checker_generics;
 pub mod core;
+pub mod emit;
 
 pub mod module_resolver;
 pub mod scope;

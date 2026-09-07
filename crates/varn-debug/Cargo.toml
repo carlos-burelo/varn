@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 varn-core     = { path = "../varn-core" }
 varn-checker  = { path = "../varn-checker" }
+varn-tir      = { path = "../varn-tir" }
 varn-types    = { path = "../varn-types" }
 varn-compiler = { path = "../varn-compiler" }
 varn-jit      = { path = "../varn-jit" }
