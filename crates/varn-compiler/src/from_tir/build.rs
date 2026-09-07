@@ -11,6 +11,7 @@
 #![allow(dead_code)]
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::rc::Rc;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp, LocalId};
 use crate::ssa::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, ValueDef, VarId};
@@ -93,6 +94,10 @@ impl<'m> Builder<'m> {
         let v = Value(self.values.len() as u32);
         self.values.push(ValueDef { ty });
         v
+    }
+
+    fn value_ty(&self, v: Value) -> HirType {
+        self.values[v.0 as usize].ty
     }
 
     fn block_mut(&mut self, id: BlockId) -> &mut Block {
@@ -373,8 +378,179 @@ impl<'m> Builder<'m> {
                 self.lower_select(c, then_val, else_val, ty)
             }
 
+            TirExprKind::Field { object, name } => {
+                let obj = self.lower_expr(object)?;
+                let kind = match &e.res {
+                    Resolution::FieldSlot(slot) => InstKind::GetFixedField { object: obj, slot: *slot },
+                    _ => InstKind::GetProperty { object: obj, name: name.clone() },
+                };
+                Ok(self.emit(kind, ty))
+            }
+            TirExprKind::Index { object, index } => {
+                let obj = self.lower_expr(object)?;
+                let idx = self.lower_expr(index)?;
+                let kind = if matches!(self.value_ty(obj), HirType::Array(_)) {
+                    InstKind::ArrayGetIndex { object: obj, index: idx }
+                } else {
+                    InstKind::GetIndex { object: obj, index: idx }
+                };
+                Ok(self.emit(kind, ty))
+            }
+
+            TirExprKind::Call { callee, args } => {
+                let cv = match &e.res {
+                    Resolution::DirectFn(f) => {
+                        let name = self
+                            .tir
+                            .function(*f)
+                            .map(|tf| tf.name.clone())
+                            .ok_or(OptError::Unsupported("from_tir: DirectFn out of range"))?;
+                        self.emit(InstKind::LoadGlobal(name), HirType::Ref)
+                    }
+                    _ => self.lower_expr(callee)?,
+                };
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+            }
+            TirExprKind::MethodCall { recv, name, args } => {
+                let r = self.lower_expr(recv)?;
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(
+                    InstKind::MethodCall { recv: r, name: name.clone(), args: argv },
+                    ty,
+                ))
+            }
+            TirExprKind::New { class, args } => {
+                let name = self
+                    .tir
+                    .class(*class)
+                    .map(|ci| ci.name.clone())
+                    .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
+                let cv = self.emit(InstKind::LoadGlobal(name), HirType::Ref);
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+            }
+            TirExprKind::MakeVariant { args } => {
+                // `E.V(a, b)` — call the variant constructor global by name.
+                let (enum_id, tag) = match &e.res {
+                    Resolution::EnumVariant { enum_id, tag } => (*enum_id, *tag),
+                    _ => return Err(OptError::Unsupported("from_tir: MakeVariant without res")),
+                };
+                let vname = self
+                    .tir
+                    .enum_info(enum_id)
+                    .and_then(|ei| ei.variants.iter().find(|v| v.tag == tag))
+                    .map(|v| v.name.clone())
+                    .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
+                let cv = self.emit(InstKind::LoadGlobal(vname), HirType::Ref);
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+            }
+
+            TirExprKind::ArrayLit(els) => {
+                let mut vals = Vec::with_capacity(els.len());
+                for el in els {
+                    match el {
+                        varn_tir::TirArrayEl::Expr(x) => vals.push(self.lower_expr(x)?),
+                        varn_tir::TirArrayEl::Spread(_) => {
+                            return Err(OptError::Unsupported("from_tir: array spread"))
+                        }
+                        varn_tir::TirArrayEl::Hole => {
+                            let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                            vals.push(n);
+                        }
+                    }
+                }
+                Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
+            }
+            TirExprKind::TupleLit(xs) => {
+                let mut vals = Vec::with_capacity(xs.len());
+                for x in xs {
+                    vals.push(self.lower_expr(x)?);
+                }
+                Ok(self.emit(InstKind::BuildTuple { elements: vals }, ty))
+            }
+            TirExprKind::ObjectLit { entries } => {
+                let mut pairs = Vec::with_capacity(entries.len());
+                for entry in entries {
+                    match entry {
+                        varn_tir::TirObjectEntry::Field { name, value } => {
+                            let v = self.lower_expr(value)?;
+                            pairs.push((name.clone(), v));
+                        }
+                        varn_tir::TirObjectEntry::Spread(_) => {
+                            return Err(OptError::Unsupported("from_tir: object spread"))
+                        }
+                    }
+                }
+                Ok(self.emit(InstKind::BuildObject { pairs }, ty))
+            }
+
+            TirExprKind::Assign { target, value } => {
+                let v = self.lower_expr(value)?;
+                self.lower_assign(target, v)?;
+                Ok(v)
+            }
+
+            TirExprKind::Await { future } => {
+                let v = self.lower_expr(future)?;
+                Ok(self.emit(InstKind::MethodCall { recv: v, name: Rc::from("await"), args: vec![] }, ty))
+            }
+
             _ => Err(OptError::Unsupported("from_tir: expression kind")),
         }
+    }
+
+    fn lower_args(&mut self, args: &[varn_tir::TirArg]) -> Result<Vec<Value>> {
+        let mut out = Vec::with_capacity(args.len());
+        for a in args {
+            match a {
+                varn_tir::TirArg::Expr(e) => out.push(self.lower_expr(e)?),
+                varn_tir::TirArg::Spread(_) | varn_tir::TirArg::Named { .. } => {
+                    return Err(OptError::Unsupported("from_tir: spread/named argument"))
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn lower_assign(&mut self, target: &TirExpr, value: Value) -> Result<()> {
+        match &target.kind {
+            TirExprKind::Var => match &target.res {
+                Resolution::Local(id) => {
+                    let cur = self.current;
+                    self.write_var(VarId::Local(LocalId(id.0)), cur, value);
+                }
+                Resolution::Param(i) => {
+                    let cur = self.current;
+                    self.write_var(VarId::Param(*i), cur, value);
+                }
+                Resolution::Upvalue(uv) => {
+                    self.emit_effect(InstKind::StoreUpvalue { index: *uv, value });
+                }
+                Resolution::ByName { name, .. } => {
+                    self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value });
+                }
+                _ => return Err(OptError::Unsupported("from_tir: assign target var")),
+            },
+            TirExprKind::Field { object, name } => {
+                let obj = self.lower_expr(object)?;
+                let kind = match &target.res {
+                    Resolution::FieldSlot(slot) => {
+                        InstKind::SetFixedField { object: obj, value, slot: *slot }
+                    }
+                    _ => InstKind::SetProperty { object: obj, name: name.clone(), value },
+                };
+                self.emit_effect(kind);
+            }
+            TirExprKind::Index { object, index } => {
+                let obj = self.lower_expr(object)?;
+                let idx = self.lower_expr(index)?;
+                self.emit_effect(InstKind::SetIndex { object: obj, index: idx, value });
+            }
+            _ => return Err(OptError::Unsupported("from_tir: assign target")),
+        }
+        Ok(())
     }
 
     fn lower_var(&mut self, res: &Resolution, ty: HirType) -> Result<Value> {
@@ -385,8 +561,17 @@ impl<'m> Builder<'m> {
             }
             Resolution::Param(i) => self.read_var(VarId::Param(*i), self.current),
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
-            Resolution::GlobalSlot(_) | Resolution::ModuleSlot { .. } => {
-                Err(OptError::Unsupported("from_tir: global slot"))
+            Resolution::GlobalSlot(n) => {
+                let name = self
+                    .tir
+                    .global_names
+                    .get(*n as usize)
+                    .cloned()
+                    .ok_or(OptError::Unsupported("from_tir: global slot out of range"))?;
+                Ok(self.emit(InstKind::LoadGlobal(name), ty))
+            }
+            Resolution::ModuleSlot { .. } => {
+                Err(OptError::Unsupported("from_tir: module slot"))
             }
             Resolution::ByName { name, .. } => Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty)),
             _ => Err(OptError::Unsupported("from_tir: var resolution")),
@@ -527,7 +712,7 @@ mod tests {
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],
             functions: vec![],
-            globals: vec![],
+            globals: vec![], global_names: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: varn_tir::SigId(0),
@@ -603,9 +788,25 @@ mod tests {
     #[test]
     fn an_unsupported_expression_is_reported() {
         let m = module(
-            vec![TirStmt::Expr(e(K::New { class: varn_tir::ClassId(0), args: vec![] }, B::Class(varn_tir::ClassId(0))))],
+            vec![TirStmt::Expr(e(
+                K::Discriminant { value: Box::new(e(K::IntLit(0), B::Int)) },
+                B::Int,
+            ))],
             vec![],
         );
         assert!(build_function(&m, &m.top_level).is_err());
+    }
+
+    #[test]
+    fn a_new_expression_lowers_to_a_call() {
+        let m = module(
+            vec![TirStmt::Expr(e(
+                K::New { class: varn_tir::ClassId(0), args: vec![] },
+                B::Class(varn_tir::ClassId(0)),
+            ))],
+            vec![],
+        );
+        let f = build_function(&m, &m.top_level).unwrap();
+        assert!(f.blocks[0].insts.iter().any(|i| matches!(i.kind, InstKind::Call { .. })));
     }
 }

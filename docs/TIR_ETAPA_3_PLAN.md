@@ -127,16 +127,17 @@ no se migra. `vn cache clean` en las notas de la etapa.
       `from_tir/ty.rs`: `BackendTy → HirType`, re-internando handles anidados
       en la `TyTable` del lado SSA (por nombre de clase). `char`→`Int`;
       `decimal`/`bigint`/`enum`/`fn`/`map`/`set`/`tuple`→`Ref`. 4 tests.
-- [~] 3.3 `from_tir/build.rs` — construcción SSA desde TIR. **Empezado.**
-      El core SSA-agnóstico (bloques / phi / value / var / sellado, ~200
-      líneas) se **copió** de `ssa/build::Builder` (esa versión muere en 3.4).
-      Cubre: literales, `Var` (Local/Param/Upvalue/ByName), `Binary`, `Unary`
-      (+ `IsNull`), `Cast`, `Select`, y sentencias `Expr`/`Let`/`Return`/
-      `Throw`/`Break`/`Continue`/`If`/`Loop`. 4 tests. Resto → `Unsupported`.
-      Falta: `Call`/`MethodCall`/`Field`/`Index`/`New`/`MakeVariant`/
-      colecciones/`Closure`/`Discriminant`/`VariantPayload`/`TypeTest`/`Await`/
-      `Yield`, `Try`, `GlobalSlot`. `from_tir` es MÁS pequeño que `ssa/build/`
-      (~3150 líneas) porque el TIR es plano y las resoluciones colapsan la
-      explosión de variantes.
+- [~] 3.3 `from_tir/build.rs` — construcción SSA desde TIR. **En curso.**
+      Core SSA-agnóstico copiado de `ssa/build::Builder` (esa versión muere en
+      3.4). `TirModule` gana `global_names` para resolver `GlobalSlot(n)`.
+      Cubierto: literales, `Var` (Local/Param/Upvalue/GlobalSlot/ByName),
+      `Binary`, `Unary`+`IsNull`, `Cast`, `Select`, `Field`
+      (`GetFixedField`/`GetProperty`), `Index` (`ArrayGetIndex`/`GetIndex`),
+      `Call` (`DirectFn`→`LoadGlobal`+`Call`, si no callee lowered),
+      `MethodCall`, `New`/`MakeVariant` (`LoadGlobal`+`Call`), `ArrayLit`/
+      `TupleLit`/`ObjectLit`, `Assign` (var/field/index), `Await`. Sentencias
+      `Expr`/`Let`/`Return`/`Throw`/`Break`/`Continue`/`If`/`Loop`. 9 tests.
+      Falta: `Closure`, `Discriminant`/`VariantPayload`/`TypeTest`, `Yield`,
+      `Try`, spread/named args, `ModuleSlot`.
 - [ ] 3.4 el corte + borrados (~6000 líneas), corpus rojo
 - [ ] 3.5 caché de bytecode

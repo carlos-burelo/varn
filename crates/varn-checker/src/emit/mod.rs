@@ -67,6 +67,10 @@ pub fn emit_module(
         );
         global_slots.insert(sym.name.clone(), slot);
     }
+    let mut global_names: Vec<Rc<str>> = vec![Rc::from(""); globals.len()];
+    for (name, &slot) in &global_slots {
+        global_names[slot as usize] = name.clone();
+    }
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
@@ -162,6 +166,7 @@ pub fn emit_module(
         signatures,
         functions,
         globals,
+        global_names,
         top_level,
     }
 }
@@ -407,7 +412,7 @@ mod tests {
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
             functions: vec![],
-            globals: vec![],
+            globals: vec![], global_names: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: SigId(0),

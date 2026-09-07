@@ -188,6 +188,9 @@ pub struct TirModule {
     pub signatures: Vec<crate::tables::Signature>,
     pub functions: Vec<TirFunction>,
     pub globals: Vec<BackendTy>,
+    /// The name of each global, parallel to `globals`. A `GlobalSlot(n)`
+    /// resolution names `globals[n]` / `global_names[n]`.
+    pub global_names: Vec<Rc<str>>,
     pub top_level: TirFunction,
 }
 

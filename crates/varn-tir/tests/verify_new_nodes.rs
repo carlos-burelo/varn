@@ -39,6 +39,7 @@ fn module(top_level: TirFunction) -> TirModule {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level,
     }
 }
@@ -120,6 +121,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level,
     }
 }

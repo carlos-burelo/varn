@@ -15,6 +15,7 @@ fn module() -> TirModule {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),

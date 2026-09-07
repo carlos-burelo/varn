@@ -20,6 +20,7 @@ fn module_with_point() -> TirModule {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -253,6 +254,7 @@ fn method_call_arity_mismatch_is_rejected() {
         ],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -305,6 +307,7 @@ fn method_call_with_correct_arity_verifies() {
         ],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -430,6 +433,7 @@ fn return_with_correct_type_verifies() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -466,6 +470,7 @@ fn bare_return_in_non_void_function_is_rejected() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -498,6 +503,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -533,6 +539,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -570,6 +577,7 @@ fn return_of_never_type_is_valid_anywhere() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -604,6 +612,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Nullable(int_id) }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -634,6 +643,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -680,6 +690,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         ],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -735,6 +746,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         ],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -785,6 +797,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -827,6 +840,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -887,6 +901,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
+        global_names: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),

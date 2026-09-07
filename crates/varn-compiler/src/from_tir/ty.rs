@@ -73,7 +73,7 @@ mod tests {
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],
             functions: vec![],
-            globals: vec![],
+            globals: vec![], global_names: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: varn_tir::SigId(0),
