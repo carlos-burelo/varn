@@ -203,7 +203,7 @@ fn compile_source_inner(
         // The stdlib goes through the same checker as user code. Silently
         // dropping these diagnostics let `std/*.vn` carry types the backend
         // then trusted — e.g. an `int`-declared function returning a whole
-        // float, which clif unboxes as an i48 payload.
+        // float, which clif then reinterprets as an int.
         let mut msg = String::new();
         for d in check.diagnostics.errors() {
             msg.push_str(&format!(

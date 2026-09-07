@@ -34,7 +34,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::alloc::{box_or_load_home, def_result, AllocCtx};
 use super::emit::{
     array_disc, box_bool, box_f64, box_int, cached_payload, call_helper_void, meta_is_float,
-    state_meta_int, unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48,
+    state_meta_int, unbox_f64_coerce, use_boxed, use_f64, use_int, unbox_int,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -55,9 +55,9 @@ pub(crate) struct ArrCtx<'a> {
 /// value, and therefore which `ArrayRepr` it can exchange elements with raw.
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum ElemRepr {
-    /// NaN-boxed `VmValue` bits — pairs raw with `ArrayRepr::Boxed` (disc 0).
+    /// Tag+payload `VmValue` bits — pairs raw with `ArrayRepr::Boxed` (disc 0).
     Boxed,
-    /// Unboxed i48-in-`i64` — pairs raw with `ArrayRepr::I64` (disc 1).
+    /// Unboxed `i64` — pairs raw with `ArrayRepr::I64` (disc 1).
     Int,
     /// Unboxed `f64` — pairs raw with `ArrayRepr::F64` (disc 2).
     Float,
@@ -94,7 +94,7 @@ fn convert(
 ) -> cranelift_codegen::ir::Value {
     match (from, want) {
         (a, w) if a == w => v,
-        (ElemRepr::Boxed, ElemRepr::Int) => wrap_i48(b, v),
+        (ElemRepr::Boxed, ElemRepr::Int) => unbox_int(b, v),
         (ElemRepr::Boxed, ElemRepr::Float) => unbox_f64_coerce(b, v),
         (ElemRepr::Int, ElemRepr::Boxed) => box_int(b, v),
         (ElemRepr::Float, ElemRepr::Boxed) => box_f64(b, v),
@@ -174,7 +174,7 @@ pub(super) fn emit_array_length(
         c.exec_ctx,
         c.helpers.jit_native_result_offset as i32,
     );
-    let un = wrap_i48(b, boxed);
+    let un = unbox_int(b, boxed);
     b.ins().jump(merge, &[un.into()]);
     b.switch_to_block(merge);
     let res = b.block_params(merge)[0];

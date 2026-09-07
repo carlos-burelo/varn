@@ -112,10 +112,8 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
-                    // The old `overflowing_add` guard here tested i64 overflow and
-                    // promoted to float. Both were wrong: an i48 operand plus an
-                    // i8 immediate cannot overflow i64, so the branch was dead,
-                    // and float promotion is exactly what numeric.rs denies.
+                    // Raise on overflow, never promote to float — numeric.rs
+                    // denies that promotion for int arithmetic.
                     let a_val = self.heap.as_int(v);
                     self.stack[base + first_reg] = match varn_core::add_int(a_val, imm) {
                         Some(r) => VmValue::from_int(r),

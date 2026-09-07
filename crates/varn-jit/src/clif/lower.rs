@@ -7,12 +7,12 @@
 //!
 //! Two functions per compilation, one buffer:
 //! * the RAW function — unboxed `fn(i64 × nparams) -> i64`, the entire body
-//!   in native registers, i48 wrap after every arith op, recursion as a
-//!   direct hardware call to its own entry;
+//!   in native registers, recursion as a direct hardware call to its own
+//!   entry;
 //! * the WRAPPER — the template JIT's `JitFn` ABI. It clears the
 //!   caller-prepush flag (protocol: every JIT prologue consumes it), loads
-//!   the boxed args from the VM stack, sign-extends the i48 payloads, calls
-//!   the raw function and re-tags the result.
+//!   the boxed args from the VM stack, unboxes their payloads, calls the raw
+//!   function and re-tags the result.
 //!
 //! Anything outside the supported subset bails, and a bail leaves the
 //! function to the interpreter — two tiers, one authority.

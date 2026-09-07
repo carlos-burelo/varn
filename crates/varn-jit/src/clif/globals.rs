@@ -25,7 +25,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
 use super::alloc::{box_or_load_home, def_result, AllocCtx};
-use super::emit::{box_or_pass, meta_is_float, state_meta_int, unbox_f64_coerce, wrap_i48};
+use super::emit::{box_or_pass, meta_is_float, state_meta_int, unbox_f64_coerce, unbox_int};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -67,7 +67,7 @@ pub(super) fn emit_load_global_idx(
         let f = unbox_f64_coerce(b, v);
         b.def_var(c.vars[first_reg], f);
     } else if state_meta_int(c.register_meta, first_reg) {
-        let un = wrap_i48(b, v);
+        let un = unbox_int(b, v);
         b.def_var(c.vars[first_reg], un);
     } else {
         let (_tag, payload) = b.ins().isplit(v);

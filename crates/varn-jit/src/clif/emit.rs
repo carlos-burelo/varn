@@ -6,10 +6,7 @@
 
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{
-    condcodes::IntCC, types, AbiParam, InstBuilder, InstructionData, MemFlags, Signature, Value,
-    ValueDef,
-};
+use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::SlotKind;
 
@@ -86,10 +83,8 @@ pub(super) fn def_const_bool(
     }
 }
 
-/// Read a register as an unboxed int. `Int` vars are already raw; `Boxed`
-/// vars are read unchanged — a boxed `VmValue`'s payload word IS the raw
-/// i64 (VmValue moved off NaN-boxing, so there is no 48-bit range to
-/// sign-extend from anymore).
+/// Read a register as an unboxed int. `Int` vars are already raw; a boxed
+/// `VmValue`'s payload word IS the raw i64, so it's read unchanged too.
 pub(super) fn use_int(
     b: &mut FunctionBuilder,
     vars: &[Variable],
@@ -98,10 +93,6 @@ pub(super) fn use_int(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
         K::Int => Ok(b.use_var(vars[r])),
-        // Boxed payload is already the full i64 — do NOT shl/shr by 16
-        // here. That used to sign-extend from a 48-bit NaN-boxed payload;
-        // it now silently drops the top 16 bits of any boxed integer whose
-        // magnitude needed them.
         k if is_boxed_kind(k) => Ok(b.use_var(vars[r])),
         k => Err(format!("clif: int use of {k:?} register")),
     }
@@ -122,7 +113,7 @@ pub(super) fn use_boxed(
 }
 
 /// The value a `Return src` yields, coerced to the raw function's return
-/// convention: an int return stays an unboxed i48 payload (the wrapper and
+/// convention: an int return stays an unboxed i64 payload (the wrapper and
 /// the clif→clif fast call re-tag it); every other return kind yields boxed
 /// VmValue bits that the wrapper passes through. A reachable `null` (a
 /// constructor's implicit `return null`) short-circuits to the null bits.
@@ -148,10 +139,10 @@ pub(super) fn emit_return_value(
                 let raw = b.use_var(vars[src]);
                 if b.func.dfg.value_type(raw) == types::F64 {
                     let iv = b.ins().fcvt_to_sint(types::I64, raw);
-                    wrap_i48(b, iv)
+                    unbox_int(b, iv)
                 } else {
                     let v = box_or_pass(b, vars, state, src);
-                    wrap_i48(b, v)
+                    unbox_int(b, v)
                 }
             }
         },
@@ -264,7 +255,7 @@ pub(super) fn box_f64(
 /// VmValue — the latter arises when a widening int argument is passed to a
 /// float parameter (`takesFloat(5)`), where the caller boxes the int and the
 /// callee must coerce, exactly as the interpreter's `to_f64_val` does. An
-/// int-tagged value sign-extends its i48 payload and `fcvt`s; anything else is
+/// int-tagged value `fcvt`s its raw i64 payload; anything else is
 /// reinterpreted as its f64 bits.
 // Parameters kept, unused: they document the signature the migrated
 // version has to satisfy.
@@ -397,7 +388,7 @@ pub(super) fn box_for_target(
         } else if !is_boxed_kind(target_state[r]) && is_boxed_kind(state[r]) {
             if target_state[r] == K::Int {
                 let v = b.use_var(vars[r]);
-                let un = wrap_i48(b, v);
+                let un = unbox_int(b, v);
                 b.def_var(vars[r], un);
             } else if target_state[r] == K::Bool {
                 let v = b.use_var(vars[r]);
@@ -617,7 +608,7 @@ impl LoopCaches<'_> {
 /// template's slow paths.
 /// Normalize a RAW function's return value to boxed `VmValue` bits.
 ///
-/// An `int`-returning raw yields an unboxed i48 payload — UNCONDITIONALLY.
+/// An `int`-returning raw yields an unboxed i64 payload — UNCONDITIONALLY.
 /// Every arm of `emit_return_value`'s `SlotKind::Int` case produces one: an
 /// `Int` register is already a payload, a boxed one goes through `use_int`,
 /// and a float one converts and wraps. Every other return kind is boxed by
@@ -823,10 +814,8 @@ pub(super) fn array_disc(
     )
 }
 
-/// `(v << 16) >> 16` — sign-extend the low 48 bits. This is the unboxing of an
-/// int-tagged VmValue payload (`varn_core::numeric::wrap_i48`), NOT an
-/// overflow policy; see [`guard_i48`].
-pub(super) fn wrap_i48(
+/// A boxed `VmValue`'s payload word IS the int — extract it.
+pub(super) fn unbox_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
@@ -836,19 +825,6 @@ pub(super) fn wrap_i48(
     } else {
         v
     }
-}
-
-/// Returns `true` when `v` is an `iconst` whose absolute value is below `threshold`.
-/// Used to prove that `v * i48_value` cannot overflow i64: choose `threshold = 2^16`
-/// since `(2^16 - 1) * (2^47 - 1) < 2^63 - 1`.
-#[allow(dead_code)]
-pub(super) fn i64_const_fits(b: &FunctionBuilder, v: Value, threshold: u64) -> bool {
-    if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
-        if let InstructionData::UnaryImm { imm, .. } = b.func.dfg.insts[inst] {
-            return imm.bits().unsigned_abs() < threshold;
-        }
-    }
-    false
 }
 
 /// Raise `integer overflow` if the CPU's overflow flag was set, otherwise yield `r`.

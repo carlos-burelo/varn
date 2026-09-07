@@ -147,15 +147,10 @@ pub(crate) fn dispatch_opcode(
             let s1 = use_int(b, vars, state, r1)?;
             let s2 = use_int(b, vars, state, r2)?;
             // `int` is a native i64, so i64 ± i64 CAN overflow and the guard is
-            // mandatory. The register kind proves the operands are integers; it
-            // proves nothing about their range. (It said otherwise while a value
-            // was a NaN-box with a 48-bit payload — that premise died with the
-            // two-word VmValue, and the interpreter, which raises on overflow,
-            // never shared it.)
-            //
-            // `is_bounds_safe_arith` is a different claim: the loop analysis
-            // proved this arithmetic stays within an array's bounds, so the
-            // range IS known. That one stays.
+            // mandatory: the register kind proves the operands are integers,
+            // not their range. `is_bounds_safe_arith` proves a range — the
+            // loop analysis showed this arithmetic stays within an array's
+            // bounds — so that one still licenses skipping the guard.
             if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
                 let v = b.ins().iadd(s1, s2);
                 b.def_var(vars[first_reg], v);
@@ -379,7 +374,7 @@ pub(crate) fn dispatch_opcode(
                 let v = if let Some(actx) = actx {
                     let boxed = super::super::alloc::box_or_load_home(b, actx, state, src);
                     match proto.return_kind {
-                        SlotKind::Int => super::super::emit::wrap_i48(b, boxed),
+                        SlotKind::Int => super::super::emit::unbox_int(b, boxed),
                         SlotKind::Float => super::super::emit::unbox_f64_coerce(b, boxed),
                         SlotKind::Bool => super::super::emit::unbox_bool(b, boxed),
                         _ => unreachable!(),

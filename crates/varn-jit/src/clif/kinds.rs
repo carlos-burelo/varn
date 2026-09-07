@@ -22,9 +22,8 @@ pub(crate) enum K {
     /// seeded at entry and preserved by the flow (see `clif::floats`).
     Float,
     Bool,
-    /// A NaN-boxed VmValue carried as raw bits (heap refs, non-int params,
-    /// untyped loads). Coerces to Int at use via the i48 sign-extend — the
-    /// same read the interpreter's typed ops perform.
+    /// A tag+payload `VmValue` pair (heap refs, non-int params, untyped
+    /// loads). `unbox_int` at use extracts the payload word directly.
     Boxed,
     /// A value freshly loaded from global slot `idx` — a `Boxed` refinement
     /// that additionally records the origin, so a `Call` on it can ask the
@@ -105,23 +104,10 @@ pub(crate) fn apply_kinds(
         | OpCode::LoadIntMinusOne
         | OpCode::LoadInt => state[dest] = if meta_float(dest) { K::Float } else { K::Int },
         OpCode::LoadTrue | OpCode::LoadFalse => state[dest] = K::Bool,
-        // A self-call returns in THIS function's own return convention, so its
-        // result kind is `return_kind`, never a constant.
-        //
-        // `emit_return_value` produces a raw, unboxed i48 for a `SlotKind::Int`
-        // return and BOXED VmValue bits for every other kind. This arm used to
-        // say `K::Int` unconditionally — correct only for the int contract, and
-        // silently wrong for the rest: `box_or_pass` then ran `box_int` over
-        // boxed bits, replacing the value's tag with the int tag while keeping
-        // its low 48 bits. For a heap value those low bits are the heap INDEX,
-        // so a recursive function returning `str` handed its caller the slot
-        // number as an integer:
-        //
-        //     function repeatStr(s: str, n: int): str {
-        //         if (n <= 0) { return "" }
-        //         return s + repeatStr(s, n - 1)   // "ab" + 52
-        //     }
-        //
+        // A self-call returns in THIS function's own return convention, so
+        // its kind must follow `return_kind`, never a fixed `K::Int` — a
+        // boxed non-int return re-tagged as int here would hand the caller
+        // the payload word as if it were the integer's value.
         OpCode::CallSelf => {
             state[dest] = if meta_float(dest) || return_kind == SlotKind::Float {
                 K::Float
@@ -135,10 +121,11 @@ pub(crate) fn apply_kinds(
         }
         // A call result is ALWAYS boxed bits, even into an `int`-typed slot:
         // the register meta types the slot, not the value, and stdlib code
-        // relies on the VM coercing a whole float (`int_div`) at the int sink
-        // rather than at the definition. Unboxing here would read those float
-        // bits as an i48 payload. The fast int-contract IC re-boxes its raw
-        // result to keep this one representation (see `lower`'s `Call` arm).
+        // relies on the VM coercing a whole float (`int_div`) at the int
+        // sink rather than at the definition. Unboxing here would reinterpret
+        // those float bits as an int. The fast int-contract IC re-boxes its
+        // raw result to keep this one representation (see `lower`'s `Call`
+        // arm).
         OpCode::Call | OpCode::CallSpread => state[dest] = boxed(dest),
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;
@@ -206,7 +193,7 @@ pub(crate) fn apply_kinds(
         // register still holds an unboxed `f64` — the emitters coerce on the
         // way in). Claiming `Int` here because the register meta types the
         // SLOT as int is a lie about the VALUE: `int_div` returns a whole
-        // float into an `int` slot, and reading those bits as an i48 payload
+        // float into an `int` slot, and reinterpreting those bits as an int
         // yields garbage. Int consumers unbox at the use instead.
         OpCode::GetProperty
         | OpCode::BuildArray

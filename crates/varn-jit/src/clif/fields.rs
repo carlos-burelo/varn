@@ -16,7 +16,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::alloc::AllocCtx;
 use super::emit::{
     self, box_or_pass, call_helper_void, meta_is_float, state_meta_int, unbox_f64_coerce,
-    use_boxed, wrap_i48, HEAP_KIND,
+    use_boxed, unbox_int, HEAP_KIND,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -322,7 +322,7 @@ pub(super) fn emit_get_fixed_field(
         let f = unbox_f64_coerce(b, v);
         b.def_var(c.vars[first_reg], f);
     } else if state_meta_int(c.register_meta, first_reg) {
-        let i = wrap_i48(b, v);
+        let i = unbox_int(b, v);
         b.def_var(c.vars[first_reg], i);
     } else {
         let (_tag, payload) = b.ins().isplit(v);

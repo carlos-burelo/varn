@@ -8,7 +8,7 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48};
+use super::super::emit::{call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, unbox_int};
 use super::super::kinds::K;
 use super::super::liveness::Liveness;
 use crate::JitHelpers;
@@ -351,7 +351,7 @@ pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]
             b.def_var(actx.vars[r], f);
         } else {
             let restored = match state[r] {
-                K::Int => wrap_i48(b, v),
+                K::Int => unbox_int(b, v),
                 K::Bool => unbox_bool(b, v),
                 _ => {
                     let (_tag, payload) = b.ins().isplit(v);

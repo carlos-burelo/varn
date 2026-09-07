@@ -3,17 +3,12 @@ use varn_core::VmValuePayload;
 
 /// A VM value: an explicit tag word plus a full 64-bit payload.
 ///
-/// This *was* a 64-bit NaN-box. NaN-boxing exists so a dynamically typed
-/// engine can carry any value in one machine word, and it buys that with a
-/// payload of 48 bits — which is why `int` used to be a 48-bit integer that
-/// truncated in silence past `2^47`. Varn knows its types before it emits an
-/// opcode, so it was paying a dynamic language's tax and taking a dynamic
-/// language's integer.
-///
-/// Now: `int` is a native `i64`, `float` is a real `f64` with no QNAN games,
-/// and a heap reference gets a whole word (room for a direct pointer when the
-/// heap table goes away). Two 64-bit registers cost the same as one on
-/// x86-64 and aarch64; the masking and shifting they replace did not.
+/// Not a NaN-box: Varn knows its types before it emits an opcode, so it has
+/// no need for a dynamic engine's one-word encoding and its 48-bit payload
+/// limit. `int` is a native `i64`, `float` a real `f64`, and a heap
+/// reference gets a whole word (room for a direct pointer later). Two
+/// 64-bit registers cost the same as one on x86-64 and aarch64; the masking
+/// a NaN-box needs did not.
 ///
 /// `#[repr(C)]` with two `u64`s — not `u128` — keeps the alignment at 8, so
 /// the DST tail of [`crate::value::ObjData`] still starts on a word boundary
@@ -311,9 +306,6 @@ impl VmValue {
         f64::from_bits(self.payload)
     }
 
-    /// The `int` this value carries. A plain reinterpret of the payload —
-    /// the sign-extension the 48-bit payload needed is gone, and with it the
-    /// `shl`/`sar` pair that used to run on every read of an int register.
     #[inline(always)]
     pub fn as_int(self) -> i64 {
         self.payload as i64

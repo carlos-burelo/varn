@@ -63,7 +63,7 @@ pub(super) fn raw_signature(
 ///
 /// Kept for the OSR entry too, rather than exposing `raw` directly: the
 /// wrapper is what consumes the caller-prepush flag (every JIT prologue must)
-/// and what re-tags an unboxed i48 return. An OSR body returns through the
+/// and what re-tags an unboxed int return. An OSR body returns through the
 /// same `Return` opcodes as any other, so it needs both.
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
@@ -148,7 +148,7 @@ pub(super) fn build_wrapper(
             ((1 + i) * 16) as i32,
         );
         if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
-            let un = super::emit::wrap_i48(&mut b, boxed);
+            let un = super::emit::unbox_int(&mut b, boxed);
             args.push(un);
         } else if proto.param_kinds.get(i) == Some(&SlotKind::Float)
             || super::emit::meta_is_float(&proto.register_meta, 1 + i)
