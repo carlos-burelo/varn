@@ -211,6 +211,12 @@ Extra. **Template strings**: `` `a${x}b` `` → concatenación `Str` con
    verificador confía en `Cast`, el backend hace la conversión real).
    `TaggedTemplate` → placeholder.
 
+Extra. **`switch` / `try` / `++` / `+=`**: `switch` → hoist + If-chain de
+   `d == case` (sin fallthrough). `try/catch/finally` → `TirStmt::Try`; el
+   `finally` se añade tras el `Try` (correcto salvo escape por
+   `return`/`throw`). `x++`/`--x` → `x = x ± 1` (Int). `x += y` → `x = x <op>
+   y` para `+ - * / % **`; `??=`/`&&=`/bitwise-assign → placeholder.
+
 Extra. **Closures**: nuevo nodo `TirExprKind::Closure{func: FnId}`.
    `function`/`arrow` → el cuerpo se emite como `TirFunction` propia y se
    añade a `functions` (esquema de `FnId`: libres 0..N, luego todas las

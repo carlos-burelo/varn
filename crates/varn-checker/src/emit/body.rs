@@ -290,8 +290,101 @@ impl<'a> FnEmitter<'a> {
 
             StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
 
-            // for-in, switch, try, using, labeled: later.
+            StmtKind::Try { block, catches, finally } => {
+                self.lower_try(block, catches, finally.as_deref())
+            }
+
+            StmtKind::Switch { discriminant, cases } => {
+                self.lower_switch(discriminant, cases)
+            }
+
+            // for-in, using, labeled: later.
             _ => one(TirStmt::Expr(placeholder(DynReason::NotYetSupported))),
+        }
+    }
+
+    /// `try { } catch (e) { } finally { }`. `finally` has no TIR node — its
+    /// statements are appended after the `Try` (correct for straight-line and
+    /// caught paths, not for a `return`/`throw` that escapes the try).
+    fn lower_try(
+        &mut self,
+        block: &Stmt,
+        catches: &[varn_core::ast::CatchClause],
+        finally: Option<&Stmt>,
+    ) -> Vec<TirStmt> {
+        let body = self.lower_stmt_as_block(block);
+        let (catch_local, catch_body) = match catches.first() {
+            Some(c) => {
+                let name = match &c.param {
+                    Some(Pattern::Identifier { name, .. }) => name.clone(),
+                    _ => Rc::from("<catch>"),
+                };
+                let local = self.bind_local(name, BackendTy::Dynamic(DynReason::NotYetSupported));
+                let cb = self.lower_stmt_as_block(&c.body);
+                (local, cb)
+            }
+            None => {
+                let local = self.fresh_local(BackendTy::Dynamic(DynReason::NotYetSupported));
+                (local, vec![])
+            }
+        };
+        let mut out = vec![TirStmt::Try { body, catch_local, catch_body }];
+        if let Some(f) = finally {
+            out.extend(self.lower_stmt_as_block(f));
+        }
+        out
+    }
+
+    /// `switch (d) { case a: … case b: … default: … }` -> hoist `d`, then an
+    /// If-chain of `d == case`. Fallthrough is not modelled — each case is
+    /// assumed to `break`.
+    fn lower_switch(
+        &mut self,
+        discriminant: &Expr,
+        cases: &[varn_core::ast::SwitchCase],
+    ) -> Vec<TirStmt> {
+        let d = self.lower_expr(discriminant);
+        let mut out = std::mem::take(&mut self.pending);
+        let d = self.hoist(d);
+        out.extend(std::mem::take(&mut self.pending));
+        out.extend(self.switch_cases(&d, cases, 0));
+        out
+    }
+
+    fn switch_cases(
+        &mut self,
+        d: &TirExpr,
+        cases: &[varn_core::ast::SwitchCase],
+        i: usize,
+    ) -> Vec<TirStmt> {
+        let Some(case) = cases.get(i) else { return vec![] };
+        self.scopes.push(FxHashMap::default());
+        let body: Vec<TirStmt> = case.body.iter().flat_map(|s| self.lower_stmt(s)).collect();
+        self.scopes.pop();
+        let rest = self.switch_cases(d, cases, i + 1);
+        match &case.test {
+            None => {
+                // default: runs unconditionally at this position.
+                let mut v = body;
+                v.extend(rest);
+                v
+            }
+            Some(t) => {
+                let te = self.lower_expr(t);
+                let mut pre = std::mem::take(&mut self.pending);
+                let cond = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Eq,
+                        lhs: Box::new(d.clone()),
+                        rhs: Box::new(te),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: d.span,
+                };
+                pre.push(TirStmt::If { cond, then_body: body, else_body: rest });
+                pre
+            }
         }
     }
 
@@ -875,19 +968,72 @@ impl<'a> FnEmitter<'a> {
             }
             ExprKind::New { callee, args, .. } => return self.lower_new(callee, args, ty, span),
 
-            // Only a plain `=` to an identifier or a field. Compound assign
-            // (`+=` …) and destructuring targets are later sub-phases.
-            ExprKind::Assign { op: varn_core::ast::operators::AssignOp::Assign, target, value }
+            // Assignment to an identifier or a field: plain `=` directly,
+            // compound `+=` … as `t = t <op> v`. Destructuring targets later.
+            ExprKind::Assign { op, target, value }
                 if matches!(
                     target.kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
-                ) =>
+                ) && Self::is_pure(target) =>
             {
                 let t = self.lower_expr(target);
                 let v = self.lower_expr(value);
+                let rhs = match assign_bin_op(*op) {
+                    Ok(None) => v, // plain `=`
+                    Ok(Some(bop)) if operands_coherent(bop, t.ty, v.ty, t.ty) => TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: bop,
+                            lhs: Box::new(t.clone()),
+                            rhs: Box::new(v),
+                        },
+                        ty: t.ty,
+                        res: Resolution::None,
+                        span,
+                    },
+                    _ => return TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
+                };
                 return TirExpr {
-                    kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(v) },
+                    kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(rhs) },
                     ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+
+            // `x++` / `--x` -> `x = x <+/-> 1` (the value it yields is not
+            // distinguished; correct in statement position, which is almost
+            // always where it sits).
+            ExprKind::Update { op, operand, .. }
+                if matches!(
+                    operand.kind,
+                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
+                ) && Self::is_pure(operand) =>
+            {
+                use varn_core::ast::operators::UpdateOp;
+                let t = self.lower_expr(operand);
+                if t.ty != BackendTy::Int {
+                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                }
+                let bop = match op {
+                    UpdateOp::Increment => TirBinOp::Add,
+                    UpdateOp::Decrement => TirBinOp::Sub,
+                };
+                let stepped = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: bop,
+                        lhs: Box::new(t.clone()),
+                        rhs: Box::new(int_lit(1)),
+                    },
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span,
+                };
+                return TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(t),
+                        value: Box::new(stepped),
+                    },
+                    ty: BackendTy::Int,
                     res: Resolution::None,
                     span,
                 };
@@ -1412,6 +1558,23 @@ fn bool_lit(v: bool) -> TirExpr {
         res: Resolution::None,
         span: Span::EMPTY,
     }
+}
+
+/// `Ok(None)` for a plain `=`, `Ok(Some(op))` for an arithmetic compound
+/// assignment, `Err` for one this sub-phase does not lower (`??=`, `&&=`,
+/// bitwise-assign).
+fn assign_bin_op(op: varn_core::ast::operators::AssignOp) -> Result<Option<TirBinOp>, ()> {
+    use varn_core::ast::operators::AssignOp as A;
+    Ok(Some(match op {
+        A::Assign => return Ok(None),
+        A::AddAssign => TirBinOp::Add,
+        A::SubAssign => TirBinOp::Sub,
+        A::MulAssign => TirBinOp::Mul,
+        A::DivAssign => TirBinOp::Div,
+        A::ModAssign => TirBinOp::Mod,
+        A::PowAssign => TirBinOp::Pow,
+        _ => return Err(()),
+    }))
 }
 
 fn int_lit(v: i64) -> TirExpr {
