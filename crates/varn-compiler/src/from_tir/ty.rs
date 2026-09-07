@@ -1,0 +1,130 @@
+//! `varn_tir::BackendTy` -> the SSA IR's type (`crate::hir::HirType`).
+//!
+//! The SSA IR keeps its current type enum through stage 3 (it is renamed off
+//! `Hir` once HIR is deleted). `BackendTy`'s structured handles index the TIR
+//! module's own `TyTable`; here they are re-interned into the SSA-side
+//! `TyTable`, which is keyed by class *name*.
+//!
+//! Kinds the SSA type has no slot for (`char`, `decimal`, `bigint`, `enum`,
+//! `fn`, `map`, `set`, `tuple`) map to `Ref` — a heap value with no further
+//! static shape. That is conservative, never wrong; the precise opcodes those
+//! types unlock are stage 4/5.
+
+use crate::hir::{HirType, TyTable as SsaTyTable};
+use varn_tir::{BackendTy, TirModule};
+
+/// Lower one `BackendTy`, re-interning any nested handles into `out`.
+pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
+    match bt {
+        BackendTy::Int => HirType::Int,
+        BackendTy::Float => HirType::Float,
+        BackendTy::Bool => HirType::Bool,
+        BackendTy::Str => HirType::Str,
+        // No scalar `Char` slot in the SSA type yet — it travels as an int.
+        BackendTy::Char => HirType::Int,
+
+        BackendTy::Decimal
+        | BackendTy::BigInt
+        | BackendTy::Map(..)
+        | BackendTy::Set(_)
+        | BackendTy::Tuple(_)
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_) => HirType::Ref,
+
+        BackendTy::Array(el) => {
+            let inner = resolve(el, tir, out);
+            HirType::Array(out.intern(inner))
+        }
+        BackendTy::Class(cid) => match tir.class(cid) {
+            Some(ci) => HirType::Class(out.class_id(&ci.name)),
+            None => HirType::Ref,
+        },
+        BackendTy::Nullable(inner) => {
+            let inner = resolve(inner, tir, out);
+            HirType::Nullable(out.intern(inner))
+        }
+
+        BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => HirType::Dynamic,
+    }
+}
+
+fn resolve(id: varn_tir::TyId, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
+    if !tir.types.contains(id) {
+        return HirType::Dynamic;
+    }
+    lower(tir.types.get(id), tir, out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use varn_tir::{
+        BackendTy as B, ClassInfo, DynReason, Signature, TirFunction, TirModule, TyTable,
+    };
+    use std::rc::Rc;
+
+    fn empty_module() -> TirModule {
+        let mut types = TyTable::default();
+        let _ = types.intern(B::Never);
+        TirModule {
+            source_file: Rc::from("t.vn"),
+            types,
+            classes: vec![ClassInfo::new(Rc::from("Point"), None, vec![])],
+            enums: vec![],
+            signatures: vec![Signature { params: vec![], return_ty: B::Void }],
+            functions: vec![],
+            globals: vec![],
+            top_level: TirFunction {
+                name: Rc::from("<module>"),
+                sig: varn_tir::SigId(0),
+                params: vec![],
+                return_ty: B::Void,
+                locals: vec![],
+                body: vec![],
+                has_this: false,
+                this_class: None,
+                is_async: false,
+                is_generator: false,
+            },
+        }
+    }
+
+    #[test]
+    fn scalars_pass_through() {
+        let m = empty_module();
+        let mut out = SsaTyTable::default();
+        assert_eq!(lower(B::Int, &m, &mut out), HirType::Int);
+        assert_eq!(lower(B::Bool, &m, &mut out), HirType::Bool);
+        assert_eq!(lower(B::Str, &m, &mut out), HirType::Str);
+    }
+
+    #[test]
+    fn dynamic_and_opaque_kinds_are_dynamic_or_ref() {
+        let m = empty_module();
+        let mut out = SsaTyTable::default();
+        assert_eq!(lower(B::Dynamic(DynReason::Unannotated), &m, &mut out), HirType::Dynamic);
+        assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Ref);
+        assert_eq!(lower(B::Void, &m, &mut out), HirType::Dynamic);
+    }
+
+    #[test]
+    fn array_of_int_re_interns() {
+        let mut m = empty_module();
+        let int_id = m.types.intern(B::Int);
+        let mut out = SsaTyTable::default();
+        let HirType::Array(el) = lower(B::Array(int_id), &m, &mut out) else {
+            panic!("expected Array");
+        };
+        assert_eq!(out.get(el), HirType::Int);
+    }
+
+    #[test]
+    fn class_maps_by_name() {
+        let m = empty_module();
+        let mut out = SsaTyTable::default();
+        let HirType::Class(cid) = lower(B::Class(varn_tir::ClassId(0)), &m, &mut out) else {
+            panic!("expected Class");
+        };
+        assert_eq!(out.class_name(cid).as_ref(), "Point");
+    }
+}

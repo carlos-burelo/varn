@@ -7,6 +7,8 @@
 //! Nothing is wired yet: the pipeline still compiles through HIR, so the
 //! corpus stays green while this fills in.
 
+pub mod ty;
+
 use crate::ssa::ir::SsaFunc;
 use crate::OptError;
 use varn_tir::TirModule;

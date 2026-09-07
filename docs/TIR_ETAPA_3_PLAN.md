@@ -119,8 +119,18 @@ no se migra. `vn cache clean` en las notas de la etapa.
 
 ## 5. Progreso
 
-- [ ] 3.1 `varn-compiler` → `varn-tir`, `from_tir/` skeleton
-- [ ] 3.2 `HirType` → `BackendTy` en `ssa/ir.rs`
-- [ ] 3.3 `from_tir/` cubre el corpus
-- [ ] 3.4 el corte + borrados
+- [x] 3.1 `varn-compiler` → `varn-tir`, `from_tir/` skeleton (`ff5d5220`)
+- [~] 3.2 tipo del SSA IR. **Revisado:** el SSA IR **conserva su enum de tipo
+      actual** (`crate::hir::HirType`, ya con handles `TyId`/`ClassId` + tabla)
+      durante la etapa 3; se renombra a `SsaTy` cuando muera `hir/`. Evita el
+      edit transversal de 47 archivos. Hecho el puente
+      `from_tir/ty.rs`: `BackendTy → HirType`, re-internando handles anidados
+      en la `TyTable` del lado SSA (por nombre de clase). `char`→`Int`;
+      `decimal`/`bigint`/`enum`/`fn`/`map`/`set`/`tuple`→`Ref`. 4 tests.
+- [ ] 3.3 `from_tir/build.rs` — construcción SSA desde TIR. El grueso:
+      `InstKind` tiene ~50 variantes, hace falta la maquinaria de bloques /
+      phi / pinned-vars / sellado. `from_tir` debería ser MÁS pequeño que
+      `ssa/build/` (~3150 líneas) porque el TIR ya es plano y las
+      resoluciones colapsan la explosión de variantes de HIR. Campaña propia.
+- [ ] 3.4 el corte + borrados (~6000 líneas), corpus rojo
 - [ ] 3.5 caché de bytecode
