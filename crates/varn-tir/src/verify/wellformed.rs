@@ -169,27 +169,42 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
         TirExprKind::Call { callee, args } => {
             check_expr(m, f, callee, errors);
             for a in args {
-                check_expr(m, f, a, errors);
+                check_expr(m, f, a.value(), errors);
             }
         }
         TirExprKind::MethodCall { recv, args, .. } => {
             check_expr(m, f, recv, errors);
             for a in args {
-                check_expr(m, f, a, errors);
+                check_expr(m, f, a.value(), errors);
             }
         }
         TirExprKind::Assign { target, value } => {
             check_expr(m, f, target, errors);
             check_expr(m, f, value, errors);
         }
-        TirExprKind::ArrayLit(xs) | TirExprKind::TupleLit(xs) => {
+        TirExprKind::TupleLit(xs) => {
             for x in xs {
                 check_expr(m, f, x, errors);
             }
         }
-        TirExprKind::ObjectLit { fields } => {
-            for (_, v) in fields {
-                check_expr(m, f, v, errors);
+        TirExprKind::ArrayLit(els) => {
+            for el in els {
+                match el {
+                    crate::node::TirArrayEl::Expr(x) | crate::node::TirArrayEl::Spread(x) => {
+                        check_expr(m, f, x, errors)
+                    }
+                    crate::node::TirArrayEl::Hole => {}
+                }
+            }
+        }
+        TirExprKind::ObjectLit { entries } => {
+            for entry in entries {
+                match entry {
+                    crate::node::TirObjectEntry::Field { value, .. }
+                    | crate::node::TirObjectEntry::Spread(value) => {
+                        check_expr(m, f, value, errors)
+                    }
+                }
             }
         }
         TirExprKind::New { class, args } => {
@@ -200,13 +215,30 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 ));
             }
             for a in args {
-                check_expr(m, f, a, errors);
+                check_expr(m, f, a.value(), errors);
             }
         }
         TirExprKind::MakeVariant { args } => {
             for a in args {
-                check_expr(m, f, a, errors);
+                check_expr(m, f, a.value(), errors);
             }
+        }
+        TirExprKind::Await { future } => check_expr(m, f, future, errors),
+        TirExprKind::Yield { value, .. } => {
+            if let Some(v) = value {
+                check_expr(m, f, v, errors);
+            }
+        }
+        TirExprKind::Discriminant { value } => check_expr(m, f, value, errors),
+        TirExprKind::VariantPayload { value, .. } => check_expr(m, f, value, errors),
+        TirExprKind::TypeTest { value, class } => {
+            if m.class(*class).is_none() {
+                errors.push(VerifyError::new(
+                    format!("TypeTest names ClassId({}), which has no entry", class.0),
+                    e.span,
+                ));
+            }
+            check_expr(m, f, value, errors);
         }
         TirExprKind::Select { cond, then_val, else_val } => {
             check_expr(m, f, cond, errors);

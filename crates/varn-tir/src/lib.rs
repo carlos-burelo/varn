@@ -13,7 +13,10 @@ mod resolution;
 pub use resolution::Resolution;
 
 mod node;
-pub use node::{Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirBinOp, TirUnOp};
+pub use node::{
+    Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirBinOp, TirUnOp, TirArg,
+    TirArrayEl, TirObjectEntry,
+};
 
 mod tables;
 pub use tables::{ClassInfo, FieldInfo, VtableEntry, EnumInfo, VariantInfo, Signature};

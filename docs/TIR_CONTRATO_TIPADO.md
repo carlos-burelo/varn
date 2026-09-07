@@ -573,25 +573,34 @@ comprobar si `match` con patrones, `for…of` y los genéricos se expresan sin
 residuo sintáctico.
 
 **El TIR sale incompleto.** El riesgo opuesto, encontrado al revisar la
-etapa 1 y no previsto al escribir esto. El conjunto de nodos de §4 no puede
-expresar todavía:
+etapa 1 y no previsto al escribir esto. El conjunto de nodos de §4 no
+expresaba todavía cuatro construcciones. Resueltas contra el AST real
+(`ast/expr.rs`, `ast/stmt.rs`, `ast/pattern.rs`) como condición de entrada de
+la etapa 2:
 
-* **generadores y `async`/`await`** — no hay `Yield` ni `Await`, y tampoco
-  estado de suspensión en `TirFunction`. Es el caso serio: exige forma nueva,
-  no una variante más;
-* **`match` con patrones, `?.` y `??`** — no hay primitiva de test de nulo
-  (`TirUnOp` carece de `IsNull`) ni accesor de discriminante para un valor
-  construido con `MakeVariant`;
-* **spread** — `Call`, `ArrayLit` y `ObjectLit` llevan `Vec<TirExpr>` planos.
+* **generadores y `async`/`await`** — `TirFunction` gana `is_async` e
+  `is_generator`; se añaden `TirExprKind::Await{future}` y
+  `TirExprKind::Yield{value,delegate}`. Sin estado de suspensión en el IR: el
+  backend construye la máquina de estados igual que hoy desde HIR, donde
+  `Await`/`Yield` son también instrucciones de un operando. El verificador
+  exige que `Await` viva en función `is_async` y `Yield` en `is_generator`.
+* **`?.` y `??`** — un único primitivo, `TirUnOp::IsNull` (→ `Bool`). El
+  cortocircuito y la evaluación única del receptor los desazucara el emisor a
+  `Let` temporal + `Select{IsNull(Var), …}`; no hay nodo dedicado.
+* **`match` con patrones** — `Discriminant{value}` (→ `Int`, el tag),
+  `VariantPayload{value,tag,field}` (con `res: EnumVariant`) y
+  `TypeTest{value,class}` (→ `Bool`, compartido con `expr is T`). El `match`
+  baja a cadena de `If`; las guardas entran como `&&` en la condición. El
+  verificador comprueba que el tipo del nodo `VariantPayload` es exactamente
+  el declarado para ese campo de la variante.
+* **spread** — se introduce `enum TirArg { Expr | Spread | Named }` en
+  `Call`/`MethodCall`/`New`/`MakeVariant`; `enum TirArrayEl { Expr | Spread |
+  Hole }` en `ArrayLit`; `enum TirObjectEntry { Field | Spread }` en
+  `ObjectLit`. Con `Spread` o `Named` presente, la regla de aridad/tipos de
+  argumento no aplica y queda para una regla posterior.
 
-Deliberadamente no se cierran en la etapa 1: sin emisor, añadir nodos que
-nadie construye es el código especulativo que este plan existe para no
-producir, y el verificador se escribiría contra variantes muertas. `?.` en
-particular necesita cortocircuito, que no se diseña bien a ciegas.
-
-**Son, por tanto, la condición de entrada de la etapa 2**: el primer trabajo
-de esa etapa es decidir la forma de estos nodos contra el AST real, antes de
-emitir nada.
+El emisor de la etapa 2 aún debe construir estos nodos; el verificador ya los
+rechaza mal formados (`tests/verify_new_nodes.rs`).
 
 **La rama no vuelve.** Entre las etapas 3 y 4 no hay ejecución. El verificador
 y el compilador de los 191 módulos son el único instrumento, y no ven

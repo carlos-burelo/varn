@@ -24,6 +24,8 @@ fn empty_module() -> TirModule {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     }
 }

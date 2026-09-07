@@ -29,6 +29,8 @@ fn module_with_point() -> TirModule {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     }
 }
@@ -159,6 +161,8 @@ fn method_call_arity_mismatch_is_rejected() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
 
@@ -209,6 +213,8 @@ fn method_call_with_correct_arity_verifies() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
 
@@ -221,7 +227,7 @@ fn method_call_with_correct_arity_verifies() {
         TirExprKind::MethodCall {
             recv: Box::new(recv),
             name: "move".into(),
-            args: vec![int(42)],
+            args: vec![TirArg::Expr(int(42))],
         },
         BackendTy::Void,
         Resolution::VtableSlot(0),
@@ -332,6 +338,8 @@ fn return_with_correct_type_verifies() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42))));
@@ -366,6 +374,8 @@ fn bare_return_in_non_void_function_is_rejected() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(None));
@@ -396,6 +406,8 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -429,6 +441,8 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -464,6 +478,8 @@ fn return_of_never_type_is_valid_anywhere() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -496,6 +512,8 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42)))); // returning Int
@@ -524,6 +542,8 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -568,6 +588,8 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
 
@@ -580,7 +602,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         TirExprKind::MethodCall {
             recv: Box::new(recv),
             name: "move".into(),
-            args: vec![int(42)], // Int goes into Nullable(Int)
+            args: vec![TirArg::Expr(int(42))], // Int goes into Nullable(Int)
         },
         BackendTy::Void,
         Resolution::VtableSlot(0),
@@ -621,6 +643,8 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
 
@@ -633,11 +657,11 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         TirExprKind::MethodCall {
             recv: Box::new(recv),
             name: "move".into(),
-            args: vec![expr(
+            args: vec![TirArg::Expr(expr(
                 TirExprKind::IntLit(42),
                 BackendTy::Nullable(int_id), // Nullable(Int) goes into Int
                 Resolution::None,
-            )],
+            ))],
         },
         BackendTy::Void,
         Resolution::VtableSlot(0),
@@ -669,6 +693,8 @@ fn let_declared_nullable_int_init_str_should_fail() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -709,6 +735,8 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -767,6 +795,8 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
             body: vec![],
             has_this: false,
             this_class: None,
+            is_async: false,
+            is_generator: false,
         },
     };
 

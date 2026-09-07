@@ -4,7 +4,9 @@
 //! is advancing — and with the corpus red, those are two different questions
 //! that need two different instruments.
 
-use crate::node::{TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
+use crate::node::{
+    TirArrayEl, TirExpr, TirExprKind, TirFunction, TirModule, TirObjectEntry, TirStmt,
+};
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, DynReason};
 
@@ -157,34 +159,55 @@ impl Coverage {
             TirExprKind::Call { callee, args } => {
                 self.walk_expr(callee);
                 for a in args {
-                    self.walk_expr(a);
+                    self.walk_expr(a.value());
                 }
             }
             TirExprKind::MethodCall { recv, args, .. } => {
                 self.walk_expr(recv);
                 for a in args {
-                    self.walk_expr(a);
+                    self.walk_expr(a.value());
                 }
             }
             TirExprKind::Assign { target, value } => {
                 self.walk_expr(target);
                 self.walk_expr(value);
             }
-            TirExprKind::ArrayLit(xs) | TirExprKind::TupleLit(xs) => {
+            TirExprKind::TupleLit(xs) => {
                 for x in xs {
                     self.walk_expr(x);
                 }
             }
-            TirExprKind::ObjectLit { fields } => {
-                for (_, v) in fields {
-                    self.walk_expr(v);
+            TirExprKind::ArrayLit(els) => {
+                for el in els {
+                    match el {
+                        TirArrayEl::Expr(x) | TirArrayEl::Spread(x) => self.walk_expr(x),
+                        TirArrayEl::Hole => {}
+                    }
+                }
+            }
+            TirExprKind::ObjectLit { entries } => {
+                for entry in entries {
+                    match entry {
+                        TirObjectEntry::Field { value, .. } | TirObjectEntry::Spread(value) => {
+                            self.walk_expr(value)
+                        }
+                    }
                 }
             }
             TirExprKind::New { args, .. } | TirExprKind::MakeVariant { args } => {
                 for a in args {
-                    self.walk_expr(a);
+                    self.walk_expr(a.value());
                 }
             }
+            TirExprKind::Await { future } => self.walk_expr(future),
+            TirExprKind::Yield { value, .. } => {
+                if let Some(v) = value {
+                    self.walk_expr(v);
+                }
+            }
+            TirExprKind::Discriminant { value }
+            | TirExprKind::VariantPayload { value, .. }
+            | TirExprKind::TypeTest { value, .. } => self.walk_expr(value),
             TirExprKind::Select { cond, then_val, else_val } => {
                 self.walk_expr(cond);
                 self.walk_expr(then_val);

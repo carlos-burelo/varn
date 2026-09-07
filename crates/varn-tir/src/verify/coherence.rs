@@ -4,7 +4,10 @@
 //! the pipeline looks for the second today.
 
 use super::VerifyError;
-use crate::node::{TirBinOp, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
+use crate::node::{
+    TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirFunction, TirModule, TirObjectEntry,
+    TirStmt, TirUnOp,
+};
 use crate::resolution::Resolution;
 use crate::ty::BackendTy;
 
@@ -23,16 +26,16 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
 
 fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<VerifyError>) {
     match s {
-        TirStmt::Expr(e) | TirStmt::Throw(e) => walk_expr(m, e, errors),
+        TirStmt::Expr(e) | TirStmt::Throw(e) => walk_expr(m, f, e, errors),
         TirStmt::Let { ty, init, .. } => {
             if let Some(e) = init {
-                walk_expr(m, e, errors);
+                walk_expr(m, f, e, errors);
                 check_let(m, *ty, e, errors);
             }
         }
         TirStmt::Return(v) => {
             if let Some(e) = v {
-                walk_expr(m, e, errors);
+                walk_expr(m, f, e, errors);
                 check_return(m, f, e, errors);
             } else {
                 // Bare Return(None) requires function to return Void
@@ -40,14 +43,14 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
             }
         }
         TirStmt::If { cond, then_body, else_body } => {
-            walk_expr(m, cond, errors);
+            walk_expr(m, f, cond, errors);
             check_condition(m, "if", cond, errors);
             for s in then_body.iter().chain(else_body) {
                 walk_stmt(m, f, s, errors);
             }
         }
         TirStmt::Loop { cond, body } => {
-            walk_expr(m, cond, errors);
+            walk_expr(m, f, cond, errors);
             check_condition(m, "loop", cond, errors);
             for s in body {
                 walk_stmt(m, f, s, errors);
@@ -62,62 +65,136 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
     }
 }
 
-fn walk_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
+fn walk_arg(m: &TirModule, f: &TirFunction, a: &TirArg, errors: &mut Vec<VerifyError>) {
+    walk_expr(m, f, a.value(), errors);
+}
+
+fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     match &e.kind {
         TirExprKind::Binary { op, lhs, rhs } => {
-            walk_expr(m, lhs, errors);
-            walk_expr(m, rhs, errors);
+            walk_expr(m, f, lhs, errors);
+            walk_expr(m, f, rhs, errors);
             check_binary(m, e, *op, lhs, rhs, errors);
         }
         TirExprKind::Field { object, .. } => {
-            walk_expr(m, object, errors);
+            walk_expr(m, f, object, errors);
             check_field(m, e, object, errors);
         }
         TirExprKind::Index { object, index } => {
-            walk_expr(m, object, errors);
-            walk_expr(m, index, errors);
+            walk_expr(m, f, object, errors);
+            walk_expr(m, f, index, errors);
             check_index(m, e, object, errors);
         }
-        TirExprKind::Unary { operand, .. } | TirExprKind::Cast { operand } => {
-            walk_expr(m, operand, errors)
+        TirExprKind::Unary { op, operand } => {
+            walk_expr(m, f, operand, errors);
+            if *op == TirUnOp::IsNull && e.ty != BackendTy::Bool {
+                errors.push(VerifyError::new(
+                    format!("IsNull must produce Bool, node says {:?}", e.ty),
+                    e.span,
+                ));
+            }
         }
+        TirExprKind::Cast { operand } => walk_expr(m, f, operand, errors),
         TirExprKind::Call { callee, args } => {
-            walk_expr(m, callee, errors);
+            walk_expr(m, f, callee, errors);
             for a in args {
-                walk_expr(m, a, errors);
+                walk_arg(m, f, a, errors);
             }
             check_direct_call(m, e, args, errors);
         }
         TirExprKind::MethodCall { recv, args, .. } => {
-            walk_expr(m, recv, errors);
+            walk_expr(m, f, recv, errors);
             for a in args {
-                walk_expr(m, a, errors);
+                walk_arg(m, f, a, errors);
             }
             check_method_call(m, e, recv, args, errors);
         }
         TirExprKind::Assign { target, value } => {
-            walk_expr(m, target, errors);
-            walk_expr(m, value, errors);
+            walk_expr(m, f, target, errors);
+            walk_expr(m, f, value, errors);
         }
-        TirExprKind::ArrayLit(xs) | TirExprKind::TupleLit(xs) => {
+        TirExprKind::TupleLit(xs) => {
             for x in xs {
-                walk_expr(m, x, errors);
+                walk_expr(m, f, x, errors);
             }
         }
-        TirExprKind::ObjectLit { fields } => {
-            for (_, v) in fields {
-                walk_expr(m, v, errors);
+        TirExprKind::ArrayLit(els) => {
+            for el in els {
+                match el {
+                    TirArrayEl::Expr(x) | TirArrayEl::Spread(x) => walk_expr(m, f, x, errors),
+                    TirArrayEl::Hole => {}
+                }
+            }
+        }
+        TirExprKind::ObjectLit { entries } => {
+            for entry in entries {
+                match entry {
+                    TirObjectEntry::Field { value, .. } | TirObjectEntry::Spread(value) => {
+                        walk_expr(m, f, value, errors)
+                    }
+                }
             }
         }
         TirExprKind::New { args, .. } | TirExprKind::MakeVariant { args } => {
             for a in args {
-                walk_expr(m, a, errors);
+                walk_arg(m, f, a, errors);
+            }
+        }
+        TirExprKind::Await { future } => {
+            walk_expr(m, f, future, errors);
+            if !f.is_async {
+                errors.push(VerifyError::new(
+                    format!("`await` in `{}`, which is not async", f.name),
+                    e.span,
+                ));
+            }
+        }
+        TirExprKind::Yield { value, .. } => {
+            if let Some(v) = value {
+                walk_expr(m, f, v, errors);
+            }
+            if !f.is_generator {
+                errors.push(VerifyError::new(
+                    format!("`yield` in `{}`, which is not a generator", f.name),
+                    e.span,
+                ));
+            }
+        }
+        TirExprKind::Discriminant { value } => {
+            walk_expr(m, f, value, errors);
+            if e.ty != BackendTy::Int {
+                errors.push(VerifyError::new(
+                    format!("Discriminant must produce Int, node says {:?}", e.ty),
+                    e.span,
+                ));
+            }
+            if !matches!(
+                value.ty.non_nullable(&m.types),
+                BackendTy::Enum(_) | BackendTy::Dynamic(_)
+            ) {
+                errors.push(VerifyError::new(
+                    format!("Discriminant of {:?}, which is not an enum", value.ty),
+                    e.span,
+                ));
+            }
+        }
+        TirExprKind::VariantPayload { value, tag, field } => {
+            walk_expr(m, f, value, errors);
+            check_variant_payload(m, e, value, *tag, *field, errors);
+        }
+        TirExprKind::TypeTest { value, .. } => {
+            walk_expr(m, f, value, errors);
+            if e.ty != BackendTy::Bool {
+                errors.push(VerifyError::new(
+                    format!("TypeTest must produce Bool, node says {:?}", e.ty),
+                    e.span,
+                ));
             }
         }
         TirExprKind::Select { cond, then_val, else_val } => {
-            walk_expr(m, cond, errors);
-            walk_expr(m, then_val, errors);
-            walk_expr(m, else_val, errors);
+            walk_expr(m, f, cond, errors);
+            walk_expr(m, f, then_val, errors);
+            walk_expr(m, f, else_val, errors);
             if then_val.ty != else_val.ty && e.ty != BackendTy::Dynamic(crate::ty::DynReason::Union)
             {
                 errors.push(VerifyError::new(
@@ -133,6 +210,46 @@ fn walk_expr(m: &TirModule, e: &TirExpr, errors: &mut Vec<VerifyError>) {
         | TirExprKind::CharLit(_)
         | TirExprKind::NullLit
         | TirExprKind::Var => {}
+    }
+}
+
+/// A payload read produces exactly the variant field's declared type.
+fn check_variant_payload(
+    m: &TirModule,
+    e: &TirExpr,
+    value: &TirExpr,
+    tag: u16,
+    field: u16,
+    errors: &mut Vec<VerifyError>,
+) {
+    let BackendTy::Enum(id) = value.ty.non_nullable(&m.types) else {
+        return; // wellformed already reported this
+    };
+    let Some(variant) = m.enum_info(id).and_then(|ei| ei.variant_at(tag)) else {
+        errors.push(VerifyError::new(
+            format!("VariantPayload names tag {tag}, which EnumId({}) has no variant for", id.0),
+            e.span,
+        ));
+        return;
+    };
+    let Some(&field_ty) = variant.payload.get(field as usize) else {
+        errors.push(VerifyError::new(
+            format!(
+                "VariantPayload field {field} is out of range for variant `{}`",
+                variant.name
+            ),
+            e.span,
+        ));
+        return;
+    };
+    if e.ty != field_ty {
+        errors.push(VerifyError::new(
+            format!(
+                "variant `{}` field {field} is {:?}, node says {:?}",
+                variant.name, field_ty, e.ty
+            ),
+            e.span,
+        ));
     }
 }
 
@@ -288,10 +405,17 @@ fn check_index(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: &mut Vec<Ve
     }
 }
 
+/// Arity and per-argument types can only be checked against a positional list
+/// with no spread. A spread contributes an unknown count; a named argument is
+/// matched by label, not position — both are left to a later rule.
+fn is_positional(args: &[TirArg]) -> bool {
+    args.iter().all(|a| matches!(a, TirArg::Expr(_)))
+}
+
 fn check_direct_call(
     m: &TirModule,
     e: &TirExpr,
-    args: &[TirExpr],
+    args: &[TirArg],
     errors: &mut Vec<VerifyError>,
 ) {
     let Resolution::DirectFn(f) = &e.res else {
@@ -303,6 +427,9 @@ fn check_direct_call(
     let Some(sig) = m.signature(func.sig) else {
         return;
     };
+    if !is_positional(args) {
+        return;
+    }
     if args.len() != sig.arity() {
         errors.push(VerifyError::new(
             format!(
@@ -317,11 +444,13 @@ fn check_direct_call(
     }
     // Each argument must be assignable TO its parameter
     for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if !assignable(m, a.ty, *p) {
+        if !assignable(m, a.value().ty, *p) {
             errors.push(VerifyError::new(
                 format!(
                     "call to `{}`: argument {i} is {:?}, parameter is {:?}",
-                    func.name, a.ty, p
+                    func.name,
+                    a.value().ty,
+                    p
                 ),
                 e.span,
             ));
@@ -343,7 +472,7 @@ fn check_method_call(
     m: &TirModule,
     e: &TirExpr,
     recv: &TirExpr,
-    args: &[TirExpr],
+    args: &[TirArg],
     errors: &mut Vec<VerifyError>,
 ) {
     let Resolution::VtableSlot(slot) = &e.res else {
@@ -362,6 +491,10 @@ fn check_method_call(
         return; // ditto
     };
 
+    if !is_positional(args) {
+        return;
+    }
+
     // Check arity
     if args.len() != sig.arity() {
         errors.push(VerifyError::new(
@@ -377,11 +510,12 @@ fn check_method_call(
 
     // Each argument must be assignable TO its parameter
     for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if !assignable(m, a.ty, *p) {
+        if !assignable(m, a.value().ty, *p) {
             errors.push(VerifyError::new(
                 format!(
                     "method call: argument {i} is {:?}, parameter is {:?}",
-                    a.ty, p
+                    a.value().ty,
+                    p
                 ),
                 e.span,
             ));

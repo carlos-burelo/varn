@@ -5,7 +5,7 @@
 //! type, so the consumer assumes one. A struct with a mandatory field cannot
 //! have that shape.
 
-use varn_tir::{BackendTy, Resolution, Span, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirArrayEl, TirExpr, TirExprKind};
 
 /// Every node has a type, whatever its kind. This is a compile-time property
 /// — the test exists to pin it, because the moment `ty` becomes an Option the
@@ -22,7 +22,7 @@ fn every_node_kind_carries_a_type() {
 
     // An array literal — one of the kinds HIR had no slot for.
     let arr = TirExpr {
-        kind: TirExprKind::ArrayLit(vec![lit]),
+        kind: TirExprKind::ArrayLit(vec![TirArrayEl::Expr(lit)]),
         ty: BackendTy::Int, // stands in for Array(TyId) built from a real table
         res: Resolution::None,
         span: Span::EMPTY,
