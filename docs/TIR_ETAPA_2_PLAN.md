@@ -193,7 +193,18 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `ExprKind::Await` → `Await{future}`; `ExprKind::Yield` → `Yield{value,
    delegate}` (valor de resume sin tipar todavía). El verificador exige
    `Await` en función `is_async`, `Yield` en `is_generator`.
-8. **Spread y named args.** `TirArg::Spread` / `Named`.
+8. **Spread y named args** (hecho ya en 3/5). `lower_arg` mapea
+   `Positional`/`Spread`/`Named` a `TirArg`; `ArrayLit`/`ObjectLit` llevan
+   spread. Con spread/named presente, `DirectFn`/`VtableSlot` degradan a
+   `ByName` (el verificador no comprueba aridad).
+
+2b (tardío). **`for` C, `do…while`, `for…of` sobre array** (hecho). `for` →
+   init + `Loop{true}` con `update` al inicio del body tras flag de primera
+   iteración (para que `continue` avance) + `test` como puerta de `break`.
+   `do…while` → body + puerta de `break` al final. `for…of` sobre iterable
+   `Array(el)` → `let i=0; loop { if !(i<len) break; let x=arr[i]; body; i=i+1 }`.
+   `for…in`, `for…of` sobre no-array (protocolo iterador), `switch`, `try`,
+   `using` → placeholder.
 
 Cada sub-fase que aún no cubra una forma la emite como
 `Dynamic(NotYetSupported)` con un `TirStmt::Expr` placeholder — nunca un

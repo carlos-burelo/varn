@@ -247,10 +247,207 @@ impl<'a> FnEmitter<'a> {
                 }
             }
 
-            // C-style for, do-while, for-of/in, switch, try, using, labeled:
-            // later sub-phases.
+            StmtKind::For { init, test, update, body } => self.lower_for(
+                init.as_deref(),
+                test.as_deref(),
+                update.as_deref(),
+                body,
+            ),
+
+            StmtKind::DoWhile { body, test } => {
+                let mut loop_body = self.lower_stmt_as_block(body);
+                let cond = self.lower_cond(test);
+                loop_body.extend(std::mem::take(&mut self.pending));
+                loop_body.push(TirStmt::If {
+                    cond,
+                    then_body: vec![],
+                    else_body: vec![TirStmt::Break],
+                });
+                one(TirStmt::Loop { cond: bool_lit(true), body: loop_body })
+            }
+
+            StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
+
+            // for-in, switch, try, using, labeled: later.
             _ => one(TirStmt::Expr(placeholder(DynReason::NotYetSupported))),
         }
+    }
+
+    /// `for (init; test; update) body` -> the init, then a `Loop` whose body
+    /// runs `update` at the top (gated by a first-iteration flag, so `continue`
+    /// still advances), then the test as a `break` gate, then the body.
+    fn lower_for(
+        &mut self,
+        init: Option<&varn_core::ast::ForInit>,
+        test: Option<&Expr>,
+        update: Option<&Expr>,
+        body: &Stmt,
+    ) -> Vec<TirStmt> {
+        use varn_core::ast::ForInit;
+        let mut out = Vec::new();
+
+        match init {
+            Some(ForInit::Var { declarators, .. }) => {
+                for d in declarators {
+                    if let Pattern::Identifier { name, .. } = &d.id {
+                        let iexpr = d.init.as_ref().map(|e| self.lower_expr(e));
+                        let ty = iexpr
+                            .as_ref()
+                            .map(|e| e.ty)
+                            .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                        let local = self.bind_local(name.clone(), ty);
+                        out.extend(std::mem::take(&mut self.pending));
+                        out.push(TirStmt::Let { local, ty, init: iexpr });
+                    }
+                }
+            }
+            Some(ForInit::Expr(e)) => {
+                let e = self.lower_expr(e);
+                out.extend(std::mem::take(&mut self.pending));
+                out.push(TirStmt::Expr(e));
+            }
+            None => {}
+        }
+
+        let first = self.fresh_local(BackendTy::Bool);
+        out.push(TirStmt::Let {
+            local: first,
+            ty: BackendTy::Bool,
+            init: Some(bool_lit(true)),
+        });
+        let first_var = || TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Bool,
+            res: Resolution::Local(first),
+            span: Span::EMPTY,
+        };
+
+        let mut loop_body: Vec<TirStmt> = Vec::new();
+
+        // update, skipped on the first iteration
+        if let Some(u) = update {
+            let ue = self.lower_expr(u);
+            let mut upd = std::mem::take(&mut self.pending);
+            upd.push(TirStmt::Expr(ue));
+            loop_body.push(TirStmt::If {
+                cond: TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::Not,
+                        operand: Box::new(first_var()),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                },
+                then_body: upd,
+                else_body: vec![],
+            });
+        }
+        loop_body.push(TirStmt::Expr(TirExpr {
+            kind: TirExprKind::Assign {
+                target: Box::new(first_var()),
+                value: Box::new(bool_lit(false)),
+            },
+            ty: BackendTy::Void,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        }));
+
+        // test -> break gate
+        if let Some(t) = test {
+            let cond = self.lower_cond(t);
+            loop_body.extend(std::mem::take(&mut self.pending));
+            loop_body.push(TirStmt::If {
+                cond,
+                then_body: vec![],
+                else_body: vec![TirStmt::Break],
+            });
+        }
+
+        loop_body.extend(self.lower_stmt_as_block(body));
+        out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
+        out
+    }
+
+    /// `for (x of iterable) body`. Only an `Array` iterable is lowered here —
+    /// `let i = 0; loop { if !(i < len) break; let x = arr[i]; body; i = i+1 }`;
+    /// the iterator protocol for other types is a later sub-phase.
+    fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+        let Pattern::Identifier { name, .. } = left else {
+            return vec![TirStmt::Expr(placeholder(DynReason::NotYetSupported))];
+        };
+        let iter = self.lower_expr(right);
+        let mut out = std::mem::take(&mut self.pending);
+
+        let BackendTy::Array(el) = iter.ty.non_nullable(self.tt) else {
+            return vec![TirStmt::Expr(placeholder(DynReason::NotYetSupported))];
+        };
+        let elem_ty = self.tt.get(el);
+        let arr = self.hoist(iter);
+        out.extend(std::mem::take(&mut self.pending));
+
+        let idx = self.fresh_local(BackendTy::Int);
+        out.push(TirStmt::Let {
+            local: idx,
+            ty: BackendTy::Int,
+            init: Some(int_lit(0)),
+        });
+        let idx_var = || TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Int,
+            res: Resolution::Local(idx),
+            span: Span::EMPTY,
+        };
+
+        let len = self.field_access(arr.clone(), Rc::from("length"), BackendTy::Int, Span::EMPTY);
+        let cond = TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Lt,
+                lhs: Box::new(idx_var()),
+                rhs: Box::new(len),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        };
+
+        let elem = TirExpr {
+            kind: TirExprKind::Index {
+                object: Box::new(arr),
+                index: Box::new(idx_var()),
+            },
+            ty: elem_ty,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        };
+        let x_local = self.bind_local(name.clone(), elem_ty);
+
+        let mut loop_body = vec![
+            TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
+            TirStmt::Let { local: x_local, ty: elem_ty, init: Some(elem) },
+        ];
+        loop_body.extend(self.lower_stmt_as_block(body));
+        loop_body.push(TirStmt::Expr(TirExpr {
+            kind: TirExprKind::Assign {
+                target: Box::new(idx_var()),
+                value: Box::new(TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Add,
+                        lhs: Box::new(idx_var()),
+                        rhs: Box::new(int_lit(1)),
+                    },
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                }),
+            },
+            ty: BackendTy::Void,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        }));
+
+        out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
+        out
     }
 
     /// `match subject { … }` -> hoist the subject, then a chain of `If`.
@@ -1069,6 +1266,15 @@ fn bool_lit(v: bool) -> TirExpr {
     TirExpr {
         kind: TirExprKind::BoolLit(v),
         ty: BackendTy::Bool,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    }
+}
+
+fn int_lit(v: i64) -> TirExpr {
+    TirExpr {
+        kind: TirExprKind::IntLit(v),
+        ty: BackendTy::Int,
         res: Resolution::None,
         span: Span::EMPTY,
     }
