@@ -9,7 +9,7 @@
 use crate::checker::TypeEntry;
 use crate::emit::tables::NameIndex;
 use crate::emit::ty::{lower_type, NameResolver};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
 use varn_core::ast::pattern::{MatchBinding, MatchPattern};
@@ -49,6 +49,12 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// Names visible in an enclosing function (this emitter is a closure body).
+    /// A reference to one of them resolves to an `Upvalue` rather than
+    /// `ByName`.
+    outer_names: FxHashSet<Rc<str>>,
+    /// Distinct captured names, in first-reference order; the `Upvalue` index.
+    captures: Vec<Rc<str>>,
     /// Statements produced while lowering an expression (hoisted temps, match
     /// desugaring). `lower_stmt` drains this in front of the statement it was
     /// lowering.
@@ -109,6 +115,8 @@ impl<'a> FnEmitter<'a> {
             scopes: vec![FxHashMap::default()],
             params,
             this_class: None,
+            outer_names: FxHashSet::default(),
+            captures: Vec::new(),
             pending: Vec::new(),
         }
     }
@@ -157,7 +165,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn resolve_name(&self, name: &str) -> Resolution {
+    fn resolve_name(&mut self, name: &str) -> Resolution {
         for scope in self.scopes.iter().rev() {
             if let Some(id) = scope.get(name) {
                 return Resolution::Local(*id);
@@ -165,6 +173,17 @@ impl<'a> FnEmitter<'a> {
         }
         if let Some(i) = self.params.iter().position(|p| p.as_ref() == name) {
             return Resolution::Param(i as u32);
+        }
+        // A name from an enclosing function: this is a closure capture.
+        if self.outer_names.contains(name) {
+            let idx = match self.captures.iter().position(|c| c.as_ref() == name) {
+                Some(i) => i,
+                None => {
+                    self.captures.push(Rc::from(name));
+                    self.captures.len() - 1
+                }
+            };
+            return Resolution::Upvalue(idx as u32);
         }
         if let Some(&slot) = self.m.globals.get(name) {
             return Resolution::GlobalSlot(slot);
@@ -1309,6 +1328,14 @@ impl<'a> FnEmitter<'a> {
             params.iter().map(|p| pattern_lead(&p.pattern)).collect();
         let param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()];
 
+        // Every name visible here is visible to the closure body as a capture:
+        // this emitter's outer names, its scopes, and its params.
+        let mut outer_names = self.outer_names.clone();
+        for scope in &self.scopes {
+            outer_names.extend(scope.keys().cloned());
+        }
+        outer_names.extend(self.params.iter().cloned());
+
         // The sub-emitter shares `out_closures`, and a closure's FnId is
         // `closure_base + <its index in that shared vector>`, so the base is
         // the same for nested closures.
@@ -1321,6 +1348,7 @@ impl<'a> FnEmitter<'a> {
             self.closure_base,
             param_names,
         );
+        sub.outer_names = outer_names;
         let stmts = match body {
             ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
             ClosureBody::Expr(e) => {

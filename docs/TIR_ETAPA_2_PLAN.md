@@ -220,10 +220,13 @@ Extra. **`switch` / `try` / `++` / `+=`**: `switch` → hoist + If-chain de
 Extra. **Closures**: nuevo nodo `TirExprKind::Closure{func: FnId}`.
    `function`/`arrow` → el cuerpo se emite como `TirFunction` propia y se
    añade a `functions` (esquema de `FnId`: libres 0..N, luego todas las
-   closures, luego métodos). Las capturas no se resuelven aún — un nombre de
-   scope externo en el cuerpo cae a `ByName` (estado honesto hasta que el
-   análisis de upvalues sea sub-fase). El verificador exige que el `FnId`
-   exista.
+   closures, luego métodos). El verificador exige que el `FnId` exista.
+
+Extra. **Capturas de closure**: el emisor del cuerpo de una closure recibe
+   el conjunto de nombres visibles en las funciones envolventes (outer del
+   padre + sus scopes + sus params). Un `Identifier` que da en ese conjunto
+   → `Resolution::Upvalue(idx)` en vez de `ByName`; `idx` = orden de primera
+   referencia. Transitivo a través de closures anidadas.
 
 Cada sub-fase que aún no cubra una forma la emite como
 `Dynamic(NotYetSupported)` con un `TirStmt::Expr` placeholder — nunca un
