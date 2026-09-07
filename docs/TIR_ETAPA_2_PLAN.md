@@ -144,9 +144,17 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `for…of` necesita el protocolo de iterador (método `.next()`), así que
    depende de la sub-fase 3. Aquí se prueba el riesgo "TIR azucarado": si
    `for…of` no baja sin residuo, D falló.
-3. **Campos y métodos.** `Field` + `Resolution::FieldSlot` / `ByName`;
-   `MethodCall` + `VtableSlot` / `Intrinsic` / `DirectFn` / `ByName`. Primer
-   informe de cobertura con señal real.
+3. **Campos y métodos** (hecho). `Member` no computado → `Field` +
+   `FieldSlot` (tipo del nodo = tipo declarado del campo, la autoridad) o
+   `ByName`; `Member` computado → `Index`. `Call` sobre `Member` →
+   `MethodCall` + `VtableSlot` (sólo si aridad casa con la firma) o `ByName`.
+   `this` → `Var : Class(this_class)`. `Assign` simple (`=` a identificador o
+   campo). Métodos y constructores de clase → `TirFunction` con `has_this`.
+   Firmas de método = `Dynamic` en aridad correcta (el tipado preciso de
+   firmas de método es sub-fase propia — un retorno sin anotar llega como
+   `Void` del binder). `Intrinsic` / `DirectFn` en `MethodCall` → sub-fase 5 /
+   sin resolver aún. Coverage con señal real: `url.vn` 44 static / 21 by-name
+   / 48 NotYetSupported.
 4. **Globales y llamadas libres.** `Var` + `GlobalSlot`; `Call` + `DirectFn`.
 5. **Colecciones y `New`.** `ArrayLit` (+ `Hole`/`Spread`), `ObjectLit`,
    `TupleLit`, `New`, `MakeVariant`.

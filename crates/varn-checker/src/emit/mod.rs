@@ -23,7 +23,9 @@ use crate::module_resolver::ImportResolver;
 use body::FnEmitter;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, StmtKind};
+use varn_core::ast::{
+    AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, Stmt, StmtKind,
+};
 use varn_core::TypeKind;
 use varn_tir::{
     BackendTy, DynReason, Resolution, Signature, SigId, Span, TirExpr, TirExprKind, TirFunction,
@@ -45,7 +47,8 @@ pub fn emit_module(
     let tables::Tables { classes, enums, mut signatures, names } = tables::build(bind, &mut types);
 
     // Module top level: every statement that is not a declaration.
-    let mut top = FnEmitter::new(expr_table, &mut types, &names, &mut signatures, vec![]);
+    let mut top =
+        FnEmitter::new(expr_table, &mut types, &names, &classes, &mut signatures, vec![]);
     let mut top_body = Vec::new();
     for stmt in &program.body {
         match &stmt.kind {
@@ -67,20 +70,31 @@ pub fn emit_module(
         is_generator: false,
     };
 
-    // Free functions, module-level and re-exported.
+    // Free functions, then class methods and constructors.
     let mut functions = Vec::new();
     for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Some(f) = free_function(decl) {
-                functions.push(emit_function(
-                    f,
-                    bind,
-                    expr_table,
-                    &mut types,
-                    &names,
-                    &mut signatures,
-                ));
-            }
+        let StmtKind::Decl(decl) = &stmt.kind else { continue };
+        if let Some(f) = free_function(decl) {
+            functions.push(emit_function(
+                f,
+                bind,
+                expr_table,
+                &mut types,
+                &names,
+                &classes,
+                &mut signatures,
+            ));
+        }
+        if let Some(class) = class_decl(decl) {
+            emit_class_methods(
+                class,
+                &names,
+                &classes,
+                expr_table,
+                &mut types,
+                &mut signatures,
+                &mut functions,
+            );
         }
     }
 
@@ -107,6 +121,83 @@ fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
     }
 }
 
+fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
+    match decl {
+        Decl::Class(c) => Some(c),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Class(c) => Some(c),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_class_methods(
+    class: &varn_core::ast::ClassDecl,
+    names: &tables::NameIndex,
+    classes: &[varn_tir::ClassInfo],
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    out: &mut Vec<TirFunction>,
+) {
+    use varn_core::ast::ClassMember;
+    let Some(class_name) = class.id.as_ref() else { return };
+    let Some(class_id) = names.class_id(class_name) else { return };
+    let info = &classes[class_id.0 as usize];
+
+    for member in &class.body {
+        let (key, params, body): (Rc<str>, &[Param], &Stmt) = match member {
+            ClassMember::Method { key, params, body: Some(body), .. } => {
+                (key.clone(), params.as_slice(), body)
+            }
+            ClassMember::Constructor { params, body, .. } => {
+                (Rc::from("constructor"), params.as_slice(), body)
+            }
+            _ => continue,
+        };
+
+        // A method reuses its vtable signature; a constructor gets a fresh one
+        // (constructors are not dispatched).
+        let sig = match info.method_slot(&key).and_then(|s| info.method_at(s)) {
+            Some(entry) => entry.sig,
+            None => {
+                let id = SigId(signatures.len() as u32);
+                signatures.push(Signature {
+                    params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); params.len()],
+                    return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                });
+                id
+            }
+        };
+        let sig_snapshot = signatures[sig.0 as usize].clone();
+
+        let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
+        let mut em =
+            FnEmitter::new(expr_table, types, names, classes, signatures, param_names)
+                .with_this(class_id);
+        let body_stmts = match &body.kind {
+            StmtKind::Block { stmts } => em.lower_block(stmts),
+            _ => em.lower_block(std::slice::from_ref(body)),
+        };
+        let locals = em.locals;
+
+        out.push(TirFunction {
+            name: Rc::from(format!("{class_name}.{key}")),
+            sig,
+            params: sig_snapshot.params,
+            return_ty: sig_snapshot.return_ty,
+            locals,
+            body: body_stmts,
+            has_this: true,
+            this_class: Some(class_id),
+            is_async: false,
+            is_generator: false,
+        });
+    }
+}
+
 fn param_name(p: &Param) -> Rc<str> {
     match &p.pattern {
         Pattern::Identifier { name, .. } => name.clone(),
@@ -114,12 +205,14 @@ fn param_name(p: &Param) -> Rc<str> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_function(
     f: &FunctionDecl,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
     names: &tables::NameIndex,
+    classes: &[varn_tir::ClassInfo],
     signatures: &mut Vec<Signature>,
 ) -> TirFunction {
     // The function's signature is on its global symbol as a `Fn` type.
@@ -143,7 +236,7 @@ fn emit_function(
     signatures.push(Signature { params: param_tys.clone(), return_ty });
 
     let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
-    let mut em = FnEmitter::new(expr_table, types, names, signatures, param_names);
+    let mut em = FnEmitter::new(expr_table, types, names, classes, signatures, param_names);
     let body = match &f.body.kind {
         StmtKind::Block { stmts } => em.lower_block(stmts),
         _ => em.lower_block(std::slice::from_ref(&f.body)),

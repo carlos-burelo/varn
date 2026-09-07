@@ -12,21 +12,23 @@ use crate::emit::ty::lower_type;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
-use varn_core::ast::{AstId, Expr, ExprKind, Pattern, Stmt, StmtKind};
+use varn_core::ast::{Arg, AstId, Expr, ExprKind, Pattern, Stmt, StmtKind};
 use varn_tir::{
-    BackendTy, DynReason, LocalId, Resolution, Signature, Span, TirBinOp, TirExpr, TirExprKind,
-    TirStmt, TirUnOp, TyTable,
+    BackendTy, ClassId, ClassInfo, DynReason, LocalId, Resolution, Signature, Span, TirArg,
+    TirBinOp, TirExpr, TirExprKind, TirStmt, TirUnOp, TyTable,
 };
 
 pub(super) struct FnEmitter<'a> {
     pub expr_table: &'a FxHashMap<AstId, TypeEntry>,
     pub tt: &'a mut TyTable,
     pub names: &'a NameIndex,
+    pub classes: &'a [ClassInfo],
     #[allow(dead_code)]
     pub signatures: &'a mut Vec<Signature>,
     pub locals: Vec<BackendTy>,
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
+    this_class: Option<ClassId>,
 }
 
 fn span_of(e: &Expr) -> Span {
@@ -47,6 +49,7 @@ impl<'a> FnEmitter<'a> {
         expr_table: &'a FxHashMap<AstId, TypeEntry>,
         tt: &'a mut TyTable,
         names: &'a NameIndex,
+        classes: &'a [ClassInfo],
         signatures: &'a mut Vec<Signature>,
         params: Vec<Rc<str>>,
     ) -> Self {
@@ -54,21 +57,36 @@ impl<'a> FnEmitter<'a> {
             expr_table,
             tt,
             names,
+            classes,
             signatures,
             locals: Vec::new(),
             scopes: vec![FxHashMap::default()],
             params,
+            this_class: None,
         }
     }
 
-    /// The type the checker proved for this expression, `refined` over `ty`,
-    /// lowered. An expression the checker never recorded is `Unannotated`.
+    pub fn with_this(mut self, class: ClassId) -> Self {
+        self.this_class = Some(class);
+        self
+    }
+
+    fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
+        match ty.non_nullable(self.tt) {
+            BackendTy::Class(c) => self.classes.get(c.0 as usize),
+            _ => None,
+        }
+    }
+
+    /// The type the checker CHECKED this expression against, lowered. The
+    /// `refined` lane is deliberately not used: it can be strictly stronger
+    /// than the declared type (an evolved empty array proved `int[]` inside a
+    /// `: str` function), and feeding it to a node the verifier then checks
+    /// for coherence turns an optimisation into a spurious error. `refined`
+    /// re-enters as an opt-only channel in a later sub-phase.
     fn expr_ty(&mut self, e: &Expr) -> BackendTy {
         match self.expr_table.get(&e.id) {
-            Some(entry) => {
-                let t = entry.refined.clone().unwrap_or_else(|| entry.ty.clone());
-                lower_type(&t, self.tt, self.names)
-            }
+            Some(entry) => lower_type(&entry.ty, self.tt, self.names),
             None => BackendTy::Dynamic(DynReason::Unannotated),
         }
     }
@@ -216,6 +234,40 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_unary(*op, operand, ty, span)
             }
 
+            ExprKind::This => {
+                let this_ty = self
+                    .this_class
+                    .map(BackendTy::Class)
+                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                return TirExpr { kind: TirExprKind::Var, ty: this_ty, res: Resolution::None, span };
+            }
+
+            ExprKind::Member { object, property, computed, optional: _ } => {
+                return self.lower_member(object, property, *computed, ty, span)
+            }
+
+            ExprKind::Call { callee, args, optional: _, type_args: _ } => {
+                return self.lower_call(callee, args, ty, span)
+            }
+
+            // Only a plain `=` to an identifier or a field. Compound assign
+            // (`+=` …) and destructuring targets are later sub-phases.
+            ExprKind::Assign { op: varn_core::ast::operators::AssignOp::Assign, target, value }
+                if matches!(
+                    target.kind,
+                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
+                ) =>
+            {
+                let t = self.lower_expr(target);
+                let v = self.lower_expr(value);
+                return TirExpr {
+                    kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(v) },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+
             _ => None,
         };
 
@@ -251,6 +303,114 @@ impl<'a> FnEmitter<'a> {
             kind: TirExprKind::Binary { op: top, lhs: Box::new(lhs), rhs: Box::new(rhs) },
             ty,
             res: Resolution::None,
+            span,
+        }
+    }
+
+    fn member_name(property: &Expr) -> Option<Rc<str>> {
+        match &property.kind {
+            ExprKind::Identifier { name } => Some(name.clone()),
+            ExprKind::StrLiteral { value } => Some(Rc::from(value.as_str())),
+            _ => None,
+        }
+    }
+
+    fn lower_member(
+        &mut self,
+        object: &Expr,
+        property: &Expr,
+        computed: bool,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let obj = self.lower_expr(object);
+
+        if computed {
+            // `obj[key]`. Verifier only constrains the Array case, so only
+            // emit Index when the element type lines up; otherwise placeholder.
+            let index = self.lower_expr(property);
+            if let BackendTy::Array(el) = obj.ty.non_nullable(self.tt) {
+                if self.tt.get(el) != ty {
+                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                }
+            }
+            return TirExpr {
+                kind: TirExprKind::Index { object: Box::new(obj), index: Box::new(index) },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
+
+        let Some(name) = Self::member_name(property) else {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        };
+
+        // A known field on a class receiver: the node type IS the field's
+        // declared type — that is the authority, and it is what the verifier
+        // checks `FieldSlot` against. The checker's type for the access
+        // expression can be absent (an assignment target) or weaker, so it is
+        // not used here. Anything not a known field is a by-name read (getter,
+        // index signature, dynamic receiver).
+        match self.class_of(obj.ty).and_then(|ci| ci.field(&name).cloned()) {
+            Some(field) => TirExpr {
+                kind: TirExprKind::Field { object: Box::new(obj), name },
+                ty: field.ty,
+                res: Resolution::FieldSlot(field.slot),
+                span,
+            },
+            None => TirExpr {
+                kind: TirExprKind::Field { object: Box::new(obj), name: name.clone() },
+                ty,
+                res: Resolution::ByName { name, why: DynReason::Unannotated },
+                span,
+            },
+        }
+    }
+
+    fn lower_arg(&mut self, a: &Arg) -> TirArg {
+        match a {
+            Arg::Positional(e) => TirArg::Expr(self.lower_expr(e)),
+            Arg::Spread(e) => TirArg::Spread(self.lower_expr(e)),
+            Arg::Named { label, value } => {
+                TirArg::Named { label: Rc::from(label.as_str()), value: self.lower_expr(value) }
+            }
+        }
+    }
+
+    fn lower_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+        // Method call: `recv.name(args)`. A free call on an identifier is
+        // sub-phase 4.
+        let ExprKind::Member { object, property, computed: false, .. } = &callee.kind else {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        };
+        let Some(name) = Self::member_name(property) else {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        };
+
+        let recv = self.lower_expr(object);
+        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+
+        // A vtable slot only when the receiver is a class with that method and
+        // the arity matches its signature — the verifier checks both. Getters
+        // and setters carry decorated names in the vtable, so a plain call
+        // never hits them here. Everything else is by-name.
+        let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
+        let res = self
+            .class_of(recv.ty)
+            .and_then(|ci| ci.method_slot(&name).map(|s| (s, ci)))
+            .and_then(|(slot, ci)| {
+                let entry = ci.method_at(slot)?;
+                let sig = self.signatures.get(entry.sig.0 as usize)?;
+                (all_positional && sig.params.len() == targs.len())
+                    .then_some(Resolution::VtableSlot(slot))
+            })
+            .unwrap_or(Resolution::ByName { name: name.clone(), why: DynReason::Unannotated });
+
+        TirExpr {
+            kind: TirExprKind::MethodCall { recv: Box::new(recv), name, args: targs },
+            ty,
+            res,
             span,
         }
     }

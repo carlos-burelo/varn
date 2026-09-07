@@ -155,22 +155,27 @@ fn build_one_class(
     info
 }
 
-/// Lower a function type to a `Signature`, append it, and hand back its id. A
-/// member whose type is not `Fn` (a malformed method) still gets the empty
-/// signature 0, which verifies.
+/// Append a signature for a method and hand back its id.
+///
+/// Sub-phase 3 keeps only the arity: params and return are
+/// `Dynamic(NotYetSupported)`. Precise method-signature typing is its own
+/// sub-phase — an un-annotated method return reads as `Void` off the binder
+/// today, which would make every `return x` inside it fail coherence.
 fn intern_signature(
     ty: &Type,
-    tt: &mut TyTable,
-    names: &NameIndex,
+    _tt: &mut TyTable,
+    _names: &NameIndex,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
-    let TypeKind::Fn(FunctionType { params, return_type, .. }) = ty.kind() else {
-        return varn_tir::SigId(0);
+    let arity = match ty.kind() {
+        TypeKind::Fn(FunctionType { params, .. }) => params.len(),
+        _ => 0,
     };
-    let params: Vec<BackendTy> = params.iter().map(|p| lower_type(&p.ty, tt, names)).collect();
-    let return_ty = lower_type(return_type, tt, names);
     let id = signatures.len() as u32;
-    signatures.push(Signature { params, return_ty });
+    signatures.push(Signature {
+        params: vec![BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported); arity],
+        return_ty: BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
+    });
     varn_tir::SigId(id)
 }
 
