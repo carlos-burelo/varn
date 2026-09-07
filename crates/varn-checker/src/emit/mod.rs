@@ -11,9 +11,10 @@
 //! corpus modules before any lowering logic is written. Coverage is ~0 % by
 //! construction — that is the baseline the later sub-phases move.
 
+mod tables;
 mod ty;
 
-pub use ty::lower_type;
+pub use ty::{lower_type, NameResolver, NoNames};
 
 use crate::binder::BindResult;
 use crate::checker::TypeEntry;
@@ -22,8 +23,8 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{AstId, Program};
 use varn_tir::{
-    BackendTy, DynReason, Resolution, Signature, Span, TirExpr, TirExprKind, TirFunction, TirModule,
-    TirStmt, TyTable,
+    BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt,
+    TyTable,
 };
 
 /// Build the TIR for one module from the same four inputs
@@ -31,23 +32,22 @@ use varn_tir::{
 /// not expose here is a gap in the checker, to be closed there.
 pub fn emit_module(
     program: &Program,
-    _bind: &BindResult,
+    bind: &BindResult,
     _resolver: &dyn ImportResolver,
     _expr_table: &FxHashMap<AstId, TypeEntry>,
 ) -> TirModule {
-    let types = TyTable::default();
+    let mut types = TyTable::default();
+    ty::prime(&mut types);
 
-    // One empty signature; every function points at it until sub-phase "tables"
-    // fills the real ones.
-    let signatures = vec![Signature { params: vec![], return_ty: BackendTy::Void }];
+    let tables::Tables { classes, enums, signatures, names: _ } = tables::build(bind, &mut types);
 
     let top_level = stub_function("<module>");
 
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
         types,
-        classes: vec![],
-        enums: vec![],
+        classes,
+        enums,
         signatures,
         functions: vec![],
         globals: vec![],
@@ -82,7 +82,7 @@ fn stub_function(name: &str) -> TirFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use varn_tir::{verify_module, Coverage};
+    use varn_tir::{verify_module, Coverage, Signature};
 
     fn empty_module() -> TirModule {
         TirModule {
