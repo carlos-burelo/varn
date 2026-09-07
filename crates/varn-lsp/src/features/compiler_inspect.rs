@@ -344,7 +344,10 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
                 .join(" + ");
             format!("build_str({p_str})")
         }
-        MakeClosure { func, .. } => format!("make_closure @{}", func.name),
+        MakeClosure { func, .. } => match func {
+            varn_compiler::ssa::ir::ClosureBody::Hir(f) => format!("make_closure @{}", f.name),
+            varn_compiler::ssa::ir::ClosureBody::Tir(i) => format!("make_closure tir#{i}"),
+        },
         LoadCaptured { var } => format!("load_captured {var:?}"),
         StoreCaptured { var, value } => format!("store_captured {var:?} = v{}", value.0),
         MakeClass { name, .. } => format!("make_class \"{name}\""),

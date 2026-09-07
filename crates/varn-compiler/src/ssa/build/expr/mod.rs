@@ -232,7 +232,7 @@ impl Builder {
     fn lower_closure(&mut self, func: &HirFunction, upvalues: &[HirUpvalueSrc]) -> Result<Value> {
         Ok(self.emit(
             InstKind::MakeClosure {
-                func: Rc::new(func.clone()),
+                func: crate::ssa::ir::ClosureBody::Hir(Rc::new(func.clone())),
                 upvalues_src: upvalues.to_vec(),
             },
             HirType::Ref,

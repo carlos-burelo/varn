@@ -143,10 +143,13 @@ no se migra. `vn cache clean` en las notas de la etapa.
       `Try` → `InstKind::Try`/`CatchParam`/`PopTry` (sin finally: el emisor ya
       lo aplanó); spread en `Call`/`New`/`Array`/`Object` → las variantes
       `*Spread`.
-      **`vn debug -p tir:check` reporta `from_tir: OK (N ssa fn)` por módulo.
-      ~157/188 del corpus construyen SSA desde TIR.** Falta (~31 módulos):
-      `Closure` (29 — `InstKind::MakeClosure.func` es `Rc<HirFunction>`;
-      cambiarlo a un ref TIR-side toca `ssa/emit`/`dump`/`uses`/`dce` y en la
-      práctica es parte del corte 3.4), named args (2).
+      `Closure` → `InstKind::MakeClosure { func: ClosureBody::Tir(fn_idx) }`:
+      `MakeClosure.func` pasó de `Rc<HirFunction>` a un enum
+      `ClosureBody { Hir(Rc<HirFunction>), Tir(u32) }`; el camino HIR usa
+      `Hir`, `from_tir` `Tir`; `ssa/emit` hace `unreachable!` en el arm `Tir`
+      (el SSA de `from_tir` no llega a emisión aún). named/array spread
+      cubiertos (named posicional en orden escrito, refinamiento después).
+      **`from_tir::lower_expr` es exhaustivo sobre `TirExprKind`.
+      `vn debug -p tir:check` → `from_tir: OK`: 184→188/188 del corpus.**
 - [ ] 3.4 el corte + borrados (~6000 líneas), corpus rojo
 - [ ] 3.5 caché de bytecode

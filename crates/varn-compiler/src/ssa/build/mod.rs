@@ -300,7 +300,7 @@ pub fn build_function(
     for f in module_funcs {
         let fn_val = b.emit(
             InstKind::MakeClosure {
-                func: Rc::new(f.clone()),
+                func: crate::ssa::ir::ClosureBody::Hir(Rc::new(f.clone())),
                 upvalues_src: Vec::new(),
             },
             HirType::Ref,

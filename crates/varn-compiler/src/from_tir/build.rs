@@ -475,20 +475,37 @@ impl<'m> Builder<'m> {
             }
 
             TirExprKind::ArrayLit(els) => {
-                let mut vals = Vec::with_capacity(els.len());
-                for el in els {
-                    match el {
-                        varn_tir::TirArrayEl::Expr(x) => vals.push(self.lower_expr(x)?),
-                        varn_tir::TirArrayEl::Spread(_) => {
-                            return Err(OptError::Unsupported("from_tir: array spread"))
-                        }
-                        varn_tir::TirArrayEl::Hole => {
-                            let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
-                            vals.push(n);
+                let any_spread =
+                    els.iter().any(|el| matches!(el, varn_tir::TirArrayEl::Spread(_)));
+                if any_spread {
+                    let mut vals: Vec<(Value, bool)> = Vec::with_capacity(els.len());
+                    for el in els {
+                        match el {
+                            varn_tir::TirArrayEl::Expr(x) => vals.push((self.lower_expr(x)?, false)),
+                            varn_tir::TirArrayEl::Spread(x) => {
+                                vals.push((self.lower_expr(x)?, true))
+                            }
+                            varn_tir::TirArrayEl::Hole => {
+                                let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                                vals.push((n, false));
+                            }
                         }
                     }
+                    Ok(self.emit(InstKind::BuildArraySpread { elements: vals }, ty))
+                } else {
+                    let mut vals = Vec::with_capacity(els.len());
+                    for el in els {
+                        match el {
+                            varn_tir::TirArrayEl::Expr(x) => vals.push(self.lower_expr(x)?),
+                            varn_tir::TirArrayEl::Hole => {
+                                let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                                vals.push(n);
+                            }
+                            varn_tir::TirArrayEl::Spread(_) => unreachable!(),
+                        }
+                    }
+                    Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
                 }
-                Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
             }
             TirExprKind::TupleLit(xs) => {
                 let mut vals = Vec::with_capacity(xs.len());
@@ -572,7 +589,13 @@ impl<'m> Builder<'m> {
                 ))
             }
 
-            _ => Err(OptError::Unsupported("from_tir: expression kind")),
+            TirExprKind::Closure { func } => Ok(self.emit(
+                InstKind::MakeClosure {
+                    func: crate::ssa::ir::ClosureBody::Tir(func.0),
+                    upvalues_src: vec![],
+                },
+                HirType::Ref,
+            )),
         }
     }
 
@@ -588,9 +611,9 @@ impl<'m> Builder<'m> {
                     any_spread = true;
                     vals.push((self.lower_expr(e)?, true));
                 }
-                varn_tir::TirArg::Named { .. } => {
-                    return Err(OptError::Unsupported("from_tir: named argument"))
-                }
+                // Named arguments are lowered positionally in written order —
+                // precise reordering against the callee signature is later work.
+                varn_tir::TirArg::Named { value, .. } => vals.push((self.lower_expr(value)?, false)),
             }
         }
         if any_spread {
@@ -606,11 +629,9 @@ impl<'m> Builder<'m> {
         for a in args {
             match a {
                 varn_tir::TirArg::Expr(e) => out.push(self.lower_expr(e)?),
+                varn_tir::TirArg::Named { value, .. } => out.push(self.lower_expr(value)?),
                 varn_tir::TirArg::Spread(_) => {
                     return Err(OptError::Unsupported("from_tir: spread in this position"))
-                }
-                varn_tir::TirArg::Named { .. } => {
-                    return Err(OptError::Unsupported("from_tir: named argument"))
                 }
             }
         }
@@ -900,12 +921,19 @@ mod tests {
     }
 
     #[test]
-    fn an_unsupported_expression_is_reported() {
+    fn a_closure_lowers_to_make_closure() {
         let m = module(
-            vec![TirStmt::Expr(e(K::Closure { func: varn_tir::FnId(0) }, B::Dynamic(varn_tir::DynReason::Unannotated)))],
+            vec![TirStmt::Expr(e(
+                K::Closure { func: varn_tir::FnId(0) },
+                B::Dynamic(varn_tir::DynReason::Unannotated),
+            ))],
             vec![],
         );
-        assert!(build_function(&m, &m.top_level).is_err());
+        let f = build_function(&m, &m.top_level).unwrap();
+        assert!(f.blocks[0]
+            .insts
+            .iter()
+            .any(|i| matches!(i.kind, InstKind::MakeClosure { .. })));
     }
 
     #[test]

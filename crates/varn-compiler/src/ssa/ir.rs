@@ -119,6 +119,16 @@ pub struct Inst {
     pub line: u32,
 }
 
+/// The body a `MakeClosure` refers to. `Hir` is the current path; `Tir` names
+/// a `varn_tir::TirModule::functions` index and is what `from_tir` produces —
+/// the bytecode emitter grows a `Tir` arm as part of the stage-3 cut, so for
+/// now no consumer of a `from_tir` SSA function reaches emission.
+#[derive(Debug, Clone)]
+pub enum ClosureBody {
+    Hir(Rc<HirFunction>),
+    Tir(u32),
+}
+
 #[derive(Debug, Clone)]
 pub enum InstKind {
     ConstInt(i64),
@@ -271,7 +281,7 @@ pub enum InstKind {
     /// Listar aquí los valores capturados creaba operandos fantasma que el
     /// backend materializaba en `Move` que nadie lee.
     MakeClosure {
-        func: Rc<HirFunction>,
+        func: ClosureBody,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
     LoadCaptured {
