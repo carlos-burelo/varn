@@ -206,6 +206,11 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `for…in`, `for…of` sobre no-array (protocolo iterador), `switch`, `try`,
    `using` → placeholder.
 
+Extra. **Template strings**: `` `a${x}b` `` → concatenación `Str` con
+   `Binary{Add}`; cada interpolación no-`Str` lleva un `Cast` a `Str` (el
+   verificador confía en `Cast`, el backend hace la conversión real).
+   `TaggedTemplate` → placeholder.
+
 Cada sub-fase que aún no cubra una forma la emite como
 `Dynamic(NotYetSupported)` con un `TirStmt::Expr` placeholder — nunca un
 nodo a medias que el verificador no pueda comprobar.

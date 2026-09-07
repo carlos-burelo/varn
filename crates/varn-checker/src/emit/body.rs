@@ -766,6 +766,8 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_logical(*op, left, right, ty, span)
             }
 
+            ExprKind::Template { parts } => return self.lower_template(parts, span),
+
             ExprKind::Await { argument } => {
                 let fut = self.lower_expr(argument);
                 return TirExpr {
@@ -1093,6 +1095,42 @@ impl<'a> FnEmitter<'a> {
                 span,
             },
         }
+    }
+
+    /// A template string folds to `Str` concatenation. Each interpolation
+    /// that is not already `Str` gets a `Cast` to it — the verifier trusts a
+    /// `Cast`, and the backend does the real conversion.
+    fn lower_template(&mut self, parts: &[varn_core::ast::TemplatePart], span: Span) -> TirExpr {
+        use varn_core::ast::TemplatePart;
+        let str_expr = |kind, span| TirExpr { kind, ty: BackendTy::Str, res: Resolution::None, span };
+        let mut acc: Option<TirExpr> = None;
+        for part in parts {
+            let piece = match part {
+                TemplatePart::Literal(s) => {
+                    str_expr(TirExprKind::StrLit(Rc::from(s.as_str())), span)
+                }
+                TemplatePart::Interpolation(e) => {
+                    let le = self.lower_expr(e);
+                    if le.ty == BackendTy::Str {
+                        le
+                    } else {
+                        str_expr(TirExprKind::Cast { operand: Box::new(le) }, span)
+                    }
+                }
+            };
+            acc = Some(match acc {
+                None => piece,
+                Some(a) => str_expr(
+                    TirExprKind::Binary {
+                        op: TirBinOp::Add,
+                        lhs: Box::new(a),
+                        rhs: Box::new(piece),
+                    },
+                    span,
+                ),
+            });
+        }
+        acc.unwrap_or_else(|| str_expr(TirExprKind::StrLit(Rc::from("")), span))
     }
 
     fn lower_new(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
