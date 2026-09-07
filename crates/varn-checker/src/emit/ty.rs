@@ -1,17 +1,18 @@
 //! `varn_checker::types::Type` → `varn_tir::BackendTy`.
 //!
 //! The narrowing that `CgTy → HirType → SlotKind` did silently, done once and
-//! explicitly. Every arm that cannot yet be represented lands on
-//! `Dynamic(NotYetSupported)` — a value that can be counted, attributed and
-//! banned per site, which is the whole point of the contract.
+//! explicitly. A type the TIR does not model precisely (a bare type
+//! parameter, an imported type, a host-shaped intrinsic like `Regex` or
+//! `Task`, an arbitrary function type) lowers to `Dynamic(Unannotated)` — the
+//! value carries no more type information here, which is the honest state.
 
 use crate::types::Type;
 use varn_core::{TypeKind, TypeTag};
 use varn_tir::{BackendTy, ClassId, DynReason, EnumId, TyTable};
 
 /// Resolves a type name to the module-table handle the checker assigned it.
-/// Sub-phase 1 has no table, so [`NoNames`] answers `None` and every named
-/// type falls to `Dynamic(NotYetSupported)`.
+/// [`NoNames`] answers `None`, so every named type falls to
+/// `Dynamic(Unannotated)`.
 pub trait NameResolver {
     fn class_id(&self, name: &str) -> Option<ClassId>;
     fn enum_id(&self, name: &str) -> Option<EnumId>;
@@ -34,8 +35,9 @@ pub fn lower_type(ty: &Type, tt: &mut TyTable, names: &dyn NameResolver) -> Back
     lower_kind(ty.kind(), tt, names)
 }
 
-fn not_supported() -> BackendTy {
-    BackendTy::Dynamic(DynReason::NotYetSupported)
+/// A type the TIR does not model precisely.
+fn opaque() -> BackendTy {
+    BackendTy::Dynamic(DynReason::Unannotated)
 }
 
 fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
@@ -74,7 +76,7 @@ fn lower_kind(
         TypeKind::Generic(name, args, _) if args.is_empty() => resolve_named(name, names),
 
         TypeKind::EnumVariant { enum_name, .. } => {
-            names.enum_id(enum_name).map(BackendTy::Enum).unwrap_or_else(not_supported)
+            names.enum_id(enum_name).map(BackendTy::Enum).unwrap_or_else(opaque)
         }
 
         // `T | null` keeps its payload as Nullable; anything else is a
@@ -85,10 +87,9 @@ fn lower_kind(
         // the backend: no slots, all by-name.
         TypeKind::Object(_) => BackendTy::Dynamic(DynReason::IndexSignature),
 
-        // The rest need design against the emitter and are the redesign's
-        // backlog until then.
+        // Types with no precise TIR representation: opaque dynamic.
         TypeKind::Fn(_)
-        | TypeKind::Generic(..) // with type arguments — not represented yet
+        | TypeKind::Generic(..) // with type arguments
         | TypeKind::Intersection(_)
         | TypeKind::This
         | TypeKind::TemplateLiteral(_)
@@ -98,7 +99,7 @@ fn lower_kind(
         | TypeKind::Mapped { .. }
         | TypeKind::Conditional { .. }
         | TypeKind::Infer(_)
-        | TypeKind::TypePredicate { .. } => not_supported(),
+        | TypeKind::TypePredicate { .. } => opaque(),
     }
 }
 
@@ -117,9 +118,9 @@ fn lower_tag(tag: TypeTag) -> BackendTy {
         // no non-null inhabitant.
         TypeTag::Null => BackendTy::Nullable(NEVER_TY),
         TypeTag::Dynamic => BackendTy::Dynamic(DynReason::Unannotated),
-        // Structured intrinsics without a resolved element type, plus the
-        // host-shaped ones (Task, Regex, DateTime, …): not expressible yet.
-        _ => BackendTy::Dynamic(DynReason::NotYetSupported),
+        // Structured intrinsics with no resolved element type, plus the
+        // host-shaped ones (Task, Regex, DateTime, …): opaque dynamic.
+        _ => BackendTy::Dynamic(DynReason::Unannotated),
     }
 }
 

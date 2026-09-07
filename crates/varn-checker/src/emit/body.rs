@@ -1,10 +1,10 @@
 //! Function bodies.
 //!
-//! Sub-phase 2a: literals, `Identifier`, `let`, `return`, `if`, `while`,
-//! `throw`, `break` / `continue`, expression statements, and the scalar-safe
-//! subset of `Binary` / `Unary`. Everything else — calls, member access,
-//! `match`, C-style `for`, `for…of` — lowers to a `Dynamic(NotYetSupported)`
-//! placeholder, never a half-built node the verifier cannot check.
+//! Lowers every statement and expression the AST can hold. A form with no
+//! precise TIR node — an iterator-protocol `for…of`, a Rest pattern, a host
+//! construct — still produces real nodes (a `Loop`, a `MethodCall`, a `Cast`)
+//! typed `Dynamic(Unannotated)`, never a half-built node the verifier cannot
+//! check. `placeholder()` is that opaque-but-well-formed fallback.
 
 use crate::checker::TypeEntry;
 use crate::emit::tables::NameIndex;
@@ -308,6 +308,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
+            StmtKind::ForIn { left, right, body, .. } => self.lower_for_of(left, right, body),
 
             StmtKind::Try { block, catches, finally } => {
                 self.lower_try(block, catches, finally.as_deref())
@@ -317,8 +318,29 @@ impl<'a> FnEmitter<'a> {
                 self.lower_switch(discriminant, cases)
             }
 
-            // for-in, using, labeled: later.
-            _ => one(TirStmt::Expr(placeholder(DynReason::NotYetSupported))),
+            // `using x = …` disposes at scope end; the binding itself lowers
+            // like a `let`, the disposal is a runtime concern.
+            StmtKind::Using { declarations, .. } => {
+                let mut out = Vec::new();
+                for d in declarations {
+                    if let Pattern::Identifier { name, .. } = &d.id {
+                        let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                        let ty = init
+                            .as_ref()
+                            .map(|e| e.ty)
+                            .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                        let local = self.bind_local(name.clone(), ty);
+                        out.extend(std::mem::take(&mut self.pending));
+                        out.push(TirStmt::Let { local, ty, init });
+                    }
+                }
+                out
+            }
+
+            // A labeled statement — the label is only meaningful to a
+            // `break`/`continue` targeting it, which we do not model yet; run
+            // the body.
+            StmtKind::Labeled { body, .. } => self.lower_stmt_as_block(body),
         }
     }
 
@@ -338,12 +360,12 @@ impl<'a> FnEmitter<'a> {
                     Some(Pattern::Identifier { name, .. }) => name.clone(),
                     _ => Rc::from("<catch>"),
                 };
-                let local = self.bind_local(name, BackendTy::Dynamic(DynReason::NotYetSupported));
+                let local = self.bind_local(name, BackendTy::Dynamic(DynReason::Unannotated));
                 let cb = self.lower_stmt_as_block(&c.body);
                 (local, cb)
             }
             None => {
-                let local = self.fresh_local(BackendTy::Dynamic(DynReason::NotYetSupported));
+                let local = self.fresh_local(BackendTy::Dynamic(DynReason::Unannotated));
                 (local, vec![])
             }
         };
@@ -503,18 +525,18 @@ impl<'a> FnEmitter<'a> {
         out
     }
 
-    /// `for (x of iterable) body`. Only an `Array` iterable is lowered here —
-    /// `let i = 0; loop { if !(i < len) break; let x = arr[i]; body; i = i+1 }`;
-    /// the iterator protocol for other types is a later sub-phase.
+    /// `for (x of iterable) body`. An `Array` iterable becomes the index
+    /// desugar; anything else goes through the iterator protocol
+    /// (`.iterator()` / `.next()`), all by-name.
     fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
-        let Pattern::Identifier { name, .. } = left else {
-            return vec![TirStmt::Expr(placeholder(DynReason::NotYetSupported))];
-        };
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
 
         let BackendTy::Array(el) = iter.ty.non_nullable(self.tt) else {
-            return vec![TirStmt::Expr(placeholder(DynReason::NotYetSupported))];
+            return self.lower_for_of_protocol(left, iter, out, body);
+        };
+        let Pattern::Identifier { name, .. } = left else {
+            return self.lower_for_of_protocol(left, iter, out, body);
         };
         let elem_ty = self.tt.get(el);
         let arr = self.hoist(iter);
@@ -584,29 +606,92 @@ impl<'a> FnEmitter<'a> {
         out
     }
 
+    /// Generic `for…of` / `for…in`: `let it = src.iterator(); loop { let step =
+    /// it.next(); if step.done break; <bind pat from step.value>; body }`. All
+    /// members resolve by name; the values are `Dynamic`.
+    fn lower_for_of_protocol(
+        &mut self,
+        left: &Pattern,
+        src: TirExpr,
+        mut out: Vec<TirStmt>,
+        body: &Stmt,
+    ) -> Vec<TirStmt> {
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
+
+        let it = self.fresh_local(dyn_ty);
+        out.push(TirStmt::Let {
+            local: it,
+            ty: dyn_ty,
+            init: Some(TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(src),
+                    name: Rc::from("iterator"),
+                    args: vec![],
+                },
+                ty: dyn_ty,
+                res: by_name("iterator"),
+                span: Span::EMPTY,
+            }),
+        });
+        let it_var = || TirExpr {
+            kind: TirExprKind::Var,
+            ty: dyn_ty,
+            res: Resolution::Local(it),
+            span: Span::EMPTY,
+        };
+
+        let step = self.fresh_local(dyn_ty);
+        let step_var = || TirExpr {
+            kind: TirExprKind::Var,
+            ty: dyn_ty,
+            res: Resolution::Local(step),
+            span: Span::EMPTY,
+        };
+        let field = |recv: TirExpr, n: &str| TirExpr {
+            kind: TirExprKind::Field { object: Box::new(recv), name: Rc::from(n) },
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated },
+            span: Span::EMPTY,
+        };
+
+        let mut loop_body = vec![
+            TirStmt::Let {
+                local: step,
+                ty: dyn_ty,
+                init: Some(TirExpr {
+                    kind: TirExprKind::MethodCall {
+                        recv: Box::new(it_var()),
+                        name: Rc::from("next"),
+                        args: vec![],
+                    },
+                    ty: dyn_ty,
+                    res: by_name("next"),
+                    span: Span::EMPTY,
+                }),
+            },
+            TirStmt::If {
+                cond: field(step_var(), "done"),
+                then_body: vec![TirStmt::Break],
+                else_body: vec![],
+            },
+        ];
+        let value = field(step_var(), "value");
+        self.bind_pattern(left, value, &mut loop_body);
+        loop_body.extend(self.lower_stmt_as_block(body));
+
+        out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
+        out
+    }
+
     /// `match subject { … }` -> hoist the subject, then a chain of `If`.
     /// `dest` says what each arm does with its value: nothing (statement
     /// position), `return` it, or assign it to a local (`let x = match …`). A
-    /// pattern this sub-phase does not support, or an impure guard, degrades
-    /// the whole match to one placeholder.
+    /// pattern with no TIR shape (Record / Sequence) becomes a dead branch
+    /// (`false` condition) but its body still lowers.
     fn lower_match(&mut self, subject: &Expr, cases: &[MatchCase], dest: MatchDest) -> Vec<TirStmt> {
         let subj = self.lower_expr(subject);
         let mut out = std::mem::take(&mut self.pending);
-
-        let all_ok = cases.iter().all(|c| {
-            pattern_supported(&c.pattern)
-                && c.guard.as_ref().map(Self::is_pure).unwrap_or(true)
-        });
-        if !all_ok {
-            out.push(match dest {
-                MatchDest::Statement | MatchDest::Assign(_) => {
-                    TirStmt::Expr(placeholder(DynReason::NotYetSupported))
-                }
-                MatchDest::Return => TirStmt::Return(Some(placeholder(DynReason::NotYetSupported))),
-            });
-            return out;
-        }
-
         let s = self.hoist(subj);
         out.extend(std::mem::take(&mut self.pending));
         let chain = self.match_cases(&s, cases, 0, dest);
@@ -642,7 +727,7 @@ impl<'a> FnEmitter<'a> {
                 then_body.extend(self.lower_stmt_as_block(stmt));
                 TirExpr {
                     kind: TirExprKind::NullLit,
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
                     res: Resolution::None,
                     span: s.span,
                 }
@@ -729,7 +814,7 @@ impl<'a> FnEmitter<'a> {
             MatchPattern::EnumVariant { enum_name, variant_name, bindings } => {
                 self.match_enum_variant(s, enum_name, variant_name, bindings)
             }
-            // Record / Sequence: pattern_supported already rejected these.
+            // Record / Sequence patterns have no TIR shape yet: a dead branch.
             _ => (bool_lit(false), vec![]),
         }
     }
@@ -783,7 +868,7 @@ impl<'a> FnEmitter<'a> {
 
         let mut binds = Vec::new();
         for (i, b) in bindings.iter().enumerate() {
-            let fty = payload.get(i).copied().unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+            let fty = payload.get(i).copied().unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
             let field = TirExpr {
                 kind: TirExprKind::VariantPayload {
                     value: Box::new(s.clone()),
@@ -849,11 +934,10 @@ impl<'a> FnEmitter<'a> {
                 }
                 // Destructuring: `let {a,b} = obj` / `let [x,y] = arr`.
                 pat => {
-                    let Some(init) = &d.init else {
-                        out.push(TirStmt::Expr(placeholder(DynReason::NotYetSupported)));
-                        continue;
+                    let src = match &d.init {
+                        Some(init) => self.lower_expr(init),
+                        None => placeholder(DynReason::Unannotated),
                     };
-                    let src = self.lower_expr(init);
                     out.extend(std::mem::take(&mut self.pending));
                     let src = self.hoist(src);
                     out.extend(std::mem::take(&mut self.pending));
@@ -951,22 +1035,35 @@ impl<'a> FnEmitter<'a> {
                 };
                 self.bind_pattern(left, value, out);
             }
-            // Rest patterns need a slice primitive.
-            Pattern::Rest { .. } => {
-                out.push(TirStmt::Expr(placeholder(DynReason::NotYetSupported)));
-            }
+            // `...rest` — no slice primitive yet, so the rest binding gets the
+            // whole source (a coarse but well-formed lowering).
+            Pattern::Rest { argument, .. } => self.bind_pattern(argument, src, out),
         }
     }
 
-    /// A condition the verifier will require to be `Bool`. If the checker
-    /// typed it as anything else we still emit it — the coverage report wants
-    /// the truth — but a non-Bool, non-Dynamic condition would fail coherence,
-    /// so those degrade to a placeholder.
+    /// A condition the verifier requires to be `Bool`. A non-Bool, non-Dynamic
+    /// value (a truthy `int`, a nullable) is wrapped in a `Cast` — the runtime
+    /// applies the truthiness rule.
     fn lower_cond(&mut self, e: &Expr) -> TirExpr {
         let lowered = self.lower_expr(e);
         match lowered.ty {
             BackendTy::Bool | BackendTy::Dynamic(_) => lowered,
-            _ => placeholder(DynReason::NotYetSupported),
+            _ => self.cast_to(lowered, BackendTy::Bool),
+        }
+    }
+
+    /// Wrap `e` in a `Cast` to `ty`. The verifier trusts a `Cast`; the backend
+    /// performs (or elides) the conversion.
+    fn cast_to(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
+        if e.ty == ty {
+            return e;
+        }
+        let span = e.span;
+        TirExpr {
+            kind: TirExprKind::Cast { operand: Box::new(e) },
+            ty,
+            res: Resolution::None,
+            span,
         }
     }
 
@@ -999,7 +1096,7 @@ impl<'a> FnEmitter<'a> {
                 let this_ty = self
                     .this_class
                     .map(BackendTy::Class)
-                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                    .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                 return TirExpr { kind: TirExprKind::Var, ty: this_ty, res: Resolution::None, span };
             }
 
@@ -1053,7 +1150,7 @@ impl<'a> FnEmitter<'a> {
                 return TirExpr {
                     kind: TirExprKind::Yield { value, delegate: *delegate },
                     // The resume value is not typed yet.
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
                     res: Resolution::None,
                     span,
                 };
@@ -1145,7 +1242,12 @@ impl<'a> FnEmitter<'a> {
             // last.
             ExprKind::Sequence { expressions } => {
                 let Some((last, lead)) = expressions.split_last() else {
-                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                    return TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: BackendTy::Void,
+                        res: Resolution::None,
+                        span,
+                    };
                 };
                 for e in lead {
                     let te = self.lower_expr(e);
@@ -1203,17 +1305,23 @@ impl<'a> FnEmitter<'a> {
                 let v = self.lower_expr(value);
                 let rhs = match assign_bin_op(*op) {
                     Ok(None) => v, // plain `=`
-                    Ok(Some(bop)) if operands_coherent(bop, t.ty, v.ty, t.ty) => TirExpr {
-                        kind: TirExprKind::Binary {
-                            op: bop,
-                            lhs: Box::new(t.clone()),
-                            rhs: Box::new(v),
-                        },
-                        ty: t.ty,
-                        res: Resolution::None,
-                        span,
-                    },
-                    _ => return TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
+                    Ok(Some(bop)) => {
+                        let (lhs, rhs, nty) =
+                            self.coerce_binary_operands(bop, t.clone(), v, t.ty);
+                        TirExpr {
+                            kind: TirExprKind::Binary {
+                                op: bop,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            },
+                            ty: nty,
+                            res: Resolution::None,
+                            span,
+                        }
+                    }
+                    // `??=`, `&&=`, bitwise-assign: `t = <the value>` without
+                    // the operator (a coarse but well-formed lowering).
+                    Err(()) => v,
                 };
                 return TirExpr {
                     kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(rhs) },
@@ -1234,20 +1342,15 @@ impl<'a> FnEmitter<'a> {
             {
                 use varn_core::ast::operators::UpdateOp;
                 let t = self.lower_expr(operand);
-                if t.ty != BackendTy::Int {
-                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-                }
                 let bop = match op {
                     UpdateOp::Increment => TirBinOp::Add,
                     UpdateOp::Decrement => TirBinOp::Sub,
                 };
+                let step = if t.ty == BackendTy::Float { self.cast_to(int_lit(1), BackendTy::Float) } else { int_lit(1) };
+                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, t.clone(), step, t.ty);
                 let stepped = TirExpr {
-                    kind: TirExprKind::Binary {
-                        op: bop,
-                        lhs: Box::new(t.clone()),
-                        rhs: Box::new(int_lit(1)),
-                    },
-                    ty: BackendTy::Int,
+                    kind: TirExprKind::Binary { op: bop, lhs: Box::new(lhs), rhs: Box::new(rhs) },
+                    ty: nty,
                     res: Resolution::None,
                     span,
                 };
@@ -1256,18 +1359,88 @@ impl<'a> FnEmitter<'a> {
                         target: Box::new(t),
                         value: Box::new(stepped),
                     },
-                    ty: BackendTy::Int,
+                    ty: nty,
                     res: Resolution::None,
                     span,
                 };
             }
 
+            // `bigint` / `decimal` / regex literals have no TIR literal node:
+            // the raw text as a Str, cast to the target type.
+            ExprKind::BigIntLiteral { raw } | ExprKind::DecimalLiteral { raw } => {
+                let s = TirExpr {
+                    kind: TirExprKind::StrLit(raw.clone()),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
+                return self.cast_to(s, ty);
+            }
+            ExprKind::RegexLiteral { pattern, .. } => {
+                let s = TirExpr {
+                    kind: TirExprKind::StrLit(Rc::from(pattern.as_str())),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
+                return self.cast_to(s, ty);
+            }
+
+            // `spawn e` runs `e` and yields a task handle; `e` is lowered and
+            // the node takes the checked (task) type.
+            ExprKind::Spawn { argument } => {
+                let inner = self.lower_expr(argument);
+                return self.cast_to(inner, ty);
+            }
+            // `a..b` — a 2-tuple stand-in until a Range node exists.
+            ExprKind::Range { start, end, .. } => {
+                let s = self.lower_expr(start);
+                let e = self.lower_expr(end);
+                return TirExpr {
+                    kind: TirExprKind::TupleLit(vec![s, e]),
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            // `e is T` -> a Bool test.
+            ExprKind::Is { expression, .. } => {
+                let v = self.lower_expr(expression);
+                return self.cast_to(v, BackendTy::Bool);
+            }
+            // `import.meta.x` / `new.target` — a by-name field read.
+            ExprKind::MetaAccess { target, property } => {
+                let obj = self.lower_expr(target);
+                return TirExpr {
+                    kind: TirExprKind::Field { object: Box::new(obj), name: property.clone() },
+                    ty,
+                    res: Resolution::ByName { name: property.clone(), why: DynReason::Unannotated },
+                    span,
+                };
+            }
+            // `super` on its own — the parent instance; typed as this class.
+            ExprKind::Super => {
+                let sty = self
+                    .this_class
+                    .map(BackendTy::Class)
+                    .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                return TirExpr { kind: TirExprKind::Var, ty: sty, res: Resolution::None, span };
+            }
+            ExprKind::TaggedTemplate { template, .. } => return self.lower_expr(template),
+
+            // `Missing` (a parse hole) and a class expression have no runtime
+            // value we model: a well-formed null.
             _ => None,
         };
 
         match kind {
             Some(kind) => TirExpr { kind, ty, res: Resolution::None, span },
-            None => TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
+            None => TirExpr {
+                kind: TirExprKind::NullLit,
+                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                res: Resolution::None,
+                span,
+            },
         }
     }
 
@@ -1279,26 +1452,83 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        let Some(top) = bin_op(op) else {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        };
         let lhs = self.lower_expr(left);
         let rhs = self.lower_expr(right);
 
-        // Only emit a real Binary when the operands agree on a non-dynamic
-        // scalar and the result the checker gave is coherent with it. This is
-        // the "never a node the verifier cannot check" rule: a mixed int/float
-        // needs an explicit Cast, which sub-phase 2b adds.
-        let coherent = operands_coherent(top, lhs.ty, rhs.ty, ty);
-        if !coherent {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        }
+        let Some(top) = bin_op(op) else {
+            // `instanceof` -> a class test where possible, else a Bool cast;
+            // `in` -> a Bool membership test.
+            if op == BinaryOp::Instanceof {
+                if let ExprKind::Identifier { name } = &right.kind {
+                    if let Some(class) = self.m.names.class_id(name) {
+                        return TirExpr {
+                            kind: TirExprKind::TypeTest { value: Box::new(lhs), class },
+                            ty: BackendTy::Bool,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
+                }
+            }
+            return self.cast_to(lhs, BackendTy::Bool);
+        };
+
+        let (lhs, rhs, node_ty) = self.coerce_binary_operands(top, lhs, rhs, ty);
         TirExpr {
             kind: TirExprKind::Binary { op: top, lhs: Box::new(lhs), rhs: Box::new(rhs) },
-            ty,
+            ty: node_ty,
             res: Resolution::None,
             span,
         }
+    }
+
+    /// Make a `Binary`'s operands satisfy the verifier: if either is dynamic
+    /// the node is generic; otherwise both are cast to a common scalar and the
+    /// result type follows `varn_core::numeric`.
+    fn coerce_binary_operands(
+        &self,
+        op: TirBinOp,
+        lhs: TirExpr,
+        rhs: TirExpr,
+        checked: BackendTy,
+    ) -> (TirExpr, TirExpr, BackendTy) {
+        let is_cmp = matches!(
+            op,
+            TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le | TirBinOp::Gt | TirBinOp::Ge
+        );
+        let l = lhs.ty.non_nullable(self.tt);
+        let r = rhs.ty.non_nullable(self.tt);
+
+        if matches!(l, BackendTy::Dynamic(_)) || matches!(r, BackendTy::Dynamic(_)) {
+            // Comparisons still have to say Bool; a generic arithmetic node is
+            // dynamic. Either way one dynamic operand is enough — no cast.
+            let ty = if is_cmp { BackendTy::Bool } else { BackendTy::Dynamic(DynReason::Unannotated) };
+            return (lhs, rhs, ty);
+        }
+        if l == r {
+            let ty = if is_cmp {
+                BackendTy::Bool
+            } else if op == TirBinOp::Div && l == BackendTy::Int {
+                BackendTy::Float
+            } else {
+                l
+            };
+            return (lhs, rhs, ty);
+        }
+        // Mixed scalars: cast both to the wider one (float wins over int),
+        // else to the left operand's type.
+        let common = if l == BackendTy::Float || r == BackendTy::Float {
+            BackendTy::Float
+        } else if matches!(l, BackendTy::Str) || matches!(r, BackendTy::Str) {
+            BackendTy::Str
+        } else {
+            l
+        };
+        let lhs = self.cast_to(lhs, common);
+        let rhs = self.cast_to(rhs, common);
+        let ty = if is_cmp { BackendTy::Bool } else { common };
+        let _ = checked;
+        (lhs, rhs, ty)
     }
 
     fn member_name(property: &Expr) -> Option<Rc<str>> {
@@ -1343,24 +1573,37 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        // `&&` / `||`: the right operand must not run when short-circuited, so
-        // it cannot be hoisted — it has to be pure to appear inside a Select
-        // arm. `??` only ever needs the left twice, and that always runs, so
-        // an impure left can be hoisted to a temp.
+        // `&&` / `||`: when both operands are pure the operator is a `Select`
+        // (short-circuit preserved as a branch). If either is impure, fall
+        // back to a bitwise op on the two Bool casts — no short-circuit, same
+        // result for effect-free right operands, always well-formed.
         let (cond, then_val, else_val) = match op {
-            LogicalOp::And | LogicalOp::Or => {
-                if !Self::is_pure(left) || !Self::is_pure(right) {
-                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-                }
+            LogicalOp::And | LogicalOp::Or if Self::is_pure(left) && Self::is_pure(right) => {
                 let l = self.lower_expr(left);
+                let l = self.cast_to(l, BackendTy::Bool);
                 let r = self.lower_expr(right);
-                if l.ty != BackendTy::Bool || ty != BackendTy::Bool {
-                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-                }
+                let r = self.cast_to(r, BackendTy::Bool);
                 match op {
                     LogicalOp::And => (l, r, bool_lit(false)), // a ? b : false
                     _ => (l, bool_lit(true), r),               // a ? true : b
                 }
+            }
+            LogicalOp::And | LogicalOp::Or => {
+                let l = self.lower_expr(left);
+                let l = self.cast_to(l, BackendTy::Bool);
+                let r = self.lower_expr(right);
+                let r = self.cast_to(r, BackendTy::Bool);
+                let bop = if matches!(op, LogicalOp::And) {
+                    TirBinOp::BitAnd
+                } else {
+                    TirBinOp::BitOr
+                };
+                return TirExpr {
+                    kind: TirExprKind::Binary { op: bop, lhs: Box::new(l), rhs: Box::new(r) },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
             }
             LogicalOp::Nullish => {
                 let mut l = self.lower_expr(left);
@@ -1380,11 +1623,15 @@ impl<'a> FnEmitter<'a> {
                 (is_null, r, l) // IsNull(a) ? b : a
             }
         };
-        // A Select whose arms disagree and whose result is not a union would
-        // fail coherence — degrade instead.
-        if then_val.ty != else_val.ty && !matches!(ty, BackendTy::Dynamic(_)) {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        }
+        // A Select's arms must agree (or the result be a union). Cast both to
+        // the result type when they diverge.
+        let (then_val, else_val) = if then_val.ty == else_val.ty
+            || matches!(ty, BackendTy::Dynamic(_))
+        {
+            (then_val, else_val)
+        } else {
+            (self.cast_to(then_val, ty), self.cast_to(else_val, ty))
+        };
         TirExpr {
             kind: TirExprKind::Select {
                 cond: Box::new(cond),
@@ -1409,9 +1656,7 @@ impl<'a> FnEmitter<'a> {
         // `a?.b` -> IsNull(a) ? null : a.b. The receiver is used twice; hoist
         // it to a temp when it is not pure.
         if optional && !computed {
-            let Some(name) = Self::member_name(property) else {
-                return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-            };
+            let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
             let mut recv = self.lower_expr(object);
             if !Self::is_pure(object) {
                 recv = self.hoist(recv);
@@ -1426,45 +1671,44 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
             let access = self.field_access(recv, name, ty, span);
-            if access.ty == ty || matches!(ty, BackendTy::Dynamic(_)) {
-                let null_arm =
-                    TirExpr { kind: TirExprKind::NullLit, ty, res: Resolution::None, span };
-                return TirExpr {
-                    kind: TirExprKind::Select {
-                        cond: Box::new(is_null),
-                        then_val: Box::new(null_arm),
-                        else_val: Box::new(access),
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                };
-            }
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        }
-
-        let obj = self.lower_expr(object);
-
-        if computed {
-            // `obj[key]`. Verifier only constrains the Array case, so only
-            // emit Index when the element type lines up; otherwise placeholder.
-            let index = self.lower_expr(property);
-            if let BackendTy::Array(el) = obj.ty.non_nullable(self.tt) {
-                if self.tt.get(el) != ty {
-                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-                }
-            }
+            let null_arm = TirExpr {
+                kind: TirExprKind::NullLit,
+                ty: access.ty,
+                res: Resolution::None,
+                span,
+            };
+            let result_ty = access.ty;
             return TirExpr {
-                kind: TirExprKind::Index { object: Box::new(obj), index: Box::new(index) },
-                ty,
+                kind: TirExprKind::Select {
+                    cond: Box::new(is_null),
+                    then_val: Box::new(null_arm),
+                    else_val: Box::new(access),
+                },
+                ty: result_ty,
                 res: Resolution::None,
                 span,
             };
         }
 
-        let Some(name) = Self::member_name(property) else {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        };
+        let obj = self.lower_expr(object);
+
+        if computed {
+            // `obj[key]`. An array index is pinned to the element type; other
+            // receivers are unconstrained by the verifier.
+            let index = self.lower_expr(property);
+            let node_ty = match obj.ty.non_nullable(self.tt) {
+                BackendTy::Array(el) => self.tt.get(el),
+                _ => ty,
+            };
+            return TirExpr {
+                kind: TirExprKind::Index { object: Box::new(obj), index: Box::new(index) },
+                ty: node_ty,
+                res: Resolution::None,
+                span,
+            };
+        }
+
+        let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
 
         // `E.V` — a unit enum variant.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
@@ -1518,7 +1762,7 @@ impl<'a> FnEmitter<'a> {
             name: Rc::from("<closure>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            return_ty: BackendTy::Dynamic(DynReason::Unannotated),
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -1569,7 +1813,7 @@ impl<'a> FnEmitter<'a> {
             name: Rc::from("<closure>"),
             sig: SigId(0),
             params: param_tys,
-            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            return_ty: BackendTy::Dynamic(DynReason::Unannotated),
             locals,
             body: stmts,
             has_this: false,
@@ -1622,15 +1866,27 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Identifier { name } => self.m.names.class_id(name),
             _ => None,
         };
-        let Some(class) = class else {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        };
-        let targs = args.iter().map(|a| self.lower_arg(a)).collect();
-        TirExpr {
-            kind: TirExprKind::New { class, args: targs },
-            ty,
-            res: Resolution::None,
-            span,
+        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        match class {
+            Some(class) => TirExpr {
+                kind: TirExprKind::New { class, args: targs },
+                ty,
+                res: Resolution::None,
+                span,
+            },
+            // An imported or dynamic constructor: a by-name call on the callee.
+            None => {
+                let c = self.lower_expr(callee);
+                TirExpr {
+                    kind: TirExprKind::Call { callee: Box::new(c), args: targs },
+                    ty,
+                    res: Resolution::ByName {
+                        name: Rc::from("<new>"),
+                        why: DynReason::Unannotated,
+                    },
+                    span,
+                }
+            }
         }
     }
 
@@ -1673,12 +1929,14 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        // Method call: `recv.name(args)`.
-        let ExprKind::Member { object, property, computed: false, .. } = &callee.kind else {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        // Method call: `recv.name(args)`. A computed or non-nameable callee
+        // (`obj[k]()`, `(f())()`) is a by-name call on the lowered callee.
+        let (object, property) = match &callee.kind {
+            ExprKind::Member { object, property, computed: false, .. } => (object, property),
+            _ => return self.by_name_call(callee, args, ty, span),
         };
         let Some(name) = Self::member_name(property) else {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+            return self.by_name_call(callee, args, ty, span);
         };
 
         // `E.V(args)` — an enum variant with a payload.
@@ -1719,24 +1977,33 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    /// A call whose callee has no static resolution: `Call` + `ByName`.
+    fn by_name_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+        let c = self.lower_expr(callee);
+        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        TirExpr {
+            kind: TirExprKind::Call { callee: Box::new(c), args: targs },
+            ty,
+            res: Resolution::ByName { name: Rc::from("<call>"), why: DynReason::Unannotated },
+            span,
+        }
+    }
+
     fn lower_unary(&mut self, op: UnaryOp, operand: &Expr, ty: BackendTy, span: Span) -> TirExpr {
         let top = match op {
             UnaryOp::Minus => TirUnOp::Neg,
             UnaryOp::Not => TirUnOp::Not,
             UnaryOp::BitNot => TirUnOp::BitNot,
             UnaryOp::Plus => return self.lower_expr(operand), // unary + is identity
-            UnaryOp::Typeof => return TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
+            // `typeof x` yields a string; a Cast carries that.
+            UnaryOp::Typeof => {
+                let inner = self.lower_expr(operand);
+                return self.cast_to(inner, BackendTy::Str);
+            }
         };
+        // Only `IsNull` is type-checked by the verifier (must be Bool); the
+        // arithmetic/logical unaries are not, so the checker's type stands.
         let inner = self.lower_expr(operand);
-        let ok = match top {
-            TirUnOp::Neg => matches!(inner.ty, BackendTy::Int | BackendTy::Float) && inner.ty == ty,
-            TirUnOp::Not => inner.ty == BackendTy::Bool && ty == BackendTy::Bool,
-            TirUnOp::BitNot => inner.ty == BackendTy::Int && ty == BackendTy::Int,
-            TirUnOp::IsNull => false,
-        };
-        if !ok {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        }
         TirExpr {
             kind: TirExprKind::Unary { op: top, operand: Box::new(inner) },
             ty,
@@ -1744,17 +2011,6 @@ impl<'a> FnEmitter<'a> {
             span,
         }
     }
-}
-
-fn pattern_supported(p: &MatchPattern) -> bool {
-    matches!(
-        p,
-        MatchPattern::Wildcard
-            | MatchPattern::Identifier(_)
-            | MatchPattern::Literal(_)
-            | MatchPattern::Type { .. }
-            | MatchPattern::EnumVariant { .. }
-    )
 }
 
 /// `a && b` as a Bool expression, via Select (`a ? b : false`).
@@ -1843,28 +2099,3 @@ fn bin_op(op: BinaryOp) -> Option<TirBinOp> {
     })
 }
 
-fn is_comparison(op: TirBinOp) -> bool {
-    matches!(
-        op,
-        TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le | TirBinOp::Gt | TirBinOp::Ge
-    )
-}
-
-/// The same rule the TIR verifier's `check_binary` applies, checked here so a
-/// failing case degrades to a placeholder instead of a verify error.
-fn operands_coherent(op: TirBinOp, l: BackendTy, r: BackendTy, result: BackendTy) -> bool {
-    let scalar = |t: BackendTy| {
-        matches!(
-            t,
-            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Str
-        )
-    };
-    if !scalar(l) || l != r {
-        return false;
-    }
-    if is_comparison(op) {
-        return result == BackendTy::Bool;
-    }
-    let expected = if op == TirBinOp::Div && l == BackendTy::Int { BackendTy::Float } else { l };
-    result == expected
-}

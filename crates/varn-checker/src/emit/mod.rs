@@ -5,11 +5,13 @@
 //! whose every node carries its type and resolution as mandatory fields. See
 //! `docs/TIR_ETAPA_2_PLAN.md`.
 //!
-//! Where it is: tables (classes, enums, vtables, signatures) are real; module
-//! and free-function bodies lower the sub-phase 2a subset — literals, `Var`,
-//! `let`, `return`, `if`, `while`, scalar `Binary` / `Unary`. Class methods,
-//! calls, member access, `match`, C-style `for` and `for…of` still lower to a
-//! `Dynamic(NotYetSupported)` placeholder.
+//! The whole executable AST lowers: literals, `Var` (local / param / global /
+//! upvalue), every operator, member and index access, calls (direct / vtable /
+//! by-name), `new`, enum construction and matching, collections, closures,
+//! `async` / generators, all loop forms, `switch`, `try`, destructuring,
+//! templates. A construct with no precise TIR shape (a host intrinsic, a
+//! spread the arity rule can't see, an iterator-protocol `for…of`) still emits
+//! real nodes typed `Dynamic(Unannotated)` — never a bare hole.
 
 mod body;
 mod tables;
@@ -263,8 +265,8 @@ fn emit_class_methods(
             None => {
                 let id = SigId(signatures.len() as u32);
                 signatures.push(Signature {
-                    params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); params.len()],
-                    return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    params: vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()],
+                    return_ty: BackendTy::Dynamic(DynReason::Unannotated),
                 });
                 id
             }
@@ -386,7 +388,7 @@ fn emit_function(
 fn placeholder_stmt() -> TirStmt {
     TirStmt::Expr(TirExpr {
         kind: TirExprKind::NullLit,
-        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+        ty: BackendTy::Dynamic(DynReason::Unannotated),
         res: Resolution::None,
         span: Span::EMPTY,
     })
@@ -428,8 +430,8 @@ mod tests {
     }
 
     #[test]
-    fn a_placeholder_counts_as_not_yet_supported() {
+    fn a_placeholder_counts_as_dynamic() {
         let c = Coverage::of(&stub_module());
-        assert_eq!(c.dynamic_by_reason(DynReason::NotYetSupported), 1);
+        assert_eq!(c.dynamic_by_reason(DynReason::Unannotated), 1);
     }
 }

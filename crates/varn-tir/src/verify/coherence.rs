@@ -294,11 +294,13 @@ fn assignable_with_depth(
     if from == BackendTy::Never {
         return true;
     }
-    // `int` widens to `float` implicitly — this is how a call like
-    // `takesFloat(1)` type-checks in the language, so a call argument is
-    // assignable across it. Arithmetic stays strict: `check_binary` compares
-    // by equality, not through here.
-    if from == BackendTy::Int && to == BackendTy::Float {
+    // `int` widens implicitly to the other numeric types — this is how a call
+    // like `takesFloat(1)` or `takesDecimal(1)` type-checks in the language,
+    // so a call argument is assignable across it. Arithmetic stays strict:
+    // `check_binary` compares by equality, not through here.
+    if from == BackendTy::Int
+        && matches!(to, BackendTy::Float | BackendTy::Decimal | BackendTy::BigInt)
+    {
         return true;
     }
     // Arrays and sets are covariant in their element for assignability — the

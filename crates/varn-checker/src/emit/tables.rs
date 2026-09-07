@@ -183,8 +183,8 @@ fn intern_signature(
     };
     let id = signatures.len() as u32;
     signatures.push(Signature {
-        params: vec![BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported); arity],
-        return_ty: BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
+        params: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); arity],
+        return_ty: BackendTy::Dynamic(varn_tir::DynReason::Unannotated),
     });
     varn_tir::SigId(id)
 }
