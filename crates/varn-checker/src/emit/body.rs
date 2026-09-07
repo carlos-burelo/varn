@@ -11,7 +11,7 @@ use crate::emit::tables::NameIndex;
 use crate::emit::ty::{lower_type, NameResolver};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::operators::{BinaryOp, UnaryOp};
+use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
 use varn_core::ast::{Arg, ArrayEl, AstId, Expr, ExprKind, ObjectProp, Pattern, PropKey, Stmt, StmtKind};
 use varn_tir::{
     BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, Span,
@@ -253,8 +253,12 @@ impl<'a> FnEmitter<'a> {
                 return TirExpr { kind: TirExprKind::Var, ty: this_ty, res: Resolution::None, span };
             }
 
-            ExprKind::Member { object, property, computed, optional: _ } => {
-                return self.lower_member(object, property, *computed, ty, span)
+            ExprKind::Member { object, property, computed, optional } => {
+                return self.lower_member(object, property, *computed, *optional, ty, span)
+            }
+
+            ExprKind::Logical { op, left, right } => {
+                return self.lower_logical(*op, left, right, ty, span)
             }
 
             ExprKind::Call { callee, args, optional: _, type_args: _ } => {
@@ -376,14 +380,129 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    /// An expression that can be lowered more than once without changing
+    /// behaviour: no calls, no assignments, no construction. Used to decide
+    /// whether `??` / `?.` / `&&` / `||` can desugar to a `Select` (which
+    /// mentions an operand twice) without a hoisted temp.
+    fn is_pure(e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::Identifier { .. }
+            | ExprKind::This
+            | ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::NullLiteral => true,
+            ExprKind::Paren { expression } => Self::is_pure(expression),
+            ExprKind::Member { object, property, computed, .. } => {
+                Self::is_pure(object) && (!computed || Self::is_pure(property))
+            }
+            ExprKind::Binary { left, right, .. } => {
+                Self::is_pure(left) && Self::is_pure(right)
+            }
+            ExprKind::Unary { operand, .. } => Self::is_pure(operand),
+            _ => false,
+        }
+    }
+
+    fn lower_logical(
+        &mut self,
+        op: LogicalOp,
+        left: &Expr,
+        right: &Expr,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        // Short-circuit desugars to Select, which names an operand twice, so
+        // both operands must be re-lowerable. A hoisted temp lands in a later
+        // sub-phase.
+        if !Self::is_pure(left) || !Self::is_pure(right) {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        }
+        let l1 = self.lower_expr(left);
+        let r = self.lower_expr(right);
+        let (cond, then_val, else_val) = match op {
+            // `a && b` -> a ? b : false
+            LogicalOp::And if l1.ty == BackendTy::Bool && ty == BackendTy::Bool => {
+                (l1, r, bool_lit(false))
+            }
+            // `a || b` -> a ? true : b
+            LogicalOp::Or if l1.ty == BackendTy::Bool && ty == BackendTy::Bool => {
+                (l1, bool_lit(true), r)
+            }
+            // `a ?? b` -> IsNull(a) ? b : a
+            LogicalOp::Nullish => {
+                let l2 = self.lower_expr(left);
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary { op: TirUnOp::IsNull, operand: Box::new(l1) },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+                (is_null, r, l2)
+            }
+            _ => return TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
+        };
+        // A Select whose arms disagree and whose result is not a union would
+        // fail coherence — degrade instead.
+        if then_val.ty != else_val.ty && !matches!(ty, BackendTy::Dynamic(_)) {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        }
+        TirExpr {
+            kind: TirExprKind::Select {
+                cond: Box::new(cond),
+                then_val: Box::new(then_val),
+                else_val: Box::new(else_val),
+            },
+            ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     fn lower_member(
         &mut self,
         object: &Expr,
         property: &Expr,
         computed: bool,
+        optional: bool,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        // `a?.b` -> IsNull(a) ? null : a.b   (pure `a` only for now)
+        if optional && !computed && Self::is_pure(object) {
+            if Self::member_name(property).is_some() {
+                let obj1 = self.lower_expr(object);
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary { op: TirUnOp::IsNull, operand: Box::new(obj1) },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+                let access = self.lower_member(object, property, false, false, ty, span);
+                let null_arm = TirExpr {
+                    kind: TirExprKind::NullLit,
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+                if access.ty == ty || matches!(ty, BackendTy::Dynamic(_)) {
+                    return TirExpr {
+                        kind: TirExprKind::Select {
+                            cond: Box::new(is_null),
+                            then_val: Box::new(null_arm),
+                            else_val: Box::new(access),
+                        },
+                        ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+            }
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        }
+
         let obj = self.lower_expr(object);
 
         if computed {

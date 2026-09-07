@@ -170,9 +170,15 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `res: EnumVariant{enum_id, tag}`. Regla del verificador: `Array`/`Set`
    covariantes en el elemento para asignabilidad. Coverage: `12-classes.vn`
    64 static / 37 by-name.
-6. **`match`, `?.`, `??`.** Desugar a `If` + `Discriminant` /
-   `VariantPayload` / `TypeTest` / `IsNull` + `Select`. La forma del desugar
-   de `?.` (temp local hoisted) se fija aquí contra el AST.
+6a. **`?.`, `??`, `&&`, `||`** (hecho). Desugar a `Select` con receptor puro
+   (sin llamadas/asignaciones/construcción — re-bajable, porque `Select`
+   nombra un operando dos veces). `a ?? b` → `IsNull(a) ? b : a`; `a?.b` →
+   `IsNull(a) ? null : a.b`; `a && b` → `a ? b : false`; `a || b` →
+   `a ? true : b`. Receptor no puro → placeholder hasta 6b (temp hoisted).
+6b. **`match` + temp hoisted.** `FnEmitter` gana un buffer de sentencias
+   pendientes; `lower_stmt` pasa a `Vec<TirStmt>`. `match` baja a cadena de
+   `If` + `Discriminant` / `VariantPayload` / `TypeTest`. Habilita también
+   `?.` / `??` con receptor con efectos.
 7. **`async` / generadores.** `is_async` / `is_generator` en `TirFunction`;
    `Await` / `Yield`.
 8. **Spread y named args.** `TirArg::Spread` / `Named`.
