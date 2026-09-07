@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use rust_decimal::Decimal;
 
-use crate::hir::{HirBinOp, HirFunction, HirType, HirUnOp, HirUpvalueSrc, LocalId};
+use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VarId {
@@ -117,16 +117,6 @@ pub struct Inst {
     pub dest: Option<Value>,
     pub kind: InstKind,
     pub line: u32,
-}
-
-/// The body a `MakeClosure` refers to. `Hir` is the current path; `Tir` names
-/// a `varn_tir::TirModule::functions` index and is what `from_tir` produces —
-/// the bytecode emitter grows a `Tir` arm as part of the stage-3 cut, so for
-/// now no consumer of a `from_tir` SSA function reaches emission.
-#[derive(Debug, Clone)]
-pub enum ClosureBody {
-    Hir(Rc<HirFunction>),
-    Tir(u32),
 }
 
 #[derive(Debug, Clone)]
@@ -281,7 +271,8 @@ pub enum InstKind {
     /// Listar aquí los valores capturados creaba operandos fantasma que el
     /// backend materializaba en `Move` que nadie lee.
     MakeClosure {
-        func: ClosureBody,
+        /// Index into `varn_tir::TirModule::functions` — the closure body.
+        func: u32,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
     LoadCaptured {

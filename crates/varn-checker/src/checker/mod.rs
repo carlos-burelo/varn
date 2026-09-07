@@ -14,7 +14,6 @@ use varn_core::ast::Expr;
 use varn_core::ast::Program;
 use varn_core::Diagnostic;
 
-pub(crate) use crate::checker_annotations::collect_type_annotations;
 pub(crate) use crate::checker_enrichment::enrich_call_returns;
 
 use crate::semantic_info::{CallResolution, MemberResolution};
@@ -80,11 +79,7 @@ pub struct CheckResult {
     /// different things.
     pub expr_types: FxHashMap<u32, ExprInfo>,
     pub flattened_members: FxHashMap<Rc<str>, Vec<crate::types::ClassMemberInfo>>,
-    pub type_annotations: varn_core::TypeAnnotations,
     pub profile: CheckProfile,
-    pub extension_calls: FxHashMap<u32, Rc<str>>,
-    pub extension_members: FxHashMap<u32, Rc<str>>,
-    pub extension_set_members: FxHashMap<u32, Rc<str>>,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
     pub scope_spans: Vec<ScopeSpan>,
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
@@ -183,8 +178,11 @@ pub struct Checker<'r> {
     pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
+    /// Written by `validate_named_call_arguments`; the codegen consumer went
+    /// away with the HIR path. Kept because the call-site plumbing that fills
+    /// it is load-bearing for the argument checks in the same function.
+    #[allow(dead_code)]
     pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
-    pub(crate) reassigned_names: rustc_hash::FxHashSet<Rc<str>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
     pub(crate) scope_spans: Vec<ScopeSpan>,
@@ -338,7 +336,6 @@ impl<'r> Checker<'r> {
             warn_implicit_dynamic,
             expected_type: None,
             call_mappings: FxHashMap::default(),
-            reassigned_names: rustc_hash::FxHashSet::default(),
             record_expr_types,
             node_scopes: FxHashMap::default(),
             scope_spans: Vec::new(),
@@ -419,17 +416,8 @@ impl<'r> Checker<'r> {
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);
 
-        let started = Instant::now();
         let expr_table = std::mem::take(&mut checker.expr_table);
-        let mut annotations = collect_type_annotations(program, &bind, resolver, &expr_table);
-
-        for (k, v) in checker.call_mappings {
-            annotations.record_call_mapping(varn_core::AnnKey::expr(k), v);
-        }
-        for name in &checker.reassigned_names {
-            annotations.record_reassigned_name(name);
-        }
-        profile.collect_annotations = started.elapsed();
+        profile.collect_annotations = Duration::ZERO;
         let flattened = std::mem::take(&mut bind.type_members.flattened);
 
         let started = Instant::now();
@@ -477,11 +465,7 @@ impl<'r> Checker<'r> {
             diagnostics: final_diagnostics,
             expr_types: checker.expr_types,
             flattened_members: flattened,
-            type_annotations: annotations,
             profile,
-            extension_calls: checker.extension_calls,
-            extension_members: checker.extension_members,
-            extension_set_members: checker.extension_set_members,
             node_scopes,
             scope_spans,
             symbol_types,

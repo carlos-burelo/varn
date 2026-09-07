@@ -7,18 +7,16 @@
 
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
-use varn_checker::module_resolver::ImportResolver;
 use varn_checker::{BindResult, TypeEntry};
 use varn_core::ast::{AstId, Program};
 
 pub fn debug_tir(
     program: &Program,
     bind: &BindResult,
-    resolver: &dyn ImportResolver,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     flags: &DebugFlags,
 ) {
-    let module = varn_checker::emit::emit_module(program, bind, resolver, expr_table);
+    let module = varn_checker::emit::emit_module(program, bind, expr_table);
 
     if flags.tir {
         eprintln!("\n=== TIR: {} ===", module.source_file);

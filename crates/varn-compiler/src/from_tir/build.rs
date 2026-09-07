@@ -607,7 +607,7 @@ impl<'m> Builder<'m> {
 
             TirExprKind::Closure { func } => Ok(self.emit(
                 InstKind::MakeClosure {
-                    func: crate::ssa::ir::ClosureBody::Tir(func.0),
+                    func: func.0,
                     upvalues_src: vec![],
                 },
                 HirType::Ref,
@@ -832,7 +832,7 @@ fn build_inner(tir: &TirModule, func: &TirFunction, register_module_fns: bool) -
         for (i, f) in tir.functions.iter().enumerate() {
             let fv = b.emit(
                 InstKind::MakeClosure {
-                    func: crate::ssa::ir::ClosureBody::Tir(i as u32),
+                    func: i as u32,
                     upvalues_src: vec![],
                 },
                 HirType::Ref,

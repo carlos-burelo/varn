@@ -206,23 +206,9 @@ pub fn build_module_graph(
             .map(|k| std::rc::Rc::from(k.as_str()))
             .collect();
         export_names.sort();
-        let module_proto = if std::env::var_os("VN_LEGACY_HIR").is_none() {
-            let tir = crate::resolver::with_resolver(|r| {
-                varn_checker::emit::emit_module(program, &check.bind, r, &check.expr_table)
-            });
-            varn_compiler::from_tir::compile_module(&tir, export_names)
-                .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?
-        } else {
-            varn_compiler::compile_module(
-                program,
-                &check.type_annotations,
-                &check.extension_calls,
-                &check.extension_members,
-                &check.extension_set_members,
-                export_names,
-            )
-            .map_err(|e| format!("compile error in '{module_path}': {e}"))?
-        };
+        let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table);
+        let module_proto = varn_compiler::from_tir::compile_module(&tir, export_names)
+            .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
 
         modules.insert(module_path, module_proto);
     }

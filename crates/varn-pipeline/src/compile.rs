@@ -35,39 +35,17 @@ pub fn compile(
         .collect();
     export_names.sort();
 
-    let proto = if std::env::var_os("VN_LEGACY_HIR").is_none() {
-        // Stage 3: the TIR path is the default. `VN_LEGACY_HIR=1` falls back
-        // to the HIR lowering for one release, then it is deleted.
-        let tir = crate::resolver::with_resolver(|r| {
-            varn_checker::emit::emit_module(
-                program,
-                &check_result.checker_result.bind,
-                r,
-                &check_result.checker_result.expr_table,
-            )
-        });
-        varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
-            PipelineError::fatal(format!(
-                "{}: {e:?}",
-                varn_core::term::chalk::chalk("error[emit:tir]").red().bold()
-            ))
-        })?
-    } else {
-        varn_compiler::compile_module(
-            program,
-            &check_result.checker_result.type_annotations,
-            &check_result.checker_result.extension_calls,
-            &check_result.checker_result.extension_members,
-            &check_result.checker_result.extension_set_members,
-            export_names,
-        )
-        .map_err(|e| {
-            PipelineError::fatal(format!(
-                "{}: {e}",
-                varn_core::term::chalk::chalk("error[emit]").red().bold()
-            ))
-        })?
-    };
+    let tir = varn_checker::emit::emit_module(
+        program,
+        &check_result.checker_result.bind,
+        &check_result.checker_result.expr_table,
+    );
+    let proto = varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
+        PipelineError::fatal(format!(
+            "{}: {e:?}",
+            varn_core::term::chalk::chalk("error[emit:tir]").red().bold()
+        ))
+    })?;
 
     if debug.bytecode {
         varn_debug::bytecode::debug_bytecode(&proto, debug);
@@ -99,45 +77,12 @@ pub fn compile(
         }
     }
 
-    if debug.hir {
-        varn_debug::hir::debug_hir(
-            program,
-            &check_result.checker_result.type_annotations,
-            &check_result.checker_result.extension_calls,
-            &check_result.checker_result.extension_members,
-            &check_result.checker_result.extension_set_members,
-        );
-    }
-
     if debug.tir || debug.tir_check {
-        crate::resolver::with_resolver(|r| {
-            varn_debug::tir::debug_tir(
-                program,
-                &check_result.checker_result.bind,
-                r,
-                &check_result.checker_result.expr_table,
-                debug,
-            )
-        });
-    }
-
-    if debug.ssa {
-        varn_debug::ssa::debug_ssa(
+        varn_debug::tir::debug_tir(
             program,
-            &check_result.checker_result.type_annotations,
-            &check_result.checker_result.extension_calls,
-            &check_result.checker_result.extension_members,
-            &check_result.checker_result.extension_set_members,
-        );
-    }
-
-    if debug.suspend {
-        varn_debug::suspend::debug_suspend(
-            program,
-            &check_result.checker_result.type_annotations,
-            &check_result.checker_result.extension_calls,
-            &check_result.checker_result.extension_members,
-            &check_result.checker_result.extension_set_members,
+            &check_result.checker_result.bind,
+            &check_result.checker_result.expr_table,
+            debug,
         );
     }
 

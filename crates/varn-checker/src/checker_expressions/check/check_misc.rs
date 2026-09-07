@@ -78,36 +78,6 @@ impl<'r> Checker<'r> {
         }
     }
 
-    
-    
-    fn collect_reassigned_names(&mut self, target: &Expr) {
-        match &target.kind {
-            ExprKind::Identifier { name } => {
-                self.reassigned_names.insert(name.clone());
-            }
-            ExprKind::Paren { expression } => self.collect_reassigned_names(expression),
-            ExprKind::Array { elements } => {
-                for el in elements {
-                    match el {
-                        varn_core::ast::ArrayEl::Expr(e)
-                        | varn_core::ast::ArrayEl::Spread(e) => {
-                            self.collect_reassigned_names(e)
-                        }
-                        varn_core::ast::ArrayEl::Hole => {}
-                    }
-                }
-            }
-            ExprKind::Object { properties } => {
-                for prop in properties {
-                    if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
-                        self.collect_reassigned_names(value);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
     pub(super) fn check_assign_expr(
         &mut self,
         target: &Expr,
@@ -120,8 +90,6 @@ impl<'r> Checker<'r> {
         self.check_expr(target, bind);
         self.is_assignment_target = prev;
         self.check_expr(value, bind);
-
-        self.collect_reassigned_names(target);
 
         self.check_extension_assignment(target, bind);
 

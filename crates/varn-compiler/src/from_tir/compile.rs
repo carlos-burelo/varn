@@ -110,5 +110,7 @@ pub fn compile_module(tir: &TirModule, export_names: Vec<Rc<str>>) -> Result<Fun
     let source_file = tir.source_file.clone();
     let mut proto = compile_one(tir, &tir.top_level, true, source_file)?;
     proto.export_names = export_names;
+    // Coalescing + register-count validation, recursing into nested protos.
+    crate::regalloc::run_post_passes(&mut proto);
     Ok(proto)
 }

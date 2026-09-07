@@ -169,6 +169,26 @@ no se migra. `vn cache clean` en las notas de la etapa.
       diagnóstico falso: `assert("label", cond)` lanza al fallar y es
       silencioso al pasar; `PASSED: 0 / ALL TESTS PASSED` es el estado verde
       real, y HIR lo produce igual.)
-      Falta: volcar `-p bytecode` de los 188 sin ejecutar, luego los borrados
-      (~6000 líneas), corpus rojo hasta etapa 4.
+- [x] 3.4 **el corte hecho.** `VN_FROM_TIR`/`VN_LEGACY_HIR` fuera: el pipeline
+      llama a `varn_checker::emit::emit_module` (sin `resolver`, era muerto) y
+      pasa el `TirModule` a `varn_compiler::from_tir::compile_module`, que ahora
+      cierra con `regalloc::run_post_passes`. Borrados (−10.5k líneas):
+      * `varn-compiler/src/hir/lower/` (todo)
+      * `varn-compiler/src/ssa/build/` (el camino viejo)
+      * `varn-checker/src/checker_annotations/`
+      * `varn-compiler/src/lib.rs`: `compile`/`compile_module`/`lower_to_hir`/
+        `lower_to_ssa`/`OptInput` — el crate ya solo habla TIR
+      * `varn-debug/src/{hir,ssa,suspend}.rs` y sus fases `-p`
+      * `CheckResult`: `type_annotations` + los tres mapas `extension_*`
+      `hir/mod.rs` (tipos `HirType`/`HirBinOp`/`TyTable`), `hir/{inline,
+      ctor_summary,module_locals}`, `lower/bin_opcode` y `ssa/emit` se quedan.
+      `typed_ir.rs`/`cg_ty.rs`/`register_meta.rs` **no** se borran: el JIT los
+      lee todavía (contrato §4, fuera de alcance de etapa 3).
+      Validado: `cargo build --workspace` + `cargo test` verdes; los 4
+      cuadrantes exit 0; 107/107 `tests/*.vn` con JIT == intérprete; los 200
+      módulos a bytecode. Dos `tests/errors/*` (`invalid-register-overflow`,
+      `invalid-bigint-overflow`, ambos `// expect: error[emit]`) ahora compilan
+      limpio — la ruta TIR hace DCE del código muerto que el límite de 255
+      registros de HIR rechazaba; el test codificaba una limitación de HIR, no
+      del lenguaje. Pendiente decidir si se reescriben o se borran.
 - [ ] 3.5 caché de bytecode

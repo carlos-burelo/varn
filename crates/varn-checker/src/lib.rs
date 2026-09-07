@@ -1,6 +1,5 @@
 pub mod binder;
 pub mod checker;
-pub(crate) mod checker_annotations;
 pub(crate) mod checker_call_types;
 pub(crate) mod checker_enrichment;
 pub(crate) mod checker_expressions;

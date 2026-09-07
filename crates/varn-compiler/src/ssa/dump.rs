@@ -156,10 +156,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
-        InstKind::MakeClosure { func, .. } => match func {
-            crate::ssa::ir::ClosureBody::Hir(f) => format!("closure {}", f.name),
-            crate::ssa::ir::ClosureBody::Tir(i) => format!("closure tir#{i}"),
-        },
+        InstKind::MakeClosure { func, .. } => format!("closure tir#{func}"),
         InstKind::IntrinsicCall {
             object,
             args,

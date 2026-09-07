@@ -21,7 +21,6 @@ pub use ty::{lower_type, NameResolver, NoNames};
 
 use crate::binder::BindResult;
 use crate::checker::TypeEntry;
-use crate::module_resolver::ImportResolver;
 use body::FnEmitter;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -40,7 +39,6 @@ use varn_tir::{
 pub fn emit_module(
     program: &Program,
     bind: &BindResult,
-    _resolver: &dyn ImportResolver,
     expr_table: &FxHashMap<AstId, TypeEntry>,
 ) -> TirModule {
     let mut types = TyTable::default();

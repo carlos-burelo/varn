@@ -27,6 +27,16 @@ use super::stats::PhaseStats;
 use super::BenchOpts;
 use crate::error::CliError;
 
+/// Compile through the TIR path — the same route the pipeline takes.
+fn compile_via_tir(
+    program: &varn_core::ast::Program,
+    check: &varn_checker::CheckResult,
+    export_names: Vec<Rc<str>>,
+) -> Result<FunctionProto, String> {
+    let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table);
+    varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
+}
+
 pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
     let canonical;
@@ -115,12 +125,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
-        let res = varn_compiler::compile_module(
+        let res = compile_via_tir(
             program_ref,
-            &check_result.type_annotations,
-            &check_result.extension_calls,
-            &check_result.extension_members,
-            &check_result.extension_set_members,
+            &check_result,
             export_names_of(&program_ref.filename),
         );
 
@@ -139,15 +146,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let proto = varn_compiler::compile_module(
-        &program,
-        &check_result.type_annotations,
-        &check_result.extension_calls,
-        &check_result.extension_members,
-        &check_result.extension_set_members,
-        export_names_of(&program.filename),
-    )
-    .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
+    let proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
+        .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
     let graph_build =
@@ -283,15 +283,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
         });
 
-        let mut proto = varn_compiler::compile_module(
-            &program,
-            &check_result.type_annotations,
-            &check_result.extension_calls,
-            &check_result.extension_members,
-            &check_result.extension_set_members,
-            export_names_of(&program.filename),
-        )
-        .map_err(|e| format!("compile failed: {}", e))?;
+        let mut proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
+            .map_err(|e| format!("compile failed: {}", e))?;
 
         varn_builtins::reset_testing_counters();
 

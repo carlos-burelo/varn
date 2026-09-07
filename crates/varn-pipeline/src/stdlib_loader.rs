@@ -224,15 +224,8 @@ fn compile_source_inner(
         .map(|k| std::rc::Rc::from(k.as_str()))
         .collect();
     export_names.sort();
-    varn_compiler::compile_module(
-        &program,
-        &check.type_annotations,
-        &check.extension_calls,
-        &check.extension_members,
-        &check.extension_set_members,
-        export_names,
-    )
-    .map_err(|e| e.to_string())
+    let tir = varn_checker::emit::emit_module(&program, &check.bind, &check.expr_table);
+    varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
 /// Spec §2: std modules may only import `runtime:*`, `std:*` or `core:intrinsics`.

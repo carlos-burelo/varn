@@ -36,16 +36,11 @@ pub struct DebugFlags {
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
 
-    pub hir: bool,
-
-    /// `tir` — dump the typed IR the checker emits (stage 2). `tir:check`
+    /// `tir` — dump the typed IR the checker emits. `tir:check`
     /// verifies it and reports coverage over the module, like `clif:check`
     /// sweeps a module rather than reading one function.
     pub tir: bool,
     pub tir_check: bool,
-
-    pub ssa: bool,
-    pub suspend: bool,
 
     pub clif: bool,
     pub clif_route: bool,
@@ -84,13 +79,7 @@ pub const PHASES: &[(&str, &str)] = &[
     ("ast", "árbol sintáctico"),
     ("check", "símbolos, binds, tipos y expresiones"),
     ("bytecode", "bytecode por función"),
-    ("hir", "HIR previo a SSA"),
-    ("tir", "IR tipado que emite el checker (etapa 2)"),
-    ("ssa", "forma SSA"),
-    (
-        "suspend",
-        "puntos de suspensión Await/Yield con su conjunto vivo, in_try, in_loop",
-    ),
+    ("tir", "IR tipado que emite el checker"),
     ("clif", "lowering Cranelift (route, kinds, ir, asm, check)"),
     ("tiers", "tier por función: clif / gate / bail"),
     (
@@ -277,10 +266,7 @@ impl DebugFlags {
                     }
                     "info" => flags.info = true,
                     "lsp" => flags.lsp = true,
-                    "hir" => flags.hir = true,
                     "tir" => flags.tir = true,
-                    "ssa" => flags.ssa = true,
-                    "suspend" => flags.suspend = true,
                     "tiers" => flags.tiers = true,
                     "bails" => flags.bails = true,
                     "roots" => flags.roots = true,
@@ -303,8 +289,6 @@ impl DebugFlags {
                         flags.cap_trace = true;
                         flags.lsp = true;
                         flags.lsp_all();
-                        flags.hir = true;
-                        flags.ssa = true;
                         flags.tiers = true;
                         flags.bails = true;
                         flags.summary = true;

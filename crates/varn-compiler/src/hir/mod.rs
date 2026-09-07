@@ -4,7 +4,6 @@ use std::rc::Rc;
 pub mod ctor_summary;
 pub mod dump;
 pub mod inline;
-pub mod lower;
 pub mod module_locals;
 
 /// Interned handle to a nested `HirType` in the module's [`TyTable`].
