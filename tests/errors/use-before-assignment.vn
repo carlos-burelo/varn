@@ -1,0 +1,5 @@
+// expect: error[VN4017]
+function f(): int {
+    let x: int
+    return x
+}

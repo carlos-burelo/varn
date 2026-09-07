@@ -1,0 +1,8 @@
+// expect: error[VN4017]
+function g(c: bool): int {
+    let x: int
+    if (c) {
+        x = 1
+    }
+    return x
+}

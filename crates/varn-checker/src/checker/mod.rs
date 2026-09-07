@@ -1,5 +1,6 @@
 pub(crate) mod compat;
 mod decls;
+mod definite_assignment;
 mod refine;
 mod stmts;
 use crate::binder::{BindResult, BindView, Binder};
@@ -371,6 +372,7 @@ impl<'r> Checker<'r> {
 
         let started = Instant::now();
         checker.check_stmts(&program.body, &bind);
+        checker.check_definite_assignment(program);
         profile.check_stmts = started.elapsed();
 
         // Positional projection of `expr_table`, for editors. Built here, from

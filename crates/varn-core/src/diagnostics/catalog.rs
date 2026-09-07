@@ -79,6 +79,7 @@ pub enum ErrorCode {
     InvalidDestructuringTarget = 4014,
     MatchPatternTypeMismatch = 4015,
     InvalidUsingTarget = 4016,
+    UseBeforeAssignment = 4017,
 
     MissingOverride = 4101,
     SpuriousOverride = 4102,
@@ -201,6 +202,7 @@ impl ErrorCode {
             ErrorCode::InvalidDestructuringTarget => "invalid-destructuring-target",
             ErrorCode::MatchPatternTypeMismatch => "match-pattern-type-mismatch",
             ErrorCode::InvalidUsingTarget => "invalid-using-target",
+            ErrorCode::UseBeforeAssignment => "use-before-assignment",
 
             ErrorCode::MissingOverride => "missing-override",
             ErrorCode::SpuriousOverride => "spurious-override",
