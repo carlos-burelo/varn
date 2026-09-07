@@ -43,7 +43,9 @@ fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
         .class_id(name)
         .map(BackendTy::Class)
         .or_else(|| names.enum_id(name).map(BackendTy::Enum))
-        .unwrap_or_else(not_supported)
+        // An unresolved name is a type parameter (erased) or an imported type
+        // — either way the type is genuinely unknown here, not a TIR gap.
+        .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
 }
 
 fn lower_kind(
@@ -221,12 +223,14 @@ mod tests {
     }
 
     #[test]
-    fn a_named_type_with_no_table_is_not_yet_supported() {
+    fn an_unresolved_named_type_is_dynamic_unannotated() {
+        // A type parameter or an imported type: genuinely unknown here, not a
+        // TIR representation gap.
         let mut tt = table();
         let ty = t(TypeKind::Named(std::rc::Rc::from("Point"), None));
         assert_eq!(
             lower_type(&ty, &mut tt, &NoNames),
-            BackendTy::Dynamic(DynReason::NotYetSupported)
+            BackendTy::Dynamic(DynReason::Unannotated)
         );
     }
 }
