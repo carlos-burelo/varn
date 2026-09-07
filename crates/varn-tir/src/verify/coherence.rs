@@ -293,6 +293,28 @@ fn assignable_with_depth(
     if from == BackendTy::Never {
         return true;
     }
+    // `int` widens to `float` implicitly — this is how a call like
+    // `takesFloat(1)` type-checks in the language, so a call argument is
+    // assignable across it. Arithmetic stays strict: `check_binary` compares
+    // by equality, not through here.
+    if from == BackendTy::Int && to == BackendTy::Float {
+        return true;
+    }
+    // A subclass is assignable to any of its ancestors.
+    if let (BackendTy::Class(sub), BackendTy::Class(sup)) = (from, to) {
+        let mut cur = Some(sub);
+        let mut hops = 0;
+        while let Some(c) = cur {
+            if c == sup {
+                return true;
+            }
+            if hops > ASSIGNABLE_DEPTH_LIMIT {
+                break;
+            }
+            hops += 1;
+            cur = m.class(c).and_then(|ci| ci.parent);
+        }
+    }
     // The bare null value — `Nullable` over a `Never` payload — is assignable
     // to every nullable type. It is what `return null` in a `T?` function
     // produces.

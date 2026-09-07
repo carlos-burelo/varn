@@ -155,7 +155,14 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `Void` del binder). `Intrinsic` / `DirectFn` en `MethodCall` → sub-fase 5 /
    sin resolver aún. Coverage con señal real: `url.vn` 44 static / 21 by-name
    / 48 NotYetSupported.
-4. **Globales y llamadas libres.** `Var` + `GlobalSlot`; `Call` + `DirectFn`.
+4. **Globales y llamadas libres** (hecho). Símbolos-valor del scope global
+   (`Var`/`Let`/`Const`/`Function`/`Class`/`Enum`/`Namespace`/`Struct`) →
+   slot por orden de declaración del binder; `Var` no local/param → `GlobalSlot`.
+   `Call` sobre identificador → `DirectFn(FnId)` si la función es libre y la
+   aridad casa (firma forzada a `f.params.len()` para que el verificador
+   concuerde), si no `Call` + `ByName`. Regla del verificador ampliada:
+   `int`→`float` en argumento de llamada; subclase→ancestro por la cadena
+   `ClassInfo.parent`. Coverage: `url.vn` 166 static / 35 by-name.
 5. **Colecciones y `New`.** `ArrayLit` (+ `Hole`/`Spread`), `ObjectLit`,
    `TupleLit`, `New`, `MakeVariant`.
 6. **`match`, `?.`, `??`.** Desugar a `If` + `Discriminant` /

@@ -46,9 +46,51 @@ pub fn emit_module(
 
     let tables::Tables { classes, enums, mut signatures, names } = tables::build(bind, &mut types);
 
+    // Module value symbols → global slots, in binder declaration order.
+    let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
+    let mut globals: Vec<BackendTy> = Vec::new();
+    for sym in bind.global_symbols() {
+        if !is_value_symbol(sym.kind) {
+            continue;
+        }
+        if global_slots.contains_key(&sym.name) {
+            continue;
+        }
+        let slot = globals.len() as u32;
+        globals.push(
+            sym.ty
+                .as_ref()
+                .map(|t| lower_type(t, &mut types, &names))
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
+        );
+        global_slots.insert(sym.name.clone(), slot);
+    }
+
+    // Free functions, in declaration order: FnId is the index, arity is the
+    // parameter count (the signature is built to match, so the verifier's
+    // arity check agrees).
+    let free_fns: Vec<&FunctionDecl> = program
+        .body
+        .iter()
+        .filter_map(|s| match &s.kind {
+            StmtKind::Decl(d) => free_function(d),
+            _ => None,
+        })
+        .collect();
+    let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
+    for (i, f) in free_fns.iter().enumerate() {
+        fn_index.entry(f.id.clone()).or_insert((i as u32, f.params.len() as u32));
+    }
+
+    let ctx = MCtx {
+        names: &names,
+        classes: &classes,
+        globals: &global_slots,
+        fns: &fn_index,
+    };
+
     // Module top level: every statement that is not a declaration.
-    let mut top =
-        FnEmitter::new(expr_table, &mut types, &names, &classes, &mut signatures, vec![]);
+    let mut top = FnEmitter::new(expr_table, &mut types, ctx.as_module_ctx(), &mut signatures, vec![]);
     let mut top_body = Vec::new();
     for stmt in &program.body {
         match &stmt.kind {
@@ -70,31 +112,16 @@ pub fn emit_module(
         is_generator: false,
     };
 
-    // Free functions, then class methods and constructors.
+    // Free-function bodies, in the same order FnId was assigned.
     let mut functions = Vec::new();
+    for f in &free_fns {
+        functions.push(emit_function(f, bind, expr_table, &mut types, &ctx, &mut signatures));
+    }
+    // Then class methods and constructors.
     for stmt in &program.body {
         let StmtKind::Decl(decl) = &stmt.kind else { continue };
-        if let Some(f) = free_function(decl) {
-            functions.push(emit_function(
-                f,
-                bind,
-                expr_table,
-                &mut types,
-                &names,
-                &classes,
-                &mut signatures,
-            ));
-        }
         if let Some(class) = class_decl(decl) {
-            emit_class_methods(
-                class,
-                &names,
-                &classes,
-                expr_table,
-                &mut types,
-                &mut signatures,
-                &mut functions,
-            );
+            emit_class_methods(class, &ctx, expr_table, &mut types, &mut signatures, &mut functions);
         }
     }
 
@@ -105,9 +132,37 @@ pub fn emit_module(
         enums,
         signatures,
         functions,
-        globals: vec![],
+        globals,
         top_level,
     }
+}
+
+/// Owns the borrows a `ModuleCtx` bundles, so the many emit helpers take one
+/// `&MCtx` instead of four separate references.
+struct MCtx<'a> {
+    names: &'a tables::NameIndex,
+    classes: &'a [varn_tir::ClassInfo],
+    globals: &'a FxHashMap<Rc<str>, u32>,
+    fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+}
+
+impl<'a> MCtx<'a> {
+    fn as_module_ctx(&self) -> body::ModuleCtx<'a> {
+        body::ModuleCtx {
+            names: self.names,
+            classes: self.classes,
+            globals: self.globals,
+            fns: self.fns,
+        }
+    }
+}
+
+fn is_value_symbol(kind: crate::symbol::SymbolKind) -> bool {
+    use crate::symbol::SymbolKind as K;
+    matches!(
+        kind,
+        K::Var | K::Let | K::Const | K::Function | K::Class | K::Enum | K::Namespace | K::Struct
+    )
 }
 
 fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
@@ -132,11 +187,9 @@ fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn emit_class_methods(
     class: &varn_core::ast::ClassDecl,
-    names: &tables::NameIndex,
-    classes: &[varn_tir::ClassInfo],
+    ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
     signatures: &mut Vec<Signature>,
@@ -144,8 +197,8 @@ fn emit_class_methods(
 ) {
     use varn_core::ast::ClassMember;
     let Some(class_name) = class.id.as_ref() else { return };
-    let Some(class_id) = names.class_id(class_name) else { return };
-    let info = &classes[class_id.0 as usize];
+    let Some(class_id) = ctx.names.class_id(class_name) else { return };
+    let info = &ctx.classes[class_id.0 as usize];
 
     for member in &class.body {
         let (key, params, body): (Rc<str>, &[Param], &Stmt) = match member {
@@ -175,7 +228,7 @@ fn emit_class_methods(
 
         let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
         let mut em =
-            FnEmitter::new(expr_table, types, names, classes, signatures, param_names)
+            FnEmitter::new(expr_table, types, ctx.as_module_ctx(), signatures, param_names)
                 .with_this(class_id);
         let body_stmts = match &body.kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
@@ -205,38 +258,37 @@ fn param_name(p: &Param) -> Rc<str> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn emit_function(
     f: &FunctionDecl,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
-    names: &tables::NameIndex,
-    classes: &[varn_tir::ClassInfo],
+    ctx: &MCtx,
     signatures: &mut Vec<Signature>,
 ) -> TirFunction {
-    // The function's signature is on its global symbol as a `Fn` type.
+    // The function's signature is on its global symbol as a `Fn` type. Its
+    // arity is forced to the AST parameter count so the verifier's arity
+    // check on a DirectFn call site agrees with `fn_index`.
     let sym_ty = bind
         .global_symbols()
         .find(|s| s.name == f.id)
         .and_then(|s| s.ty.clone());
 
-    let (param_tys, return_ty) = match sym_ty.as_ref().map(|t| t.kind()) {
-        Some(TypeKind::Fn(ft)) => (
-            ft.params.iter().map(|p| lower_type(&p.ty, types, names)).collect::<Vec<_>>(),
-            lower_type(&ft.return_type, types, names),
-        ),
-        _ => (
-            vec![BackendTy::Dynamic(DynReason::Unannotated); f.params.len()],
-            BackendTy::Dynamic(DynReason::Unannotated),
-        ),
-    };
+    let arity = f.params.len();
+    let mut param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); arity];
+    let mut return_ty = BackendTy::Dynamic(DynReason::Unannotated);
+    if let Some(TypeKind::Fn(ft)) = sym_ty.as_ref().map(|t| t.kind()) {
+        for (i, p) in ft.params.iter().take(arity).enumerate() {
+            param_tys[i] = lower_type(&p.ty, types, ctx.names);
+        }
+        return_ty = lower_type(&ft.return_type, types, ctx.names);
+    }
 
     let sig = SigId(signatures.len() as u32);
     signatures.push(Signature { params: param_tys.clone(), return_ty });
 
     let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
-    let mut em = FnEmitter::new(expr_table, types, names, classes, signatures, param_names);
+    let mut em = FnEmitter::new(expr_table, types, ctx.as_module_ctx(), signatures, param_names);
     let body = match &f.body.kind {
         StmtKind::Block { stmts } => em.lower_block(stmts),
         _ => em.lower_block(std::slice::from_ref(&f.body)),

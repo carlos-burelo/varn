@@ -18,12 +18,21 @@ use varn_tir::{
     TirBinOp, TirExpr, TirExprKind, TirStmt, TirUnOp, TyTable,
 };
 
+/// The module-wide handles a body emitter needs but does not own.
+#[derive(Clone, Copy)]
+pub(super) struct ModuleCtx<'a> {
+    pub names: &'a NameIndex,
+    pub classes: &'a [ClassInfo],
+    /// Module value symbol name → global slot.
+    pub globals: &'a FxHashMap<Rc<str>, u32>,
+    /// Free-function name → (index into `TirModule::functions`, arity).
+    pub fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+}
+
 pub(super) struct FnEmitter<'a> {
     pub expr_table: &'a FxHashMap<AstId, TypeEntry>,
     pub tt: &'a mut TyTable,
-    pub names: &'a NameIndex,
-    pub classes: &'a [ClassInfo],
-    #[allow(dead_code)]
+    m: ModuleCtx<'a>,
     pub signatures: &'a mut Vec<Signature>,
     pub locals: Vec<BackendTy>,
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
@@ -48,16 +57,14 @@ impl<'a> FnEmitter<'a> {
     pub fn new(
         expr_table: &'a FxHashMap<AstId, TypeEntry>,
         tt: &'a mut TyTable,
-        names: &'a NameIndex,
-        classes: &'a [ClassInfo],
+        m: ModuleCtx<'a>,
         signatures: &'a mut Vec<Signature>,
         params: Vec<Rc<str>>,
     ) -> Self {
         FnEmitter {
             expr_table,
             tt,
-            names,
-            classes,
+            m,
             signatures,
             locals: Vec::new(),
             scopes: vec![FxHashMap::default()],
@@ -73,7 +80,7 @@ impl<'a> FnEmitter<'a> {
 
     fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
         match ty.non_nullable(self.tt) {
-            BackendTy::Class(c) => self.classes.get(c.0 as usize),
+            BackendTy::Class(c) => self.m.classes.get(c.0 as usize),
             _ => None,
         }
     }
@@ -85,8 +92,9 @@ impl<'a> FnEmitter<'a> {
     /// for coherence turns an optimisation into a spurious error. `refined`
     /// re-enters as an opt-only channel in a later sub-phase.
     fn expr_ty(&mut self, e: &Expr) -> BackendTy {
+        let names = self.m.names;
         match self.expr_table.get(&e.id) {
-            Some(entry) => lower_type(&entry.ty, self.tt, self.names),
+            Some(entry) => lower_type(&entry.ty, self.tt, names),
             None => BackendTy::Dynamic(DynReason::Unannotated),
         }
     }
@@ -100,7 +108,9 @@ impl<'a> FnEmitter<'a> {
         if let Some(i) = self.params.iter().position(|p| p.as_ref() == name) {
             return Resolution::Param(i as u32);
         }
-        // Globals and imports resolve in sub-phase 4.
+        if let Some(&slot) = self.m.globals.get(name) {
+            return Resolution::GlobalSlot(slot);
+        }
         Resolution::ByName { name: Rc::from(name), why: DynReason::Unannotated }
     }
 
@@ -379,8 +389,26 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn lower_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
-        // Method call: `recv.name(args)`. A free call on an identifier is
-        // sub-phase 4.
+        // Free call on an identifier: `f(args)`.
+        if let ExprKind::Identifier { name } = &callee.kind {
+            let c = self.lower_expr(callee);
+            let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+            let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
+            let res = match self.m.fns.get(name) {
+                Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
+                    Resolution::DirectFn(varn_tir::FnId(fn_id))
+                }
+                _ => Resolution::ByName { name: name.clone(), why: DynReason::Unannotated },
+            };
+            return TirExpr {
+                kind: TirExprKind::Call { callee: Box::new(c), args: targs },
+                ty,
+                res,
+                span,
+            };
+        }
+
+        // Method call: `recv.name(args)`.
         let ExprKind::Member { object, property, computed: false, .. } = &callee.kind else {
             return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
         };

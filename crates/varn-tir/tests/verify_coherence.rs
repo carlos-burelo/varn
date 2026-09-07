@@ -73,6 +73,77 @@ fn bare_null_returns_from_any_nullable_function() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
+/// `int` widens to `float` at a call argument — `takesFloat(1)`.
+#[test]
+fn int_argument_widens_to_a_float_parameter() {
+    let mut m = module_with_point();
+    m.signatures.push(Signature {
+        params: vec![BackendTy::Float],
+        return_ty: BackendTy::Void,
+    });
+    m.functions.push(TirFunction {
+        name: Rc::from("takesFloat"),
+        sig: SigId(1),
+        params: vec![BackendTy::Float],
+        return_ty: BackendTy::Void,
+        locals: vec![],
+        body: vec![],
+        has_this: false,
+        this_class: None,
+        is_async: false,
+        is_generator: false,
+    });
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Call {
+            callee: Box::new(expr(TirExprKind::Var, BackendTy::Void, Resolution::None)),
+            args: vec![TirArg::Expr(int(1))],
+        },
+        BackendTy::Void,
+        Resolution::DirectFn(FnId(0)),
+    )));
+    assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
+}
+
+/// A subclass argument satisfies an ancestor parameter.
+#[test]
+fn a_subclass_is_assignable_to_its_parent() {
+    // ClassId(0) = Animal, ClassId(1) = Dog extends Animal.
+    let animal = ClassInfo::new(Rc::from("Animal"), None, vec![]);
+    let mut dog = ClassInfo::new(Rc::from("Dog"), None, vec![]);
+    dog.parent = Some(ClassId(0));
+    let mut m = module_with_point();
+    m.classes = vec![animal, dog];
+    m.signatures.push(Signature {
+        params: vec![BackendTy::Class(ClassId(0))],
+        return_ty: BackendTy::Void,
+    });
+    m.functions.push(TirFunction {
+        name: Rc::from("greet"),
+        sig: SigId(1),
+        params: vec![BackendTy::Class(ClassId(0))],
+        return_ty: BackendTy::Void,
+        locals: vec![BackendTy::Class(ClassId(1))],
+        body: vec![],
+        has_this: false,
+        this_class: None,
+        is_async: false,
+        is_generator: false,
+    });
+    m.top_level.body.push(TirStmt::Expr(expr(
+        TirExprKind::Call {
+            callee: Box::new(expr(TirExprKind::Var, BackendTy::Void, Resolution::None)),
+            args: vec![TirArg::Expr(expr(
+                TirExprKind::Var,
+                BackendTy::Class(ClassId(1)),
+                Resolution::None,
+            ))],
+        },
+        BackendTy::Void,
+        Resolution::DirectFn(FnId(0)),
+    )));
+    assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
+}
+
 /// int + int is int.
 #[test]
 fn int_addition_is_int() {
