@@ -12,7 +12,11 @@ use crate::emit::ty::{lower_type, NameResolver};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
-use varn_core::ast::{Arg, ArrayEl, AstId, Expr, ExprKind, ObjectProp, Pattern, PropKey, Stmt, StmtKind};
+use varn_core::ast::pattern::{MatchBinding, MatchPattern};
+use varn_core::ast::{
+    Arg, ArrayEl, AstId, Expr, ExprKind, MatchBody, MatchCase, ObjectProp, Pattern, PropKey, Stmt,
+    StmtKind,
+};
 use varn_tir::{
     BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, Span,
     TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp, TyTable,
@@ -39,6 +43,18 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// Statements produced while lowering an expression (hoisted temps, match
+    /// desugaring). `lower_stmt` drains this in front of the statement it was
+    /// lowering.
+    pending: Vec<TirStmt>,
+}
+
+/// What a `match` arm does with its value.
+#[derive(Clone, Copy)]
+enum MatchDest {
+    Statement,
+    Return,
+    Assign(LocalId),
 }
 
 fn span_of(e: &Expr) -> Span {
@@ -71,7 +87,26 @@ impl<'a> FnEmitter<'a> {
             scopes: vec![FxHashMap::default()],
             params,
             this_class: None,
+            pending: Vec::new(),
         }
+    }
+
+    /// A synthetic local with no source name, for a hoisted temp.
+    fn fresh_local(&mut self, ty: BackendTy) -> LocalId {
+        let id = LocalId(self.locals.len() as u32);
+        self.locals.push(ty);
+        id
+    }
+
+    /// Bind `e` to a fresh local via a pending `Let`, and return a `Var` that
+    /// reads it. Used where an expression must be mentioned more than once but
+    /// is not pure.
+    fn hoist(&mut self, e: TirExpr) -> TirExpr {
+        let ty = e.ty;
+        let span = e.span;
+        let local = self.fresh_local(ty);
+        self.pending.push(TirStmt::Let { local, ty, init: Some(e) });
+        TirExpr { kind: TirExprKind::Var, ty, res: Resolution::Local(local), span }
     }
 
     pub fn with_this(mut self, class: ClassId) -> Self {
@@ -124,7 +159,10 @@ impl<'a> FnEmitter<'a> {
 
     pub fn lower_block(&mut self, stmts: &[Stmt]) -> Vec<TirStmt> {
         self.scopes.push(FxHashMap::default());
-        let out = stmts.iter().filter_map(|s| self.lower_stmt(s)).collect();
+        let mut out = Vec::new();
+        for s in stmts {
+            out.extend(self.lower_stmt(s));
+        }
         self.scopes.pop();
         out
     }
@@ -132,80 +170,338 @@ impl<'a> FnEmitter<'a> {
     pub fn lower_stmt_as_block(&mut self, s: &Stmt) -> Vec<TirStmt> {
         match &s.kind {
             StmtKind::Block { stmts } => self.lower_block(stmts),
-            _ => self.lower_stmt(s).into_iter().collect(),
+            _ => self.lower_stmt(s),
         }
     }
 
-    fn lower_stmt(&mut self, s: &Stmt) -> Option<TirStmt> {
+    /// Lower one source statement into zero or more TIR statements. Hoisted
+    /// temps from the statement's own expressions are prepended; control-flow
+    /// arms that recurse into sub-statements drain `pending` themselves before
+    /// recursing.
+    fn lower_stmt(&mut self, s: &Stmt) -> Vec<TirStmt> {
+        let one = |s: TirStmt| vec![s];
+        let drained = |em: &mut Self, built: Vec<TirStmt>| {
+            let mut out = std::mem::take(&mut em.pending);
+            out.extend(built);
+            out
+        };
         match &s.kind {
-            StmtKind::Block { stmts } => {
-                // A bare block keeps its own scope but has no TIR node of its
-                // own; splice its statements. Rare at statement position.
-                let inner = self.lower_block(stmts);
-                Some(TirStmt::If {
-                    cond: bool_lit(true),
-                    then_body: inner,
-                    else_body: vec![],
-                })
+            StmtKind::Block { stmts } => self.lower_block(stmts),
+            StmtKind::Expr { expression } => {
+                if let ExprKind::Match { subject, cases } = &expression.kind {
+                    return self.lower_match_stmt(subject, cases);
+                }
+                let e = self.lower_expr(expression);
+                drained(self, one(TirStmt::Expr(e)))
             }
-            StmtKind::Expr { expression } => Some(TirStmt::Expr(self.lower_expr(expression))),
-            StmtKind::Empty | StmtKind::Debugger | StmtKind::Error => None,
+            StmtKind::Empty | StmtKind::Debugger | StmtKind::Error => vec![],
 
-            StmtKind::Decl(decl) => self.lower_decl_stmt(decl),
+            StmtKind::Decl(decl) => {
+                let built = self.lower_decl_stmt(decl);
+                drained(self, built)
+            }
 
             StmtKind::Return { argument } => {
-                Some(TirStmt::Return(argument.as_ref().map(|a| self.lower_expr(a))))
+                if let Some(arg) = argument {
+                    if let ExprKind::Match { subject, cases } = &arg.kind {
+                        return self.lower_match(subject, cases, MatchDest::Return);
+                    }
+                }
+                let a = argument.as_ref().map(|a| self.lower_expr(a));
+                drained(self, one(TirStmt::Return(a)))
             }
-            StmtKind::Throw { argument } => Some(TirStmt::Throw(self.lower_expr(argument))),
-            StmtKind::Break { .. } => Some(TirStmt::Break),
-            StmtKind::Continue { .. } => Some(TirStmt::Continue),
+            StmtKind::Throw { argument } => {
+                let a = self.lower_expr(argument);
+                drained(self, one(TirStmt::Throw(a)))
+            }
+            StmtKind::Break { .. } => one(TirStmt::Break),
+            StmtKind::Continue { .. } => one(TirStmt::Continue),
 
             StmtKind::If { test, consequent, alternate } => {
                 let cond = self.lower_cond(test);
+                let mut out = std::mem::take(&mut self.pending);
                 let then_body = self.lower_stmt_as_block(consequent);
                 let else_body =
                     alternate.as_ref().map(|a| self.lower_stmt_as_block(a)).unwrap_or_default();
-                Some(TirStmt::If { cond, then_body, else_body })
+                out.push(TirStmt::If { cond, then_body, else_body });
+                out
             }
 
             StmtKind::While { test, body } => {
                 let cond = self.lower_cond(test);
+                let cond_pending = std::mem::take(&mut self.pending);
                 let body = self.lower_stmt_as_block(body);
-                Some(TirStmt::Loop { cond, body })
+                if cond_pending.is_empty() {
+                    one(TirStmt::Loop { cond, body })
+                } else {
+                    // The condition needs a temp; recompute it each iteration
+                    // as a gate at the top of the loop body.
+                    let mut loop_body = cond_pending;
+                    loop_body.push(TirStmt::If {
+                        cond,
+                        then_body: vec![],
+                        else_body: vec![TirStmt::Break],
+                    });
+                    loop_body.extend(body);
+                    one(TirStmt::Loop { cond: bool_lit(true), body: loop_body })
+                }
             }
 
             // C-style for, do-while, for-of/in, switch, try, using, labeled:
-            // sub-phase 2b and later. Emit a placeholder statement so the
-            // shape is visible in the dump and counted.
-            _ => Some(TirStmt::Expr(placeholder(DynReason::NotYetSupported))),
+            // later sub-phases.
+            _ => one(TirStmt::Expr(placeholder(DynReason::NotYetSupported))),
         }
     }
 
-    fn lower_decl_stmt(&mut self, decl: &varn_core::ast::Decl) -> Option<TirStmt> {
+    /// `match subject { … }` -> hoist the subject, then a chain of `If`.
+    /// `dest` says what each arm does with its value: nothing (statement
+    /// position), `return` it, or assign it to a local (`let x = match …`). A
+    /// pattern this sub-phase does not support, or an impure guard, degrades
+    /// the whole match to one placeholder.
+    fn lower_match(&mut self, subject: &Expr, cases: &[MatchCase], dest: MatchDest) -> Vec<TirStmt> {
+        let subj = self.lower_expr(subject);
+        let mut out = std::mem::take(&mut self.pending);
+
+        let all_ok = cases.iter().all(|c| {
+            pattern_supported(&c.pattern)
+                && c.guard.as_ref().map(Self::is_pure).unwrap_or(true)
+        });
+        if !all_ok {
+            out.push(match dest {
+                MatchDest::Statement | MatchDest::Assign(_) => {
+                    TirStmt::Expr(placeholder(DynReason::NotYetSupported))
+                }
+                MatchDest::Return => TirStmt::Return(Some(placeholder(DynReason::NotYetSupported))),
+            });
+            return out;
+        }
+
+        let s = self.hoist(subj);
+        out.extend(std::mem::take(&mut self.pending));
+        let chain = self.match_cases(&s, cases, 0, dest);
+        out.extend(chain);
+        out
+    }
+
+    fn lower_match_stmt(&mut self, subject: &Expr, cases: &[MatchCase]) -> Vec<TirStmt> {
+        self.lower_match(subject, cases, MatchDest::Statement)
+    }
+
+    fn match_cases(
+        &mut self,
+        s: &TirExpr,
+        cases: &[MatchCase],
+        i: usize,
+        dest: MatchDest,
+    ) -> Vec<TirStmt> {
+        let Some(case) = cases.get(i) else { return vec![] };
+
+        self.scopes.push(FxHashMap::default());
+        let (mut cond, mut then_body) = self.match_pattern(s, &case.pattern);
+        if let Some(g) = &case.guard {
+            let gexpr = self.lower_expr(g);
+            cond = and_bool(cond, gexpr); // guard is pure, no pending
+        }
+        // The arm's value expression, then what `dest` does with it.
+        let value = match &case.body {
+            MatchBody::Expr(e) => self.lower_expr(e),
+            MatchBody::Block(stmt) => {
+                // A block-bodied arm in value position is not lowered yet;
+                // run it for effect and yield null.
+                then_body.extend(self.lower_stmt_as_block(stmt));
+                TirExpr {
+                    kind: TirExprKind::NullLit,
+                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    res: Resolution::None,
+                    span: s.span,
+                }
+            }
+        };
+        then_body.extend(std::mem::take(&mut self.pending));
+        match dest {
+            MatchDest::Statement => then_body.push(TirStmt::Expr(value)),
+            MatchDest::Return => then_body.push(TirStmt::Return(Some(value))),
+            MatchDest::Assign(local) => then_body.push(TirStmt::Expr(TirExpr {
+                kind: TirExprKind::Assign {
+                    target: Box::new(TirExpr {
+                        kind: TirExprKind::Var,
+                        ty: value.ty,
+                        res: Resolution::Local(local),
+                        span: s.span,
+                    }),
+                    value: Box::new(value),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: s.span,
+            })),
+        }
+        self.scopes.pop();
+
+        let else_body = self.match_cases(s, cases, i + 1, dest);
+        vec![TirStmt::If { cond, then_body, else_body }]
+    }
+
+    /// Test `s` against one pattern: a `Bool` condition and the bindings the
+    /// pattern introduces, as `Let` statements to run when it matches.
+    fn match_pattern(&mut self, s: &TirExpr, pat: &MatchPattern) -> (TirExpr, Vec<TirStmt>) {
+        match pat {
+            MatchPattern::Wildcard => (bool_lit(true), vec![]),
+            MatchPattern::Identifier(name) => {
+                let local = self.bind_local(name.clone(), s.ty);
+                (bool_lit(true), vec![TirStmt::Let { local, ty: s.ty, init: Some(s.clone()) }])
+            }
+            MatchPattern::Literal(lit) => {
+                let l = self.lower_expr(lit);
+                let cond = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Eq,
+                        lhs: Box::new(s.clone()),
+                        rhs: Box::new(l),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: s.span,
+                };
+                (cond, vec![])
+            }
+            MatchPattern::Type { type_name, binding } => {
+                let Some(cid) = self.m.names.class_id(type_name) else {
+                    return (bool_lit(false), vec![]);
+                };
+                let cond = TirExpr {
+                    kind: TirExprKind::TypeTest { value: Box::new(s.clone()), class: cid },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: s.span,
+                };
+                let mut binds = vec![];
+                if let Some(name) = binding {
+                    let local = self.bind_local(name.clone(), BackendTy::Class(cid));
+                    binds.push(TirStmt::Let {
+                        local,
+                        ty: BackendTy::Class(cid),
+                        init: Some(s.clone()),
+                    });
+                }
+                (cond, binds)
+            }
+            MatchPattern::EnumVariant { enum_name, variant_name, bindings } => {
+                self.match_enum_variant(s, enum_name, variant_name, bindings)
+            }
+            // Record / Sequence: pattern_supported already rejected these.
+            _ => (bool_lit(false), vec![]),
+        }
+    }
+
+    fn match_enum_variant(
+        &mut self,
+        s: &TirExpr,
+        enum_name: &str,
+        variant_name: &str,
+        bindings: &[MatchBinding],
+    ) -> (TirExpr, Vec<TirStmt>) {
+        // The pattern may name the enum (`Color.Red`) or just the variant
+        // (`Red`), in which case the subject's own type says which enum.
+        let eid = self.m.names.enum_id(enum_name).or_else(|| match s.ty.non_nullable(self.tt) {
+            BackendTy::Enum(e) => Some(e),
+            _ => None,
+        });
+        let Some(eid) = eid else {
+            return (bool_lit(false), vec![]);
+        };
+        let Some(info) = self.m.enums.get(eid.0 as usize) else {
+            return (bool_lit(false), vec![]);
+        };
+        let Some(variant) = info.variants.iter().find(|v| v.name.as_ref() == variant_name) else {
+            return (bool_lit(false), vec![]);
+        };
+        let tag = variant.tag;
+        let payload: Vec<BackendTy> = variant.payload.clone();
+
+        let disc = TirExpr {
+            kind: TirExprKind::Discriminant { value: Box::new(s.clone()) },
+            ty: BackendTy::Int,
+            res: Resolution::None,
+            span: s.span,
+        };
+        let cond = TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Eq,
+                lhs: Box::new(disc),
+                rhs: Box::new(TirExpr {
+                    kind: TirExprKind::IntLit(tag as i64),
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span: s.span,
+                }),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: s.span,
+        };
+
+        let mut binds = Vec::new();
+        for (i, b) in bindings.iter().enumerate() {
+            let fty = payload.get(i).copied().unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+            let field = TirExpr {
+                kind: TirExprKind::VariantPayload {
+                    value: Box::new(s.clone()),
+                    tag,
+                    field: i as u16,
+                },
+                ty: fty,
+                res: Resolution::EnumVariant { enum_id: eid, tag },
+                span: s.span,
+            };
+            let local = self.bind_local(b.name.clone(), fty);
+            binds.push(TirStmt::Let { local, ty: fty, init: Some(field) });
+        }
+        (cond, binds)
+    }
+
+    fn lower_decl_stmt(&mut self, decl: &varn_core::ast::Decl) -> Vec<TirStmt> {
         use varn_core::ast::Decl;
         let Decl::Variable(v) = decl else {
             // Nested function/class/enum declarations are handled at module
             // level, not as body statements.
-            return None;
+            return vec![];
         };
-        // One `let` with several declarators becomes several `Let` statements;
-        // only the last is returned, the rest are pushed. Simplest correct
-        // lowering without a block node.
-        let mut last = None;
+        let mut out = Vec::new();
         for d in &v.declarators {
             let Pattern::Identifier { name, .. } = &d.id else {
-                // Destructuring: sub-phase later.
-                continue;
+                continue; // destructuring: later
             };
+
+            // `let x = match … { … }` — declare `x`, then let the match arms
+            // assign it.
+            if let Some(init) = &d.init {
+                if let ExprKind::Match { subject, cases } = &init.kind {
+                    let ty = self
+                        .expr_table
+                        .get(&init.id)
+                        .map(|e| {
+                            let names = self.m.names;
+                            lower_type(&e.ty, self.tt, names)
+                        })
+                        .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                    let local = self.bind_local(name.clone(), ty);
+                    out.push(TirStmt::Let { local, ty, init: None });
+                    out.extend(std::mem::take(&mut self.pending));
+                    out.extend(self.lower_match(subject, cases, MatchDest::Assign(local)));
+                    continue;
+                }
+            }
+
             let init = d.init.as_ref().map(|e| self.lower_expr(e));
             let ty = init
                 .as_ref()
                 .map(|e| e.ty)
                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
             let local = self.bind_local(name.clone(), ty);
-            last = Some(TirStmt::Let { local, ty, init });
+            out.push(TirStmt::Let { local, ty, init });
         }
-        last
+        out
     }
 
     /// A condition the verifier will require to be `Bool`. If the checker
@@ -414,35 +710,42 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        // Short-circuit desugars to Select, which names an operand twice, so
-        // both operands must be re-lowerable. A hoisted temp lands in a later
-        // sub-phase.
-        if !Self::is_pure(left) || !Self::is_pure(right) {
-            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
-        }
-        let l1 = self.lower_expr(left);
-        let r = self.lower_expr(right);
+        // `&&` / `||`: the right operand must not run when short-circuited, so
+        // it cannot be hoisted — it has to be pure to appear inside a Select
+        // arm. `??` only ever needs the left twice, and that always runs, so
+        // an impure left can be hoisted to a temp.
         let (cond, then_val, else_val) = match op {
-            // `a && b` -> a ? b : false
-            LogicalOp::And if l1.ty == BackendTy::Bool && ty == BackendTy::Bool => {
-                (l1, r, bool_lit(false))
+            LogicalOp::And | LogicalOp::Or => {
+                if !Self::is_pure(left) || !Self::is_pure(right) {
+                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                }
+                let l = self.lower_expr(left);
+                let r = self.lower_expr(right);
+                if l.ty != BackendTy::Bool || ty != BackendTy::Bool {
+                    return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+                }
+                match op {
+                    LogicalOp::And => (l, r, bool_lit(false)), // a ? b : false
+                    _ => (l, bool_lit(true), r),               // a ? true : b
+                }
             }
-            // `a || b` -> a ? true : b
-            LogicalOp::Or if l1.ty == BackendTy::Bool && ty == BackendTy::Bool => {
-                (l1, bool_lit(true), r)
-            }
-            // `a ?? b` -> IsNull(a) ? b : a
             LogicalOp::Nullish => {
-                let l2 = self.lower_expr(left);
+                let mut l = self.lower_expr(left);
+                if !Self::is_pure(left) {
+                    l = self.hoist(l);
+                }
+                let r = self.lower_expr(right);
                 let is_null = TirExpr {
-                    kind: TirExprKind::Unary { op: TirUnOp::IsNull, operand: Box::new(l1) },
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::IsNull,
+                        operand: Box::new(l.clone()),
+                    },
                     ty: BackendTy::Bool,
                     res: Resolution::None,
                     span,
                 };
-                (is_null, r, l2)
+                (is_null, r, l) // IsNull(a) ? b : a
             }
-            _ => return TirExpr { span, ..placeholder(DynReason::NotYetSupported) },
         };
         // A Select whose arms disagree and whose result is not a union would
         // fail coherence — degrade instead.
@@ -470,35 +773,39 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        // `a?.b` -> IsNull(a) ? null : a.b   (pure `a` only for now)
-        if optional && !computed && Self::is_pure(object) {
-            if Self::member_name(property).is_some() {
-                let obj1 = self.lower_expr(object);
-                let is_null = TirExpr {
-                    kind: TirExprKind::Unary { op: TirUnOp::IsNull, operand: Box::new(obj1) },
-                    ty: BackendTy::Bool,
-                    res: Resolution::None,
-                    span,
-                };
-                let access = self.lower_member(object, property, false, false, ty, span);
-                let null_arm = TirExpr {
-                    kind: TirExprKind::NullLit,
+        // `a?.b` -> IsNull(a) ? null : a.b. The receiver is used twice; hoist
+        // it to a temp when it is not pure.
+        if optional && !computed {
+            let Some(name) = Self::member_name(property) else {
+                return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+            };
+            let mut recv = self.lower_expr(object);
+            if !Self::is_pure(object) {
+                recv = self.hoist(recv);
+            }
+            let is_null = TirExpr {
+                kind: TirExprKind::Unary {
+                    op: TirUnOp::IsNull,
+                    operand: Box::new(recv.clone()),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span,
+            };
+            let access = self.field_access(recv, name, ty, span);
+            if access.ty == ty || matches!(ty, BackendTy::Dynamic(_)) {
+                let null_arm =
+                    TirExpr { kind: TirExprKind::NullLit, ty, res: Resolution::None, span };
+                return TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(is_null),
+                        then_val: Box::new(null_arm),
+                        else_val: Box::new(access),
+                    },
                     ty,
                     res: Resolution::None,
                     span,
                 };
-                if access.ty == ty || matches!(ty, BackendTy::Dynamic(_)) {
-                    return TirExpr {
-                        kind: TirExprKind::Select {
-                            cond: Box::new(is_null),
-                            then_val: Box::new(null_arm),
-                            else_val: Box::new(access),
-                        },
-                        ty,
-                        res: Resolution::None,
-                        span,
-                    };
-                }
             }
             return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
         }
@@ -536,12 +843,13 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        // A known field on a class receiver: the node type IS the field's
-        // declared type — that is the authority, and it is what the verifier
-        // checks `FieldSlot` against. The checker's type for the access
-        // expression can be absent (an assignment target) or weaker, so it is
-        // not used here. Anything not a known field is a by-name read (getter,
-        // index signature, dynamic receiver).
+        self.field_access(obj, name, ty, span)
+    }
+
+    /// Build a `Field` node from an already-lowered receiver. A known field on
+    /// a class receiver takes its declared type (the authority the verifier
+    /// checks `FieldSlot` against); anything else is a by-name read.
+    fn field_access(&mut self, obj: TirExpr, name: Rc<str>, ty: BackendTy, span: Span) -> TirExpr {
         match self.class_of(obj.ty).and_then(|ci| ci.field(&name).cloned()) {
             Some(field) => TirExpr {
                 kind: TirExprKind::Field { object: Box::new(obj), name },
@@ -684,6 +992,36 @@ impl<'a> FnEmitter<'a> {
             res: Resolution::None,
             span,
         }
+    }
+}
+
+fn pattern_supported(p: &MatchPattern) -> bool {
+    matches!(
+        p,
+        MatchPattern::Wildcard
+            | MatchPattern::Identifier(_)
+            | MatchPattern::Literal(_)
+            | MatchPattern::Type { .. }
+            | MatchPattern::EnumVariant { .. }
+    )
+}
+
+/// `a && b` as a Bool expression, via Select (`a ? b : false`).
+fn and_bool(a: TirExpr, b: TirExpr) -> TirExpr {
+    let span = a.span;
+    if a.ty != BackendTy::Bool || b.ty != BackendTy::Bool {
+        // A non-Bool guard: fall back to just the pattern condition.
+        return a;
+    }
+    TirExpr {
+        kind: TirExprKind::Select {
+            cond: Box::new(a),
+            then_val: Box::new(b),
+            else_val: Box::new(bool_lit(false)),
+        },
+        ty: BackendTy::Bool,
+        res: Resolution::None,
+        span,
     }
 }
 

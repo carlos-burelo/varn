@@ -175,10 +175,15 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    nombra un operando dos veces). `a ?? b` → `IsNull(a) ? b : a`; `a?.b` →
    `IsNull(a) ? null : a.b`; `a && b` → `a ? b : false`; `a || b` →
    `a ? true : b`. Receptor no puro → placeholder hasta 6b (temp hoisted).
-6b. **`match` + temp hoisted.** `FnEmitter` gana un buffer de sentencias
-   pendientes; `lower_stmt` pasa a `Vec<TirStmt>`. `match` baja a cadena de
-   `If` + `Discriminant` / `VariantPayload` / `TypeTest`. Habilita también
-   `?.` / `??` con receptor con efectos.
+6b. **`match` + temp hoisted** (hecho). `FnEmitter` gana buffer `pending`;
+   `lower_stmt` pasa a `Vec<TirStmt>`. `match` en posición de sentencia,
+   `return` y `let x = match` → sujeto hoisted + cadena de `If`. Patrones:
+   wildcard, identificador (binding), literal (`s == lit`), `T` (`TypeTest` +
+   binding), variante de enum (`Discriminant(s) == tag` + `VariantPayload`
+   por binding). Guarda pura → `&&` en la cond. `?.` / `??` con receptor con
+   efectos → hoist a temp. Pendiente: patrón `Name(binding)` sin prefijo de
+   enum (parser lo emite como algo que `pattern_supported` no acepta aún);
+   `match` como sub-expresión; patrones Record/Sequence.
 7. **`async` / generadores.** `is_async` / `is_generator` en `TirFunction`;
    `Await` / `Yield`.
 8. **Spread y named args.** `TirArg::Spread` / `Named`.
