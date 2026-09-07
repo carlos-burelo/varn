@@ -1013,6 +1013,21 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::Template { parts } => return self.lower_template(parts, span),
 
+            // `match` in expression position: a result temp, the If-chain as
+            // pending statements assigning it, then a read of the temp.
+            ExprKind::Match { subject, cases } => {
+                let result = self.fresh_local(ty);
+                self.pending.push(TirStmt::Let { local: result, ty, init: None });
+                let chain = self.lower_match(subject, cases, MatchDest::Assign(result));
+                self.pending.extend(chain);
+                return TirExpr {
+                    kind: TirExprKind::Var,
+                    ty,
+                    res: Resolution::Local(result),
+                    span,
+                };
+            }
+
             ExprKind::Function { params, body, is_async, is_generator, .. } => {
                 return self.lower_closure(params, ClosureBody::Stmt(body), *is_async, *is_generator, ty, span)
             }

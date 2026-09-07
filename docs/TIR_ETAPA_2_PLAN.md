@@ -222,6 +222,10 @@ Extra. **Closures**: nuevo nodo `TirExprKind::Closure{func: FnId}`.
    añade a `functions` (esquema de `FnId`: libres 0..N, luego todas las
    closures, luego métodos). El verificador exige que el `FnId` exista.
 
+Extra. **`match` como sub-expresión**: temp de resultado + cadena de `If`
+   como sentencias pendientes que lo asignan (`MatchDest::Assign`), devuelve
+   un read del temp. Cierra el mayor contribuyente de `NotYetSupported`.
+
 Extra. **Expresiones menores**: `x!` (NonNull) → inner con tipo no-nulo;
    `x as T` → `Cast`; `x satisfies T` → identidad; `(a,b,c)` (Sequence) →
    los previos como sentencias pendientes, devuelve el último; `x |> f` →
