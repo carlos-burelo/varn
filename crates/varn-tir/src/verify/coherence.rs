@@ -300,6 +300,17 @@ fn assignable_with_depth(
     if from == BackendTy::Int && to == BackendTy::Float {
         return true;
     }
+    // Arrays and sets are covariant in their element for assignability — the
+    // checker treats them so, and the backend representation is a pointer
+    // either way.
+    match (from, to) {
+        (BackendTy::Array(a), BackendTy::Array(b)) | (BackendTy::Set(a), BackendTy::Set(b))
+            if m.types.contains(a) && m.types.contains(b) =>
+        {
+            return assignable_with_depth(m, m.types.get(a), m.types.get(b), depth + 1);
+        }
+        _ => {}
+    }
     // A subclass is assignable to any of its ancestors.
     if let (BackendTy::Class(sub), BackendTy::Class(sup)) = (from, to) {
         let mut cur = Some(sub);

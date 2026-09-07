@@ -163,8 +163,13 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    concuerde), si no `Call` + `ByName`. Regla del verificador ampliada:
    `int`→`float` en argumento de llamada; subclase→ancestro por la cadena
    `ClassInfo.parent`. Coverage: `url.vn` 166 static / 35 by-name.
-5. **Colecciones y `New`.** `ArrayLit` (+ `Hole`/`Spread`), `ObjectLit`,
-   `TupleLit`, `New`, `MakeVariant`.
+5. **Colecciones y `New`** (hecho). `ArrayLit` (+ `Hole`/`Spread`),
+   `TupleLit`, `ObjectLit` (spread sí; métodos/getters/setters en literal de
+   objeto → sub-fase posterior). `New` sobre identificador de clase local →
+   `New{class}`, si no placeholder. `E.V` / `E.V(args)` → `MakeVariant` +
+   `res: EnumVariant{enum_id, tag}`. Regla del verificador: `Array`/`Set`
+   covariantes en el elemento para asignabilidad. Coverage: `12-classes.vn`
+   64 static / 37 by-name.
 6. **`match`, `?.`, `??`.** Desugar a `If` + `Discriminant` /
    `VariantPayload` / `TypeTest` / `IsNull` + `Select`. La forma del desugar
    de `?.` (temp local hoisted) se fija aquí contra el AST.

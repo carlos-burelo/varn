@@ -85,6 +85,7 @@ pub fn emit_module(
     let ctx = MCtx {
         names: &names,
         classes: &classes,
+        enums: &enums,
         globals: &global_slots,
         fns: &fn_index,
     };
@@ -142,6 +143,7 @@ pub fn emit_module(
 struct MCtx<'a> {
     names: &'a tables::NameIndex,
     classes: &'a [varn_tir::ClassInfo],
+    enums: &'a [varn_tir::EnumInfo],
     globals: &'a FxHashMap<Rc<str>, u32>,
     fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
 }
@@ -151,6 +153,7 @@ impl<'a> MCtx<'a> {
         body::ModuleCtx {
             names: self.names,
             classes: self.classes,
+            enums: self.enums,
             globals: self.globals,
             fns: self.fns,
         }

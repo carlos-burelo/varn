@@ -8,14 +8,14 @@
 
 use crate::checker::TypeEntry;
 use crate::emit::tables::NameIndex;
-use crate::emit::ty::lower_type;
+use crate::emit::ty::{lower_type, NameResolver};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
-use varn_core::ast::{Arg, AstId, Expr, ExprKind, Pattern, Stmt, StmtKind};
+use varn_core::ast::{Arg, ArrayEl, AstId, Expr, ExprKind, ObjectProp, Pattern, PropKey, Stmt, StmtKind};
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, LocalId, Resolution, Signature, Span, TirArg,
-    TirBinOp, TirExpr, TirExprKind, TirStmt, TirUnOp, TyTable,
+    BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, Span,
+    TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp, TyTable,
 };
 
 /// The module-wide handles a body emitter needs but does not own.
@@ -23,6 +23,7 @@ use varn_tir::{
 pub(super) struct ModuleCtx<'a> {
     pub names: &'a NameIndex,
     pub classes: &'a [ClassInfo],
+    pub enums: &'a [EnumInfo],
     /// Module value symbol name → global slot.
     pub globals: &'a FxHashMap<Rc<str>, u32>,
     /// Free-function name → (index into `TirModule::functions`, arity).
@@ -260,6 +261,56 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_call(callee, args, ty, span)
             }
 
+            ExprKind::Array { elements } => {
+                let els = elements
+                    .iter()
+                    .map(|el| match el {
+                        ArrayEl::Expr(e) => TirArrayEl::Expr(self.lower_expr(e)),
+                        ArrayEl::Spread(e) => TirArrayEl::Spread(self.lower_expr(e)),
+                        ArrayEl::Hole => TirArrayEl::Hole,
+                    })
+                    .collect();
+                return TirExpr {
+                    kind: TirExprKind::ArrayLit(els),
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Tuple { elements } => {
+                let xs = elements.iter().map(|e| self.lower_expr(e)).collect();
+                return TirExpr {
+                    kind: TirExprKind::TupleLit(xs),
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Object { properties } | ExprKind::Record { properties } => {
+                let entries = properties
+                    .iter()
+                    .filter_map(|p| match p {
+                        ObjectProp::Property { key, value, .. } => Some(TirObjectEntry::Field {
+                            name: prop_key_name(key)?,
+                            value: self.lower_expr(value),
+                        }),
+                        ObjectProp::Spread { argument, .. } => {
+                            Some(TirObjectEntry::Spread(self.lower_expr(argument)))
+                        }
+                        // Methods / getters / setters in an object literal are
+                        // a later sub-phase.
+                        _ => None,
+                    })
+                    .collect();
+                return TirExpr {
+                    kind: TirExprKind::ObjectLit { entries },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::New { callee, args, .. } => return self.lower_new(callee, args, ty, span),
+
             // Only a plain `=` to an identifier or a field. Compound assign
             // (`+=` …) and destructuring targets are later sub-phases.
             ExprKind::Assign { op: varn_core::ast::operators::AssignOp::Assign, target, value }
@@ -356,6 +407,16 @@ impl<'a> FnEmitter<'a> {
             return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
         };
 
+        // `E.V` — a unit enum variant.
+        if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
+            return TirExpr {
+                kind: TirExprKind::MakeVariant { args: vec![] },
+                ty: BackendTy::Enum(enum_id),
+                res: Resolution::EnumVariant { enum_id, tag },
+                span,
+            };
+        }
+
         // A known field on a class receiver: the node type IS the field's
         // declared type — that is the authority, and it is what the verifier
         // checks `FieldSlot` against. The checker's type for the access
@@ -376,6 +437,32 @@ impl<'a> FnEmitter<'a> {
                 span,
             },
         }
+    }
+
+    fn lower_new(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+        let class = match &callee.kind {
+            ExprKind::Identifier { name } => self.m.names.class_id(name),
+            _ => None,
+        };
+        let Some(class) = class else {
+            return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
+        };
+        let targs = args.iter().map(|a| self.lower_arg(a)).collect();
+        TirExpr {
+            kind: TirExprKind::New { class, args: targs },
+            ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
+    /// `E.V` or `E.V(args)` for a module enum — the tag lives in `res`.
+    fn enum_variant(&self, object: &Expr, variant: &str) -> Option<(varn_tir::EnumId, u16)> {
+        let ExprKind::Identifier { name } = &object.kind else { return None };
+        let eid = self.m.names.enum_id(name)?;
+        let info = self.m.enums.get(eid.0 as usize)?;
+        let v = info.variants.iter().find(|v| v.name.as_ref() == variant)?;
+        Some((eid, v.tag))
     }
 
     fn lower_arg(&mut self, a: &Arg) -> TirArg {
@@ -415,6 +502,17 @@ impl<'a> FnEmitter<'a> {
         let Some(name) = Self::member_name(property) else {
             return TirExpr { span, ..placeholder(DynReason::NotYetSupported) };
         };
+
+        // `E.V(args)` — an enum variant with a payload.
+        if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
+            let vargs = args.iter().map(|a| self.lower_arg(a)).collect();
+            return TirExpr {
+                kind: TirExprKind::MakeVariant { args: vargs },
+                ty: BackendTy::Enum(enum_id),
+                res: Resolution::EnumVariant { enum_id, tag },
+                span,
+            };
+        }
 
         let recv = self.lower_expr(object);
         let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
@@ -467,6 +565,14 @@ impl<'a> FnEmitter<'a> {
             res: Resolution::None,
             span,
         }
+    }
+}
+
+fn prop_key_name(key: &PropKey) -> Option<Rc<str>> {
+    match key {
+        PropKey::Identifier(s) | PropKey::Str(s) => Some(Rc::from(s.as_str())),
+        PropKey::Int(n) => Some(Rc::from(n.to_string())),
+        PropKey::Computed(_) => None,
     }
 }
 
