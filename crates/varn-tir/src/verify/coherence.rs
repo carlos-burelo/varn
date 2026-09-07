@@ -293,6 +293,14 @@ fn assignable_with_depth(
     if from == BackendTy::Never {
         return true;
     }
+    // The bare null value — `Nullable` over a `Never` payload — is assignable
+    // to every nullable type. It is what `return null` in a `T?` function
+    // produces.
+    if let (BackendTy::Nullable(fi), BackendTy::Nullable(_)) = (from, to) {
+        if m.types.contains(fi) && m.types.get(fi) == BackendTy::Never {
+            return true;
+        }
+    }
     // T is assignable to T?; the reverse is not.
     if let BackendTy::Nullable(inner) = to {
         // A dangling handle means wellformed already reported the real

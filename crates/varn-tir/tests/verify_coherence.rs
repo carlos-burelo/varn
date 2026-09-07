@@ -43,6 +43,36 @@ fn int(v: i64) -> TirExpr {
     expr(TirExprKind::IntLit(v), BackendTy::Int, Resolution::None)
 }
 
+/// `return null` in a `T?` function: bare null (Nullable over Never) is
+/// assignable to every nullable type.
+#[test]
+fn bare_null_returns_from_any_nullable_function() {
+    let mut m = module_with_point();
+    let never_id = m.types.intern(BackendTy::Never);
+    let int_id = m.types.intern(BackendTy::Int);
+    m.signatures.push(Signature {
+        params: vec![],
+        return_ty: BackendTy::Nullable(int_id),
+    });
+    m.functions.push(TirFunction {
+        name: Rc::from("first"),
+        sig: SigId(1),
+        params: vec![],
+        return_ty: BackendTy::Nullable(int_id),
+        locals: vec![],
+        body: vec![TirStmt::Return(Some(expr(
+            TirExprKind::NullLit,
+            BackendTy::Nullable(never_id),
+            Resolution::None,
+        )))],
+        has_this: false,
+        this_class: None,
+        is_async: false,
+        is_generator: false,
+    });
+    assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
+}
+
 /// int + int is int.
 #[test]
 fn int_addition_is_int() {

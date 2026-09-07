@@ -133,9 +133,17 @@ Orden de las sub-fases (cada una es un commit, verificador verde al final):
    `NotYetSupported`).
 1b. **Tablas.** Clases, enums, vtables y firmas reales desde `bind`;
    `NameResolver` deja de ser `NoNames`.
-2. **Literales, `Var`, aritmética, `if`/`loop`/`return`.** Desugar de `for`,
-   `for…of`, `while`, `do…while` al único `Loop`. Aquí se prueba el riesgo
-   "TIR azucarado": si `for…of` no baja sin residuo, D falló.
+2a. **Literales, `Var`, aritmética, `if`/`while`/`return`** (hecho). Cuerpos
+   de módulo y de funciones libres. `Var` resuelve a `Local`/`Param`;
+   globales/imports quedan `ByName` hasta la sub-fase 4. `Binary`/`Unary`
+   sólo se emiten cuando los operandos son un escalar coherente — un
+   `int + float` degrada a placeholder hasta que 2b añada `Cast`. Regla del
+   verificador ampliada: null desnudo (`Nullable(Never)`) asigna a cualquier
+   `T?` (`return null` en función `T?`).
+2b. **`for` C, `do…while`, `for…of`/`for…in`.** Desugar al único `Loop`.
+   `for…of` necesita el protocolo de iterador (método `.next()`), así que
+   depende de la sub-fase 3. Aquí se prueba el riesgo "TIR azucarado": si
+   `for…of` no baja sin residuo, D falló.
 3. **Campos y métodos.** `Field` + `Resolution::FieldSlot` / `ByName`;
    `MethodCall` + `VtableSlot` / `Intrinsic` / `DirectFn` / `ByName`. Primer
    informe de cobertura con señal real.

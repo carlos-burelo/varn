@@ -1,16 +1,17 @@
 //! The checker emits TIR.
 //!
-//! This is the stage-2 replacement for `checker_annotations/`: instead of
-//! walking the AST and noting types in a side map, it builds a
-//! `varn_tir::TirModule` whose every node carries its type and resolution as
-//! mandatory fields. See `docs/TIR_ETAPA_2_PLAN.md`.
+//! The stage-2 replacement for `checker_annotations/`: instead of walking the
+//! AST and noting types in a side map, it builds a `varn_tir::TirModule`
+//! whose every node carries its type and resolution as mandatory fields. See
+//! `docs/TIR_ETAPA_2_PLAN.md`.
 //!
-//! Sub-phase 1 (this file): the skeleton. Tables are empty, every body is a
-//! single `Dynamic(NotYetSupported)` placeholder. It exists so the pipeline
-//! wiring, the verifier pass and `vn debug -p tir:check` land against real
-//! corpus modules before any lowering logic is written. Coverage is ~0 % by
-//! construction — that is the baseline the later sub-phases move.
+//! Where it is: tables (classes, enums, vtables, signatures) are real; module
+//! and free-function bodies lower the sub-phase 2a subset — literals, `Var`,
+//! `let`, `return`, `if`, `while`, scalar `Binary` / `Unary`. Class methods,
+//! calls, member access, `match`, C-style `for` and `for…of` still lower to a
+//! `Dynamic(NotYetSupported)` placeholder.
 
+mod body;
 mod tables;
 mod ty;
 
@@ -19,12 +20,14 @@ pub use ty::{lower_type, NameResolver, NoNames};
 use crate::binder::BindResult;
 use crate::checker::TypeEntry;
 use crate::module_resolver::ImportResolver;
+use body::FnEmitter;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{AstId, Program};
+use varn_core::ast::{AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, StmtKind};
+use varn_core::TypeKind;
 use varn_tir::{
-    BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt,
-    TyTable,
+    BackendTy, DynReason, Resolution, Signature, SigId, Span, TirExpr, TirExprKind, TirFunction,
+    TirModule, TirStmt, TyTable,
 };
 
 /// Build the TIR for one module from the same four inputs
@@ -34,14 +37,52 @@ pub fn emit_module(
     program: &Program,
     bind: &BindResult,
     _resolver: &dyn ImportResolver,
-    _expr_table: &FxHashMap<AstId, TypeEntry>,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
 ) -> TirModule {
     let mut types = TyTable::default();
     ty::prime(&mut types);
 
-    let tables::Tables { classes, enums, signatures, names: _ } = tables::build(bind, &mut types);
+    let tables::Tables { classes, enums, mut signatures, names } = tables::build(bind, &mut types);
 
-    let top_level = stub_function("<module>");
+    // Module top level: every statement that is not a declaration.
+    let mut top = FnEmitter::new(expr_table, &mut types, &names, &mut signatures, vec![]);
+    let mut top_body = Vec::new();
+    for stmt in &program.body {
+        match &stmt.kind {
+            StmtKind::Decl(_) => {}
+            _ => top_body.extend(top.lower_stmt_as_block(stmt)),
+        }
+    }
+    let top_locals = top.locals;
+    let top_level = TirFunction {
+        name: Rc::from("<module>"),
+        sig: SigId(0),
+        params: vec![],
+        return_ty: BackendTy::Void,
+        locals: top_locals,
+        body: top_body,
+        has_this: false,
+        this_class: None,
+        is_async: false,
+        is_generator: false,
+    };
+
+    // Free functions, module-level and re-exported.
+    let mut functions = Vec::new();
+    for stmt in &program.body {
+        if let StmtKind::Decl(decl) = &stmt.kind {
+            if let Some(f) = free_function(decl) {
+                functions.push(emit_function(
+                    f,
+                    bind,
+                    expr_table,
+                    &mut types,
+                    &names,
+                    &mut signatures,
+                ));
+            }
+        }
+    }
 
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
@@ -49,42 +90,96 @@ pub fn emit_module(
         classes,
         enums,
         signatures,
-        functions: vec![],
+        functions,
         globals: vec![],
         top_level,
     }
 }
 
-/// A function whose body is one placeholder statement. Not `NotYetSupported`
-/// on a real node yet — there is no node — just an expression statement whose
-/// type names the reason, so the coverage counter has something to count.
-fn stub_function(name: &str) -> TirFunction {
-    let placeholder = TirExpr {
+fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
+    match decl {
+        Decl::Function(f) => Some(f),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Function(f) => Some(f),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn param_name(p: &Param) -> Rc<str> {
+    match &p.pattern {
+        Pattern::Identifier { name, .. } => name.clone(),
+        _ => Rc::from("_"),
+    }
+}
+
+fn emit_function(
+    f: &FunctionDecl,
+    bind: &BindResult,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    names: &tables::NameIndex,
+    signatures: &mut Vec<Signature>,
+) -> TirFunction {
+    // The function's signature is on its global symbol as a `Fn` type.
+    let sym_ty = bind
+        .global_symbols()
+        .find(|s| s.name == f.id)
+        .and_then(|s| s.ty.clone());
+
+    let (param_tys, return_ty) = match sym_ty.as_ref().map(|t| t.kind()) {
+        Some(TypeKind::Fn(ft)) => (
+            ft.params.iter().map(|p| lower_type(&p.ty, types, names)).collect::<Vec<_>>(),
+            lower_type(&ft.return_type, types, names),
+        ),
+        _ => (
+            vec![BackendTy::Dynamic(DynReason::Unannotated); f.params.len()],
+            BackendTy::Dynamic(DynReason::Unannotated),
+        ),
+    };
+
+    let sig = SigId(signatures.len() as u32);
+    signatures.push(Signature { params: param_tys.clone(), return_ty });
+
+    let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
+    let mut em = FnEmitter::new(expr_table, types, names, signatures, param_names);
+    let body = match &f.body.kind {
+        StmtKind::Block { stmts } => em.lower_block(stmts),
+        _ => em.lower_block(std::slice::from_ref(&f.body)),
+    };
+    let locals = em.locals;
+
+    TirFunction {
+        name: f.id.clone(),
+        sig,
+        params: param_tys,
+        return_ty,
+        locals,
+        body,
+        has_this: false,
+        this_class: None,
+        is_async: f.modifiers.is_async,
+        is_generator: f.modifiers.is_generator,
+    }
+}
+
+#[allow(dead_code)]
+fn placeholder_stmt() -> TirStmt {
+    TirStmt::Expr(TirExpr {
         kind: TirExprKind::NullLit,
         ty: BackendTy::Dynamic(DynReason::NotYetSupported),
         res: Resolution::None,
         span: Span::EMPTY,
-    };
-    TirFunction {
-        name: Rc::from(name),
-        sig: varn_tir::SigId(0),
-        params: vec![],
-        return_ty: BackendTy::Void,
-        locals: vec![],
-        body: vec![TirStmt::Expr(placeholder)],
-        has_this: false,
-        this_class: None,
-        is_async: false,
-        is_generator: false,
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use varn_tir::{verify_module, Coverage, Signature};
+    use varn_tir::{verify_module, Coverage};
 
-    fn empty_module() -> TirModule {
+    fn stub_module() -> TirModule {
         TirModule {
             source_file: Rc::from("t.vn"),
             types: TyTable::default(),
@@ -93,21 +188,30 @@ mod tests {
             signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
             functions: vec![],
             globals: vec![],
-            top_level: stub_function("<module>"),
+            top_level: TirFunction {
+                name: Rc::from("<module>"),
+                sig: SigId(0),
+                params: vec![],
+                return_ty: BackendTy::Void,
+                locals: vec![],
+                body: vec![placeholder_stmt()],
+                has_this: false,
+                this_class: None,
+                is_async: false,
+                is_generator: false,
+            },
         }
     }
 
     #[test]
-    fn the_skeleton_verifies() {
-        let m = empty_module();
+    fn a_placeholder_only_module_verifies() {
+        let m = stub_module();
         assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
     }
 
     #[test]
-    fn the_skeleton_reports_zero_static_coverage() {
-        let m = empty_module();
-        let c = Coverage::of(&m);
+    fn a_placeholder_counts_as_not_yet_supported() {
+        let c = Coverage::of(&stub_module());
         assert_eq!(c.dynamic_by_reason(DynReason::NotYetSupported), 1);
-        assert_eq!(c.static_dispatch, 0);
     }
 }
