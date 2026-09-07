@@ -334,7 +334,37 @@ impl<'m> Builder<'m> {
                 self.seal_block(exit);
                 self.current = exit;
             }
-            TirStmt::Try { .. } => return Err(OptError::Unsupported("from_tir: try")),
+            TirStmt::Try { body, catch_local, catch_body } => {
+                let try_entry = self.current;
+                let landing = self.new_block();
+                let exit = self.new_block();
+
+                let try_val = self.emit(InstKind::Try { handler: landing }, HirType::Dynamic);
+
+                self.lower_block(body)?;
+                if self.is_open() {
+                    self.emit_effect(InstKind::PopTry);
+                    let from = self.current;
+                    self.set_term(Terminator::Jump { target: exit, args: vec![] });
+                    self.add_pred(exit, from);
+                }
+
+                self.add_pred(landing, try_entry);
+                self.seal_block(landing);
+                self.current = landing;
+                let err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
+                let cur = self.current;
+                self.write_var(VarId::Local(LocalId(catch_local.0)), cur, err);
+                self.lower_block(catch_body)?;
+                if self.is_open() {
+                    let from = self.current;
+                    self.set_term(Terminator::Jump { target: exit, args: vec![] });
+                    self.add_pred(exit, from);
+                }
+
+                self.seal_block(exit);
+                self.current = exit;
+            }
         }
         Ok(())
     }
@@ -409,8 +439,7 @@ impl<'m> Builder<'m> {
                     }
                     _ => self.lower_expr(callee)?,
                 };
-                let argv = self.lower_args(args)?;
-                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+                self.lower_call(cv, args, ty)
             }
             TirExprKind::MethodCall { recv, name, args } => {
                 let r = self.lower_expr(recv)?;
@@ -427,8 +456,7 @@ impl<'m> Builder<'m> {
                     .map(|ci| ci.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
                 let cv = self.emit(InstKind::LoadGlobal(name), HirType::Ref);
-                let argv = self.lower_args(args)?;
-                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+                self.lower_call(cv, args, ty)
             }
             TirExprKind::MakeVariant { args } => {
                 // `E.V(a, b)` — call the variant constructor global by name.
@@ -443,8 +471,7 @@ impl<'m> Builder<'m> {
                     .map(|v| v.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
                 let cv = self.emit(InstKind::LoadGlobal(vname), HirType::Ref);
-                let argv = self.lower_args(args)?;
-                Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty))
+                self.lower_call(cv, args, ty)
             }
 
             TirExprKind::ArrayLit(els) => {
@@ -471,19 +498,34 @@ impl<'m> Builder<'m> {
                 Ok(self.emit(InstKind::BuildTuple { elements: vals }, ty))
             }
             TirExprKind::ObjectLit { entries } => {
-                let mut pairs = Vec::with_capacity(entries.len());
-                for entry in entries {
-                    match entry {
-                        varn_tir::TirObjectEntry::Field { name, value } => {
+                let any_spread = entries
+                    .iter()
+                    .any(|e| matches!(e, varn_tir::TirObjectEntry::Spread(_)));
+                if any_spread {
+                    let mut parts: Vec<(Option<Rc<str>>, Value)> = Vec::with_capacity(entries.len());
+                    for entry in entries {
+                        match entry {
+                            varn_tir::TirObjectEntry::Field { name, value } => {
+                                let v = self.lower_expr(value)?;
+                                parts.push((Some(name.clone()), v));
+                            }
+                            varn_tir::TirObjectEntry::Spread(x) => {
+                                let v = self.lower_expr(x)?;
+                                parts.push((None, v));
+                            }
+                        }
+                    }
+                    Ok(self.emit(InstKind::BuildObjectSpread { parts }, ty))
+                } else {
+                    let mut pairs = Vec::with_capacity(entries.len());
+                    for entry in entries {
+                        if let varn_tir::TirObjectEntry::Field { name, value } = entry {
                             let v = self.lower_expr(value)?;
                             pairs.push((name.clone(), v));
                         }
-                        varn_tir::TirObjectEntry::Spread(_) => {
-                            return Err(OptError::Unsupported("from_tir: object spread"))
-                        }
                     }
+                    Ok(self.emit(InstKind::BuildObject { pairs }, ty))
                 }
-                Ok(self.emit(InstKind::BuildObject { pairs }, ty))
             }
 
             TirExprKind::Assign { target, value } => {
@@ -534,13 +576,41 @@ impl<'m> Builder<'m> {
         }
     }
 
+    /// Lower a `Call` / `New` argument list. Returns the spread-tagged form
+    /// when any argument is a spread; a named argument is not modelled.
+    fn lower_call(&mut self, callee: Value, args: &[varn_tir::TirArg], ty: HirType) -> Result<Value> {
+        let mut vals: Vec<(Value, bool)> = Vec::with_capacity(args.len());
+        let mut any_spread = false;
+        for a in args {
+            match a {
+                varn_tir::TirArg::Expr(e) => vals.push((self.lower_expr(e)?, false)),
+                varn_tir::TirArg::Spread(e) => {
+                    any_spread = true;
+                    vals.push((self.lower_expr(e)?, true));
+                }
+                varn_tir::TirArg::Named { .. } => {
+                    return Err(OptError::Unsupported("from_tir: named argument"))
+                }
+            }
+        }
+        if any_spread {
+            Ok(self.emit(InstKind::CallSpread { callee, args: vals }, ty))
+        } else {
+            let plain = vals.into_iter().map(|(v, _)| v).collect();
+            Ok(self.emit(InstKind::Call { callee, args: plain }, ty))
+        }
+    }
+
     fn lower_args(&mut self, args: &[varn_tir::TirArg]) -> Result<Vec<Value>> {
         let mut out = Vec::with_capacity(args.len());
         for a in args {
             match a {
                 varn_tir::TirArg::Expr(e) => out.push(self.lower_expr(e)?),
-                varn_tir::TirArg::Spread(_) | varn_tir::TirArg::Named { .. } => {
-                    return Err(OptError::Unsupported("from_tir: spread/named argument"))
+                varn_tir::TirArg::Spread(_) => {
+                    return Err(OptError::Unsupported("from_tir: spread in this position"))
+                }
+                varn_tir::TirArg::Named { .. } => {
+                    return Err(OptError::Unsupported("from_tir: named argument"))
                 }
             }
         }
