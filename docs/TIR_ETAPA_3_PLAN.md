@@ -151,5 +151,13 @@ no se migra. `vn cache clean` en las notas de la etapa.
       cubiertos (named posicional en orden escrito, refinamiento después).
       **`from_tir::lower_expr` es exhaustivo sobre `TirExprKind`.
       `vn debug -p tir:check` → `from_tir: OK`: 184→188/188 del corpus.**
-- [ ] 3.4 el corte + borrados (~6000 líneas), corpus rojo
+- [~] 3.4 el corte. **`from_tir` compila los 188 módulos a `FunctionProto`.**
+      `emit_function` partido en `emit_function_meta(ssa, &FnMeta, src)`;
+      `MakeClosure::Tir` vía scope thread-local del módulo. `VN_FROM_TIR=1`
+      en `varn-pipeline/compile.rs` conmuta el camino (solo módulo de entrada;
+      imports siguen por HIR). **Validado por ejecución: 65 archivos
+      standalone corren por el camino TIR con salida IDÉNTICA a HIR, y JIT ==
+      intérprete en los 65.** Falta: cablear los imports (module_precompile),
+      volcar `-p bytecode` de los 188 sin ejecutar, luego los borrados
+      (~6000 líneas), corpus rojo hasta etapa 4.
 - [ ] 3.5 caché de bytecode

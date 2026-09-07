@@ -35,20 +35,38 @@ pub fn compile(
         .collect();
     export_names.sort();
 
-    let proto = varn_compiler::compile_module(
-        program,
-        &check_result.checker_result.type_annotations,
-        &check_result.checker_result.extension_calls,
-        &check_result.checker_result.extension_members,
-        &check_result.checker_result.extension_set_members,
-        export_names,
-    )
-    .map_err(|e| {
-        PipelineError::fatal(format!(
-            "{}: {e}",
-            varn_core::term::chalk::chalk("error[emit]").red().bold()
-        ))
-    })?;
+    let proto = if std::env::var_os("VN_FROM_TIR").is_some() {
+        // Stage 3: the TIR path. Opt-in until the cut.
+        let tir = crate::resolver::with_resolver(|r| {
+            varn_checker::emit::emit_module(
+                program,
+                &check_result.checker_result.bind,
+                r,
+                &check_result.checker_result.expr_table,
+            )
+        });
+        varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
+            PipelineError::fatal(format!(
+                "{}: {e:?}",
+                varn_core::term::chalk::chalk("error[emit:tir]").red().bold()
+            ))
+        })?
+    } else {
+        varn_compiler::compile_module(
+            program,
+            &check_result.checker_result.type_annotations,
+            &check_result.checker_result.extension_calls,
+            &check_result.checker_result.extension_members,
+            &check_result.checker_result.extension_set_members,
+            export_names,
+        )
+        .map_err(|e| {
+            PipelineError::fatal(format!(
+                "{}: {e}",
+                varn_core::term::chalk::chalk("error[emit]").red().bold()
+            ))
+        })?
+    };
 
     if debug.bytecode {
         varn_debug::bytecode::debug_bytecode(&proto, debug);
