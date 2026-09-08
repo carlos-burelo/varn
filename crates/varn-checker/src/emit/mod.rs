@@ -472,6 +472,9 @@ fn emit_class(
     };
 
     if let Some(sup) = &class.super_class {
+        if let varn_core::ast::ExprKind::Identifier { name } = &sup.kind {
+            def.parent = ctx.names.class_id(name);
+        }
         let (pre, x) =
             lower_outer(sup, ctx, expr_table, types, signatures, out, out.len() as u32, None);
         def.prelude.extend(pre);

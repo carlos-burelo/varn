@@ -140,7 +140,12 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
     let mut out: Vec<&TirExpr> = Vec::new();
     match &e.kind {
         IntLit(_) | FloatLit(_) | BoolLit(_) | StrLit(_) | CharLit(_) | NullLit | Var
-        | Closure { .. } => {}
+        | Closure { .. } | DecimalLit(_) | BigIntLit(_) => {}
+        RangeLit { start, end, .. } => {
+            out.push(start);
+            out.push(end);
+        }
+        ObjectRest { object, .. } => out.push(object),
         Binary { lhs, rhs, .. } => {
             out.push(lhs);
             out.push(rhs);
@@ -187,7 +192,8 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
         Discriminant { value } | VariantPayload { value, .. } | TypeTest { value, .. } => {
             out.push(value)
         }
-        New { args, .. } | MakeVariant { args } => out.extend(arg_exprs(args)),
+        New { args, .. } | MakeVariant { args } | SuperCall { args }
+        | SuperMethodCall { args, .. } => out.extend(arg_exprs(args)),
         Select { cond, then_val, else_val } => {
             out.push(cond);
             out.push(then_val);

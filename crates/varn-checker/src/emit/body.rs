@@ -1094,7 +1094,7 @@ impl<'a> FnEmitter<'a> {
                 let local = self.bind_local(name.clone(), src.ty);
                 out.push(TirStmt::Let { local, ty: src.ty, init: Some(src) });
             }
-            Pattern::Object { properties, .. } => {
+            Pattern::Object { properties, rest, .. } => {
                 for prop in properties {
                     let field = self.field_access(
                         src.clone(),
@@ -1104,8 +1104,21 @@ impl<'a> FnEmitter<'a> {
                     );
                     self.bind_pattern(&prop.value, field, out);
                 }
+                if let Some(rest_pat) = rest {
+                    let skip: Vec<Rc<str>> = properties.iter().map(|p| p.key.clone()).collect();
+                    let rest_obj = TirExpr {
+                        kind: TirExprKind::ObjectRest {
+                            object: Box::new(src.clone()),
+                            skip_keys: skip,
+                        },
+                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        res: Resolution::None,
+                        span: src.span,
+                    };
+                    self.bind_pattern(rest_pat, rest_obj, out);
+                }
             }
-            Pattern::Array { elements, .. } => {
+            Pattern::Array { elements, rest, .. } => {
                 // The verifier pins an array index's type to the element type.
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
@@ -1123,6 +1136,23 @@ impl<'a> FnEmitter<'a> {
                         span: src.span,
                     };
                     self.bind_pattern(&el.pattern, idx, out);
+                }
+                // `[a, b, ...rest]` — the tail from index `elements.len()`.
+                if let Some(rest_pat) = rest {
+                    let tail = TirExpr {
+                        kind: TirExprKind::MethodCall {
+                            recv: Box::new(src.clone()),
+                            name: Rc::from("slice"),
+                            args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
+                        },
+                        ty: src.ty,
+                        res: Resolution::ByName {
+                            name: Rc::from("slice"),
+                            why: DynReason::Unannotated,
+                        },
+                        span: src.span,
+                    };
+                    self.bind_pattern(rest_pat, tail, out);
                 }
             }
             Pattern::Assignment { left, right, .. } => {
@@ -1486,18 +1516,27 @@ impl<'a> FnEmitter<'a> {
 
             // `bigint` / `decimal` / regex literals have no TIR literal node:
             // the raw text as a Str, cast to the target type.
-            ExprKind::BigIntLiteral { raw } | ExprKind::DecimalLiteral { raw } => {
-                let s = TirExpr {
-                    kind: TirExprKind::StrLit(raw.clone()),
-                    ty: BackendTy::Str,
-                    res: Resolution::None,
-                    span,
-                };
-                return self.cast_to(s, ty);
+            ExprKind::DecimalLiteral { raw } => {
+                let text: Rc<str> = Rc::from(raw.trim_end_matches('d'));
+                Some(TirExprKind::DecimalLit(text))
             }
-            ExprKind::RegexLiteral { pattern, .. } => {
+            ExprKind::BigIntLiteral { raw } => {
+                let s = raw.trim_end_matches('n').replace('_', "");
+                let n = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    i128::from_str_radix(r, 16)
+                } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
+                    i128::from_str_radix(r, 8)
+                } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
+                    i128::from_str_radix(r, 2)
+                } else {
+                    s.parse()
+                }
+                .unwrap_or(0);
+                Some(TirExprKind::BigIntLit(n))
+            }
+            ExprKind::RegexLiteral { pattern, flags } => {
                 let s = TirExpr {
-                    kind: TirExprKind::StrLit(Rc::from(pattern.as_str())),
+                    kind: TirExprKind::StrLit(Rc::from(format!("/{pattern}/{flags}"))),
                     ty: BackendTy::Str,
                     res: Resolution::None,
                     span,
@@ -1511,12 +1550,15 @@ impl<'a> FnEmitter<'a> {
                 let inner = self.lower_expr(argument);
                 return self.cast_to(inner, ty);
             }
-            // `a..b` — a 2-tuple stand-in until a Range node exists.
-            ExprKind::Range { start, end, .. } => {
+            ExprKind::Range { start, end, inclusive } => {
                 let s = self.lower_expr(start);
-                let e = self.lower_expr(end);
+                let en = self.lower_expr(end);
                 return TirExpr {
-                    kind: TirExprKind::TupleLit(vec![s, e]),
+                    kind: TirExprKind::RangeLit {
+                        start: Box::new(s),
+                        end: Box::new(en),
+                        inclusive: *inclusive,
+                    },
                     ty,
                     res: Resolution::None,
                     span,
@@ -1836,6 +1878,37 @@ impl<'a> FnEmitter<'a> {
         let obj = self.lower_expr(object);
 
         if computed {
+            // `obj[a..b]` — a slice. Lower to `obj.slice(a, b')` where an
+            // inclusive range bumps the end by one.
+            if let ExprKind::Range { start, end, inclusive } = &property.kind {
+                let s = self.lower_expr(start);
+                let mut e = self.lower_expr(end);
+                if *inclusive {
+                    e = TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Add,
+                            lhs: Box::new(e),
+                            rhs: Box::new(int_lit(1)),
+                        },
+                        ty: BackendTy::Int,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                return TirExpr {
+                    kind: TirExprKind::MethodCall {
+                        recv: Box::new(obj),
+                        name: Rc::from("slice"),
+                        args: vec![TirArg::Expr(s), TirArg::Expr(e)],
+                    },
+                    ty,
+                    res: Resolution::ByName {
+                        name: Rc::from("slice"),
+                        why: DynReason::Unannotated,
+                    },
+                    span,
+                };
+            }
             // `obj[key]`. An array index is pinned to the element type; other
             // receivers are unconstrained by the verifier.
             let index = self.lower_expr(property);
@@ -2109,6 +2182,31 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        // `super(args)` — base constructor.
+        if matches!(callee.kind, ExprKind::Super) {
+            let targs = self.lower_call_args(call_id, args);
+            return TirExpr {
+                kind: TirExprKind::SuperCall { args: targs },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
+        // `super.name(args)` — base method, bypassing the vtable.
+        if let ExprKind::Member { object, property, computed: false, .. } = &callee.kind {
+            if matches!(object.kind, ExprKind::Super) {
+                if let Some(name) = Self::member_name(property) {
+                    let targs = self.lower_call_args(call_id, args);
+                    return TirExpr {
+                        kind: TirExprKind::SuperMethodCall { name, args: targs },
+                        ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+            }
+        }
+
         // Free call on an identifier: `f(args)`.
         if let ExprKind::Identifier { name } = &callee.kind {
             let c = self.lower_expr(callee);

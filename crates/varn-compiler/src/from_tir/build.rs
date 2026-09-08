@@ -389,6 +389,28 @@ impl<'m> Builder<'m> {
             TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
             TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Int)),
             TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
+            TirExprKind::DecimalLit(s) => {
+                let d = s.parse().unwrap_or_default();
+                Ok(self.emit(InstKind::ConstDecimal(d), HirType::Ref))
+            }
+            TirExprKind::BigIntLit(n) => {
+                Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Ref))
+            }
+            TirExprKind::RangeLit { start, end, inclusive } => {
+                let s = self.lower_expr(start)?;
+                let e2 = self.lower_expr(end)?;
+                Ok(self.emit(
+                    InstKind::Range { start: s, end: e2, inclusive: *inclusive },
+                    HirType::Ref,
+                ))
+            }
+            TirExprKind::ObjectRest { object, skip_keys } => {
+                let o = self.lower_expr(object)?;
+                Ok(self.emit(
+                    InstKind::ObjectRest { object: o, skip_keys: skip_keys.clone() },
+                    HirType::Ref,
+                ))
+            }
 
             TirExprKind::Var => self.lower_var(&e.res, ty),
 
@@ -629,6 +651,18 @@ impl<'m> Builder<'m> {
             TirExprKind::ObjectKeys { operand } => {
                 let o = self.lower_expr(operand)?;
                 Ok(self.emit(InstKind::ObjectKeys { operand: o }, ty))
+            }
+
+            TirExprKind::SuperCall { args } => {
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(InstKind::SuperCall { args: argv }, ty))
+            }
+            TirExprKind::SuperMethodCall { name, args } => {
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(
+                    InstKind::SuperMethodCall { name: name.clone(), args: argv },
+                    ty,
+                ))
             }
 
             TirExprKind::Closure { func, upvalues } => {
@@ -927,15 +961,16 @@ impl<'m> Builder<'m> {
         // list with the parent's fields first, and the runtime inherits those
         // through the shape. Re-declaring an inherited field indexes a
         // `field_tags` vec the child never sized.
+        let inherited = def
+            .parent
+            .or_else(|| def.class_id.and_then(|c| self.tir.class(c)).and_then(|ci| ci.parent))
+            .and_then(|p| self.tir.class(p))
+            .map(|p| p.fields.len())
+            .unwrap_or(0);
         let fields: Vec<(Rc<str>, BackendTy)> = def
             .class_id
             .and_then(|cid| self.tir.class(cid))
             .map(|ci| {
-                let inherited = ci
-                    .parent
-                    .and_then(|p| self.tir.class(p))
-                    .map(|p| p.fields.len())
-                    .unwrap_or(0);
                 ci.fields.iter().skip(inherited).map(|f| (f.name.clone(), f.ty)).collect()
             })
             .unwrap_or_default();

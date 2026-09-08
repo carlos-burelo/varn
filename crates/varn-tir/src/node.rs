@@ -150,6 +150,24 @@ pub enum TirExprKind {
     /// The enumerable string keys of an object — the iterand of `for…in`.
     /// Produces `str[]`.
     ObjectKeys { operand: Box<TirExpr> },
+
+    /// `super(args)` — the base constructor call, only valid inside a
+    /// subclass constructor.
+    SuperCall { args: Vec<TirArg> },
+    /// `super.name(args)` — a base method call bypassing the vtable.
+    SuperMethodCall { name: Rc<str>, args: Vec<TirArg> },
+
+    /// A `decimal` literal, carried as its source text (minus the `d` suffix)
+    /// — the backend parses it, keeping this crate free of `rust_decimal`.
+    DecimalLit(Rc<str>),
+    /// A `bigint` literal, already parsed to `i128` by the checker.
+    BigIntLit(i128),
+    /// `a..b` / `a..=b`.
+    RangeLit { start: Box<TirExpr>, end: Box<TirExpr>, inclusive: bool },
+
+    /// `const { a, ...rest } = obj` — a shallow copy of `object` without
+    /// `skip_keys`.
+    ObjectRest { object: Box<TirExpr>, skip_keys: Vec<Rc<str>> },
 }
 
 #[derive(Debug, Clone)]
@@ -205,6 +223,9 @@ pub struct TirClassDef {
     /// resolved (a generic-only or erased declaration — still built by name).
     pub class_id: Option<ClassId>,
     pub enum_id: Option<EnumId>,
+    /// The base class, resolved from `extends` — more reliable than
+    /// `ClassInfo::parent`, which the binder sometimes leaves unset.
+    pub parent: Option<ClassId>,
     /// Hoisted temporaries from `super_class` / decorator / static-init
     /// expressions, emitted before the `MakeClass`.
     pub prelude: Vec<TirStmt>,

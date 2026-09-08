@@ -214,6 +214,15 @@ impl Coverage {
                 self.walk_expr(else_val);
             }
             TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
+            TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
+                for a in args { self.walk_expr(a.value()); }
+            }
+            TirExprKind::RangeLit { start, end, .. } => {
+                self.walk_expr(start);
+                self.walk_expr(end);
+            }
+            TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
+            TirExprKind::ObjectRest { object, .. } => self.walk_expr(object),
             TirExprKind::IntLit(_)
             | TirExprKind::FloatLit(_)
             | TirExprKind::BoolLit(_)
