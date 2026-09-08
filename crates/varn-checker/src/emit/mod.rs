@@ -41,6 +41,8 @@ pub fn emit_module(
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
+    ext_calls: &FxHashMap<u32, Rc<str>>,
+    ext_members: &FxHashMap<u32, Rc<str>>,
 ) -> TirModule {
     let mut types = TyTable::default();
     ty::prime(&mut types);
@@ -107,6 +109,8 @@ pub fn emit_module(
         globals: &global_slots,
         fns: &fn_index,
         call_mappings,
+        ext_calls,
+        ext_members,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -180,6 +184,8 @@ pub fn emit_module(
         }
     }
 
+    emit_extensions(program, &ctx, expr_table, &mut types, &mut signatures, &mut functions);
+
     let imports = collect_imports(program);
     let exports = collect_exports(program);
 
@@ -208,6 +214,8 @@ struct MCtx<'a> {
     globals: &'a FxHashMap<Rc<str>, u32>,
     fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
     call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
+    ext_calls: &'a FxHashMap<u32, Rc<str>>,
+    ext_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 impl<'a> MCtx<'a> {
@@ -219,6 +227,8 @@ impl<'a> MCtx<'a> {
             globals: self.globals,
             fns: self.fns,
             call_mappings: self.call_mappings,
+            ext_calls: self.ext_calls,
+            ext_members: self.ext_members,
         }
     }
 }
@@ -325,6 +335,98 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
         _ => {}
+    }
+}
+
+/// The type label an `extension X on T` targets — matches the binder's
+/// mangling (`__ext_{label}_{name}`).
+fn extension_target_label(t: &varn_core::ast::types::TypeNode) -> Option<Rc<str>> {
+    use varn_core::TypeKind;
+    match &t.kind {
+        TypeKind::Named(n, _) => Some(Rc::from(n.as_str())),
+        TypeKind::Generic(n, _, _) => Some(Rc::from(n.as_str())),
+        TypeKind::Intrinsic(tag) => Some(Rc::from(varn_core::IntrinsicType::from(*tag).as_str())),
+        TypeKind::Array(_) => Some(Rc::from("Array")),
+        _ => None,
+    }
+}
+
+fn emit_extensions(
+    program: &Program,
+    ctx: &MCtx,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    out: &mut Vec<TirFunction>,
+) {
+    use varn_core::ast::ExtensionMember;
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let Decl::Extension(ext) = d.as_ref() else { continue };
+        let Some(label) = extension_target_label(&ext.target) else { continue };
+        let recv_ty = match label.as_ref() {
+            "str" => BackendTy::Str,
+            "int" => BackendTy::Int,
+            "float" => BackendTy::Float,
+            "bool" => BackendTy::Bool,
+            "char" => BackendTy::Char,
+            other => ctx
+                .names
+                .class_id(other)
+                .map(BackendTy::Class)
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
+        };
+        let this_cid = match recv_ty {
+            BackendTy::Class(cid) => Some(cid),
+            _ => None,
+        };
+        for member in &ext.members {
+            let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, &Stmt) = match member {
+                ExtensionMember::Method(f) => (
+                    Rc::from(format!("__ext_{label}_{}", f.id)),
+                    f.params.iter().map(param_name).collect(),
+                    &f.body,
+                ),
+                ExtensionMember::Getter { key, body, .. } => {
+                    (Rc::from(format!("__extget_{label}_{key}")), vec![], body)
+                }
+                ExtensionMember::Setter { key, param, body, .. } => (
+                    Rc::from(format!("__extset_{label}_{key}")),
+                    vec![param_name(param)],
+                    body,
+                ),
+            };
+            let arity = params.len();
+            let sig = fresh_sig(signatures, arity);
+            let base = out.len() as u32 + 1;
+            let mut mcls: Vec<TirFunction> = Vec::new();
+            let (body_stmts, locals) = {
+                let mut em = FnEmitter::new(
+                    expr_table, types, ctx.as_module_ctx(), signatures, &mut mcls, base, params,
+                );
+                if let Some(cid) = this_cid {
+                    em = em.with_this(cid);
+                }
+                let b = match &body.kind {
+                    StmtKind::Block { stmts } => em.lower_block(stmts),
+                    _ => em.lower_block(std::slice::from_ref(body)),
+                };
+                (b, std::mem::take(&mut em.locals))
+            };
+            out.push(TirFunction {
+                name: mangled,
+                sig,
+                params: vec![BackendTy::Dynamic(DynReason::Unannotated); arity],
+                return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+                locals,
+                body: body_stmts,
+                has_this: true,
+                this_class: this_cid,
+                is_async: false,
+                is_generator: false,
+            });
+            out.extend(mcls);
+        }
     }
 }
 

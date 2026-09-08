@@ -223,6 +223,10 @@ impl Coverage {
             }
             TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
             TirExprKind::ObjectRest { object, .. } => self.walk_expr(object),
+            TirExprKind::ExtensionCall { recv, args, .. } => {
+                self.walk_expr(recv);
+                for a in args { self.walk_expr(a.value()); }
+            }
             TirExprKind::IntLit(_)
             | TirExprKind::FloatLit(_)
             | TirExprKind::BoolLit(_)

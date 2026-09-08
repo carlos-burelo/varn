@@ -201,6 +201,10 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
         }
         TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
         TirExprKind::ObjectRest { object, .. } => walk_expr(m, f, object, errors),
+        TirExprKind::ExtensionCall { recv, args, .. } => {
+            walk_expr(m, f, recv, errors);
+            for a in args { walk_arg(m, f, a, errors); }
+        }
         TirExprKind::Select { cond, then_val, else_val } => {
             walk_expr(m, f, cond, errors);
             walk_expr(m, f, then_val, errors);

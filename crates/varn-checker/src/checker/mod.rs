@@ -95,6 +95,13 @@ pub struct CheckResult {
     /// Named-argument layout, keyed by call-expression id. See the field of the
     /// same name on `Checker`.
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
+    /// `recv.m(..)` call ids resolved to an extension function, mapped to its
+    /// mangled name.
+    pub extension_calls: FxHashMap<u32, Rc<str>>,
+    /// `recv.p` reads resolved to an extension getter.
+    pub extension_members: FxHashMap<u32, Rc<str>>,
+    /// `recv.p = v` writes resolved to an extension setter.
+    pub extension_set_members: FxHashMap<u32, Rc<str>>,
 }
 
 impl CheckResult {
@@ -475,6 +482,9 @@ impl<'r> Checker<'r> {
             call_resolutions: checker.call_resolutions,
             expr_table,
             call_mappings: checker.call_mappings,
+            extension_calls: checker.extension_calls,
+            extension_members: checker.extension_members,
+            extension_set_members: checker.extension_set_members,
         }
     }
 

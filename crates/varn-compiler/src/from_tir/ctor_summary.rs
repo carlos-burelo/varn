@@ -146,6 +146,10 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
             out.push(end);
         }
         ObjectRest { object, .. } => out.push(object),
+        ExtensionCall { recv, args, .. } => {
+            out.push(recv);
+            out.extend(arg_exprs(args));
+        }
         Binary { lhs, rhs, .. } => {
             out.push(lhs);
             out.push(rhs);

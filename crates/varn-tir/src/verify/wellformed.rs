@@ -263,6 +263,10 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
         }
         TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
         TirExprKind::ObjectRest { object, .. } => check_expr(m, f, object, errors),
+        TirExprKind::ExtensionCall { recv, args, .. } => {
+            check_expr(m, f, recv, errors);
+            for a in args { check_expr(m, f, a.value(), errors); }
+        }
         TirExprKind::IntLit(_)
         | TirExprKind::FloatLit(_)
         | TirExprKind::BoolLit(_)

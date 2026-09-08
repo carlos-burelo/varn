@@ -35,6 +35,10 @@ pub(super) struct ModuleCtx<'a> {
     pub fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
     /// Named-argument layout by call-expression id.
     pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
+    /// `recv.m(..)` call ids the checker resolved to an extension function.
+    pub ext_calls: &'a FxHashMap<u32, Rc<str>>,
+    /// `recv.p` reads resolved to an extension getter.
+    pub ext_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -51,6 +55,7 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// Extension method: `this` is param 0, not a receiver frame.
     /// This emitter is the module top level: a `let x` whose name is a module
     /// global becomes a store to that global slot, not a `<module>` local, so
     /// the other functions in the module (which see it as a global) agree.
@@ -150,6 +155,7 @@ impl<'a> FnEmitter<'a> {
         self.this_class = Some(class);
         self
     }
+
 
     pub fn as_top_level(mut self) -> Self {
         self.top_level = true;
@@ -977,9 +983,19 @@ impl<'a> FnEmitter<'a> {
                     }
 
                     let init = d.init.as_ref().map(|e| self.lower_expr(e));
-                    let ty = init
+                    // The declared annotation wins over the initializer's type
+                    // — `let x: float = 1` is a `float` binding, and a typed op
+                    // that later reads `x` must not pick the `int` opcode.
+                    let ty = d
+                        .type_ann
                         .as_ref()
-                        .map(|e| e.ty)
+                        .map(|t| {
+                            let resolved =
+                                crate::binder::resolve_type_node(t, None);
+                            lower_type(&resolved, self.tt, self.m.names)
+                        })
+                        .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
+                        .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                     out.extend(std::mem::take(&mut self.pending));
 
@@ -2242,6 +2258,22 @@ impl<'a> FnEmitter<'a> {
         let Some(name) = Self::member_name(property) else {
             return self.by_name_call(call_id, callee, args, ty, span);
         };
+
+        // `recv.m(args)` the checker resolved to an extension function.
+        if let Some(mangled) = self.m.ext_calls.get(&span.start).cloned() {
+            let recv = self.lower_expr(object);
+            let targs = self.lower_call_args(call_id, args);
+            return TirExpr {
+                kind: TirExprKind::ExtensionCall {
+                    func: mangled,
+                    recv: Box::new(recv),
+                    args: targs,
+                },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
 
         // `E.V(args)` — an enum variant with a payload.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {

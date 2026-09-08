@@ -172,6 +172,10 @@ pub enum TirExprKind {
     /// `const { a, ...rest } = obj` — a shallow copy of `object` without
     /// `skip_keys`.
     ObjectRest { object: Box<TirExpr>, skip_keys: Vec<Rc<str>> },
+
+    /// `recv.m(args)` resolved to an extension function: a free-function call
+    /// with `recv` prepended, dispatched by the mangled `func` name.
+    ExtensionCall { func: Rc<str>, recv: Box<TirExpr>, args: Vec<TirArg> },
 }
 
 #[derive(Debug, Clone)]

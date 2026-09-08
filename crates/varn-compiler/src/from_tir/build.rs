@@ -83,6 +83,16 @@ impl<'m> Builder<'m> {
         Rc::from(format!("{}::{}", self.tir.source_file.replace('\\', "/"), name))
     }
 
+    /// Force `v` to `target`, inserting a `Cast` when the representation
+    /// actually differs (an `int` initializer for a `float` binding, say).
+    fn coerce(&mut self, v: Value, target: HirType) -> Value {
+        if self.value_ty(v) == target {
+            v
+        } else {
+            self.emit(InstKind::Cast { operand: v, ty: target }, target)
+        }
+    }
+
     // ---- SSA-agnostic core (copy of ssa/build::Builder) -------------------
 
     fn new_block(&mut self) -> BlockId {
@@ -236,12 +246,17 @@ impl<'m> Builder<'m> {
                 self.lower_expr(e)?;
             }
             TirStmt::Let { local, ty, init } => {
+                let declared = self.ty(*ty);
                 let value = match init {
-                    Some(e) => self.lower_expr(e)?,
-                    None => {
-                        let t = self.ty(*ty);
-                        self.emit(InstKind::ConstNull, t)
+                    Some(e) => {
+                        let v = self.lower_expr(e)?;
+                        // The binding's declared type wins — an `int`
+                        // initializer for a `let x: float` needs the widening
+                        // the checker proved, or a typed op reading `x` later
+                        // picks the wrong opcode.
+                        self.coerce(v, declared)
                     }
+                    None => self.emit(InstKind::ConstNull, declared),
                 };
                 let cur = self.current;
                 self.write_var(VarId::Local(LocalId(local.0)), cur, value);
@@ -411,12 +426,32 @@ impl<'m> Builder<'m> {
                     HirType::Ref,
                 ))
             }
+            TirExprKind::ExtensionCall { func, recv, args } => {
+                let r = self.lower_expr(recv)?;
+                let argv = self.lower_args(args)?;
+                Ok(self.emit(
+                    InstKind::ExtensionCall { func: func.clone(), recv: r, args: argv },
+                    ty,
+                ))
+            }
 
             TirExprKind::Var => self.lower_var(&e.res, ty),
 
             TirExprKind::Binary { op, lhs, rhs } => {
-                let l = self.lower_expr(lhs)?;
-                let r = self.lower_expr(rhs)?;
+                let mut l = self.lower_expr(lhs)?;
+                let mut r = self.lower_expr(rhs)?;
+                let is_cmp = matches!(
+                    op,
+                    TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le
+                        | TirBinOp::Gt | TirBinOp::Ge
+                );
+                // An arithmetic node whose result type is a scalar (the checker
+                // widened, e.g. `int - int` used where a `float` is wanted)
+                // wants that scalar's opcode; coerce both operands to it.
+                if !is_cmp && matches!(ty, HirType::Int | HirType::Float | HirType::Str) {
+                    l = self.coerce(l, ty);
+                    r = self.coerce(r, ty);
+                }
                 // `InstKind::Binary.ty` picks the typed opcode (`EqInt`,
                 // `AddFloat`, …), which `ssa/verify` then holds both operands
                 // to exactly. Only use a typed op when the lowered operands
@@ -1173,7 +1208,14 @@ fn build_inner(
                 InstKind::MakeClosure { func: i as u32, upvalues_src: vec![] },
                 HirType::Ref,
             );
-            let name = b.gname(&f.name);
+            // Extension functions are mangled to a globally-unique name and
+            // called by that bare name (`InstKind::ExtensionCall`); everything
+            // else is qualified by its declaring file.
+            let name = if f.name.starts_with("__ext") {
+                f.name.clone()
+            } else {
+                b.gname(&f.name)
+            };
             b.emit_effect(InstKind::StoreGlobal { name, value: fv });
         }
         for def in &tir.class_defs {
