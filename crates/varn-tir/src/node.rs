@@ -194,6 +194,10 @@ pub enum TirStmt {
     Continue,
     Throw(TirExpr),
     Try { body: Vec<TirStmt>, catch_local: crate::ty::LocalId, catch_body: Vec<TirStmt> },
+    /// Build the class/enum at `TirModule::class_defs[n]` and bind its global —
+    /// emitted at the declaration's source position so decorators and static
+    /// initializers see the module state that precedes it.
+    BuildClass(u32),
 }
 
 /// Where a closure upvalue is sourced from in the enclosing frame.

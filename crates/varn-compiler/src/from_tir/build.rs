@@ -411,6 +411,15 @@ impl<'m> Builder<'m> {
                 self.seal_block(exit);
                 self.current = exit;
             }
+            TirStmt::BuildClass(n) => {
+                let def = self
+                    .tir
+                    .class_defs
+                    .get(*n as usize)
+                    .ok_or(OptError::Unsupported("from_tir: BuildClass index"))?
+                    .clone();
+                self.build_class_def(&def)?;
+            }
         }
         Ok(())
     }
@@ -1243,9 +1252,6 @@ fn build_inner(
             };
             b.emit_effect(InstKind::StoreGlobal { name, value: fv });
         }
-        for def in &tir.class_defs {
-            b.build_class_def(def)?;
-        }
     }
 
     b.lower_block(&func.body)?;
@@ -1375,7 +1381,7 @@ mod tests {
     fn a_closure_lowers_to_make_closure() {
         let m = module(
             vec![TirStmt::Expr(e(
-                K::Closure { func: varn_tir::FnId(0) },
+                K::Closure { func: varn_tir::FnId(0), upvalues: vec![] },
                 B::Dynamic(varn_tir::DynReason::Unannotated),
             ))],
             vec![],

@@ -145,7 +145,7 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 check_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Break | TirStmt::Continue => {}
+        TirStmt::Break | TirStmt::Continue | TirStmt::BuildClass(_) => {}
     }
 }
 

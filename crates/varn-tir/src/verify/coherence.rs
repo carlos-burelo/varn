@@ -61,7 +61,7 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
                 walk_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Break | TirStmt::Continue => {}
+        TirStmt::Break | TirStmt::Continue | TirStmt::BuildClass(_) => {}
     }
 }
 

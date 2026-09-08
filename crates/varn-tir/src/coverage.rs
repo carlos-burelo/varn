@@ -123,6 +123,7 @@ impl Coverage {
             }
             TirStmt::Break => {}
             TirStmt::Continue => {}
+            TirStmt::BuildClass(_) => {}
             TirStmt::Throw(e) => self.walk_expr(e),
         }
     }

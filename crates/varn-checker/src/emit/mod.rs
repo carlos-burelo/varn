@@ -146,8 +146,17 @@ pub fn emit_module(
             vec![],
         )
         .as_top_level();
+        let mut class_ord: u32 = 0;
         for stmt in &program.body {
             match &stmt.kind {
+                // A class / enum declaration: a `BuildClass` at this position,
+                // in the same order `class_defs` is filled below.
+                StmtKind::Decl(d)
+                    if class_decl(d).is_some() || enum_decl(d).is_some() =>
+                {
+                    top_body.push(TirStmt::BuildClass(class_ord));
+                    class_ord += 1;
+                }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
             }
