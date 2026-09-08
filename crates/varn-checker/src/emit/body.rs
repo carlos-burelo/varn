@@ -578,6 +578,71 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+        // `for (i of a..b)` — a plain integer loop, `..=` bumping the bound.
+        if let (ExprKind::Range { start, end, inclusive }, Pattern::Identifier { name, .. }) =
+            (&right.kind, left)
+        {
+            let name = name.clone();
+            let lo = self.lower_expr(start);
+            let mut hi = self.lower_expr(end);
+            if *inclusive {
+                hi = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Add,
+                        lhs: Box::new(hi),
+                        rhs: Box::new(int_lit(1)),
+                    },
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+            }
+            let mut out = std::mem::take(&mut self.pending);
+            let hi = self.hoist(hi);
+            out.extend(std::mem::take(&mut self.pending));
+            let i = self.bind_local(name, BackendTy::Int);
+            let ivar = || TirExpr {
+                kind: TirExprKind::Var,
+                ty: BackendTy::Int,
+                res: Resolution::Local(i),
+                span: Span::EMPTY,
+            };
+            out.push(TirStmt::Let { local: i, ty: BackendTy::Int, init: Some(lo) });
+            let cond = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Lt,
+                    lhs: Box::new(ivar()),
+                    rhs: Box::new(hi),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            let mut loop_body =
+                vec![TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] }];
+            loop_body.extend(self.lower_stmt_as_block(body));
+            loop_body.push(TirStmt::Expr(TirExpr {
+                kind: TirExprKind::Assign {
+                    target: Box::new(ivar()),
+                    value: Box::new(TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Add,
+                            lhs: Box::new(ivar()),
+                            rhs: Box::new(int_lit(1)),
+                        },
+                        ty: BackendTy::Int,
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }));
+            out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
+            return out;
+        }
+
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
 

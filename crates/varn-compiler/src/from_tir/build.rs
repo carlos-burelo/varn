@@ -29,6 +29,9 @@ type Result<T> = std::result::Result<T, OptError>;
 struct LoopCtx {
     continue_target: BlockId,
     break_target: BlockId,
+    /// `try` regions open when this loop was entered — `break` / `continue`
+    /// must `PopTry` back down to this depth.
+    try_depth: usize,
 }
 
 struct Builder<'m> {
@@ -45,6 +48,8 @@ struct Builder<'m> {
     var_ty: FxHashMap<VarId, HirType>,
     incomplete_phis: FxHashMap<BlockId, Vec<(VarId, Value)>>,
     loops: Vec<LoopCtx>,
+    /// Count of `try` regions currently open on the path being lowered.
+    try_depth: usize,
     next_synthetic: u32,
     current: BlockId,
 }
@@ -62,6 +67,7 @@ impl<'m> Builder<'m> {
             var_ty: FxHashMap::default(),
             incomplete_phis: FxHashMap::default(),
             loops: Vec::new(),
+            try_depth: 0,
             next_synthetic: 0,
             current: BlockId(0),
         };
@@ -266,6 +272,10 @@ impl<'m> Builder<'m> {
                     Some(e) => Some(self.lower_expr(e)?),
                     None => None,
                 };
+                // Leave every `try` region this return jumps out of.
+                for _ in 0..self.try_depth {
+                    self.emit_effect(InstKind::PopTry);
+                }
                 self.set_term(Terminator::Return(val));
             }
             TirStmt::Throw(e) => {
@@ -274,6 +284,9 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Break => {
                 if let Some(c) = self.loops.last().copied() {
+                    for _ in 0..self.try_depth.saturating_sub(c.try_depth) {
+                        self.emit_effect(InstKind::PopTry);
+                    }
                     let from = self.current;
                     self.set_term(Terminator::Jump { target: c.break_target, args: vec![] });
                     self.add_pred(c.break_target, from);
@@ -281,6 +294,9 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Continue => {
                 if let Some(c) = self.loops.last().copied() {
+                    for _ in 0..self.try_depth.saturating_sub(c.try_depth) {
+                        self.emit_effect(InstKind::PopTry);
+                    }
                     let from = self.current;
                     self.set_term(Terminator::Jump { target: c.continue_target, args: vec![] });
                     self.add_pred(c.continue_target, from);
@@ -344,7 +360,11 @@ impl<'m> Builder<'m> {
                 self.add_pred(exit, head);
                 self.seal_block(body_blk);
 
-                self.loops.push(LoopCtx { continue_target: head, break_target: exit });
+                self.loops.push(LoopCtx {
+                    continue_target: head,
+                    break_target: exit,
+                    try_depth: self.try_depth,
+                });
                 self.current = body_blk;
                 self.lower_block(body)?;
                 if self.is_open() {
@@ -365,7 +385,9 @@ impl<'m> Builder<'m> {
 
                 let try_val = self.emit(InstKind::Try { handler: landing }, HirType::Dynamic);
 
+                self.try_depth += 1;
                 self.lower_block(body)?;
+                self.try_depth -= 1;
                 if self.is_open() {
                     self.emit_effect(InstKind::PopTry);
                     let from = self.current;
