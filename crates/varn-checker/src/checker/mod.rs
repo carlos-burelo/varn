@@ -92,6 +92,9 @@ pub struct CheckResult {
     /// annotations are built by reading it. Written on every check, tooling or
     /// not, because a compile needs these types too.
     pub expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
+    /// Named-argument layout, keyed by call-expression id. See the field of the
+    /// same name on `Checker`.
+    pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
 }
 
 impl CheckResult {
@@ -178,10 +181,9 @@ pub struct Checker<'r> {
     pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
-    /// Written by `validate_named_call_arguments`; the codegen consumer went
-    /// away with the HIR path. Kept because the call-site plumbing that fills
-    /// it is load-bearing for the argument checks in the same function.
-    #[allow(dead_code)]
+    /// Filled by `validate_named_call_arguments`: for a call with named args,
+    /// `[param_pos] = Some(arg_idx)` or `None` (omitted, use the default). The
+    /// TIR emitter reads it to lay named arguments out positionally.
     pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
@@ -472,6 +474,7 @@ impl<'r> Checker<'r> {
             member_resolutions: checker.member_resolutions,
             call_resolutions: checker.call_resolutions,
             expr_table,
+            call_mappings: checker.call_mappings,
         }
     }
 

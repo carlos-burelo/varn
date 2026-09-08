@@ -39,6 +39,7 @@ pub fn compile(
         program,
         &check_result.checker_result.bind,
         &check_result.checker_result.expr_table,
+        &check_result.checker_result.call_mappings,
     );
     let proto = varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
         PipelineError::fatal(format!(
@@ -82,6 +83,7 @@ pub fn compile(
             program,
             &check_result.checker_result.bind,
             &check_result.checker_result.expr_table,
+            &check_result.checker_result.call_mappings,
             debug,
         );
     }

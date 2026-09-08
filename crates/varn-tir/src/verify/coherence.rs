@@ -191,6 +191,7 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
                 ));
             }
         }
+        TirExprKind::ObjectKeys { operand } => walk_expr(m, f, operand, errors),
         TirExprKind::Select { cond, then_val, else_val } => {
             walk_expr(m, f, cond, errors);
             walk_expr(m, f, then_val, errors);

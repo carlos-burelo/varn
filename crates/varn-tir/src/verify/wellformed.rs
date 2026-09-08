@@ -207,7 +207,7 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 }
             }
         }
-        TirExprKind::Closure { func } => {
+        TirExprKind::Closure { func, .. } => {
             if m.function(*func).is_none() {
                 errors.push(VerifyError::new(
                     format!("Closure names FnId({}), which has no entry", func.0),
@@ -253,6 +253,7 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             check_expr(m, f, then_val, errors);
             check_expr(m, f, else_val, errors);
         }
+        TirExprKind::ObjectKeys { operand } => check_expr(m, f, operand, errors),
         TirExprKind::IntLit(_)
         | TirExprKind::FloatLit(_)
         | TirExprKind::BoolLit(_)

@@ -68,12 +68,13 @@ mod tests {
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            types,
+            imports: vec![],            types,
             classes: vec![ClassInfo::new(Rc::from("Point"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],
             functions: vec![],
             globals: vec![], global_names: vec![],
+            class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: varn_tir::SigId(0),

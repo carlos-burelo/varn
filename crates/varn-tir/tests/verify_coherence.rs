@@ -10,7 +10,7 @@ fn module_with_point() -> TirModule {
     let _ = types.intern(BackendTy::Int);
     TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![ClassInfo::new(
             Rc::from("Point"),
             None,
@@ -21,6 +21,7 @@ fn module_with_point() -> TirModule {
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -240,7 +241,7 @@ fn a_correct_field_read_verifies() {
 fn method_call_arity_mismatch_is_rejected() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -255,6 +256,7 @@ fn method_call_arity_mismatch_is_rejected() {
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -293,7 +295,7 @@ fn method_call_arity_mismatch_is_rejected() {
 fn method_call_with_correct_arity_verifies() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -308,6 +310,7 @@ fn method_call_with_correct_arity_verifies() {
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -427,13 +430,14 @@ fn return_type_mismatch_is_rejected() {
 fn return_with_correct_type_verifies() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -464,13 +468,14 @@ fn bare_return_in_void_function_verifies() {
 fn bare_return_in_non_void_function_is_rejected() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -497,13 +502,14 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -533,13 +539,14 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -571,13 +578,14 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
 fn return_of_never_type_is_valid_anywhere() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -606,13 +614,14 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Nullable(int_id) }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -637,13 +646,14 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -673,7 +683,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -691,6 +701,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -729,7 +740,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -747,6 +758,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(1),
@@ -791,13 +803,14 @@ fn let_declared_nullable_int_init_str_should_fail() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -834,13 +847,14 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
     let nullable_str = BackendTy::Nullable(str_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),
@@ -895,13 +909,14 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
 
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        types,
+        imports: vec![],        types,
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),

@@ -134,7 +134,10 @@ pub enum TirExprKind {
 
     /// A function value. `func` is the `TirFunction` holding its body; captures
     /// are resolved by the backend against the parent frame, as HIR does.
-    Closure { func: FnId },
+    /// A function value. `func` holds the body; `upvalues` says, in upvalue-
+    /// index order, where each captured value comes from in the ENCLOSING
+    /// frame — the backend needs this to build the closure record.
+    Closure { func: FnId, upvalues: Vec<TirUpvalue> },
 
     /// Construction of a class instance.
     New { class: ClassId, args: Vec<TirArg> },
@@ -143,6 +146,10 @@ pub enum TirExprKind {
 
     /// `cond ? a : b`
     Select { cond: Box<TirExpr>, then_val: Box<TirExpr>, else_val: Box<TirExpr> },
+
+    /// The enumerable string keys of an object — the iterand of `for…in`.
+    /// Produces `str[]`.
+    ObjectKeys { operand: Box<TirExpr> },
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +170,14 @@ pub enum TirStmt {
     Try { body: Vec<TirStmt>, catch_local: crate::ty::LocalId, catch_body: Vec<TirStmt> },
 }
 
+/// Where a closure upvalue is sourced from in the enclosing frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TirUpvalue {
+    ParentLocal(u32),
+    ParentParam(u32),
+    ParentUpvalue(u32),
+}
+
 #[derive(Debug, Clone)]
 pub struct TirFunction {
     pub name: Rc<str>,
@@ -179,9 +194,85 @@ pub struct TirFunction {
     pub is_generator: bool,
 }
 
+/// Everything the backend needs to BUILD a class/enum object at module load
+/// and bind it to its global. The `classes` / `enums` tables describe layout
+/// and dispatch; this describes construction. Instance-field names and types
+/// come from the referenced table entry, not repeated here.
+#[derive(Debug, Clone, Default)]
+pub struct TirClassDef {
+    pub name: Rc<str>,
+    /// Table handle: `Some(Ok)` a class, `Some(Err)` an enum, `None` neither
+    /// resolved (a generic-only or erased declaration — still built by name).
+    pub class_id: Option<ClassId>,
+    pub enum_id: Option<EnumId>,
+    /// Hoisted temporaries from `super_class` / decorator / static-init
+    /// expressions, emitted before the `MakeClass`.
+    pub prelude: Vec<TirStmt>,
+    /// The `extends` expression, evaluated for the `MakeClass` super argument.
+    pub super_class: Option<TirExpr>,
+    /// Static fields / consts: name + optional initializer.
+    pub statics: Vec<(Rc<str>, Option<TirExpr>)>,
+    /// Methods and the constructor: key, body `FnId`, `is_static`.
+    pub methods: Vec<TirClassMember>,
+    /// Getters / setters: key, body `FnId`, `is_getter`, `is_static`.
+    pub accessors: Vec<TirClassAccessor>,
+    /// Class decorators, applied outermost-last.
+    pub decorators: Vec<TirExpr>,
+    /// `static { ... }` blocks, as `FnId`s to invoke after the class is bound.
+    pub static_blocks: Vec<FnId>,
+    /// Enum variants: name, tag, metadata string, payload default args.
+    pub variants: Vec<TirVariantDef>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirClassMember {
+    pub key: Rc<str>,
+    pub func: FnId,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirClassAccessor {
+    pub key: Rc<str>,
+    pub func: FnId,
+    pub is_getter: bool,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirVariantDef {
+    pub name: Rc<str>,
+    pub tag: i64,
+    pub meta: Rc<str>,
+    pub const_args: Vec<TirExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TirImportKind {
+    Default,
+    Named(Rc<str>),
+    Namespace,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirImportSpec {
+    pub local: Rc<str>,
+    pub kind: TirImportKind,
+}
+
+/// One `import ... from "src"` — the linkage the backend turns into a
+/// `LoadModule` plus a `StoreGlobal` per bound name.
+#[derive(Debug, Clone)]
+pub struct TirImport {
+    pub source: Rc<str>,
+    pub is_type_only: bool,
+    pub specs: Vec<TirImportSpec>,
+}
+
 #[derive(Debug)]
 pub struct TirModule {
     pub source_file: Rc<str>,
+    pub imports: Vec<TirImport>,
     pub types: TyTable,
     pub classes: Vec<crate::tables::ClassInfo>,
     pub enums: Vec<crate::tables::EnumInfo>,
@@ -191,6 +282,9 @@ pub struct TirModule {
     /// The name of each global, parallel to `globals`. A `GlobalSlot(n)`
     /// resolution names `globals[n]` / `global_names[n]`.
     pub global_names: Vec<Rc<str>>,
+    /// Class / enum construction, one per top-level declaration, in source
+    /// order. Empty for a module with no classes or enums.
+    pub class_defs: Vec<TirClassDef>,
     pub top_level: TirFunction,
 }
 

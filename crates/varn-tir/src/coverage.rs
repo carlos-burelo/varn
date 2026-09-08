@@ -213,6 +213,7 @@ impl Coverage {
                 self.walk_expr(then_val);
                 self.walk_expr(else_val);
             }
+            TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
             TirExprKind::IntLit(_)
             | TirExprKind::FloatLit(_)
             | TirExprKind::BoolLit(_)

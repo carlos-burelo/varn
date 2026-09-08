@@ -94,10 +94,15 @@ fn build_classes(
     class_names: &[Rc<str>],
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
-    class_names
-        .iter()
-        .map(|name| build_one_class(bind, tt, names, name, signatures))
-        .collect()
+    // `class_names` is parent-before-child, so a class's parent `ClassInfo` is
+    // already in `built` by the time we reach it — needed to lay inherited
+    // fields out first, with the slots the runtime's inherited shape uses.
+    let mut built: Vec<ClassInfo> = Vec::with_capacity(class_names.len());
+    for name in class_names {
+        let info = build_one_class(bind, tt, names, name, signatures, &built);
+        built.push(info);
+    }
+    built
 }
 
 /// The binder's `type_members.classes[name].members` is already flattened —
@@ -111,7 +116,13 @@ fn build_one_class(
     names: &NameIndex,
     name: &Rc<str>,
     signatures: &mut Vec<Signature>,
+    built: &[ClassInfo],
 ) -> ClassInfo {
+    let parent_id = bind.class_parents.get(name).and_then(|p| names.class_id(p));
+    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize));
+    let inherited_fields: FxHashMap<Rc<str>, ()> = parent_info
+        .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
+        .unwrap_or_default();
     let members = bind
         .type_members
         .classes
@@ -137,7 +148,11 @@ fn build_one_class(
         }
         match m.kind {
             ClassMemberKind::Property | ClassMemberKind::Variable => {
-                if seen_field.insert(m.name.clone(), ()).is_none() {
+                // Own fields only — inherited ones are laid out by the parent
+                // prefix `new_with_methods` prepends.
+                if !inherited_fields.contains_key(&m.name)
+                    && seen_field.insert(m.name.clone(), ()).is_none()
+                {
                     fields.push((m.name.clone(), lower_type(&m.ty, tt, names)));
                 }
             }
@@ -160,9 +175,8 @@ fn build_one_class(
     let methods: Vec<(Rc<str>, varn_tir::SigId)> =
         method_names.into_iter().map(|n| (n.clone(), method_sig[&n])).collect();
 
-    let mut info = ClassInfo::new_with_methods(name.clone(), None, fields, methods);
-    info.parent = bind.class_parents.get(name).and_then(|p| names.class_id(p));
-    info
+    let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
+    ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods)
 }
 
 /// Append a signature for a method and hand back its id.

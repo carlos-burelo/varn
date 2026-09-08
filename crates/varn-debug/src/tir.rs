@@ -14,9 +14,10 @@ pub fn debug_tir(
     program: &Program,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
+    call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
     flags: &DebugFlags,
 ) {
-    let module = varn_checker::emit::emit_module(program, bind, expr_table);
+    let module = varn_checker::emit::emit_module(program, bind, expr_table, call_mappings);
 
     if flags.tir {
         eprintln!("\n=== TIR: {} ===", module.source_file);

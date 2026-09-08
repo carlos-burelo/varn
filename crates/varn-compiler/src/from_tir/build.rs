@@ -13,11 +13,12 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 
-use crate::hir::{HirBinOp, HirType, HirUnOp, LocalId};
+use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
 use crate::ssa::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, ValueDef, VarId};
 use crate::OptError;
 use varn_tir::{
-    BackendTy, Resolution, TirBinOp, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt, TirUnOp,
+    BackendTy, Resolution, TirBinOp, TirClassDef, TirExpr, TirExprKind, TirFunction, TirImportKind,
+    TirModule, TirStmt, TirUnOp,
 };
 
 use super::ty::lower as lower_ty;
@@ -72,6 +73,14 @@ impl<'m> Builder<'m> {
 
     fn ty(&mut self, bt: BackendTy) -> HirType {
         lower_ty(bt, self.tir, &mut self.ssa_types)
+    }
+
+    /// Qualify a module-local global (free function, class, enum, top-level
+    /// `let`) by its declaring file, matching what `build_top_level` and the
+    /// HIR path both store. Imported / host names stay bare — they arrive as
+    /// `Resolution::ByName`, which never reaches this.
+    fn gname(&self, name: &str) -> Rc<str> {
+        Rc::from(format!("{}::{}", self.tir.source_file.replace('\\', "/"), name))
     }
 
     // ---- SSA-agnostic core (copy of ssa/build::Builder) -------------------
@@ -451,7 +460,7 @@ impl<'m> Builder<'m> {
                             .function(*f)
                             .map(|tf| tf.name.clone())
                             .ok_or(OptError::Unsupported("from_tir: DirectFn out of range"))?;
-                        self.emit(InstKind::LoadGlobal(name), HirType::Ref)
+                        self.emit(InstKind::LoadGlobal(self.gname(&name)), HirType::Ref)
                     }
                     _ => self.lower_expr(callee)?,
                 };
@@ -471,23 +480,35 @@ impl<'m> Builder<'m> {
                     .class(*class)
                     .map(|ci| ci.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
-                let cv = self.emit(InstKind::LoadGlobal(name), HirType::Ref);
+                let cv = self.emit(InstKind::LoadGlobal(self.gname(&name)), HirType::Ref);
                 self.lower_call(cv, args, ty)
             }
             TirExprKind::MakeVariant { args } => {
-                // `E.V(a, b)` — call the variant constructor global by name.
+                // `E.V` -> the variant static on the enum global; `E.V(a, b)`
+                // -> a call on it. Mirrors the HIR member / call split.
                 let (enum_id, tag) = match &e.res {
                     Resolution::EnumVariant { enum_id, tag } => (*enum_id, *tag),
                     _ => return Err(OptError::Unsupported("from_tir: MakeVariant without res")),
                 };
-                let vname = self
+                let ei = self
                     .tir
                     .enum_info(enum_id)
-                    .and_then(|ei| ei.variants.iter().find(|v| v.tag == tag))
+                    .ok_or(OptError::Unsupported("from_tir: enum out of range"))?;
+                let ename = self.gname(&ei.name);
+                let vname = ei
+                    .variants
+                    .iter()
+                    .find(|v| v.tag == tag)
                     .map(|v| v.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
-                let cv = self.emit(InstKind::LoadGlobal(vname), HirType::Ref);
-                self.lower_call(cv, args, ty)
+                let enum_val = self.emit(InstKind::LoadGlobal(ename), HirType::Ref);
+                let variant =
+                    self.emit(InstKind::GetProperty { object: enum_val, name: vname }, HirType::Ref);
+                if args.is_empty() {
+                    Ok(variant)
+                } else {
+                    self.lower_call(variant, args, ty)
+                }
             }
 
             TirExprKind::ArrayLit(els) => {
@@ -605,13 +626,18 @@ impl<'m> Builder<'m> {
                 ))
             }
 
-            TirExprKind::Closure { func } => Ok(self.emit(
-                InstKind::MakeClosure {
-                    func: func.0,
-                    upvalues_src: vec![],
-                },
-                HirType::Ref,
-            )),
+            TirExprKind::ObjectKeys { operand } => {
+                let o = self.lower_expr(operand)?;
+                Ok(self.emit(InstKind::ObjectKeys { operand: o }, ty))
+            }
+
+            TirExprKind::Closure { func, upvalues } => {
+                let src = upvalues.iter().map(|u| upvalue_src(*u)).collect();
+                Ok(self.emit(
+                    InstKind::MakeClosure { func: func.0, upvalues_src: src },
+                    HirType::Ref,
+                ))
+            }
         }
     }
 
@@ -672,12 +698,13 @@ impl<'m> Builder<'m> {
                     self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value });
                 }
                 Resolution::GlobalSlot(n) => {
-                    let name = self
+                    let raw = self
                         .tir
                         .global_names
                         .get(*n as usize)
                         .cloned()
                         .ok_or(OptError::Unsupported("from_tir: assign global slot"))?;
+                    let name = self.gname(&raw);
                     self.emit_effect(InstKind::StoreGlobal { name, value });
                 }
                 _ => return Err(OptError::Unsupported("from_tir: assign target var")),
@@ -711,13 +738,13 @@ impl<'m> Builder<'m> {
             Resolution::Param(i) => self.read_var(VarId::Param(*i), self.current),
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
             Resolution::GlobalSlot(n) => {
-                let name = self
+                let raw = self
                     .tir
                     .global_names
                     .get(*n as usize)
                     .cloned()
                     .ok_or(OptError::Unsupported("from_tir: global slot out of range"))?;
-                Ok(self.emit(InstKind::LoadGlobal(name), ty))
+                Ok(self.emit(InstKind::LoadGlobal(self.gname(&raw)), ty))
             }
             Resolution::ModuleSlot { .. } => {
                 Err(OptError::Unsupported("from_tir: module slot"))
@@ -804,6 +831,241 @@ fn un_op(op: TirUnOp) -> HirUnOp {
     }
 }
 
+fn upvalue_src(u: varn_tir::TirUpvalue) -> HirUpvalueSrc {
+    match u {
+        varn_tir::TirUpvalue::ParentLocal(i) => HirUpvalueSrc::ParentLocal(LocalId(i)),
+        varn_tir::TirUpvalue::ParentParam(i) => HirUpvalueSrc::ParentParam(i),
+        varn_tir::TirUpvalue::ParentUpvalue(i) => HirUpvalueSrc::ParentUpvalue(i),
+    }
+}
+
+/// A plain identifier — a free function. Methods (`C.m`), accessors
+/// (`C.get x`) and closures (`<closure>`) never match.
+fn is_free_fn_name(name: &str) -> bool {
+    let mut cs = name.chars();
+    matches!(cs.next(), Some(c) if c == '_' || c.is_ascii_alphabetic())
+        && cs.all(|c| c == '_' || c.is_ascii_alphanumeric())
+}
+
+/// The layout tag the runtime lays a declared field out by.
+fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
+    use varn_core::TypeTag as T;
+    match bt {
+        BackendTy::Int => T::Int,
+        BackendTy::Float => T::Float,
+        BackendTy::Bool => T::Bool,
+        BackendTy::Str => T::Str,
+        BackendTy::Char => T::Char,
+        BackendTy::Decimal => T::Decimal,
+        BackendTy::BigInt => T::BigInt,
+        BackendTy::Array(_) => T::Array,
+        BackendTy::Set(_) => T::Set,
+        BackendTy::Map(..) => T::Map,
+        BackendTy::Class(_) => T::Class,
+        _ => T::Dynamic,
+    }
+}
+
+impl<'m> Builder<'m> {
+    /// `import ... from "src"` — a `LoadModule` and a `StoreGlobal` per bound
+    /// name, under the module-qualified local name every other reference reads.
+    fn build_imports(&mut self) {
+        for imp in &self.tir.imports {
+            if imp.is_type_only {
+                continue;
+            }
+            let mod_v =
+                self.emit(InstKind::LoadModule { source: imp.source.clone() }, HirType::Ref);
+            for spec in &imp.specs {
+                let name = self.gname(&spec.local);
+                let val = match &spec.kind {
+                    TirImportKind::Namespace => mod_v,
+                    TirImportKind::Default => self.emit(
+                        InstKind::GetProperty { object: mod_v, name: Rc::from("default") },
+                        HirType::Dynamic,
+                    ),
+                    TirImportKind::Named(n) => self.emit(
+                        InstKind::GetProperty { object: mod_v, name: n.clone() },
+                        HirType::Dynamic,
+                    ),
+                };
+                self.emit_effect(InstKind::StoreGlobal { name, value: val });
+            }
+        }
+    }
+
+    /// Emit the `MakeClass` … `StoreGlobal` sequence that builds a class or
+    /// enum object and binds it to its module global. Mirrors HIR's
+    /// `lower_class` / `lower_enum`.
+    fn build_class_def(&mut self, def: &TirClassDef) -> Result<()> {
+        for s in &def.prelude {
+            self.lower_stmt(s)?;
+        }
+
+        let super_v = match &def.super_class {
+            Some(e) => Some(self.lower_expr(e)?),
+            None => None,
+        };
+        let mut class_v = self.emit(
+            InstKind::MakeClass { name: def.name.clone(), super_class: super_v },
+            HirType::Ref,
+        );
+
+        for v in &def.variants {
+            let variant_v = self.emit(
+                InstKind::MakeEnumVariant { tag: v.tag, meta: v.meta.clone() },
+                HirType::Ref,
+            );
+            self.emit_effect(InstKind::DefineStatic {
+                class: class_v,
+                name: v.name.clone(),
+                value: variant_v,
+            });
+        }
+
+        // Only the class's OWN fields — `ClassInfo::fields` is the flattened
+        // list with the parent's fields first, and the runtime inherits those
+        // through the shape. Re-declaring an inherited field indexes a
+        // `field_tags` vec the child never sized.
+        let fields: Vec<(Rc<str>, BackendTy)> = def
+            .class_id
+            .and_then(|cid| self.tir.class(cid))
+            .map(|ci| {
+                let inherited = ci
+                    .parent
+                    .and_then(|p| self.tir.class(p))
+                    .map(|p| p.fields.len())
+                    .unwrap_or(0);
+                ci.fields.iter().skip(inherited).map(|f| (f.name.clone(), f.ty)).collect()
+            })
+            .unwrap_or_default();
+        for (fname, fty) in fields {
+            self.emit_effect(InstKind::DeclareField {
+                class: class_v,
+                name: fname,
+                tag: field_tag(fty),
+            });
+        }
+
+        for (sname, init) in &def.statics {
+            let val = match init {
+                Some(e) => self.lower_expr(e)?,
+                None => self.emit(InstKind::ConstNull, HirType::Ref),
+            };
+            self.emit_effect(InstKind::DefineStatic {
+                class: class_v,
+                name: sname.clone(),
+                value: val,
+            });
+        }
+
+        for m in &def.methods {
+            let mv = self.emit(
+                InstKind::MakeClosure { func: m.func.0, upvalues_src: vec![] },
+                HirType::Ref,
+            );
+            self.emit_effect(InstKind::DefineMethod {
+                class: class_v,
+                name: m.key.clone(),
+                method: mv,
+                is_static: m.is_static,
+            });
+        }
+
+        for a in &def.accessors {
+            let av = self.emit(
+                InstKind::MakeClosure { func: a.func.0, upvalues_src: vec![] },
+                HirType::Ref,
+            );
+            self.emit_effect(InstKind::DefineAccessor {
+                class: class_v,
+                name: a.key.clone(),
+                accessor: av,
+                is_getter: a.is_getter,
+                is_static: a.is_static,
+            });
+        }
+
+        for deco in &def.decorators {
+            let deco_v = self.lower_expr(deco)?;
+            let result =
+                self.emit(InstKind::Call { callee: deco_v, args: vec![class_v] }, HirType::Ref);
+            let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
+            class_v = self.select_value(isnull, class_v, result, HirType::Ref)?;
+        }
+
+        self.emit_effect(InstKind::StoreGlobal {
+            name: self.gname(&def.name),
+            value: class_v,
+        });
+
+        for blk in &def.static_blocks {
+            let fv = self.emit(
+                InstKind::MakeClosure { func: blk.0, upvalues_src: vec![] },
+                HirType::Ref,
+            );
+            self.emit(InstKind::Call { callee: fv, args: vec![] }, HirType::Dynamic);
+        }
+
+        for v in &def.variants {
+            if v.const_args.is_empty() {
+                continue;
+            }
+            let recv = self.emit(
+                InstKind::GetProperty { object: class_v, name: v.name.clone() },
+                HirType::Ref,
+            );
+            let mut args = Vec::with_capacity(v.const_args.len());
+            for a in &v.const_args {
+                args.push(self.lower_expr(a)?);
+            }
+            self.emit(
+                InstKind::MethodCall { recv, name: Rc::from("constructor"), args },
+                HirType::Dynamic,
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Value-level `cond ? then_v : else_v` — the decorator keep-or-replace.
+    fn select_value(
+        &mut self,
+        cond: Value,
+        then_v: Value,
+        else_v: Value,
+        ty: HirType,
+    ) -> Result<Value> {
+        let then_blk = self.new_block();
+        let else_blk = self.new_block();
+        let join = self.new_block();
+        let from = self.current;
+        self.set_term(Terminator::Branch {
+            cond,
+            then_blk,
+            then_args: vec![then_v],
+            else_blk,
+            else_args: vec![else_v],
+        });
+        self.add_pred(then_blk, from);
+        self.add_pred(else_blk, from);
+        self.seal_block(then_blk);
+        self.seal_block(else_blk);
+        let tp = self.add_block_param(then_blk, ty);
+        let ep = self.add_block_param(else_blk, ty);
+        let phi = self.add_block_param(join, ty);
+        self.current = then_blk;
+        self.set_term(Terminator::Jump { target: join, args: vec![tp] });
+        self.add_pred(join, then_blk);
+        self.current = else_blk;
+        self.set_term(Terminator::Jump { target: join, args: vec![ep] });
+        self.add_pred(join, else_blk);
+        self.seal_block(join);
+        self.current = join;
+        Ok(phi)
+    }
+}
+
 /// Build one `SsaFunc` from a `TirFunction`. `register_module_fns` is set for
 /// the module top level, which stores every free function / method as a
 /// global by qualified name (the convention the callee side reads back).
@@ -828,19 +1090,23 @@ fn build_inner(tir: &TirModule, func: &TirFunction, register_module_fns: bool) -
     }
 
     if register_module_fns {
-        let src = tir.source_file.replace('\\', "/");
+        b.build_imports();
+        // Free functions only — a plain identifier name. Methods, accessors and
+        // closures carry `.` / space / `<` and are bound by class construction
+        // or referenced by index.
         for (i, f) in tir.functions.iter().enumerate() {
+            if !is_free_fn_name(&f.name) {
+                continue;
+            }
             let fv = b.emit(
-                InstKind::MakeClosure {
-                    func: i as u32,
-                    upvalues_src: vec![],
-                },
+                InstKind::MakeClosure { func: i as u32, upvalues_src: vec![] },
                 HirType::Ref,
             );
-            b.emit_effect(InstKind::StoreGlobal {
-                name: Rc::from(format!("{src}::{}", f.name)),
-                value: fv,
-            });
+            let name = b.gname(&f.name);
+            b.emit_effect(InstKind::StoreGlobal { name, value: fv });
+        }
+        for def in &tir.class_defs {
+            b.build_class_def(def)?;
         }
     }
 
@@ -885,12 +1151,13 @@ mod tests {
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            types,
+            imports: vec![],            types,
             classes: vec![ClassInfo::new(Rc::from("C"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],
             functions: vec![],
             globals: vec![], global_names: vec![],
+            class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: varn_tir::SigId(0),

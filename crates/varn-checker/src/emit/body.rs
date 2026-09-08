@@ -33,6 +33,8 @@ pub(super) struct ModuleCtx<'a> {
     pub globals: &'a FxHashMap<Rc<str>, u32>,
     /// Free-function name → (index into `TirModule::functions`, arity).
     pub fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+    /// Named-argument layout by call-expression id.
+    pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -152,6 +154,14 @@ impl<'a> FnEmitter<'a> {
     pub fn as_top_level(mut self) -> Self {
         self.top_level = true;
         self
+    }
+
+    /// Lower a single expression that sits outside a statement — a decorator,
+    /// an `extends` clause, a static-field initializer. Any hoisted temporary
+    /// it produced is returned alongside; the caller emits those first.
+    pub fn lower_outer_expr(&mut self, e: &Expr) -> (Vec<TirStmt>, TirExpr) {
+        let x = self.lower_expr(e);
+        (std::mem::take(&mut self.pending), x)
     }
 
     fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
@@ -318,7 +328,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
-            StmtKind::ForIn { left, right, body, .. } => self.lower_for_of(left, right, body),
+            StmtKind::ForIn { left, right, body, .. } => self.lower_for_in(left, right, body),
 
             StmtKind::Try { block, catches, finally } => {
                 self.lower_try(block, catches, finally.as_deref())
@@ -538,6 +548,29 @@ impl<'a> FnEmitter<'a> {
     /// `for (x of iterable) body`. An `Array` iterable becomes the index
     /// desugar; anything else goes through the iterator protocol
     /// (`.iterator()` / `.next()`), all by-name.
+    /// `for (k in obj)` — iterate the object's string keys. Lowered as a
+    /// for-of over `ObjectKeys(obj)`, which is a `str[]`.
+    fn lower_for_in(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+        let obj = self.lower_expr(right);
+        let mut out = std::mem::take(&mut self.pending);
+        let s = self.tt.intern(BackendTy::Str);
+        let keys_ty = BackendTy::Array(s);
+        let keys = TirExpr {
+            kind: TirExprKind::ObjectKeys { operand: Box::new(obj) },
+            ty: keys_ty,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        };
+        let keys = self.hoist(keys);
+        out.extend(std::mem::take(&mut self.pending));
+        let Pattern::Identifier { name, .. } = left else {
+            return self.lower_for_of_protocol(left, keys, out, body);
+        };
+        let name = name.clone();
+        out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
+        out
+    }
+
     fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
@@ -551,13 +584,23 @@ impl<'a> FnEmitter<'a> {
         let elem_ty = self.tt.get(el);
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
+        out.extend(self.for_of_over_array(name, arr, elem_ty, body));
+        out
+    }
 
+    /// The C-style index loop shared by array `for…of` and `for…in`:
+    /// `let i = 0; loop { if !(i < arr.length) break; let <name> = arr[i];
+    /// body; i = i + 1 }`.
+    fn for_of_over_array(
+        &mut self,
+        name: &Rc<str>,
+        arr: TirExpr,
+        elem_ty: BackendTy,
+        body: &Stmt,
+    ) -> Vec<TirStmt> {
+        let mut out = Vec::new();
         let idx = self.fresh_local(BackendTy::Int);
-        out.push(TirStmt::Let {
-            local: idx,
-            ty: BackendTy::Int,
-            init: Some(int_lit(0)),
-        });
+        out.push(TirStmt::Let { local: idx, ty: BackendTy::Int, init: Some(int_lit(0)) });
         let idx_var = || TirExpr {
             kind: TirExprKind::Var,
             ty: BackendTy::Int,
@@ -993,6 +1036,42 @@ impl<'a> FnEmitter<'a> {
     pub fn destructure_params(&mut self, params: &[varn_core::ast::Param]) -> Vec<TirStmt> {
         let mut out = Vec::new();
         for (i, p) in params.iter().enumerate() {
+            // `x = default` — a null (omitted) argument falls back to the
+            // default: `if (x == null) x = <default>`.
+            if let Some(def) = &p.default {
+                let pvar = || TirExpr {
+                    kind: TirExprKind::Var,
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    res: Resolution::Param(i as u32),
+                    span: Span::EMPTY,
+                };
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::IsNull,
+                        operand: Box::new(pvar()),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+                let value = self.lower_expr(def);
+                let assign = TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(pvar()),
+                        value: Box::new(value),
+                    },
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+                out.append(&mut self.pending);
+                out.push(TirStmt::If {
+                    cond: is_null,
+                    then_body: vec![TirStmt::Expr(assign)],
+                    else_body: vec![],
+                });
+            }
+
             if matches!(p.pattern, Pattern::Identifier { .. }) {
                 continue;
             }
@@ -1197,7 +1276,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Call { callee, args, optional: _, type_args: _ } => {
-                return self.lower_call(callee, args, ty, span)
+                return self.lower_call(e.id, callee, args, ty, span)
             }
 
             ExprKind::Array { elements } => {
@@ -1248,7 +1327,7 @@ impl<'a> FnEmitter<'a> {
                     span,
                 };
             }
-            ExprKind::New { callee, args, .. } => return self.lower_new(callee, args, ty, span),
+            ExprKind::New { callee, args, .. } => return self.lower_new(e.id, callee, args, ty, span),
 
             // `x!` — a non-null assertion. A `Cast` carries the type change
             // without disturbing the inner node's `res` (a `FieldSlot` read
@@ -1467,6 +1546,30 @@ impl<'a> FnEmitter<'a> {
                 return TirExpr { kind: TirExprKind::Var, ty: sty, res: Resolution::None, span };
             }
             ExprKind::TaggedTemplate { template, .. } => return self.lower_expr(template),
+
+            ExprKind::Conditional { test, consequent, alternate } => {
+                let cond = self.lower_expr(test);
+                let cond = self.cast_to(cond, BackendTy::Bool);
+                let then_val = self.lower_expr(consequent);
+                let else_val = self.lower_expr(alternate);
+                let (then_val, else_val) = if then_val.ty == else_val.ty
+                    || matches!(ty, BackendTy::Dynamic(_))
+                {
+                    (then_val, else_val)
+                } else {
+                    (self.cast_to(then_val, ty), self.cast_to(else_val, ty))
+                };
+                return TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(cond),
+                        then_val: Box::new(then_val),
+                        else_val: Box::new(else_val),
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
 
             // `Missing` (a parse hole) and a class expression have no runtime
             // value we model: a well-formed null.
@@ -1848,6 +1951,7 @@ impl<'a> FnEmitter<'a> {
             }
         });
         let locals = sub.locals;
+        let captures = std::mem::take(&mut sub.captures);
 
         self.out_closures[slot] = TirFunction {
             name: Rc::from("<closure>"),
@@ -1862,7 +1966,28 @@ impl<'a> FnEmitter<'a> {
             is_generator,
         };
 
-        TirExpr { kind: TirExprKind::Closure { func: func_id }, ty, res: Resolution::None, span }
+        // Resolve each captured name against THIS (the enclosing) frame. A
+        // name that is itself an upvalue here chains through as `ParentUpvalue`
+        // — `resolve_name` records it in `self.captures` on the way.
+        let upvalues: Vec<varn_tir::TirUpvalue> = captures
+            .iter()
+            .map(|name| match self.resolve_name(name) {
+                Resolution::Local(id) => varn_tir::TirUpvalue::ParentLocal(id.0),
+                Resolution::Param(i) => varn_tir::TirUpvalue::ParentParam(i),
+                Resolution::Upvalue(i) => varn_tir::TirUpvalue::ParentUpvalue(i),
+                // A capture that resolves to a global here is not really a
+                // capture; the closure body will read it as a global too. Use
+                // a param-0 placeholder that the backend simply never reads.
+                _ => varn_tir::TirUpvalue::ParentUpvalue(0),
+            })
+            .collect();
+
+        TirExpr {
+            kind: TirExprKind::Closure { func: func_id, upvalues },
+            ty,
+            res: Resolution::None,
+            span,
+        }
     }
 
     /// A template string folds to `Str` concatenation. Each interpolation
@@ -1901,12 +2026,12 @@ impl<'a> FnEmitter<'a> {
         acc.unwrap_or_else(|| str_expr(TirExprKind::StrLit(Rc::from("")), span))
     }
 
-    fn lower_new(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    fn lower_new(&mut self, call_id: AstId, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
         let class = match &callee.kind {
             ExprKind::Identifier { name } => self.m.names.class_id(name),
             _ => None,
         };
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
         match class {
             Some(class) => TirExpr {
                 kind: TirExprKind::New { class, args: targs },
@@ -1949,11 +2074,45 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn lower_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    /// Argument list for a call, laid out positionally. When the checker
+    /// recorded a named-argument mapping for this call, arguments are
+    /// reordered to parameter position and omitted slots become a bare `null`
+    /// — the callee's own default-guard prologue fills them in.
+    fn lower_call_args(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
+        match self.m.call_mappings.get(&call_id).cloned() {
+            Some(mapping) => mapping
+                .iter()
+                .map(|opt| match opt {
+                    Some(i) => match &args[*i] {
+                        Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                            TirArg::Expr(self.lower_expr(e))
+                        }
+                        Arg::Spread(e) => TirArg::Spread(self.lower_expr(e)),
+                    },
+                    None => TirArg::Expr(TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                })
+                .collect(),
+            None => args.iter().map(|a| self.lower_arg(a)).collect(),
+        }
+    }
+
+    fn lower_call(
+        &mut self,
+        call_id: AstId,
+        callee: &Expr,
+        args: &[Arg],
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
         // Free call on an identifier: `f(args)`.
         if let ExprKind::Identifier { name } = &callee.kind {
             let c = self.lower_expr(callee);
-            let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+            let targs = self.lower_call_args(call_id, args);
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
             let res = match self.m.fns.get(name) {
                 Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
@@ -1973,15 +2132,15 @@ impl<'a> FnEmitter<'a> {
         // (`obj[k]()`, `(f())()`) is a by-name call on the lowered callee.
         let (object, property) = match &callee.kind {
             ExprKind::Member { object, property, computed: false, .. } => (object, property),
-            _ => return self.by_name_call(callee, args, ty, span),
+            _ => return self.by_name_call(call_id, callee, args, ty, span),
         };
         let Some(name) = Self::member_name(property) else {
-            return self.by_name_call(callee, args, ty, span);
+            return self.by_name_call(call_id, callee, args, ty, span);
         };
 
         // `E.V(args)` — an enum variant with a payload.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
-            let vargs = args.iter().map(|a| self.lower_arg(a)).collect();
+            let vargs = self.lower_call_args(call_id, args);
             return TirExpr {
                 kind: TirExprKind::MakeVariant { args: vargs },
                 ty: BackendTy::Enum(enum_id),
@@ -1991,7 +2150,7 @@ impl<'a> FnEmitter<'a> {
         }
 
         let recv = self.lower_expr(object);
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
 
         // A vtable slot only when the receiver is a class with that method and
         // the arity matches its signature — the verifier checks both. Getters
@@ -2018,9 +2177,9 @@ impl<'a> FnEmitter<'a> {
     }
 
     /// A call whose callee has no static resolution: `Call` + `ByName`.
-    fn by_name_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    fn by_name_call(&mut self, call_id: AstId, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
         let c = self.lower_expr(callee);
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
         TirExpr {
             kind: TirExprKind::Call { callee: Box::new(c), args: targs },
             ty,

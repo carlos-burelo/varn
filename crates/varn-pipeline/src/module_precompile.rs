@@ -206,7 +206,7 @@ pub fn build_module_graph(
             .map(|k| std::rc::Rc::from(k.as_str()))
             .collect();
         export_names.sort();
-        let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table);
+        let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table, &check.call_mappings);
         let module_proto = varn_compiler::from_tir::compile_module(&tir, export_names)
             .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
 

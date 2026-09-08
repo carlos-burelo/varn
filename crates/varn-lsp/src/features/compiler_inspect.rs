@@ -77,7 +77,7 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table);
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default());
     let ssa_res = varn_compiler::from_tir::build_module(&tir);
 
     let mut json_functions = Vec::new();
@@ -455,7 +455,7 @@ pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> 
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table);
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default());
     let proto = varn_compiler::from_tir::compile_module(&tir, Vec::new())
         .map_err(|e| format!("Compilation failed: {e:?}"))?;
 
@@ -470,7 +470,7 @@ pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table);
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default());
     let fns = varn_compiler::from_tir::build_module(&tir)
         .map_err(|e| format!("SSA build failed: {e:?}"))?;
 

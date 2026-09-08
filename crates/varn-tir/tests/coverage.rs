@@ -9,13 +9,14 @@ use varn_tir::*;
 fn module() -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        types: TyTable::default(),
+        imports: vec![],        types: TyTable::default(),
         classes: vec![ClassInfo::new(Rc::from("P"), None, vec![("x".into(), BackendTy::Int)])],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
+        class_defs: vec![],
         top_level: TirFunction {
             name: Rc::from("<module>"),
             sig: SigId(0),

@@ -224,7 +224,7 @@ fn compile_source_inner(
         .map(|k| std::rc::Rc::from(k.as_str()))
         .collect();
     export_names.sort();
-    let tir = varn_checker::emit::emit_module(&program, &check.bind, &check.expr_table);
+    let tir = varn_checker::emit::emit_module(&program, &check.bind, &check.expr_table, &check.call_mappings);
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
