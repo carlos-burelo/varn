@@ -1054,6 +1054,9 @@ impl<'m> Builder<'m> {
             .or_else(|| def.class_id.and_then(|c| self.tir.class(c)).and_then(|ci| ci.parent))
             .and_then(|p| self.tir.class(p))
             .map(|p| p.fields.len())
+            // `extends` a native class the table doesn't hold — the checker
+            // prepended the 3-field `Error` prefix, which the runtime supplies.
+            .or_else(|| (def.super_class.is_some() && def.parent.is_none()).then_some(3))
             .unwrap_or(0);
         let fields: Vec<(Rc<str>, BackendTy)> = def
             .class_id

@@ -118,11 +118,24 @@ fn build_one_class(
     signatures: &mut Vec<Signature>,
     built: &[ClassInfo],
 ) -> ClassInfo {
-    let parent_id = bind.class_parents.get(name).and_then(|p| names.class_id(p));
+    let parent_name = bind.class_parents.get(name);
+    let parent_id = parent_name.and_then(|p| names.class_id(p));
     let parent_info = parent_id.and_then(|id| built.get(id.0 as usize));
-    let inherited_fields: FxHashMap<Rc<str>, ()> = parent_info
+    let mut inherited_fields: FxHashMap<Rc<str>, ()> = parent_info
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
         .unwrap_or_default();
+
+    // A class extending a NATIVE class the local table doesn't hold: the only
+    // user-extensible one is the `Error` family, whose instances carry
+    // `message` / `name` / `stack` before any own field. The runtime's
+    // `op_inherit` lays them out first, so the own fields' slots must too.
+    let mut fields: Vec<(Rc<str>, BackendTy)> = Vec::new();
+    if parent_name.is_some() && parent_id.is_none() {
+        for f in ["message", "name", "stack"] {
+            fields.push((Rc::from(f), BackendTy::Str));
+            inherited_fields.insert(Rc::from(f), ());
+        }
+    }
     let members = bind
         .type_members
         .classes
@@ -130,7 +143,6 @@ fn build_one_class(
         .map(|e| e.members.as_slice())
         .unwrap_or(&[]);
 
-    let mut fields: Vec<(Rc<str>, BackendTy)> = Vec::new();
     let mut seen_field: FxHashMap<Rc<str>, ()> = FxHashMap::default();
     let mut method_names: Vec<Rc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Rc<str>, varn_tir::SigId> = FxHashMap::default();

@@ -77,6 +77,68 @@ enum ClosureBody<'a> {
     Stmt(&'a Stmt),
 }
 
+/// Insert `fin` before every `Return` / `Break` / `Continue` that would leave
+/// this statement list, recursing into nested `If` / `Loop` / `Try` bodies —
+/// but NOT into a nested loop for `Break`/`Continue`, which stay inside it.
+fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    let mut out = Vec::with_capacity(stmts.len());
+    for s in stmts {
+        match s {
+            TirStmt::Return(_) | TirStmt::Break | TirStmt::Continue => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
+            TirStmt::If { cond, then_body, else_body } => out.push(TirStmt::If {
+                cond,
+                then_body: splice_finally_before_exits(then_body, fin),
+                else_body: splice_finally_before_exits(else_body, fin),
+            }),
+            TirStmt::Loop { cond, body } => {
+                // `break` / `continue` here belong to this inner loop; only a
+                // `Return` escapes the guarded region.
+                out.push(TirStmt::Loop {
+                    cond,
+                    body: splice_returns_only(body, fin),
+                });
+            }
+            TirStmt::Try { body, catch_local, catch_body } => out.push(TirStmt::Try {
+                body: splice_finally_before_exits(body, fin),
+                catch_local,
+                catch_body: splice_finally_before_exits(catch_body, fin),
+            }),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn splice_returns_only(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    let mut out = Vec::with_capacity(stmts.len());
+    for s in stmts {
+        match s {
+            TirStmt::Return(_) => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
+            TirStmt::If { cond, then_body, else_body } => out.push(TirStmt::If {
+                cond,
+                then_body: splice_returns_only(then_body, fin),
+                else_body: splice_returns_only(else_body, fin),
+            }),
+            TirStmt::Loop { cond, body } => {
+                out.push(TirStmt::Loop { cond, body: splice_returns_only(body, fin) })
+            }
+            TirStmt::Try { body, catch_local, catch_body } => out.push(TirStmt::Try {
+                body: splice_returns_only(body, fin),
+                catch_local,
+                catch_body: splice_returns_only(catch_body, fin),
+            }),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 fn pattern_lead(p: &Pattern) -> Rc<str> {
     match p {
         Pattern::Identifier { name, .. } => name.clone(),
@@ -395,10 +457,21 @@ impl<'a> FnEmitter<'a> {
                 (local, vec![])
             }
         };
+        // `finally` has no TIR node: lower it once, then run it on the normal
+        // fall-through AND before every early exit inside the guarded region.
+        let fin: Vec<TirStmt> = finally
+            .map(|f| self.lower_stmt_as_block(f))
+            .unwrap_or_default();
+        let (body, catch_body) = if fin.is_empty() {
+            (body, catch_body)
+        } else {
+            (
+                splice_finally_before_exits(body, &fin),
+                splice_finally_before_exits(catch_body, &fin),
+            )
+        };
         let mut out = vec![TirStmt::Try { body, catch_local, catch_body }];
-        if let Some(f) = finally {
-            out.extend(self.lower_stmt_as_block(f));
-        }
+        out.extend(fin);
         out
     }
 
