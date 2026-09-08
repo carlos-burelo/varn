@@ -1782,12 +1782,12 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        // `&&` / `||`: when both operands are pure the operator is a `Select`
-        // (short-circuit preserved as a branch). If either is impure, fall
-        // back to a bitwise op on the two Bool casts — no short-circuit, same
-        // result for effect-free right operands, always well-formed.
+        // `&&` / `||` -> a `Select`: the operator mentions the left operand
+        // once (as the condition) and the right once (as one arm), so a branch
+        // preserves both the short-circuit and any side effect exactly, with
+        // no need for a hoisted temp. `is_pure` is not consulted for these.
         let (cond, then_val, else_val) = match op {
-            LogicalOp::And | LogicalOp::Or if Self::is_pure(left) && Self::is_pure(right) => {
+            LogicalOp::And | LogicalOp::Or => {
                 let l = self.lower_expr(left);
                 let l = self.cast_to(l, BackendTy::Bool);
                 let r = self.lower_expr(right);
@@ -1796,23 +1796,6 @@ impl<'a> FnEmitter<'a> {
                     LogicalOp::And => (l, r, bool_lit(false)), // a ? b : false
                     _ => (l, bool_lit(true), r),               // a ? true : b
                 }
-            }
-            LogicalOp::And | LogicalOp::Or => {
-                let l = self.lower_expr(left);
-                let l = self.cast_to(l, BackendTy::Bool);
-                let r = self.lower_expr(right);
-                let r = self.cast_to(r, BackendTy::Bool);
-                let bop = if matches!(op, LogicalOp::And) {
-                    TirBinOp::BitAnd
-                } else {
-                    TirBinOp::BitOr
-                };
-                return TirExpr {
-                    kind: TirExprKind::Binary { op: bop, lhs: Box::new(l), rhs: Box::new(r) },
-                    ty: BackendTy::Bool,
-                    res: Resolution::None,
-                    span,
-                };
             }
             LogicalOp::Nullish => {
                 let mut l = self.lower_expr(left);
