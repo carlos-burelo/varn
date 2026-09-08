@@ -1560,6 +1560,43 @@ impl<'a> FnEmitter<'a> {
             }
             // `x |> f` -> `f(x)`.
             ExprKind::Pipeline { left, right } => {
+                // `x |> f(_, y)` — substitute `x` for each `_` in the call's
+                // arguments. `x |> f` (no call) — `f(x)`.
+                if let ExprKind::Call { callee, args, .. } = &right.kind {
+                    let has_placeholder = args.iter().any(|a| {
+                        matches!(
+                            a,
+                            Arg::Positional(e) | Arg::Named { value: e, .. }
+                                if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_")
+                        )
+                    });
+                    if has_placeholder {
+                        let lv = self.lower_expr(left);
+                        let piped = self.hoist(lv);
+                        let c = self.lower_expr(callee);
+                        let targs: Vec<TirArg> = args
+                            .iter()
+                            .map(|a| match a {
+                                Arg::Positional(e)
+                                | Arg::Named { value: e, .. }
+                                    if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_") =>
+                                {
+                                    TirArg::Expr(piped.clone())
+                                }
+                                other => self.lower_arg(other),
+                            })
+                            .collect();
+                        return TirExpr {
+                            kind: TirExprKind::Call { callee: Box::new(c), args: targs },
+                            ty,
+                            res: Resolution::ByName {
+                                name: Rc::from("<pipeline>"),
+                                why: DynReason::Unannotated,
+                            },
+                            span,
+                        };
+                    }
+                }
                 let arg = self.lower_expr(left);
                 let callee = self.lower_expr(right);
                 return TirExpr {
