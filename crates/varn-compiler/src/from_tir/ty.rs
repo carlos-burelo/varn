@@ -68,7 +68,7 @@ mod tests {
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![],            types,
+            imports: vec![], exports: vec![],            types,
             classes: vec![ClassInfo::new(Rc::from("Point"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],

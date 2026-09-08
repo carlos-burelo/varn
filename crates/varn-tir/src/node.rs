@@ -290,10 +290,24 @@ pub struct TirImport {
     pub specs: Vec<TirImportSpec>,
 }
 
+/// One name this module exposes. The backend fills the module slot named by
+/// `exported` from either a local global or, for `export {..} from "src"`, a
+/// property of that source module.
+#[derive(Debug, Clone)]
+pub struct TirExport {
+    pub exported: Rc<str>,
+    pub local: Rc<str>,
+    /// `Some(src)` — a re-export; the value is `src`'s `local` property.
+    pub reexport_from: Option<Rc<str>>,
+    /// `export * as ns from "src"` — bind the whole module object.
+    pub namespace: bool,
+}
+
 #[derive(Debug)]
 pub struct TirModule {
     pub source_file: Rc<str>,
     pub imports: Vec<TirImport>,
+    pub exports: Vec<TirExport>,
     pub types: TyTable,
     pub classes: Vec<crate::tables::ClassInfo>,
     pub enums: Vec<crate::tables::EnumInfo>,

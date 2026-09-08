@@ -77,8 +77,13 @@ fn compile_one(
     f: &TirFunction,
     is_top_level: bool,
     source_file: Rc<str>,
+    export_slots: &[Rc<str>],
 ) -> Result<FunctionProto> {
-    let mut ssa = if is_top_level { build_top_level(tir)? } else { build_function(tir, f)? };
+    let mut ssa = if is_top_level {
+        build_top_level(tir, export_slots)?
+    } else {
+        build_function(tir, f)?
+    };
     crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     let state_size = crate::passes::state_machine::run(&mut ssa);
     if let Err(why) = crate::ssa::verify::verify(&ssa) {
@@ -100,7 +105,7 @@ pub(crate) fn compile_closure(
         .functions
         .get(idx as usize)
         .ok_or(OptError::Unsupported("from_tir: closure index out of range"))?;
-    compile_one(tir, f, false, source_file)
+    compile_one(tir, f, false, source_file, &[])
 }
 
 /// Compile a whole module: the top-level proto, with every free function and
@@ -108,7 +113,7 @@ pub(crate) fn compile_closure(
 pub fn compile_module(tir: &TirModule, export_names: Vec<Rc<str>>) -> Result<FunctionProto> {
     let _scope = enter_module(tir);
     let source_file = tir.source_file.clone();
-    let mut proto = compile_one(tir, &tir.top_level, true, source_file)?;
+    let mut proto = compile_one(tir, &tir.top_level, true, source_file, &export_names)?;
     proto.export_names = export_names;
     // Coalescing + register-count validation, recursing into nested protos.
     crate::regalloc::run_post_passes(&mut proto);

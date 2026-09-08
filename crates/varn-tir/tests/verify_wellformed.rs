@@ -9,7 +9,7 @@ use varn_tir::*;
 fn empty_module() -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![],        types: TyTable::default(),
+        imports: vec![], exports: vec![],        types: TyTable::default(),
         classes: vec![ClassInfo::new(Rc::from("P"), None, vec![("x".into(), BackendTy::Int)])],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],

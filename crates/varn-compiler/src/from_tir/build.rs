@@ -901,6 +901,34 @@ fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
 }
 
 impl<'m> Builder<'m> {
+    /// Fill this module's export slots. Slot `n` is the position of the name
+    /// in the sorted `export_slots` list (the same order the VM builds
+    /// `export_map` from `proto.export_names`).
+    fn build_exports(&mut self, export_slots: &[Rc<str>]) {
+        let slot_of = |name: &str| export_slots.iter().position(|n| n.as_ref() == name);
+        for exp in &self.tir.exports {
+            let Some(slot) = slot_of(&exp.exported) else { continue };
+            let value = match &exp.reexport_from {
+                None => self.emit(InstKind::LoadGlobal(self.gname(&exp.local)), HirType::Dynamic),
+                Some(src) => {
+                    let m = self.emit(
+                        InstKind::LoadModule { source: src.clone() },
+                        HirType::Ref,
+                    );
+                    if exp.namespace {
+                        m
+                    } else {
+                        self.emit(
+                            InstKind::GetProperty { object: m, name: exp.local.clone() },
+                            HirType::Dynamic,
+                        )
+                    }
+                }
+            };
+            self.emit_effect(InstKind::StoreModuleSlot { value, slot: slot as u16 });
+        }
+    }
+
     /// `import ... from "src"` — a `LoadModule` and a `StoreGlobal` per bound
     /// name, under the module-qualified local name every other reference reads.
     fn build_imports(&mut self) {
@@ -1105,14 +1133,19 @@ impl<'m> Builder<'m> {
 /// the module top level, which stores every free function / method as a
 /// global by qualified name (the convention the callee side reads back).
 pub fn build_function(tir: &TirModule, func: &TirFunction) -> Result<SsaFunc> {
-    build_inner(tir, func, false)
+    build_inner(tir, func, false, &[])
 }
 
-pub fn build_top_level(tir: &TirModule) -> Result<SsaFunc> {
-    build_inner(tir, &tir.top_level, true)
+pub fn build_top_level(tir: &TirModule, export_slots: &[Rc<str>]) -> Result<SsaFunc> {
+    build_inner(tir, &tir.top_level, true, export_slots)
 }
 
-fn build_inner(tir: &TirModule, func: &TirFunction, register_module_fns: bool) -> Result<SsaFunc> {
+fn build_inner(
+    tir: &TirModule,
+    func: &TirFunction,
+    register_module_fns: bool,
+    export_slots: &[Rc<str>],
+) -> Result<SsaFunc> {
     let mut b = Builder::new(tir);
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
@@ -1146,6 +1179,9 @@ fn build_inner(tir: &TirModule, func: &TirFunction, register_module_fns: bool) -
     }
 
     b.lower_block(&func.body)?;
+    if register_module_fns && b.is_open() {
+        b.build_exports(export_slots);
+    }
     if b.is_open() {
         b.set_term(Terminator::Return(None));
     }
@@ -1186,7 +1222,7 @@ mod tests {
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![],            types,
+            imports: vec![], exports: vec![],            types,
             classes: vec![ClassInfo::new(Rc::from("C"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: B::Void }],

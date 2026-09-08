@@ -33,7 +33,7 @@ fn func(name: &str, is_async: bool, is_generator: bool, body: Vec<TirStmt>) -> T
 fn module(top_level: TirFunction) -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![],        types: TyTable::default(),
+        imports: vec![], exports: vec![],        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
@@ -109,7 +109,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
     let _ = types.intern(BackendTy::Int);
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![],        types,
+        imports: vec![], exports: vec![],        types,
         classes: vec![],
         enums: vec![EnumInfo {
             name: Rc::from("Shape"),

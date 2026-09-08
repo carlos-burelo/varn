@@ -181,10 +181,12 @@ pub fn emit_module(
     }
 
     let imports = collect_imports(program);
+    let exports = collect_exports(program);
 
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
         imports,
+        exports,
         types,
         classes,
         enums,
@@ -324,6 +326,38 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
         _ => {}
     }
+}
+
+fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
+    let mut out = Vec::new();
+    let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
+        out.push(varn_tir::TirExport { exported, local, reexport_from: from, namespace: ns });
+    };
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        match d.as_ref() {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                let mut names = FxHashSet::default();
+                collect_decl_names(declaration, &mut names);
+                for n in names {
+                    push(n.clone(), n, None, false);
+                }
+            }
+            Decl::Export(ExportDecl::Named { specifiers, source, .. }) => {
+                for sp in specifiers {
+                    push(sp.exported.clone(), sp.local.clone(), source.clone(), false);
+                }
+            }
+            Decl::Export(ExportDecl::All { source, alias: Some(alias), .. }) => {
+                push(alias.clone(), alias.clone(), Some(source.clone()), true);
+            }
+            Decl::Export(ExportDecl::Default { .. }) => {
+                push(Rc::from("default"), Rc::from("default"), None, false);
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
@@ -804,7 +838,7 @@ mod tests {
     fn stub_module() -> TirModule {
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![],
+            imports: vec![], exports: vec![],
             types: TyTable::default(),
             classes: vec![],
             enums: vec![],
