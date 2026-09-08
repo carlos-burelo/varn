@@ -29,8 +29,8 @@ use varn_core::ast::{
 };
 use varn_core::TypeKind;
 use varn_tir::{
-    BackendTy, DynReason, Resolution, Signature, SigId, Span, TirExpr, TirExprKind, TirFunction,
-    TirModule, TirStmt, TyTable,
+    BackendTy, DynReason, FnId, Resolution, Signature, SigId, Span, TirExpr, TirExprKind,
+    TirFunction, TirModule, TirObjectEntry, TirStmt, TyTable,
 };
 
 /// Build the TIR for one module from the same four inputs
@@ -132,6 +132,30 @@ pub fn emit_module(
         functions.push(tf);
     }
 
+    // `namespace NS { export function f … }` — each member function lowers to a
+    // closure body; the namespace itself becomes a plain object global built at
+    // the declaration's source position (below, in the top-level loop).
+    let mut ns_members: FxHashMap<Rc<str>, Vec<(Rc<str>, u32)>> = FxHashMap::default();
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let Some(ns) = namespace_decl(d) else { continue };
+        let mut members = Vec::new();
+        for m in &ns.body {
+            let inner = match m {
+                Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+                other => other,
+            };
+            let Decl::Function(f) = inner else { continue };
+            let tf = emit_function(
+                f, bind, expr_table, &mut types, &ctx, &mut signatures, &mut closures, n_free,
+            );
+            let fnid = n_free + closures.len() as u32;
+            closures.push(tf);
+            members.push((f.id.clone(), fnid));
+        }
+        ns_members.insert(ns.id.clone(), members);
+    }
+
     // Module top level: every statement, plus module-level `let` / `const`.
     let tl_base = n_free;
     let mut top_body = Vec::new();
@@ -156,6 +180,50 @@ pub fn emit_module(
                 {
                     top_body.push(TirStmt::BuildClass(class_ord));
                     class_ord += 1;
+                }
+                StmtKind::Decl(d) if namespace_decl(d).is_some() => {
+                    let ns = namespace_decl(d).unwrap();
+                    if let (Some(&slot), Some(members)) =
+                        (global_slots.get(ns.id.as_ref()), ns_members.get(&ns.id))
+                    {
+                        let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+                        let entries = members
+                            .iter()
+                            .map(|(name, fnid)| TirObjectEntry::Field {
+                                name: name.clone(),
+                                value: TirExpr {
+                                    kind: TirExprKind::Closure {
+                                        func: FnId(*fnid),
+                                        upvalues: vec![],
+                                    },
+                                    ty: dyno(),
+                                    res: Resolution::None,
+                                    span: Span::EMPTY,
+                                },
+                            })
+                            .collect();
+                        let obj = TirExpr {
+                            kind: TirExprKind::ObjectLit { entries },
+                            ty: dyno(),
+                            res: Resolution::None,
+                            span: Span::EMPTY,
+                        };
+                        let target = TirExpr {
+                            kind: TirExprKind::Var,
+                            ty: dyno(),
+                            res: Resolution::GlobalSlot(slot),
+                            span: Span::EMPTY,
+                        };
+                        top_body.push(TirStmt::Expr(TirExpr {
+                            kind: TirExprKind::Assign {
+                                target: Box::new(target),
+                                value: Box::new(obj),
+                            },
+                            ty: BackendTy::Void,
+                            res: Resolution::None,
+                            span: Span::EMPTY,
+                        }));
+                    }
                 }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
@@ -259,6 +327,17 @@ fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
         Decl::Function(f) => Some(f),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Function(f) => Some(f),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDecl> {
+    match decl {
+        Decl::Namespace(n) => Some(n),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Namespace(n) => Some(n),
             _ => None,
         },
         _ => None,

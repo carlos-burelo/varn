@@ -20,8 +20,10 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
         BackendTy::Float => HirType::Float,
         BackendTy::Bool => HirType::Bool,
         BackendTy::Str => HirType::Str,
-        // No scalar `Char` slot in the SSA type yet — it travels as an int.
-        BackendTy::Char => HirType::Int,
+        // The SSA type has no scalar `Char`; a char is a tagged runtime value,
+        // not a raw int, so it must travel dynamically (a typed int register
+        // would read its NaN-box bits as garbage).
+        BackendTy::Char => HirType::Dynamic,
 
         BackendTy::Decimal
         | BackendTy::BigInt

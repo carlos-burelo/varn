@@ -84,8 +84,10 @@ fn compile_one(
     } else {
         build_function(tir, f)?
     };
+    crate::ssa::verify::recompute_preds(&mut ssa);
     crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     let state_size = crate::passes::state_machine::run(&mut ssa);
+    crate::ssa::verify::recompute_preds(&mut ssa);
     if let Err(why) = crate::ssa::verify::verify(&ssa) {
         panic!("from_tir: ssa verify failed for {}: {}", f.name, why);
     }
