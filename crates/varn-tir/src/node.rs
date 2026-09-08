@@ -262,6 +262,9 @@ pub struct TirClassMember {
     pub key: Rc<str>,
     pub func: FnId,
     pub is_static: bool,
+    pub is_private: bool,
+    /// Method decorators, applied innermost-first.
+    pub decorators: Vec<TirExpr>,
 }
 
 #[derive(Debug, Clone)]

@@ -443,6 +443,30 @@ fn emit_extensions(
     }
 }
 
+/// `this.<field> = <value>` as a statement.
+fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
+    let this = TirExpr {
+        kind: TirExprKind::Var,
+        ty: BackendTy::Dynamic(DynReason::Unannotated),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    };
+    TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign {
+            target: Box::new(TirExpr {
+                kind: TirExprKind::Field { object: Box::new(this), name: field },
+                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }),
+            value: Box::new(value),
+        },
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    })
+}
+
 fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
     let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
@@ -646,6 +670,33 @@ fn emit_class(
             .unwrap_or_else(|| fresh_sig(signatures, arity))
     };
 
+    // Instance-field defaults: `this.<field> = <init>` prepended to the
+    // constructor (a synthetic one if the class declares none).
+    let field_defaults: Vec<TirStmt> = {
+        let mut stmts = Vec::new();
+        let base = out.len() as u32;
+        let mut cls: Vec<TirFunction> = Vec::new();
+        let mut em = FnEmitter::new(
+            expr_table, types, ctx.as_module_ctx(), signatures, &mut cls, base, vec![],
+        );
+        if let Some(cid) = class_id {
+            em = em.with_this(cid);
+        }
+        for member in &class.body {
+            if let ClassMember::Property { key, init: Some(init), modifiers, .. } = member {
+                if modifiers.is_static {
+                    continue;
+                }
+                let value = em.lower_expression(init);
+                stmts.append(&mut em.take_pending());
+                stmts.push(this_field_assign(key.clone(), value));
+            }
+        }
+        drop(em);
+        out.extend(cls);
+        stmts
+    };
+
     for member in &class.body {
         match member {
             ClassMember::Constructor { params, body, .. } => {
@@ -659,9 +710,13 @@ fn emit_class(
                     key: Rc::from("constructor"),
                     func: id,
                     is_static: false,
-                });
+                    is_private: false,
+                    decorators: vec![],
+                    });
             }
-            ClassMember::Method { key, params, body: Some(body), modifiers, .. } => {
+            ClassMember::Method {
+                key, params, body: Some(body), modifiers, decorators, ..
+            } => {
                 let sig = info_sig(key, params.len(), signatures);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.{key}")),
@@ -677,10 +732,23 @@ fn emit_class(
                     signatures,
                     out,
                 );
+                let decos: Vec<TirExpr> = decorators
+                    .iter()
+                    .map(|d| {
+                        let (pre, x) = lower_outer(
+                            &d.expression, ctx, expr_table, types, signatures, out,
+                            out.len() as u32, class_id,
+                        );
+                        def.prelude.extend(pre);
+                        x
+                    })
+                    .collect();
                 def.methods.push(varn_tir::TirClassMember {
                     key: key.clone(),
                     func: id,
                     is_static: modifiers.is_static,
+                    is_private: matches!(modifiers.visibility, Some(varn_core::ast::operators::Visibility::Private)),
+                    decorators: decos,
                 });
             }
             ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
@@ -735,6 +803,43 @@ fn emit_class(
             _ => {}
         }
     }
+
+    if !field_defaults.is_empty() {
+        match def.methods.iter().find(|m| m.key.as_ref() == "constructor") {
+            Some(ctor) => {
+                // Prepend the defaults; an explicit `this.x = arg` later just
+                // overwrites, matching field-then-constructor order.
+                let body = &mut out[ctor.func.0 as usize].body;
+                let mut new = field_defaults;
+                new.extend(std::mem::take(body));
+                *body = new;
+            }
+            None => {
+                let sig = fresh_sig(signatures, 0);
+                let id = varn_tir::FnId(out.len() as u32);
+                out.push(TirFunction {
+                    name: Rc::from(format!("{class_name}.constructor")),
+                    sig,
+                    params: vec![],
+                    return_ty: BackendTy::Void,
+                    locals: vec![],
+                    body: field_defaults,
+                    has_this: true,
+                    this_class: class_id,
+                    is_async: false,
+                    is_generator: false,
+                });
+                def.methods.push(varn_tir::TirClassMember {
+                    key: Rc::from("constructor"),
+                    func: id,
+                    is_static: false,
+                    is_private: false,
+                    decorators: vec![],
+                });
+            }
+        }
+    }
+
     def
 }
 
@@ -812,7 +917,9 @@ fn emit_enum(
                     key: key.clone(),
                     func: id,
                     is_static: modifiers.is_static,
-                });
+                    is_private: false,
+                    decorators: vec![],
+                    });
             }
             ClassMember::Constructor { params, body, .. } => {
                 let sig = fresh_sig(signatures, params.len());
@@ -825,7 +932,9 @@ fn emit_enum(
                     key: Rc::from("constructor"),
                     func: id,
                     is_static: false,
-                });
+                    is_private: false,
+                    decorators: vec![],
+                    });
             }
             ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
                 let sig = fresh_sig(signatures, 0);

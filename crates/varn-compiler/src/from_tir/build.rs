@@ -1095,10 +1095,35 @@ impl<'m> Builder<'m> {
         }
 
         for m in &def.methods {
-            let mv = self.emit(
+            let mut mv = self.emit(
                 InstKind::MakeClosure { func: m.func.0, upvalues_src: vec![] },
                 HirType::Ref,
             );
+            // `@a @b method()` — apply `b` (innermost) first: `deco(method,
+            // { name, kind, isStatic, isPrivate })`, keeping the original when
+            // the decorator returns null.
+            for deco in m.decorators.iter().rev() {
+                let deco_v = self.lower_expr(deco)?;
+                let n = self.emit(InstKind::ConstStr(m.key.clone()), HirType::Str);
+                let k = self.emit(InstKind::ConstStr(Rc::from("method")), HirType::Str);
+                let st = self.emit(InstKind::ConstBool(m.is_static), HirType::Bool);
+                let pv = self.emit(InstKind::ConstBool(m.is_private), HirType::Bool);
+                let ctx = self.emit(
+                    InstKind::BuildObject {
+                        pairs: vec![
+                            (Rc::from("name"), n),
+                            (Rc::from("kind"), k),
+                            (Rc::from("isStatic"), st),
+                            (Rc::from("isPrivate"), pv),
+                        ],
+                    },
+                    HirType::Ref,
+                );
+                let result =
+                    self.emit(InstKind::Call { callee: deco_v, args: vec![mv, ctx] }, HirType::Ref);
+                let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
+                mv = self.select_value(isnull, mv, result, HirType::Ref)?;
+            }
             self.emit_effect(InstKind::DefineMethod {
                 class: class_v,
                 name: m.key.clone(),
@@ -1121,7 +1146,7 @@ impl<'m> Builder<'m> {
             });
         }
 
-        for deco in &def.decorators {
+        for deco in def.decorators.iter().rev() {
             let deco_v = self.lower_expr(deco)?;
             let result =
                 self.emit(InstKind::Call { callee: deco_v, args: vec![class_v] }, HirType::Ref);

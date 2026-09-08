@@ -234,6 +234,14 @@ impl<'a> FnEmitter<'a> {
         (std::mem::take(&mut self.pending), x)
     }
 
+    pub fn lower_expression(&mut self, e: &Expr) -> TirExpr {
+        self.lower_expr(e)
+    }
+
+    pub fn take_pending(&mut self) -> Vec<TirStmt> {
+        std::mem::take(&mut self.pending)
+    }
+
     fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
         match ty.non_nullable(self.tt) {
             BackendTy::Class(c) => self.m.classes.get(c.0 as usize),
