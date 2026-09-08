@@ -10,12 +10,67 @@
 //! — the exact shape `escape` keys on — so a class whose name is assigned
 //! anywhere is dropped.
 
+#![allow(dead_code)]
+
 use rustc_hash::FxHashSet;
 use std::rc::Rc;
 
 use varn_tir::{Resolution, TirExpr, TirExprKind, TirModule, TirStmt};
 
 use crate::hir::ctor_summary::{CtorSummaries, SlotInit};
+use crate::ssa::ir::VarId;
+
+/// Parent locals / params captured by a nested closure. They must be pinned to
+/// a fixed frame slot and read / written through `LoadCaptured` /
+/// `StoreCaptured` so the linear-scan allocator never reuses their register
+/// while an open upvalue still points at it.
+pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
+    use crate::hir::LocalId;
+    use varn_tir::TirUpvalue;
+    let mut out = FxHashSet::default();
+    fn walk_expr(e: &TirExpr, out: &mut FxHashSet<VarId>) {
+        if let TirExprKind::Closure { upvalues, .. } = &e.kind {
+            for u in upvalues {
+                match u {
+                    TirUpvalue::ParentLocal(i) => {
+                        out.insert(VarId::Local(LocalId(*i)));
+                    }
+                    TirUpvalue::ParentParam(i) => {
+                        out.insert(VarId::Param(*i));
+                    }
+                    TirUpvalue::ParentUpvalue(_) => {}
+                }
+            }
+        }
+        for c in child_exprs(e) {
+            walk_expr(c, out);
+        }
+    }
+    fn walk_body(body: &[TirStmt], out: &mut FxHashSet<VarId>) {
+        for stmt in body {
+            match stmt {
+                TirStmt::Expr(e) | TirStmt::Throw(e) => walk_expr(e, out),
+                TirStmt::Let { init: Some(e), .. } | TirStmt::Return(Some(e)) => walk_expr(e, out),
+                TirStmt::If { cond, then_body, else_body } => {
+                    walk_expr(cond, out);
+                    walk_body(then_body, out);
+                    walk_body(else_body, out);
+                }
+                TirStmt::Loop { cond, body } => {
+                    walk_expr(cond, out);
+                    walk_body(body, out);
+                }
+                TirStmt::Try { body, catch_body, .. } => {
+                    walk_body(body, out);
+                    walk_body(catch_body, out);
+                }
+                _ => {}
+            }
+        }
+    }
+    walk_body(&func.body, &mut out);
+    out
+}
 
 pub fn collect(tir: &TirModule) -> CtorSummaries {
     let mut reassigned: FxHashSet<Rc<str>> = FxHashSet::default();
@@ -90,7 +145,11 @@ fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Rc<str>))
             TirStmt::Let { init: Some(e), .. } | TirStmt::Return(Some(e)) => {
                 scan_expr(e, tir, note)
             }
-            TirStmt::Let { .. } | TirStmt::Return(None) | TirStmt::Break | TirStmt::Continue => {}
+            TirStmt::Let { .. }
+            | TirStmt::Return(None)
+            | TirStmt::Break
+            | TirStmt::Continue
+            | TirStmt::BuildClass(_) => {}
             TirStmt::If { cond, then_body, else_body } => {
                 scan_expr(cond, tir, note);
                 scan_body(then_body, tir, note);

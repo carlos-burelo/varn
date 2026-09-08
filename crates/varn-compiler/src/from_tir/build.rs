@@ -50,12 +50,19 @@ struct Builder<'m> {
     loops: Vec<LoopCtx>,
     /// Count of `try` regions currently open on the path being lowered.
     try_depth: usize,
+    /// Parent locals / params captured by a nested closure — read and written
+    /// through `LoadCaptured` / `StoreCaptured`, never the SSA var machinery.
+    pinned: FxHashSet<VarId>,
     next_synthetic: u32,
     current: BlockId,
 }
 
 impl<'m> Builder<'m> {
     fn new(tir: &'m TirModule) -> Self {
+        Self::with_pinned(tir, FxHashSet::default())
+    }
+
+    fn with_pinned(tir: &'m TirModule, pinned: FxHashSet<VarId>) -> Self {
         let mut b = Builder {
             tir,
             ssa_types: crate::hir::TyTable::default(),
@@ -68,6 +75,7 @@ impl<'m> Builder<'m> {
             incomplete_phis: FxHashMap::default(),
             loops: Vec::new(),
             try_depth: 0,
+            pinned,
             next_synthetic: 0,
             current: BlockId(0),
         };
@@ -264,8 +272,7 @@ impl<'m> Builder<'m> {
                     }
                     None => self.emit(InstKind::ConstNull, declared),
                 };
-                let cur = self.current;
-                self.write_var(VarId::Local(LocalId(local.0)), cur, value);
+                self.store_var(VarId::Local(LocalId(local.0)), value);
             }
             TirStmt::Return(v) => {
                 let val = match v {
@@ -399,8 +406,7 @@ impl<'m> Builder<'m> {
                 self.seal_block(landing);
                 self.current = landing;
                 let err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
-                let cur = self.current;
-                self.write_var(VarId::Local(LocalId(catch_local.0)), cur, err);
+                self.store_var(VarId::Local(LocalId(catch_local.0)), err);
                 self.lower_block(catch_body)?;
                 if self.is_open() {
                     let from = self.current;
@@ -785,12 +791,10 @@ impl<'m> Builder<'m> {
         match &target.kind {
             TirExprKind::Var => match &target.res {
                 Resolution::Local(id) => {
-                    let cur = self.current;
-                    self.write_var(VarId::Local(LocalId(id.0)), cur, value);
+                    self.store_var(VarId::Local(LocalId(id.0)), value);
                 }
                 Resolution::Param(i) => {
-                    let cur = self.current;
-                    self.write_var(VarId::Param(*i), cur, value);
+                    self.store_var(VarId::Param(*i), value);
                 }
                 Resolution::Upvalue(uv) => {
                     self.emit_effect(InstKind::StoreUpvalue { index: *uv, value });
@@ -830,13 +834,31 @@ impl<'m> Builder<'m> {
         Ok(())
     }
 
+    /// Write a local / param — through `StoreCaptured` when it is pinned (a
+    /// nested closure captures it), otherwise the SSA var machinery.
+    fn store_var(&mut self, var: VarId, value: Value) {
+        if self.pinned.contains(&var) {
+            self.var_ty.insert(var, self.value_ty(value));
+            self.emit_effect(InstKind::StoreCaptured { var, value });
+        } else {
+            let cur = self.current;
+            self.write_var(var, cur, value);
+        }
+    }
+
+    fn load_var(&mut self, var: VarId, ty: HirType) -> Result<Value> {
+        if self.pinned.contains(&var) {
+            let ty = self.var_ty.get(&var).copied().unwrap_or(ty);
+            Ok(self.emit(InstKind::LoadCaptured { var }, ty))
+        } else {
+            self.read_var(var, self.current)
+        }
+    }
+
     fn lower_var(&mut self, res: &Resolution, ty: HirType) -> Result<Value> {
         match res {
-            Resolution::Local(id) => {
-                let var = VarId::Local(LocalId(id.0));
-                self.read_var(var, self.current)
-            }
-            Resolution::Param(i) => self.read_var(VarId::Param(*i), self.current),
+            Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
+            Resolution::Param(i) => self.load_var(VarId::Param(*i), ty),
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
             Resolution::GlobalSlot(n) => {
                 let raw = self
@@ -1243,7 +1265,8 @@ fn build_inner(
     register_module_fns: bool,
     export_slots: &[Rc<str>],
 ) -> Result<SsaFunc> {
-    let mut b = Builder::new(tir);
+    let pinned = super::ctor_summary::captured_vars(func);
+    let mut b = Builder::with_pinned(tir, pinned.clone());
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
 
@@ -1292,7 +1315,7 @@ fn build_inner(
         entry,
         blocks: b.blocks,
         values: b.values,
-        pinned_vars: FxHashSet::default(),
+        pinned_vars: pinned,
         nlocals: func.locals.len() as u32,
         is_async: func.is_async,
         is_generator: func.is_generator,
