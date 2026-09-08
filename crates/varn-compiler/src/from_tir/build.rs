@@ -952,6 +952,7 @@ fn un_op(op: TirUnOp) -> HirUnOp {
         TirUnOp::Neg => HirUnOp::Neg,
         TirUnOp::Not => HirUnOp::Not,
         TirUnOp::BitNot => HirUnOp::BitNot,
+        TirUnOp::Typeof => HirUnOp::Typeof,
         TirUnOp::IsNull => unreachable!("handled by lower_expr"),
     }
 }

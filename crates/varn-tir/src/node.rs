@@ -45,6 +45,8 @@ pub enum TirUnOp {
     Neg,
     Not,
     BitNot,
+    /// `typeof x` — yields the runtime type name as a string.
+    Typeof,
     /// The null test `?.` and `??` desugar against. The emitter binds the
     /// tested value to a temp local, then branches on `IsNull(Var)` inside a
     /// `Select` — that is the whole short-circuit, no dedicated node.

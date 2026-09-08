@@ -632,6 +632,7 @@ fn emit_member_fn(
     is_async: bool,
     is_generator: bool,
     this_class: Option<varn_tir::ClassId>,
+    this_enum: Option<varn_tir::EnumId>,
     sig: SigId,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
@@ -652,6 +653,9 @@ fn emit_member_fn(
         if let Some(cid) = this_class {
             em = em.with_this(cid);
         }
+        if let Some(eid) = this_enum {
+            em = em.with_this_enum(eid);
+        }
         let mut b = em.destructure_params(params);
         b.extend(match &body.kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
@@ -666,7 +670,7 @@ fn emit_member_fn(
         return_ty: sig_snapshot.return_ty,
         locals,
         body: body_stmts,
-        has_this: this_class.is_some(),
+        has_this: this_class.is_some() || this_enum.is_some(),
         this_class,
         is_async,
         is_generator,
@@ -782,8 +786,8 @@ fn emit_class(
                 let sig = info_sig("constructor", params.len(), signatures);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.constructor")),
-                    params, body, false, false, class_id, sig, ctx, expr_table, types, signatures,
-                    out,
+                    params, body, false, false, class_id, None, sig, ctx, expr_table, types,
+                    signatures, out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
                     key: Rc::from("constructor"),
@@ -804,6 +808,7 @@ fn emit_class(
                     modifiers.is_async,
                     modifiers.is_generator,
                     (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
                     sig,
                     ctx,
                     expr_table,
@@ -836,6 +841,7 @@ fn emit_class(
                     Rc::from(format!("{class_name}.get {key}")),
                     &[], body, false, false,
                     (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
                     sig, ctx, expr_table, types, signatures, out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
@@ -852,6 +858,7 @@ fn emit_class(
                     Rc::from(format!("{class_name}.set {key}")),
                     ps, body, false, false,
                     (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
                     sig, ctx, expr_table, types, signatures, out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
@@ -875,7 +882,8 @@ fn emit_class(
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.<static>")),
-                    &[], body, false, false, class_id, sig, ctx, expr_table, types, signatures, out,
+                    &[], body, false, false, class_id, None, sig, ctx, expr_table, types, signatures,
+                    out,
                 );
                 def.static_blocks.push(id);
             }
@@ -990,6 +998,7 @@ fn emit_enum(
                     modifiers.is_async,
                     modifiers.is_generator,
                     (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
                     sig, ctx, expr_table, types, signatures, out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
@@ -1004,8 +1013,8 @@ fn emit_enum(
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.constructor")),
-                    params, body, false, false, this_cid, sig, ctx, expr_table, types, signatures,
-                    out,
+                    params, body, false, false, this_cid, enum_id, sig, ctx, expr_table, types,
+                    signatures, out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
                     key: Rc::from("constructor"),
@@ -1021,6 +1030,7 @@ fn emit_enum(
                     Rc::from(format!("{name}.get {key}")),
                     &[], body, false, false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
                     sig, ctx, expr_table, types, signatures, out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
@@ -1036,6 +1046,7 @@ fn emit_enum(
                     Rc::from(format!("{name}.set {key}")),
                     std::slice::from_ref(param), body, false, false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
                     sig, ctx, expr_table, types, signatures, out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {

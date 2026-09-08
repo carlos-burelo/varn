@@ -18,7 +18,8 @@ use varn_core::ast::{
     StmtKind,
 };
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, SigId, Span,
+    BackendTy, ClassId, ClassInfo, DynReason, EnumId, EnumInfo, LocalId, Resolution, Signature,
+    SigId, Span,
     TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirFunction, TirObjectEntry, TirStmt,
     TirUnOp, TyTable,
 };
@@ -57,6 +58,9 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// Set inside an enum method: `this` is typed as this enum, so a bare
+    /// variant pattern (`Circle(r)`) in `match (this)` resolves.
+    this_enum: Option<EnumId>,
     /// Extension method: `this` is param 0, not a receiver frame.
     /// This emitter is the module top level: a `let x` whose name is a module
     /// global becomes a store to that global slot, not a `<module>` local, so
@@ -190,6 +194,7 @@ impl<'a> FnEmitter<'a> {
             scopes: vec![FxHashMap::default()],
             params,
             this_class: None,
+            this_enum: None,
             top_level: false,
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
@@ -217,6 +222,11 @@ impl<'a> FnEmitter<'a> {
 
     pub fn with_this(mut self, class: ClassId) -> Self {
         self.this_class = Some(class);
+        self
+    }
+
+    pub fn with_this_enum(mut self, enum_id: EnumId) -> Self {
+        self.this_enum = Some(enum_id);
         self
     }
 
@@ -1407,8 +1417,9 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::This => {
                 let this_ty = self
-                    .this_class
-                    .map(BackendTy::Class)
+                    .this_enum
+                    .map(BackendTy::Enum)
+                    .or_else(|| self.this_class.map(BackendTy::Class))
                     .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                 return TirExpr { kind: TirExprKind::Var, ty: this_ty, res: Resolution::None, span };
             }
@@ -1693,9 +1704,37 @@ impl<'a> FnEmitter<'a> {
                             span,
                         }
                     }
-                    // `??=`, `&&=`, bitwise-assign: `t = <the value>` without
-                    // the operator (a coarse but well-formed lowering).
-                    Err(()) => v,
+                    // `&&=` / `||=` / `??=` — short-circuit against the current
+                    // value: `t = t ? v : t`, `t = t ? t : v`, `t = t ?? v`.
+                    Err(()) => {
+                        use varn_core::ast::operators::AssignOp as A;
+                        let cond = match op {
+                            A::NullishAssign => TirExpr {
+                                kind: TirExprKind::Unary {
+                                    op: TirUnOp::IsNull,
+                                    operand: Box::new(t.clone()),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            },
+                            _ => self.cast_to(t.clone(), BackendTy::Bool),
+                        };
+                        let (then_val, else_val) = match op {
+                            A::OrAssign => (t.clone(), v),
+                            _ => (v, t.clone()), // AndAssign, NullishAssign
+                        };
+                        TirExpr {
+                            kind: TirExprKind::Select {
+                                cond: Box::new(cond),
+                                then_val: Box::new(then_val),
+                                else_val: Box::new(else_val),
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        }
+                    }
                 };
                 return TirExpr {
                     kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(rhs) },
@@ -2555,10 +2594,15 @@ impl<'a> FnEmitter<'a> {
             UnaryOp::Not => TirUnOp::Not,
             UnaryOp::BitNot => TirUnOp::BitNot,
             UnaryOp::Plus => return self.lower_expr(operand), // unary + is identity
-            // `typeof x` yields a string; a Cast carries that.
+            // `typeof x` yields the runtime type name as a string.
             UnaryOp::Typeof => {
                 let inner = self.lower_expr(operand);
-                return self.cast_to(inner, BackendTy::Str);
+                return TirExpr {
+                    kind: TirExprKind::Unary { op: TirUnOp::Typeof, operand: Box::new(inner) },
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
             }
         };
         // Only `IsNull` is type-checked by the verifier (must be Bool); the
@@ -2622,7 +2666,14 @@ fn assign_bin_op(op: varn_core::ast::operators::AssignOp) -> Result<Option<TirBi
         A::DivAssign => TirBinOp::Div,
         A::ModAssign => TirBinOp::Mod,
         A::PowAssign => TirBinOp::Pow,
-        _ => return Err(()),
+        A::BitAndAssign => TirBinOp::BitAnd,
+        A::BitOrAssign => TirBinOp::BitOr,
+        A::BitXorAssign => TirBinOp::BitXor,
+        A::ShlAssign => TirBinOp::Shl,
+        A::ShrAssign => TirBinOp::Shr,
+        A::UShrAssign => TirBinOp::Ushr,
+        // `&&=` / `||=` / `??=` short-circuit — lowered by the caller.
+        A::AndAssign | A::OrAssign | A::NullishAssign => return Err(()),
     }))
 }
 
