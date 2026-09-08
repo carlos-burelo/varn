@@ -43,6 +43,7 @@ pub fn emit_module(
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
     ext_calls: &FxHashMap<u32, Rc<str>>,
     ext_members: &FxHashMap<u32, Rc<str>>,
+    ext_set_members: &FxHashMap<u32, Rc<str>>,
 ) -> TirModule {
     let mut types = TyTable::default();
     ty::prime(&mut types);
@@ -111,6 +112,7 @@ pub fn emit_module(
         call_mappings,
         ext_calls,
         ext_members,
+        ext_set_members,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -216,6 +218,7 @@ struct MCtx<'a> {
     call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
     ext_calls: &'a FxHashMap<u32, Rc<str>>,
     ext_members: &'a FxHashMap<u32, Rc<str>>,
+    ext_set_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 impl<'a> MCtx<'a> {
@@ -229,6 +232,7 @@ impl<'a> MCtx<'a> {
             call_mappings: self.call_mappings,
             ext_calls: self.ext_calls,
             ext_members: self.ext_members,
+            ext_set_members: self.ext_set_members,
         }
     }
 }

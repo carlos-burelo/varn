@@ -39,6 +39,8 @@ pub(super) struct ModuleCtx<'a> {
     pub ext_calls: &'a FxHashMap<u32, Rc<str>>,
     /// `recv.p` reads resolved to an extension getter.
     pub ext_members: &'a FxHashMap<u32, Rc<str>>,
+    /// `recv.p = v` writes resolved to an extension setter.
+    pub ext_set_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -1635,6 +1637,30 @@ impl<'a> FnEmitter<'a> {
 
             // Assignment to an identifier or a field: plain `=` directly,
             // compound `+=` … as `t = t <op> v`. Destructuring targets later.
+            // `recv.p = v` resolved to an extension setter: `__extset(recv, v)`.
+            ExprKind::Assign { op, target, value }
+                if matches!(assign_bin_op(*op), Ok(None))
+                    && matches!(&target.kind, ExprKind::Member { .. })
+                    && self.m.ext_set_members.contains_key(&target.range.start.offset) =>
+            {
+                let ExprKind::Member { object, .. } = &target.kind else {
+                    unreachable!()
+                };
+                let mangled =
+                    self.m.ext_set_members[&target.range.start.offset].clone();
+                let recv = self.lower_expr(object);
+                let v = self.lower_expr(value);
+                return TirExpr {
+                    kind: TirExprKind::ExtensionCall {
+                        func: mangled,
+                        recv: Box::new(recv),
+                        args: vec![TirArg::Expr(v)],
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
             ExprKind::Assign { op, target, value }
                 if matches!(
                     target.kind,
@@ -2123,6 +2149,21 @@ impl<'a> FnEmitter<'a> {
         }
 
         let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
+
+        // `recv.p` the checker resolved to an extension getter: `__extget(recv)`
+        // — an extension call so `recv` lands in the `this` slot.
+        if let Some(mangled) = self.m.ext_members.get(&property.range.start.offset).cloned() {
+            return TirExpr {
+                kind: TirExprKind::ExtensionCall {
+                    func: mangled,
+                    recv: Box::new(obj),
+                    args: vec![],
+                },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
 
         // `E.V` — a unit enum variant.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {

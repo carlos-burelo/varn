@@ -33,7 +33,7 @@ fn compile_via_tir(
     check: &varn_checker::CheckResult,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, String> {
-    let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table, &check.call_mappings, &check.extension_calls, &check.extension_members);
+    let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table, &check.call_mappings, &check.extension_calls, &check.extension_members, &check.extension_set_members);
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 

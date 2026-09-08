@@ -42,6 +42,7 @@ pub fn compile(
         &check_result.checker_result.call_mappings,
         &check_result.checker_result.extension_calls,
         &check_result.checker_result.extension_members,
+        &check_result.checker_result.extension_set_members,
     );
     let proto = varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
         PipelineError::fatal(format!(
