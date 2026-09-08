@@ -34,6 +34,10 @@ pub enum TirBinOp {
     Add, Sub, Mul, Div, Mod, Pow,
     Eq, Ne, Lt, Le, Gt, Ge,
     BitAnd, BitOr, BitXor, Shl, Shr, Ushr,
+    /// `x instanceof C` — always produces `Bool`, operands are references.
+    Instanceof,
+    /// `k in obj` — membership, always `Bool`.
+    In,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

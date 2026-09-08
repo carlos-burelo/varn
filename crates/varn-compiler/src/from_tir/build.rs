@@ -637,12 +637,13 @@ impl<'m> Builder<'m> {
                     .class(*class)
                     .map(|ci| ci.name.clone())
                     .unwrap_or_else(|| Rc::from("?"));
-                let name_v = self.emit(InstKind::ConstStr(cname), HirType::Str);
+                let cls = self.emit(InstKind::LoadGlobal(self.gname(&cname)), HirType::Ref);
                 Ok(self.emit(
-                    InstKind::MethodCall {
-                        recv: v,
-                        name: Rc::from("__instanceof"),
-                        args: vec![name_v],
+                    InstKind::Binary {
+                        op: HirBinOp::Instanceof,
+                        lhs: v,
+                        rhs: cls,
+                        ty: HirType::Dynamic,
                     },
                     HirType::Bool,
                 ))
@@ -853,6 +854,8 @@ fn bin_op(op: TirBinOp) -> HirBinOp {
         TirBinOp::Shl => HirBinOp::Shl,
         TirBinOp::Shr => HirBinOp::Shr,
         TirBinOp::Ushr => HirBinOp::Ushr,
+        TirBinOp::Instanceof => HirBinOp::Instanceof,
+        TirBinOp::In => HirBinOp::In,
     }
 }
 

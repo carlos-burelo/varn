@@ -1653,7 +1653,31 @@ impl<'a> FnEmitter<'a> {
                             span,
                         };
                     }
+                    // An intrinsic (`Array`, `Error`) or imported class — a
+                    // real `instanceof` against the named global.
+                    return TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Instanceof,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        },
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
                 }
+            }
+            if op == BinaryOp::In {
+                return TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::In,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
             }
             return self.cast_to(lhs, BackendTy::Bool);
         };
