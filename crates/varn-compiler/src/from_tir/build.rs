@@ -89,6 +89,35 @@ impl<'m> Builder<'m> {
         lower_ty(bt, self.tir, &mut self.ssa_types)
     }
 
+    /// Pinned locals a loop body declares directly (or in a nested `If`, not a
+    /// nested loop): their upvalue cells must close each iteration.
+    fn loop_body_pinned(&self, body: &[TirStmt]) -> Vec<VarId> {
+        fn walk(stmts: &[TirStmt], pinned: &FxHashSet<VarId>, out: &mut Vec<VarId>) {
+            for s in stmts {
+                match s {
+                    TirStmt::Let { local, .. } => {
+                        let v = VarId::Local(LocalId(local.0));
+                        if pinned.contains(&v) && !out.contains(&v) {
+                            out.push(v);
+                        }
+                    }
+                    TirStmt::If { then_body, else_body, .. } => {
+                        walk(then_body, pinned, out);
+                        walk(else_body, pinned, out);
+                    }
+                    TirStmt::Try { body, catch_body, .. } => {
+                        walk(body, pinned, out);
+                        walk(catch_body, pinned, out);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(body, &self.pinned, &mut out);
+        out
+    }
+
     /// Qualify a module-local global (free function, class, enum, top-level
     /// `let`) by its declaring file, matching what `build_top_level` and the
     /// HIR path both store. Imported / host names stay bare — they arrive as
@@ -375,6 +404,14 @@ impl<'m> Builder<'m> {
                 self.current = body_blk;
                 self.lower_block(body)?;
                 if self.is_open() {
+                    // Per-iteration binding capture: a pinned local first
+                    // declared in this body backs an upvalue cell; close it
+                    // before the back-edge so the next iteration's closures
+                    // capture a fresh binding, not the shared slot.
+                    let closes = self.loop_body_pinned(body);
+                    if !closes.is_empty() {
+                        self.emit_effect(InstKind::CloseUpvalues { targets: closes });
+                    }
                     let cur = self.current;
                     self.set_term(Terminator::Jump { target: head, args: vec![] });
                     self.add_pred(head, cur);
