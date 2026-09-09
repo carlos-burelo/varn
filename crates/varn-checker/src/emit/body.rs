@@ -839,13 +839,19 @@ impl<'a> FnEmitter<'a> {
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
 
-        let BackendTy::Array(el) = iter.ty.non_nullable(self.tt) else {
-            return self.lower_for_of_protocol(left, iter, out, body);
-        };
         let Pattern::Identifier { name, .. } = left else {
             return self.lower_for_of_protocol(left, iter, out, body);
         };
-        let elem_ty = self.tt.get(el);
+        // A statically-typed array indexes directly. So does a `Dynamic`
+        // subject — `for (x of bucket)` where `bucket` came off an index
+        // signature is the overwhelmingly common case, and the VM's
+        // `length` / `[i]` work on any runtime array. Only a value with a
+        // known non-array iterable type takes the `.iterator()` protocol.
+        let elem_ty = match iter.ty.non_nullable(self.tt) {
+            BackendTy::Array(el) => self.tt.get(el),
+            BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unannotated),
+            _ => return self.lower_for_of_protocol(left, iter, out, body),
+        };
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
         out.extend(self.for_of_over_array(name, arr, elem_ty, body));
