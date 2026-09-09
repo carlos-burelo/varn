@@ -87,6 +87,18 @@ enum ClosureBody<'a> {
 /// this statement list, recursing into nested `If` / `Loop` / `Try` bodies —
 /// but NOT into a nested loop for `Break`/`Continue`, which stay inside it.
 fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    splice_finally_impl(stmts, fin, false)
+}
+
+/// As `splice_finally_before_exits`, but also runs `fin` before a `Throw` that
+/// would escape — used for a `catch` body, whose re-throw propagates past the
+/// `finally`. Never used on the guarded `body`: a `throw` there is caught by
+/// this try's own landing pad, and `finally` runs after the catch, not before.
+fn splice_finally_before_exits_and_throw(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    splice_finally_impl(stmts, fin, true)
+}
+
+fn splice_finally_impl(stmts: Vec<TirStmt>, fin: &[TirStmt], on_throw: bool) -> Vec<TirStmt> {
     let mut out = Vec::with_capacity(stmts.len());
     for s in stmts {
         match s {
@@ -94,10 +106,14 @@ fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirS
                 out.extend(fin.iter().cloned());
                 out.push(s);
             }
+            TirStmt::Throw(_) if on_throw => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
             TirStmt::If { cond, then_body, else_body } => out.push(TirStmt::If {
                 cond,
-                then_body: splice_finally_before_exits(then_body, fin),
-                else_body: splice_finally_before_exits(else_body, fin),
+                then_body: splice_finally_impl(then_body, fin, on_throw),
+                else_body: splice_finally_impl(else_body, fin, on_throw),
             }),
             TirStmt::Loop { cond, body } => {
                 // `break` / `continue` here belong to this inner loop; only a
@@ -108,9 +124,9 @@ fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirS
                 });
             }
             TirStmt::Try { body, catch_local, catch_body } => out.push(TirStmt::Try {
-                body: splice_finally_before_exits(body, fin),
+                body: splice_finally_impl(body, fin, false),
                 catch_local,
-                catch_body: splice_finally_before_exits(catch_body, fin),
+                catch_body: splice_finally_impl(catch_body, fin, on_throw),
             }),
             other => out.push(other),
         }
@@ -571,7 +587,7 @@ impl<'a> FnEmitter<'a> {
         } else {
             (
                 splice_finally_before_exits(body, &fin),
-                splice_finally_before_exits(catch_body, &fin),
+                splice_finally_before_exits_and_throw(catch_body, &fin),
             )
         };
         let mut out = vec![TirStmt::Try { body, catch_local, catch_body }];
@@ -1188,11 +1204,31 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_decl_stmt(&mut self, decl: &varn_core::ast::Decl) -> Vec<TirStmt> {
         use varn_core::ast::{Decl, ExportDecl};
+        let unwrapped = match decl {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        // A named function declared inside a body is a local bound to a closure
+        // over the enclosing frame. (Top-level function declarations never reach
+        // here — they are free functions.)
+        if let Decl::Function(f) = unwrapped {
+            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let local = self.bind_local(f.id.clone(), dyn_ty);
+            let closure = self.lower_closure(
+                &f.params,
+                ClosureBody::Stmt(&f.body),
+                f.modifiers.is_async,
+                f.modifiers.is_generator,
+                dyn_ty,
+                Span::EMPTY,
+            );
+            return vec![TirStmt::Let { local, ty: dyn_ty, init: Some(closure) }];
+        }
         let v = match decl {
             Decl::Variable(v) => v,
             Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
                 Decl::Variable(v) => v,
-                _ => return vec![], // nested fn/class/enum: handled at module level
+                _ => return vec![], // nested class/enum: handled at module level
             },
             _ => return vec![],
         };

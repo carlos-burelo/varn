@@ -1266,7 +1266,8 @@ fn build_inner(
     register_module_fns: bool,
     export_slots: &[Rc<str>],
 ) -> Result<SsaFunc> {
-    let pinned = super::ctor_summary::captured_vars(func);
+    let mut pinned = super::ctor_summary::captured_vars(func);
+    pinned.extend(super::ctor_summary::try_pinned_vars(func));
     let mut b = Builder::with_pinned(tir, pinned.clone());
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;

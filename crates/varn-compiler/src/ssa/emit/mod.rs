@@ -274,6 +274,27 @@ pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta
 /// numeric order so every block is still emitted.
 fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     let n = ssa.blocks.len();
+    // Successors in the order the DFS should walk them: `else` before `then`
+    // (loop-header fall-through), then every `try` handler this block opens. A
+    // landing pad is reachable only through the `Try` inst, never the
+    // terminator, so without this it counts as "unreachable" and is emitted in
+    // raw numeric order — which puts a catch-chain merge block ahead of its
+    // predecessors and turns its forward jump into a back-edge `Loop`.
+    let succs = |b: usize| -> Vec<usize> {
+        let mut s = match &ssa.blocks[b].term {
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
+            Terminator::Jump { target, .. } => vec![target.0 as usize],
+            Terminator::Branch { then_blk, else_blk, .. } => {
+                vec![else_blk.0 as usize, then_blk.0 as usize]
+            }
+        };
+        for inst in &ssa.blocks[b].insts {
+            if let InstKind::Try { handler } = &inst.kind {
+                s.push(handler.0 as usize);
+            }
+        }
+        s
+    };
     let mut visited = vec![false; n];
     let mut post: Vec<usize> = Vec::with_capacity(n);
     let mut stack: Vec<(usize, u8)> = Vec::with_capacity(n);
@@ -283,12 +304,7 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     while let Some(top) = stack.last_mut() {
         let (b, stage) = *top;
         top.1 += 1;
-        let succ = match &ssa.blocks[b].term {
-            Terminator::Jump { target, .. } if stage == 0 => Some(target.0 as usize),
-            Terminator::Branch { else_blk, .. } if stage == 0 => Some(else_blk.0 as usize),
-            Terminator::Branch { then_blk, .. } if stage == 1 => Some(then_blk.0 as usize),
-            _ => None,
-        };
+        let succ = succs(b).get(stage as usize).copied();
         match succ {
             Some(s) => {
                 if !visited[s] {
