@@ -2446,6 +2446,7 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             is_async,
             is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
         });
         let slot = self.out_closures.len() - 1;
 
@@ -2498,6 +2499,7 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             is_async,
             is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
         };
 
         // Resolve each captured name against THIS (the enclosing) frame. A

@@ -239,6 +239,7 @@ pub fn emit_module(
         // Module top level permits top-level `await`.
         is_async: true,
         is_generator: false,
+        has_rest: false,
     };
 
     functions.extend(closures);
@@ -512,6 +513,7 @@ fn emit_extensions(
                 this_class: this_cid,
                 is_async: false,
                 is_generator: false,
+                has_rest: matches!(member, ExtensionMember::Method(f) if f.params.last().is_some_and(|p| p.is_rest)),
             });
             out.extend(mcls);
         }
@@ -693,6 +695,7 @@ fn emit_member_fn(
         this_class,
         is_async,
         is_generator,
+        has_rest: params.last().is_some_and(|p| p.is_rest),
     });
     out.extend(mcls);
     fn_id
@@ -1188,6 +1191,7 @@ fn emit_function(
         this_class: None,
         is_async: f.modifiers.is_async,
         is_generator: f.modifiers.is_generator,
+        has_rest: f.params.last().is_some_and(|p| p.is_rest),
     }
 }
 
@@ -1228,6 +1232,7 @@ mod tests {
                 this_class: None,
                 is_async: false,
                 is_generator: false,
+                has_rest: false,
             },
         }
     }

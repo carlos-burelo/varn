@@ -88,6 +88,7 @@ mod tests {
                 this_class: None,
                 is_async: false,
                 is_generator: false,
+                has_rest: false,
             },
         }
     }

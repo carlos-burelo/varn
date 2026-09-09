@@ -27,6 +27,7 @@ fn func(name: &str, is_async: bool, is_generator: bool, body: Vec<TirStmt>) -> T
         this_class: None,
         is_async,
         is_generator,
+        has_rest: false,
     }
 }
 

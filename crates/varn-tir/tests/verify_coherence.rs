@@ -33,6 +33,7 @@ fn module_with_point() -> TirModule {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     }
 }
@@ -71,6 +72,7 @@ fn bare_null_returns_from_any_nullable_function() {
         this_class: None,
         is_async: false,
         is_generator: false,
+        has_rest: false,
     });
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
@@ -94,6 +96,7 @@ fn int_argument_widens_to_a_float_parameter() {
         this_class: None,
         is_async: false,
         is_generator: false,
+        has_rest: false,
     });
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Call {
@@ -130,6 +133,7 @@ fn a_subclass_is_assignable_to_its_parent() {
         this_class: None,
         is_async: false,
         is_generator: false,
+        has_rest: false,
     });
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Call {
@@ -268,6 +272,7 @@ fn method_call_arity_mismatch_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
 
@@ -322,6 +327,7 @@ fn method_call_with_correct_arity_verifies() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
 
@@ -449,6 +455,7 @@ fn return_with_correct_type_verifies() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42))));
@@ -487,6 +494,7 @@ fn bare_return_in_non_void_function_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(None));
@@ -521,6 +529,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -558,6 +567,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -597,6 +607,7 @@ fn return_of_never_type_is_valid_anywhere() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -633,6 +644,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42)))); // returning Int
@@ -665,6 +677,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -713,6 +726,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
 
@@ -770,6 +784,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
 
@@ -822,6 +837,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -866,6 +882,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -928,6 +945,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
             this_class: None,
             is_async: false,
             is_generator: false,
+        has_rest: false,
         },
     };
 

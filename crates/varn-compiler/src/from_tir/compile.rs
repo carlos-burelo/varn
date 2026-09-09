@@ -64,7 +64,7 @@ fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
         nparams: f.params.len(),
         param_kinds: f.params.iter().map(|p| slot_kind_of(ty(*p))).collect(),
         return_kind: slot_kind_of(ty(f.return_ty)),
-        has_rest: false,
+        has_rest: f.has_rest,
         is_async: f.is_async,
         is_generator: f.is_generator,
         has_this: f.has_this,

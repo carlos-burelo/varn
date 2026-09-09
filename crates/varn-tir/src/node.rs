@@ -224,6 +224,9 @@ pub struct TirFunction {
     /// the verifier and tells the backend to build a state machine.
     pub is_async: bool,
     pub is_generator: bool,
+    /// The last parameter is `...rest`: the VM packs the trailing arguments
+    /// into an array bound to it.
+    pub has_rest: bool,
 }
 
 /// Everything the backend needs to BUILD a class/enum object at module load
