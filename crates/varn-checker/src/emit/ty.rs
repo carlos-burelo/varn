@@ -71,8 +71,15 @@ fn lower_kind(
 
         TypeKind::Named(name, _) => resolve_named(name, names),
 
-        // A generic reference with no type arguments is just a named type
-        // (an enum or class often carries an empty type-param list).
+        // A generic reference — `Box<T>`, `Result<int, str>` — is the named
+        // class / enum with its type arguments erased at the backend level.
+        // Only a generic that names neither (a bare type parameter `T`, an
+        // alias) stays opaque.
+        TypeKind::Generic(name, _, _)
+            if names.class_id(name).is_some() || names.enum_id(name).is_some() =>
+        {
+            resolve_named(name, names)
+        }
         TypeKind::Generic(name, args, _) if args.is_empty() => resolve_named(name, names),
 
         TypeKind::EnumVariant { enum_name, .. } => {
