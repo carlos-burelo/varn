@@ -522,6 +522,20 @@ fn emit_extensions(
     }
 }
 
+/// `this.<field> = <param i>` — a parameter property / primary-constructor
+/// field assignment.
+fn param_field_assign(field: Rc<str>, param: u32) -> TirStmt {
+    this_field_assign(
+        field,
+        TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::Param(param),
+            span: Span::EMPTY,
+        },
+    )
+}
+
 /// `this.<field> = <value>` as a statement.
 fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
     let this = TirExpr {
@@ -657,6 +671,15 @@ fn emit_member_fn(
             em = em.with_this_enum(eid);
         }
         let mut b = em.destructure_params(params);
+        // TypeScript-style parameter properties: `constructor(public id: int)`
+        // implies `this.id = id`.
+        for (i, p) in params.iter().enumerate() {
+            if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                if let Pattern::Identifier { name, .. } = &p.pattern {
+                    b.push(param_field_assign(name.clone(), i as u32));
+                }
+            }
+        }
         b.extend(match &body.kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
             _ => em.lower_block(std::slice::from_ref(body)),
@@ -891,7 +914,12 @@ fn emit_class(
         }
     }
 
-    if !field_defaults.is_empty() {
+    // C# / Kotlin primary constructor: `class User(public id: int, …)` — the
+    // params are fields, assigned `this.id = id` in a synthesized constructor.
+    let primary: &[Param] = class.primary_params.as_deref().unwrap_or(&[]);
+    let has_ctor = def.methods.iter().any(|m| m.key.as_ref() == "constructor");
+
+    if !field_defaults.is_empty() || (!primary.is_empty() && !has_ctor) {
         match def.methods.iter().find(|m| m.key.as_ref() == "constructor") {
             Some(ctor) => {
                 // Prepend the defaults; an explicit `this.x = arg` later just
@@ -902,20 +930,53 @@ fn emit_class(
                 *body = new;
             }
             None => {
-                let sig = fresh_sig(signatures, 0);
-                let id = varn_tir::FnId(out.len() as u32);
-                out.push(TirFunction {
-                    name: Rc::from(format!("{class_name}.constructor")),
-                    sig,
-                    params: vec![],
-                    return_ty: BackendTy::Void,
-                    locals: vec![],
-                    body: field_defaults,
-                    has_this: true,
-                    this_class: class_id,
-                    is_async: false,
-                    is_generator: false,
-                });
+                // A synthetic constructor: primary params (with their defaults,
+                // via `destructure_params`), then the field defaults, then
+                // `this.<p> = p` for every primary param.
+                let empty_body = Stmt {
+                    id: class.ast_id,
+                    range: class.range.clone(),
+                    kind: StmtKind::Block { stmts: vec![] },
+                };
+                let sig = fresh_sig(signatures, primary.len());
+                {
+                    let tys: Vec<BackendTy> = primary
+                        .iter()
+                        .map(|p| {
+                            p.type_ann
+                                .as_ref()
+                                .map(|t| {
+                                    lower_type(
+                                        &crate::binder::resolve_type_node(t, None),
+                                        types,
+                                        ctx.names,
+                                    )
+                                })
+                                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
+                        })
+                        .collect();
+                    signatures[sig.0 as usize].params = tys;
+                }
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.constructor")),
+                    primary, &empty_body, false, false, class_id, None, sig, ctx, expr_table,
+                    types, signatures, out,
+                );
+                let body = &mut out[id.0 as usize].body;
+                // `this.<p> = p` for params `emit_member_fn` did not (those
+                // without a visibility / readonly modifier). Appended after the
+                // default-value checks it emitted.
+                for (i, p) in primary.iter().enumerate() {
+                    if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                        continue;
+                    }
+                    if let Pattern::Identifier { name, .. } = &p.pattern {
+                        body.push(param_field_assign(name.clone(), i as u32));
+                    }
+                }
+                let mut new = field_defaults;
+                new.extend(std::mem::take(body));
+                *body = new;
                 def.methods.push(varn_tir::TirClassMember {
                     key: Rc::from("constructor"),
                     func: id,

@@ -455,6 +455,48 @@ impl<'a> FnEmitter<'a> {
     /// `try { } catch (e) { } finally { }`. `finally` has no TIR node — its
     /// statements are appended after the `Try` (correct for straight-line and
     /// caught paths, not for a `return`/`throw` that escapes the try).
+    /// The class names a `catch (e: T)` / `catch (e: A | B)` filter tests.
+    fn catch_type_names(&self, t: &varn_core::ast::TypeNode) -> Vec<Rc<str>> {
+        use varn_core::TypeKind;
+        match &t.kind {
+            TypeKind::Named(n, _) => vec![Rc::from(n.as_str())],
+            TypeKind::Union(items) | TypeKind::Intersection(items) => {
+                items.iter().flat_map(|x| self.catch_type_names(x)).collect()
+            }
+            _ => vec![],
+        }
+    }
+
+    /// `e instanceof <name>` — a `TypeTest` for a module class, else a dynamic
+    /// `instanceof` against the global of that name (builtins: `TypeError` …).
+    fn instance_of_name(&self, value: TirExpr, name: &str) -> TirExpr {
+        let span = value.span;
+        if let Some(class) = self.m.names.class_id(name) {
+            return TirExpr {
+                kind: TirExprKind::TypeTest { value: Box::new(value), class },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span,
+            };
+        }
+        let rhs = TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::ByName { name: Rc::from(name), why: DynReason::Unannotated },
+            span,
+        };
+        TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Instanceof,
+                lhs: Box::new(value),
+                rhs: Box::new(rhs),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     fn lower_try(
         &mut self,
         block: &Stmt,
@@ -462,21 +504,63 @@ impl<'a> FnEmitter<'a> {
         finally: Option<&Stmt>,
     ) -> Vec<TirStmt> {
         let body = self.lower_stmt_as_block(block);
-        let (catch_local, catch_body) = match catches.first() {
-            Some(c) => {
-                let name = match &c.param {
-                    Some(Pattern::Identifier { name, .. }) => name.clone(),
-                    _ => Rc::from("<catch>"),
-                };
-                let local = self.bind_local(name, BackendTy::Dynamic(DynReason::Unannotated));
-                let cb = self.lower_stmt_as_block(&c.body);
-                (local, cb)
-            }
-            None => {
-                let local = self.fresh_local(BackendTy::Dynamic(DynReason::Unannotated));
-                (local, vec![])
-            }
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        // One landing local holds the thrown value; typed clauses dispatch on
+        // `e instanceof T`, an untyped clause is the catch-all, and if none
+        // catches the value it is re-thrown.
+        self.scopes.push(FxHashMap::default());
+        let catch_local = self.bind_local(Rc::from("<catch>"), dyn_ty);
+        let e_var = |span: Span| TirExpr {
+            kind: TirExprKind::Var,
+            ty: dyn_ty,
+            res: Resolution::Local(catch_local),
+            span,
         };
+        let lower_clause = |this: &mut Self, c: &varn_core::ast::CatchClause| -> Vec<TirStmt> {
+            this.scopes.push(FxHashMap::default());
+            let mut out = Vec::new();
+            if let Some(Pattern::Identifier { name, .. }) = &c.param {
+                if name.as_ref() != "<catch>" {
+                    let alias = this.bind_local(name.clone(), dyn_ty);
+                    out.push(TirStmt::Let {
+                        local: alias,
+                        ty: dyn_ty,
+                        init: Some(e_var(Span::EMPTY)),
+                    });
+                }
+            }
+            out.extend(this.lower_stmt_as_block(&c.body));
+            this.scopes.pop();
+            out
+        };
+        let typed: Vec<&varn_core::ast::CatchClause> =
+            catches.iter().filter(|c| c.type_ann.is_some()).collect();
+        let catch_all = catches.iter().find(|c| c.type_ann.is_none());
+        let mut chain: Vec<TirStmt> = match catch_all {
+            Some(c) => lower_clause(self, c),
+            None => vec![TirStmt::Throw(e_var(Span::EMPTY))],
+        };
+        for c in typed.iter().rev() {
+            let names = self.catch_type_names(c.type_ann.as_ref().unwrap());
+            let cond = names
+                .into_iter()
+                .map(|n| self.instance_of_name(e_var(Span::EMPTY), &n))
+                .reduce(|a, b| TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(a),
+                        then_val: Box::new(bool_lit(true)),
+                        else_val: Box::new(b),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                })
+                .unwrap_or_else(|| bool_lit(true));
+            let then_body = lower_clause(self, c);
+            chain = vec![TirStmt::If { cond, then_body, else_body: std::mem::take(&mut chain) }];
+        }
+        self.scopes.pop();
+        let catch_body = chain;
         // `finally` has no TIR node: lower it once, then run it on the normal
         // fall-through AND before every early exit inside the guarded region.
         let fin: Vec<TirStmt> = finally
