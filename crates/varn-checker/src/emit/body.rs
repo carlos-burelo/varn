@@ -1913,7 +1913,7 @@ impl<'a> FnEmitter<'a> {
             // `x++` / `--x` -> `x = x <+/-> 1` (the value it yields is not
             // distinguished; correct in statement position, which is almost
             // always where it sits).
-            ExprKind::Update { op, operand, .. }
+            ExprKind::Update { op, operand, prefix }
                 if matches!(
                     operand.kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
@@ -1926,14 +1926,17 @@ impl<'a> FnEmitter<'a> {
                     UpdateOp::Decrement => TirBinOp::Sub,
                 };
                 let step = if t.ty == BackendTy::Float { self.cast_to(int_lit(1), BackendTy::Float) } else { int_lit(1) };
-                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, t.clone(), step, t.ty);
+                // Postfix (`x++`) yields the value BEFORE the step; hoist it so
+                // the assignment can still overwrite the target.
+                let old = if *prefix { t.clone() } else { self.hoist(t.clone()) };
+                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, old.clone(), step, t.ty);
                 let stepped = TirExpr {
                     kind: TirExprKind::Binary { op: bop, lhs: Box::new(lhs), rhs: Box::new(rhs) },
                     ty: nty,
                     res: Resolution::None,
                     span,
                 };
-                return TirExpr {
+                let assign = TirExpr {
                     kind: TirExprKind::Assign {
                         target: Box::new(t),
                         value: Box::new(stepped),
@@ -1942,6 +1945,12 @@ impl<'a> FnEmitter<'a> {
                     res: Resolution::None,
                     span,
                 };
+                if *prefix {
+                    return assign;
+                }
+                // `x++` — run the store for effect, evaluate to the old value.
+                self.pending.push(TirStmt::Expr(assign));
+                return old;
             }
 
             // `bigint` / `decimal` / regex literals have no TIR literal node:
