@@ -101,11 +101,9 @@ pub fn emit_module(
     // `namespace NS { export function f … }` — a member function is a free
     // function too, so a sibling member can call it by bare name and the
     // namespace object can point an entry at it. The object is built below.
-    let mut ns_members: FxHashMap<Rc<str>, Vec<Rc<str>>> = FxHashMap::default();
     for stmt in &program.body {
         let StmtKind::Decl(d) = &stmt.kind else { continue };
         let Some(ns) = namespace_decl(d) else { continue };
-        let mut names_in_ns = Vec::new();
         for m in &ns.body {
             let inner = match m {
                 Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
@@ -113,10 +111,8 @@ pub fn emit_module(
             };
             if let Decl::Function(f) = inner {
                 free_fns.push(f);
-                names_in_ns.push(f.id.clone());
             }
         }
-        ns_members.insert(ns.id.clone(), names_in_ns);
     }
     let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
     for (i, f) in free_fns.iter().enumerate() {
@@ -179,25 +175,48 @@ pub fn emit_module(
                 }
                 StmtKind::Decl(d) if namespace_decl(d).is_some() => {
                     let ns = namespace_decl(d).unwrap();
-                    if let (Some(&slot), Some(members)) =
-                        (global_slots.get(ns.id.as_ref()), ns_members.get(&ns.id))
-                    {
+                    if let Some(&slot) = global_slots.get(ns.id.as_ref()) {
                         let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
-                        let entries = members
-                            .iter()
-                            .filter_map(|name| {
-                                let &(fnid, _) = fn_index.get(name)?;
-                                Some(TirObjectEntry::Field {
-                                    name: name.clone(),
-                                    value: TirExpr {
-                                        kind: TirExprKind::Var,
-                                        ty: dyno(),
-                                        res: Resolution::DirectFn(FnId(fnid)),
-                                        span: Span::EMPTY,
-                                    },
-                                })
-                            })
-                            .collect();
+                        let mut entries: Vec<TirObjectEntry> = Vec::new();
+                        for m in &ns.body {
+                            let inner = match m {
+                                Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                                    declaration.as_ref()
+                                }
+                                other => other,
+                            };
+                            match inner {
+                                Decl::Function(f) => {
+                                    if let Some(&(fnid, _)) = fn_index.get(&f.id) {
+                                        entries.push(TirObjectEntry::Field {
+                                            name: f.id.clone(),
+                                            value: TirExpr {
+                                                kind: TirExprKind::Var,
+                                                ty: dyno(),
+                                                res: Resolution::DirectFn(FnId(fnid)),
+                                                span: Span::EMPTY,
+                                            },
+                                        });
+                                    }
+                                }
+                                // `export const k = <expr>` inside a namespace —
+                                // the object binds `k` to the initializer value.
+                                Decl::Variable(v) => {
+                                    for decl in &v.declarators {
+                                        if let (Pattern::Identifier { name, .. }, Some(init)) =
+                                            (&decl.id, &decl.init)
+                                        {
+                                            let value = top.lower_expression(init);
+                                            entries.push(TirObjectEntry::Field {
+                                                name: name.clone(),
+                                                value,
+                                            });
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                         let obj = TirExpr {
                             kind: TirExprKind::ObjectLit { entries },
                             ty: dyno(),
