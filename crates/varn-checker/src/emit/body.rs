@@ -2004,9 +2004,59 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             // `e is T` -> a Bool test.
-            ExprKind::Is { expression, .. } => {
+            ExprKind::Is { expression, type_ann } => {
                 let v = self.lower_expr(expression);
-                return self.cast_to(v, BackendTy::Bool);
+                let bool_ty = BackendTy::Bool;
+                // `v is SomeClass` — a real class membership test.
+                if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
+                    if let Some(class) = self.m.names.class_id(n) {
+                        return TirExpr {
+                            kind: TirExprKind::TypeTest { value: Box::new(v), class },
+                            ty: bool_ty,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
+                }
+                // `v is int` / `is decimal` / `is str` … — a runtime type-name
+                // check. The tag names match the keyword exactly.
+                let tag_name: Option<&'static str> = match &type_ann.kind {
+                    varn_core::TypeKind::Intrinsic(t) => Some(t.name()),
+                    varn_core::TypeKind::Named(n, _) => {
+                        varn_core::TypeTag::from_str(n).map(|t| t.name())
+                    }
+                    _ => None,
+                };
+                if let Some(name) = tag_name {
+                    let got = TirExpr {
+                        kind: TirExprKind::Unary {
+                            op: TirUnOp::Typeof,
+                            operand: Box::new(v),
+                        },
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                    let want = TirExpr {
+                        kind: TirExprKind::StrLit(Rc::from(name)),
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                    return TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Eq,
+                            lhs: Box::new(got),
+                            rhs: Box::new(want),
+                        },
+                        ty: bool_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                // An unresolved type: treat the value's truthiness as the test
+                // (matches the prior behaviour for the shapes we cannot check).
+                return self.cast_to(v, bool_ty);
             }
             // `import.meta.x` / `new.target` — a by-name field read.
             ExprKind::MetaAccess { target, property } => {
