@@ -884,6 +884,16 @@ impl<'m> Builder<'m> {
                 Err(OptError::Unsupported("from_tir: module slot"))
             }
             Resolution::ByName { name, .. } => Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty)),
+            // A bare reference to a free function — a namespace object entry, a
+            // function value passed around. Load the global it is stored under.
+            Resolution::DirectFn(f) => {
+                let name = self
+                    .tir
+                    .function(*f)
+                    .map(|tf| tf.name.clone())
+                    .ok_or(OptError::Unsupported("from_tir: DirectFn var out of range"))?;
+                Ok(self.emit(InstKind::LoadGlobal(self.gname(&name)), ty))
+            }
             // A `Var` node with no resolution is `this`.
             Resolution::None => Ok(self.emit(InstKind::This, ty)),
             _ => Err(OptError::Unsupported("from_tir: var resolution")),

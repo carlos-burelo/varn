@@ -90,7 +90,7 @@ pub fn emit_module(
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
     // arity check agrees).
-    let free_fns: Vec<&FunctionDecl> = program
+    let mut free_fns: Vec<&FunctionDecl> = program
         .body
         .iter()
         .filter_map(|s| match &s.kind {
@@ -98,6 +98,26 @@ pub fn emit_module(
             _ => None,
         })
         .collect();
+    // `namespace NS { export function f … }` — a member function is a free
+    // function too, so a sibling member can call it by bare name and the
+    // namespace object can point an entry at it. The object is built below.
+    let mut ns_members: FxHashMap<Rc<str>, Vec<Rc<str>>> = FxHashMap::default();
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let Some(ns) = namespace_decl(d) else { continue };
+        let mut names_in_ns = Vec::new();
+        for m in &ns.body {
+            let inner = match m {
+                Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+                other => other,
+            };
+            if let Decl::Function(f) = inner {
+                free_fns.push(f);
+                names_in_ns.push(f.id.clone());
+            }
+        }
+        ns_members.insert(ns.id.clone(), names_in_ns);
+    }
     let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
     for (i, f) in free_fns.iter().enumerate() {
         fn_index.entry(f.id.clone()).or_insert((i as u32, f.params.len() as u32));
@@ -130,30 +150,6 @@ pub fn emit_module(
             f, bind, expr_table, &mut types, &ctx, &mut signatures, &mut closures, n_free,
         );
         functions.push(tf);
-    }
-
-    // `namespace NS { export function f … }` — each member function lowers to a
-    // closure body; the namespace itself becomes a plain object global built at
-    // the declaration's source position (below, in the top-level loop).
-    let mut ns_members: FxHashMap<Rc<str>, Vec<(Rc<str>, u32)>> = FxHashMap::default();
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
-        let Some(ns) = namespace_decl(d) else { continue };
-        let mut members = Vec::new();
-        for m in &ns.body {
-            let inner = match m {
-                Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-                other => other,
-            };
-            let Decl::Function(f) = inner else { continue };
-            let tf = emit_function(
-                f, bind, expr_table, &mut types, &ctx, &mut signatures, &mut closures, n_free,
-            );
-            let fnid = n_free + closures.len() as u32;
-            closures.push(tf);
-            members.push((f.id.clone(), fnid));
-        }
-        ns_members.insert(ns.id.clone(), members);
     }
 
     // Module top level: every statement, plus module-level `let` / `const`.
@@ -189,17 +185,17 @@ pub fn emit_module(
                         let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
                         let entries = members
                             .iter()
-                            .map(|(name, fnid)| TirObjectEntry::Field {
-                                name: name.clone(),
-                                value: TirExpr {
-                                    kind: TirExprKind::Closure {
-                                        func: FnId(*fnid),
-                                        upvalues: vec![],
+                            .filter_map(|name| {
+                                let &(fnid, _) = fn_index.get(name)?;
+                                Some(TirObjectEntry::Field {
+                                    name: name.clone(),
+                                    value: TirExpr {
+                                        kind: TirExprKind::Var,
+                                        ty: dyno(),
+                                        res: Resolution::DirectFn(FnId(fnid)),
+                                        span: Span::EMPTY,
                                     },
-                                    ty: dyno(),
-                                    res: Resolution::None,
-                                    span: Span::EMPTY,
-                                },
+                                })
                             })
                             .collect();
                         let obj = TirExpr {
