@@ -503,9 +503,20 @@ impl<'m> Builder<'m> {
                 } else {
                     HirType::Dynamic
                 };
+                // A typed opcode (`ModInt`, `AddFloat`, …) defines a value of
+                // exactly that scalar; the verifier holds it to that. A
+                // comparison always defines `Bool`. Only the generic op keeps
+                // the node's own (possibly widened / dynamic) type.
+                let result_ty = if is_cmp && op_ty != HirType::Dynamic {
+                    HirType::Bool
+                } else if op_ty != HirType::Dynamic {
+                    op_ty
+                } else {
+                    ty
+                };
                 Ok(self.emit(
                     InstKind::Binary { op: bin_op(*op), lhs: l, rhs: r, ty: op_ty },
-                    ty,
+                    result_ty,
                 ))
             }
             TirExprKind::Unary { op, operand } => {

@@ -1030,11 +1030,17 @@ impl<'a> FnEmitter<'a> {
         let Some(case) = cases.get(i) else { return vec![] };
 
         self.scopes.push(FxHashMap::default());
-        let (mut cond, mut then_body) = self.match_pattern(s, &case.pattern);
-        if let Some(g) = &case.guard {
+        let (cond, bindings) = self.match_pattern(s, &case.pattern);
+        // A guard (`P if expr => …`) reads the pattern's bindings, so it must
+        // run AFTER they are declared — inside the matched branch, not folded
+        // into the entry test. A false guard falls through to the later cases,
+        // which is why they are re-tried here as well as on a pattern miss.
+        let guard = case.guard.as_ref().map(|g| {
             let gexpr = self.lower_expr(g);
-            cond = and_bool(cond, gexpr); // guard is pure, no pending
-        }
+            let pending = std::mem::take(&mut self.pending);
+            (pending, gexpr)
+        });
+        let mut then_body: Vec<TirStmt> = Vec::new();
         // The arm's value expression, then what `dest` does with it.
         let value = match &case.body {
             MatchBody::Expr(e) => self.lower_expr(e),
@@ -1072,7 +1078,26 @@ impl<'a> FnEmitter<'a> {
         self.scopes.pop();
 
         let else_body = self.match_cases(s, cases, i + 1, dest);
-        vec![TirStmt::If { cond, then_body, else_body }]
+        match guard {
+            None => {
+                let mut m = bindings;
+                m.extend(then_body);
+                vec![TirStmt::If { cond, then_body: m, else_body }]
+            }
+            Some((gpending, gexpr)) => {
+                // pattern matched: declare its bindings, evaluate the guard;
+                // on true run the arm, on false (or a pattern miss) fall to
+                // the later cases.
+                let mut matched = bindings;
+                matched.extend(gpending);
+                matched.push(TirStmt::If {
+                    cond: gexpr,
+                    then_body,
+                    else_body: else_body.clone(),
+                });
+                vec![TirStmt::If { cond, then_body: matched, else_body }]
+            }
+        }
     }
 
     /// Test `s` against one pattern: a `Bool` condition and the bindings the
