@@ -1260,6 +1260,27 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
 
+                    // `const f = () => { … f() … }` — the closure refers to
+                    // itself. Bind the name before lowering the initializer so
+                    // the self-reference is a capture of this local, not a null
+                    // global. (A top-level global is already reachable by name.)
+                    let prebound = {
+                        let is_closure = matches!(
+                            d.init.as_ref().map(|e| &e.kind),
+                            Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
+                        );
+                        let is_global =
+                            self.top_level && self.m.globals.contains_key(name.as_ref());
+                        if is_closure && !is_global {
+                            Some(self.bind_local(
+                                name.clone(),
+                                BackendTy::Dynamic(DynReason::Unannotated),
+                            ))
+                        } else {
+                            None
+                        }
+                    };
+
                     let init = d.init.as_ref().map(|e| self.lower_expr(e));
                     // The declared annotation wins over the initializer's type
                     // — `let x: float = 1` is a `float` binding, and a typed op
@@ -1279,7 +1300,7 @@ impl<'a> FnEmitter<'a> {
 
                     // A module-level binding that is a module global: store it
                     // to the slot, not to a `<module>` local.
-                    if self.top_level {
+                    if self.top_level && prebound.is_none() {
                         if let Some(&slot) = self.m.globals.get(name.as_ref()) {
                             let value = init.unwrap_or_else(|| TirExpr {
                                 kind: TirExprKind::NullLit,
@@ -1306,7 +1327,7 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
 
-                    let local = self.bind_local(name.clone(), ty);
+                    let local = prebound.unwrap_or_else(|| self.bind_local(name.clone(), ty));
                     out.push(TirStmt::Let { local, ty, init });
                 }
                 // Destructuring: `let {a,b} = obj` / `let [x,y] = arr`.
