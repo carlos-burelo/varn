@@ -76,6 +76,10 @@ pub(super) struct FnEmitter<'a> {
     /// desugaring). `lower_stmt` drains this in front of the statement it was
     /// lowering.
     pending: Vec<TirStmt>,
+    /// `using x = …` bindings awaiting disposal, one frame per open block.
+    /// `lower_block` appends `x.dispose()` for each (last-in first-out) as the
+    /// block falls through.
+    disposables: Vec<Vec<TirExpr>>,
 }
 
 enum ClosureBody<'a> {
@@ -215,6 +219,7 @@ impl<'a> FnEmitter<'a> {
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
             pending: Vec::new(),
+            disposables: Vec::new(),
         }
     }
 
@@ -324,9 +329,26 @@ impl<'a> FnEmitter<'a> {
 
     pub fn lower_block(&mut self, stmts: &[Stmt]) -> Vec<TirStmt> {
         self.scopes.push(FxHashMap::default());
+        self.disposables.push(Vec::new());
         let mut out = Vec::new();
         for s in stmts {
             out.extend(self.lower_stmt(s));
+        }
+        // `using` bindings dispose on the way out, most-recent first.
+        for resource in self.disposables.pop().unwrap_or_default().into_iter().rev() {
+            out.push(TirStmt::Expr(TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(resource),
+                    name: Rc::from("dispose"),
+                    args: vec![],
+                },
+                ty: BackendTy::Void,
+                res: Resolution::ByName {
+                    name: Rc::from("dispose"),
+                    why: DynReason::Unannotated,
+                },
+                span: Span::EMPTY,
+            }));
         }
         self.scopes.pop();
         out
@@ -456,6 +478,14 @@ impl<'a> FnEmitter<'a> {
                         let local = self.bind_local(name.clone(), ty);
                         out.extend(std::mem::take(&mut self.pending));
                         out.push(TirStmt::Let { local, ty, init });
+                        if let Some(frame) = self.disposables.last_mut() {
+                            frame.push(TirExpr {
+                                kind: TirExprKind::Var,
+                                ty,
+                                res: Resolution::Local(local),
+                                span: Span::EMPTY,
+                            });
+                        }
                     }
                 }
                 out
@@ -1180,14 +1210,16 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Enum(e) => Some(e),
             _ => None,
         });
+        // An imported enum has no local `EnumInfo`; match on the variant's
+        // runtime name instead, and pull payload fields by ordinal.
         let Some(eid) = eid else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let Some(info) = self.m.enums.get(eid.0 as usize) else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let Some(variant) = info.variants.iter().find(|v| v.name.as_ref() == variant_name) else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let tag = variant.tag;
         let payload: Vec<BackendTy> = variant.payload.clone();
@@ -1229,6 +1261,47 @@ impl<'a> FnEmitter<'a> {
             };
             let local = self.bind_local(b.name.clone(), fty);
             binds.push(TirStmt::Let { local, ty: fty, init: Some(field) });
+        }
+        (cond, binds)
+    }
+
+    /// `match (opt) { Some(v) => … }` where `opt`'s enum is imported (no local
+    /// `EnumInfo`): test the runtime `__variant_name__`, read payloads by the
+    /// `valueN` ordinal accessor.
+    fn match_variant_by_name(
+        &mut self,
+        s: &TirExpr,
+        variant_name: &str,
+        bindings: &[MatchBinding],
+    ) -> (TirExpr, Vec<TirStmt>) {
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
+        let field = |recv: TirExpr, name: &str, ty: BackendTy| TirExpr {
+            kind: TirExprKind::Field { object: Box::new(recv), name: Rc::from(name) },
+            ty,
+            res: by_name(name),
+            span: s.span,
+        };
+        let cond = TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Eq,
+                lhs: Box::new(field(s.clone(), "__variant_name__", BackendTy::Str)),
+                rhs: Box::new(TirExpr {
+                    kind: TirExprKind::StrLit(Rc::from(variant_name)),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span: s.span,
+                }),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: s.span,
+        };
+        let mut binds = Vec::new();
+        for (i, b) in bindings.iter().enumerate() {
+            let init = field(s.clone(), &format!("value{i}"), dyn_ty);
+            let local = self.bind_local(b.name.clone(), dyn_ty);
+            binds.push(TirStmt::Let { local, ty: dyn_ty, init: Some(init) });
         }
         (cond, binds)
     }
