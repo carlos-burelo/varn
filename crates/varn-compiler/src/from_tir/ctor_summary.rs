@@ -318,6 +318,7 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
             }
         }
         TupleLit(xs) => out.extend(xs.iter()),
+        RecordLit { fields } => out.extend(fields.iter().map(|(_, v)| v)),
         ObjectLit { entries } => {
             for en in entries {
                 match en {

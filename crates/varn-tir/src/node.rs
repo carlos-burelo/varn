@@ -117,6 +117,8 @@ pub enum TirExprKind {
     ArrayLit(Vec<TirArrayEl>),
     TupleLit(Vec<TirExpr>),
     ObjectLit { entries: Vec<TirObjectEntry> },
+    /// `#{ k: v, … }` — a deeply-immutable record; `==` on it is structural.
+    RecordLit { fields: Vec<(Rc<str>, TirExpr)> },
 
     /// `await e` — only legal in a function whose `is_async` is set, which the
     /// verifier enforces. No suspension state in the IR: the backend builds the

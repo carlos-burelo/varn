@@ -118,6 +118,11 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
                 walk_expr(m, f, x, errors);
             }
         }
+        TirExprKind::RecordLit { fields } => {
+            for (_, v) in fields {
+                walk_expr(m, f, v, errors);
+            }
+        }
         TirExprKind::ArrayLit(els) => {
             for el in els {
                 match el {

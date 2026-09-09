@@ -187,6 +187,11 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 check_expr(m, f, x, errors);
             }
         }
+        TirExprKind::RecordLit { fields } => {
+            for (_, v) in fields {
+                check_expr(m, f, v, errors);
+            }
+        }
         TirExprKind::ArrayLit(els) => {
             for el in els {
                 match el {

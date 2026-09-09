@@ -1681,7 +1681,24 @@ impl<'a> FnEmitter<'a> {
                     span,
                 };
             }
-            ExprKind::Object { properties } | ExprKind::Record { properties } => {
+            ExprKind::Record { properties } => {
+                let fields = properties
+                    .iter()
+                    .filter_map(|p| match p {
+                        ObjectProp::Property { key, value, .. } => {
+                            Some((prop_key_name(key)?, self.lower_expr(value)))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                return TirExpr {
+                    kind: TirExprKind::RecordLit { fields },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Object { properties } => {
                 let entries = properties
                     .iter()
                     .filter_map(|p| match p {
@@ -2082,7 +2099,76 @@ impl<'a> FnEmitter<'a> {
                     .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                 return TirExpr { kind: TirExprKind::Var, ty: sty, res: Resolution::None, span };
             }
-            ExprKind::TaggedTemplate { template, .. } => return self.lower_expr(template),
+            ExprKind::TaggedTemplate { tag, template } => {
+                use varn_core::ast::TemplatePart;
+                let ExprKind::Template { parts } = &template.kind else {
+                    return self.lower_expr(template);
+                };
+                // `tag`strings ${a} more ${b}`` -> `tag([s0, s1, s2], a, b)`,
+                // where `strings` has one more entry than the interpolations
+                // (an empty string fills any gap).
+                let str_lit = |s: &str| TirExpr {
+                    kind: TirExprKind::StrLit(Rc::from(s)),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
+                let mut strings: Vec<TirArrayEl> = Vec::new();
+                let mut values: Vec<TirArg> = Vec::new();
+                let mut cur = String::new();
+                for part in parts {
+                    match part {
+                        TemplatePart::Literal(s) => cur.push_str(s),
+                        TemplatePart::Interpolation(e) => {
+                            strings.push(TirArrayEl::Expr(str_lit(&cur)));
+                            cur.clear();
+                            let v = self.lower_expr(e);
+                            values.push(TirArg::Expr(v));
+                        }
+                    }
+                }
+                strings.push(TirArrayEl::Expr(str_lit(&cur)));
+
+                let strings_arr = TirExpr {
+                    kind: TirExprKind::ArrayLit(strings),
+                    ty: BackendTy::Array(self.tt.intern(BackendTy::Str)),
+                    res: Resolution::None,
+                    span,
+                };
+                let mut all_args = vec![TirArg::Expr(strings_arr)];
+                all_args.extend(values);
+
+                // `obj.tag`…`` keeps `obj` as the receiver.
+                if let ExprKind::Member { object, property, computed: false, .. } = &tag.kind {
+                    if let Some(name) = Self::member_name(property) {
+                        let recv = self.lower_expr(object);
+                        return TirExpr {
+                            kind: TirExprKind::MethodCall {
+                                recv: Box::new(recv),
+                                name,
+                                args: all_args,
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
+                }
+                let callee = self.lower_expr(tag);
+                let res = match &tag.kind {
+                    ExprKind::Identifier { name } => Resolution::ByName {
+                        name: name.clone(),
+                        why: DynReason::Unannotated,
+                    },
+                    _ => Resolution::None,
+                };
+                return TirExpr {
+                    kind: TirExprKind::Call { callee: Box::new(callee), args: all_args },
+                    ty,
+                    res,
+                    span,
+                };
+            }
 
             ExprKind::Conditional { test, consequent, alternate } => {
                 let cond = self.lower_expr(test);

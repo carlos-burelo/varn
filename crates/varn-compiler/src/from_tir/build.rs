@@ -693,6 +693,14 @@ impl<'m> Builder<'m> {
                 }
                 Ok(self.emit(InstKind::BuildTuple { elements: vals }, ty))
             }
+            TirExprKind::RecordLit { fields } => {
+                let mut pairs = Vec::with_capacity(fields.len());
+                for (k, v) in fields {
+                    let val = self.lower_expr(v)?;
+                    pairs.push((k.clone(), val));
+                }
+                Ok(self.emit(InstKind::BuildRecord { pairs }, ty))
+            }
             TirExprKind::ObjectLit { entries } => {
                 let any_spread = entries
                     .iter()

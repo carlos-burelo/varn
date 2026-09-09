@@ -178,6 +178,11 @@ impl Coverage {
                     self.walk_expr(x);
                 }
             }
+            TirExprKind::RecordLit { fields } => {
+                for (_, v) in fields {
+                    self.walk_expr(v);
+                }
+            }
             TirExprKind::ArrayLit(els) => {
                 for el in els {
                     match el {
