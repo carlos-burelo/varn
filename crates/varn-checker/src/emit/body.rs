@@ -2707,6 +2707,11 @@ impl<'a> FnEmitter<'a> {
     fn lower_new(&mut self, call_id: AstId, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
         let class = match &callee.kind {
             ExprKind::Identifier { name } => self.m.names.class_id(name),
+            // `new NS.Class(…)` — a namespaced class is still a module global;
+            // the qualifier only scopes the name.
+            ExprKind::Member { property, computed: false, .. } => {
+                Self::member_name(property).and_then(|n| self.m.names.class_id(&n))
+            }
             _ => None,
         };
         let targs = self.lower_call_args(call_id, args);

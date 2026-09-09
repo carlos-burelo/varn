@@ -101,17 +101,23 @@ pub fn emit_module(
     // `namespace NS { export function f … }` — a member function is a free
     // function too, so a sibling member can call it by bare name and the
     // namespace object can point an entry at it. The object is built below.
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
-        let Some(ns) = namespace_decl(d) else { continue };
+    fn ns_member_fns<'a>(ns: &'a varn_core::ast::NamespaceDecl, out: &mut Vec<&'a FunctionDecl>) {
         for m in &ns.body {
             let inner = match m {
                 Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
                 other => other,
             };
-            if let Decl::Function(f) = inner {
-                free_fns.push(f);
+            match inner {
+                Decl::Function(f) => out.push(f),
+                Decl::Namespace(inner_ns) => ns_member_fns(inner_ns, out),
+                _ => {}
             }
+        }
+    }
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        if let Some(ns) = namespace_decl(d) {
+            ns_member_fns(ns, &mut free_fns);
         }
     }
     let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
@@ -175,70 +181,14 @@ pub fn emit_module(
                 }
                 StmtKind::Decl(d) if namespace_decl(d).is_some() => {
                     let ns = namespace_decl(d).unwrap();
-                    if let Some(&slot) = global_slots.get(ns.id.as_ref()) {
-                        let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
-                        let mut entries: Vec<TirObjectEntry> = Vec::new();
-                        for m in &ns.body {
-                            let inner = match m {
-                                Decl::Export(ExportDecl::Decl { declaration, .. }) => {
-                                    declaration.as_ref()
-                                }
-                                other => other,
-                            };
-                            match inner {
-                                Decl::Function(f) => {
-                                    if let Some(&(fnid, _)) = fn_index.get(&f.id) {
-                                        entries.push(TirObjectEntry::Field {
-                                            name: f.id.clone(),
-                                            value: TirExpr {
-                                                kind: TirExprKind::Var,
-                                                ty: dyno(),
-                                                res: Resolution::DirectFn(FnId(fnid)),
-                                                span: Span::EMPTY,
-                                            },
-                                        });
-                                    }
-                                }
-                                // `export const k = <expr>` inside a namespace —
-                                // the object binds `k` to the initializer value.
-                                Decl::Variable(v) => {
-                                    for decl in &v.declarators {
-                                        if let (Pattern::Identifier { name, .. }, Some(init)) =
-                                            (&decl.id, &decl.init)
-                                        {
-                                            let value = top.lower_expression(init);
-                                            entries.push(TirObjectEntry::Field {
-                                                name: name.clone(),
-                                                value,
-                                            });
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                        let obj = TirExpr {
-                            kind: TirExprKind::ObjectLit { entries },
-                            ty: dyno(),
-                            res: Resolution::None,
-                            span: Span::EMPTY,
-                        };
-                        let target = TirExpr {
-                            kind: TirExprKind::Var,
-                            ty: dyno(),
-                            res: Resolution::GlobalSlot(slot),
-                            span: Span::EMPTY,
-                        };
-                        top_body.push(TirStmt::Expr(TirExpr {
-                            kind: TirExprKind::Assign {
-                                target: Box::new(target),
-                                value: Box::new(obj),
-                            },
-                            ty: BackendTy::Void,
-                            res: Resolution::None,
-                            span: Span::EMPTY,
-                        }));
+                    // Build every class / enum the namespace (and its nested
+                    // namespaces) declares, at this position — matching the
+                    // `class_defs` fill order below.
+                    for _ in ns_nested_types(ns) {
+                        top_body.push(TirStmt::BuildClass(class_ord));
+                        class_ord += 1;
                     }
+                    emit_namespace_object(ns, &fn_index, &global_slots, &mut top, &mut top_body);
                 }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
@@ -266,16 +216,27 @@ pub fn emit_module(
     // Class / enum construction, methods and constructors, after every
     // closure. In source order, so a class can extend one declared earlier.
     let mut class_defs: Vec<varn_tir::TirClassDef> = Vec::new();
-    for stmt in &program.body {
-        let StmtKind::Decl(decl) = &stmt.kind else { continue };
+    let mut emit_type = |decl: &Decl,
+                         class_defs: &mut Vec<varn_tir::TirClassDef>,
+                         functions: &mut Vec<TirFunction>,
+                         types: &mut TyTable,
+                         signatures: &mut Vec<Signature>| {
         if let Some(class) = class_decl(decl) {
             class_defs.push(emit_class(
-                class, &ctx, expr_table, &mut types, &mut signatures, &mut functions,
+                class, &ctx, expr_table, types, signatures, functions,
             ));
         } else if let Some(en) = enum_decl(decl) {
-            class_defs.push(emit_enum(
-                en, &ctx, expr_table, &mut types, &mut signatures, &mut functions,
-            ));
+            class_defs.push(emit_enum(en, &ctx, expr_table, types, signatures, functions));
+        }
+    };
+    for stmt in &program.body {
+        let StmtKind::Decl(decl) = &stmt.kind else { continue };
+        if class_decl(decl).is_some() || enum_decl(decl).is_some() {
+            emit_type(decl, &mut class_defs, &mut functions, &mut types, &mut signatures);
+        } else if let Some(ns) = namespace_decl(decl) {
+            for nested in ns_nested_types(ns) {
+                emit_type(nested, &mut class_defs, &mut functions, &mut types, &mut signatures);
+            }
         }
     }
 
@@ -347,6 +308,124 @@ fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
         },
         _ => None,
     }
+}
+
+/// Every class / enum declaration a namespace body contributes, in source
+/// order, descending through nested namespaces. Used to keep the `BuildClass`
+/// statements and the `class_defs` table in lock-step.
+fn ns_nested_types(ns: &varn_core::ast::NamespaceDecl) -> Vec<&Decl> {
+    let mut out = Vec::new();
+    for m in &ns.body {
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        match inner {
+            Decl::Class(_) | Decl::Enum(_) => out.push(inner),
+            Decl::Namespace(inner_ns) => out.extend(ns_nested_types(inner_ns)),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Emit the object global for `ns` (and, first, for every namespace nested in
+/// it). Only `export`ed members appear on the object: a function points at its
+/// free-function global, a class / enum / nested namespace at its qualified
+/// global, a `const` / `let` at its lowered initializer.
+fn emit_namespace_object(
+    ns: &varn_core::ast::NamespaceDecl,
+    fn_index: &FxHashMap<Rc<str>, (u32, u32)>,
+    global_slots: &FxHashMap<Rc<str>, u32>,
+    top: &mut FnEmitter,
+    top_body: &mut Vec<TirStmt>,
+) {
+    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let global_ref = |slot: u32| TirExpr {
+        kind: TirExprKind::Var,
+        ty: dyno(),
+        res: Resolution::GlobalSlot(slot),
+        span: Span::EMPTY,
+    };
+
+    // Nested namespaces are assembled before the parent references them.
+    for m in &ns.body {
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        if let Decl::Namespace(inner_ns) = inner {
+            emit_namespace_object(inner_ns, fn_index, global_slots, top, top_body);
+        }
+    }
+
+    let Some(&slot) = global_slots.get(ns.id.as_ref()) else { return };
+    let mut entries: Vec<TirObjectEntry> = Vec::new();
+    for m in &ns.body {
+        let Decl::Export(_) = m else { continue };
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            _ => continue,
+        };
+        match inner {
+            Decl::Function(f) => {
+                if let Some(&(fnid, _)) = fn_index.get(&f.id) {
+                    entries.push(TirObjectEntry::Field {
+                        name: f.id.clone(),
+                        value: TirExpr {
+                            kind: TirExprKind::Var,
+                            ty: dyno(),
+                            res: Resolution::DirectFn(FnId(fnid)),
+                            span: Span::EMPTY,
+                        },
+                    });
+                }
+            }
+            Decl::Class(_) | Decl::Enum(_) | Decl::Namespace(_) => {
+                let mname = match inner {
+                    Decl::Class(c) => c.id.clone(),
+                    Decl::Enum(e) => Some(e.id.clone()),
+                    Decl::Namespace(n) => Some(n.id.clone()),
+                    _ => None,
+                };
+                if let Some(mname) = mname {
+                    if let Some(&mslot) = global_slots.get(mname.as_ref()) {
+                        entries.push(TirObjectEntry::Field {
+                            name: mname.clone(),
+                            value: global_ref(mslot),
+                        });
+                    }
+                }
+            }
+            Decl::Variable(v) => {
+                for decl in &v.declarators {
+                    if let (Pattern::Identifier { name, .. }, Some(init)) =
+                        (&decl.id, &decl.init)
+                    {
+                        let value = top.lower_expression(init);
+                        entries.push(TirObjectEntry::Field { name: name.clone(), value });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let obj = TirExpr {
+        kind: TirExprKind::ObjectLit { entries },
+        ty: dyno(),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    };
+    top_body.push(TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign {
+            target: Box::new(global_ref(slot)),
+            value: Box::new(obj),
+        },
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    }));
 }
 
 fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDecl> {
@@ -432,6 +511,11 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         }
         Decl::Namespace(ns) => {
             out.insert(ns.id.clone());
+            // A namespace member is a module binding too: a sibling reads it by
+            // bare name and its qualified global backs the namespace object.
+            for m in &ns.body {
+                collect_decl_names(m, out);
+            }
         }
         Decl::Import(i) => {
             for spec in &i.specifiers {
