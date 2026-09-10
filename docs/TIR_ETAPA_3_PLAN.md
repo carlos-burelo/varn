@@ -300,3 +300,38 @@ pares elegibles siguen genéricos.** Aritmética ~95% tipada; el resto:
   (`DISENO_IDEAL.md §7`, el bloque siguiente: `ObjData` inline, slots de 16
   bytes, GC de raíces a mano). En el modelo actual de heap-por-índice ahorra
   un branch predicho por acceso — marginal.
+
+### 7.1 CLIF inlinea el poly-IC (hecho para acceso a campo)
+
+El "opcode genérico" no es sólo falta de tipo estático: aunque el checker
+pruebe la forma, el JIT bajaba `GetProperty`/`SetProperty` a un FFI
+(`get_property_flat`) con `flush_boxed`/`reload_boxed` por acceso. El runtime
+**ya** inline-cachea (`PolyICSlot`), pero el JIT no leía la caché en código
+generado.
+
+- [x] **`GetProperty`/`SetProperty` inline** (`f1f389b4`, `98e1b2d0`,
+  `1dabbab3`). `emit_field_ic` en `clif/alloc/calls.rs`: resuelve el slot de
+  heap, guarda tag, y converge dos formas de receptor en un bloque `keyed`:
+  clase `Instance` (`INSTANCE_FIELD`, key = `class_id` del header
+  `InstanceData`) y `Object`/`Record` dinámico (`SHAPE_PROP`, key = shape id,
+  bound = `inline_len` — campo en overflow store cae al helper). Prueba 4
+  entradas del `PolyICSlot` (`VmClosure.ic_entries`, raw ptr; stride
+  `POLY_IC_SLOT_SIZE`); hit → load/store inline (store sólo si receptor
+  nursery, si no hay write barrier → helper). La vía TIPADA de forma probada
+  (`GetFixedField`/`SetFixedField` con narrow-load i64) ya existía; esto cubre
+  el residual dinámico.
+
+- [ ] **`InvokeVirtual`/`CallMethod` inline — EVALUADO, NO SE HACE.** El probe
+  del IC es trivial de inlinear; el montaje de frame NO. El ABI de entrada de
+  método (`try_fast_jit_method`) necesita `stack.resize` + `frames.push` +
+  `frames.pop` + `stack.truncate` — manipular internos de dos `Vec` desde
+  código generado. El path `raw_slot` que hace `call_indirect` directo sólo
+  existe para targets monomórficos declarados en compilación; un método
+  virtual no lo es, y `CacheEntry` (8 bytes) no tiene sitio para un code ptr.
+  Además `flush_boxed`/`reload_boxed` alrededor de la llamada es **obligatorio**
+  (el callee puede GC) y domina. Ganancia real de inlinear: saltarse una
+  llamada C-ABI + marshalling (~5-15ns) — negativa vs. el riesgo. El
+  intérprete ya hace lo inteligente: caché `ACTIVE_METHODS` (keyed
+  `caller_proto ^ class_id ^ name_idx`) + dispatch JIT→JIT directo.
+  Requeriría rework de `CacheEntry` + exponer entradas raw para métodos
+  (bloque propio, no "limpieza de fase").
