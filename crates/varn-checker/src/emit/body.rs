@@ -1386,6 +1386,34 @@ impl<'a> FnEmitter<'a> {
             );
             return vec![TirStmt::Let { local, ty: dyn_ty, init: Some(closure) }];
         }
+        // `namespace LocalNS { export function f … }` inside a body — a local
+        // bound to an object of closure members.
+        if let Decl::Namespace(ns) = unwrapped {
+            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let local = self.bind_local(ns.id.clone(), dyn_ty);
+            let mut entries: Vec<TirObjectEntry> = Vec::new();
+            for m in &ns.body {
+                let Decl::Export(ExportDecl::Decl { declaration, .. }) = m else { continue };
+                if let Decl::Function(f) = declaration.as_ref() {
+                    let closure = self.lower_closure(
+                        &f.params,
+                        ClosureBody::Stmt(&f.body),
+                        f.modifiers.is_async,
+                        f.modifiers.is_generator,
+                        dyn_ty,
+                        Span::EMPTY,
+                    );
+                    entries.push(TirObjectEntry::Field { name: f.id.clone(), value: closure });
+                }
+            }
+            let obj = TirExpr {
+                kind: TirExprKind::ObjectLit { entries },
+                ty: dyn_ty,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            return vec![TirStmt::Let { local, ty: dyn_ty, init: Some(obj) }];
+        }
         let v = match decl {
             Decl::Variable(v) => v,
             Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
