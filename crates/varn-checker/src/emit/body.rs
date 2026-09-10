@@ -1874,21 +1874,42 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             ExprKind::Object { properties } => {
-                let entries = properties
-                    .iter()
-                    .filter_map(|p| match p {
-                        ObjectProp::Property { key, value, .. } => Some(TirObjectEntry::Field {
-                            name: prop_key_name(key)?,
-                            value: self.lower_expr(value),
-                        }),
-                        ObjectProp::Spread { argument, .. } => {
-                            Some(TirObjectEntry::Spread(self.lower_expr(argument)))
+                let mut entries: Vec<TirObjectEntry> = Vec::new();
+                for p in properties {
+                    match p {
+                        ObjectProp::Property { key, value, .. } => {
+                            if let Some(name) = prop_key_name(key) {
+                                entries.push(TirObjectEntry::Field {
+                                    name,
+                                    value: self.lower_expr(value),
+                                });
+                            }
                         }
-                        // Methods / getters / setters in an object literal are
-                        // a later sub-phase.
-                        _ => None,
-                    })
-                    .collect();
+                        ObjectProp::Spread { argument, .. } => {
+                            entries.push(TirObjectEntry::Spread(self.lower_expr(argument)));
+                        }
+                        // `{ method() { … }, async m2() { … } }` — a closure
+                        // bound to the property.
+                        ObjectProp::Method {
+                            key, params, body, is_async, is_generator, ..
+                        } => {
+                            if let Some(name) = prop_key_name(key) {
+                                let closure = self.lower_closure(
+                                    params,
+                                    ClosureBody::Stmt(body),
+                                    *is_async,
+                                    *is_generator,
+                                    BackendTy::Dynamic(DynReason::Unannotated),
+                                    span,
+                                );
+                                entries.push(TirObjectEntry::Field { name, value: closure });
+                            }
+                        }
+                        // Getters / setters on an object literal are a later
+                        // sub-phase.
+                        _ => {}
+                    }
+                }
                 return TirExpr {
                     kind: TirExprKind::ObjectLit { entries },
                     ty,
