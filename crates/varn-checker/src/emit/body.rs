@@ -3129,24 +3129,6 @@ impl<'a> FnEmitter<'a> {
     }
 }
 
-/// `a && b` as a Bool expression, via Select (`a ? b : false`).
-fn and_bool(a: TirExpr, b: TirExpr) -> TirExpr {
-    let span = a.span;
-    if a.ty != BackendTy::Bool || b.ty != BackendTy::Bool {
-        // A non-Bool guard: fall back to just the pattern condition.
-        return a;
-    }
-    TirExpr {
-        kind: TirExprKind::Select {
-            cond: Box::new(a),
-            then_val: Box::new(b),
-            else_val: Box::new(bool_lit(false)),
-        },
-        ty: BackendTy::Bool,
-        res: Resolution::None,
-        span,
-    }
-}
 
 fn prop_key_name(key: &PropKey) -> Option<Rc<str>> {
     match key {

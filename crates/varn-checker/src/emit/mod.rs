@@ -240,7 +240,7 @@ pub fn emit_module(
     // Class / enum construction, methods and constructors, after every
     // closure. In source order, so a class can extend one declared earlier.
     let mut class_defs: Vec<varn_tir::TirClassDef> = Vec::new();
-    let mut emit_type = |decl: &Decl,
+    let emit_type = |decl: &Decl,
                          class_defs: &mut Vec<varn_tir::TirClassDef>,
                          functions: &mut Vec<TirFunction>,
                          types: &mut TyTable,
@@ -530,7 +530,6 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
             }
             P::Assignment { left, .. } => pat_names(left, out),
             P::Rest { argument, .. } => pat_names(argument, out),
-            _ => {}
         }
     }
     match decl {
