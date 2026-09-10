@@ -296,9 +296,11 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
 
         OpCode::AddImm | OpCode::SubImm => s(2, Some(dest0), vec![hi1]),
 
-        OpCode::LoadConst | OpCode::LoadInt | OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
-            s(2, Some(dest0), vec![])
-        }
+        OpCode::LoadConst
+        | OpCode::LoadInt
+        | OpCode::LoadGlobal
+        | OpCode::LoadGlobalIdx
+        | OpCode::LoadNativeGlobalIdx => s(2, Some(dest0), vec![]),
 
         OpCode::StoreGlobal
         | OpCode::DefineGlobal

@@ -76,6 +76,12 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
+    /// Start of this closure's module's global-slot region in the `GlobalStore`.
+    /// `LoadGlobalIdx` / `StoreGlobalIdx` carry a slot relative to this. Set
+    /// when the module is evaluated (top-level closure) and inherited by every
+    /// nested closure at `MakeClosure`. `0` for the entry proto's own module
+    /// and for protos with no module globals.
+    pub module_base: u32,
 }
 
 impl VmClosure {
@@ -93,6 +99,7 @@ impl VmClosure {
             constants: Rc::new(constants),
             ic_cache,
             feedback,
+            module_base: 0,
         };
         // No compilation here: the compiled entry lives on the proto and is
         // produced lazily by `hot_jit_fn` once the function proves hot (see
@@ -118,6 +125,7 @@ impl VmClosure {
             constants,
             ic_cache,
             feedback,
+            module_base: 0,
         };
         // No compilation here: the compiled entry lives on the proto and is
         // produced lazily by `hot_jit_fn` once the function proves hot (see

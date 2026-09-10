@@ -99,6 +99,11 @@ pub(super) fn emit_value(
             let idx = chunk.add_str(name);
             chunk.emit_rc(OpCode::LoadGlobal, d, idx, line);
         }
+        InstKind::LoadGlobalIdx(slot) => {
+            let slot = u16::try_from(*slot)
+                .map_err(|_| OptError::Unsupported("ssa-emit: global slot exceeds u16"))?;
+            chunk.emit_rc(OpCode::LoadGlobalIdx, d, slot, line);
+        }
         InstKind::LoadUpvalue(uv) => {
             chunk.emit(OpCode::LoadUpvalue, line);
             chunk.write(Chunk::pack(d, *uv as u8), line);
@@ -630,6 +635,7 @@ pub(super) fn emit_value(
         | InstKind::ObjectMerge { .. }
         | InstKind::AssertNotNull { .. }
         | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
         | InstKind::StoreUpvalue { .. }
         | InstKind::StoreCaptured { .. }
         | InstKind::StoreModuleSlot { .. }

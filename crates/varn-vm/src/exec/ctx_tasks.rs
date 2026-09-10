@@ -158,12 +158,12 @@ impl ExecCtx {
             .collect();
         let mut proto = Rc::clone(&task.closure.proto);
         crate::globals::resolve_in_proto(Rc::make_mut(&mut proto), &mut fork.globals);
-        let closure = Rc::new(VmClosure::with_upvalues(
-            proto,
-            upvalues,
-            Rc::new(constants),
-            fork.settings,
-        ));
+        let mut vm_closure =
+            VmClosure::with_upvalues(proto, upvalues, Rc::new(constants), fork.settings);
+        // The spawned function keeps its home module's global region. A task
+        // fork shares the parent store, so the base is still valid.
+        vm_closure.module_base = task.closure.module_base;
+        let closure = Rc::new(vm_closure);
         let stack_values: Vec<VmValue> = task
             .args
             .iter()

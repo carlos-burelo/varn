@@ -131,7 +131,8 @@ pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping:
                 OpCode::LoadConst
                 | OpCode::LoadInt
                 | OpCode::LoadGlobal
-                | OpCode::LoadGlobalIdx => {
+                | OpCode::LoadGlobalIdx
+                | OpCode::LoadNativeGlobalIdx => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                 }
 

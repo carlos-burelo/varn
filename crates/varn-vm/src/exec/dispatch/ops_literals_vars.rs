@@ -61,7 +61,7 @@ impl ExecCtx {
                 self.stack[dest] = self.stack[src];
             }
             OpCode::LoadGlobalIdx => {
-                let gidx = code[*ip] as usize;
+                let gidx = closure.module_base as usize + code[*ip] as usize;
                 *ip += 1;
                 debug_assert!(
                     gidx < self.globals.values.len(),
@@ -71,9 +71,20 @@ impl ExecCtx {
                 self.stack[base + first_reg] = self.globals.values[gidx];
                 self.record_hotspot_global(gidx);
             }
+            OpCode::LoadNativeGlobalIdx => {
+                let gidx = code[*ip] as usize;
+                *ip += 1;
+                debug_assert!(
+                    gidx < self.globals.values.len(),
+                    "LoadNativeGlobalIdx out of bounds: {gidx} >= {}",
+                    self.globals.values.len()
+                );
+                self.stack[base + first_reg] = self.globals.values[gidx];
+                self.record_hotspot_global(gidx);
+            }
             OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
                 let src = (code[*ip] >> 8) as usize;
-                let gidx = code[*ip + 1] as usize;
+                let gidx = closure.module_base as usize + code[*ip + 1] as usize;
                 *ip += 2;
                 debug_assert!(
                     gidx < self.globals.values.len(),

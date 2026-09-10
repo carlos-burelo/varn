@@ -136,6 +136,37 @@ impl<'m> Builder<'m> {
         ))
     }
 
+    /// The region-relative slot for a module global by its bare name, or `None`
+    /// when the name is not one this module declares (an `__ext` mangled name,
+    /// say — those stay name-keyed).
+    fn gslot(&self, bare: &str) -> Option<u32> {
+        self.tir
+            .global_names
+            .iter()
+            .position(|n| n.as_ref() == bare)
+            .map(|i| i as u32)
+    }
+
+    /// Load a module global: `LoadGlobalIdx` when the checker numbered it,
+    /// falling back to the file-qualified name otherwise.
+    fn global_load(&self, bare: &str) -> InstKind {
+        match self.gslot(bare) {
+            Some(slot) => InstKind::LoadGlobalIdx(slot),
+            None => InstKind::LoadGlobal(self.gname(bare)),
+        }
+    }
+
+    /// Store to a module global, slot-keyed when possible.
+    fn global_store(&self, bare: &str, value: Value) -> InstKind {
+        match self.gslot(bare) {
+            Some(slot) => InstKind::StoreGlobalIdx { slot, value },
+            None => InstKind::StoreGlobal {
+                name: self.gname(bare),
+                value,
+            },
+        }
+    }
+
     /// Force `v` to `target`, inserting a `Cast` when the representation
     /// actually differs (an `int` initializer for a `float` binding, say).
     fn coerce(&mut self, v: Value, target: HirType) -> Value {
@@ -710,7 +741,7 @@ impl<'m> Builder<'m> {
                             .function(*f)
                             .map(|tf| tf.name.clone())
                             .ok_or(OptError::Unsupported("from_tir: DirectFn out of range"))?;
-                        self.emit(InstKind::LoadGlobal(self.gname(&name)), HirType::Ref)
+                        self.emit(self.global_load(&name), HirType::Ref)
                     }
                     _ => self.lower_expr(callee)?,
                 };
@@ -746,7 +777,7 @@ impl<'m> Builder<'m> {
                     .class(*class)
                     .map(|ci| ci.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
-                let cv = self.emit(InstKind::LoadGlobal(self.gname(&name)), HirType::Ref);
+                let cv = self.emit(self.global_load(&name), HirType::Ref);
                 self.lower_call(cv, args, ty)
             }
             TirExprKind::MakeVariant { args } => {
@@ -760,14 +791,13 @@ impl<'m> Builder<'m> {
                     .tir
                     .enum_info(enum_id)
                     .ok_or(OptError::Unsupported("from_tir: enum out of range"))?;
-                let ename = self.gname(&ei.name);
                 let vname = ei
                     .variants
                     .iter()
                     .find(|v| v.tag == tag)
                     .map(|v| v.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
-                let enum_val = self.emit(InstKind::LoadGlobal(ename), HirType::Ref);
+                let enum_val = self.emit(self.global_load(&ei.name), HirType::Ref);
                 let variant = self.emit(
                     InstKind::GetProperty {
                         object: enum_val,
@@ -904,7 +934,7 @@ impl<'m> Builder<'m> {
                     .class(*class)
                     .map(|ci| ci.name.clone())
                     .unwrap_or_else(|| Rc::from("?"));
-                let cls = self.emit(InstKind::LoadGlobal(self.gname(&cname)), HirType::Ref);
+                let cls = self.emit(self.global_load(&cname), HirType::Ref);
                 Ok(self.emit(
                     InstKind::Binary {
                         op: HirBinOp::Instanceof,
@@ -1038,14 +1068,7 @@ impl<'m> Builder<'m> {
                     });
                 }
                 Resolution::GlobalSlot(n) => {
-                    let raw = self
-                        .tir
-                        .global_names
-                        .get(*n as usize)
-                        .cloned()
-                        .ok_or(OptError::Unsupported("from_tir: assign global slot"))?;
-                    let name = self.gname(&raw);
-                    self.emit_effect(InstKind::StoreGlobal { name, value });
+                    self.emit_effect(InstKind::StoreGlobalIdx { slot: *n, value });
                 }
                 _ => return Err(OptError::Unsupported("from_tir: assign target var")),
             },
@@ -1105,15 +1128,7 @@ impl<'m> Builder<'m> {
             Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
             Resolution::Param(i) => self.load_var(VarId::Param(*i), ty),
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
-            Resolution::GlobalSlot(n) => {
-                let raw = self
-                    .tir
-                    .global_names
-                    .get(*n as usize)
-                    .cloned()
-                    .ok_or(OptError::Unsupported("from_tir: global slot out of range"))?;
-                Ok(self.emit(InstKind::LoadGlobal(self.gname(&raw)), ty))
-            }
+            Resolution::GlobalSlot(n) => Ok(self.emit(InstKind::LoadGlobalIdx(*n), ty)),
             Resolution::ModuleSlot { .. } => Err(OptError::Unsupported("from_tir: module slot")),
             Resolution::ByName { name, .. } => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty))
@@ -1126,7 +1141,7 @@ impl<'m> Builder<'m> {
                     .function(*f)
                     .map(|tf| tf.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: DirectFn var out of range"))?;
-                Ok(self.emit(InstKind::LoadGlobal(self.gname(&name)), ty))
+                Ok(self.emit(self.global_load(&name), ty))
             }
             // A `Var` node with no resolution is `this`.
             Resolution::None => Ok(self.emit(InstKind::This, ty)),
@@ -1264,10 +1279,7 @@ impl<'m> Builder<'m> {
                 continue;
             };
             let value = match &exp.reexport_from {
-                None => self.emit(
-                    InstKind::LoadGlobal(self.gname(&exp.local)),
-                    HirType::Dynamic,
-                ),
+                None => self.emit(self.global_load(&exp.local), HirType::Dynamic),
                 Some(src) => {
                     let m = self.emit(
                         InstKind::LoadModule {
@@ -1309,7 +1321,6 @@ impl<'m> Builder<'m> {
                 HirType::Ref,
             );
             for spec in &imp.specs {
-                let name = self.gname(&spec.local);
                 let val = match &spec.kind {
                     TirImportKind::Namespace => mod_v,
                     TirImportKind::Default => self.emit(
@@ -1327,7 +1338,8 @@ impl<'m> Builder<'m> {
                         HirType::Dynamic,
                     ),
                 };
-                self.emit_effect(InstKind::StoreGlobal { name, value: val });
+                let store = self.global_store(&spec.local, val);
+                self.emit_effect(store);
             }
         }
     }
@@ -1491,10 +1503,8 @@ impl<'m> Builder<'m> {
             class_v = self.select_value(isnull, class_v, result, HirType::Ref)?;
         }
 
-        self.emit_effect(InstKind::StoreGlobal {
-            name: self.gname(&def.name),
-            value: class_v,
-        });
+        let store = self.global_store(&def.name, class_v);
+        self.emit_effect(store);
 
         for blk in &def.static_blocks {
             let fv = self.emit(
@@ -1632,14 +1642,17 @@ fn build_inner(
                 HirType::Ref,
             );
             // Extension functions are mangled to a globally-unique name and
-            // called by that bare name (`InstKind::ExtensionCall`); everything
-            // else is qualified by its declaring file.
-            let name = if f.name.starts_with("__ext") {
-                f.name.clone()
+            // called by that bare name (`InstKind::ExtensionCall`); those stay
+            // name-keyed. Everything else is a numbered module global.
+            let store = if f.name.starts_with("__ext") {
+                InstKind::StoreGlobal {
+                    name: f.name.clone(),
+                    value: fv,
+                }
             } else {
-                b.gname(&f.name)
+                b.global_store(&f.name, fv)
             };
-            b.emit_effect(InstKind::StoreGlobal { name, value: fv });
+            b.emit_effect(store);
         }
         // Populate export slots for functions / classes now, before any
         // top-level `await` can suspend the module with its exports still

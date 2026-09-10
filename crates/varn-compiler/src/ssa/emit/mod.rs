@@ -163,6 +163,8 @@ pub fn emit_function_meta(
         chunk,
         required_caps: Vec::new(),
         state_size: 0,
+        // Set by `compile_one` for the module top-level proto only.
+        global_count: 0,
         register_meta,
         exception_table: Vec::new(),
         param_kinds,

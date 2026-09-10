@@ -1,24 +1,16 @@
-//! Global-slot access lowering for CLIF: `LoadGlobalIdx` / `StoreGlobalIdx`.
+//! Global-slot access lowering for CLIF: `LoadGlobalIdx` (module-relative),
+//! `LoadNativeGlobalIdx` (absolute prelude region) and `StoreGlobalIdx`.
 //! Globals live in `ExecCtx.globals` (a non-`repr(C)` `GlobalStore`), whose
 //! `values` Vec data pointer sits at `globals_offset + 8`. Globals are always
 //! GC roots, so a store needs no write barrier. Split out of `lower.rs` for the
 //! file-size governance limit.
 //!
-//! The indexed forms are the ONLY ones lowered, and that is an invariant, not a
-//! subset: `varn_vm::globals::resolve_in_proto` rewrites every name-keyed
-//! Global-slot access lowering for CLIF: `LoadGlobalIdx` / `StoreGlobalIdx`.
-//! Globals live in `ExecCtx.globals` (a non-`repr(C)` `GlobalStore`), whose
-//! `values` Vec data pointer sits at `globals_offset + 8`. Globals are always
-//! GC roots, so a store needs no write barrier. Split out of `lower.rs` for the
-//! file-size governance limit.
-//!
-//! The indexed forms are the ONLY ones lowered, and that is an invariant, not a
-//! subset: `varn_vm::globals::resolve_in_proto` rewrites every name-keyed
-//! `LoadGlobal`/`StoreGlobal`/`DefineGlobal` before the proto can run, in every
-//! VM. A name-keyed global reaching here is a bug in that pass, and it bails —
-//! the function silently drops to the interpreter. If that ever needs
-//! diagnosing, the cheap check is to make those three opcodes a distinct bail
-//! message and run the suite with `VARN_CLIF_TRACE=1 VARN_JIT_TIER=1`.
+//! `LoadGlobalIdx` / `StoreGlobalIdx` carry a slot RELATIVE to the running
+//! closure's module region; the lowering loads `module_base` from the closure
+//! param (`closure_module_base_offset`) and adds it. `LoadNativeGlobalIdx` is
+//! absolute. A name-keyed `LoadGlobal` still reaches here for a genuinely
+//! dynamic name and bails — the function drops to the interpreter. Diagnose
+//! with `VARN_CLIF_TRACE=1 VARN_JIT_TIER=1`.
 
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -47,20 +39,44 @@ fn globals_base(b: &mut FunctionBuilder, c: &GblCtx) -> cranelift_codegen::ir::V
     )
 }
 
-/// `LoadGlobalIdx first_reg, idx` — load a global slot, unboxed to int when
-/// the register meta proves it.
-pub(super) fn emit_load_global_idx(
+/// Byte address of global slot `idx`. When `relative`, `idx` is added to the
+/// running closure's `module_base` (loaded from the closure param); otherwise
+/// it is absolute (the native/prelude region).
+///
+/// A relative access with no `actx` (a leaf lowering, no closure param) falls
+/// back to absolute — but such a lowering also touches `c.exec_ctx`, the dummy
+/// that forces the frame-aware retry, so this address is never actually run.
+fn slot_addr(
     b: &mut FunctionBuilder,
     c: &GblCtx,
-    code: &[u16],
-    ip: usize,
-    first_reg: usize,
-) {
-    let idx = code[ip + 1] as usize;
+    idx: usize,
+    relative: bool,
+) -> cranelift_codegen::ir::Value {
     let gbase = globals_base(b, c);
-    let v = b
-        .ins()
-        .load(types::I128, MemFlags::trusted(), gbase, (idx * 16) as i32);
+    let eff = match (relative, c.actx) {
+        (true, Some(actx)) => {
+            let mb = b.ins().load(
+                types::I32,
+                MemFlags::trusted(),
+                actx.closure,
+                c.helpers.closure_module_base_offset as i32,
+            );
+            let mb = b.ins().uextend(types::I64, mb);
+            let idx_v = b.ins().iconst(types::I64, idx as i64);
+            b.ins().iadd(mb, idx_v)
+        }
+        _ => b.ins().iconst(types::I64, idx as i64),
+    };
+    let scaled = b.ins().imul_imm(eff, 16);
+    b.ins().iadd(gbase, scaled)
+}
+
+fn store_load_result(
+    b: &mut FunctionBuilder,
+    c: &GblCtx,
+    first_reg: usize,
+    v: cranelift_codegen::ir::Value,
+) {
     if let Some(actx) = c.actx {
         def_result(b, actx, first_reg, v);
     } else if meta_is_float(c.register_meta, first_reg) {
@@ -73,6 +89,34 @@ pub(super) fn emit_load_global_idx(
         let (_tag, payload) = b.ins().isplit(v);
         b.def_var(c.vars[first_reg], payload);
     }
+}
+
+/// `LoadGlobalIdx first_reg, idx` — module-relative global read.
+pub(super) fn emit_load_global_idx(
+    b: &mut FunctionBuilder,
+    c: &GblCtx,
+    code: &[u16],
+    ip: usize,
+    first_reg: usize,
+) {
+    let idx = code[ip + 1] as usize;
+    let addr = slot_addr(b, c, idx, true);
+    let v = b.ins().load(types::I128, MemFlags::trusted(), addr, 0);
+    store_load_result(b, c, first_reg, v);
+}
+
+/// `LoadNativeGlobalIdx first_reg, idx` — absolute (native/prelude) global read.
+pub(super) fn emit_load_native_global_idx(
+    b: &mut FunctionBuilder,
+    c: &GblCtx,
+    code: &[u16],
+    ip: usize,
+    first_reg: usize,
+) {
+    let idx = code[ip + 1] as usize;
+    let addr = slot_addr(b, c, idx, false);
+    let v = b.ins().load(types::I128, MemFlags::trusted(), addr, 0);
+    store_load_result(b, c, first_reg, v);
 }
 
 /// `StoreGlobalIdx src, idx` / `DefineGlobalIdx src, idx` — plain boxed store,
@@ -99,8 +143,7 @@ pub(super) fn emit_store_global_idx(
             b.ins().iconcat(tag, raw)
         }
     };
-    let gbase = globals_base(b, c);
-    b.ins()
-        .store(MemFlags::trusted(), v, gbase, (idx * 16) as i32);
+    let addr = slot_addr(b, c, idx, true);
+    b.ins().store(MemFlags::trusted(), v, addr, 0);
     Ok(())
 }

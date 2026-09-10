@@ -78,6 +78,25 @@ impl GlobalStore {
         }
     }
 
+    /// Reserve a contiguous region of `count` fresh (null) slots for a module's
+    /// globals and return its base index. `LoadGlobalIdx` / `StoreGlobalIdx`
+    /// carry slots relative to this base; the running closure carries the base.
+    ///
+    /// The region is anonymous — `idx_to_name` gets placeholder entries so the
+    /// two vecs stay the same length; a later `define` of the same name (a
+    /// module top-level `DefineGlobal` for a name that also needs a string key,
+    /// e.g. a re-export) still appends rather than reusing the slot, which is
+    /// fine: the indexed ops never consult `idx_to_name`.
+    pub(crate) fn reserve_region(&mut self, count: u32) -> u32 {
+        let base = self.values.len() as u32;
+        let empty: Rc<str> = Rc::from("");
+        for _ in 0..count {
+            self.values.push(VmValue::null());
+            self.idx_to_name.push(empty.clone());
+        }
+        base
+    }
+
     pub(crate) fn define(&mut self, name: &str, value: VmValue) -> usize {
         if let Some(&idx) = self.names.get(name) {
             self.values[idx] = value;

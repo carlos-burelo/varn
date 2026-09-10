@@ -95,6 +95,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::StoreGlobal
             | OpCode::DefineGlobalIdx
             | OpCode::LoadGlobalIdx
+            | OpCode::LoadNativeGlobalIdx
             | OpCode::StoreGlobalIdx
             | OpCode::LoadModule
             | OpCode::StoreModuleSlot

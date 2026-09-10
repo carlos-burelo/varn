@@ -1,41 +1,26 @@
-//! Global-slot resolution: rewrite name-keyed global access into index-keyed
-//! access, once, before a proto ever runs.
+//! Prelude-global resolution: rewrite a name-keyed `LoadGlobal` of a
+//! native/prelude symbol (`print`, `assert`, …) into `LoadNativeGlobalIdx`.
 //!
-//! `LoadGlobal`/`StoreGlobal`/`DefineGlobal` carry a constant-pool index for
-//! the global's NAME — reading one costs a hash lookup in the interpreter and
-//! a full FFI helper call (with a register flush/reload around it) in the JIT.
-//! `LoadGlobalIdx`/`StoreGlobalIdx`/`DefineGlobalIdx` carry the slot index
-//! instead: one indexed load or store, inline, in both tiers.
+//! Module globals no longer pass through here: the checker numbers them
+//! (`Resolution::GlobalSlot`) and the compiler emits `LoadGlobalIdx` /
+//! `StoreGlobalIdx` directly, relative to the module's region base which the
+//! running closure carries. What is left is the prelude — a fixed,
+//! deterministic layout (`GlobalStore::with_native_layout`) whose indices are
+//! the same in every VM, so a proto resolved once needs no per-store rebinding.
 //!
-//! Slot indices belong to ONE [`GlobalStore`], and every `Vm` has its own —
-//! isolates define `isIsolate` before loading anything, so the same name lands
-//! on different indices in different VMs. A proto must therefore be resolved
-//! against the store it will actually run against, and a proto shared between
-//! VMs (the thread-local stdlib cache, the `precompiled` map) must never be
-//! resolved in place. Both call sites go through `Rc::make_mut`, which clones
-//! precisely when the proto is shared — that is the whole safety argument.
-//!
-//! Two call sites cover every proto that runs. `ExecCtx::eval_module_proto`
-//! takes every module — in every VM, from `precompiled` or from a
-//! `ModuleLoader`, main thread or isolate worker. [`crate::Vm::resolve_globals`]
-//! takes the entry proto, the one that never passes through there; the pipeline
-//! calls it during setup rather than from `Vm::run`, which the bench harness
-//! times. Nested protos come along through the constant pool.
-//!
-//! Because that is airtight, `clif` lowers ONLY the `*Idx` forms — see
-//! `varn_jit::clif::globals`. Break it and those functions silently drop to the
-//! interpreter.
+//! A name-keyed `LoadGlobal` that does NOT resolve here (a truly dynamic name)
+//! stays as it is and the interpreter handles it; `clif` bails on it.
 
 use super::GlobalStore;
-use crate::value::VmValue;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{FunctionProto, PoolEntry};
 use varn_types::Literal;
 
-/// Rewrite every name-keyed global access in `proto` — and, recursively, in
-/// every nested proto in its constant pool — to the `*Idx` form, defining
-/// slots in `globals` as they are first seen.
+/// Rewrite a name-keyed `LoadGlobal` of a prelude symbol — and, recursively, in
+/// every nested proto in its constant pool — to `LoadNativeGlobalIdx`. Module
+/// globals are already `LoadGlobalIdx` / `StoreGlobalIdx` from the compiler and
+/// pass through untouched.
 ///
 /// Idempotent, and cheap when repeated: a proto already bound to this store
 /// returns immediately.
@@ -64,29 +49,15 @@ pub fn resolve_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore) {
         let Some(info) = decode(&chunk.code, ip, &chunk.constants) else {
             break;
         };
-        match OpCode::from_u8(chunk.code[ip] as u8) {
-            // `LoadGlobal dest, name_idx` — dest rides in the opcode word.
-            Some(OpCode::LoadGlobal) => {
-                if let Some(slot) = slot_for(chunk, ip + 1, globals) {
-                    let dest = chunk.code[ip] & 0xFF00;
-                    chunk.code[ip] = dest | (OpCode::LoadGlobalIdx as u8 as u16);
-                    chunk.code[ip + 1] = slot;
-                }
+        // `LoadGlobal dest, name_idx` — dest rides in the opcode word. Only a
+        // name that already exists in the store (a prelude symbol) is rewritten;
+        // anything else is left for the interpreter's name path.
+        if let Some(OpCode::LoadGlobal) = OpCode::from_u8(chunk.code[ip] as u8) {
+            if let Some(slot) = slot_for(chunk, ip + 1, globals) {
+                let dest = chunk.code[ip] & 0xFF00;
+                chunk.code[ip] = dest | (OpCode::LoadNativeGlobalIdx as u8 as u16);
+                chunk.code[ip + 1] = slot;
             }
-            // `StoreGlobal|DefineGlobal src, name_idx` — src is in the first
-            // operand word, the name constant in the second.
-            Some(op @ (OpCode::StoreGlobal | OpCode::DefineGlobal)) => {
-                if let Some(slot) = slot_for(chunk, ip + 2, globals) {
-                    let new_op = if op == OpCode::StoreGlobal {
-                        OpCode::StoreGlobalIdx
-                    } else {
-                        OpCode::DefineGlobalIdx
-                    };
-                    chunk.code[ip] = new_op as u8 as u16;
-                    chunk.code[ip + 2] = slot;
-                }
-            }
-            _ => {}
         }
         ip += info.len;
     }
@@ -114,10 +85,9 @@ pub fn resolve_shared(proto: &mut std::rc::Rc<FunctionProto>, globals: &mut Glob
     resolve_in_proto(std::rc::Rc::make_mut(proto), globals);
 }
 
-/// The slot index for the name constant at `name_word`, defining it if this is
-/// its first sighting. `None` leaves the instruction in its name-keyed form —
-/// only reachable if the operand does not point at a string literal, which the
-/// emitter never produces.
+/// The absolute slot for the name constant at `name_word` when the store
+/// already holds it (a prelude symbol). `None` — a name never seen, or an
+/// operand that is not a string literal — leaves the instruction name-keyed.
 fn slot_for(
     chunk: &varn_types::chunk::Chunk,
     name_word: usize,
@@ -127,8 +97,7 @@ fn slot_for(
     let PoolEntry::Literal(Literal::Str(name)) = chunk.constants.get(name_idx)? else {
         return None;
     };
-    let slot = globals
-        .resolve_index(name)
-        .unwrap_or_else(|| globals.define(name, VmValue::null()));
-    Some(slot as u16)
+    // Only an already-defined name (a prelude/native symbol). A name the store
+    // has never seen is genuinely dynamic — leave it name-keyed.
+    Some(globals.resolve_index(name)? as u16)
 }

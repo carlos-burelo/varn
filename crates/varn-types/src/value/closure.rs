@@ -19,6 +19,10 @@ pub struct Closure {
     pub upvalues: Vec<Upvalue>,
     pub resolved_constants: Vec<Value>,
     pub ic_cache: Rc<Vec<std::sync::atomic::AtomicU64>>,
+    /// Global-region base of the module this closure belongs to, carried across
+    /// a task/isolate fork so the forked frame resolves `LoadGlobalIdx` against
+    /// the right region. `0` for a closure with no enclosing module region.
+    pub module_base: u32,
 }
 
 impl Closure {
@@ -26,6 +30,15 @@ impl Closure {
         proto: Rc<FunctionProto>,
         upvalues: Vec<Upvalue>,
         resolved_constants: Vec<Value>,
+    ) -> Self {
+        Self::with_module_base(proto, upvalues, resolved_constants, 0)
+    }
+
+    pub fn with_module_base(
+        proto: Rc<FunctionProto>,
+        upvalues: Vec<Upvalue>,
+        resolved_constants: Vec<Value>,
+        module_base: u32,
     ) -> Self {
         let cache_count = proto.cache_count;
         let mut ic_cache = Vec::with_capacity(cache_count);
@@ -37,6 +50,7 @@ impl Closure {
             upvalues,
             resolved_constants,
             ic_cache: Rc::new(ic_cache),
+            module_base,
         }
     }
 }

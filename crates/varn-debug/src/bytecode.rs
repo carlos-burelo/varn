@@ -21,8 +21,9 @@ fn op_color(op: OpCode) -> &'static str {
         Call | CallSpread | CallSelf | CallMethod | InvokeVirtual | Spawn => MAGENTA,
 
         LoadConst | LoadInt | LoadIntZero | LoadIntOne | LoadIntMinusOne | LoadGlobal
-        | LoadGlobalIdx | StoreGlobal | StoreGlobalIdx | DefineGlobal | DefineGlobalIdx
-        | LoadModule | LoadModuleSlot | StoreModuleSlot | LoadUpvalue | StoreUpvalue => CYAN,
+        | LoadGlobalIdx | LoadNativeGlobalIdx | StoreGlobal | StoreGlobalIdx | DefineGlobal
+        | DefineGlobalIdx | LoadModule | LoadModuleSlot | StoreModuleSlot | LoadUpvalue
+        | StoreUpvalue => CYAN,
 
         MakeClass | MakeClosure | LoadStaticFn | BuildArray | BuildObject
         | BuildObjectWithShape | BuildStr | Method | DefineStatic | DefineGetter | DefineSetter
@@ -346,12 +347,17 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadIntOne => format!("r{} = 1", hi(op_val)),
             OpCode::LoadIntMinusOne => format!("r{} = -1", hi(op_val)),
 
-            OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
+            OpCode::LoadGlobal | OpCode::LoadGlobalIdx | OpCode::LoadNativeGlobalIdx => {
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = const_hint(c);
                 }
-                format!("r{} = global[{}]", hi(op_val), idx)
+                let tag = match op {
+                    OpCode::LoadGlobalIdx => "@",
+                    OpCode::LoadNativeGlobalIdx => "native@",
+                    _ => "",
+                };
+                format!("r{} = global[{tag}{}]", hi(op_val), idx)
             }
             OpCode::StoreGlobal | OpCode::StoreGlobalIdx => {
                 let w1 = w!();

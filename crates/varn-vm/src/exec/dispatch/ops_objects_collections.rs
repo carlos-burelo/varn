@@ -69,13 +69,15 @@ impl ExecCtx {
                     })
                     .1
                     .clone();
-                let vm_closure = std::rc::Rc::new(crate::closure::VmClosure::with_upvalues(
+                let mut vm_closure = crate::closure::VmClosure::with_upvalues(
                     proto.clone(),
                     upvalues,
                     constants,
                     self.settings,
-                ));
-                let val = self.heap.alloc_vm_closure(vm_closure);
+                );
+                // A nested closure runs against its defining module's globals.
+                vm_closure.module_base = closure.module_base;
+                let val = self.heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
                 if uv_count == 0 {
                     self.static_closures.insert(proto_ptr, (proto, val));
                 }

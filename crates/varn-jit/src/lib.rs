@@ -226,6 +226,11 @@ macro_rules! define_jit_helpers {
         pub nursery_threshold: usize,
         pub jit_native_result_offset: usize,
         pub globals_offset: usize,
+        /// Byte offset of `module_base: u32` within `VmClosure`. A `LoadGlobalIdx`
+        /// slot is relative to the running closure's module region; the lowering
+        /// loads this from the closure param and adds it. `LoadNativeGlobalIdx`
+        /// is absolute and ignores it.
+        pub closure_module_base_offset: usize,
         /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
         /// pointer word (`offset_of!(ExecCtx, stack) + slots_ptr_off`, the bare-Vec
         /// ptr offset — NOT `elems_ptr_off`, which is `ArrayRepr`-relative). The

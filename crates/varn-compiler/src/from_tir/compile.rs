@@ -93,6 +93,11 @@ fn compile_one(
     }
     let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file)?;
     proto.state_size = state_size;
+    if is_top_level {
+        // The module owns this many global slots; the VM reserves a contiguous
+        // region for them and the indexed global opcodes are region-relative.
+        proto.global_count = tir.global_names.len() as u32;
+    }
     Ok(proto)
 }
 

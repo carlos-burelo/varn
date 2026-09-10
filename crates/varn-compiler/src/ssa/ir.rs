@@ -143,10 +143,19 @@ pub enum InstKind {
 
     LoadGlobal(Rc<str>),
 
+    /// Module-global read at a region-relative slot the checker numbered.
+    LoadGlobalIdx(u32),
+
     LoadUpvalue(u32),
 
     StoreGlobal {
         name: Rc<str>,
+        value: Value,
+    },
+
+    /// Module-global write at a region-relative slot the checker numbered.
+    StoreGlobalIdx {
+        slot: u32,
         value: Value,
     },
 

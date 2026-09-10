@@ -569,6 +569,9 @@ pub(crate) fn dispatch_opcode(
         OpCode::LoadGlobalIdx => {
             globals::emit_load_global_idx(b, gbl, code, ip, first_reg);
         }
+        OpCode::LoadNativeGlobalIdx => {
+            globals::emit_load_native_global_idx(b, gbl, code, ip, first_reg);
+        }
         OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
             globals::emit_store_global_idx(b, gbl, state, code, ip)?;
         }

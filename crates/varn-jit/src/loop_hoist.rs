@@ -122,6 +122,7 @@ pub fn is_alloc_free_op(op: OpCode) -> bool {
             | OpCode::LoadIntMinusOne
             | OpCode::LoadConst
             | OpCode::LoadGlobalIdx
+            | OpCode::LoadNativeGlobalIdx
             | OpCode::StoreGlobalIdx
             | OpCode::DefineGlobalIdx
             | OpCode::Move

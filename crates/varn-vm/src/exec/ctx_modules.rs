@@ -176,13 +176,14 @@ impl ExecCtx {
         resolved: ModuleId,
         mut proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
-        // Every module reaches the VM through here — `precompiled`, `FileLoader`,
-        // the stdlib bundle — and every VM (main, isolate worker, the
-        // module-freezing scratch VM) has its own `GlobalStore`. Resolving here
-        // is what makes the name-keyed global opcodes unreachable at runtime;
-        // `make_mut` keeps a proto shared with the thread-local stdlib cache or
-        // the `precompiled` map from inheriting another VM's indices.
+        // Prelude-global rewrite (a fixed layout, so a shared proto needs no
+        // per-store rebinding — see `globals::resolve`).
         crate::globals::resolve_shared(&mut proto, &mut self.globals);
+
+        // Reserve this module's own contiguous global-slot region. `module_base`
+        // rides on the closure below; `LoadGlobalIdx` / `StoreGlobalIdx` are
+        // relative to it. Every eval gets a fresh region in its own store.
+        let module_base = self.globals.reserve_region(proto.global_count);
 
         debug_assert!(
             proto.export_names.windows(2).all(|w| w[0] <= w[1]),
@@ -201,7 +202,10 @@ impl ExecCtx {
 
         self.linker.set_evaluating(resolved.clone());
 
-        let closure = crate::exec::calls::build_closure(proto, &mut self.heap, self.settings);
+        let mut closure = crate::exec::calls::build_closure(proto, &mut self.heap, self.settings);
+        std::rc::Rc::get_mut(&mut closure)
+            .expect("fresh module closure is uniquely owned")
+            .module_base = module_base;
         self.push_frame(closure)?;
         let frame_idx = self.frames.len() - 1;
         self.module_exports.insert(frame_idx, module_val);

@@ -114,6 +114,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | ConstBigInt(_)
         | ConstNull
         | LoadGlobal(_)
+        | LoadGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | ModuleSlot { .. }
@@ -205,6 +206,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         // Stores and other observable writes.
         StoreGlobal { .. }
+        | StoreGlobalIdx { .. }
         | StoreUpvalue { .. }
         | StoreCaptured { .. }
         | StoreModuleSlot { .. }

@@ -262,6 +262,7 @@ pub(crate) fn apply_kinds(
         // register last held — an `Int` param, and then the callee is passed
         // as a raw i64. Listing it costs nothing when the rewrite did happen.
         | OpCode::LoadGlobal
+        | OpCode::LoadNativeGlobalIdx
         | OpCode::LoadUpvalue
         | OpCode::MakeClosure
         | OpCode::LoadStaticFn
@@ -276,12 +277,14 @@ pub(crate) fn apply_kinds(
         | OpCode::Try => state[dest] = boxed(dest),
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
+        //
+        // TODO(etapa4): the slot is now MODULE-RELATIVE. `static_target` indexes
+        // `ctx.globals.values` absolutely, so `K::Global(relative)` would resolve
+        // the wrong entry (the `expected_bits` guard makes that safe, just a
+        // missed link). Restoring the static link needs `module_base` threaded
+        // into `varn_jit::compile`; until then a module global is plain boxed.
         OpCode::LoadGlobalIdx => {
-            state[dest] = if meta_int(dest) {
-                K::Int
-            } else {
-                K::Global(code[ip + 1] as u32)
-            };
+            state[dest] = if meta_int(dest) { K::Int } else { boxed(dest) };
         }
         _ => {}
     }

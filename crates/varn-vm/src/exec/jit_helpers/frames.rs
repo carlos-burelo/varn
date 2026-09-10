@@ -258,12 +258,13 @@ pub(crate) extern "C" fn jit_load_static_fn(
             })
             .1
             .clone();
-        let new_closure = crate::closure::VmClosure::with_upvalues(
+        let mut new_closure = crate::closure::VmClosure::with_upvalues(
             proto.clone(),
             vec![],
             constants,
             ctx_ref.settings,
         );
+        new_closure.module_base = closure_ref.module_base;
         let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
         ctx_ref
             .static_closures

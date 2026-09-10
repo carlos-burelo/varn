@@ -69,8 +69,12 @@ fn inst_kind(kind: &InstKind) -> String {
             format!("{}.{} {}", unop(*op), ty(*t), val(*operand))
         }
         InstKind::LoadGlobal(name) => format!("global {name}"),
+        InstKind::LoadGlobalIdx(slot) => format!("global @{slot}"),
         InstKind::LoadUpvalue(uv) => format!("upvalue #{uv}"),
         InstKind::StoreGlobal { name, value } => format!("storeglobal {name} = {}", val(*value)),
+        InstKind::StoreGlobalIdx { slot, value } => {
+            format!("storeglobal @{slot} = {}", val(*value))
+        }
         InstKind::StoreUpvalue { index, value } => {
             format!("storeupvalue #{index} = {}", val(*value))
         }

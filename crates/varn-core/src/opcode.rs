@@ -204,12 +204,19 @@ pub enum OpCode {
     /// representation. Only unary math ops qualify: every other domain
     /// actually reads its receiver.
     IntrinsicDirect,
+
+    /// Read a global from the native/prelude region of the `GlobalStore` — a
+    /// fixed, deterministic layout the runtime rewrite of a name-keyed
+    /// `LoadGlobal` produces. Operand: `[abs_slot: u16]`, dest in the opcode
+    /// word. Unlike `LoadGlobalIdx` (module-relative, `module_base` added at
+    /// run time) this index is absolute.
+    LoadNativeGlobalIdx,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::IntrinsicDirect as u8 {
+        if v <= OpCode::LoadNativeGlobalIdx as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

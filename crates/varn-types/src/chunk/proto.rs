@@ -106,6 +106,21 @@ pub struct FunctionProto {
     #[serde(default)]
     pub state_size: u16,
 
+    /// Number of module-level global slots this proto's module owns, `0` for a
+    /// non-module proto (nested function, closure). A module's globals occupy a
+    /// contiguous region of the `GlobalStore` reserved when the module is
+    /// evaluated; `LoadGlobalIdx`/`StoreGlobalIdx` carry the slot RELATIVE to
+    /// that region's base, and the running closure carries the base. This is
+    /// what let the runtime bytecode-rewrite pass (`globals::resolve`) go away:
+    /// the checker already numbered these (`Resolution::GlobalSlot`), so the
+    /// compiler emits the indexed form directly.
+    ///
+    /// Appended (postcard is positional) with `#[serde(default)]`; a cache
+    /// written before this field decodes it as `0`, and `BUILD_FINGERPRINT`
+    /// changes with the struct shape so those caches are discarded anyway.
+    #[serde(default)]
+    pub global_count: u32,
+
     #[serde(default)]
     pub register_meta: Vec<crate::register_meta::RegisterMeta>,
 

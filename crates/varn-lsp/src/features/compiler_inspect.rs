@@ -238,7 +238,9 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
             format!("{op_sym}v{}", operand.0)
         }
         LoadGlobal(name) => format!("LoadGlobal \"{name}\""),
+        LoadGlobalIdx(slot) => format!("LoadGlobalIdx @{slot}"),
         StoreGlobal { name, value } => format!("StoreGlobal \"{name}\" = v{}", value.0),
+        StoreGlobalIdx { slot, value } => format!("StoreGlobalIdx @{slot} = v{}", value.0),
         LoadUpvalue(idx) => format!("LoadUpvalue [{idx}]"),
         StoreUpvalue { index, value } => format!("StoreUpvalue [{index}] = v{}", value.0),
         Call { callee, args } => {

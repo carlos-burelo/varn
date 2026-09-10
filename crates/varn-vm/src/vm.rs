@@ -66,15 +66,17 @@ impl Vm {
             })
             .collect();
 
-        let nan_closure = Rc::new(VmClosure::with_upvalues(
-            closure.proto.clone(),
-            upvalues,
-            Rc::new(constants),
-            self.ctx.settings,
-        ));
-
         if self.ctx.frames.is_empty() {
-            self.ctx.push_frame(nan_closure)?;
+            let mut nan_closure = VmClosure::with_upvalues(
+                closure.proto.clone(),
+                upvalues,
+                Rc::new(constants),
+                self.ctx.settings,
+            );
+            // The entry proto's module owns the first global region after the
+            // native/prelude layout.
+            nan_closure.module_base = self.ctx.globals.reserve_region(closure.proto.global_count);
+            self.ctx.push_frame(Rc::new(nan_closure))?;
         }
 
         self.ctx.run()

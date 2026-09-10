@@ -30,6 +30,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | ConstBigInt(_)
         | ConstNull
         | LoadGlobal(_)
+        | LoadGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | MakeClosure { .. }
@@ -63,6 +64,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | GetSymbol { object, .. } => f(*object),
 
         StoreGlobal { value, .. }
+        | StoreGlobalIdx { value, .. }
         | StoreUpvalue { value, .. }
         | StoreCaptured { value, .. }
         | StoreModuleSlot { value, .. } => f(*value),
@@ -177,6 +179,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | ConstBigInt(_)
         | ConstNull
         | LoadGlobal(_)
+        | LoadGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | MakeClosure { .. }
@@ -209,6 +212,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | GetSymbol { object, .. } => f(object),
 
         StoreGlobal { value, .. }
+        | StoreGlobalIdx { value, .. }
         | StoreUpvalue { value, .. }
         | StoreCaptured { value, .. }
         | StoreModuleSlot { value, .. } => f(value),

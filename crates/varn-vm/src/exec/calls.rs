@@ -118,13 +118,11 @@ fn describe_generator(
         .iter()
         .map(|uv| VmUpvalue::closed(uv.read(stack)))
         .collect();
+    let mut gen_closure =
+        VmClosure::with_upvalues(nc.proto.clone(), upvalues, Rc::new(constants), settings);
+    gen_closure.module_base = nc.module_base;
     PreparedCall::Generator {
-        closure: Rc::new(VmClosure::with_upvalues(
-            nc.proto.clone(),
-            upvalues,
-            Rc::new(constants),
-            settings,
-        )),
+        closure: Rc::new(gen_closure),
         args,
         current_class,
     }
@@ -176,7 +174,12 @@ pub(crate) fn prepare_call(
                         .collect();
                     let consts: Vec<varn_types::Value> =
                         nc.constants.iter().map(|&c| heap.extract(c)).collect();
-                    let closure = varn_types::Closure::new(nc.proto.clone(), upvalues, consts);
+                    let closure = varn_types::Closure::with_module_base(
+                        nc.proto.clone(),
+                        upvalues,
+                        consts,
+                        nc.module_base,
+                    );
                     let task = Value::Task(std::rc::Rc::new(LazyTask {
                         closure: std::rc::Rc::new(closure),
                         args,
@@ -269,8 +272,12 @@ pub(crate) fn prepare_call(
                                 .collect();
                             let consts: Vec<varn_types::Value> =
                                 nc.constants.iter().map(|&c| heap.extract(c)).collect();
-                            let closure =
-                                varn_types::Closure::new(nc.proto.clone(), upvalues, consts);
+                            let closure = varn_types::Closure::with_module_base(
+                                nc.proto.clone(),
+                                upvalues,
+                                consts,
+                                nc.module_base,
+                            );
                             let task = Value::Task(std::rc::Rc::new(LazyTask {
                                 closure: std::rc::Rc::new(closure),
                                 args,

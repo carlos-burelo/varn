@@ -217,6 +217,13 @@ impl ExecCtx {
 
                 match op {
                     OpCode::LoadGlobalIdx => {
+                        let gidx = closure.module_base as usize + code[ip] as usize;
+                        ip += 1;
+
+                        reg!(first_reg) = (*ctx).globals.get_by_index_unchecked(gidx);
+                        (*ctx).record_hotspot_global(gidx);
+                    }
+                    OpCode::LoadNativeGlobalIdx => {
                         let gidx = code[ip] as usize;
                         ip += 1;
 
@@ -240,7 +247,7 @@ impl ExecCtx {
                     }
                     OpCode::DefineGlobalIdx | OpCode::StoreGlobalIdx => {
                         let src = hi(code[ip]);
-                        let gidx = code[ip + 1] as usize;
+                        let gidx = closure.module_base as usize + code[ip + 1] as usize;
                         ip += 2;
                         let val = reg!(src);
                         (*ctx).globals.set_by_index_unchecked(gidx, val);
@@ -619,14 +626,14 @@ impl ExecCtx {
                             let constants = std::rc::Rc::new(
                                 crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap),
                             );
-                            let vm_closure =
-                                std::rc::Rc::new(crate::closure::VmClosure::with_upvalues(
-                                    proto.clone(),
-                                    vec![],
-                                    constants,
-                                    (*ctx).settings,
-                                ));
-                            let val = (*ctx).heap.alloc_vm_closure(vm_closure);
+                            let mut vm_closure = crate::closure::VmClosure::with_upvalues(
+                                proto.clone(),
+                                vec![],
+                                constants,
+                                (*ctx).settings,
+                            );
+                            vm_closure.module_base = closure.module_base;
+                            let val = (*ctx).heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
                             (*ctx)
                                 .static_closures
                                 .insert(proto_ptr, (proto.clone(), val));

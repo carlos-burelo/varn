@@ -52,6 +52,10 @@ macro_rules! fill_jit_helpers {
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals) + array_layout.slots_ptr_off,
+            closure_module_base_offset: std::mem::offset_of!(
+                crate::closure::VmClosure,
+                module_base
+            ),
             stack_data_offset,
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
             jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),

@@ -120,6 +120,18 @@ pub(super) fn emit_effect(
             chunk.emit_rrc(OpCode::DefineGlobal, 0, reg[value.0 as usize], idx, line);
             return Ok(true);
         }
+        InstKind::StoreGlobalIdx { slot, value } => {
+            let slot = u16::try_from(*slot)
+                .map_err(|_| OptError::Unsupported("ssa-emit: global slot exceeds u16"))?;
+            chunk.emit_rrc(
+                OpCode::DefineGlobalIdx,
+                0,
+                reg[value.0 as usize],
+                slot,
+                line,
+            );
+            return Ok(true);
+        }
 
         InstKind::StoreUpvalue { index, value } => {
             chunk.emit1(

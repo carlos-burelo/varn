@@ -57,6 +57,7 @@ enum Key {
     ArrayElem(u32, u32),
     ModuleSlot(u32, u16),
     Global(Rc<str>),
+    GlobalIdx(u32),
     Upvalue(u32),
 }
 
@@ -69,6 +70,7 @@ impl Key {
                 | Key::ArrayElem(..)
                 | Key::ModuleSlot(..)
                 | Key::Global(_)
+                | Key::GlobalIdx(_)
                 | Key::Upvalue(_)
         )
     }
@@ -143,6 +145,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::ArrayGetIndex { object, index } => Key::ArrayElem(id(*object), id(*index)),
         InstKind::ModuleSlot { object, slot } => Key::ModuleSlot(id(*object), *slot),
         InstKind::LoadGlobal(name) => Key::Global(name.clone()),
+        InstKind::LoadGlobalIdx(slot) => Key::GlobalIdx(*slot),
         InstKind::LoadUpvalue(i) => Key::Upvalue(*i),
 
         // `ConstDecimal` is left out on purpose: `Decimal` compares equal
