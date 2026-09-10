@@ -253,10 +253,16 @@ pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta
         HirType::Float => SlotKind::Float,
         HirType::Bool => SlotKind::Bool,
         HirType::Str => SlotKind::Str,
-        HirType::Class(id) => SlotKind::Class(id.0),
-        HirType::Array(id) => SlotKind::Array(id.0),
-        HirType::Ref | HirType::Map(_, _) | HirType::Set(_) => SlotKind::Ref,
-        HirType::Nullable(id) => SlotKind::Nullable(id.0),
+        // Every heap-only shape collapses to `Ref` — the id was never read by
+        // the backend.
+        HirType::Class(_)
+        | HirType::Array(_)
+        | HirType::Ref
+        | HirType::Map(_, _)
+        | HirType::Set(_) => SlotKind::Ref,
+        // A nullable of anything is boxed today (tag word says null-or-not);
+        // the backend has no `Pair` kind yet.
+        HirType::Nullable(_) => SlotKind::Dynamic,
         HirType::Dynamic => SlotKind::Dynamic,
     }
 }

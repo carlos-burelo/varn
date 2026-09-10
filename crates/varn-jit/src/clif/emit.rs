@@ -175,12 +175,7 @@ pub(super) fn emit_return_value(
                 unbox_bool(b, v)
             }
         },
-        SlotKind::Str
-        | SlotKind::Ref
-        | SlotKind::Class(_)
-        | SlotKind::Array(_)
-        | SlotKind::Nullable(_)
-        | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
     })
 }
 
