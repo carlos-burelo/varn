@@ -191,4 +191,68 @@ no se migra. `vn cache clean` en las notas de la etapa.
       limpio — la ruta TIR hace DCE del código muerto que el límite de 255
       registros de HIR rechazaba; el test codificaba una limitación de HIR, no
       del lenguaje. Pendiente decidir si se reescriben o se borran.
-- [ ] 3.5 caché de bytecode
+- [x] **Etapa 3 cerrada** (merge `1aedd1bc` a `main`, 2026-09-10). Los 107
+      `tests/*.vn` byte-idénticos al binario pre-corte en los 3 tiers (JIT/
+      no-JIT × @embedded/std-dev); `tests/main.vn` → PASSED 1180; `cargo test
+      --workspace` verde; `tir:check` limpio sobre el corpus. Trabajo de esta
+      tanda: soporte completo de namespaces (anidados, miembros clase/enum/
+      const, `new NS.Class`, namespace local), `for await`/`IterInit`,
+      `continue` en for-of/in/range, `using` disposal, rest params, object-
+      literal methods, tagged templates, records `#{}`, match sobre enum
+      importado, operador `::`, clases anónimas, enum `static {}`. Bugs:
+      `emission_order` no seguía aristas de `Try`; `build_enums` contaba
+      métodos/statics como variantes (corría los tags — era el falso "bug del
+      JIT" de 65); export slots antes del await top-level.
+- [~] 3.5 caché de bytecode. **Aplazado a Etapa 5.** `FunctionProto` NO cambió
+      de forma en la Etapa 3 (`register_meta: Vec<RegisterMeta>` sigue igual;
+      `register_meta.rs` lo lee el JIT todavía). La invalidación de caché ya la
+      cubren `BUILD_FINGERPRINT` + `producer_fingerprint`. El cambio de forma
+      real (`register_meta` → `Vec<BackendTy>` / `K`, subir versión) es 5.
+- [ ] Cabo suelto: `emit/body.rs` (3403) y `emit/mod.rs` (1704) superan el
+      límite de 1000 líneas del check de gobernanza de CI (que ya se violaba
+      en `main`: `xtask/main.rs` 1301). Modularizar cuando toque.
+
+---
+
+## 6. Etapa 4 — el intérprete vuelve (en curso)
+
+Meta del contrato §10: los opcodes que las resoluciones habilitan, con el
+intérprete corriendo de vuelta. `run --compare-tiers` como control.
+
+- [x] **`InvokeVirtual` con índice.** El emisor ya bajaba `InvokeVirtual`
+      cuando el checker conocía la clase del receptor, pero pasaba
+      `cs = usize::MAX` — la inline cache nunca enganchaba y la llamada
+      resolvía por nombre en cada iteración. Ahora comparte el slot de
+      call-site cache de `CallMethod` (empaquetado en la palabra del opcode);
+      tras el primer hit la IC lo resuelve a un índice de vtable con su
+      propio guard de `id` de clase + versión de vtable. Comportamiento
+      idéntico. `commit 7e540ba1`.
+- [x] **`CallNativeOp` para métodos de tipo núcleo.** El checker vuelve a
+      clasificar `recv.metodo(args)` cuando `recv` es `Array`/`str`/`Map`/`Set`
+      y el método es de instancia nativo → `Resolution::NativeOp(op_id)`;
+      `from_tir` lo baja a `InstKind::CallNativeOp`, saltándose el lookup por
+      nombre y la IC. Guard: `Method` no-estático/no-async/no-generador de un
+      contrato core cargado. Los primitivos numéricos quedan FUERA a
+      propósito: la coerción implícita (`int` → `bigint`/`decimal`) deja el
+      valor con tag de int mientras el tipo estático dice otra cosa, así que
+      un op-id sobre el tipo estático misdespacharía (lo caza
+      `tests/26-numeric-coercion`). El set se construye en `emit_module`
+      desde `bind.core.class_members`. `commit 7e540ba1`.
+- [~] **`CallIntrinsic` (wire de math/int).** El camino `Resolution::Intrinsic`
+      (bytes wire de `std:math`, `IntOp::ToString`) sigue sin productor. Menor
+      valor (funciones libres de `std:math`, mayormente); se retoma junto con
+      la reintroducción del canal de anotaciones `intrinsic`.
+- [ ] **`LoadGlobalIdx` directo — se queda en el pase de reescritura.**
+      Emitirlo directo exige que la numeración de slots del compilador case
+      con la del `GlobalStore` en runtime, y el store arranca con ~cientos de
+      globales nativos (`print`, `assert`, builtins ordenados) ANTES de los
+      del módulo, más los de cada import, más `isIsolate` primero en workers
+      de isolate. Esa numeración no es conocible en tiempo de compilación en
+      un mundo multi-módulo/isolate — es exactamente por lo que
+      `globals/resolve.rs` existe y está medido en cero sobre la suite y los
+      benches. El baking real cae en Etapa 5, cuando `FunctionProto` cambia de
+      forma y la cuestión del prefijo nativo se ataca a propósito.
+
+*Control cumplido:* 321/321 `tests/*.vn` byte-idénticos en los 3 tiers;
+`tests/main.vn` → PASSED 1180 (JIT / no-JIT / std-dev); `run --compare-tiers`
+sin desacuerdos sobre el corpus completo; `cargo test --workspace` verde.
