@@ -76,6 +76,11 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
+    /// Raw data pointer of `ic_cache`'s `Vec<PolyICSlot>`, cached for the JIT to
+    /// index a poly slot inline (`base + cs * POLY_IC_SLOT_SIZE`). The vec is
+    /// fixed-size for a proto's life so this never dangles; the VM already
+    /// reads the cache unsynchronised via `ic_cache.as_ptr()`.
+    pub ic_entries: *const PolyICSlot,
     /// Start of this closure's module's global-slot region in the `GlobalStore`.
     /// `LoadGlobalIdx` / `StoreGlobalIdx` carry a slot relative to this. Set
     /// when the module is evaluated (top-level closure) and inherited by every
@@ -93,12 +98,14 @@ impl VmClosure {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
         let feedback = Rc::clone(&proto.feedback);
+        let ic_entries = unsafe { (*ic_cache.as_ptr()).as_ptr() };
         let closure = Self {
             proto,
             upvalues: Vec::new(),
             constants: Rc::new(constants),
             ic_cache,
             feedback,
+            ic_entries,
             module_base: 0,
         };
         // No compilation here: the compiled entry lives on the proto and is
@@ -119,12 +126,14 @@ impl VmClosure {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
         let feedback = Rc::clone(&proto.feedback);
+        let ic_entries = unsafe { (*ic_cache.as_ptr()).as_ptr() };
         let closure = Self {
             proto,
             upvalues,
             constants,
             ic_cache,
             feedback,
+            ic_entries,
             module_base: 0,
         };
         // No compilation here: the compiled entry lives on the proto and is

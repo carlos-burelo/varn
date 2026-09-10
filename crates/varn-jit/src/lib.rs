@@ -108,6 +108,9 @@ pub struct JitObjectLayout {
     pub values_off: usize,
     /// Data pointer → `InstanceData.payload`.
     pub instance_values_off: usize,
+    /// Data pointer → `InstanceData.class_id` (u32). The 8-byte header sits
+    /// right before the payload.
+    pub instance_class_id_off: usize,
     /// Data pointer → `ObjData.shape` (an `Rc<Shape>`).
     pub shape_off: usize,
     /// Shape pointer → `Shape.id` (u32).
@@ -231,6 +234,12 @@ macro_rules! define_jit_helpers {
         /// loads this from the closure param and adds it. `LoadNativeGlobalIdx`
         /// is absolute and ignores it.
         pub closure_module_base_offset: usize,
+        /// Byte offset of `ic_entries: *const PolyICSlot` within `VmClosure` —
+        /// the poly inline-cache vec's data pointer, so a lowering can probe
+        /// entry `[cs]` inline (`base + cs * poly_ic_slot_size`).
+        pub closure_ic_entries_offset: usize,
+        /// `size_of::<PolyICSlot>()`, the stride between poly slots.
+        pub poly_ic_slot_size: usize,
         /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
         /// pointer word (`offset_of!(ExecCtx, stack) + slots_ptr_off`, the bare-Vec
         /// ptr offset — NOT `elems_ptr_off`, which is `ArrayRepr`-relative). The

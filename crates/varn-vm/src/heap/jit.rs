@@ -229,6 +229,14 @@ impl Heap {
 
         let raw_payload_ptr = inst_ref.raw_payload_ptr() as usize;
         let instance_values_off = raw_payload_ptr - inst_rcbox;
+        // `InstanceData { class_id: u32, payload_size: u32, payload }` — an
+        // 8-byte header immediately before the payload.
+        let instance_class_id_off = instance_values_off - 8;
+        assert_eq!(
+            unsafe { *((inst_rcbox + instance_class_id_off) as *const u32) },
+            inst_ref.class_id,
+            "instance class_id offset does not resolve to InstanceData.class_id"
+        );
 
         varn_jit::JitObjectLayout {
             object_tag,
@@ -238,6 +246,7 @@ impl Heap {
             len_off,
             values_off,
             instance_values_off,
+            instance_class_id_off,
             shape_off,
             shape_id_off,
         }

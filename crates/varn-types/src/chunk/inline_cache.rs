@@ -44,7 +44,10 @@ impl CacheEntry {
     }
 }
 
+/// `#[repr(C)]` so the JIT can index the entries array directly: `entries` is
+/// at offset 0, one slot is `POLY_IC_SLOT_SIZE` bytes.
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct PolyICSlot {
     pub entries: [CacheEntry; 8],
 
@@ -52,6 +55,11 @@ pub struct PolyICSlot {
 
     last_hit: u8,
 }
+
+/// `size_of::<PolyICSlot>()` — the stride the JIT uses to reach slot `cs`.
+/// `[CacheEntry; 8]` is 64 bytes (`CacheEntry` is 8, align 4); the two trailing
+/// `u8`s pad the struct to 68.
+pub const POLY_IC_SLOT_SIZE: usize = 68;
 
 impl Default for PolyICSlot {
     fn default() -> Self {
@@ -61,6 +69,7 @@ impl Default for PolyICSlot {
 
 impl PolyICSlot {
     pub fn new() -> Self {
+        const _: () = assert!(std::mem::size_of::<PolyICSlot>() == POLY_IC_SLOT_SIZE);
         Self {
             entries: [CacheEntry::default(); 8],
             next: 0,

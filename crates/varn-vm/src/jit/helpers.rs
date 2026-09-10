@@ -56,6 +56,11 @@ macro_rules! fill_jit_helpers {
                 crate::closure::VmClosure,
                 module_base
             ),
+            closure_ic_entries_offset: std::mem::offset_of!(
+                crate::closure::VmClosure,
+                ic_entries
+            ),
+            poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
             stack_data_offset,
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
             jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),

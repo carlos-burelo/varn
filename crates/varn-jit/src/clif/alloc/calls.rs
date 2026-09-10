@@ -320,14 +320,128 @@ pub(crate) fn emit_get_property(
     code: &[u16],
     ip: usize,
 ) {
+    use super::super::emit::{HEAP_KIND, KIND_MASK};
+
     let dest = (code[ip] >> 8) as usize;
     let obj_r = (code[ip + 1] >> 8) as usize;
     let cs_idx = (code[ip + 1] & 0xFF) as usize;
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
+    let m = MemFlags::trusted();
+    let olay = actx.helpers.object_layout;
+    let alay = actx.helpers.array_layout;
+
     let obj = box_or_load_home(b, actx, state, obj_r);
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
+
+    // `cont` merges the inline-cache result and the helper result; `slow` is
+    // the runtime path for every shape the probe below does not handle
+    // (getters, methods, shape props, non-instance receivers, cache miss).
+    let cont = b.create_block();
+    b.append_block_param(cont, types::I128);
+    let slow = b.create_block();
+
+    // ── Inline IC fast path: a class instance field the checker did not pin ──
+    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
+    let probe = b.create_block();
+    b.ins().brif(is_heap, probe, &[], slow, &[]);
+    b.switch_to_block(probe);
+
+    // heap index → slot address (generation bit picks old-gen vs nursery vec)
+    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+    let rc = b.ins().load(
+        types::I64,
+        m,
+        actx.exec_ctx,
+        actx.helpers.heap_field_offset as i32,
+    );
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let sbase = b.ins().select(old_bit, base_old, base_nur);
+    let sidx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm(sidx, alay.slot_size as i64);
+    let slot_addr = b.ins().iadd(sbase, byte_off);
+
+    // Must be `HeapObj::Instance` — the only shape whose `class_id` lives at a
+    // fixed header offset and whose `INSTANCE_FIELD` cache entries are valid.
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_inst = b
+        .ins()
+        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let inst_ok = b.create_block();
+    b.ins().brif(is_inst, inst_ok, &[], slow, &[]);
+    b.switch_to_block(inst_ok);
+
+    let data_ptr = {
+        let obj_ptr = b
+            .ins()
+            .iadd_imm(slot_addr, olay.instance_payload_off as i64);
+        b.ins().load(types::I64, m, obj_ptr, 0)
+    };
+    let class_id = {
+        let cid = b
+            .ins()
+            .load(types::I32, m, data_ptr, olay.instance_class_id_off as i32);
+        b.ins().uextend(types::I64, cid)
+    };
+    let values_base = b.ins().iadd_imm(data_ptr, olay.instance_values_off as i64);
+
+    // Poly slot for this call site: `ic_entries + cs * poly_ic_slot_size`.
+    let ic_base = b.ins().load(
+        types::I64,
+        m,
+        actx.closure,
+        actx.helpers.closure_ic_entries_offset as i32,
+    );
+    let slot_base = b
+        .ins()
+        .iadd_imm(ic_base, (cs_idx * actx.helpers.poly_ic_slot_size) as i64);
+
+    // Probe the first four entries (`CacheEntry` is 8 bytes: id u32 @0,
+    // slot u16 @4, is_class u8 @6). A hit past four, or any other kind, falls
+    // to the helper — still correct, just not inlined.
+    const INSTANCE_FIELD: i64 = varn_types::chunk::ICKind::INSTANCE_FIELD as i64;
+    for e in 0..4i32 {
+        let eoff = e * 8;
+        let eid = {
+            let v = b.ins().load(types::I32, m, slot_base, eoff);
+            b.ins().uextend(types::I64, v)
+        };
+        let eisc = b.ins().uload8(types::I64, m, slot_base, eoff + 6);
+        let eslot = b.ins().uload16(types::I64, m, slot_base, eoff + 4);
+        let id_ok = b.ins().icmp(IntCC::Equal, eid, class_id);
+        let kind_ok = b.ins().icmp_imm(IntCC::Equal, eisc, INSTANCE_FIELD);
+        let hit = b.ins().band(id_ok, kind_ok);
+        let do_load = b.create_block();
+        let next = b.create_block();
+        b.ins().brif(hit, do_load, &[], next, &[]);
+
+        b.switch_to_block(do_load);
+        let field_off = b.ins().imul_imm(eslot, 16);
+        let field_addr = b.ins().iadd(values_base, field_off);
+        let v = b.ins().load(types::I128, m, field_addr, 0);
+        b.ins().jump(cont, &[v.into()]);
+
+        b.switch_to_block(next);
+    }
+    b.ins().jump(slow, &[]);
+
+    // ── Slow path: the runtime property helper ──
+    b.switch_to_block(slow);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -351,16 +465,19 @@ pub(crate) fn emit_get_property(
             ipv,
         ],
     );
-
     reload_boxed(b, actx, state, &regs);
-
     let res = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        m,
         actx.exec_ctx,
         actx.helpers.jit_native_result_offset as i32,
     );
-    def_result(b, actx, dest, res);
+    b.ins().jump(cont, &[res.into()]);
+
+    // ── Result ──
+    b.switch_to_block(cont);
+    let v = b.block_params(cont)[0];
+    def_result(b, actx, dest, v);
 }
 
 pub(crate) fn emit_set_property(
