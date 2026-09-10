@@ -242,16 +242,20 @@ intérprete corriendo de vuelta. `run --compare-tiers` como control.
       (bytes wire de `std:math`, `IntOp::ToString`) sigue sin productor. Menor
       valor (funciones libres de `std:math`, mayormente); se retoma junto con
       la reintroducción del canal de anotaciones `intrinsic`.
-- [ ] **`LoadGlobalIdx` directo — se queda en el pase de reescritura.**
-      Emitirlo directo exige que la numeración de slots del compilador case
-      con la del `GlobalStore` en runtime, y el store arranca con ~cientos de
-      globales nativos (`print`, `assert`, builtins ordenados) ANTES de los
-      del módulo, más los de cada import, más `isIsolate` primero en workers
-      de isolate. Esa numeración no es conocible en tiempo de compilación en
-      un mundo multi-módulo/isolate — es exactamente por lo que
-      `globals/resolve.rs` existe y está medido en cero sobre la suite y los
-      benches. El baking real cae en Etapa 5, cuando `FunctionProto` cambia de
-      forma y la cuestión del prefijo nativo se ataca a propósito.
+- [x] **`LoadGlobalIdx` directo — regiones de globales por módulo.**
+      (`6ff813d1` + `3fce8b49`, ver `docs/TIR_ETAPA_4_GLOBALS.md`.) El checker
+      ya numera los globales de módulo (`Resolution::GlobalSlot`); ahora
+      `from_tir` emite `LoadGlobalIdx` / `StoreGlobalIdx` RELATIVOS a la
+      región del módulo. Cada módulo reserva una región contigua del
+      `GlobalStore` al evaluarse (`FunctionProto.global_count`); la closure
+      lleva `module_base` y lo hereda cada closure anidada / fork de
+      generador / fork de task. Intérprete y JIT suman `module_base`; el link
+      estático (`K::Global`) también, vía `CtxLinker::for_module`. El pase de
+      reescritura queda reducido a `LoadGlobal` de prelude → nuevo opcode
+      `LoadNativeGlobalIdx`. Corpus 321/321 ×3 tiers, main.vn 1180 ×3,
+      compare-tiers limpio. La re-derivación en runtime de los globales de
+      módulo — el grueso — desapareció; borrar el pase residual del prelude
+      (frontera del host, sin regresión de perf) es Fase B opcional.
 
 *Control cumplido:* 321/321 `tests/*.vn` byte-idénticos en los 3 tiers;
 `tests/main.vn` → PASSED 1180 (JIT / no-JIT / std-dev); `run --compare-tiers`
