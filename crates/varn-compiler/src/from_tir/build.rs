@@ -1368,6 +1368,12 @@ fn build_inner(
             };
             b.emit_effect(InstKind::StoreGlobal { name, value: fv });
         }
+        // Populate export slots for functions / classes now, before any
+        // top-level `await` can suspend the module with its exports still
+        // unset (an isolate worker spawned from `await main()` looks itself
+        // up through the module object). `let` / re-export slots that depend
+        // on later statements are re-stored at the end.
+        b.build_exports(export_slots);
     }
 
     b.lower_block(&func.body)?;
