@@ -312,15 +312,16 @@ pub(crate) fn emit_call_self(
     )
 }
 
-/// The instance-field inline-cache probe shared by `GetProperty` /
-/// `SetProperty`. `obj_tag` / `obj_payload` are the receiver's split VmValue.
+/// The field inline-cache probe shared by `GetProperty` / `SetProperty`.
+/// `obj_tag` / `obj_payload` are the receiver's split VmValue. Handles two
+/// shapes: a class `Instance` (an `INSTANCE_FIELD` entry keyed by `class_id`)
+/// and a dynamic `Object` / `Record` (a `SHAPE_PROP` entry keyed by shape id).
 /// On return the builder sits in a fresh block where `field_addr` (the
 /// VmValue-slot address of the resolved field) and `is_nursery` (`i8`, non-zero
 /// when the receiver is a nursery object — a store then needs no write barrier)
-/// are valid. Every shape the probe does not handle — non-heap, non-instance,
-/// cache miss, a hit past the first four entries, any non-`INSTANCE_FIELD`
-/// kind — jumps to `slow`.
-fn emit_instance_field_ic(
+/// are valid. Anything else — non-heap, some other slot tag, cache miss, a hit
+/// past the first four entries — jumps to `slow`.
+fn emit_field_ic(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     obj_tag: cranelift_codegen::ir::Value,
@@ -332,6 +333,9 @@ fn emit_instance_field_ic(
     let m = MemFlags::trusted();
     let olay = actx.helpers.object_layout;
     let alay = actx.helpers.array_layout;
+
+    const INSTANCE_FIELD: i64 = varn_types::chunk::ICKind::INSTANCE_FIELD as i64;
+    const SHAPE_PROP: i64 = varn_types::chunk::ICKind::SHAPE_PROP as i64;
 
     let tag = b.ins().band_imm(obj_tag, KIND_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
@@ -367,27 +371,72 @@ fn emit_instance_field_ic(
     let byte_off = b.ins().imul_imm(sidx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(sbase, byte_off);
 
-    // Must be `HeapObj::Instance` — the only shape whose `class_id` lives at a
-    // fixed header offset and whose `INSTANCE_FIELD` cache entries are valid.
+    // `keyed` converges the two receiver shapes: `key_id` is the class id or
+    // the shape id; `key_kind` the matching `ICKind`; `values_base` the field
+    // region start.
+    let keyed = b.create_block();
+    b.append_block_param(keyed, types::I64); // key_id
+    b.append_block_param(keyed, types::I64); // key_kind
+    b.append_block_param(keyed, types::I64); // values_base
+    b.append_block_param(keyed, types::I64); // slot_bound (fields at slot >= this spilled)
+
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_inst = b
         .ins()
         .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
-    let inst_ok = b.create_block();
-    b.ins().brif(is_inst, inst_ok, &[], slow, &[]);
-    b.switch_to_block(inst_ok);
+    let inst_blk = b.create_block();
+    let try_obj = b.create_block();
+    b.ins().brif(is_inst, inst_blk, &[], try_obj, &[]);
 
-    let obj_ptr = b
-        .ins()
-        .iadd_imm(slot_addr, olay.instance_payload_off as i64);
-    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
-    let class_id = {
+    b.switch_to_block(inst_blk);
+    {
+        let obj_ptr = b
+            .ins()
+            .iadd_imm(slot_addr, olay.instance_payload_off as i64);
+        let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
         let cid = b
             .ins()
             .load(types::I32, m, data_ptr, olay.instance_class_id_off as i32);
-        b.ins().uextend(types::I64, cid)
-    };
-    let values_base = b.ins().iadd_imm(data_ptr, olay.instance_values_off as i64);
+        let cid = b.ins().uextend(types::I64, cid);
+        let vbase = b.ins().iadd_imm(data_ptr, olay.instance_values_off as i64);
+        let kind = b.ins().iconst(types::I64, INSTANCE_FIELD);
+        // An instance's cached field slot is always valid — every declared
+        // field is inline.
+        let bound = b.ins().iconst(types::I64, i64::from(i32::MAX));
+        b.ins().jump(
+            keyed,
+            &[cid.into(), kind.into(), vbase.into(), bound.into()],
+        );
+    }
+
+    b.switch_to_block(try_obj);
+    {
+        let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+        let obj_blk = b.create_block();
+        b.ins().brif(is_obj, obj_blk, &[], slow, &[]);
+        b.switch_to_block(obj_blk);
+        let obj_ptr = b.ins().iadd_imm(slot_addr, olay.payload_off as i64);
+        let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
+        let shape_ptr = b.ins().load(types::I64, m, data_ptr, olay.shape_off as i32);
+        let sid = b
+            .ins()
+            .load(types::I32, m, shape_ptr, olay.shape_id_off as i32);
+        let sid = b.ins().uextend(types::I64, sid);
+        let vbase = b.ins().iadd_imm(data_ptr, olay.values_off as i64);
+        let kind = b.ins().iconst(types::I64, SHAPE_PROP);
+        // Fields at slot >= `inline_len` spilled to the overflow store, which
+        // the inline path cannot read.
+        let ilen = b.ins().load(types::I32, m, data_ptr, olay.len_off as i32);
+        let ilen = b.ins().uextend(types::I64, ilen);
+        b.ins()
+            .jump(keyed, &[sid.into(), kind.into(), vbase.into(), ilen.into()]);
+    }
+
+    b.switch_to_block(keyed);
+    let key_id = b.block_params(keyed)[0];
+    let key_kind = b.block_params(keyed)[1];
+    let values_base = b.block_params(keyed)[2];
+    let slot_bound = b.block_params(keyed)[3];
 
     // Poly slot for this call site: `ic_entries + cs * poly_ic_slot_size`.
     let ic_base = b.ins().load(
@@ -401,12 +450,11 @@ fn emit_instance_field_ic(
         .iadd_imm(ic_base, (cs_idx * actx.helpers.poly_ic_slot_size) as i64);
 
     let resolved = b.create_block();
-    b.append_block_param(resolved, types::I64);
-    b.append_block_param(resolved, types::I8); // is_nursery (icmp result)
+    b.append_block_param(resolved, types::I64); // field_addr
+    b.append_block_param(resolved, types::I8); // is_nursery
 
     // Probe the first four entries (`CacheEntry` is 8 bytes: id u32 @0,
     // slot u16 @4, is_class u8 @6).
-    const INSTANCE_FIELD: i64 = varn_types::chunk::ICKind::INSTANCE_FIELD as i64;
     for e in 0..4i32 {
         let eoff = e * 8;
         let eid = {
@@ -415,9 +463,11 @@ fn emit_instance_field_ic(
         };
         let eisc = b.ins().uload8(types::I64, m, slot_base, eoff + 6);
         let eslot = b.ins().uload16(types::I64, m, slot_base, eoff + 4);
-        let id_ok = b.ins().icmp(IntCC::Equal, eid, class_id);
-        let kind_ok = b.ins().icmp_imm(IntCC::Equal, eisc, INSTANCE_FIELD);
-        let hit = b.ins().band(id_ok, kind_ok);
+        let id_ok = b.ins().icmp(IntCC::Equal, eid, key_id);
+        let kind_ok = b.ins().icmp(IntCC::Equal, eisc, key_kind);
+        let in_bound = b.ins().icmp(IntCC::UnsignedLessThan, eslot, slot_bound);
+        let m1 = b.ins().band(id_ok, kind_ok);
+        let hit = b.ins().band(m1, in_bound);
         let do_hit = b.create_block();
         let next = b.create_block();
         b.ins().brif(hit, do_hit, &[], next, &[]);
@@ -460,8 +510,7 @@ pub(crate) fn emit_get_property(
     b.append_block_param(cont, types::I128);
     let slow = b.create_block();
 
-    let (field_addr, _is_nursery) =
-        emit_instance_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
+    let (field_addr, _is_nursery) = emit_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
     let v = b.ins().load(types::I128, m, field_addr, 0);
     b.ins().jump(cont, &[v.into()]);
 
@@ -529,8 +578,7 @@ pub(crate) fn emit_set_property(
     // A nursery instance field the checker did not pin: store the VmValue
     // directly. An old-gen receiver falls to the helper, which carries the
     // old←young write barrier.
-    let (field_addr, is_nursery) =
-        emit_instance_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
+    let (field_addr, is_nursery) = emit_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
     let inline_store = b.create_block();
     b.ins().brif(is_nursery, inline_store, &[], slow, &[]);
     b.switch_to_block(inline_store);
