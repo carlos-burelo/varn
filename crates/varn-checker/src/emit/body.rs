@@ -453,7 +453,9 @@ impl<'a> FnEmitter<'a> {
                 one(TirStmt::Loop { cond: bool_lit(true), body: loop_body })
             }
 
-            StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
+            StmtKind::ForOf { left, right, body, is_await, .. } => {
+                self.lower_for_of(left, right, body, *is_await)
+            }
             StmtKind::ForIn { left, right, body, .. } => self.lower_for_in(left, right, body),
 
             StmtKind::Try { block, catches, finally } => {
@@ -793,15 +795,22 @@ impl<'a> FnEmitter<'a> {
         let keys = self.hoist(keys);
         out.extend(std::mem::take(&mut self.pending));
         let Pattern::Identifier { name, .. } = left else {
-            return self.lower_for_of_protocol(left, keys, out, body);
+            return self.lower_for_of_protocol(left, keys, out, body, false);
         };
         let name = name.clone();
         out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
         out
     }
 
-    fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+    fn lower_for_of(
+        &mut self,
+        left: &Pattern,
+        right: &Expr,
+        body: &Stmt,
+        is_await: bool,
+    ) -> Vec<TirStmt> {
         // `for (i of a..b)` — a plain integer loop, `..=` bumping the bound.
+        if !is_await {
         if let (ExprKind::Range { start, end, inclusive }, Pattern::Identifier { name, .. }) =
             (&right.kind, left)
         {
@@ -865,12 +874,19 @@ impl<'a> FnEmitter<'a> {
             out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
             return out;
         }
+        } // !is_await
 
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
 
+        // `for await (x of src)` is never a plain array walk: it awaits each
+        // step off the async iterator.
+        if is_await {
+            return self.lower_for_of_protocol(left, iter, out, body, true);
+        }
+
         let Pattern::Identifier { name, .. } = left else {
-            return self.lower_for_of_protocol(left, iter, out, body);
+            return self.lower_for_of_protocol(left, iter, out, body, false);
         };
         // A statically-typed array indexes directly. So does a `Dynamic`
         // subject — `for (x of bucket)` where `bucket` came off an index
@@ -880,7 +896,7 @@ impl<'a> FnEmitter<'a> {
         let elem_ty = match iter.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
             BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unannotated),
-            _ => return self.lower_for_of_protocol(left, iter, out, body),
+            _ => return self.lower_for_of_protocol(left, iter, out, body, false),
         };
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
@@ -968,15 +984,38 @@ impl<'a> FnEmitter<'a> {
         src: TirExpr,
         mut out: Vec<TirStmt>,
         body: &Stmt,
+        is_await: bool,
     ) -> Vec<TirStmt> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
         let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
 
-        let it = self.fresh_local(dyn_ty);
-        out.push(TirStmt::Let {
-            local: it,
-            ty: dyn_ty,
-            init: Some(TirExpr {
+        // Sync: `src.iterator()`. Async (`for await`): `src["Symbol.asyncIterator"]()`
+        // — the runtime hangs the async iterator off that field.
+        let iter_getter = if is_await {
+            TirExpr {
+                kind: TirExprKind::Call {
+                    callee: Box::new(TirExpr {
+                        kind: TirExprKind::Index {
+                            object: Box::new(src),
+                            index: Box::new(TirExpr {
+                                kind: TirExprKind::StrLit(Rc::from("Symbol.asyncIterator")),
+                                ty: BackendTy::Str,
+                                res: Resolution::None,
+                                span: Span::EMPTY,
+                            }),
+                        },
+                        ty: dyn_ty,
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                    args: vec![],
+                },
+                ty: dyn_ty,
+                res: by_name("<asyncIterator>"),
+                span: Span::EMPTY,
+            }
+        } else {
+            TirExpr {
                 kind: TirExprKind::MethodCall {
                     recv: Box::new(src),
                     name: Rc::from("iterator"),
@@ -985,8 +1024,10 @@ impl<'a> FnEmitter<'a> {
                 ty: dyn_ty,
                 res: by_name("iterator"),
                 span: Span::EMPTY,
-            }),
-        });
+            }
+        };
+        let it = self.fresh_local(dyn_ty);
+        out.push(TirStmt::Let { local: it, ty: dyn_ty, init: Some(iter_getter) });
         let it_var = || TirExpr {
             kind: TirExprKind::Var,
             ty: dyn_ty,
@@ -1008,21 +1049,26 @@ impl<'a> FnEmitter<'a> {
             span: Span::EMPTY,
         };
 
-        let mut loop_body = vec![
-            TirStmt::Let {
-                local: step,
-                ty: dyn_ty,
-                init: Some(TirExpr {
-                    kind: TirExprKind::MethodCall {
-                        recv: Box::new(it_var()),
-                        name: Rc::from("next"),
-                        args: vec![],
-                    },
-                    ty: dyn_ty,
-                    res: by_name("next"),
-                    span: Span::EMPTY,
-                }),
+        let mut next_call = TirExpr {
+            kind: TirExprKind::MethodCall {
+                recv: Box::new(it_var()),
+                name: Rc::from("next"),
+                args: vec![],
             },
+            ty: dyn_ty,
+            res: by_name("next"),
+            span: Span::EMPTY,
+        };
+        if is_await {
+            next_call = TirExpr {
+                kind: TirExprKind::Await { future: Box::new(next_call) },
+                ty: dyn_ty,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+        }
+        let mut loop_body = vec![
+            TirStmt::Let { local: step, ty: dyn_ty, init: Some(next_call) },
             TirStmt::If {
                 cond: field(step_var(), "done"),
                 then_body: vec![TirStmt::Break],
