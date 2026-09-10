@@ -238,25 +238,32 @@ intérprete corriendo de vuelta. `run --compare-tiers` como control.
       un op-id sobre el tipo estático misdespacharía (lo caza
       `tests/26-numeric-coercion`). El set se construye en `emit_module`
       desde `bind.core.class_members`. `commit 7e540ba1`.
-- [~] **`CallIntrinsic` (wire de math/int).** El camino `Resolution::Intrinsic`
-      (bytes wire de `std:math`, `IntOp::ToString`) sigue sin productor. Menor
-      valor (funciones libres de `std:math`, mayormente); se retoma junto con
-      la reintroducción del canal de anotaciones `intrinsic`.
-- [x] **`LoadGlobalIdx` directo — regiones de globales por módulo.**
-      (`6ff813d1` + `3fce8b49`, ver `docs/TIR_ETAPA_4_GLOBALS.md`.) El checker
-      ya numera los globales de módulo (`Resolution::GlobalSlot`); ahora
-      `from_tir` emite `LoadGlobalIdx` / `StoreGlobalIdx` RELATIVOS a la
-      región del módulo. Cada módulo reserva una región contigua del
-      `GlobalStore` al evaluarse (`FunctionProto.global_count`); la closure
-      lleva `module_base` y lo hereda cada closure anidada / fork de
-      generador / fork de task. Intérprete y JIT suman `module_base`; el link
-      estático (`K::Global`) también, vía `CtxLinker::for_module`. El pase de
-      reescritura queda reducido a `LoadGlobal` de prelude → nuevo opcode
-      `LoadNativeGlobalIdx`. Corpus 321/321 ×3 tiers, main.vn 1180 ×3,
-      compare-tiers limpio. La re-derivación en runtime de los globales de
-      módulo — el grueso — desapareció; borrar el pase residual del prelude
-      (frontera del host, sin regresión de perf) es Fase B opcional.
+- [x] **`CallIntrinsic` (wire de `std:math`).** (`b60b88e7`.) `import { abs,
+      sqrt, floor, ceil } from "std:math"` → `Resolution::Intrinsic(wire)` →
+      `InstKind::IntrinsicCall` / `IntrinsicDirect`: el JIT emite una
+      instrucción ISA (`sqrtsd`, …) sin cruzar la frontera FFI.
+      `math_intrinsic_imports` mapea nombre local → wire byte; la ligadura del
+      import descarta un shadow. `tests/67` emite `IntrinsicDirect`.
+- [x] **`LoadGlobalIdx` directo — regiones de globales por módulo, pase
+      BORRADO.** (`6ff813d1` + `3fce8b49` + `bf550a5d`, ver
+      `docs/TIR_ETAPA_4_GLOBALS.md`.) El checker numera los globales de módulo
+      (`Resolution::GlobalSlot`) y los del prelude
+      (`varn_builtins::native_global_layout` → `Resolution::NativeGlobal`);
+      `from_tir` emite `LoadGlobalIdx`/`StoreGlobalIdx` (relativos a la región
+      del módulo) y `LoadNativeGlobalIdx` (absoluto) directamente. Cada módulo
+      reserva su región del `GlobalStore` al evaluarse
+      (`FunctionProto.global_count`); la closure lleva `module_base`, heredado
+      por cada closure anidada / fork de generador / fork de task. Intérprete y
+      JIT suman `module_base`; el link estático (`K::Global`) vía
+      `CtxLinker::for_module`. Miembros de `extension` numerados como globales
+      de módulo. **`globals/resolve.rs` + sus 3 call sites +
+      `FunctionProto.globals_id` + `GlobalStore::id` BORRADOS.** La
+      re-derivación en runtime de los globales desapareció.
 
 *Control cumplido:* 321/321 `tests/*.vn` byte-idénticos en los 3 tiers;
 `tests/main.vn` → PASSED 1180 (JIT / no-JIT / std-dev); `run --compare-tiers`
-sin desacuerdos sobre el corpus completo; `cargo test --workspace` verde.
+sin desacuerdos sobre el corpus completo; `cargo test --workspace` +
+`cargo clippy --workspace` verdes; isolates + `vn cache clean` roundtrip OK.
+
+**Etapa 4 CERRADA.** Sigue Etapa 5 (formaliza el JIT; `K` derivado de
+`BackendTy`; `FunctionProto.register_meta` cambia de forma).

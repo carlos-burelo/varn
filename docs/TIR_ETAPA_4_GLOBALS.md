@@ -63,25 +63,35 @@ slot recorriendo bytecode:
 Esto es la parte del objetivo inviolable que tocaba a los globales: la
 re-derivación en runtime de los globales de MÓDULO — el grueso — desapareció.
 
-### Fase B — opcional: borrar el pase residual del prelude
+### Fase B — el pase muere del todo — HECHA (`bf550a5d`)
 
-El pase que queda liga `print`/`assert` a la capa del host en tiempo de carga.
-Es defendible como frontera del host (el compilador honestamente no posee esos
-símbolos: `Resolution::ByName { why: HostBoundary }`), no una re-derivación de
-lo que el checker sabía. Y NO hay regresión de rendimiento: el pase corre antes
-de ejecutar, así que una función que lee `assert` sí compila a CLIF
-(verificado: `CLIF ROUTE check`).
+- `varn_builtins::native_global_layout() -> &[&'static str]` — el orden exacto
+  que construye `with_native_layout` (`["print","assert"]` ++ resto ordenado,
+  del set `{isIsolate, core} ∪ campos del módulo globals`).
+  `with_native_layout` lo consume para el ORDEN y `register_globals_vm` sólo
+  para los valores — misma fuente, imposible que difieran.
+- `Resolution::NativeGlobal(u32)` + `InstKind::LoadNativeGlobalIdx(u32)`.
+- checker `resolve_name`: antes de `ByName`, `native_global_index(name)` →
+  `Resolution::NativeGlobal(idx)`. `Call` con callee `NativeGlobal` propaga la
+  resolución.
+- Miembros de `extension` (`__ext*`) numerados como globales de módulo
+  (`collect_extension_names`) → `InstKind::ExtensionCall` gana `slot: Option<u32>`
+  → `LoadGlobalIdx` en vez de nombre. Una `x.extMethod()` caliente ya compila
+  a CLIF (antes bailaba).
+- BORRADOS: `globals/resolve.rs` + sus 3 call sites (`Vm::resolve_globals`,
+  `resolve_shared` en `eval_module_proto`, `resolve_in_proto` en el fork de
+  task), `FunctionProto.globals_id`, `GlobalStore::id` + `next_store_id` + el
+  baile de pre-resolución del bench, la dep `varn-vm` de `varn-debug`
+  (`resolved_copy` ahora es clon a secas).
+- `varn-checker` gana dep de `varn-builtins` (feature-unificada bajo
+  `--workspace`).
 
-Si aún así se quiere borrar:
+### Fase C — `CallIntrinsic` — HECHA (`b60b88e7`)
 
-10. `varn-builtins::native_global_names() -> Vec<&'static str>` en el orden
-    exacto que construye `with_native_layout` (`["print","assert"]` ++
-    resto ordenado). `with_native_layout` lo consume — misma fuente, imposible
-    que difieran.
-11. `Resolution::NativeGlobal(u32)` + `InstKind::LoadNativeGlobalIdx(u32)`.
-12. checker `resolve_name`: antes de caer a `ByName`, mirar
-    `native_global_names` → `Resolution::NativeGlobal(idx)`.
-13. Borrar `globals/resolve.rs`, sus 3 call sites, `FunctionProto.globals_id`.
+`import { abs, sqrt, floor, ceil } from "std:math"` → `IntrinsicCall` /
+`IntrinsicDirect` (una instrucción ISA en el JIT, sin cruzar la frontera FFI).
+`math_intrinsic_imports` mapea nombre local → wire byte; la ligadura del
+import descarta un shadow del usuario.
 
 ## Control (cada fase)
 
