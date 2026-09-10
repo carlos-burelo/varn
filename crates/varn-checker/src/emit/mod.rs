@@ -82,6 +82,22 @@ pub fn emit_module(
         );
         global_slots.insert(sym.name.clone(), slot);
     }
+    // Nested namespaces (and their members) are not binder symbols, but they
+    // still need a qualified global to hang the object off. Give every
+    // declared-but-unslotted name a slot.
+    {
+        let mut extra: Vec<Rc<str>> = declared
+            .iter()
+            .filter(|n| !global_slots.contains_key(n.as_ref()))
+            .cloned()
+            .collect();
+        extra.sort();
+        for name in extra {
+            let slot = globals.len() as u32;
+            globals.push(BackendTy::Dynamic(DynReason::Unannotated));
+            global_slots.insert(name, slot);
+        }
+    }
     let mut global_names: Vec<Rc<str>> = vec![Rc::from(""); globals.len()];
     for (name, &slot) in &global_slots {
         global_names[slot as usize] = name.clone();

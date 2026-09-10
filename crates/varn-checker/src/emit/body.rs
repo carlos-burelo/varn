@@ -469,24 +469,36 @@ impl<'a> FnEmitter<'a> {
             // `using x = …` disposes at scope end; the binding itself lowers
             // like a `let`, the disposal is a runtime concern.
             StmtKind::Using { declarations, .. } => {
+                let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
                 let mut out = Vec::new();
                 for d in declarations {
-                    if let Pattern::Identifier { name, .. } = &d.id {
-                        let init = d.init.as_ref().map(|e| self.lower_expr(e));
-                        let ty = init
-                            .as_ref()
-                            .map(|e| e.ty)
-                            .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                        let local = self.bind_local(name.clone(), ty);
-                        out.extend(std::mem::take(&mut self.pending));
-                        out.push(TirStmt::Let { local, ty, init });
-                        if let Some(frame) = self.disposables.last_mut() {
-                            frame.push(TirExpr {
-                                kind: TirExprKind::Var,
-                                ty,
-                                res: Resolution::Local(local),
-                                span: Span::EMPTY,
-                            });
+                    let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                    match &d.id {
+                        Pattern::Identifier { name, .. } => {
+                            let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
+                            let local = self.bind_local(name.clone(), ty);
+                            out.extend(std::mem::take(&mut self.pending));
+                            out.push(TirStmt::Let { local, ty, init });
+                            if let Some(frame) = self.disposables.last_mut() {
+                                frame.push(TirExpr {
+                                    kind: TirExprKind::Var,
+                                    ty,
+                                    res: Resolution::Local(local),
+                                    span: Span::EMPTY,
+                                });
+                            }
+                        }
+                        // `using { a, b } = res` — the whole `res` disposes;
+                        // the pattern only pulls fields out of it.
+                        pat => {
+                            let src = init.unwrap_or_else(|| placeholder(DynReason::Unannotated));
+                            out.extend(std::mem::take(&mut self.pending));
+                            let src = self.hoist(src);
+                            out.extend(std::mem::take(&mut self.pending));
+                            if let Some(frame) = self.disposables.last_mut() {
+                                frame.push(src.clone());
+                            }
+                            self.bind_pattern(pat, src, &mut out);
                         }
                     }
                 }
