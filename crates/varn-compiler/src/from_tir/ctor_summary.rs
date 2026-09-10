@@ -290,6 +290,7 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
             out.push(rhs);
         }
         Unary { operand, .. } | Cast { operand } | ObjectKeys { operand } => out.push(operand),
+        IterInit { source, .. } => out.push(source),
         Field { object, .. } => out.push(object),
         Index { object, index } => {
             out.push(object);

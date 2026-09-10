@@ -158,6 +158,10 @@ pub enum TirExprKind {
     /// The enumerable string keys of an object — the iterand of `for…in`.
     /// Produces `str[]`.
     ObjectKeys { operand: Box<TirExpr> },
+    /// The iterator object for `for…of` — `source[Symbol.iterator]()` (or
+    /// `Symbol.asyncIterator` when `is_async`). Works for arrays, generators,
+    /// and any object carrying the symbol; the emitter then drives `.next()`.
+    IterInit { source: Box<TirExpr>, is_async: bool },
 
     /// `super(args)` — the base constructor call, only valid inside a
     /// subclass constructor.

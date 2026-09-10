@@ -259,6 +259,7 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             check_expr(m, f, else_val, errors);
         }
         TirExprKind::ObjectKeys { operand } => check_expr(m, f, operand, errors),
+        TirExprKind::IterInit { source, .. } => check_expr(m, f, source, errors),
         TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
             for a in args { check_expr(m, f, a.value(), errors); }
         }

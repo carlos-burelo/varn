@@ -920,7 +920,6 @@ impl<'a> FnEmitter<'a> {
         // known non-array iterable type takes the `.iterator()` protocol.
         let elem_ty = match iter.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
-            BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unannotated),
             _ => return self.lower_for_of_protocol(left, iter, out, body, false),
         };
         let arr = self.hoist(iter);
@@ -1017,42 +1016,14 @@ impl<'a> FnEmitter<'a> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
         let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
 
-        // Sync: `src.iterator()`. Async (`for await`): `src["Symbol.asyncIterator"]()`
-        // — the runtime hangs the async iterator off that field.
-        let iter_getter = if is_await {
-            TirExpr {
-                kind: TirExprKind::Call {
-                    callee: Box::new(TirExpr {
-                        kind: TirExprKind::Index {
-                            object: Box::new(src),
-                            index: Box::new(TirExpr {
-                                kind: TirExprKind::StrLit(Rc::from("Symbol.asyncIterator")),
-                                ty: BackendTy::Str,
-                                res: Resolution::None,
-                                span: Span::EMPTY,
-                            }),
-                        },
-                        ty: dyn_ty,
-                        res: Resolution::None,
-                        span: Span::EMPTY,
-                    }),
-                    args: vec![],
-                },
-                ty: dyn_ty,
-                res: by_name("<asyncIterator>"),
-                span: Span::EMPTY,
-            }
-        } else {
-            TirExpr {
-                kind: TirExprKind::MethodCall {
-                    recv: Box::new(src),
-                    name: Rc::from("iterator"),
-                    args: vec![],
-                },
-                ty: dyn_ty,
-                res: by_name("iterator"),
-                span: Span::EMPTY,
-            }
+        out.extend(std::mem::take(&mut self.pending));
+        // `src[Symbol.iterator]()` (or `Symbol.asyncIterator`) — the backend
+        // resolves the symbol for arrays, generators and objects alike.
+        let iter_getter = TirExpr {
+            kind: TirExprKind::IterInit { source: Box::new(src), is_async: is_await },
+            ty: dyn_ty,
+            res: Resolution::None,
+            span: Span::EMPTY,
         };
         let it = self.fresh_local(dyn_ty);
         out.push(TirStmt::Let { local: it, ty: dyn_ty, init: Some(iter_getter) });
