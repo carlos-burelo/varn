@@ -56,6 +56,36 @@ fn lower_kind(
     names: &dyn NameResolver,
 ) -> BackendTy {
     match kind {
+        // `Map` / `Set` are structured intrinsics: their element types live in
+        // a `Generic` node, or are absent for a bare annotation. Either way the
+        // container itself is a known reference type, not `Dynamic` — this is
+        // what lets `m.get(k)` reach `CallNativeOp` and `.size` a typed read.
+        // `Map<V>` (key defaults to `str`) or `Map<K, V>`.
+        TypeKind::Generic(name, args, _)
+            if name.as_ref() == TypeTag::Map.name() && (args.len() == 1 || args.len() == 2) =>
+        {
+            let (k, v) = if args.len() == 2 {
+                (lower_type(&args[0], tt, names), lower_type(&args[1], tt, names))
+            } else {
+                (BackendTy::Str, lower_type(&args[0], tt, names))
+            };
+            BackendTy::Map(tt.intern(k), tt.intern(v))
+        }
+        TypeKind::Generic(name, args, _)
+            if name.as_ref() == TypeTag::Set.name() && args.len() == 1 =>
+        {
+            let el = lower_type(&args[0], tt, names);
+            BackendTy::Set(tt.intern(el))
+        }
+        TypeKind::Intrinsic(TypeTag::Map) => {
+            let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
+            BackendTy::Map(d, d)
+        }
+        TypeKind::Intrinsic(TypeTag::Set) => {
+            let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
+            BackendTy::Set(d)
+        }
+
         TypeKind::Intrinsic(tag) => lower_tag(*tag),
 
         TypeKind::Array(el) => {
