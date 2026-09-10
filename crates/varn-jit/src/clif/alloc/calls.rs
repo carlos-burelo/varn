@@ -312,37 +312,27 @@ pub(crate) fn emit_call_self(
     )
 }
 
-pub(crate) fn emit_get_property(
+/// The instance-field inline-cache probe shared by `GetProperty` /
+/// `SetProperty`. `obj_tag` / `obj_payload` are the receiver's split VmValue.
+/// On return the builder sits in a fresh block where `field_addr` (the
+/// VmValue-slot address of the resolved field) and `is_nursery` (`i8`, non-zero
+/// when the receiver is a nursery object — a store then needs no write barrier)
+/// are valid. Every shape the probe does not handle — non-heap, non-instance,
+/// cache miss, a hit past the first four entries, any non-`INSTANCE_FIELD`
+/// kind — jumps to `slow`.
+fn emit_instance_field_ic(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
-    state: &[K],
-    _meta: &[varn_types::register_meta::RegisterMeta],
-    code: &[u16],
-    ip: usize,
-) {
+    obj_tag: cranelift_codegen::ir::Value,
+    obj_payload: cranelift_codegen::ir::Value,
+    cs_idx: usize,
+    slow: cranelift_codegen::ir::Block,
+) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
     use super::super::emit::{HEAP_KIND, KIND_MASK};
-
-    let dest = (code[ip] >> 8) as usize;
-    let obj_r = (code[ip + 1] >> 8) as usize;
-    let cs_idx = (code[ip + 1] & 0xFF) as usize;
-    let name_idx = code[ip + 2] as usize;
-    let next_ip = ip + 3;
-
     let m = MemFlags::trusted();
     let olay = actx.helpers.object_layout;
     let alay = actx.helpers.array_layout;
 
-    let obj = box_or_load_home(b, actx, state, obj_r);
-    let (obj_tag, obj_payload) = b.ins().isplit(obj);
-
-    // `cont` merges the inline-cache result and the helper result; `slow` is
-    // the runtime path for every shape the probe below does not handle
-    // (getters, methods, shape props, non-instance receivers, cache miss).
-    let cont = b.create_block();
-    b.append_block_param(cont, types::I128);
-    let slow = b.create_block();
-
-    // ── Inline IC fast path: a class instance field the checker did not pin ──
     let tag = b.ins().band_imm(obj_tag, KIND_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let probe = b.create_block();
@@ -358,6 +348,7 @@ pub(crate) fn emit_get_property(
         actx.helpers.heap_field_offset as i32,
     );
     let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let is_nursery = b.ins().icmp_imm(IntCC::Equal, old_bit, 0);
     let base_old = b.ins().load(
         types::I64,
         m,
@@ -386,12 +377,10 @@ pub(crate) fn emit_get_property(
     b.ins().brif(is_inst, inst_ok, &[], slow, &[]);
     b.switch_to_block(inst_ok);
 
-    let data_ptr = {
-        let obj_ptr = b
-            .ins()
-            .iadd_imm(slot_addr, olay.instance_payload_off as i64);
-        b.ins().load(types::I64, m, obj_ptr, 0)
-    };
+    let obj_ptr = b
+        .ins()
+        .iadd_imm(slot_addr, olay.instance_payload_off as i64);
+    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
     let class_id = {
         let cid = b
             .ins()
@@ -411,9 +400,12 @@ pub(crate) fn emit_get_property(
         .ins()
         .iadd_imm(ic_base, (cs_idx * actx.helpers.poly_ic_slot_size) as i64);
 
+    let resolved = b.create_block();
+    b.append_block_param(resolved, types::I64);
+    b.append_block_param(resolved, types::I8); // is_nursery (icmp result)
+
     // Probe the first four entries (`CacheEntry` is 8 bytes: id u32 @0,
-    // slot u16 @4, is_class u8 @6). A hit past four, or any other kind, falls
-    // to the helper — still correct, just not inlined.
+    // slot u16 @4, is_class u8 @6).
     const INSTANCE_FIELD: i64 = varn_types::chunk::ICKind::INSTANCE_FIELD as i64;
     for e in 0..4i32 {
         let eoff = e * 8;
@@ -426,19 +418,52 @@ pub(crate) fn emit_get_property(
         let id_ok = b.ins().icmp(IntCC::Equal, eid, class_id);
         let kind_ok = b.ins().icmp_imm(IntCC::Equal, eisc, INSTANCE_FIELD);
         let hit = b.ins().band(id_ok, kind_ok);
-        let do_load = b.create_block();
+        let do_hit = b.create_block();
         let next = b.create_block();
-        b.ins().brif(hit, do_load, &[], next, &[]);
+        b.ins().brif(hit, do_hit, &[], next, &[]);
 
-        b.switch_to_block(do_load);
+        b.switch_to_block(do_hit);
         let field_off = b.ins().imul_imm(eslot, 16);
         let field_addr = b.ins().iadd(values_base, field_off);
-        let v = b.ins().load(types::I128, m, field_addr, 0);
-        b.ins().jump(cont, &[v.into()]);
+        b.ins()
+            .jump(resolved, &[field_addr.into(), is_nursery.into()]);
 
         b.switch_to_block(next);
     }
     b.ins().jump(slow, &[]);
+
+    b.switch_to_block(resolved);
+    let field_addr = b.block_params(resolved)[0];
+    let is_nursery = b.block_params(resolved)[1];
+    (field_addr, is_nursery)
+}
+
+pub(crate) fn emit_get_property(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    _meta: &[varn_types::register_meta::RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let obj_r = (code[ip + 1] >> 8) as usize;
+    let cs_idx = (code[ip + 1] & 0xFF) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let next_ip = ip + 3;
+
+    let m = MemFlags::trusted();
+    let obj = box_or_load_home(b, actx, state, obj_r);
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
+
+    let cont = b.create_block();
+    b.append_block_param(cont, types::I128);
+    let slow = b.create_block();
+
+    let (field_addr, _is_nursery) =
+        emit_instance_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
+    let v = b.ins().load(types::I128, m, field_addr, 0);
+    b.ins().jump(cont, &[v.into()]);
 
     // ── Slow path: the runtime property helper ──
     b.switch_to_block(slow);
@@ -474,7 +499,6 @@ pub(crate) fn emit_get_property(
     );
     b.ins().jump(cont, &[res.into()]);
 
-    // ── Result ──
     b.switch_to_block(cont);
     let v = b.block_params(cont)[0];
     def_result(b, actx, dest, v);
@@ -493,10 +517,29 @@ pub(crate) fn emit_set_property(
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
+    let m = MemFlags::trusted();
     let obj = box_or_load_home(b, actx, state, obj_r);
     let val = box_or_load_home(b, actx, state, val_r);
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let (val_tag, val_payload) = b.ins().isplit(val);
+
+    let cont = b.create_block();
+    let slow = b.create_block();
+
+    // A nursery instance field the checker did not pin: store the VmValue
+    // directly. An old-gen receiver falls to the helper, which carries the
+    // old←young write barrier.
+    let (field_addr, is_nursery) =
+        emit_instance_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
+    let inline_store = b.create_block();
+    b.ins().brif(is_nursery, inline_store, &[], slow, &[]);
+    b.switch_to_block(inline_store);
+    let val128 = b.ins().iconcat(val_tag, val_payload);
+    b.ins().store(m, val128, field_addr, 0);
+    b.ins().jump(cont, &[]);
+
+    // ── Slow path: the runtime property helper ──
+    b.switch_to_block(slow);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -519,6 +562,8 @@ pub(crate) fn emit_set_property(
             ipv,
         ],
     );
-
     reload_boxed(b, actx, state, &regs);
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
 }
