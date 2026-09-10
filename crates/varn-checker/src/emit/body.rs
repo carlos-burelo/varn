@@ -851,7 +851,18 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::Local(i),
                 span: Span::EMPTY,
             };
-            out.push(TirStmt::Let { local: i, ty: BackendTy::Int, init: Some(lo) });
+            // `lo - 1`, stepped first each iteration so `continue` still bumps.
+            let start = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Sub,
+                    lhs: Box::new(lo),
+                    rhs: Box::new(int_lit(1)),
+                },
+                ty: BackendTy::Int,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            out.push(TirStmt::Let { local: i, ty: BackendTy::Int, init: Some(start) });
             let cond = TirExpr {
                 kind: TirExprKind::Binary {
                     op: TirBinOp::Lt,
@@ -862,10 +873,7 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::None,
                 span: Span::EMPTY,
             };
-            let mut loop_body =
-                vec![TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] }];
-            loop_body.extend(self.lower_stmt_as_block(body));
-            loop_body.push(TirStmt::Expr(TirExpr {
+            let step = TirStmt::Expr(TirExpr {
                 kind: TirExprKind::Assign {
                     target: Box::new(ivar()),
                     value: Box::new(TirExpr {
@@ -882,7 +890,12 @@ impl<'a> FnEmitter<'a> {
                 ty: BackendTy::Void,
                 res: Resolution::None,
                 span: Span::EMPTY,
-            }));
+            });
+            let mut loop_body = vec![
+                step,
+                TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
+            ];
+            loop_body.extend(self.lower_stmt_as_block(body));
             out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
             return out;
         }
@@ -928,7 +941,9 @@ impl<'a> FnEmitter<'a> {
     ) -> Vec<TirStmt> {
         let mut out = Vec::new();
         let idx = self.fresh_local(BackendTy::Int);
-        out.push(TirStmt::Let { local: idx, ty: BackendTy::Int, init: Some(int_lit(0)) });
+        // Start at -1 and step FIRST each iteration, so a `continue` in the
+        // body (which jumps to the loop head) still advances the index.
+        out.push(TirStmt::Let { local: idx, ty: BackendTy::Int, init: Some(int_lit(-1)) });
         let idx_var = || TirExpr {
             kind: TirExprKind::Var,
             ty: BackendTy::Int,
@@ -959,12 +974,7 @@ impl<'a> FnEmitter<'a> {
         };
         let x_local = self.bind_local(name.clone(), elem_ty);
 
-        let mut loop_body = vec![
-            TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
-            TirStmt::Let { local: x_local, ty: elem_ty, init: Some(elem) },
-        ];
-        loop_body.extend(self.lower_stmt_as_block(body));
-        loop_body.push(TirStmt::Expr(TirExpr {
+        let step = TirStmt::Expr(TirExpr {
             kind: TirExprKind::Assign {
                 target: Box::new(idx_var()),
                 value: Box::new(TirExpr {
@@ -981,7 +991,13 @@ impl<'a> FnEmitter<'a> {
             ty: BackendTy::Void,
             res: Resolution::None,
             span: Span::EMPTY,
-        }));
+        });
+        let mut loop_body = vec![
+            step,
+            TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
+            TirStmt::Let { local: x_local, ty: elem_ty, init: Some(elem) },
+        ];
+        loop_body.extend(self.lower_stmt_as_block(body));
 
         out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
         out
