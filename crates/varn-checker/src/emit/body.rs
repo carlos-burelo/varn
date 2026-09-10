@@ -2372,8 +2372,18 @@ impl<'a> FnEmitter<'a> {
                 };
             }
 
-            // `Missing` (a parse hole) and a class expression have no runtime
-            // value we model: a well-formed null.
+            // `class { … }` — built at its `let`'s position; the expression is
+            // a load of the `<anon>` class global.
+            ExprKind::ClassExpr { .. } => {
+                return TirExpr {
+                    kind: TirExprKind::Var,
+                    ty,
+                    res: self.resolve_name("<anon>"),
+                    span,
+                };
+            }
+
+            // `Missing` (a parse hole) has no runtime value: a well-formed null.
             _ => None,
         };
 

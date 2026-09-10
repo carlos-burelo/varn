@@ -255,6 +255,18 @@ fn build_enums(
                 .map(|vs| vs.as_slice())
                 .unwrap_or(&[])
                 .iter()
+                // Methods, accessors and `static` members share the enum body
+                // but are not variants — including them shifts every tag.
+                .filter(|v| {
+                    !v.is_static
+                        && !matches!(
+                            v.kind,
+                            crate::types::ClassMemberKind::Method
+                                | crate::types::ClassMemberKind::Getter
+                                | crate::types::ClassMemberKind::Setter
+                                | crate::types::ClassMemberKind::Constructor
+                        )
+                })
                 .enumerate()
                 .map(|(tag, v)| {
                     let payload = bind

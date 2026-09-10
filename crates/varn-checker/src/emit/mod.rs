@@ -206,6 +206,14 @@ pub fn emit_module(
                     }
                     emit_namespace_object(ns, &fn_index, &global_slots, &mut top, &mut top_body);
                 }
+                // `let X = class { … }` — build the class here, then let the
+                // `let` bind `X` to it (the initializer lowers to a load of the
+                // `<anon>` global).
+                StmtKind::Decl(d) if anon_class_of(d).is_some() => {
+                    top_body.push(TirStmt::BuildClass(class_ord));
+                    class_ord += 1;
+                    top_body.extend(top.lower_stmt_as_block(stmt));
+                }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
             }
@@ -237,7 +245,7 @@ pub fn emit_module(
                          functions: &mut Vec<TirFunction>,
                          types: &mut TyTable,
                          signatures: &mut Vec<Signature>| {
-        if let Some(class) = class_decl(decl) {
+        if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl)) {
             class_defs.push(emit_class(
                 class, &ctx, expr_table, types, signatures, functions,
             ));
@@ -247,7 +255,10 @@ pub fn emit_module(
     };
     for stmt in &program.body {
         let StmtKind::Decl(decl) = &stmt.kind else { continue };
-        if class_decl(decl).is_some() || enum_decl(decl).is_some() {
+        if class_decl(decl).is_some()
+            || enum_decl(decl).is_some()
+            || anon_class_of(decl).is_some()
+        {
             emit_type(decl, &mut class_defs, &mut functions, &mut types, &mut signatures);
         } else if let Some(ns) = namespace_decl(decl) {
             for nested in ns_nested_types(ns) {
@@ -444,6 +455,20 @@ fn emit_namespace_object(
     }));
 }
 
+/// `let X = class { … }` — the class body of an anonymous class expression,
+/// so it is built like a named class (under `<anon>`).
+fn anon_class_of(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
+    let v = variable_decl(decl)?;
+    for d in &v.declarators {
+        if let Some(init) = &d.init {
+            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &init.kind {
+                return Some(declaration);
+            }
+        }
+    }
+    None
+}
+
 fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDecl> {
     match decl {
         Decl::Namespace(n) => Some(n),
@@ -523,6 +548,12 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         Decl::Variable(v) => {
             for d in &v.declarators {
                 pat_names(&d.id, out);
+                if matches!(
+                    d.init.as_ref().map(|e| &e.kind),
+                    Some(varn_core::ast::ExprKind::ClassExpr { .. })
+                ) {
+                    out.insert(Rc::from("<anon>"));
+                }
             }
         }
         Decl::Namespace(ns) => {
@@ -857,9 +888,8 @@ fn emit_class(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
-    let Some(class_name) = class.id.clone() else {
-        return varn_tir::TirClassDef::default();
-    };
+    // An anonymous `class { … }` is bound by the binder under `<anon>`.
+    let class_name = class.id.clone().unwrap_or_else(|| Rc::from("<anon>"));
     let class_id = ctx.names.class_id(&class_name);
 
     let mut def = varn_tir::TirClassDef {
@@ -1234,6 +1264,26 @@ fn emit_enum(
                     is_getter: false,
                     is_static: modifiers.is_static,
                 });
+            }
+            // `enum E { … static val: int; static { E.val = 1 } }`
+            ClassMember::Property { key, init, modifiers, .. } if modifiers.is_static => {
+                let init_x = init.as_ref().map(|e| {
+                    let (pre, x) = lower_outer(
+                        e, ctx, expr_table, types, signatures, out, out.len() as u32, None,
+                    );
+                    def.prelude.extend(pre);
+                    x
+                });
+                def.statics.push((key.clone(), init_x));
+            }
+            ClassMember::StaticBlock { body, .. } => {
+                let sig = fresh_sig(signatures, 0);
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.<static>")),
+                    &[], body, false, false, None, None, sig, ctx, expr_table, types,
+                    signatures, out,
+                );
+                def.static_blocks.push(id);
             }
             _ => {}
         }
