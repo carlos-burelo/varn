@@ -1618,12 +1618,20 @@ impl<'a> FnEmitter<'a> {
                 };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue }; // hole
+                    // A defaulted element (`[a = 0]`) needs a nullable read so
+                    // the `?? default` null test is not folded away as an
+                    // int-can't-be-null constant.
+                    let read_ty = if matches!(el.pattern, Pattern::Assignment { .. }) {
+                        BackendTy::Dynamic(DynReason::Unannotated)
+                    } else {
+                        elem_ty
+                    };
                     let idx = TirExpr {
                         kind: TirExprKind::Index {
                             object: Box::new(src.clone()),
                             index: Box::new(int_lit(i as i64)),
                         },
-                        ty: elem_ty,
+                        ty: read_ty,
                         res: Resolution::None,
                         span: src.span,
                     };
@@ -2249,12 +2257,15 @@ impl<'a> FnEmitter<'a> {
                 return self.cast_to(v, bool_ty);
             }
             // `import.meta.x` / `new.target` — a by-name field read.
+            // `x::name` — the reflection operator. The VM routes a property key
+            // that starts with `::` through `resolve_meta_property`.
             ExprKind::MetaAccess { target, property } => {
                 let obj = self.lower_expr(target);
+                let key: Rc<str> = Rc::from(format!("::{property}"));
                 return TirExpr {
-                    kind: TirExprKind::Field { object: Box::new(obj), name: property.clone() },
+                    kind: TirExprKind::Field { object: Box::new(obj), name: key.clone() },
                     ty,
-                    res: Resolution::ByName { name: property.clone(), why: DynReason::Unannotated },
+                    res: Resolution::ByName { name: key, why: DynReason::Unannotated },
                     span,
                 };
             }
