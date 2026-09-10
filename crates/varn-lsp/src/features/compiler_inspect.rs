@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use varn_compiler::FunctionProto;
 use varn_types::chunk::PoolEntry;
 
@@ -78,24 +77,12 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let dummy_annotations = varn_core::TypeAnnotations::default();
-    let empty_map = FxHashMap::default();
-    let export_names = Vec::new();
-
-    let input = varn_compiler::OptInput {
-        program,
-        annotations: &dummy_annotations,
-        extension_calls: &empty_map,
-        extension_members: &empty_map,
-        extension_set_members: &empty_map,
-        export_names,
-    };
-
-    let ssa_res = varn_compiler::lower_to_ssa(input);
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default(), &Default::default(), &Default::default(), &Default::default());
+    let ssa_res = varn_compiler::from_tir::build_module(&tir);
 
     let mut json_functions = Vec::new();
 
-    if let Ok((funcs, _skipped)) = ssa_res {
+    if let Ok(funcs) = ssa_res {
         for func in funcs {
             let mut json_blocks = Vec::new();
             for (b_idx, block) in func.blocks.iter().enumerate() {
@@ -344,7 +331,7 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
                 .join(" + ");
             format!("build_str({p_str})")
         }
-        MakeClosure { func, .. } => format!("make_closure @{}", func.name),
+        MakeClosure { func, .. } => format!("make_closure tir#{func}"),
         LoadCaptured { var } => format!("load_captured {var:?}"),
         StoreCaptured { var, value } => format!("store_captured {var:?} = v{}", value.0),
         MakeClass { name, .. } => format!("make_class \"{name}\""),
@@ -468,19 +455,9 @@ pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> 
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let dummy_annotations = varn_core::TypeAnnotations::default();
-    let empty_map = FxHashMap::default();
-    let export_names = Vec::new();
-
-    let proto = varn_compiler::compile_module(
-        program,
-        &dummy_annotations,
-        &empty_map,
-        &empty_map,
-        &empty_map,
-        export_names,
-    )
-    .map_err(|e| format!("Compilation failed: {e}"))?;
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default(), &Default::default(), &Default::default(), &Default::default());
+    let proto = varn_compiler::from_tir::compile_module(&tir, Vec::new())
+        .map_err(|e| format!("Compilation failed: {e:?}"))?;
 
     let mut out = String::new();
     format_proto(&proto, 0, &mut out);
@@ -493,42 +470,19 @@ pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
 
-    let dummy_annotations = varn_core::TypeAnnotations::default();
-    let empty_map = FxHashMap::default();
-    let export_names = Vec::new();
-
-    let input = varn_compiler::OptInput {
-        program,
-        annotations: &dummy_annotations,
-        extension_calls: &empty_map,
-        extension_members: &empty_map,
-        extension_set_members: &empty_map,
-        export_names,
-    };
-
-    let mut module = varn_compiler::hir::lower::lower_program(&input)
-        .map_err(|e| format!("HIR lowering failed: {e:?}"))?;
-    varn_compiler::hir::inline::run(&mut module);
-    varn_compiler::hir::module_locals::run(&mut module);
+    let tir = varn_checker::emit::emit_module(program, &state.db.bind, &state.db.expr_table, &Default::default(), &Default::default(), &Default::default(), &Default::default());
+    let fns = varn_compiler::from_tir::build_module(&tir)
+        .map_err(|e| format!("SSA build failed: {e:?}"))?;
 
     let mut out = String::new();
-    out.push_str(&format!("; Varn HIR/SSA Module: {}\n", program.filename));
-    out.push_str(&format!(
-        "; Top-level + {} functions\n\n",
-        module.functions.len()
-    ));
-
-    out.push_str(&format!(
-        "fn @top_level (params: {}, locals: {})\n",
-        module.top_level.params.len(),
-        module.top_level.locals
-    ));
-    for (idx, func) in module.functions.iter().enumerate() {
+    out.push_str(&format!("; Varn TIR/SSA Module: {}\n", program.filename));
+    out.push_str(&format!("; {} SSA function(s)\n\n", fns.len()));
+    for (idx, func) in fns.iter().enumerate() {
         out.push_str(&format!(
-            "fn #{idx} @{} (params: {}, locals: {})\n",
+            "fn #{idx} @{} (locals: {}, blocks: {})\n",
             func.name,
-            func.params.len(),
-            func.locals
+            func.nlocals,
+            func.blocks.len()
         ));
     }
 

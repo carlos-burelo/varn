@@ -123,6 +123,7 @@ impl Coverage {
             }
             TirStmt::Break => {}
             TirStmt::Continue => {}
+            TirStmt::BuildClass(_) => {}
             TirStmt::Throw(e) => self.walk_expr(e),
         }
     }
@@ -177,6 +178,11 @@ impl Coverage {
                     self.walk_expr(x);
                 }
             }
+            TirExprKind::RecordLit { fields } => {
+                for (_, v) in fields {
+                    self.walk_expr(v);
+                }
+            }
             TirExprKind::ArrayLit(els) => {
                 for el in els {
                     match el {
@@ -212,6 +218,21 @@ impl Coverage {
                 self.walk_expr(cond);
                 self.walk_expr(then_val);
                 self.walk_expr(else_val);
+            }
+            TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
+            TirExprKind::IterInit { source, .. } => self.walk_expr(source),
+            TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
+                for a in args { self.walk_expr(a.value()); }
+            }
+            TirExprKind::RangeLit { start, end, .. } => {
+                self.walk_expr(start);
+                self.walk_expr(end);
+            }
+            TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
+            TirExprKind::ObjectRest { object, .. } => self.walk_expr(object),
+            TirExprKind::ExtensionCall { recv, args, .. } => {
+                self.walk_expr(recv);
+                for a in args { self.walk_expr(a.value()); }
             }
             TirExprKind::IntLit(_)
             | TirExprKind::FloatLit(_)

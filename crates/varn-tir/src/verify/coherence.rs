@@ -61,7 +61,7 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
                 walk_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Break | TirStmt::Continue => {}
+        TirStmt::Break | TirStmt::Continue | TirStmt::BuildClass(_) => {}
     }
 }
 
@@ -116,6 +116,11 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
         TirExprKind::TupleLit(xs) => {
             for x in xs {
                 walk_expr(m, f, x, errors);
+            }
+        }
+        TirExprKind::RecordLit { fields } => {
+            for (_, v) in fields {
+                walk_expr(m, f, v, errors);
             }
         }
         TirExprKind::ArrayLit(els) => {
@@ -190,6 +195,21 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
                     e.span,
                 ));
             }
+        }
+        TirExprKind::ObjectKeys { operand } => walk_expr(m, f, operand, errors),
+        TirExprKind::IterInit { source, .. } => walk_expr(m, f, source, errors),
+        TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
+            for a in args { walk_arg(m, f, a, errors); }
+        }
+        TirExprKind::RangeLit { start, end, .. } => {
+            walk_expr(m, f, start, errors);
+            walk_expr(m, f, end, errors);
+        }
+        TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
+        TirExprKind::ObjectRest { object, .. } => walk_expr(m, f, object, errors),
+        TirExprKind::ExtensionCall { recv, args, .. } => {
+            walk_expr(m, f, recv, errors);
+            for a in args { walk_arg(m, f, a, errors); }
         }
         TirExprKind::Select { cond, then_val, else_val } => {
             walk_expr(m, f, cond, errors);

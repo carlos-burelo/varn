@@ -126,6 +126,27 @@ fn check_use(
     }
 }
 
+/// Rebuild every block's `preds` from the current terminators and `Try`
+/// handlers. The optimizer rewrites terminators without always keeping `preds`
+/// in step; callers that need an accurate pred set (the verifier, dominance)
+/// run this first.
+pub(crate) fn recompute_preds(func: &mut SsaFunc) {
+    let n = func.blocks.len();
+    let mut preds = vec![Vec::new(); n];
+    for (b_idx, block) in func.blocks.iter().enumerate() {
+        let bid = BlockId(b_idx as u32);
+        for succ in block_succs(block) {
+            let slot = &mut preds[succ.0 as usize];
+            if !slot.contains(&bid) {
+                slot.push(bid);
+            }
+        }
+    }
+    for (b_idx, block) in func.blocks.iter_mut().enumerate() {
+        block.preds = std::mem::take(&mut preds[b_idx]);
+    }
+}
+
 fn block_succs(block: &Block) -> Vec<BlockId> {
     let mut s = match &block.term {
         Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),

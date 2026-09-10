@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use rust_decimal::Decimal;
 
-use crate::hir::{HirBinOp, HirFunction, HirType, HirUnOp, HirUpvalueSrc, LocalId};
+use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VarId {
@@ -271,7 +271,8 @@ pub enum InstKind {
     /// Listar aquí los valores capturados creaba operandos fantasma que el
     /// backend materializaba en `Move` que nadie lee.
     MakeClosure {
-        func: Rc<HirFunction>,
+        /// Index into `varn_tir::TirModule::functions` — the closure body.
+        func: u32,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
     LoadCaptured {

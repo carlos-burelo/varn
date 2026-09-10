@@ -289,7 +289,7 @@ pub(super) fn emit_value(
         }
 
         InstKind::MakeClosure { func, upvalues_src } => {
-            let proto = crate::lower::lower_function(func, source_file.clone());
+            let proto = crate::from_tir::compile::emit_tir_closure(*func, source_file.clone());
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
             if upvalues_src.is_empty() {
                 chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), line);

@@ -145,7 +145,7 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 check_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Break | TirStmt::Continue => {}
+        TirStmt::Break | TirStmt::Continue | TirStmt::BuildClass(_) => {}
     }
 }
 
@@ -187,6 +187,11 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 check_expr(m, f, x, errors);
             }
         }
+        TirExprKind::RecordLit { fields } => {
+            for (_, v) in fields {
+                check_expr(m, f, v, errors);
+            }
+        }
         TirExprKind::ArrayLit(els) => {
             for el in els {
                 match el {
@@ -207,7 +212,7 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
                 }
             }
         }
-        TirExprKind::Closure { func } => {
+        TirExprKind::Closure { func, .. } => {
             if m.function(*func).is_none() {
                 errors.push(VerifyError::new(
                     format!("Closure names FnId({}), which has no entry", func.0),
@@ -252,6 +257,21 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             check_expr(m, f, cond, errors);
             check_expr(m, f, then_val, errors);
             check_expr(m, f, else_val, errors);
+        }
+        TirExprKind::ObjectKeys { operand } => check_expr(m, f, operand, errors),
+        TirExprKind::IterInit { source, .. } => check_expr(m, f, source, errors),
+        TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
+            for a in args { check_expr(m, f, a.value(), errors); }
+        }
+        TirExprKind::RangeLit { start, end, .. } => {
+            check_expr(m, f, start, errors);
+            check_expr(m, f, end, errors);
+        }
+        TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) => {}
+        TirExprKind::ObjectRest { object, .. } => check_expr(m, f, object, errors),
+        TirExprKind::ExtensionCall { recv, args, .. } => {
+            check_expr(m, f, recv, errors);
+            for a in args { check_expr(m, f, a.value(), errors); }
         }
         TirExprKind::IntLit(_)
         | TirExprKind::FloatLit(_)

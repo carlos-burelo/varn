@@ -21,17 +21,16 @@ pub use ty::{lower_type, NameResolver, NoNames};
 
 use crate::binder::BindResult;
 use crate::checker::TypeEntry;
-use crate::module_resolver::ImportResolver;
 use body::FnEmitter;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use varn_core::ast::{
     AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, Stmt, StmtKind,
 };
 use varn_core::TypeKind;
 use varn_tir::{
-    BackendTy, DynReason, Resolution, Signature, SigId, Span, TirExpr, TirExprKind, TirFunction,
-    TirModule, TirStmt, TyTable,
+    BackendTy, DynReason, FnId, Resolution, Signature, SigId, Span, TirExpr, TirExprKind,
+    TirFunction, TirModule, TirObjectEntry, TirStmt, TyTable,
 };
 
 /// Build the TIR for one module from the same four inputs
@@ -40,8 +39,11 @@ use varn_tir::{
 pub fn emit_module(
     program: &Program,
     bind: &BindResult,
-    _resolver: &dyn ImportResolver,
     expr_table: &FxHashMap<AstId, TypeEntry>,
+    call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
+    ext_calls: &FxHashMap<u32, Rc<str>>,
+    ext_members: &FxHashMap<u32, Rc<str>>,
+    ext_set_members: &FxHashMap<u32, Rc<str>>,
 ) -> TirModule {
     let mut types = TyTable::default();
     ty::prime(&mut types);
@@ -49,10 +51,23 @@ pub fn emit_module(
     let tables::Tables { classes, enums, mut signatures, names } = tables::build(bind, &mut types);
 
     // Module value symbols → global slots, in binder declaration order.
+    // Names this file itself declares at the top level — the only ones that
+    // become a module-qualified global. A builtin (`print`) or a name reaching
+    // us from the prelude is NOT one of these; it resolves by bare name.
+    let mut declared: FxHashSet<Rc<str>> = FxHashSet::default();
+    for stmt in &program.body {
+        if let StmtKind::Decl(d) = &stmt.kind {
+            collect_decl_names(d, &mut declared);
+        }
+    }
+
     let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
     for sym in bind.global_symbols() {
         if !is_value_symbol(sym.kind) {
+            continue;
+        }
+        if !declared.contains(&sym.name) {
             continue;
         }
         if global_slots.contains_key(&sym.name) {
@@ -67,11 +82,31 @@ pub fn emit_module(
         );
         global_slots.insert(sym.name.clone(), slot);
     }
+    // Nested namespaces (and their members) are not binder symbols, but they
+    // still need a qualified global to hang the object off. Give every
+    // declared-but-unslotted name a slot.
+    {
+        let mut extra: Vec<Rc<str>> = declared
+            .iter()
+            .filter(|n| !global_slots.contains_key(n.as_ref()))
+            .cloned()
+            .collect();
+        extra.sort();
+        for name in extra {
+            let slot = globals.len() as u32;
+            globals.push(BackendTy::Dynamic(DynReason::Unannotated));
+            global_slots.insert(name, slot);
+        }
+    }
+    let mut global_names: Vec<Rc<str>> = vec![Rc::from(""); globals.len()];
+    for (name, &slot) in &global_slots {
+        global_names[slot as usize] = name.clone();
+    }
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
     // arity check agrees).
-    let free_fns: Vec<&FunctionDecl> = program
+    let mut free_fns: Vec<&FunctionDecl> = program
         .body
         .iter()
         .filter_map(|s| match &s.kind {
@@ -79,6 +114,28 @@ pub fn emit_module(
             _ => None,
         })
         .collect();
+    // `namespace NS { export function f … }` — a member function is a free
+    // function too, so a sibling member can call it by bare name and the
+    // namespace object can point an entry at it. The object is built below.
+    fn ns_member_fns<'a>(ns: &'a varn_core::ast::NamespaceDecl, out: &mut Vec<&'a FunctionDecl>) {
+        for m in &ns.body {
+            let inner = match m {
+                Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+                other => other,
+            };
+            match inner {
+                Decl::Function(f) => out.push(f),
+                Decl::Namespace(inner_ns) => ns_member_fns(inner_ns, out),
+                _ => {}
+            }
+        }
+    }
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        if let Some(ns) = namespace_decl(d) {
+            ns_member_fns(ns, &mut free_fns);
+        }
+    }
     let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
     for (i, f) in free_fns.iter().enumerate() {
         fn_index.entry(f.id.clone()).or_insert((i as u32, f.params.len() as u32));
@@ -90,6 +147,10 @@ pub fn emit_module(
         enums: &enums,
         globals: &global_slots,
         fns: &fn_index,
+        call_mappings,
+        ext_calls,
+        ext_members,
+        ext_set_members,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -121,9 +182,38 @@ pub fn emit_module(
             &mut closures,
             tl_base,
             vec![],
-        );
+        )
+        .as_top_level();
+        let mut class_ord: u32 = 0;
         for stmt in &program.body {
             match &stmt.kind {
+                // A class / enum declaration: a `BuildClass` at this position,
+                // in the same order `class_defs` is filled below.
+                StmtKind::Decl(d)
+                    if class_decl(d).is_some() || enum_decl(d).is_some() =>
+                {
+                    top_body.push(TirStmt::BuildClass(class_ord));
+                    class_ord += 1;
+                }
+                StmtKind::Decl(d) if namespace_decl(d).is_some() => {
+                    let ns = namespace_decl(d).unwrap();
+                    // Build every class / enum the namespace (and its nested
+                    // namespaces) declares, at this position — matching the
+                    // `class_defs` fill order below.
+                    for _ in ns_nested_types(ns) {
+                        top_body.push(TirStmt::BuildClass(class_ord));
+                        class_ord += 1;
+                    }
+                    emit_namespace_object(ns, &fn_index, &global_slots, &mut top, &mut top_body);
+                }
+                // `let X = class { … }` — build the class here, then let the
+                // `let` bind `X` to it (the initializer lowers to a load of the
+                // `<anon>` global).
+                StmtKind::Decl(d) if anon_class_of(d).is_some() => {
+                    top_body.push(TirStmt::BuildClass(class_ord));
+                    class_ord += 1;
+                    top_body.extend(top.lower_stmt_as_block(stmt));
+                }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
             }
@@ -142,26 +232,58 @@ pub fn emit_module(
         // Module top level permits top-level `await`.
         is_async: true,
         is_generator: false,
+        has_rest: false,
     };
 
     functions.extend(closures);
 
-    // Class methods and constructors, after every closure.
+    // Class / enum construction, methods and constructors, after every
+    // closure. In source order, so a class can extend one declared earlier.
+    let mut class_defs: Vec<varn_tir::TirClassDef> = Vec::new();
+    let emit_type = |decl: &Decl,
+                         class_defs: &mut Vec<varn_tir::TirClassDef>,
+                         functions: &mut Vec<TirFunction>,
+                         types: &mut TyTable,
+                         signatures: &mut Vec<Signature>| {
+        if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl)) {
+            class_defs.push(emit_class(
+                class, &ctx, expr_table, types, signatures, functions,
+            ));
+        } else if let Some(en) = enum_decl(decl) {
+            class_defs.push(emit_enum(en, &ctx, expr_table, types, signatures, functions));
+        }
+    };
     for stmt in &program.body {
         let StmtKind::Decl(decl) = &stmt.kind else { continue };
-        if let Some(class) = class_decl(decl) {
-            emit_class_methods(class, &ctx, expr_table, &mut types, &mut signatures, &mut functions);
+        if class_decl(decl).is_some()
+            || enum_decl(decl).is_some()
+            || anon_class_of(decl).is_some()
+        {
+            emit_type(decl, &mut class_defs, &mut functions, &mut types, &mut signatures);
+        } else if let Some(ns) = namespace_decl(decl) {
+            for nested in ns_nested_types(ns) {
+                emit_type(nested, &mut class_defs, &mut functions, &mut types, &mut signatures);
+            }
         }
     }
 
+    emit_extensions(program, &ctx, expr_table, &mut types, &mut signatures, &mut functions);
+
+    let imports = collect_imports(program);
+    let exports = collect_exports(program);
+
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
+        imports,
+        exports,
         types,
         classes,
         enums,
         signatures,
         functions,
         globals,
+        global_names,
+        class_defs,
         top_level,
     }
 }
@@ -174,6 +296,10 @@ struct MCtx<'a> {
     enums: &'a [varn_tir::EnumInfo],
     globals: &'a FxHashMap<Rc<str>, u32>,
     fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+    call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
+    ext_calls: &'a FxHashMap<u32, Rc<str>>,
+    ext_members: &'a FxHashMap<u32, Rc<str>>,
+    ext_set_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 impl<'a> MCtx<'a> {
@@ -184,6 +310,10 @@ impl<'a> MCtx<'a> {
             enums: self.enums,
             globals: self.globals,
             fns: self.fns,
+            call_mappings: self.call_mappings,
+            ext_calls: self.ext_calls,
+            ext_members: self.ext_members,
+            ext_set_members: self.ext_set_members,
         }
     }
 }
@@ -201,6 +331,149 @@ fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
         Decl::Function(f) => Some(f),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Function(f) => Some(f),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Every class / enum declaration a namespace body contributes, in source
+/// order, descending through nested namespaces. Used to keep the `BuildClass`
+/// statements and the `class_defs` table in lock-step.
+fn ns_nested_types(ns: &varn_core::ast::NamespaceDecl) -> Vec<&Decl> {
+    let mut out = Vec::new();
+    for m in &ns.body {
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        match inner {
+            Decl::Class(_) | Decl::Enum(_) => out.push(inner),
+            Decl::Namespace(inner_ns) => out.extend(ns_nested_types(inner_ns)),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Emit the object global for `ns` (and, first, for every namespace nested in
+/// it). Only `export`ed members appear on the object: a function points at its
+/// free-function global, a class / enum / nested namespace at its qualified
+/// global, a `const` / `let` at its lowered initializer.
+fn emit_namespace_object(
+    ns: &varn_core::ast::NamespaceDecl,
+    fn_index: &FxHashMap<Rc<str>, (u32, u32)>,
+    global_slots: &FxHashMap<Rc<str>, u32>,
+    top: &mut FnEmitter,
+    top_body: &mut Vec<TirStmt>,
+) {
+    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let global_ref = |slot: u32| TirExpr {
+        kind: TirExprKind::Var,
+        ty: dyno(),
+        res: Resolution::GlobalSlot(slot),
+        span: Span::EMPTY,
+    };
+
+    // Nested namespaces are assembled before the parent references them.
+    for m in &ns.body {
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        if let Decl::Namespace(inner_ns) = inner {
+            emit_namespace_object(inner_ns, fn_index, global_slots, top, top_body);
+        }
+    }
+
+    let Some(&slot) = global_slots.get(ns.id.as_ref()) else { return };
+    let mut entries: Vec<TirObjectEntry> = Vec::new();
+    for m in &ns.body {
+        let Decl::Export(_) = m else { continue };
+        let inner = match m {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            _ => continue,
+        };
+        match inner {
+            Decl::Function(f) => {
+                if let Some(&(fnid, _)) = fn_index.get(&f.id) {
+                    entries.push(TirObjectEntry::Field {
+                        name: f.id.clone(),
+                        value: TirExpr {
+                            kind: TirExprKind::Var,
+                            ty: dyno(),
+                            res: Resolution::DirectFn(FnId(fnid)),
+                            span: Span::EMPTY,
+                        },
+                    });
+                }
+            }
+            Decl::Class(_) | Decl::Enum(_) | Decl::Namespace(_) => {
+                let mname = match inner {
+                    Decl::Class(c) => c.id.clone(),
+                    Decl::Enum(e) => Some(e.id.clone()),
+                    Decl::Namespace(n) => Some(n.id.clone()),
+                    _ => None,
+                };
+                if let Some(mname) = mname {
+                    if let Some(&mslot) = global_slots.get(mname.as_ref()) {
+                        entries.push(TirObjectEntry::Field {
+                            name: mname.clone(),
+                            value: global_ref(mslot),
+                        });
+                    }
+                }
+            }
+            Decl::Variable(v) => {
+                for decl in &v.declarators {
+                    if let (Pattern::Identifier { name, .. }, Some(init)) =
+                        (&decl.id, &decl.init)
+                    {
+                        let value = top.lower_expression(init);
+                        entries.push(TirObjectEntry::Field { name: name.clone(), value });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let obj = TirExpr {
+        kind: TirExprKind::ObjectLit { entries },
+        ty: dyno(),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    };
+    top_body.push(TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign {
+            target: Box::new(global_ref(slot)),
+            value: Box::new(obj),
+        },
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    }));
+}
+
+/// `let X = class { … }` — the class body of an anonymous class expression,
+/// so it is built like a named class (under `<anon>`).
+fn anon_class_of(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
+    let v = variable_decl(decl)?;
+    for d in &v.declarators {
+        if let Some(init) = &d.init {
+            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &init.kind {
+                return Some(declaration);
+            }
+        }
+    }
+    None
+}
+
+fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDecl> {
+    match decl {
+        Decl::Namespace(n) => Some(n),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Namespace(n) => Some(n),
             _ => None,
         },
         _ => None,
@@ -229,87 +502,792 @@ fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
     }
 }
 
-fn emit_class_methods(
-    class: &varn_core::ast::ClassDecl,
+/// Top-level binding names this declaration introduces — functions, classes,
+/// enums, `let`/`const` (including destructured), namespaces, and import
+/// locals. The set the module qualifies its globals by.
+fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
+    use varn_core::ast::{ImportSpecifier, Pattern as P};
+    fn pat_names(p: &P, out: &mut FxHashSet<Rc<str>>) {
+        match p {
+            P::Identifier { name, .. } => {
+                out.insert(name.clone());
+            }
+            P::Array { elements, rest, .. } => {
+                for e in elements.iter().flatten() {
+                    pat_names(&e.pattern, out);
+                }
+                if let Some(r) = rest {
+                    pat_names(r, out);
+                }
+            }
+            P::Object { properties, rest, .. } => {
+                for prop in properties {
+                    pat_names(&prop.value, out);
+                }
+                if let Some(r) = rest {
+                    pat_names(r, out);
+                }
+            }
+            P::Assignment { left, .. } => pat_names(left, out),
+            P::Rest { argument, .. } => pat_names(argument, out),
+        }
+    }
+    match decl {
+        Decl::Function(f) => {
+            out.insert(f.id.clone());
+        }
+        Decl::Class(c) => {
+            if let Some(id) = &c.id {
+                out.insert(id.clone());
+            }
+        }
+        Decl::Enum(e) => {
+            out.insert(e.id.clone());
+        }
+        Decl::Variable(v) => {
+            for d in &v.declarators {
+                pat_names(&d.id, out);
+                if matches!(
+                    d.init.as_ref().map(|e| &e.kind),
+                    Some(varn_core::ast::ExprKind::ClassExpr { .. })
+                ) {
+                    out.insert(Rc::from("<anon>"));
+                }
+            }
+        }
+        Decl::Namespace(ns) => {
+            out.insert(ns.id.clone());
+            // A namespace member is a module binding too: a sibling reads it by
+            // bare name and its qualified global backs the namespace object.
+            for m in &ns.body {
+                collect_decl_names(m, out);
+            }
+        }
+        Decl::Import(i) => {
+            for spec in &i.specifiers {
+                let (ImportSpecifier::Default { local, .. }
+                | ImportSpecifier::Named { local, .. }
+                | ImportSpecifier::Namespace { local, .. }) = spec;
+                out.insert(local.clone());
+            }
+        }
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
+        _ => {}
+    }
+}
+
+/// The type label an `extension X on T` targets — matches the binder's
+/// mangling (`__ext_{label}_{name}`).
+fn extension_target_label(t: &varn_core::ast::types::TypeNode) -> Option<Rc<str>> {
+    use varn_core::TypeKind;
+    match &t.kind {
+        TypeKind::Named(n, _) => Some(Rc::from(n.as_str())),
+        TypeKind::Generic(n, _, _) => Some(Rc::from(n.as_str())),
+        TypeKind::Intrinsic(tag) => Some(Rc::from(varn_core::IntrinsicType::from(*tag).as_str())),
+        TypeKind::Array(_) => Some(Rc::from("Array")),
+        _ => None,
+    }
+}
+
+fn emit_extensions(
+    program: &Program,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
     signatures: &mut Vec<Signature>,
     out: &mut Vec<TirFunction>,
 ) {
+    use varn_core::ast::ExtensionMember;
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let Decl::Extension(ext) = d.as_ref() else { continue };
+        let Some(label) = extension_target_label(&ext.target) else { continue };
+        let recv_ty = match label.as_ref() {
+            "str" => BackendTy::Str,
+            "int" => BackendTy::Int,
+            "float" => BackendTy::Float,
+            "bool" => BackendTy::Bool,
+            "char" => BackendTy::Char,
+            other => ctx
+                .names
+                .class_id(other)
+                .map(BackendTy::Class)
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
+        };
+        let this_cid = match recv_ty {
+            BackendTy::Class(cid) => Some(cid),
+            _ => None,
+        };
+        for member in &ext.members {
+            let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, &Stmt) = match member {
+                ExtensionMember::Method(f) => (
+                    Rc::from(format!("__ext_{label}_{}", f.id)),
+                    f.params.iter().map(param_name).collect(),
+                    &f.body,
+                ),
+                ExtensionMember::Getter { key, body, .. } => {
+                    (Rc::from(format!("__extget_{label}_{key}")), vec![], body)
+                }
+                ExtensionMember::Setter { key, param, body, .. } => (
+                    Rc::from(format!("__extset_{label}_{key}")),
+                    vec![param_name(param)],
+                    body,
+                ),
+            };
+            let arity = params.len();
+            let sig = fresh_sig(signatures, arity);
+            let base = out.len() as u32 + 1;
+            let mut mcls: Vec<TirFunction> = Vec::new();
+            let (body_stmts, locals) = {
+                let mut em = FnEmitter::new(
+                    expr_table, types, ctx.as_module_ctx(), signatures, &mut mcls, base, params,
+                );
+                if let Some(cid) = this_cid {
+                    em = em.with_this(cid);
+                }
+                let b = match &body.kind {
+                    StmtKind::Block { stmts } => em.lower_block(stmts),
+                    _ => em.lower_block(std::slice::from_ref(body)),
+                };
+                (b, std::mem::take(&mut em.locals))
+            };
+            out.push(TirFunction {
+                name: mangled,
+                sig,
+                params: vec![BackendTy::Dynamic(DynReason::Unannotated); arity],
+                return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+                locals,
+                body: body_stmts,
+                has_this: true,
+                this_class: this_cid,
+                is_async: false,
+                is_generator: false,
+                has_rest: matches!(member, ExtensionMember::Method(f) if f.params.last().is_some_and(|p| p.is_rest)),
+            });
+            out.extend(mcls);
+        }
+    }
+}
+
+/// `this.<field> = <param i>` — a parameter property / primary-constructor
+/// field assignment.
+fn param_field_assign(field: Rc<str>, param: u32) -> TirStmt {
+    this_field_assign(
+        field,
+        TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::Param(param),
+            span: Span::EMPTY,
+        },
+    )
+}
+
+/// `this.<field> = <value>` as a statement.
+fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
+    let this = TirExpr {
+        kind: TirExprKind::Var,
+        ty: BackendTy::Dynamic(DynReason::Unannotated),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    };
+    TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign {
+            target: Box::new(TirExpr {
+                kind: TirExprKind::Field { object: Box::new(this), name: field },
+                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }),
+            value: Box::new(value),
+        },
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    })
+}
+
+fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
+    let mut out = Vec::new();
+    let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
+        out.push(varn_tir::TirExport { exported, local, reexport_from: from, namespace: ns });
+    };
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        match d.as_ref() {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                let mut names = FxHashSet::default();
+                collect_decl_names(declaration, &mut names);
+                for n in names {
+                    push(n.clone(), n, None, false);
+                }
+            }
+            Decl::Export(ExportDecl::Named { specifiers, source, .. }) => {
+                for sp in specifiers {
+                    push(sp.exported.clone(), sp.local.clone(), source.clone(), false);
+                }
+            }
+            Decl::Export(ExportDecl::All { source, alias: Some(alias), .. }) => {
+                push(alias.clone(), alias.clone(), Some(source.clone()), true);
+            }
+            Decl::Export(ExportDecl::Default { .. }) => {
+                push(Rc::from("default"), Rc::from("default"), None, false);
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
+    use varn_core::ast::ImportSpecifier as IS;
+    let mut out = Vec::new();
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let Decl::Import(imp) = d.as_ref() else { continue };
+        let specs = imp
+            .specifiers
+            .iter()
+            .map(|s| {
+                let (local, kind) = match s {
+                    IS::Default { local, .. } => (local.clone(), varn_tir::TirImportKind::Default),
+                    IS::Namespace { local, .. } => {
+                        (local.clone(), varn_tir::TirImportKind::Namespace)
+                    }
+                    IS::Named { local, imported, .. } => (
+                        local.clone(),
+                        varn_tir::TirImportKind::Named(imported.clone()),
+                    ),
+                };
+                varn_tir::TirImportSpec { local, kind }
+            })
+            .collect();
+        out.push(varn_tir::TirImport {
+            source: imp.source.clone(),
+            is_type_only: imp.is_type,
+            specs,
+        });
+    }
+    out
+}
+
+fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
+    match decl {
+        Decl::Enum(e) => Some(e),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+            Decl::Enum(e) => Some(e),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Emit one member body (method, constructor, accessor, static block) as a
+/// `TirFunction`, push it (and any closures it spawns) onto `out`, and return
+/// its `FnId`.
+#[allow(clippy::too_many_arguments)]
+fn emit_member_fn(
+    display_name: Rc<str>,
+    params: &[Param],
+    body: &Stmt,
+    is_async: bool,
+    is_generator: bool,
+    this_class: Option<varn_tir::ClassId>,
+    this_enum: Option<varn_tir::EnumId>,
+    sig: SigId,
+    ctx: &MCtx,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    out: &mut Vec<TirFunction>,
+) -> varn_tir::FnId {
+    let sig_snapshot = signatures[sig.0 as usize].clone();
+    let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
+    let fn_id = varn_tir::FnId(out.len() as u32);
+    // Reserve this slot; the member's own closures follow it.
+    let base = out.len() as u32 + 1;
+    let mut mcls: Vec<TirFunction> = Vec::new();
+    let (body_stmts, locals) = {
+        let mut em = FnEmitter::new(
+            expr_table, types, ctx.as_module_ctx(), signatures, &mut mcls, base, param_names,
+        );
+        if let Some(cid) = this_class {
+            em = em.with_this(cid);
+        }
+        if let Some(eid) = this_enum {
+            em = em.with_this_enum(eid);
+        }
+        let mut b = em.destructure_params(params);
+        // TypeScript-style parameter properties: `constructor(public id: int)`
+        // implies `this.id = id`.
+        for (i, p) in params.iter().enumerate() {
+            if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                if let Pattern::Identifier { name, .. } = &p.pattern {
+                    b.push(param_field_assign(name.clone(), i as u32));
+                }
+            }
+        }
+        b.extend(match &body.kind {
+            StmtKind::Block { stmts } => em.lower_block(stmts),
+            _ => em.lower_block(std::slice::from_ref(body)),
+        });
+        (b, std::mem::take(&mut em.locals))
+    };
+    out.push(TirFunction {
+        name: display_name,
+        sig,
+        params: sig_snapshot.params,
+        return_ty: sig_snapshot.return_ty,
+        locals,
+        body: body_stmts,
+        has_this: this_class.is_some() || this_enum.is_some(),
+        this_class,
+        is_async,
+        is_generator,
+        has_rest: params.last().is_some_and(|p| p.is_rest),
+    });
+    out.extend(mcls);
+    fn_id
+}
+
+fn fresh_sig(signatures: &mut Vec<Signature>, arity: usize) -> SigId {
+    let id = SigId(signatures.len() as u32);
+    signatures.push(Signature {
+        params: vec![BackendTy::Dynamic(DynReason::Unannotated); arity],
+        return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+    });
+    id
+}
+
+fn lower_outer(
+    e: &varn_core::ast::Expr,
+    ctx: &MCtx,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    closures: &mut Vec<TirFunction>,
+    base: u32,
+    this_class: Option<varn_tir::ClassId>,
+) -> (Vec<TirStmt>, TirExpr) {
+    let mut em = FnEmitter::new(
+        expr_table, types, ctx.as_module_ctx(), signatures, closures, base, vec![],
+    );
+    if let Some(cid) = this_class {
+        em = em.with_this(cid);
+    }
+    em.lower_outer_expr(e)
+}
+
+fn emit_class(
+    class: &varn_core::ast::ClassDecl,
+    ctx: &MCtx,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    out: &mut Vec<TirFunction>,
+) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
-    let Some(class_name) = class.id.as_ref() else { return };
-    let Some(class_id) = ctx.names.class_id(class_name) else { return };
-    let info = &ctx.classes[class_id.0 as usize];
+    // An anonymous `class { … }` is bound by the binder under `<anon>`.
+    let class_name = class.id.clone().unwrap_or_else(|| Rc::from("<anon>"));
+    let class_id = ctx.names.class_id(&class_name);
+
+    let mut def = varn_tir::TirClassDef {
+        name: class_name.clone(),
+        class_id,
+        ..Default::default()
+    };
+
+    if let Some(sup) = &class.super_class {
+        if let varn_core::ast::ExprKind::Identifier { name } = &sup.kind {
+            def.parent = ctx.names.class_id(name);
+        }
+        let (pre, x) =
+            lower_outer(sup, ctx, expr_table, types, signatures, out, out.len() as u32, None);
+        def.prelude.extend(pre);
+        def.super_class = Some(x);
+    }
+    for deco in &class.decorators {
+        let (pre, x) = lower_outer(
+            &deco.expression, ctx, expr_table, types, signatures, out, out.len() as u32, class_id,
+        );
+        def.prelude.extend(pre);
+        def.decorators.push(x);
+    }
+
+    let info_sig = |key: &str, arity: usize, signatures: &mut Vec<Signature>| -> SigId {
+        class_id
+            .and_then(|cid| {
+                let info = &ctx.classes[cid.0 as usize];
+                info.method_slot(key).and_then(|s| info.method_at(s)).map(|e| e.sig)
+            })
+            .unwrap_or_else(|| fresh_sig(signatures, arity))
+    };
+
+    // Instance-field defaults: `this.<field> = <init>` prepended to the
+    // constructor (a synthetic one if the class declares none).
+    let field_defaults: Vec<TirStmt> = {
+        let mut stmts = Vec::new();
+        let base = out.len() as u32;
+        let mut cls: Vec<TirFunction> = Vec::new();
+        let mut em = FnEmitter::new(
+            expr_table, types, ctx.as_module_ctx(), signatures, &mut cls, base, vec![],
+        );
+        if let Some(cid) = class_id {
+            em = em.with_this(cid);
+        }
+        for member in &class.body {
+            if let ClassMember::Property { key, init: Some(init), modifiers, .. } = member {
+                if modifiers.is_static {
+                    continue;
+                }
+                let value = em.lower_expression(init);
+                stmts.append(&mut em.take_pending());
+                stmts.push(this_field_assign(key.clone(), value));
+            }
+        }
+        drop(em);
+        out.extend(cls);
+        stmts
+    };
 
     for member in &class.body {
-        let (key, params, body, is_async, is_generator): (Rc<str>, &[Param], &Stmt, bool, bool) =
-            match member {
-                ClassMember::Method { key, params, body: Some(body), modifiers, .. } => (
-                    key.clone(),
-                    params.as_slice(),
+        match member {
+            ClassMember::Constructor { params, body, .. } => {
+                let sig = info_sig("constructor", params.len(), signatures);
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.constructor")),
+                    params, body, false, false, class_id, None, sig, ctx, expr_table, types,
+                    signatures, out,
+                );
+                def.methods.push(varn_tir::TirClassMember {
+                    key: Rc::from("constructor"),
+                    func: id,
+                    is_static: false,
+                    is_private: false,
+                    decorators: vec![],
+                    });
+            }
+            ClassMember::Method {
+                key, params, body: Some(body), modifiers, decorators, ..
+            } => {
+                let sig = info_sig(key, params.len(), signatures);
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.{key}")),
+                    params,
                     body,
                     modifiers.is_async,
                     modifiers.is_generator,
-                ),
-                ClassMember::Constructor { params, body, .. } => {
-                    (Rc::from("constructor"), params.as_slice(), body, false, false)
-                }
-                _ => continue,
-            };
-
-        // A method reuses its vtable signature; a constructor gets a fresh one
-        // (constructors are not dispatched).
-        let sig = match info.method_slot(&key).and_then(|s| info.method_at(s)) {
-            Some(entry) => entry.sig,
-            None => {
-                let id = SigId(signatures.len() as u32);
-                signatures.push(Signature {
-                    params: vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()],
-                    return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
+                );
+                let decos: Vec<TirExpr> = decorators
+                    .iter()
+                    .map(|d| {
+                        let (pre, x) = lower_outer(
+                            &d.expression, ctx, expr_table, types, signatures, out,
+                            out.len() as u32, class_id,
+                        );
+                        def.prelude.extend(pre);
+                        x
+                    })
+                    .collect();
+                def.methods.push(varn_tir::TirClassMember {
+                    key: key.clone(),
+                    func: id,
+                    is_static: modifiers.is_static,
+                    is_private: matches!(modifiers.visibility, Some(varn_core::ast::operators::Visibility::Private)),
+                    decorators: decos,
                 });
-                id
             }
-        };
-        let sig_snapshot = signatures[sig.0 as usize].clone();
-
-        let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
-        // Reserve one slot for the method itself; its closures follow.
-        let base = out.len() as u32 + 1;
-        let mut mcls: Vec<TirFunction> = Vec::new();
-        let (body_stmts, locals) = {
-            let mut em = FnEmitter::new(
-                expr_table,
-                types,
-                ctx.as_module_ctx(),
-                signatures,
-                &mut mcls,
-                base,
-                param_names,
-            )
-            .with_this(class_id);
-            let mut b = em.destructure_params(params);
-            b.extend(match &body.kind {
-                StmtKind::Block { stmts } => em.lower_block(stmts),
-                _ => em.lower_block(std::slice::from_ref(body)),
-            });
-            (b, std::mem::take(&mut em.locals))
-        };
-
-        out.push(TirFunction {
-            name: Rc::from(format!("{class_name}.{key}")),
-            sig,
-            params: sig_snapshot.params,
-            return_ty: sig_snapshot.return_ty,
-            locals,
-            body: body_stmts,
-            has_this: true,
-            this_class: Some(class_id),
-            is_async,
-            is_generator,
-        });
-        out.extend(mcls);
+            ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
+                let sig = fresh_sig(signatures, 0);
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.get {key}")),
+                    &[], body, false, false,
+                    (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
+                    sig, ctx, expr_table, types, signatures, out,
+                );
+                def.accessors.push(varn_tir::TirClassAccessor {
+                    key: key.clone(),
+                    func: id,
+                    is_getter: true,
+                    is_static: modifiers.is_static,
+                });
+            }
+            ClassMember::Setter { key, param, body: Some(body), modifiers, .. } => {
+                let sig = fresh_sig(signatures, 1);
+                let ps = std::slice::from_ref(param);
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.set {key}")),
+                    ps, body, false, false,
+                    (!modifiers.is_static).then_some(()).and(class_id),
+                    None,
+                    sig, ctx, expr_table, types, signatures, out,
+                );
+                def.accessors.push(varn_tir::TirClassAccessor {
+                    key: key.clone(),
+                    func: id,
+                    is_getter: false,
+                    is_static: modifiers.is_static,
+                });
+            }
+            ClassMember::Property { key, init, modifiers, .. } if modifiers.is_static => {
+                let init_x = init.as_ref().map(|e| {
+                    let (pre, x) = lower_outer(
+                        e, ctx, expr_table, types, signatures, out, out.len() as u32, class_id,
+                    );
+                    def.prelude.extend(pre);
+                    x
+                });
+                def.statics.push((key.clone(), init_x));
+            }
+            ClassMember::StaticBlock { body, .. } => {
+                let sig = fresh_sig(signatures, 0);
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.<static>")),
+                    &[], body, false, false, class_id, None, sig, ctx, expr_table, types, signatures,
+                    out,
+                );
+                def.static_blocks.push(id);
+            }
+            _ => {}
+        }
     }
+
+    // C# / Kotlin primary constructor: `class User(public id: int, …)` — the
+    // params are fields, assigned `this.id = id` in a synthesized constructor.
+    let primary: &[Param] = class.primary_params.as_deref().unwrap_or(&[]);
+    let has_ctor = def.methods.iter().any(|m| m.key.as_ref() == "constructor");
+
+    if !field_defaults.is_empty() || (!primary.is_empty() && !has_ctor) {
+        match def.methods.iter().find(|m| m.key.as_ref() == "constructor") {
+            Some(ctor) => {
+                // Prepend the defaults; an explicit `this.x = arg` later just
+                // overwrites, matching field-then-constructor order.
+                let body = &mut out[ctor.func.0 as usize].body;
+                let mut new = field_defaults;
+                new.extend(std::mem::take(body));
+                *body = new;
+            }
+            None => {
+                // A synthetic constructor: primary params (with their defaults,
+                // via `destructure_params`), then the field defaults, then
+                // `this.<p> = p` for every primary param.
+                let empty_body = Stmt {
+                    id: class.ast_id,
+                    range: class.range.clone(),
+                    kind: StmtKind::Block { stmts: vec![] },
+                };
+                let sig = fresh_sig(signatures, primary.len());
+                {
+                    let tys: Vec<BackendTy> = primary
+                        .iter()
+                        .map(|p| {
+                            p.type_ann
+                                .as_ref()
+                                .map(|t| {
+                                    lower_type(
+                                        &crate::binder::resolve_type_node(t, None),
+                                        types,
+                                        ctx.names,
+                                    )
+                                })
+                                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
+                        })
+                        .collect();
+                    signatures[sig.0 as usize].params = tys;
+                }
+                let id = emit_member_fn(
+                    Rc::from(format!("{class_name}.constructor")),
+                    primary, &empty_body, false, false, class_id, None, sig, ctx, expr_table,
+                    types, signatures, out,
+                );
+                let body = &mut out[id.0 as usize].body;
+                // `this.<p> = p` for params `emit_member_fn` did not (those
+                // without a visibility / readonly modifier). Appended after the
+                // default-value checks it emitted.
+                for (i, p) in primary.iter().enumerate() {
+                    if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                        continue;
+                    }
+                    if let Pattern::Identifier { name, .. } = &p.pattern {
+                        body.push(param_field_assign(name.clone(), i as u32));
+                    }
+                }
+                let mut new = field_defaults;
+                new.extend(std::mem::take(body));
+                *body = new;
+                def.methods.push(varn_tir::TirClassMember {
+                    key: Rc::from("constructor"),
+                    func: id,
+                    is_static: false,
+                    is_private: false,
+                    decorators: vec![],
+                });
+            }
+        }
+    }
+
+    def
+}
+
+fn emit_enum(
+    en: &varn_core::ast::EnumDecl,
+    ctx: &MCtx,
+    expr_table: &FxHashMap<AstId, TypeEntry>,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+    out: &mut Vec<TirFunction>,
+) -> varn_tir::TirClassDef {
+    use varn_core::ast::ClassMember;
+    let name = en.id.clone();
+    let enum_id = ctx.names.enum_id(&name);
+    let mut def = varn_tir::TirClassDef {
+        name: name.clone(),
+        enum_id,
+        ..Default::default()
+    };
+
+    let mut tag = 0i64;
+    for m in &en.members {
+        if let Some(init) = &m.init {
+            if let varn_core::ast::ExprKind::IntLiteral { value, .. } = &init.kind {
+                tag = *value;
+            }
+        }
+        let fields_str = m
+            .payload_fields
+            .iter()
+            .map(|f| f.name.as_ref())
+            .collect::<Vec<&str>>()
+            .join(",");
+        let meta = if fields_str.is_empty() {
+            format!("{name}.{}", m.id)
+        } else {
+            format!("{name}.{}:{fields_str}", m.id)
+        };
+        let mut const_args = Vec::new();
+        for f in &m.payload_fields {
+            if let Some(init) = &f.init {
+                let (pre, x) = lower_outer(
+                    init, ctx, expr_table, types, signatures, out, out.len() as u32, None,
+                );
+                def.prelude.extend(pre);
+                const_args.push(x);
+            }
+        }
+        def.variants.push(varn_tir::TirVariantDef {
+            name: m.id.clone(),
+            tag,
+            meta: Rc::from(meta.as_str()),
+            const_args,
+        });
+        tag += 1;
+    }
+
+    // Enums may carry methods / getters / setters in `body`, `this` typed as
+    // the enum's class handle (the binder registers it under `classes` too).
+    let this_cid = ctx.names.class_id(&name);
+    for member in &en.body {
+        match member {
+            ClassMember::Method { key, params, body: Some(body), modifiers, .. } => {
+                let sig = fresh_sig(signatures, params.len());
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.{key}")),
+                    params,
+                    body,
+                    modifiers.is_async,
+                    modifiers.is_generator,
+                    (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
+                    sig, ctx, expr_table, types, signatures, out,
+                );
+                def.methods.push(varn_tir::TirClassMember {
+                    key: key.clone(),
+                    func: id,
+                    is_static: modifiers.is_static,
+                    is_private: false,
+                    decorators: vec![],
+                    });
+            }
+            ClassMember::Constructor { params, body, .. } => {
+                let sig = fresh_sig(signatures, params.len());
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.constructor")),
+                    params, body, false, false, this_cid, enum_id, sig, ctx, expr_table, types,
+                    signatures, out,
+                );
+                def.methods.push(varn_tir::TirClassMember {
+                    key: Rc::from("constructor"),
+                    func: id,
+                    is_static: false,
+                    is_private: false,
+                    decorators: vec![],
+                    });
+            }
+            ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
+                let sig = fresh_sig(signatures, 0);
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.get {key}")),
+                    &[], body, false, false,
+                    (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
+                    sig, ctx, expr_table, types, signatures, out,
+                );
+                def.accessors.push(varn_tir::TirClassAccessor {
+                    key: key.clone(),
+                    func: id,
+                    is_getter: true,
+                    is_static: modifiers.is_static,
+                });
+            }
+            ClassMember::Setter { key, param, body: Some(body), modifiers, .. } => {
+                let sig = fresh_sig(signatures, 1);
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.set {key}")),
+                    std::slice::from_ref(param), body, false, false,
+                    (!modifiers.is_static).then_some(()).and(this_cid),
+                    (!modifiers.is_static).then_some(()).and(enum_id),
+                    sig, ctx, expr_table, types, signatures, out,
+                );
+                def.accessors.push(varn_tir::TirClassAccessor {
+                    key: key.clone(),
+                    func: id,
+                    is_getter: false,
+                    is_static: modifiers.is_static,
+                });
+            }
+            // `enum E { … static val: int; static { E.val = 1 } }`
+            ClassMember::Property { key, init, modifiers, .. } if modifiers.is_static => {
+                let init_x = init.as_ref().map(|e| {
+                    let (pre, x) = lower_outer(
+                        e, ctx, expr_table, types, signatures, out, out.len() as u32, None,
+                    );
+                    def.prelude.extend(pre);
+                    x
+                });
+                def.statics.push((key.clone(), init_x));
+            }
+            ClassMember::StaticBlock { body, .. } => {
+                let sig = fresh_sig(signatures, 0);
+                let id = emit_member_fn(
+                    Rc::from(format!("{name}.<static>")),
+                    &[], body, false, false, None, None, sig, ctx, expr_table, types,
+                    signatures, out,
+                );
+                def.static_blocks.push(id);
+            }
+            _ => {}
+        }
+    }
+    def
 }
 
 fn param_name(p: &Param) -> Rc<str> {
@@ -381,6 +1359,7 @@ fn emit_function(
         this_class: None,
         is_async: f.modifiers.is_async,
         is_generator: f.modifiers.is_generator,
+        has_rest: f.params.last().is_some_and(|p| p.is_rest),
     }
 }
 
@@ -402,12 +1381,14 @@ mod tests {
     fn stub_module() -> TirModule {
         TirModule {
             source_file: Rc::from("t.vn"),
+            imports: vec![], exports: vec![],
             types: TyTable::default(),
             classes: vec![],
             enums: vec![],
             signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
             functions: vec![],
-            globals: vec![],
+            globals: vec![], global_names: vec![],
+            class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
                 sig: SigId(0),
@@ -419,6 +1400,7 @@ mod tests {
                 this_class: None,
                 is_async: false,
                 is_generator: false,
+                has_rest: false,
             },
         }
     }

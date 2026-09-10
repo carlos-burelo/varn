@@ -18,7 +18,8 @@ use varn_core::ast::{
     StmtKind,
 };
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, EnumInfo, LocalId, Resolution, Signature, SigId, Span,
+    BackendTy, ClassId, ClassInfo, DynReason, EnumId, EnumInfo, LocalId, Resolution, Signature,
+    SigId, Span,
     TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirFunction, TirObjectEntry, TirStmt,
     TirUnOp, TyTable,
 };
@@ -33,6 +34,14 @@ pub(super) struct ModuleCtx<'a> {
     pub globals: &'a FxHashMap<Rc<str>, u32>,
     /// Free-function name → (index into `TirModule::functions`, arity).
     pub fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+    /// Named-argument layout by call-expression id.
+    pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
+    /// `recv.m(..)` call ids the checker resolved to an extension function.
+    pub ext_calls: &'a FxHashMap<u32, Rc<str>>,
+    /// `recv.p` reads resolved to an extension getter.
+    pub ext_members: &'a FxHashMap<u32, Rc<str>>,
+    /// `recv.p = v` writes resolved to an extension setter.
+    pub ext_set_members: &'a FxHashMap<u32, Rc<str>>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -49,6 +58,14 @@ pub(super) struct FnEmitter<'a> {
     scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
     params: Vec<Rc<str>>,
     this_class: Option<ClassId>,
+    /// Set inside an enum method: `this` is typed as this enum, so a bare
+    /// variant pattern (`Circle(r)`) in `match (this)` resolves.
+    this_enum: Option<EnumId>,
+    /// Extension method: `this` is param 0, not a receiver frame.
+    /// This emitter is the module top level: a `let x` whose name is a module
+    /// global becomes a store to that global slot, not a `<module>` local, so
+    /// the other functions in the module (which see it as a global) agree.
+    top_level: bool,
     /// Names visible in an enclosing function (this emitter is a closure body).
     /// A reference to one of them resolves to an `Upvalue` rather than
     /// `ByName`.
@@ -59,11 +76,93 @@ pub(super) struct FnEmitter<'a> {
     /// desugaring). `lower_stmt` drains this in front of the statement it was
     /// lowering.
     pending: Vec<TirStmt>,
+    /// `using x = …` bindings awaiting disposal, one frame per open block.
+    /// `lower_block` appends `x.dispose()` for each (last-in first-out) as the
+    /// block falls through.
+    disposables: Vec<Vec<TirExpr>>,
 }
 
 enum ClosureBody<'a> {
     Expr(&'a Expr),
     Stmt(&'a Stmt),
+}
+
+/// Insert `fin` before every `Return` / `Break` / `Continue` that would leave
+/// this statement list, recursing into nested `If` / `Loop` / `Try` bodies —
+/// but NOT into a nested loop for `Break`/`Continue`, which stay inside it.
+fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    splice_finally_impl(stmts, fin, false)
+}
+
+/// As `splice_finally_before_exits`, but also runs `fin` before a `Throw` that
+/// would escape — used for a `catch` body, whose re-throw propagates past the
+/// `finally`. Never used on the guarded `body`: a `throw` there is caught by
+/// this try's own landing pad, and `finally` runs after the catch, not before.
+fn splice_finally_before_exits_and_throw(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    splice_finally_impl(stmts, fin, true)
+}
+
+fn splice_finally_impl(stmts: Vec<TirStmt>, fin: &[TirStmt], on_throw: bool) -> Vec<TirStmt> {
+    let mut out = Vec::with_capacity(stmts.len());
+    for s in stmts {
+        match s {
+            TirStmt::Return(_) | TirStmt::Break | TirStmt::Continue => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
+            TirStmt::Throw(_) if on_throw => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
+            TirStmt::If { cond, then_body, else_body } => out.push(TirStmt::If {
+                cond,
+                then_body: splice_finally_impl(then_body, fin, on_throw),
+                else_body: splice_finally_impl(else_body, fin, on_throw),
+            }),
+            TirStmt::Loop { cond, body } => {
+                // `break` / `continue` here belong to this inner loop; only a
+                // `Return` escapes the guarded region.
+                out.push(TirStmt::Loop {
+                    cond,
+                    body: splice_returns_only(body, fin),
+                });
+            }
+            TirStmt::Try { body, catch_local, catch_body } => out.push(TirStmt::Try {
+                body: splice_finally_impl(body, fin, false),
+                catch_local,
+                catch_body: splice_finally_impl(catch_body, fin, on_throw),
+            }),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn splice_returns_only(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
+    let mut out = Vec::with_capacity(stmts.len());
+    for s in stmts {
+        match s {
+            TirStmt::Return(_) => {
+                out.extend(fin.iter().cloned());
+                out.push(s);
+            }
+            TirStmt::If { cond, then_body, else_body } => out.push(TirStmt::If {
+                cond,
+                then_body: splice_returns_only(then_body, fin),
+                else_body: splice_returns_only(else_body, fin),
+            }),
+            TirStmt::Loop { cond, body } => {
+                out.push(TirStmt::Loop { cond, body: splice_returns_only(body, fin) })
+            }
+            TirStmt::Try { body, catch_local, catch_body } => out.push(TirStmt::Try {
+                body: splice_returns_only(body, fin),
+                catch_local,
+                catch_body: splice_returns_only(catch_body, fin),
+            }),
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 fn pattern_lead(p: &Pattern) -> Rc<str> {
@@ -115,9 +214,12 @@ impl<'a> FnEmitter<'a> {
             scopes: vec![FxHashMap::default()],
             params,
             this_class: None,
+            this_enum: None,
+            top_level: false,
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
             pending: Vec::new(),
+            disposables: Vec::new(),
         }
     }
 
@@ -142,6 +244,33 @@ impl<'a> FnEmitter<'a> {
     pub fn with_this(mut self, class: ClassId) -> Self {
         self.this_class = Some(class);
         self
+    }
+
+    pub fn with_this_enum(mut self, enum_id: EnumId) -> Self {
+        self.this_enum = Some(enum_id);
+        self
+    }
+
+
+    pub fn as_top_level(mut self) -> Self {
+        self.top_level = true;
+        self
+    }
+
+    /// Lower a single expression that sits outside a statement — a decorator,
+    /// an `extends` clause, a static-field initializer. Any hoisted temporary
+    /// it produced is returned alongside; the caller emits those first.
+    pub fn lower_outer_expr(&mut self, e: &Expr) -> (Vec<TirStmt>, TirExpr) {
+        let x = self.lower_expr(e);
+        (std::mem::take(&mut self.pending), x)
+    }
+
+    pub fn lower_expression(&mut self, e: &Expr) -> TirExpr {
+        self.lower_expr(e)
+    }
+
+    pub fn take_pending(&mut self) -> Vec<TirStmt> {
+        std::mem::take(&mut self.pending)
     }
 
     fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
@@ -200,9 +329,26 @@ impl<'a> FnEmitter<'a> {
 
     pub fn lower_block(&mut self, stmts: &[Stmt]) -> Vec<TirStmt> {
         self.scopes.push(FxHashMap::default());
+        self.disposables.push(Vec::new());
         let mut out = Vec::new();
         for s in stmts {
             out.extend(self.lower_stmt(s));
+        }
+        // `using` bindings dispose on the way out, most-recent first.
+        for resource in self.disposables.pop().unwrap_or_default().into_iter().rev() {
+            out.push(TirStmt::Expr(TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(resource),
+                    name: Rc::from("dispose"),
+                    args: vec![],
+                },
+                ty: BackendTy::Void,
+                res: Resolution::ByName {
+                    name: Rc::from("dispose"),
+                    why: DynReason::Unannotated,
+                },
+                span: Span::EMPTY,
+            }));
         }
         self.scopes.pop();
         out
@@ -307,8 +453,10 @@ impl<'a> FnEmitter<'a> {
                 one(TirStmt::Loop { cond: bool_lit(true), body: loop_body })
             }
 
-            StmtKind::ForOf { left, right, body, .. } => self.lower_for_of(left, right, body),
-            StmtKind::ForIn { left, right, body, .. } => self.lower_for_of(left, right, body),
+            StmtKind::ForOf { left, right, body, is_await, .. } => {
+                self.lower_for_of(left, right, body, *is_await)
+            }
+            StmtKind::ForIn { left, right, body, .. } => self.lower_for_in(left, right, body),
 
             StmtKind::Try { block, catches, finally } => {
                 self.lower_try(block, catches, finally.as_deref())
@@ -321,17 +469,37 @@ impl<'a> FnEmitter<'a> {
             // `using x = …` disposes at scope end; the binding itself lowers
             // like a `let`, the disposal is a runtime concern.
             StmtKind::Using { declarations, .. } => {
+                let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
                 let mut out = Vec::new();
                 for d in declarations {
-                    if let Pattern::Identifier { name, .. } = &d.id {
-                        let init = d.init.as_ref().map(|e| self.lower_expr(e));
-                        let ty = init
-                            .as_ref()
-                            .map(|e| e.ty)
-                            .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                        let local = self.bind_local(name.clone(), ty);
-                        out.extend(std::mem::take(&mut self.pending));
-                        out.push(TirStmt::Let { local, ty, init });
+                    let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                    match &d.id {
+                        Pattern::Identifier { name, .. } => {
+                            let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
+                            let local = self.bind_local(name.clone(), ty);
+                            out.extend(std::mem::take(&mut self.pending));
+                            out.push(TirStmt::Let { local, ty, init });
+                            if let Some(frame) = self.disposables.last_mut() {
+                                frame.push(TirExpr {
+                                    kind: TirExprKind::Var,
+                                    ty,
+                                    res: Resolution::Local(local),
+                                    span: Span::EMPTY,
+                                });
+                            }
+                        }
+                        // `using { a, b } = res` — the whole `res` disposes;
+                        // the pattern only pulls fields out of it.
+                        pat => {
+                            let src = init.unwrap_or_else(|| placeholder(DynReason::Unannotated));
+                            out.extend(std::mem::take(&mut self.pending));
+                            let src = self.hoist(src);
+                            out.extend(std::mem::take(&mut self.pending));
+                            if let Some(frame) = self.disposables.last_mut() {
+                                frame.push(src.clone());
+                            }
+                            self.bind_pattern(pat, src, &mut out);
+                        }
                     }
                 }
                 out
@@ -347,6 +515,48 @@ impl<'a> FnEmitter<'a> {
     /// `try { } catch (e) { } finally { }`. `finally` has no TIR node — its
     /// statements are appended after the `Try` (correct for straight-line and
     /// caught paths, not for a `return`/`throw` that escapes the try).
+    /// The class names a `catch (e: T)` / `catch (e: A | B)` filter tests.
+    fn catch_type_names(&self, t: &varn_core::ast::TypeNode) -> Vec<Rc<str>> {
+        use varn_core::TypeKind;
+        match &t.kind {
+            TypeKind::Named(n, _) => vec![Rc::from(n.as_str())],
+            TypeKind::Union(items) | TypeKind::Intersection(items) => {
+                items.iter().flat_map(|x| self.catch_type_names(x)).collect()
+            }
+            _ => vec![],
+        }
+    }
+
+    /// `e instanceof <name>` — a `TypeTest` for a module class, else a dynamic
+    /// `instanceof` against the global of that name (builtins: `TypeError` …).
+    fn instance_of_name(&self, value: TirExpr, name: &str) -> TirExpr {
+        let span = value.span;
+        if let Some(class) = self.m.names.class_id(name) {
+            return TirExpr {
+                kind: TirExprKind::TypeTest { value: Box::new(value), class },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span,
+            };
+        }
+        let rhs = TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::ByName { name: Rc::from(name), why: DynReason::Unannotated },
+            span,
+        };
+        TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Instanceof,
+                lhs: Box::new(value),
+                rhs: Box::new(rhs),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     fn lower_try(
         &mut self,
         block: &Stmt,
@@ -354,25 +564,78 @@ impl<'a> FnEmitter<'a> {
         finally: Option<&Stmt>,
     ) -> Vec<TirStmt> {
         let body = self.lower_stmt_as_block(block);
-        let (catch_local, catch_body) = match catches.first() {
-            Some(c) => {
-                let name = match &c.param {
-                    Some(Pattern::Identifier { name, .. }) => name.clone(),
-                    _ => Rc::from("<catch>"),
-                };
-                let local = self.bind_local(name, BackendTy::Dynamic(DynReason::Unannotated));
-                let cb = self.lower_stmt_as_block(&c.body);
-                (local, cb)
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        // One landing local holds the thrown value; typed clauses dispatch on
+        // `e instanceof T`, an untyped clause is the catch-all, and if none
+        // catches the value it is re-thrown.
+        self.scopes.push(FxHashMap::default());
+        let catch_local = self.bind_local(Rc::from("<catch>"), dyn_ty);
+        let e_var = |span: Span| TirExpr {
+            kind: TirExprKind::Var,
+            ty: dyn_ty,
+            res: Resolution::Local(catch_local),
+            span,
+        };
+        let lower_clause = |this: &mut Self, c: &varn_core::ast::CatchClause| -> Vec<TirStmt> {
+            this.scopes.push(FxHashMap::default());
+            let mut out = Vec::new();
+            if let Some(Pattern::Identifier { name, .. }) = &c.param {
+                if name.as_ref() != "<catch>" {
+                    let alias = this.bind_local(name.clone(), dyn_ty);
+                    out.push(TirStmt::Let {
+                        local: alias,
+                        ty: dyn_ty,
+                        init: Some(e_var(Span::EMPTY)),
+                    });
+                }
             }
-            None => {
-                let local = self.fresh_local(BackendTy::Dynamic(DynReason::Unannotated));
-                (local, vec![])
-            }
+            out.extend(this.lower_stmt_as_block(&c.body));
+            this.scopes.pop();
+            out
+        };
+        let typed: Vec<&varn_core::ast::CatchClause> =
+            catches.iter().filter(|c| c.type_ann.is_some()).collect();
+        let catch_all = catches.iter().find(|c| c.type_ann.is_none());
+        let mut chain: Vec<TirStmt> = match catch_all {
+            Some(c) => lower_clause(self, c),
+            None => vec![TirStmt::Throw(e_var(Span::EMPTY))],
+        };
+        for c in typed.iter().rev() {
+            let names = self.catch_type_names(c.type_ann.as_ref().unwrap());
+            let cond = names
+                .into_iter()
+                .map(|n| self.instance_of_name(e_var(Span::EMPTY), &n))
+                .reduce(|a, b| TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(a),
+                        then_val: Box::new(bool_lit(true)),
+                        else_val: Box::new(b),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                })
+                .unwrap_or_else(|| bool_lit(true));
+            let then_body = lower_clause(self, c);
+            chain = vec![TirStmt::If { cond, then_body, else_body: std::mem::take(&mut chain) }];
+        }
+        self.scopes.pop();
+        let catch_body = chain;
+        // `finally` has no TIR node: lower it once, then run it on the normal
+        // fall-through AND before every early exit inside the guarded region.
+        let fin: Vec<TirStmt> = finally
+            .map(|f| self.lower_stmt_as_block(f))
+            .unwrap_or_default();
+        let (body, catch_body) = if fin.is_empty() {
+            (body, catch_body)
+        } else {
+            (
+                splice_finally_before_exits(body, &fin),
+                splice_finally_before_exits_and_throw(catch_body, &fin),
+            )
         };
         let mut out = vec![TirStmt::Try { body, catch_local, catch_body }];
-        if let Some(f) = finally {
-            out.extend(self.lower_stmt_as_block(f));
-        }
+        out.extend(fin);
         out
     }
 
@@ -528,26 +791,158 @@ impl<'a> FnEmitter<'a> {
     /// `for (x of iterable) body`. An `Array` iterable becomes the index
     /// desugar; anything else goes through the iterator protocol
     /// (`.iterator()` / `.next()`), all by-name.
-    fn lower_for_of(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+    /// `for (k in obj)` — iterate the object's string keys. Lowered as a
+    /// for-of over `ObjectKeys(obj)`, which is a `str[]`.
+    fn lower_for_in(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+        let obj = self.lower_expr(right);
+        let mut out = std::mem::take(&mut self.pending);
+        let s = self.tt.intern(BackendTy::Str);
+        let keys_ty = BackendTy::Array(s);
+        let keys = TirExpr {
+            kind: TirExprKind::ObjectKeys { operand: Box::new(obj) },
+            ty: keys_ty,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        };
+        let keys = self.hoist(keys);
+        out.extend(std::mem::take(&mut self.pending));
+        let Pattern::Identifier { name, .. } = left else {
+            return self.lower_for_of_protocol(left, keys, out, body, false);
+        };
+        let name = name.clone();
+        out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
+        out
+    }
+
+    fn lower_for_of(
+        &mut self,
+        left: &Pattern,
+        right: &Expr,
+        body: &Stmt,
+        is_await: bool,
+    ) -> Vec<TirStmt> {
+        // `for (i of a..b)` — a plain integer loop, `..=` bumping the bound.
+        if !is_await {
+        if let (ExprKind::Range { start, end, inclusive }, Pattern::Identifier { name, .. }) =
+            (&right.kind, left)
+        {
+            let name = name.clone();
+            let lo = self.lower_expr(start);
+            let mut hi = self.lower_expr(end);
+            if *inclusive {
+                hi = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Add,
+                        lhs: Box::new(hi),
+                        rhs: Box::new(int_lit(1)),
+                    },
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+            }
+            let mut out = std::mem::take(&mut self.pending);
+            let hi = self.hoist(hi);
+            out.extend(std::mem::take(&mut self.pending));
+            let i = self.bind_local(name, BackendTy::Int);
+            let ivar = || TirExpr {
+                kind: TirExprKind::Var,
+                ty: BackendTy::Int,
+                res: Resolution::Local(i),
+                span: Span::EMPTY,
+            };
+            // `lo - 1`, stepped first each iteration so `continue` still bumps.
+            let start = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Sub,
+                    lhs: Box::new(lo),
+                    rhs: Box::new(int_lit(1)),
+                },
+                ty: BackendTy::Int,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            out.push(TirStmt::Let { local: i, ty: BackendTy::Int, init: Some(start) });
+            let cond = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Lt,
+                    lhs: Box::new(ivar()),
+                    rhs: Box::new(hi),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            let step = TirStmt::Expr(TirExpr {
+                kind: TirExprKind::Assign {
+                    target: Box::new(ivar()),
+                    value: Box::new(TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Add,
+                            lhs: Box::new(ivar()),
+                            rhs: Box::new(int_lit(1)),
+                        },
+                        ty: BackendTy::Int,
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            });
+            let mut loop_body = vec![
+                step,
+                TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
+            ];
+            loop_body.extend(self.lower_stmt_as_block(body));
+            out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
+            return out;
+        }
+        } // !is_await
+
         let iter = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
 
-        let BackendTy::Array(el) = iter.ty.non_nullable(self.tt) else {
-            return self.lower_for_of_protocol(left, iter, out, body);
-        };
+        // `for await (x of src)` is never a plain array walk: it awaits each
+        // step off the async iterator.
+        if is_await {
+            return self.lower_for_of_protocol(left, iter, out, body, true);
+        }
+
         let Pattern::Identifier { name, .. } = left else {
-            return self.lower_for_of_protocol(left, iter, out, body);
+            return self.lower_for_of_protocol(left, iter, out, body, false);
         };
-        let elem_ty = self.tt.get(el);
+        // A statically-typed array indexes directly. So does a `Dynamic`
+        // subject — `for (x of bucket)` where `bucket` came off an index
+        // signature is the overwhelmingly common case, and the VM's
+        // `length` / `[i]` work on any runtime array. Only a value with a
+        // known non-array iterable type takes the `.iterator()` protocol.
+        let elem_ty = match iter.ty.non_nullable(self.tt) {
+            BackendTy::Array(el) => self.tt.get(el),
+            _ => return self.lower_for_of_protocol(left, iter, out, body, false),
+        };
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
+        out.extend(self.for_of_over_array(name, arr, elem_ty, body));
+        out
+    }
 
+    /// The C-style index loop shared by array `for…of` and `for…in`:
+    /// `let i = 0; loop { if !(i < arr.length) break; let <name> = arr[i];
+    /// body; i = i + 1 }`.
+    fn for_of_over_array(
+        &mut self,
+        name: &Rc<str>,
+        arr: TirExpr,
+        elem_ty: BackendTy,
+        body: &Stmt,
+    ) -> Vec<TirStmt> {
+        let mut out = Vec::new();
         let idx = self.fresh_local(BackendTy::Int);
-        out.push(TirStmt::Let {
-            local: idx,
-            ty: BackendTy::Int,
-            init: Some(int_lit(0)),
-        });
+        // Start at -1 and step FIRST each iteration, so a `continue` in the
+        // body (which jumps to the loop head) still advances the index.
+        out.push(TirStmt::Let { local: idx, ty: BackendTy::Int, init: Some(int_lit(-1)) });
         let idx_var = || TirExpr {
             kind: TirExprKind::Var,
             ty: BackendTy::Int,
@@ -578,12 +973,7 @@ impl<'a> FnEmitter<'a> {
         };
         let x_local = self.bind_local(name.clone(), elem_ty);
 
-        let mut loop_body = vec![
-            TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
-            TirStmt::Let { local: x_local, ty: elem_ty, init: Some(elem) },
-        ];
-        loop_body.extend(self.lower_stmt_as_block(body));
-        loop_body.push(TirStmt::Expr(TirExpr {
+        let step = TirStmt::Expr(TirExpr {
             kind: TirExprKind::Assign {
                 target: Box::new(idx_var()),
                 value: Box::new(TirExpr {
@@ -600,7 +990,13 @@ impl<'a> FnEmitter<'a> {
             ty: BackendTy::Void,
             res: Resolution::None,
             span: Span::EMPTY,
-        }));
+        });
+        let mut loop_body = vec![
+            step,
+            TirStmt::If { cond, then_body: vec![], else_body: vec![TirStmt::Break] },
+            TirStmt::Let { local: x_local, ty: elem_ty, init: Some(elem) },
+        ];
+        loop_body.extend(self.lower_stmt_as_block(body));
 
         out.push(TirStmt::Loop { cond: bool_lit(true), body: loop_body });
         out
@@ -615,25 +1011,22 @@ impl<'a> FnEmitter<'a> {
         src: TirExpr,
         mut out: Vec<TirStmt>,
         body: &Stmt,
+        is_await: bool,
     ) -> Vec<TirStmt> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
         let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
 
-        let it = self.fresh_local(dyn_ty);
-        out.push(TirStmt::Let {
-            local: it,
+        out.extend(std::mem::take(&mut self.pending));
+        // `src[Symbol.iterator]()` (or `Symbol.asyncIterator`) — the backend
+        // resolves the symbol for arrays, generators and objects alike.
+        let iter_getter = TirExpr {
+            kind: TirExprKind::IterInit { source: Box::new(src), is_async: is_await },
             ty: dyn_ty,
-            init: Some(TirExpr {
-                kind: TirExprKind::MethodCall {
-                    recv: Box::new(src),
-                    name: Rc::from("iterator"),
-                    args: vec![],
-                },
-                ty: dyn_ty,
-                res: by_name("iterator"),
-                span: Span::EMPTY,
-            }),
-        });
+            res: Resolution::None,
+            span: Span::EMPTY,
+        };
+        let it = self.fresh_local(dyn_ty);
+        out.push(TirStmt::Let { local: it, ty: dyn_ty, init: Some(iter_getter) });
         let it_var = || TirExpr {
             kind: TirExprKind::Var,
             ty: dyn_ty,
@@ -655,21 +1048,26 @@ impl<'a> FnEmitter<'a> {
             span: Span::EMPTY,
         };
 
-        let mut loop_body = vec![
-            TirStmt::Let {
-                local: step,
-                ty: dyn_ty,
-                init: Some(TirExpr {
-                    kind: TirExprKind::MethodCall {
-                        recv: Box::new(it_var()),
-                        name: Rc::from("next"),
-                        args: vec![],
-                    },
-                    ty: dyn_ty,
-                    res: by_name("next"),
-                    span: Span::EMPTY,
-                }),
+        let mut next_call = TirExpr {
+            kind: TirExprKind::MethodCall {
+                recv: Box::new(it_var()),
+                name: Rc::from("next"),
+                args: vec![],
             },
+            ty: dyn_ty,
+            res: by_name("next"),
+            span: Span::EMPTY,
+        };
+        if is_await {
+            next_call = TirExpr {
+                kind: TirExprKind::Await { future: Box::new(next_call) },
+                ty: dyn_ty,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+        }
+        let mut loop_body = vec![
+            TirStmt::Let { local: step, ty: dyn_ty, init: Some(next_call) },
             TirStmt::If {
                 cond: field(step_var(), "done"),
                 then_body: vec![TirStmt::Break],
@@ -713,11 +1111,17 @@ impl<'a> FnEmitter<'a> {
         let Some(case) = cases.get(i) else { return vec![] };
 
         self.scopes.push(FxHashMap::default());
-        let (mut cond, mut then_body) = self.match_pattern(s, &case.pattern);
-        if let Some(g) = &case.guard {
+        let (cond, bindings) = self.match_pattern(s, &case.pattern);
+        // A guard (`P if expr => …`) reads the pattern's bindings, so it must
+        // run AFTER they are declared — inside the matched branch, not folded
+        // into the entry test. A false guard falls through to the later cases,
+        // which is why they are re-tried here as well as on a pattern miss.
+        let guard = case.guard.as_ref().map(|g| {
             let gexpr = self.lower_expr(g);
-            cond = and_bool(cond, gexpr); // guard is pure, no pending
-        }
+            let pending = std::mem::take(&mut self.pending);
+            (pending, gexpr)
+        });
+        let mut then_body: Vec<TirStmt> = Vec::new();
         // The arm's value expression, then what `dest` does with it.
         let value = match &case.body {
             MatchBody::Expr(e) => self.lower_expr(e),
@@ -755,7 +1159,26 @@ impl<'a> FnEmitter<'a> {
         self.scopes.pop();
 
         let else_body = self.match_cases(s, cases, i + 1, dest);
-        vec![TirStmt::If { cond, then_body, else_body }]
+        match guard {
+            None => {
+                let mut m = bindings;
+                m.extend(then_body);
+                vec![TirStmt::If { cond, then_body: m, else_body }]
+            }
+            Some((gpending, gexpr)) => {
+                // pattern matched: declare its bindings, evaluate the guard;
+                // on true run the arm, on false (or a pattern miss) fall to
+                // the later cases.
+                let mut matched = bindings;
+                matched.extend(gpending);
+                matched.push(TirStmt::If {
+                    cond: gexpr,
+                    then_body,
+                    else_body: else_body.clone(),
+                });
+                vec![TirStmt::If { cond, then_body: matched, else_body }]
+            }
+        }
     }
 
     /// Test `s` against one pattern: a `Bool` condition and the bindings the
@@ -832,14 +1255,16 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Enum(e) => Some(e),
             _ => None,
         });
+        // An imported enum has no local `EnumInfo`; match on the variant's
+        // runtime name instead, and pull payload fields by ordinal.
         let Some(eid) = eid else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let Some(info) = self.m.enums.get(eid.0 as usize) else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let Some(variant) = info.variants.iter().find(|v| v.name.as_ref() == variant_name) else {
-            return (bool_lit(false), vec![]);
+            return self.match_variant_by_name(s, variant_name, bindings);
         };
         let tag = variant.tag;
         let payload: Vec<BackendTy> = variant.payload.clone();
@@ -885,13 +1310,102 @@ impl<'a> FnEmitter<'a> {
         (cond, binds)
     }
 
+    /// `match (opt) { Some(v) => … }` where `opt`'s enum is imported (no local
+    /// `EnumInfo`): test the runtime `__variant_name__`, read payloads by the
+    /// `valueN` ordinal accessor.
+    fn match_variant_by_name(
+        &mut self,
+        s: &TirExpr,
+        variant_name: &str,
+        bindings: &[MatchBinding],
+    ) -> (TirExpr, Vec<TirStmt>) {
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        let by_name = |n: &str| Resolution::ByName { name: Rc::from(n), why: DynReason::Unannotated };
+        let field = |recv: TirExpr, name: &str, ty: BackendTy| TirExpr {
+            kind: TirExprKind::Field { object: Box::new(recv), name: Rc::from(name) },
+            ty,
+            res: by_name(name),
+            span: s.span,
+        };
+        let cond = TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Eq,
+                lhs: Box::new(field(s.clone(), "__variant_name__", BackendTy::Str)),
+                rhs: Box::new(TirExpr {
+                    kind: TirExprKind::StrLit(Rc::from(variant_name)),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span: s.span,
+                }),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: s.span,
+        };
+        let mut binds = Vec::new();
+        for (i, b) in bindings.iter().enumerate() {
+            let init = field(s.clone(), &format!("value{i}"), dyn_ty);
+            let local = self.bind_local(b.name.clone(), dyn_ty);
+            binds.push(TirStmt::Let { local, ty: dyn_ty, init: Some(init) });
+        }
+        (cond, binds)
+    }
+
     fn lower_decl_stmt(&mut self, decl: &varn_core::ast::Decl) -> Vec<TirStmt> {
         use varn_core::ast::{Decl, ExportDecl};
+        let unwrapped = match decl {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        // A named function declared inside a body is a local bound to a closure
+        // over the enclosing frame. (Top-level function declarations never reach
+        // here — they are free functions.)
+        if let Decl::Function(f) = unwrapped {
+            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let local = self.bind_local(f.id.clone(), dyn_ty);
+            let closure = self.lower_closure(
+                &f.params,
+                ClosureBody::Stmt(&f.body),
+                f.modifiers.is_async,
+                f.modifiers.is_generator,
+                dyn_ty,
+                Span::EMPTY,
+            );
+            return vec![TirStmt::Let { local, ty: dyn_ty, init: Some(closure) }];
+        }
+        // `namespace LocalNS { export function f … }` inside a body — a local
+        // bound to an object of closure members.
+        if let Decl::Namespace(ns) = unwrapped {
+            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let local = self.bind_local(ns.id.clone(), dyn_ty);
+            let mut entries: Vec<TirObjectEntry> = Vec::new();
+            for m in &ns.body {
+                let Decl::Export(ExportDecl::Decl { declaration, .. }) = m else { continue };
+                if let Decl::Function(f) = declaration.as_ref() {
+                    let closure = self.lower_closure(
+                        &f.params,
+                        ClosureBody::Stmt(&f.body),
+                        f.modifiers.is_async,
+                        f.modifiers.is_generator,
+                        dyn_ty,
+                        Span::EMPTY,
+                    );
+                    entries.push(TirObjectEntry::Field { name: f.id.clone(), value: closure });
+                }
+            }
+            let obj = TirExpr {
+                kind: TirExprKind::ObjectLit { entries },
+                ty: dyn_ty,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            return vec![TirStmt::Let { local, ty: dyn_ty, init: Some(obj) }];
+        }
         let v = match decl {
             Decl::Variable(v) => v,
             Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
                 Decl::Variable(v) => v,
-                _ => return vec![], // nested fn/class/enum: handled at module level
+                _ => return vec![], // nested class/enum: handled at module level
             },
             _ => return vec![],
         };
@@ -923,13 +1437,74 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
 
+                    // `const f = () => { … f() … }` — the closure refers to
+                    // itself. Bind the name before lowering the initializer so
+                    // the self-reference is a capture of this local, not a null
+                    // global. (A top-level global is already reachable by name.)
+                    let prebound = {
+                        let is_closure = matches!(
+                            d.init.as_ref().map(|e| &e.kind),
+                            Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
+                        );
+                        let is_global =
+                            self.top_level && self.m.globals.contains_key(name.as_ref());
+                        if is_closure && !is_global {
+                            Some(self.bind_local(
+                                name.clone(),
+                                BackendTy::Dynamic(DynReason::Unannotated),
+                            ))
+                        } else {
+                            None
+                        }
+                    };
+
                     let init = d.init.as_ref().map(|e| self.lower_expr(e));
-                    let ty = init
+                    // The declared annotation wins over the initializer's type
+                    // — `let x: float = 1` is a `float` binding, and a typed op
+                    // that later reads `x` must not pick the `int` opcode.
+                    let ty = d
+                        .type_ann
                         .as_ref()
-                        .map(|e| e.ty)
+                        .map(|t| {
+                            let resolved =
+                                crate::binder::resolve_type_node(t, None);
+                            lower_type(&resolved, self.tt, self.m.names)
+                        })
+                        .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
+                        .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                    let local = self.bind_local(name.clone(), ty);
                     out.extend(std::mem::take(&mut self.pending));
+
+                    // A module-level binding that is a module global: store it
+                    // to the slot, not to a `<module>` local.
+                    if self.top_level && prebound.is_none() {
+                        if let Some(&slot) = self.m.globals.get(name.as_ref()) {
+                            let value = init.unwrap_or_else(|| TirExpr {
+                                kind: TirExprKind::NullLit,
+                                ty,
+                                res: Resolution::None,
+                                span: Span::EMPTY,
+                            });
+                            let target = TirExpr {
+                                kind: TirExprKind::Var,
+                                ty,
+                                res: Resolution::GlobalSlot(slot),
+                                span: Span::EMPTY,
+                            };
+                            out.push(TirStmt::Expr(TirExpr {
+                                kind: TirExprKind::Assign {
+                                    target: Box::new(target),
+                                    value: Box::new(value),
+                                },
+                                ty: BackendTy::Void,
+                                res: Resolution::None,
+                                span: Span::EMPTY,
+                            }));
+                            continue;
+                        }
+                    }
+
+                    let local = prebound.unwrap_or_else(|| self.bind_local(name.clone(), ty));
                     out.push(TirStmt::Let { local, ty, init });
                 }
                 // Destructuring: `let {a,b} = obj` / `let [x,y] = arr`.
@@ -953,6 +1528,42 @@ impl<'a> FnEmitter<'a> {
     pub fn destructure_params(&mut self, params: &[varn_core::ast::Param]) -> Vec<TirStmt> {
         let mut out = Vec::new();
         for (i, p) in params.iter().enumerate() {
+            // `x = default` — a null (omitted) argument falls back to the
+            // default: `if (x == null) x = <default>`.
+            if let Some(def) = &p.default {
+                let pvar = || TirExpr {
+                    kind: TirExprKind::Var,
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    res: Resolution::Param(i as u32),
+                    span: Span::EMPTY,
+                };
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::IsNull,
+                        operand: Box::new(pvar()),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+                let value = self.lower_expr(def);
+                let assign = TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(pvar()),
+                        value: Box::new(value),
+                    },
+                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                };
+                out.append(&mut self.pending);
+                out.push(TirStmt::If {
+                    cond: is_null,
+                    then_body: vec![TirStmt::Expr(assign)],
+                    else_body: vec![],
+                });
+            }
+
             if matches!(p.pattern, Pattern::Identifier { .. }) {
                 continue;
             }
@@ -975,7 +1586,7 @@ impl<'a> FnEmitter<'a> {
                 let local = self.bind_local(name.clone(), src.ty);
                 out.push(TirStmt::Let { local, ty: src.ty, init: Some(src) });
             }
-            Pattern::Object { properties, .. } => {
+            Pattern::Object { properties, rest, .. } => {
                 for prop in properties {
                     let field = self.field_access(
                         src.clone(),
@@ -985,8 +1596,21 @@ impl<'a> FnEmitter<'a> {
                     );
                     self.bind_pattern(&prop.value, field, out);
                 }
+                if let Some(rest_pat) = rest {
+                    let skip: Vec<Rc<str>> = properties.iter().map(|p| p.key.clone()).collect();
+                    let rest_obj = TirExpr {
+                        kind: TirExprKind::ObjectRest {
+                            object: Box::new(src.clone()),
+                            skip_keys: skip,
+                        },
+                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        res: Resolution::None,
+                        span: src.span,
+                    };
+                    self.bind_pattern(rest_pat, rest_obj, out);
+                }
             }
-            Pattern::Array { elements, .. } => {
+            Pattern::Array { elements, rest, .. } => {
                 // The verifier pins an array index's type to the element type.
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
@@ -994,16 +1618,41 @@ impl<'a> FnEmitter<'a> {
                 };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue }; // hole
+                    // A defaulted element (`[a = 0]`) needs a nullable read so
+                    // the `?? default` null test is not folded away as an
+                    // int-can't-be-null constant.
+                    let read_ty = if matches!(el.pattern, Pattern::Assignment { .. }) {
+                        BackendTy::Dynamic(DynReason::Unannotated)
+                    } else {
+                        elem_ty
+                    };
                     let idx = TirExpr {
                         kind: TirExprKind::Index {
                             object: Box::new(src.clone()),
                             index: Box::new(int_lit(i as i64)),
                         },
-                        ty: elem_ty,
+                        ty: read_ty,
                         res: Resolution::None,
                         span: src.span,
                     };
                     self.bind_pattern(&el.pattern, idx, out);
+                }
+                // `[a, b, ...rest]` — the tail from index `elements.len()`.
+                if let Some(rest_pat) = rest {
+                    let tail = TirExpr {
+                        kind: TirExprKind::MethodCall {
+                            recv: Box::new(src.clone()),
+                            name: Rc::from("slice"),
+                            args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
+                        },
+                        ty: src.ty,
+                        res: Resolution::ByName {
+                            name: Rc::from("slice"),
+                            why: DynReason::Unannotated,
+                        },
+                        span: src.span,
+                    };
+                    self.bind_pattern(rest_pat, tail, out);
                 }
             }
             Pattern::Assignment { left, right, .. } => {
@@ -1094,8 +1743,9 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::This => {
                 let this_ty = self
-                    .this_class
-                    .map(BackendTy::Class)
+                    .this_enum
+                    .map(BackendTy::Enum)
+                    .or_else(|| self.this_class.map(BackendTy::Class))
                     .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                 return TirExpr { kind: TirExprKind::Var, ty: this_ty, res: Resolution::None, span };
             }
@@ -1157,7 +1807,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Call { callee, args, optional: _, type_args: _ } => {
-                return self.lower_call(callee, args, ty, span)
+                return self.lower_call(e.id, callee, args, ty, span)
             }
 
             ExprKind::Array { elements } => {
@@ -1185,22 +1835,60 @@ impl<'a> FnEmitter<'a> {
                     span,
                 };
             }
-            ExprKind::Object { properties } | ExprKind::Record { properties } => {
-                let entries = properties
+            ExprKind::Record { properties } => {
+                let fields = properties
                     .iter()
                     .filter_map(|p| match p {
-                        ObjectProp::Property { key, value, .. } => Some(TirObjectEntry::Field {
-                            name: prop_key_name(key)?,
-                            value: self.lower_expr(value),
-                        }),
-                        ObjectProp::Spread { argument, .. } => {
-                            Some(TirObjectEntry::Spread(self.lower_expr(argument)))
+                        ObjectProp::Property { key, value, .. } => {
+                            Some((prop_key_name(key)?, self.lower_expr(value)))
                         }
-                        // Methods / getters / setters in an object literal are
-                        // a later sub-phase.
                         _ => None,
                     })
                     .collect();
+                return TirExpr {
+                    kind: TirExprKind::RecordLit { fields },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Object { properties } => {
+                let mut entries: Vec<TirObjectEntry> = Vec::new();
+                for p in properties {
+                    match p {
+                        ObjectProp::Property { key, value, .. } => {
+                            if let Some(name) = prop_key_name(key) {
+                                entries.push(TirObjectEntry::Field {
+                                    name,
+                                    value: self.lower_expr(value),
+                                });
+                            }
+                        }
+                        ObjectProp::Spread { argument, .. } => {
+                            entries.push(TirObjectEntry::Spread(self.lower_expr(argument)));
+                        }
+                        // `{ method() { … }, async m2() { … } }` — a closure
+                        // bound to the property.
+                        ObjectProp::Method {
+                            key, params, body, is_async, is_generator, ..
+                        } => {
+                            if let Some(name) = prop_key_name(key) {
+                                let closure = self.lower_closure(
+                                    params,
+                                    ClosureBody::Stmt(body),
+                                    *is_async,
+                                    *is_generator,
+                                    BackendTy::Dynamic(DynReason::Unannotated),
+                                    span,
+                                );
+                                entries.push(TirObjectEntry::Field { name, value: closure });
+                            }
+                        }
+                        // Getters / setters on an object literal are a later
+                        // sub-phase.
+                        _ => {}
+                    }
+                }
                 return TirExpr {
                     kind: TirExprKind::ObjectLit { entries },
                     ty,
@@ -1208,7 +1896,7 @@ impl<'a> FnEmitter<'a> {
                     span,
                 };
             }
-            ExprKind::New { callee, args, .. } => return self.lower_new(callee, args, ty, span),
+            ExprKind::New { callee, args, .. } => return self.lower_new(e.id, callee, args, ty, span),
 
             // `x!` — a non-null assertion. A `Cast` carries the type change
             // without disturbing the inner node's `res` (a `FieldSlot` read
@@ -1257,6 +1945,43 @@ impl<'a> FnEmitter<'a> {
             }
             // `x |> f` -> `f(x)`.
             ExprKind::Pipeline { left, right } => {
+                // `x |> f(_, y)` — substitute `x` for each `_` in the call's
+                // arguments. `x |> f` (no call) — `f(x)`.
+                if let ExprKind::Call { callee, args, .. } = &right.kind {
+                    let has_placeholder = args.iter().any(|a| {
+                        matches!(
+                            a,
+                            Arg::Positional(e) | Arg::Named { value: e, .. }
+                                if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_")
+                        )
+                    });
+                    if has_placeholder {
+                        let lv = self.lower_expr(left);
+                        let piped = self.hoist(lv);
+                        let c = self.lower_expr(callee);
+                        let targs: Vec<TirArg> = args
+                            .iter()
+                            .map(|a| match a {
+                                Arg::Positional(e)
+                                | Arg::Named { value: e, .. }
+                                    if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_") =>
+                                {
+                                    TirArg::Expr(piped.clone())
+                                }
+                                other => self.lower_arg(other),
+                            })
+                            .collect();
+                        return TirExpr {
+                            kind: TirExprKind::Call { callee: Box::new(c), args: targs },
+                            ty,
+                            res: Resolution::ByName {
+                                name: Rc::from("<pipeline>"),
+                                why: DynReason::Unannotated,
+                            },
+                            span,
+                        };
+                    }
+                }
                 let arg = self.lower_expr(left);
                 let callee = self.lower_expr(right);
                 return TirExpr {
@@ -1295,6 +2020,30 @@ impl<'a> FnEmitter<'a> {
 
             // Assignment to an identifier or a field: plain `=` directly,
             // compound `+=` … as `t = t <op> v`. Destructuring targets later.
+            // `recv.p = v` resolved to an extension setter: `__extset(recv, v)`.
+            ExprKind::Assign { op, target, value }
+                if matches!(assign_bin_op(*op), Ok(None))
+                    && matches!(&target.kind, ExprKind::Member { .. })
+                    && self.m.ext_set_members.contains_key(&target.range.start.offset) =>
+            {
+                let ExprKind::Member { object, .. } = &target.kind else {
+                    unreachable!()
+                };
+                let mangled =
+                    self.m.ext_set_members[&target.range.start.offset].clone();
+                let recv = self.lower_expr(object);
+                let v = self.lower_expr(value);
+                return TirExpr {
+                    kind: TirExprKind::ExtensionCall {
+                        func: mangled,
+                        recv: Box::new(recv),
+                        args: vec![TirArg::Expr(v)],
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
             ExprKind::Assign { op, target, value }
                 if matches!(
                     target.kind,
@@ -1319,9 +2068,37 @@ impl<'a> FnEmitter<'a> {
                             span,
                         }
                     }
-                    // `??=`, `&&=`, bitwise-assign: `t = <the value>` without
-                    // the operator (a coarse but well-formed lowering).
-                    Err(()) => v,
+                    // `&&=` / `||=` / `??=` — short-circuit against the current
+                    // value: `t = t ? v : t`, `t = t ? t : v`, `t = t ?? v`.
+                    Err(()) => {
+                        use varn_core::ast::operators::AssignOp as A;
+                        let cond = match op {
+                            A::NullishAssign => TirExpr {
+                                kind: TirExprKind::Unary {
+                                    op: TirUnOp::IsNull,
+                                    operand: Box::new(t.clone()),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            },
+                            _ => self.cast_to(t.clone(), BackendTy::Bool),
+                        };
+                        let (then_val, else_val) = match op {
+                            A::OrAssign => (t.clone(), v),
+                            _ => (v, t.clone()), // AndAssign, NullishAssign
+                        };
+                        TirExpr {
+                            kind: TirExprKind::Select {
+                                cond: Box::new(cond),
+                                then_val: Box::new(then_val),
+                                else_val: Box::new(else_val),
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        }
+                    }
                 };
                 return TirExpr {
                     kind: TirExprKind::Assign { target: Box::new(t), value: Box::new(rhs) },
@@ -1334,7 +2111,7 @@ impl<'a> FnEmitter<'a> {
             // `x++` / `--x` -> `x = x <+/-> 1` (the value it yields is not
             // distinguished; correct in statement position, which is almost
             // always where it sits).
-            ExprKind::Update { op, operand, .. }
+            ExprKind::Update { op, operand, prefix }
                 if matches!(
                     operand.kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
@@ -1347,14 +2124,17 @@ impl<'a> FnEmitter<'a> {
                     UpdateOp::Decrement => TirBinOp::Sub,
                 };
                 let step = if t.ty == BackendTy::Float { self.cast_to(int_lit(1), BackendTy::Float) } else { int_lit(1) };
-                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, t.clone(), step, t.ty);
+                // Postfix (`x++`) yields the value BEFORE the step; hoist it so
+                // the assignment can still overwrite the target.
+                let old = if *prefix { t.clone() } else { self.hoist(t.clone()) };
+                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, old.clone(), step, t.ty);
                 let stepped = TirExpr {
                     kind: TirExprKind::Binary { op: bop, lhs: Box::new(lhs), rhs: Box::new(rhs) },
                     ty: nty,
                     res: Resolution::None,
                     span,
                 };
-                return TirExpr {
+                let assign = TirExpr {
                     kind: TirExprKind::Assign {
                         target: Box::new(t),
                         value: Box::new(stepped),
@@ -1363,22 +2143,37 @@ impl<'a> FnEmitter<'a> {
                     res: Resolution::None,
                     span,
                 };
+                if *prefix {
+                    return assign;
+                }
+                // `x++` — run the store for effect, evaluate to the old value.
+                self.pending.push(TirStmt::Expr(assign));
+                return old;
             }
 
             // `bigint` / `decimal` / regex literals have no TIR literal node:
             // the raw text as a Str, cast to the target type.
-            ExprKind::BigIntLiteral { raw } | ExprKind::DecimalLiteral { raw } => {
-                let s = TirExpr {
-                    kind: TirExprKind::StrLit(raw.clone()),
-                    ty: BackendTy::Str,
-                    res: Resolution::None,
-                    span,
-                };
-                return self.cast_to(s, ty);
+            ExprKind::DecimalLiteral { raw } => {
+                let text: Rc<str> = Rc::from(raw.trim_end_matches('d'));
+                Some(TirExprKind::DecimalLit(text))
             }
-            ExprKind::RegexLiteral { pattern, .. } => {
+            ExprKind::BigIntLiteral { raw } => {
+                let s = raw.trim_end_matches('n').replace('_', "");
+                let n = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    i128::from_str_radix(r, 16)
+                } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
+                    i128::from_str_radix(r, 8)
+                } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
+                    i128::from_str_radix(r, 2)
+                } else {
+                    s.parse()
+                }
+                .unwrap_or(0);
+                Some(TirExprKind::BigIntLit(n))
+            }
+            ExprKind::RegexLiteral { pattern, flags } => {
                 let s = TirExpr {
-                    kind: TirExprKind::StrLit(Rc::from(pattern.as_str())),
+                    kind: TirExprKind::StrLit(Rc::from(format!("/{pattern}/{flags}"))),
                     ty: BackendTy::Str,
                     res: Resolution::None,
                     span,
@@ -1392,29 +2187,85 @@ impl<'a> FnEmitter<'a> {
                 let inner = self.lower_expr(argument);
                 return self.cast_to(inner, ty);
             }
-            // `a..b` — a 2-tuple stand-in until a Range node exists.
-            ExprKind::Range { start, end, .. } => {
+            ExprKind::Range { start, end, inclusive } => {
                 let s = self.lower_expr(start);
-                let e = self.lower_expr(end);
+                let en = self.lower_expr(end);
                 return TirExpr {
-                    kind: TirExprKind::TupleLit(vec![s, e]),
+                    kind: TirExprKind::RangeLit {
+                        start: Box::new(s),
+                        end: Box::new(en),
+                        inclusive: *inclusive,
+                    },
                     ty,
                     res: Resolution::None,
                     span,
                 };
             }
             // `e is T` -> a Bool test.
-            ExprKind::Is { expression, .. } => {
+            ExprKind::Is { expression, type_ann } => {
                 let v = self.lower_expr(expression);
-                return self.cast_to(v, BackendTy::Bool);
+                let bool_ty = BackendTy::Bool;
+                // `v is SomeClass` — a real class membership test.
+                if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
+                    if let Some(class) = self.m.names.class_id(n) {
+                        return TirExpr {
+                            kind: TirExprKind::TypeTest { value: Box::new(v), class },
+                            ty: bool_ty,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
+                }
+                // `v is int` / `is decimal` / `is str` … — a runtime type-name
+                // check. The tag names match the keyword exactly.
+                let tag_name: Option<&'static str> = match &type_ann.kind {
+                    varn_core::TypeKind::Intrinsic(t) => Some(t.name()),
+                    varn_core::TypeKind::Named(n, _) => {
+                        varn_core::TypeTag::from_str(n).map(|t| t.name())
+                    }
+                    _ => None,
+                };
+                if let Some(name) = tag_name {
+                    let got = TirExpr {
+                        kind: TirExprKind::Unary {
+                            op: TirUnOp::Typeof,
+                            operand: Box::new(v),
+                        },
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                    let want = TirExpr {
+                        kind: TirExprKind::StrLit(Rc::from(name)),
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                    return TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Eq,
+                            lhs: Box::new(got),
+                            rhs: Box::new(want),
+                        },
+                        ty: bool_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                // An unresolved type: treat the value's truthiness as the test
+                // (matches the prior behaviour for the shapes we cannot check).
+                return self.cast_to(v, bool_ty);
             }
             // `import.meta.x` / `new.target` — a by-name field read.
+            // `x::name` — the reflection operator. The VM routes a property key
+            // that starts with `::` through `resolve_meta_property`.
             ExprKind::MetaAccess { target, property } => {
                 let obj = self.lower_expr(target);
+                let key: Rc<str> = Rc::from(format!("::{property}"));
                 return TirExpr {
-                    kind: TirExprKind::Field { object: Box::new(obj), name: property.clone() },
+                    kind: TirExprKind::Field { object: Box::new(obj), name: key.clone() },
                     ty,
-                    res: Resolution::ByName { name: property.clone(), why: DynReason::Unannotated },
+                    res: Resolution::ByName { name: key, why: DynReason::Unannotated },
                     span,
                 };
             }
@@ -1426,10 +2277,113 @@ impl<'a> FnEmitter<'a> {
                     .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                 return TirExpr { kind: TirExprKind::Var, ty: sty, res: Resolution::None, span };
             }
-            ExprKind::TaggedTemplate { template, .. } => return self.lower_expr(template),
+            ExprKind::TaggedTemplate { tag, template } => {
+                use varn_core::ast::TemplatePart;
+                let ExprKind::Template { parts } = &template.kind else {
+                    return self.lower_expr(template);
+                };
+                // `tag`strings ${a} more ${b}`` -> `tag([s0, s1, s2], a, b)`,
+                // where `strings` has one more entry than the interpolations
+                // (an empty string fills any gap).
+                let str_lit = |s: &str| TirExpr {
+                    kind: TirExprKind::StrLit(Rc::from(s)),
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
+                let mut strings: Vec<TirArrayEl> = Vec::new();
+                let mut values: Vec<TirArg> = Vec::new();
+                let mut cur = String::new();
+                for part in parts {
+                    match part {
+                        TemplatePart::Literal(s) => cur.push_str(s),
+                        TemplatePart::Interpolation(e) => {
+                            strings.push(TirArrayEl::Expr(str_lit(&cur)));
+                            cur.clear();
+                            let v = self.lower_expr(e);
+                            values.push(TirArg::Expr(v));
+                        }
+                    }
+                }
+                strings.push(TirArrayEl::Expr(str_lit(&cur)));
 
-            // `Missing` (a parse hole) and a class expression have no runtime
-            // value we model: a well-formed null.
+                let strings_arr = TirExpr {
+                    kind: TirExprKind::ArrayLit(strings),
+                    ty: BackendTy::Array(self.tt.intern(BackendTy::Str)),
+                    res: Resolution::None,
+                    span,
+                };
+                let mut all_args = vec![TirArg::Expr(strings_arr)];
+                all_args.extend(values);
+
+                // `obj.tag`…`` keeps `obj` as the receiver.
+                if let ExprKind::Member { object, property, computed: false, .. } = &tag.kind {
+                    if let Some(name) = Self::member_name(property) {
+                        let recv = self.lower_expr(object);
+                        return TirExpr {
+                            kind: TirExprKind::MethodCall {
+                                recv: Box::new(recv),
+                                name,
+                                args: all_args,
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
+                }
+                let callee = self.lower_expr(tag);
+                let res = match &tag.kind {
+                    ExprKind::Identifier { name } => Resolution::ByName {
+                        name: name.clone(),
+                        why: DynReason::Unannotated,
+                    },
+                    _ => Resolution::None,
+                };
+                return TirExpr {
+                    kind: TirExprKind::Call { callee: Box::new(callee), args: all_args },
+                    ty,
+                    res,
+                    span,
+                };
+            }
+
+            ExprKind::Conditional { test, consequent, alternate } => {
+                let cond = self.lower_expr(test);
+                let cond = self.cast_to(cond, BackendTy::Bool);
+                let then_val = self.lower_expr(consequent);
+                let else_val = self.lower_expr(alternate);
+                let (then_val, else_val) = if then_val.ty == else_val.ty
+                    || matches!(ty, BackendTy::Dynamic(_))
+                {
+                    (then_val, else_val)
+                } else {
+                    (self.cast_to(then_val, ty), self.cast_to(else_val, ty))
+                };
+                return TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(cond),
+                        then_val: Box::new(then_val),
+                        else_val: Box::new(else_val),
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+
+            // `class { … }` — built at its `let`'s position; the expression is
+            // a load of the `<anon>` class global.
+            ExprKind::ClassExpr { .. } => {
+                return TirExpr {
+                    kind: TirExprKind::Var,
+                    ty,
+                    res: self.resolve_name("<anon>"),
+                    span,
+                };
+            }
+
+            // `Missing` (a parse hole) has no runtime value: a well-formed null.
             _ => None,
         };
 
@@ -1468,7 +2422,31 @@ impl<'a> FnEmitter<'a> {
                             span,
                         };
                     }
+                    // An intrinsic (`Array`, `Error`) or imported class — a
+                    // real `instanceof` against the named global.
+                    return TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Instanceof,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        },
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
                 }
+            }
+            if op == BinaryOp::In {
+                return TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::In,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
             }
             return self.cast_to(lhs, BackendTy::Bool);
         };
@@ -1573,12 +2551,12 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        // `&&` / `||`: when both operands are pure the operator is a `Select`
-        // (short-circuit preserved as a branch). If either is impure, fall
-        // back to a bitwise op on the two Bool casts — no short-circuit, same
-        // result for effect-free right operands, always well-formed.
+        // `&&` / `||` -> a `Select`: the operator mentions the left operand
+        // once (as the condition) and the right once (as one arm), so a branch
+        // preserves both the short-circuit and any side effect exactly, with
+        // no need for a hoisted temp. `is_pure` is not consulted for these.
         let (cond, then_val, else_val) = match op {
-            LogicalOp::And | LogicalOp::Or if Self::is_pure(left) && Self::is_pure(right) => {
+            LogicalOp::And | LogicalOp::Or => {
                 let l = self.lower_expr(left);
                 let l = self.cast_to(l, BackendTy::Bool);
                 let r = self.lower_expr(right);
@@ -1587,23 +2565,6 @@ impl<'a> FnEmitter<'a> {
                     LogicalOp::And => (l, r, bool_lit(false)), // a ? b : false
                     _ => (l, bool_lit(true), r),               // a ? true : b
                 }
-            }
-            LogicalOp::And | LogicalOp::Or => {
-                let l = self.lower_expr(left);
-                let l = self.cast_to(l, BackendTy::Bool);
-                let r = self.lower_expr(right);
-                let r = self.cast_to(r, BackendTy::Bool);
-                let bop = if matches!(op, LogicalOp::And) {
-                    TirBinOp::BitAnd
-                } else {
-                    TirBinOp::BitOr
-                };
-                return TirExpr {
-                    kind: TirExprKind::Binary { op: bop, lhs: Box::new(l), rhs: Box::new(r) },
-                    ty: BackendTy::Bool,
-                    res: Resolution::None,
-                    span,
-                };
             }
             LogicalOp::Nullish => {
                 let mut l = self.lower_expr(left);
@@ -1693,6 +2654,37 @@ impl<'a> FnEmitter<'a> {
         let obj = self.lower_expr(object);
 
         if computed {
+            // `obj[a..b]` — a slice. Lower to `obj.slice(a, b')` where an
+            // inclusive range bumps the end by one.
+            if let ExprKind::Range { start, end, inclusive } = &property.kind {
+                let s = self.lower_expr(start);
+                let mut e = self.lower_expr(end);
+                if *inclusive {
+                    e = TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Add,
+                            lhs: Box::new(e),
+                            rhs: Box::new(int_lit(1)),
+                        },
+                        ty: BackendTy::Int,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                return TirExpr {
+                    kind: TirExprKind::MethodCall {
+                        recv: Box::new(obj),
+                        name: Rc::from("slice"),
+                        args: vec![TirArg::Expr(s), TirArg::Expr(e)],
+                    },
+                    ty,
+                    res: Resolution::ByName {
+                        name: Rc::from("slice"),
+                        why: DynReason::Unannotated,
+                    },
+                    span,
+                };
+            }
             // `obj[key]`. An array index is pinned to the element type; other
             // receivers are unconstrained by the verifier.
             let index = self.lower_expr(property);
@@ -1709,6 +2701,21 @@ impl<'a> FnEmitter<'a> {
         }
 
         let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
+
+        // `recv.p` the checker resolved to an extension getter: `__extget(recv)`
+        // — an extension call so `recv` lands in the `this` slot.
+        if let Some(mangled) = self.m.ext_members.get(&property.range.start.offset).cloned() {
+            return TirExpr {
+                kind: TirExprKind::ExtensionCall {
+                    func: mangled,
+                    recv: Box::new(obj),
+                    args: vec![],
+                },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
 
         // `E.V` — a unit enum variant.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
@@ -1769,6 +2776,7 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             is_async,
             is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
         });
         let slot = self.out_closures.len() - 1;
 
@@ -1808,6 +2816,7 @@ impl<'a> FnEmitter<'a> {
             }
         });
         let locals = sub.locals;
+        let captures = std::mem::take(&mut sub.captures);
 
         self.out_closures[slot] = TirFunction {
             name: Rc::from("<closure>"),
@@ -1820,9 +2829,31 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             is_async,
             is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
         };
 
-        TirExpr { kind: TirExprKind::Closure { func: func_id }, ty, res: Resolution::None, span }
+        // Resolve each captured name against THIS (the enclosing) frame. A
+        // name that is itself an upvalue here chains through as `ParentUpvalue`
+        // — `resolve_name` records it in `self.captures` on the way.
+        let upvalues: Vec<varn_tir::TirUpvalue> = captures
+            .iter()
+            .map(|name| match self.resolve_name(name) {
+                Resolution::Local(id) => varn_tir::TirUpvalue::ParentLocal(id.0),
+                Resolution::Param(i) => varn_tir::TirUpvalue::ParentParam(i),
+                Resolution::Upvalue(i) => varn_tir::TirUpvalue::ParentUpvalue(i),
+                // A capture that resolves to a global here is not really a
+                // capture; the closure body will read it as a global too. Use
+                // a param-0 placeholder that the backend simply never reads.
+                _ => varn_tir::TirUpvalue::ParentUpvalue(0),
+            })
+            .collect();
+
+        TirExpr {
+            kind: TirExprKind::Closure { func: func_id, upvalues },
+            ty,
+            res: Resolution::None,
+            span,
+        }
     }
 
     /// A template string folds to `Str` concatenation. Each interpolation
@@ -1861,12 +2892,17 @@ impl<'a> FnEmitter<'a> {
         acc.unwrap_or_else(|| str_expr(TirExprKind::StrLit(Rc::from("")), span))
     }
 
-    fn lower_new(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    fn lower_new(&mut self, call_id: AstId, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
         let class = match &callee.kind {
             ExprKind::Identifier { name } => self.m.names.class_id(name),
+            // `new NS.Class(…)` — a namespaced class is still a module global;
+            // the qualifier only scopes the name.
+            ExprKind::Member { property, computed: false, .. } => {
+                Self::member_name(property).and_then(|n| self.m.names.class_id(&n))
+            }
             _ => None,
         };
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
         match class {
             Some(class) => TirExpr {
                 kind: TirExprKind::New { class, args: targs },
@@ -1909,11 +2945,70 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn lower_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    /// Argument list for a call, laid out positionally. When the checker
+    /// recorded a named-argument mapping for this call, arguments are
+    /// reordered to parameter position and omitted slots become a bare `null`
+    /// — the callee's own default-guard prologue fills them in.
+    fn lower_call_args(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
+        match self.m.call_mappings.get(&call_id).cloned() {
+            Some(mapping) => mapping
+                .iter()
+                .map(|opt| match opt {
+                    Some(i) => match &args[*i] {
+                        Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                            TirArg::Expr(self.lower_expr(e))
+                        }
+                        Arg::Spread(e) => TirArg::Spread(self.lower_expr(e)),
+                    },
+                    None => TirArg::Expr(TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                })
+                .collect(),
+            None => args.iter().map(|a| self.lower_arg(a)).collect(),
+        }
+    }
+
+    fn lower_call(
+        &mut self,
+        call_id: AstId,
+        callee: &Expr,
+        args: &[Arg],
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        // `super(args)` — base constructor.
+        if matches!(callee.kind, ExprKind::Super) {
+            let targs = self.lower_call_args(call_id, args);
+            return TirExpr {
+                kind: TirExprKind::SuperCall { args: targs },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
+        // `super.name(args)` — base method, bypassing the vtable.
+        if let ExprKind::Member { object, property, computed: false, .. } = &callee.kind {
+            if matches!(object.kind, ExprKind::Super) {
+                if let Some(name) = Self::member_name(property) {
+                    let targs = self.lower_call_args(call_id, args);
+                    return TirExpr {
+                        kind: TirExprKind::SuperMethodCall { name, args: targs },
+                        ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+            }
+        }
+
         // Free call on an identifier: `f(args)`.
         if let ExprKind::Identifier { name } = &callee.kind {
             let c = self.lower_expr(callee);
-            let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+            let targs = self.lower_call_args(call_id, args);
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
             let res = match self.m.fns.get(name) {
                 Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
@@ -1933,15 +3028,31 @@ impl<'a> FnEmitter<'a> {
         // (`obj[k]()`, `(f())()`) is a by-name call on the lowered callee.
         let (object, property) = match &callee.kind {
             ExprKind::Member { object, property, computed: false, .. } => (object, property),
-            _ => return self.by_name_call(callee, args, ty, span),
+            _ => return self.by_name_call(call_id, callee, args, ty, span),
         };
         let Some(name) = Self::member_name(property) else {
-            return self.by_name_call(callee, args, ty, span);
+            return self.by_name_call(call_id, callee, args, ty, span);
         };
+
+        // `recv.m(args)` the checker resolved to an extension function.
+        if let Some(mangled) = self.m.ext_calls.get(&span.start).cloned() {
+            let recv = self.lower_expr(object);
+            let targs = self.lower_call_args(call_id, args);
+            return TirExpr {
+                kind: TirExprKind::ExtensionCall {
+                    func: mangled,
+                    recv: Box::new(recv),
+                    args: targs,
+                },
+                ty,
+                res: Resolution::None,
+                span,
+            };
+        }
 
         // `E.V(args)` — an enum variant with a payload.
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
-            let vargs = args.iter().map(|a| self.lower_arg(a)).collect();
+            let vargs = self.lower_call_args(call_id, args);
             return TirExpr {
                 kind: TirExprKind::MakeVariant { args: vargs },
                 ty: BackendTy::Enum(enum_id),
@@ -1951,7 +3062,7 @@ impl<'a> FnEmitter<'a> {
         }
 
         let recv = self.lower_expr(object);
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
 
         // A vtable slot only when the receiver is a class with that method and
         // the arity matches its signature — the verifier checks both. Getters
@@ -1978,9 +3089,9 @@ impl<'a> FnEmitter<'a> {
     }
 
     /// A call whose callee has no static resolution: `Call` + `ByName`.
-    fn by_name_call(&mut self, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
+    fn by_name_call(&mut self, call_id: AstId, callee: &Expr, args: &[Arg], ty: BackendTy, span: Span) -> TirExpr {
         let c = self.lower_expr(callee);
-        let targs: Vec<TirArg> = args.iter().map(|a| self.lower_arg(a)).collect();
+        let targs = self.lower_call_args(call_id, args);
         TirExpr {
             kind: TirExprKind::Call { callee: Box::new(c), args: targs },
             ty,
@@ -1995,10 +3106,15 @@ impl<'a> FnEmitter<'a> {
             UnaryOp::Not => TirUnOp::Not,
             UnaryOp::BitNot => TirUnOp::BitNot,
             UnaryOp::Plus => return self.lower_expr(operand), // unary + is identity
-            // `typeof x` yields a string; a Cast carries that.
+            // `typeof x` yields the runtime type name as a string.
             UnaryOp::Typeof => {
                 let inner = self.lower_expr(operand);
-                return self.cast_to(inner, BackendTy::Str);
+                return TirExpr {
+                    kind: TirExprKind::Unary { op: TirUnOp::Typeof, operand: Box::new(inner) },
+                    ty: BackendTy::Str,
+                    res: Resolution::None,
+                    span,
+                };
             }
         };
         // Only `IsNull` is type-checked by the verifier (must be Bool); the
@@ -2013,24 +3129,6 @@ impl<'a> FnEmitter<'a> {
     }
 }
 
-/// `a && b` as a Bool expression, via Select (`a ? b : false`).
-fn and_bool(a: TirExpr, b: TirExpr) -> TirExpr {
-    let span = a.span;
-    if a.ty != BackendTy::Bool || b.ty != BackendTy::Bool {
-        // A non-Bool guard: fall back to just the pattern condition.
-        return a;
-    }
-    TirExpr {
-        kind: TirExprKind::Select {
-            cond: Box::new(a),
-            then_val: Box::new(b),
-            else_val: Box::new(bool_lit(false)),
-        },
-        ty: BackendTy::Bool,
-        res: Resolution::None,
-        span,
-    }
-}
 
 fn prop_key_name(key: &PropKey) -> Option<Rc<str>> {
     match key {
@@ -2062,7 +3160,14 @@ fn assign_bin_op(op: varn_core::ast::operators::AssignOp) -> Result<Option<TirBi
         A::DivAssign => TirBinOp::Div,
         A::ModAssign => TirBinOp::Mod,
         A::PowAssign => TirBinOp::Pow,
-        _ => return Err(()),
+        A::BitAndAssign => TirBinOp::BitAnd,
+        A::BitOrAssign => TirBinOp::BitOr,
+        A::BitXorAssign => TirBinOp::BitXor,
+        A::ShlAssign => TirBinOp::Shl,
+        A::ShrAssign => TirBinOp::Shr,
+        A::UShrAssign => TirBinOp::Ushr,
+        // `&&=` / `||=` / `??=` short-circuit — lowered by the caller.
+        A::AndAssign | A::OrAssign | A::NullishAssign => return Err(()),
     }))
 }
 

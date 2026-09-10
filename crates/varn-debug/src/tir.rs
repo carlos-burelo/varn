@@ -7,18 +7,17 @@
 
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
-use varn_checker::module_resolver::ImportResolver;
 use varn_checker::{BindResult, TypeEntry};
 use varn_core::ast::{AstId, Program};
 
 pub fn debug_tir(
     program: &Program,
     bind: &BindResult,
-    resolver: &dyn ImportResolver,
     expr_table: &FxHashMap<AstId, TypeEntry>,
+    call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
     flags: &DebugFlags,
 ) {
-    let module = varn_checker::emit::emit_module(program, bind, resolver, expr_table);
+    let module = varn_checker::emit::emit_module(program, bind, expr_table, call_mappings, &Default::default(), &Default::default(), &Default::default());
 
     if flags.tir {
         eprintln!("\n=== TIR: {} ===", module.source_file);
@@ -41,5 +40,19 @@ pub fn debug_tir(
         }
         let coverage = varn_tir::Coverage::of(&module);
         eprint!("{}", coverage.report());
+
+        // Stage 3: how far `from_tir` gets building SSA from this module.
+        match varn_compiler::from_tir::build_module(&module) {
+            Ok(fns) => eprintln!("  from_tir(ssa): OK ({} ssa fn(s))", fns.len()),
+            Err(e) => eprintln!("  from_tir(ssa): {e:?}"),
+        }
+        // ...and compiling it all the way to a proto (panics are caught).
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            varn_compiler::from_tir::compile_module(&module, vec![])
+        })) {
+            Ok(Ok(_)) => eprintln!("  from_tir(proto): OK"),
+            Ok(Err(e)) => eprintln!("  from_tir(proto): {e:?}"),
+            Err(_) => eprintln!("  from_tir(proto): PANIC"),
+        }
     }
 }

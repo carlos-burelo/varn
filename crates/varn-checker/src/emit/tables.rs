@@ -94,10 +94,15 @@ fn build_classes(
     class_names: &[Rc<str>],
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
-    class_names
-        .iter()
-        .map(|name| build_one_class(bind, tt, names, name, signatures))
-        .collect()
+    // `class_names` is parent-before-child, so a class's parent `ClassInfo` is
+    // already in `built` by the time we reach it — needed to lay inherited
+    // fields out first, with the slots the runtime's inherited shape uses.
+    let mut built: Vec<ClassInfo> = Vec::with_capacity(class_names.len());
+    for name in class_names {
+        let info = build_one_class(bind, tt, names, name, signatures, &built);
+        built.push(info);
+    }
+    built
 }
 
 /// The binder's `type_members.classes[name].members` is already flattened —
@@ -111,7 +116,26 @@ fn build_one_class(
     names: &NameIndex,
     name: &Rc<str>,
     signatures: &mut Vec<Signature>,
+    built: &[ClassInfo],
 ) -> ClassInfo {
+    let parent_name = bind.class_parents.get(name);
+    let parent_id = parent_name.and_then(|p| names.class_id(p));
+    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize));
+    let mut inherited_fields: FxHashMap<Rc<str>, ()> = parent_info
+        .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
+        .unwrap_or_default();
+
+    // A class extending a NATIVE class the local table doesn't hold: the only
+    // user-extensible one is the `Error` family, whose instances carry
+    // `message` / `name` / `stack` before any own field. The runtime's
+    // `op_inherit` lays them out first, so the own fields' slots must too.
+    let mut fields: Vec<(Rc<str>, BackendTy)> = Vec::new();
+    if parent_name.is_some() && parent_id.is_none() {
+        for f in ["message", "name", "stack"] {
+            fields.push((Rc::from(f), BackendTy::Str));
+            inherited_fields.insert(Rc::from(f), ());
+        }
+    }
     let members = bind
         .type_members
         .classes
@@ -119,7 +143,6 @@ fn build_one_class(
         .map(|e| e.members.as_slice())
         .unwrap_or(&[]);
 
-    let mut fields: Vec<(Rc<str>, BackendTy)> = Vec::new();
     let mut seen_field: FxHashMap<Rc<str>, ()> = FxHashMap::default();
     let mut method_names: Vec<Rc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Rc<str>, varn_tir::SigId> = FxHashMap::default();
@@ -137,7 +160,11 @@ fn build_one_class(
         }
         match m.kind {
             ClassMemberKind::Property | ClassMemberKind::Variable => {
-                if seen_field.insert(m.name.clone(), ()).is_none() {
+                // Own fields only — inherited ones are laid out by the parent
+                // prefix `new_with_methods` prepends.
+                if !inherited_fields.contains_key(&m.name)
+                    && seen_field.insert(m.name.clone(), ()).is_none()
+                {
                     fields.push((m.name.clone(), lower_type(&m.ty, tt, names)));
                 }
             }
@@ -160,9 +187,8 @@ fn build_one_class(
     let methods: Vec<(Rc<str>, varn_tir::SigId)> =
         method_names.into_iter().map(|n| (n.clone(), method_sig[&n])).collect();
 
-    let mut info = ClassInfo::new_with_methods(name.clone(), None, fields, methods);
-    info.parent = bind.class_parents.get(name).and_then(|p| names.class_id(p));
-    info
+    let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
+    ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods)
 }
 
 /// Append a signature for a method and hand back its id.
@@ -229,6 +255,18 @@ fn build_enums(
                 .map(|vs| vs.as_slice())
                 .unwrap_or(&[])
                 .iter()
+                // Methods, accessors and `static` members share the enum body
+                // but are not variants — including them shifts every tag.
+                .filter(|v| {
+                    !v.is_static
+                        && !matches!(
+                            v.kind,
+                            crate::types::ClassMemberKind::Method
+                                | crate::types::ClassMemberKind::Getter
+                                | crate::types::ClassMemberKind::Setter
+                                | crate::types::ClassMemberKind::Constructor
+                        )
+                })
                 .enumerate()
                 .map(|(tag, v)| {
                     let payload = bind

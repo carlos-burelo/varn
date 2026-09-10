@@ -24,20 +24,60 @@ use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
 
+/// What `emit_function` needs about a function beyond its SSA body. Built from
+/// a `HirFunction` (current path) or a `varn_tir::TirFunction` (`from_tir`).
+pub struct FnMeta {
+    pub name: Rc<str>,
+    pub start_line: u32,
+    pub nparams: usize,
+    pub param_kinds: Vec<varn_types::register_meta::SlotKind>,
+    pub return_kind: varn_types::register_meta::SlotKind,
+    pub has_rest: bool,
+    pub is_async: bool,
+    pub is_generator: bool,
+    pub has_this: bool,
+    pub upvalue_count: u32,
+}
+
+impl FnMeta {
+    pub fn from_hir(f: &HirFunction) -> Self {
+        FnMeta {
+            name: f.name.clone(),
+            start_line: f.start_line,
+            nparams: f.params.len(),
+            param_kinds: f.params.iter().map(|p| slot_kind_of(p.ty)).collect(),
+            return_kind: slot_kind_of(f.return_ty),
+            has_rest: f.has_rest,
+            is_async: f.is_async,
+            is_generator: f.is_generator,
+            has_this: f.has_this,
+            upvalue_count: f.upvalue_count,
+        }
+    }
+}
+
 pub fn emit_function(
-    mut ssa: SsaFunc,
+    ssa: SsaFunc,
     f: &HirFunction,
+    source_file: Rc<str>,
+) -> Result<FunctionProto> {
+    emit_function_meta(ssa, &FnMeta::from_hir(f), source_file)
+}
+
+pub fn emit_function_meta(
+    mut ssa: SsaFunc,
+    f: &FnMeta,
     source_file: Rc<str>,
 ) -> Result<FunctionProto> {
     phi_edges::split_phi_edges(&mut ssa);
 
     let fn_line = if f.start_line > 0 { f.start_line } else { 1 };
-    let nparams = f.params.len();
+    let nparams = f.nparams;
     let (reg, scratch, null_reg, call_base, register_count) =
         regs::assign_registers(&ssa, nparams)?;
-    let param_kinds: Vec<_> = f.params.iter().map(|p| slot_kind_of(p.ty)).collect();
+    let param_kinds = f.param_kinds.clone();
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
-    let return_kind = slot_kind_of(f.return_ty);
+    let return_kind = f.return_kind;
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -208,7 +248,7 @@ fn derive_register_meta(
         .collect()
 }
 
-fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
+pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
     use crate::hir::HirType;
     use varn_types::register_meta::SlotKind;
     match ty {
@@ -234,6 +274,27 @@ fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind 
 /// numeric order so every block is still emitted.
 fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     let n = ssa.blocks.len();
+    // Successors in the order the DFS should walk them: `else` before `then`
+    // (loop-header fall-through), then every `try` handler this block opens. A
+    // landing pad is reachable only through the `Try` inst, never the
+    // terminator, so without this it counts as "unreachable" and is emitted in
+    // raw numeric order — which puts a catch-chain merge block ahead of its
+    // predecessors and turns its forward jump into a back-edge `Loop`.
+    let succs = |b: usize| -> Vec<usize> {
+        let mut s = match &ssa.blocks[b].term {
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
+            Terminator::Jump { target, .. } => vec![target.0 as usize],
+            Terminator::Branch { then_blk, else_blk, .. } => {
+                vec![else_blk.0 as usize, then_blk.0 as usize]
+            }
+        };
+        for inst in &ssa.blocks[b].insts {
+            if let InstKind::Try { handler } = &inst.kind {
+                s.push(handler.0 as usize);
+            }
+        }
+        s
+    };
     let mut visited = vec![false; n];
     let mut post: Vec<usize> = Vec::with_capacity(n);
     let mut stack: Vec<(usize, u8)> = Vec::with_capacity(n);
@@ -243,12 +304,7 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     while let Some(top) = stack.last_mut() {
         let (b, stage) = *top;
         top.1 += 1;
-        let succ = match &ssa.blocks[b].term {
-            Terminator::Jump { target, .. } if stage == 0 => Some(target.0 as usize),
-            Terminator::Branch { else_blk, .. } if stage == 0 => Some(else_blk.0 as usize),
-            Terminator::Branch { then_blk, .. } if stage == 1 => Some(then_blk.0 as usize),
-            _ => None,
-        };
+        let succ = succs(b).get(stage as usize).copied();
         match succ {
             Some(s) => {
                 if !visited[s] {

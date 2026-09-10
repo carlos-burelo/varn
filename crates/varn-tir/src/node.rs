@@ -34,6 +34,10 @@ pub enum TirBinOp {
     Add, Sub, Mul, Div, Mod, Pow,
     Eq, Ne, Lt, Le, Gt, Ge,
     BitAnd, BitOr, BitXor, Shl, Shr, Ushr,
+    /// `x instanceof C` — always produces `Bool`, operands are references.
+    Instanceof,
+    /// `k in obj` — membership, always `Bool`.
+    In,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +45,8 @@ pub enum TirUnOp {
     Neg,
     Not,
     BitNot,
+    /// `typeof x` — yields the runtime type name as a string.
+    Typeof,
     /// The null test `?.` and `??` desugar against. The emitter binds the
     /// tested value to a temp local, then branches on `IsNull(Var)` inside a
     /// `Select` — that is the whole short-circuit, no dedicated node.
@@ -111,6 +117,8 @@ pub enum TirExprKind {
     ArrayLit(Vec<TirArrayEl>),
     TupleLit(Vec<TirExpr>),
     ObjectLit { entries: Vec<TirObjectEntry> },
+    /// `#{ k: v, … }` — a deeply-immutable record; `==` on it is structural.
+    RecordLit { fields: Vec<(Rc<str>, TirExpr)> },
 
     /// `await e` — only legal in a function whose `is_async` is set, which the
     /// verifier enforces. No suspension state in the IR: the backend builds the
@@ -134,7 +142,10 @@ pub enum TirExprKind {
 
     /// A function value. `func` is the `TirFunction` holding its body; captures
     /// are resolved by the backend against the parent frame, as HIR does.
-    Closure { func: FnId },
+    /// A function value. `func` holds the body; `upvalues` says, in upvalue-
+    /// index order, where each captured value comes from in the ENCLOSING
+    /// frame — the backend needs this to build the closure record.
+    Closure { func: FnId, upvalues: Vec<TirUpvalue> },
 
     /// Construction of a class instance.
     New { class: ClassId, args: Vec<TirArg> },
@@ -143,6 +154,36 @@ pub enum TirExprKind {
 
     /// `cond ? a : b`
     Select { cond: Box<TirExpr>, then_val: Box<TirExpr>, else_val: Box<TirExpr> },
+
+    /// The enumerable string keys of an object — the iterand of `for…in`.
+    /// Produces `str[]`.
+    ObjectKeys { operand: Box<TirExpr> },
+    /// The iterator object for `for…of` — `source[Symbol.iterator]()` (or
+    /// `Symbol.asyncIterator` when `is_async`). Works for arrays, generators,
+    /// and any object carrying the symbol; the emitter then drives `.next()`.
+    IterInit { source: Box<TirExpr>, is_async: bool },
+
+    /// `super(args)` — the base constructor call, only valid inside a
+    /// subclass constructor.
+    SuperCall { args: Vec<TirArg> },
+    /// `super.name(args)` — a base method call bypassing the vtable.
+    SuperMethodCall { name: Rc<str>, args: Vec<TirArg> },
+
+    /// A `decimal` literal, carried as its source text (minus the `d` suffix)
+    /// — the backend parses it, keeping this crate free of `rust_decimal`.
+    DecimalLit(Rc<str>),
+    /// A `bigint` literal, already parsed to `i128` by the checker.
+    BigIntLit(i128),
+    /// `a..b` / `a..=b`.
+    RangeLit { start: Box<TirExpr>, end: Box<TirExpr>, inclusive: bool },
+
+    /// `const { a, ...rest } = obj` — a shallow copy of `object` without
+    /// `skip_keys`.
+    ObjectRest { object: Box<TirExpr>, skip_keys: Vec<Rc<str>> },
+
+    /// `recv.m(args)` resolved to an extension function: a free-function call
+    /// with `recv` prepended, dispatched by the mangled `func` name.
+    ExtensionCall { func: Rc<str>, recv: Box<TirExpr>, args: Vec<TirArg> },
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +202,18 @@ pub enum TirStmt {
     Continue,
     Throw(TirExpr),
     Try { body: Vec<TirStmt>, catch_local: crate::ty::LocalId, catch_body: Vec<TirStmt> },
+    /// Build the class/enum at `TirModule::class_defs[n]` and bind its global —
+    /// emitted at the declaration's source position so decorators and static
+    /// initializers see the module state that precedes it.
+    BuildClass(u32),
+}
+
+/// Where a closure upvalue is sourced from in the enclosing frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TirUpvalue {
+    ParentLocal(u32),
+    ParentParam(u32),
+    ParentUpvalue(u32),
 }
 
 #[derive(Debug, Clone)]
@@ -177,17 +230,122 @@ pub struct TirFunction {
     /// the verifier and tells the backend to build a state machine.
     pub is_async: bool,
     pub is_generator: bool,
+    /// The last parameter is `...rest`: the VM packs the trailing arguments
+    /// into an array bound to it.
+    pub has_rest: bool,
+}
+
+/// Everything the backend needs to BUILD a class/enum object at module load
+/// and bind it to its global. The `classes` / `enums` tables describe layout
+/// and dispatch; this describes construction. Instance-field names and types
+/// come from the referenced table entry, not repeated here.
+#[derive(Debug, Clone, Default)]
+pub struct TirClassDef {
+    pub name: Rc<str>,
+    /// Table handle: `Some(Ok)` a class, `Some(Err)` an enum, `None` neither
+    /// resolved (a generic-only or erased declaration — still built by name).
+    pub class_id: Option<ClassId>,
+    pub enum_id: Option<EnumId>,
+    /// The base class, resolved from `extends` — more reliable than
+    /// `ClassInfo::parent`, which the binder sometimes leaves unset.
+    pub parent: Option<ClassId>,
+    /// Hoisted temporaries from `super_class` / decorator / static-init
+    /// expressions, emitted before the `MakeClass`.
+    pub prelude: Vec<TirStmt>,
+    /// The `extends` expression, evaluated for the `MakeClass` super argument.
+    pub super_class: Option<TirExpr>,
+    /// Static fields / consts: name + optional initializer.
+    pub statics: Vec<(Rc<str>, Option<TirExpr>)>,
+    /// Methods and the constructor: key, body `FnId`, `is_static`.
+    pub methods: Vec<TirClassMember>,
+    /// Getters / setters: key, body `FnId`, `is_getter`, `is_static`.
+    pub accessors: Vec<TirClassAccessor>,
+    /// Class decorators, applied outermost-last.
+    pub decorators: Vec<TirExpr>,
+    /// `static { ... }` blocks, as `FnId`s to invoke after the class is bound.
+    pub static_blocks: Vec<FnId>,
+    /// Enum variants: name, tag, metadata string, payload default args.
+    pub variants: Vec<TirVariantDef>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirClassMember {
+    pub key: Rc<str>,
+    pub func: FnId,
+    pub is_static: bool,
+    pub is_private: bool,
+    /// Method decorators, applied innermost-first.
+    pub decorators: Vec<TirExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirClassAccessor {
+    pub key: Rc<str>,
+    pub func: FnId,
+    pub is_getter: bool,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirVariantDef {
+    pub name: Rc<str>,
+    pub tag: i64,
+    pub meta: Rc<str>,
+    pub const_args: Vec<TirExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TirImportKind {
+    Default,
+    Named(Rc<str>),
+    Namespace,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirImportSpec {
+    pub local: Rc<str>,
+    pub kind: TirImportKind,
+}
+
+/// One `import ... from "src"` — the linkage the backend turns into a
+/// `LoadModule` plus a `StoreGlobal` per bound name.
+#[derive(Debug, Clone)]
+pub struct TirImport {
+    pub source: Rc<str>,
+    pub is_type_only: bool,
+    pub specs: Vec<TirImportSpec>,
+}
+
+/// One name this module exposes. The backend fills the module slot named by
+/// `exported` from either a local global or, for `export {..} from "src"`, a
+/// property of that source module.
+#[derive(Debug, Clone)]
+pub struct TirExport {
+    pub exported: Rc<str>,
+    pub local: Rc<str>,
+    /// `Some(src)` — a re-export; the value is `src`'s `local` property.
+    pub reexport_from: Option<Rc<str>>,
+    /// `export * as ns from "src"` — bind the whole module object.
+    pub namespace: bool,
 }
 
 #[derive(Debug)]
 pub struct TirModule {
     pub source_file: Rc<str>,
+    pub imports: Vec<TirImport>,
+    pub exports: Vec<TirExport>,
     pub types: TyTable,
     pub classes: Vec<crate::tables::ClassInfo>,
     pub enums: Vec<crate::tables::EnumInfo>,
     pub signatures: Vec<crate::tables::Signature>,
     pub functions: Vec<TirFunction>,
     pub globals: Vec<BackendTy>,
+    /// The name of each global, parallel to `globals`. A `GlobalSlot(n)`
+    /// resolution names `globals[n]` / `global_names[n]`.
+    pub global_names: Vec<Rc<str>>,
+    /// Class / enum construction, one per top-level declaration, in source
+    /// order. Empty for a module with no classes or enums.
+    pub class_defs: Vec<TirClassDef>,
     pub top_level: TirFunction,
 }
 

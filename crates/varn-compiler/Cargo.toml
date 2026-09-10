@@ -9,6 +9,7 @@ edition.workspace = true
 # emits. The register-allocation post-passes live in varn-regalloc.
 [dependencies]
 varn-core  = { path = "../varn-core" }
+varn-tir   = { path = "../varn-tir" }
 varn-types = { path = "../varn-types" }
 rustc-hash = { workspace = true }
 rust_decimal = { workspace = true }

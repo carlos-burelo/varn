@@ -1,23 +1,8 @@
-use std::rc::Rc;
-
 use varn_core::OpCode;
-use varn_types::chunk::FunctionProto;
 
-use crate::hir::*;
-use crate::OptError;
+use crate::hir::{HirBinOp, HirType};
 
-pub(crate) fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
-    match crate::ssa::try_compile_function(f, source_file) {
-        Ok(proto) => proto,
-        Err(OptError::Unsupported(why)) => {
-            panic!(
-                "SSA compiler unsupported construct in function {}: {}",
-                f.name, why
-            );
-        }
-    }
-}
-
+/// Pick the typed binary opcode for an operand type the SSA emitter proved.
 pub(crate) fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
     use HirBinOp::*;
     match ty {
@@ -91,16 +76,4 @@ pub(crate) fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             And | Or => OpCode::Add,
         },
     }
-}
-
-pub fn lower(
-    module: &HirModule,
-    source_file: Rc<str>,
-    export_names: Vec<Rc<str>>,
-) -> Result<FunctionProto, OptError> {
-    // Established for the whole module lowering, top-level and every nested
-    // function alike — `escape` runs inside both.
-    let _summaries =
-        crate::hir::ctor_summary::Scope::enter(crate::hir::ctor_summary::collect(module));
-    crate::ssa::lower_module(module, source_file, export_names)
 }
