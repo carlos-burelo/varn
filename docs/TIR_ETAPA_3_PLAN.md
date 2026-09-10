@@ -265,5 +265,38 @@ intérprete corriendo de vuelta. `run --compare-tiers` como control.
 sin desacuerdos sobre el corpus completo; `cargo test --workspace` +
 `cargo clippy --workspace` verdes; isolates + `vn cache clean` roundtrip OK.
 
-**Etapa 4 CERRADA.** Sigue Etapa 5 (formaliza el JIT; `K` derivado de
-`BackendTy`; `FunctionProto.register_meta` cambia de forma).
+**Etapa 4 CERRADA.**
+
+---
+
+## 7. Etapa 5 — `SlotKind` es el discriminante físico
+
+- [x] **`SlotKind` adelgazado** (`78325335`). Llevaba `Class(u32)` / `Array(u32)`
+      / `Nullable(u32)` — handles de tipo que el backend **nunca leía**, un
+      sistema de tipos paralelo. Colapsado a lo que codegen discrimina de
+      verdad: `Int | Float | Bool | Str | Ref | Dynamic`. `Str` aparte (puede
+      ser small-string inline, no puntero); todo lo demás heap-only → `Ref`;
+      cualquier nullable → `Dynamic` (la palabra de tag ya dice null-o-no; el
+      JIT no tiene kind `Pair`). `.vnc` invalida por `BUILD_FINGERPRINT`.
+      321/321 ×3 tiers; main.vn 1180 ×3; compare-tiers limpio; cargo test verde.
+
+### Lo que falta para "CLIF full-typed" (cada uno tamaño-feature, como fue
+### `InvokeVirtual`)
+
+Medido `-p typeloss` (sin `<module>`): generic 755 / typed 312 — **71% de los
+pares elegibles siguen genéricos.** Aritmética ~95% tipada; el resto:
+
+* **Getters** (`.size`, `.length`, `.celsius`) → `GetProperty` hash. Falta
+  `ClassInfo.getters` + `Resolution::GetterSlot` + opcode `InvokeGetter` + VM +
+  JIT. Es el trozo grande de los 837 `GetProperty` genéricos.
+* **Campos estáticos** (`Class._x`) → `GetProperty`/`SetProperty`.
+  `Resolution::StaticField` ya existe en el enum, sin productor. Falta opcode
+  `Get/SetStaticField` + VM + JIT.
+* **Payloads de enum importado** → `Field(s, "value0")` genérico. Extender el
+  camino de enum local (`Discriminant`/`VariantPayload`) al enum importado.
+* **`K::Pair`** para nullable escalar (`int?`, `float?`) — repr interna de CLIF,
+  sin dependencia de §7. `x ?? 0` → `select` en vez de load i128 + tag check.
+* **`K::Ptr`** para refs heap — sólo paga con punteros directos
+  (`DISENO_IDEAL.md §7`, el bloque siguiente: `ObjData` inline, slots de 16
+  bytes, GC de raíces a mano). En el modelo actual de heap-por-índice ahorra
+  un branch predicho por acceso — marginal.
