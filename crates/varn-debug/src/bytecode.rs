@@ -347,33 +347,43 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadIntOne => format!("r{} = 1", hi(op_val)),
             OpCode::LoadIntMinusOne => format!("r{} = -1", hi(op_val)),
 
-            OpCode::LoadGlobal | OpCode::LoadGlobalIdx | OpCode::LoadNativeGlobalIdx => {
+            // Name-keyed: the operand is a constant-pool index, so the string
+            // hint is meaningful. Idx forms carry a raw slot — no hint.
+            OpCode::LoadGlobal => {
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = const_hint(c);
                 }
-                let tag = match op {
-                    OpCode::LoadGlobalIdx => "@",
-                    OpCode::LoadNativeGlobalIdx => "native@",
-                    _ => "",
+                format!("r{} = global[{}]", hi(op_val), idx)
+            }
+            OpCode::LoadGlobalIdx => {
+                format!("r{} = global[@{}]", hi(op_val), w!())
+            }
+            OpCode::LoadNativeGlobalIdx => {
+                format!("r{} = global[native@{}]", hi(op_val), w!())
+            }
+            OpCode::StoreGlobal | OpCode::DefineGlobal => {
+                let w1 = w!();
+                let idx = w!();
+                if let Some(c) = proto.chunk.constants.get(idx as usize) {
+                    hint = const_hint(c);
+                }
+                let kw = if op == OpCode::DefineGlobal {
+                    "def "
+                } else {
+                    ""
                 };
-                format!("r{} = global[{tag}{}]", hi(op_val), idx)
+                format!("{kw}global[{}] = r{}", idx, hi(w1))
             }
-            OpCode::StoreGlobal | OpCode::StoreGlobalIdx => {
+            OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
                 let w1 = w!();
-                let idx = w!();
-                if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = const_hint(c);
-                }
-                format!("global[{}] = r{}", idx, hi(w1))
-            }
-            OpCode::DefineGlobal | OpCode::DefineGlobalIdx => {
-                let w1 = w!();
-                let idx = w!();
-                if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = const_hint(c);
-                }
-                format!("def global[{}] = r{}", idx, hi(w1))
+                let slot = w!();
+                let kw = if op == OpCode::DefineGlobalIdx {
+                    "def "
+                } else {
+                    ""
+                };
+                format!("{kw}global[@{}] = r{}", slot, hi(w1))
             }
 
             OpCode::Jump | OpCode::Loop => {
@@ -412,7 +422,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let name_idx = w!();
                 let w3 = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!(
                     "r{} = r{}.<virtual>({} args)  [cs={}]",
@@ -428,7 +438,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let name_idx = w!();
                 let w3 = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!(
                     "r{} = r{}.{}({} args @ r{})",
@@ -444,7 +454,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!(
                     "r{} = r{}.prop[{}] cs={}",
@@ -458,7 +468,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!(
                     "r{}.prop[{}] = r{} cs={}",
@@ -473,7 +483,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = r{}.prop?[{}]", hi(op_val), hi(w1), name_idx)
             }
@@ -490,7 +500,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::GetSuper => {
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = super.prop[{}]", hi(op_val), name_idx)
             }
