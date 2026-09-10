@@ -39,37 +39,49 @@ slot recorriendo bytecode:
 
 ## Fases
 
-### Fase A — regiones de módulo (mata el pase para el caso caliente)
+### Fase A — regiones de módulo — HECHA (`6ff813d1`, `<linker fix>`)
 
-1. `FunctionProto.global_count: u32` (append, `#[serde(default)]`; bumpea
-   `BUILD_FINGERPRINT`).
-2. `VmClosure.module_base: u32`. `build_closure` lo fija para el top-level;
-   `MakeClosure` lo copia del frame creador.
-3. `CallFrame` lo lee de la closure. `ExecCtx` cachea `cur_module_base` por
-   frame activo (para el JIT).
-4. `eval_module_proto` / `ctx_tasks` / `vm.rs`: `globals.reserve_region(n)`.
-5. `globals/resolve.rs`: emitir índices RELATIVOS (`slot - base`) mientras siga
-   existiendo — deja ambos caminos (pase viejo, compilador nuevo) coherentes.
-6. Intérprete `*Idx` (`ops_literals_vars.rs`): `base + idx`.
-7. JIT `clif/globals.rs` + `GblCtx`: sumar `module_base` (hornear constante).
-8. `from_tir` + `ssa/ir.rs` + `ssa/emit`: `Resolution::GlobalSlot(k)` →
-   `InstKind::LoadGlobalIdx { slot: k }` directo; mapa nombre→slot desde
-   `tir.global_names` para `build_imports` / `build_class_def` /
-   `build_exports` / registro de free-fns.
-9. El pase deja de tocar `LoadGlobal` de módulo (ya llegan `*Idx`); sólo
-   quedan los `ByName` de prelude → siguen name-keyed (hash, correcto; el JIT
-   baila hasta la Fase B).
+- `FunctionProto.global_count: u32` (append, `#[serde(default)]`).
+- `VmClosure.module_base: u32` + `varn_types::Closure.module_base`. Fijado al
+  evaluar el módulo (`eval_module_proto`, `vm.rs`), heredado por cada closure
+  anidada (`MakeClosure`, `LoadStaticFn`, fork de generador y de task).
+- `GlobalStore::reserve_region(count) -> base`.
+- Intérprete `LoadGlobalIdx`/`StoreGlobalIdx`/`DefineGlobalIdx`: `+ module_base`.
+- JIT `clif/globals.rs`: carga `module_base` del parámetro closure y lo suma.
+  El acceso a global ya fuerza el lowering frame-aware, así que la closure
+  siempre está en scope.
+- `from_tir`: `Resolution::GlobalSlot(k)` → `InstKind::LoadGlobalIdx(k)` /
+  `StoreGlobalIdx { slot: k }`; `global_load` / `global_store` con mapa
+  nombre→slot de `tir.global_names` para imports / clases / exports / free-fns.
+- `K::Global` (link estático de llamadas): `CtxLinker` lleva el `module_base`
+  del proto que compila (`CtxLinker::for_module`) y lo suma antes de indexar
+  el store. Restaurado.
+- El pase (`globals/resolve.rs`) queda reducido a una cosa: `LoadGlobal` de un
+  símbolo de prelude por nombre → nuevo opcode `LoadNativeGlobalIdx` (absoluto,
+  sin base). Un nombre genuinamente dinámico se queda name-keyed.
 
-### Fase B — manifiesto nativo, borrar el pase
+Esto es la parte del objetivo inviolable que tocaba a los globales: la
+re-derivación en runtime de los globales de MÓDULO — el grueso — desapareció.
 
-10. `varn-core::NATIVE_GLOBALS` generado de la misma fuente que
-    `varn-builtins` registra. `with_native_layout` lo sigue exacto.
-    `isIsolate` en un slot fijo del manifiesto.
-11. `LoadNativeGlobalIdx` / `StoreNativeGlobalIdx` (sin base).
-12. checker: `ByName` de prelude conocido → índice de región nativa.
-13. Borrar `globals/resolve.rs`, sus 3 call sites, `FunctionProto.globals_id`,
-    el arm `LoadGlobal | StoreGlobal | DefineGlobal` de `exec_variable_op`
-    (o dejarlo sólo para `dynamic` de verdad).
+### Fase B — opcional: borrar el pase residual del prelude
+
+El pase que queda liga `print`/`assert` a la capa del host en tiempo de carga.
+Es defendible como frontera del host (el compilador honestamente no posee esos
+símbolos: `Resolution::ByName { why: HostBoundary }`), no una re-derivación de
+lo que el checker sabía. Y NO hay regresión de rendimiento: el pase corre antes
+de ejecutar, así que una función que lee `assert` sí compila a CLIF
+(verificado: `CLIF ROUTE check`).
+
+Si aún así se quiere borrar:
+
+10. `varn-builtins::native_global_names() -> Vec<&'static str>` en el orden
+    exacto que construye `with_native_layout` (`["print","assert"]` ++
+    resto ordenado). `with_native_layout` lo consume — misma fuente, imposible
+    que difieran.
+11. `Resolution::NativeGlobal(u32)` + `InstKind::LoadNativeGlobalIdx(u32)`.
+12. checker `resolve_name`: antes de caer a `ByName`, mirar
+    `native_global_names` → `Resolution::NativeGlobal(idx)`.
+13. Borrar `globals/resolve.rs`, sus 3 call sites, `FunctionProto.globals_id`.
 
 ## Control (cada fase)
 

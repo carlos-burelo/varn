@@ -215,24 +215,32 @@ impl Drop for CtxGuard {
     }
 }
 
-/// Linker bound to whatever context is current on this thread.
-pub struct CtxLinker(*const ExecCtx);
+/// Linker bound to whatever context is current on this thread. `module_base`
+/// is the compiling proto's module global region — `K::Global` slots are
+/// module-relative, so it is added before indexing the store.
+pub struct CtxLinker {
+    ctx: *const ExecCtx,
+    module_base: usize,
+}
 
 impl CtxLinker {
-    pub(crate) fn current() -> Self {
-        CtxLinker(CURRENT_CTX.with(|c| c.get()))
+    pub(crate) fn for_module(module_base: u32) -> Self {
+        CtxLinker {
+            ctx: CURRENT_CTX.with(|c| c.get()),
+            module_base: module_base as usize,
+        }
     }
 }
 
 impl ClifLinker for CtxLinker {
     fn static_target(&self, global_idx: usize) -> Option<ClifTarget> {
-        if self.0.is_null() {
+        if self.ctx.is_null() {
             return None;
         }
         // Safety: the pointer is valid for the lifetime of the CtxGuard that
         // set it; clif compilation runs synchronously inside that run.
-        let ctx = unsafe { &*self.0 };
-        let gv = *ctx.globals.values.get(global_idx)?;
+        let ctx = unsafe { &*self.ctx };
+        let gv = *ctx.globals.values.get(self.module_base + global_idx)?;
         if !gv.is_heap() {
             return None;
         }
@@ -261,11 +269,11 @@ impl ClifLinker for CtxLinker {
         &self,
         global_idx: usize,
     ) -> Option<varn_jit::clif::lower::ClifClassTarget> {
-        if self.0.is_null() {
+        if self.ctx.is_null() {
             return None;
         }
-        let ctx = unsafe { &*self.0 };
-        let gv = *ctx.globals.values.get(global_idx)?;
+        let ctx = unsafe { &*self.ctx };
+        let gv = *ctx.globals.values.get(self.module_base + global_idx)?;
         if !gv.is_heap() {
             return None;
         }

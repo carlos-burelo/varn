@@ -235,7 +235,7 @@ impl VmClosure {
             None
         };
         let helpers = super::helpers::build_jit_helpers();
-        let linker = crate::clif_link::CtxLinker::current();
+        let linker = crate::clif_link::CtxLinker::for_module(self.module_base);
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
@@ -310,7 +310,7 @@ impl VmClosure {
         }
 
         let helpers = super::helpers::build_jit_helpers();
-        let linker = crate::clif_link::CtxLinker::current();
+        let linker = crate::clif_link::CtxLinker::for_module(self.module_base);
         match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
