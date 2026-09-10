@@ -735,6 +735,21 @@ impl<'m> Builder<'m> {
             }
 
             TirExprKind::Call { callee, args } => {
+                // A `std:math` free function the checker resolved to a wire byte:
+                // a windowless intrinsic, no FFI crossing. The receiver slot the
+                // dispatcher expects is a synthetic null.
+                if let Resolution::Intrinsic(wire) = &e.res {
+                    let object = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                    let argv = self.lower_args(args)?;
+                    return Ok(self.emit(
+                        InstKind::IntrinsicCall {
+                            object,
+                            args: argv,
+                            wire_byte: *wire as u8,
+                        },
+                        ty,
+                    ));
+                }
                 let cv = match &e.res {
                     Resolution::DirectFn(f) => {
                         let name = self

@@ -34,6 +34,8 @@ pub(super) struct ModuleCtx<'a> {
     pub ext_set_members: &'a FxHashMap<u32, Rc<str>>,
 
     pub core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
+
+    pub math_intrinsics: &'a FxHashMap<Rc<str>, u8>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -3212,6 +3214,11 @@ impl<'a> FnEmitter<'a> {
             let res = match self.m.fns.get(name) {
                 Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
                     Resolution::DirectFn(varn_tir::FnId(fn_id))
+                }
+                // A `std:math` import (`abs`, `sqrt`, …) the JIT lowers to a
+                // single ISA instruction; the import binding rules out a shadow.
+                _ if all_positional && self.m.math_intrinsics.contains_key(name) => {
+                    Resolution::Intrinsic(self.m.math_intrinsics[name] as u16)
                 }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),

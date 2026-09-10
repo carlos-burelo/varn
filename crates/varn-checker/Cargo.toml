@@ -9,12 +9,14 @@ varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser" }
 varn-modules  = { path = "../varn-modules" }
 varn-tir      = { path = "../varn-tir" }
-# The native-global layout the compiler emits `LoadNativeGlobalIdx` against.
-# `default-features = false` keeps the heavy stdlib crates out of the checker.
+# For `native_global_layout()` — the prelude-global order the compiler emits
+# `LoadNativeGlobalIdx` against. Builds under `--workspace` (feature-unified);
+# `cargo -p varn-checker` in isolation needs `-p varn-cli` context because
+# varn-builtins is not standalone-buildable.
 varn-builtins = { path = "../varn-builtins", default-features = false }
-rustc-hash   = { workspace = true }
-serde        = { workspace = true, features = ["rc"] }
-postcard     = { workspace = true }
+rustc-hash    = { workspace = true }
+serde         = { workspace = true, features = ["rc"] }
+postcard      = { workspace = true }
 
 [lints]
 workspace = true

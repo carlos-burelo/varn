@@ -120,6 +120,7 @@ pub fn emit_module(
     // Guarded to non-static, non-async, non-generator `Method` members so the
     // emitted op-id is guaranteed to resolve.
     let core_ops = core_method_ops(bind);
+    let math_intrinsics = math_intrinsic_imports(program);
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
@@ -174,6 +175,7 @@ pub fn emit_module(
         ext_members,
         ext_set_members,
         core_ops: &core_ops,
+        math_intrinsics: &math_intrinsics,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -350,6 +352,7 @@ struct MCtx<'a> {
     ext_members: &'a FxHashMap<u32, Rc<str>>,
     ext_set_members: &'a FxHashMap<u32, Rc<str>>,
     core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
+    math_intrinsics: &'a FxHashMap<Rc<str>, u8>,
 }
 
 impl<'a> MCtx<'a> {
@@ -365,6 +368,7 @@ impl<'a> MCtx<'a> {
             ext_members: self.ext_members,
             ext_set_members: self.ext_set_members,
             core_ops: self.core_ops,
+            math_intrinsics: self.math_intrinsics,
         }
     }
 }
@@ -658,6 +662,40 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
         _ => {}
     }
+}
+
+/// Local name → math wire byte for every `import { f } from "std:math"` whose
+/// `f` the JIT can lower to a single ISA instruction. Empty when nothing
+/// intrinsic-able is imported. The import binding is what makes it safe: a
+/// user `let abs = …` shadows the name and never reaches here.
+fn math_intrinsic_imports(program: &Program) -> FxHashMap<Rc<str>, u8> {
+    use varn_core::ast::ImportSpecifier;
+    let mut out = FxHashMap::default();
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
+        let Decl::Import(imp) = d.as_ref() else {
+            continue;
+        };
+        if imp.source.as_ref() != "std:math" {
+            continue;
+        }
+        for spec in &imp.specifiers {
+            let ImportSpecifier::Named {
+                local, imported, ..
+            } = spec
+            else {
+                continue;
+            };
+            if let Some(wire) =
+                varn_core::intrinsic_ops::intrinsic_lookup(&format!("std:math/{imported}"))
+            {
+                out.insert(local.clone(), wire);
+            }
+        }
+    }
+    out
 }
 
 /// The mangled global names of every `extension` member — same strings
