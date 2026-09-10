@@ -20,7 +20,10 @@ pub enum Resolution {
     /// Numbered at compile time, so `LoadGlobalIdx` is emitted directly and
     /// the runtime rewriting pass disappears.
     GlobalSlot(u32),
-    ModuleSlot { module: ModuleId, slot: u32 },
+    ModuleSlot {
+        module: ModuleId,
+        slot: u32,
+    },
 
     /// Instance field at a known slot.
     FieldSlot(u16),
@@ -40,11 +43,17 @@ pub enum Resolution {
     /// A native operation, by its registered id.
     NativeOp(u64),
 
-    EnumVariant { enum_id: EnumId, tag: u16 },
+    EnumVariant {
+        enum_id: EnumId,
+        tag: u16,
+    },
 
     /// Honestly dynamic. Carries why, so the remaining name-keyed accesses can
     /// be separated into the ones that are correct and the ones that are holes.
-    ByName { name: Rc<str>, why: DynReason },
+    ByName {
+        name: Rc<str>,
+        why: DynReason,
+    },
 }
 
 impl Resolution {

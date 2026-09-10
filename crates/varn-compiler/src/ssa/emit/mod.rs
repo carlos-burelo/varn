@@ -56,11 +56,7 @@ impl FnMeta {
     }
 }
 
-pub fn emit_function(
-    ssa: SsaFunc,
-    f: &HirFunction,
-    source_file: Rc<str>,
-) -> Result<FunctionProto> {
+pub fn emit_function(ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) -> Result<FunctionProto> {
     emit_function_meta(ssa, &FnMeta::from_hir(f), source_file)
 }
 
@@ -284,7 +280,9 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
         let mut s = match &ssa.blocks[b].term {
             Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
             Terminator::Jump { target, .. } => vec![target.0 as usize],
-            Terminator::Branch { then_blk, else_blk, .. } => {
+            Terminator::Branch {
+                then_blk, else_blk, ..
+            } => {
                 vec![else_blk.0 as usize, then_blk.0 as usize]
             }
         };

@@ -29,7 +29,7 @@ use varn_core::ast::{
 };
 use varn_core::TypeKind;
 use varn_tir::{
-    BackendTy, DynReason, FnId, Resolution, Signature, SigId, Span, TirExpr, TirExprKind,
+    BackendTy, DynReason, FnId, Resolution, SigId, Signature, Span, TirExpr, TirExprKind,
     TirFunction, TirModule, TirObjectEntry, TirStmt, TyTable,
 };
 
@@ -48,7 +48,12 @@ pub fn emit_module(
     let mut types = TyTable::default();
     ty::prime(&mut types);
 
-    let tables::Tables { classes, enums, mut signatures, names } = tables::build(bind, &mut types);
+    let tables::Tables {
+        classes,
+        enums,
+        mut signatures,
+        names,
+    } = tables::build(bind, &mut types);
 
     // Module value symbols → global slots, in binder declaration order.
     // Names this file itself declares at the top level — the only ones that
@@ -131,14 +136,18 @@ pub fn emit_module(
         }
     }
     for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
         if let Some(ns) = namespace_decl(d) {
             ns_member_fns(ns, &mut free_fns);
         }
     }
     let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
     for (i, f) in free_fns.iter().enumerate() {
-        fn_index.entry(f.id.clone()).or_insert((i as u32, f.params.len() as u32));
+        fn_index
+            .entry(f.id.clone())
+            .or_insert((i as u32, f.params.len() as u32));
     }
 
     let ctx = MCtx {
@@ -165,7 +174,14 @@ pub fn emit_module(
     // index, so every free function and the module top level share this base.
     for f in &free_fns {
         let tf = emit_function(
-            f, bind, expr_table, &mut types, &ctx, &mut signatures, &mut closures, n_free,
+            f,
+            bind,
+            expr_table,
+            &mut types,
+            &ctx,
+            &mut signatures,
+            &mut closures,
+            n_free,
         );
         functions.push(tf);
     }
@@ -189,9 +205,7 @@ pub fn emit_module(
             match &stmt.kind {
                 // A class / enum declaration: a `BuildClass` at this position,
                 // in the same order `class_defs` is filled below.
-                StmtKind::Decl(d)
-                    if class_decl(d).is_some() || enum_decl(d).is_some() =>
-                {
+                StmtKind::Decl(d) if class_decl(d).is_some() || enum_decl(d).is_some() => {
                     top_body.push(TirStmt::BuildClass(class_ord));
                     class_ord += 1;
                 }
@@ -241,33 +255,54 @@ pub fn emit_module(
     // closure. In source order, so a class can extend one declared earlier.
     let mut class_defs: Vec<varn_tir::TirClassDef> = Vec::new();
     let emit_type = |decl: &Decl,
-                         class_defs: &mut Vec<varn_tir::TirClassDef>,
-                         functions: &mut Vec<TirFunction>,
-                         types: &mut TyTable,
-                         signatures: &mut Vec<Signature>| {
+                     class_defs: &mut Vec<varn_tir::TirClassDef>,
+                     functions: &mut Vec<TirFunction>,
+                     types: &mut TyTable,
+                     signatures: &mut Vec<Signature>| {
         if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl)) {
             class_defs.push(emit_class(
                 class, &ctx, expr_table, types, signatures, functions,
             ));
         } else if let Some(en) = enum_decl(decl) {
-            class_defs.push(emit_enum(en, &ctx, expr_table, types, signatures, functions));
+            class_defs.push(emit_enum(
+                en, &ctx, expr_table, types, signatures, functions,
+            ));
         }
     };
     for stmt in &program.body {
-        let StmtKind::Decl(decl) = &stmt.kind else { continue };
-        if class_decl(decl).is_some()
-            || enum_decl(decl).is_some()
-            || anon_class_of(decl).is_some()
+        let StmtKind::Decl(decl) = &stmt.kind else {
+            continue;
+        };
+        if class_decl(decl).is_some() || enum_decl(decl).is_some() || anon_class_of(decl).is_some()
         {
-            emit_type(decl, &mut class_defs, &mut functions, &mut types, &mut signatures);
+            emit_type(
+                decl,
+                &mut class_defs,
+                &mut functions,
+                &mut types,
+                &mut signatures,
+            );
         } else if let Some(ns) = namespace_decl(decl) {
             for nested in ns_nested_types(ns) {
-                emit_type(nested, &mut class_defs, &mut functions, &mut types, &mut signatures);
+                emit_type(
+                    nested,
+                    &mut class_defs,
+                    &mut functions,
+                    &mut types,
+                    &mut signatures,
+                );
             }
         }
     }
 
-    emit_extensions(program, &ctx, expr_table, &mut types, &mut signatures, &mut functions);
+    emit_extensions(
+        program,
+        &ctx,
+        expr_table,
+        &mut types,
+        &mut signatures,
+        &mut functions,
+    );
 
     let imports = collect_imports(program);
     let exports = collect_exports(program);
@@ -386,7 +421,9 @@ fn emit_namespace_object(
         }
     }
 
-    let Some(&slot) = global_slots.get(ns.id.as_ref()) else { return };
+    let Some(&slot) = global_slots.get(ns.id.as_ref()) else {
+        return;
+    };
     let mut entries: Vec<TirObjectEntry> = Vec::new();
     for m in &ns.body {
         let Decl::Export(_) = m else { continue };
@@ -426,11 +463,12 @@ fn emit_namespace_object(
             }
             Decl::Variable(v) => {
                 for decl in &v.declarators {
-                    if let (Pattern::Identifier { name, .. }, Some(init)) =
-                        (&decl.id, &decl.init)
-                    {
+                    if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, &decl.init) {
                         let value = top.lower_expression(init);
-                        entries.push(TirObjectEntry::Field { name: name.clone(), value });
+                        entries.push(TirObjectEntry::Field {
+                            name: name.clone(),
+                            value,
+                        });
                     }
                 }
             }
@@ -520,7 +558,9 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
                     pat_names(r, out);
                 }
             }
-            P::Object { properties, rest, .. } => {
+            P::Object {
+                properties, rest, ..
+            } => {
                 for prop in properties {
                     pat_names(&prop.value, out);
                 }
@@ -599,9 +639,15 @@ fn emit_extensions(
 ) {
     use varn_core::ast::ExtensionMember;
     for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
-        let Decl::Extension(ext) = d.as_ref() else { continue };
-        let Some(label) = extension_target_label(&ext.target) else { continue };
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
+        let Decl::Extension(ext) = d.as_ref() else {
+            continue;
+        };
+        let Some(label) = extension_target_label(&ext.target) else {
+            continue;
+        };
         let recv_ty = match label.as_ref() {
             "str" => BackendTy::Str,
             "int" => BackendTy::Int,
@@ -628,7 +674,9 @@ fn emit_extensions(
                 ExtensionMember::Getter { key, body, .. } => {
                     (Rc::from(format!("__extget_{label}_{key}")), vec![], body)
                 }
-                ExtensionMember::Setter { key, param, body, .. } => (
+                ExtensionMember::Setter {
+                    key, param, body, ..
+                } => (
                     Rc::from(format!("__extset_{label}_{key}")),
                     vec![param_name(param)],
                     body,
@@ -640,7 +688,13 @@ fn emit_extensions(
             let mut mcls: Vec<TirFunction> = Vec::new();
             let (body_stmts, locals) = {
                 let mut em = FnEmitter::new(
-                    expr_table, types, ctx.as_module_ctx(), signatures, &mut mcls, base, params,
+                    expr_table,
+                    types,
+                    ctx.as_module_ctx(),
+                    signatures,
+                    &mut mcls,
+                    base,
+                    params,
                 );
                 if let Some(cid) = this_cid {
                     em = em.with_this(cid);
@@ -694,7 +748,10 @@ fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
     TirStmt::Expr(TirExpr {
         kind: TirExprKind::Assign {
             target: Box::new(TirExpr {
-                kind: TirExprKind::Field { object: Box::new(this), name: field },
+                kind: TirExprKind::Field {
+                    object: Box::new(this),
+                    name: field,
+                },
                 ty: BackendTy::Dynamic(DynReason::Unannotated),
                 res: Resolution::None,
                 span: Span::EMPTY,
@@ -710,10 +767,17 @@ fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
 fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
     let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
-        out.push(varn_tir::TirExport { exported, local, reexport_from: from, namespace: ns });
+        out.push(varn_tir::TirExport {
+            exported,
+            local,
+            reexport_from: from,
+            namespace: ns,
+        });
     };
     for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
         match d.as_ref() {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => {
                 let mut names = FxHashSet::default();
@@ -722,12 +786,18 @@ fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
                     push(n.clone(), n, None, false);
                 }
             }
-            Decl::Export(ExportDecl::Named { specifiers, source, .. }) => {
+            Decl::Export(ExportDecl::Named {
+                specifiers, source, ..
+            }) => {
                 for sp in specifiers {
                     push(sp.exported.clone(), sp.local.clone(), source.clone(), false);
                 }
             }
-            Decl::Export(ExportDecl::All { source, alias: Some(alias), .. }) => {
+            Decl::Export(ExportDecl::All {
+                source,
+                alias: Some(alias),
+                ..
+            }) => {
                 push(alias.clone(), alias.clone(), Some(source.clone()), true);
             }
             Decl::Export(ExportDecl::Default { .. }) => {
@@ -743,8 +813,12 @@ fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
     use varn_core::ast::ImportSpecifier as IS;
     let mut out = Vec::new();
     for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else { continue };
-        let Decl::Import(imp) = d.as_ref() else { continue };
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
+        let Decl::Import(imp) = d.as_ref() else {
+            continue;
+        };
         let specs = imp
             .specifiers
             .iter()
@@ -754,7 +828,9 @@ fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
                     IS::Namespace { local, .. } => {
                         (local.clone(), varn_tir::TirImportKind::Namespace)
                     }
-                    IS::Named { local, imported, .. } => (
+                    IS::Named {
+                        local, imported, ..
+                    } => (
                         local.clone(),
                         varn_tir::TirImportKind::Named(imported.clone()),
                     ),
@@ -809,7 +885,13 @@ fn emit_member_fn(
     let mut mcls: Vec<TirFunction> = Vec::new();
     let (body_stmts, locals) = {
         let mut em = FnEmitter::new(
-            expr_table, types, ctx.as_module_ctx(), signatures, &mut mcls, base, param_names,
+            expr_table,
+            types,
+            ctx.as_module_ctx(),
+            signatures,
+            &mut mcls,
+            base,
+            param_names,
         );
         if let Some(cid) = this_class {
             em = em.with_this(cid);
@@ -870,7 +952,13 @@ fn lower_outer(
     this_class: Option<varn_tir::ClassId>,
 ) -> (Vec<TirStmt>, TirExpr) {
     let mut em = FnEmitter::new(
-        expr_table, types, ctx.as_module_ctx(), signatures, closures, base, vec![],
+        expr_table,
+        types,
+        ctx.as_module_ctx(),
+        signatures,
+        closures,
+        base,
+        vec![],
     );
     if let Some(cid) = this_class {
         em = em.with_this(cid);
@@ -901,14 +989,29 @@ fn emit_class(
         if let varn_core::ast::ExprKind::Identifier { name } = &sup.kind {
             def.parent = ctx.names.class_id(name);
         }
-        let (pre, x) =
-            lower_outer(sup, ctx, expr_table, types, signatures, out, out.len() as u32, None);
+        let (pre, x) = lower_outer(
+            sup,
+            ctx,
+            expr_table,
+            types,
+            signatures,
+            out,
+            out.len() as u32,
+            None,
+        );
         def.prelude.extend(pre);
         def.super_class = Some(x);
     }
     for deco in &class.decorators {
         let (pre, x) = lower_outer(
-            &deco.expression, ctx, expr_table, types, signatures, out, out.len() as u32, class_id,
+            &deco.expression,
+            ctx,
+            expr_table,
+            types,
+            signatures,
+            out,
+            out.len() as u32,
+            class_id,
         );
         def.prelude.extend(pre);
         def.decorators.push(x);
@@ -918,7 +1021,9 @@ fn emit_class(
         class_id
             .and_then(|cid| {
                 let info = &ctx.classes[cid.0 as usize];
-                info.method_slot(key).and_then(|s| info.method_at(s)).map(|e| e.sig)
+                info.method_slot(key)
+                    .and_then(|s| info.method_at(s))
+                    .map(|e| e.sig)
             })
             .unwrap_or_else(|| fresh_sig(signatures, arity))
     };
@@ -930,13 +1035,25 @@ fn emit_class(
         let base = out.len() as u32;
         let mut cls: Vec<TirFunction> = Vec::new();
         let mut em = FnEmitter::new(
-            expr_table, types, ctx.as_module_ctx(), signatures, &mut cls, base, vec![],
+            expr_table,
+            types,
+            ctx.as_module_ctx(),
+            signatures,
+            &mut cls,
+            base,
+            vec![],
         );
         if let Some(cid) = class_id {
             em = em.with_this(cid);
         }
         for member in &class.body {
-            if let ClassMember::Property { key, init: Some(init), modifiers, .. } = member {
+            if let ClassMember::Property {
+                key,
+                init: Some(init),
+                modifiers,
+                ..
+            } = member
+            {
                 if modifiers.is_static {
                     continue;
                 }
@@ -956,8 +1073,18 @@ fn emit_class(
                 let sig = info_sig("constructor", params.len(), signatures);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.constructor")),
-                    params, body, false, false, class_id, None, sig, ctx, expr_table, types,
-                    signatures, out,
+                    params,
+                    body,
+                    false,
+                    false,
+                    class_id,
+                    None,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
                     key: Rc::from("constructor"),
@@ -965,10 +1092,15 @@ fn emit_class(
                     is_static: false,
                     is_private: false,
                     decorators: vec![],
-                    });
+                });
             }
             ClassMember::Method {
-                key, params, body: Some(body), modifiers, decorators, ..
+                key,
+                params,
+                body: Some(body),
+                modifiers,
+                decorators,
+                ..
             } => {
                 let sig = info_sig(key, params.len(), signatures);
                 let id = emit_member_fn(
@@ -990,8 +1122,14 @@ fn emit_class(
                     .iter()
                     .map(|d| {
                         let (pre, x) = lower_outer(
-                            &d.expression, ctx, expr_table, types, signatures, out,
-                            out.len() as u32, class_id,
+                            &d.expression,
+                            ctx,
+                            expr_table,
+                            types,
+                            signatures,
+                            out,
+                            out.len() as u32,
+                            class_id,
                         );
                         def.prelude.extend(pre);
                         x
@@ -1001,18 +1139,34 @@ fn emit_class(
                     key: key.clone(),
                     func: id,
                     is_static: modifiers.is_static,
-                    is_private: matches!(modifiers.visibility, Some(varn_core::ast::operators::Visibility::Private)),
+                    is_private: matches!(
+                        modifiers.visibility,
+                        Some(varn_core::ast::operators::Visibility::Private)
+                    ),
                     decorators: decos,
                 });
             }
-            ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
+            ClassMember::Getter {
+                key,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.get {key}")),
-                    &[], body, false, false,
+                    &[],
+                    body,
+                    false,
+                    false,
                     (!modifiers.is_static).then_some(()).and(class_id),
                     None,
-                    sig, ctx, expr_table, types, signatures, out,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: key.clone(),
@@ -1021,15 +1175,29 @@ fn emit_class(
                     is_static: modifiers.is_static,
                 });
             }
-            ClassMember::Setter { key, param, body: Some(body), modifiers, .. } => {
+            ClassMember::Setter {
+                key,
+                param,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, 1);
                 let ps = std::slice::from_ref(param);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.set {key}")),
-                    ps, body, false, false,
+                    ps,
+                    body,
+                    false,
+                    false,
                     (!modifiers.is_static).then_some(()).and(class_id),
                     None,
-                    sig, ctx, expr_table, types, signatures, out,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: key.clone(),
@@ -1038,10 +1206,22 @@ fn emit_class(
                     is_static: modifiers.is_static,
                 });
             }
-            ClassMember::Property { key, init, modifiers, .. } if modifiers.is_static => {
+            ClassMember::Property {
+                key,
+                init,
+                modifiers,
+                ..
+            } if modifiers.is_static => {
                 let init_x = init.as_ref().map(|e| {
                     let (pre, x) = lower_outer(
-                        e, ctx, expr_table, types, signatures, out, out.len() as u32, class_id,
+                        e,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        out.len() as u32,
+                        class_id,
                     );
                     def.prelude.extend(pre);
                     x
@@ -1052,7 +1232,17 @@ fn emit_class(
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.<static>")),
-                    &[], body, false, false, class_id, None, sig, ctx, expr_table, types, signatures,
+                    &[],
+                    body,
+                    false,
+                    false,
+                    class_id,
+                    None,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
                     out,
                 );
                 def.static_blocks.push(id);
@@ -1106,8 +1296,18 @@ fn emit_class(
                 }
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.constructor")),
-                    primary, &empty_body, false, false, class_id, None, sig, ctx, expr_table,
-                    types, signatures, out,
+                    primary,
+                    &empty_body,
+                    false,
+                    false,
+                    class_id,
+                    None,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 let body = &mut out[id.0 as usize].body;
                 // `this.<p> = p` for params `emit_member_fn` did not (those
@@ -1177,7 +1377,14 @@ fn emit_enum(
         for f in &m.payload_fields {
             if let Some(init) = &f.init {
                 let (pre, x) = lower_outer(
-                    init, ctx, expr_table, types, signatures, out, out.len() as u32, None,
+                    init,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
+                    out.len() as u32,
+                    None,
                 );
                 def.prelude.extend(pre);
                 const_args.push(x);
@@ -1197,7 +1404,13 @@ fn emit_enum(
     let this_cid = ctx.names.class_id(&name);
     for member in &en.body {
         match member {
-            ClassMember::Method { key, params, body: Some(body), modifiers, .. } => {
+            ClassMember::Method {
+                key,
+                params,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.{key}")),
@@ -1207,7 +1420,12 @@ fn emit_enum(
                     modifiers.is_generator,
                     (!modifiers.is_static).then_some(()).and(this_cid),
                     (!modifiers.is_static).then_some(()).and(enum_id),
-                    sig, ctx, expr_table, types, signatures, out,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
                     key: key.clone(),
@@ -1215,14 +1433,24 @@ fn emit_enum(
                     is_static: modifiers.is_static,
                     is_private: false,
                     decorators: vec![],
-                    });
+                });
             }
             ClassMember::Constructor { params, body, .. } => {
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.constructor")),
-                    params, body, false, false, this_cid, enum_id, sig, ctx, expr_table, types,
-                    signatures, out,
+                    params,
+                    body,
+                    false,
+                    false,
+                    this_cid,
+                    enum_id,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
                     key: Rc::from("constructor"),
@@ -1230,16 +1458,29 @@ fn emit_enum(
                     is_static: false,
                     is_private: false,
                     decorators: vec![],
-                    });
+                });
             }
-            ClassMember::Getter { key, body: Some(body), modifiers, .. } => {
+            ClassMember::Getter {
+                key,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.get {key}")),
-                    &[], body, false, false,
+                    &[],
+                    body,
+                    false,
+                    false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
                     (!modifiers.is_static).then_some(()).and(enum_id),
-                    sig, ctx, expr_table, types, signatures, out,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: key.clone(),
@@ -1248,14 +1489,28 @@ fn emit_enum(
                     is_static: modifiers.is_static,
                 });
             }
-            ClassMember::Setter { key, param, body: Some(body), modifiers, .. } => {
+            ClassMember::Setter {
+                key,
+                param,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, 1);
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.set {key}")),
-                    std::slice::from_ref(param), body, false, false,
+                    std::slice::from_ref(param),
+                    body,
+                    false,
+                    false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
                     (!modifiers.is_static).then_some(()).and(enum_id),
-                    sig, ctx, expr_table, types, signatures, out,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: key.clone(),
@@ -1265,10 +1520,22 @@ fn emit_enum(
                 });
             }
             // `enum E { … static val: int; static { E.val = 1 } }`
-            ClassMember::Property { key, init, modifiers, .. } if modifiers.is_static => {
+            ClassMember::Property {
+                key,
+                init,
+                modifiers,
+                ..
+            } if modifiers.is_static => {
                 let init_x = init.as_ref().map(|e| {
                     let (pre, x) = lower_outer(
-                        e, ctx, expr_table, types, signatures, out, out.len() as u32, None,
+                        e,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        out.len() as u32,
+                        None,
                     );
                     def.prelude.extend(pre);
                     x
@@ -1279,8 +1546,18 @@ fn emit_enum(
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.<static>")),
-                    &[], body, false, false, None, None, sig, ctx, expr_table, types,
-                    signatures, out,
+                    &[],
+                    body,
+                    false,
+                    false,
+                    None,
+                    None,
+                    sig,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
                 );
                 def.static_blocks.push(id);
             }
@@ -1327,7 +1604,10 @@ fn emit_function(
     }
 
     let sig = SigId(signatures.len() as u32);
-    signatures.push(Signature { params: param_tys.clone(), return_ty });
+    signatures.push(Signature {
+        params: param_tys.clone(),
+        return_ty,
+    });
 
     let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
     let (body, locals) = {
@@ -1381,13 +1661,18 @@ mod tests {
     fn stub_module() -> TirModule {
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![], exports: vec![],
+            imports: vec![],
+            exports: vec![],
             types: TyTable::default(),
             classes: vec![],
             enums: vec![],
-            signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+            signatures: vec![Signature {
+                params: vec![],
+                return_ty: BackendTy::Void,
+            }],
             functions: vec![],
-            globals: vec![], global_names: vec![],
+            globals: vec![],
+            global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),

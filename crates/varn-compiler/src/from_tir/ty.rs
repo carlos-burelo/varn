@@ -60,22 +60,28 @@ fn resolve(id: varn_tir::TyId, tir: &TirModule, out: &mut SsaTyTable) -> HirType
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
     use varn_tir::{
         BackendTy as B, ClassInfo, DynReason, Signature, TirFunction, TirModule, TyTable,
     };
-    use std::rc::Rc;
 
     fn empty_module() -> TirModule {
         let mut types = TyTable::default();
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![], exports: vec![],            types,
+            imports: vec![],
+            exports: vec![],
+            types,
             classes: vec![ClassInfo::new(Rc::from("Point"), None, vec![])],
             enums: vec![],
-            signatures: vec![Signature { params: vec![], return_ty: B::Void }],
+            signatures: vec![Signature {
+                params: vec![],
+                return_ty: B::Void,
+            }],
             functions: vec![],
-            globals: vec![], global_names: vec![],
+            globals: vec![],
+            global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
@@ -106,7 +112,10 @@ mod tests {
     fn dynamic_and_opaque_kinds_are_dynamic_or_ref() {
         let m = empty_module();
         let mut out = SsaTyTable::default();
-        assert_eq!(lower(B::Dynamic(DynReason::Unannotated), &m, &mut out), HirType::Dynamic);
+        assert_eq!(
+            lower(B::Dynamic(DynReason::Unannotated), &m, &mut out),
+            HirType::Dynamic
+        );
         assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Ref);
         assert_eq!(lower(B::Void, &m, &mut out), HirType::Dynamic);
     }

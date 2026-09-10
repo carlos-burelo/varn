@@ -51,7 +51,11 @@ pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
             match stmt {
                 TirStmt::Expr(e) | TirStmt::Throw(e) => walk_expr(e, out),
                 TirStmt::Let { init: Some(e), .. } | TirStmt::Return(Some(e)) => walk_expr(e, out),
-                TirStmt::If { cond, then_body, else_body } => {
+                TirStmt::If {
+                    cond,
+                    then_body,
+                    else_body,
+                } => {
                     walk_expr(cond, out);
                     walk_body(then_body, out);
                     walk_body(else_body, out);
@@ -60,7 +64,9 @@ pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
                     walk_expr(cond, out);
                     walk_body(body, out);
                 }
-                TirStmt::Try { body, catch_body, .. } => {
+                TirStmt::Try {
+                    body, catch_body, ..
+                } => {
                     walk_body(body, out);
                     walk_body(catch_body, out);
                 }
@@ -103,12 +109,18 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                     // later exception path reads it
                     out.insert(VarId::Local(crate::hir::LocalId(local.0)));
                 }
-                TirStmt::If { then_body, else_body, .. } => {
+                TirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } => {
                     scan_assigns(then_body, out);
                     scan_assigns(else_body, out);
                 }
                 TirStmt::Loop { body, .. } => scan_assigns(body, out),
-                TirStmt::Try { body, catch_body, .. } => {
+                TirStmt::Try {
+                    body, catch_body, ..
+                } => {
                     scan_assigns(body, out);
                     scan_assigns(catch_body, out);
                 }
@@ -128,12 +140,18 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
     fn walk(body: &[TirStmt], out: &mut FxHashSet<VarId>) {
         for stmt in body {
             match stmt {
-                TirStmt::If { then_body, else_body, .. } => {
+                TirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } => {
                     walk(then_body, out);
                     walk(else_body, out);
                 }
                 TirStmt::Loop { body, .. } => walk(body, out),
-                TirStmt::Try { body, catch_body, .. } => {
+                TirStmt::Try {
+                    body, catch_body, ..
+                } => {
                     scan_assigns(body, out);
                     scan_assigns(catch_body, out);
                     // nested trys inside
@@ -190,9 +208,7 @@ fn summarize(ctor: &varn_tir::TirFunction, field_count: usize) -> Option<Vec<Slo
             return None;
         };
         // `this.<field>` — a `Var` node with no resolution is `this`.
-        if !matches!(object.kind, TirExprKind::Var)
-            || !matches!(object.res, Resolution::None)
-        {
+        if !matches!(object.kind, TirExprKind::Var) || !matches!(object.res, Resolution::None) {
             return None;
         }
         let Resolution::FieldSlot(slot) = target.res else {
@@ -226,7 +242,11 @@ fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Rc<str>))
             | TirStmt::Break
             | TirStmt::Continue
             | TirStmt::BuildClass(_) => {}
-            TirStmt::If { cond, then_body, else_body } => {
+            TirStmt::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
                 scan_expr(cond, tir, note);
                 scan_body(then_body, tir, note);
                 scan_body(else_body, tir, note);
@@ -235,7 +255,9 @@ fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Rc<str>))
                 scan_expr(cond, tir, note);
                 scan_body(body, tir, note);
             }
-            TirStmt::Try { body, catch_body, .. } => {
+            TirStmt::Try {
+                body, catch_body, ..
+            } => {
                 scan_body(body, tir, note);
                 scan_body(catch_body, tir, note);
             }
@@ -274,8 +296,16 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
     use TirExprKind::*;
     let mut out: Vec<&TirExpr> = Vec::new();
     match &e.kind {
-        IntLit(_) | FloatLit(_) | BoolLit(_) | StrLit(_) | CharLit(_) | NullLit | Var
-        | Closure { .. } | DecimalLit(_) | BigIntLit(_) => {}
+        IntLit(_)
+        | FloatLit(_)
+        | BoolLit(_)
+        | StrLit(_)
+        | CharLit(_)
+        | NullLit
+        | Var
+        | Closure { .. }
+        | DecimalLit(_)
+        | BigIntLit(_) => {}
         RangeLit { start, end, .. } => {
             out.push(start);
             out.push(end);
@@ -311,9 +341,7 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
         ArrayLit(els) => {
             for el in els {
                 match el {
-                    varn_tir::TirArrayEl::Expr(x) | varn_tir::TirArrayEl::Spread(x) => {
-                        out.push(x)
-                    }
+                    varn_tir::TirArrayEl::Expr(x) | varn_tir::TirArrayEl::Spread(x) => out.push(x),
                     varn_tir::TirArrayEl::Hole => {}
                 }
             }
@@ -333,9 +361,15 @@ fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
         Discriminant { value } | VariantPayload { value, .. } | TypeTest { value, .. } => {
             out.push(value)
         }
-        New { args, .. } | MakeVariant { args } | SuperCall { args }
+        New { args, .. }
+        | MakeVariant { args }
+        | SuperCall { args }
         | SuperMethodCall { args, .. } => out.extend(arg_exprs(args)),
-        Select { cond, then_val, else_val } => {
+        Select {
+            cond,
+            then_val,
+            else_val,
+        } => {
             out.push(cond);
             out.push(then_val);
             out.push(else_val);

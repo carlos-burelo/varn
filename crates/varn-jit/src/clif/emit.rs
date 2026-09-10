@@ -925,7 +925,9 @@ pub(super) fn emit_object_data_base(
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
-    let is_inst = b.ins().icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let is_inst = b
+        .ins()
+        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
     let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
     let is_valid = b.ins().bor(is_inst, is_obj);
     let ok = b.create_block();

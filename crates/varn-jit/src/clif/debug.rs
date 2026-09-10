@@ -89,10 +89,7 @@ use super::kinds::K;
 use crate::mem::JitBuffer;
 
 /// Record broken lowering invariants into an active sink.
-pub(super) fn capture_invariants(
-    debug: &mut Option<&mut ClifDebugSink>,
-    violations: &[Violation],
-) {
+pub(super) fn capture_invariants(debug: &mut Option<&mut ClifDebugSink>, violations: &[Violation]) {
     if violations.is_empty() {
         return;
     }

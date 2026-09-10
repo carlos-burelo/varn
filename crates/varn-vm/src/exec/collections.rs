@@ -390,9 +390,8 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
                 for field in &cls.get_or_compute_layout().fields {
                     let offset = field.offset as usize;
                     if offset + 16 <= inst.payload_size as usize {
-                        target_obj.insert(field.name.clone(), unsafe {
-                            inst.read_vm_value(offset)
-                        });
+                        target_obj
+                            .insert(field.name.clone(), unsafe { inst.read_vm_value(offset) });
                     }
                 }
             }

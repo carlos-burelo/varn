@@ -33,7 +33,15 @@ fn compile_via_tir(
     check: &varn_checker::CheckResult,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, String> {
-    let tir = varn_checker::emit::emit_module(program, &check.bind, &check.expr_table, &check.call_mappings, &check.extension_calls, &check.extension_members, &check.extension_set_members);
+    let tir = varn_checker::emit::emit_module(
+        program,
+        &check.bind,
+        &check.expr_table,
+        &check.call_mappings,
+        &check.extension_calls,
+        &check.extension_members,
+        &check.extension_set_members,
+    );
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
@@ -283,8 +291,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
         });
 
-        let mut proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
-            .map_err(|e| format!("compile failed: {}", e))?;
+        let mut proto =
+            compile_via_tir(&program, &check_result, export_names_of(&program.filename))
+                .map_err(|e| format!("compile failed: {}", e))?;
 
         varn_builtins::reset_testing_counters();
 

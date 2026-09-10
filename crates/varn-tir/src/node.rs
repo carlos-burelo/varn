@@ -31,9 +31,24 @@ pub struct TirExpr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TirBinOp {
-    Add, Sub, Mul, Div, Mod, Pow,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    BitAnd, BitOr, BitXor, Shl, Shr, Ushr,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Pow,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Ushr,
     /// `x instanceof C` — always produces `Bool`, operands are references.
     Instanceof,
     /// `k in obj` — membership, always `Bool`.
@@ -101,73 +116,138 @@ pub enum TirExprKind {
     /// A binding reference. Which binding is in `res`.
     Var,
 
-    Binary { op: TirBinOp, lhs: Box<TirExpr>, rhs: Box<TirExpr> },
-    Unary { op: TirUnOp, operand: Box<TirExpr> },
+    Binary {
+        op: TirBinOp,
+        lhs: Box<TirExpr>,
+        rhs: Box<TirExpr>,
+    },
+    Unary {
+        op: TirUnOp,
+        operand: Box<TirExpr>,
+    },
 
     /// Field access. Slot or by-name lives in `res`, not in the kind.
-    Field { object: Box<TirExpr>, name: Rc<str> },
-    Index { object: Box<TirExpr>, index: Box<TirExpr> },
+    Field {
+        object: Box<TirExpr>,
+        name: Rc<str>,
+    },
+    Index {
+        object: Box<TirExpr>,
+        index: Box<TirExpr>,
+    },
 
-    Call { callee: Box<TirExpr>, args: Vec<TirArg> },
+    Call {
+        callee: Box<TirExpr>,
+        args: Vec<TirArg>,
+    },
     /// Method call. Vtable slot, intrinsic or by-name lives in `res`.
-    MethodCall { recv: Box<TirExpr>, name: Rc<str>, args: Vec<TirArg> },
+    MethodCall {
+        recv: Box<TirExpr>,
+        name: Rc<str>,
+        args: Vec<TirArg>,
+    },
 
-    Assign { target: Box<TirExpr>, value: Box<TirExpr> },
+    Assign {
+        target: Box<TirExpr>,
+        value: Box<TirExpr>,
+    },
 
     ArrayLit(Vec<TirArrayEl>),
     TupleLit(Vec<TirExpr>),
-    ObjectLit { entries: Vec<TirObjectEntry> },
+    ObjectLit {
+        entries: Vec<TirObjectEntry>,
+    },
     /// `#{ k: v, … }` — a deeply-immutable record; `==` on it is structural.
-    RecordLit { fields: Vec<(Rc<str>, TirExpr)> },
+    RecordLit {
+        fields: Vec<(Rc<str>, TirExpr)>,
+    },
 
     /// `await e` — only legal in a function whose `is_async` is set, which the
     /// verifier enforces. No suspension state in the IR: the backend builds the
     /// state machine, exactly as it does from HIR today.
-    Await { future: Box<TirExpr> },
+    Await {
+        future: Box<TirExpr>,
+    },
     /// `yield e` / `yield* e` — only legal when `is_generator` is set.
-    Yield { value: Option<Box<TirExpr>>, delegate: bool },
+    Yield {
+        value: Option<Box<TirExpr>>,
+        delegate: bool,
+    },
 
     /// The integer tag of an enum value. `match` lowers to a chain of `If`s
     /// comparing this against constants.
-    Discriminant { value: Box<TirExpr> },
+    Discriminant {
+        value: Box<TirExpr>,
+    },
     /// One payload field of an enum value, once the tag is known. `res` is the
     /// `EnumVariant` it was narrowed to.
-    VariantPayload { value: Box<TirExpr>, tag: u16, field: u16 },
+    VariantPayload {
+        value: Box<TirExpr>,
+        tag: u16,
+        field: u16,
+    },
     /// `e is T` — and the primitive a type pattern lowers to. Produces `Bool`.
-    TypeTest { value: Box<TirExpr>, class: ClassId },
+    TypeTest {
+        value: Box<TirExpr>,
+        class: ClassId,
+    },
 
     /// Explicit representation change. The verifier requires one wherever an
     /// operation would otherwise mix representations.
-    Cast { operand: Box<TirExpr> },
+    Cast {
+        operand: Box<TirExpr>,
+    },
 
     /// A function value. `func` is the `TirFunction` holding its body; captures
     /// are resolved by the backend against the parent frame, as HIR does.
     /// A function value. `func` holds the body; `upvalues` says, in upvalue-
     /// index order, where each captured value comes from in the ENCLOSING
     /// frame — the backend needs this to build the closure record.
-    Closure { func: FnId, upvalues: Vec<TirUpvalue> },
+    Closure {
+        func: FnId,
+        upvalues: Vec<TirUpvalue>,
+    },
 
     /// Construction of a class instance.
-    New { class: ClassId, args: Vec<TirArg> },
+    New {
+        class: ClassId,
+        args: Vec<TirArg>,
+    },
     /// Construction of an enum variant. Which variant lives in `res`.
-    MakeVariant { args: Vec<TirArg> },
+    MakeVariant {
+        args: Vec<TirArg>,
+    },
 
     /// `cond ? a : b`
-    Select { cond: Box<TirExpr>, then_val: Box<TirExpr>, else_val: Box<TirExpr> },
+    Select {
+        cond: Box<TirExpr>,
+        then_val: Box<TirExpr>,
+        else_val: Box<TirExpr>,
+    },
 
     /// The enumerable string keys of an object — the iterand of `for…in`.
     /// Produces `str[]`.
-    ObjectKeys { operand: Box<TirExpr> },
+    ObjectKeys {
+        operand: Box<TirExpr>,
+    },
     /// The iterator object for `for…of` — `source[Symbol.iterator]()` (or
     /// `Symbol.asyncIterator` when `is_async`). Works for arrays, generators,
     /// and any object carrying the symbol; the emitter then drives `.next()`.
-    IterInit { source: Box<TirExpr>, is_async: bool },
+    IterInit {
+        source: Box<TirExpr>,
+        is_async: bool,
+    },
 
     /// `super(args)` — the base constructor call, only valid inside a
     /// subclass constructor.
-    SuperCall { args: Vec<TirArg> },
+    SuperCall {
+        args: Vec<TirArg>,
+    },
     /// `super.name(args)` — a base method call bypassing the vtable.
-    SuperMethodCall { name: Rc<str>, args: Vec<TirArg> },
+    SuperMethodCall {
+        name: Rc<str>,
+        args: Vec<TirArg>,
+    },
 
     /// A `decimal` literal, carried as its source text (minus the `d` suffix)
     /// — the backend parses it, keeping this crate free of `rust_decimal`.
@@ -175,15 +255,26 @@ pub enum TirExprKind {
     /// A `bigint` literal, already parsed to `i128` by the checker.
     BigIntLit(i128),
     /// `a..b` / `a..=b`.
-    RangeLit { start: Box<TirExpr>, end: Box<TirExpr>, inclusive: bool },
+    RangeLit {
+        start: Box<TirExpr>,
+        end: Box<TirExpr>,
+        inclusive: bool,
+    },
 
     /// `const { a, ...rest } = obj` — a shallow copy of `object` without
     /// `skip_keys`.
-    ObjectRest { object: Box<TirExpr>, skip_keys: Vec<Rc<str>> },
+    ObjectRest {
+        object: Box<TirExpr>,
+        skip_keys: Vec<Rc<str>>,
+    },
 
     /// `recv.m(args)` resolved to an extension function: a free-function call
     /// with `recv` prepended, dispatched by the mangled `func` name.
-    ExtensionCall { func: Rc<str>, recv: Box<TirExpr>, args: Vec<TirArg> },
+    ExtensionCall {
+        func: Rc<str>,
+        recv: Box<TirExpr>,
+        args: Vec<TirArg>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -191,17 +282,32 @@ pub enum TirStmt {
     Expr(TirExpr),
     /// A local binding. Its type is the declared type; the initializer's type
     /// must be assignable to it, which the verifier checks.
-    Let { local: crate::ty::LocalId, ty: BackendTy, init: Option<TirExpr> },
+    Let {
+        local: crate::ty::LocalId,
+        ty: BackendTy,
+        init: Option<TirExpr>,
+    },
     Return(Option<TirExpr>),
-    If { cond: TirExpr, then_body: Vec<TirStmt>, else_body: Vec<TirStmt> },
+    If {
+        cond: TirExpr,
+        then_body: Vec<TirStmt>,
+        else_body: Vec<TirStmt>,
+    },
     /// The only loop form. `for…of` and `for` are desugared into it by the
     /// emitter — if either survives as its own node, the TIR is not desugared
     /// and `hir/` cannot be deleted.
-    Loop { cond: TirExpr, body: Vec<TirStmt> },
+    Loop {
+        cond: TirExpr,
+        body: Vec<TirStmt>,
+    },
     Break,
     Continue,
     Throw(TirExpr),
-    Try { body: Vec<TirStmt>, catch_local: crate::ty::LocalId, catch_body: Vec<TirStmt> },
+    Try {
+        body: Vec<TirStmt>,
+        catch_local: crate::ty::LocalId,
+        catch_body: Vec<TirStmt>,
+    },
     /// Build the class/enum at `TirModule::class_defs[n]` and bind its global —
     /// emitted at the declaration's source position so decorators and static
     /// initializers see the module state that precedes it.

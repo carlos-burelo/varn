@@ -7,8 +7,8 @@ use varn_core::VmValuePayload;
 use varn_types::{
     generator::GeneratorObj,
     value::{
-        BoundMethod, EnumVariantData, FrozenModuleObj, InstanceRef, MapRef, ModuleObj, ObjRef, RangeData,
-        RuntimeSymbol, SetRef,
+        BoundMethod, EnumVariantData, FrozenModuleObj, InstanceRef, MapRef, ModuleObj, ObjRef,
+        RangeData, RuntimeSymbol, SetRef,
     },
     AsyncTask, ClassObj, LazyTask, NativeFn, VmArray,
 };

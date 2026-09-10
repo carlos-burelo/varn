@@ -163,17 +163,27 @@ fn report_first_difference(baseline: &Outcome, tier: &Outcome) {
     println!(
         "      {} {}",
         chalk(format!("{:>5}", split + 1)).dim(),
-        chalk(format!("- {}", base.get(split).copied().unwrap_or("<no more output>")))
-            .green()
+        chalk(format!(
+            "- {}",
+            base.get(split).copied().unwrap_or("<no more output>")
+        ))
+        .green()
     );
     println!(
         "      {} {}",
         chalk("     ").dim(),
-        chalk(format!("+ {}", other.get(split).copied().unwrap_or("<no more output>"))).red()
+        chalk(format!(
+            "+ {}",
+            other.get(split).copied().unwrap_or("<no more output>")
+        ))
+        .red()
     );
     let extra = other.len().saturating_sub(split + 1);
     if extra > 0 {
-        println!("      {}", chalk(format!("… and {extra} more line(s)")).dim());
+        println!(
+            "      {}",
+            chalk(format!("… and {extra} more line(s)")).dim()
+        );
     }
 }
 

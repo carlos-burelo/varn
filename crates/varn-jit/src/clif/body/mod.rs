@@ -17,7 +17,9 @@ use super::abi::raw_signature;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
-use super::emit::{box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_int};
+use super::emit::{
+    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_int,
+};
 use super::fields;
 use super::floats;
 use super::generic;
@@ -97,7 +99,6 @@ pub(super) fn lower_raw(
     let cc = isa.default_call_conv();
     let has_round = floats::has_round_support(isa);
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
-
 
     let block_starts = scan::block_starts(code, pool)?;
     let regions = scan::loop_regions(proto, code, pool, has_alloc)?;

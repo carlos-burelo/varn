@@ -34,7 +34,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::alloc::{box_or_load_home, def_result, AllocCtx};
 use super::emit::{
     array_disc, box_bool, box_f64, box_int, cached_payload, call_helper_void, meta_is_float,
-    state_meta_int, unbox_f64_coerce, use_boxed, use_f64, use_int, unbox_int,
+    state_meta_int, unbox_f64_coerce, unbox_int, use_boxed, use_f64, use_int,
 };
 use super::kinds::K;
 use crate::JitHelpers;

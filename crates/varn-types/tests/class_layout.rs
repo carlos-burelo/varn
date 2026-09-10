@@ -36,7 +36,9 @@ fn redeclaring_a_field_keeps_its_slot() {
 
     assert_eq!(first, second);
     assert_eq!(
-        cls.get_or_compute_layout().get_field("v").map(|f| f.type_tag),
+        cls.get_or_compute_layout()
+            .get_field("v")
+            .map(|f| f.type_tag),
         Some(TypeTag::Int)
     );
 }

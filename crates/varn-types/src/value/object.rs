@@ -749,7 +749,11 @@ impl std::fmt::Debug for InstanceData {
 
 impl std::fmt::Debug for InstanceRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InstanceRef(class_id={}, size={})", self.0.class_id, self.0.payload_size)
+        write!(
+            f,
+            "InstanceRef(class_id={}, size={})",
+            self.0.class_id, self.0.payload_size
+        )
     }
 }
 

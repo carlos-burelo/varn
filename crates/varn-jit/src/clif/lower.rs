@@ -120,11 +120,7 @@ pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
     proto.param_kinds.iter().any(|k| !scalar(k))
-        || proto
-            .register_meta
-            .iter()
-            .skip(1)
-            .any(|m| !scalar(&m.kind))
+        || proto.register_meta.iter().skip(1).any(|m| !scalar(&m.kind))
 }
 
 /// The opening guess at the calling convention, and the single authority the

@@ -47,7 +47,9 @@ pub fn compile(
     let proto = varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
         PipelineError::fatal(format!(
             "{}: {e:?}",
-            varn_core::term::chalk::chalk("error[emit:tir]").red().bold()
+            varn_core::term::chalk::chalk("error[emit:tir]")
+                .red()
+                .bold()
         ))
     })?;
 

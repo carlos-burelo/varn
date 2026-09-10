@@ -68,7 +68,10 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
 fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>) {
     if m.signature(f.sig).is_none() {
         errors.push(VerifyError::new(
-            format!("function `{}` names SigId({}), which has no entry", f.name, f.sig.0),
+            format!(
+                "function `{}` names SigId({}), which has no entry",
+                f.name, f.sig.0
+            ),
             crate::node::Span::EMPTY,
         ));
     }
@@ -96,7 +99,9 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
 fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<VerifyError>) {
     match s {
         TirStmt::Expr(e) | TirStmt::Throw(e) => check_expr(m, f, e, errors),
-        TirStmt::Let { ty, init, local, .. } => {
+        TirStmt::Let {
+            ty, init, local, ..
+        } => {
             let dummy_expr = TirExpr {
                 kind: TirExprKind::NullLit,
                 ty: BackendTy::Void,
@@ -119,7 +124,11 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 check_expr(m, f, e, errors);
             }
         }
-        TirStmt::If { cond, then_body, else_body } => {
+        TirStmt::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
             check_expr(m, f, cond, errors);
             for s in then_body.iter().chain(else_body) {
                 check_stmt(m, f, s, errors);
@@ -131,7 +140,11 @@ fn check_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Veri
                 check_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Try { body, catch_local, catch_body } => {
+        TirStmt::Try {
+            body,
+            catch_local,
+            catch_body,
+        } => {
             if catch_local.0 as usize >= f.locals.len() {
                 errors.push(VerifyError::new(
                     format!(
@@ -206,9 +219,7 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             for entry in entries {
                 match entry {
                     crate::node::TirObjectEntry::Field { value, .. }
-                    | crate::node::TirObjectEntry::Spread(value) => {
-                        check_expr(m, f, value, errors)
-                    }
+                    | crate::node::TirObjectEntry::Spread(value) => check_expr(m, f, value, errors),
                 }
             }
         }
@@ -253,7 +264,11 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             }
             check_expr(m, f, value, errors);
         }
-        TirExprKind::Select { cond, then_val, else_val } => {
+        TirExprKind::Select {
+            cond,
+            then_val,
+            else_val,
+        } => {
             check_expr(m, f, cond, errors);
             check_expr(m, f, then_val, errors);
             check_expr(m, f, else_val, errors);
@@ -261,7 +276,9 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
         TirExprKind::ObjectKeys { operand } => check_expr(m, f, operand, errors),
         TirExprKind::IterInit { source, .. } => check_expr(m, f, source, errors),
         TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
-            for a in args { check_expr(m, f, a.value(), errors); }
+            for a in args {
+                check_expr(m, f, a.value(), errors);
+            }
         }
         TirExprKind::RangeLit { start, end, .. } => {
             check_expr(m, f, start, errors);
@@ -271,7 +288,9 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
         TirExprKind::ObjectRest { object, .. } => check_expr(m, f, object, errors),
         TirExprKind::ExtensionCall { recv, args, .. } => {
             check_expr(m, f, recv, errors);
-            for a in args { check_expr(m, f, a.value(), errors); }
+            for a in args {
+                check_expr(m, f, a.value(), errors);
+            }
         }
         TirExprKind::IntLit(_)
         | TirExprKind::FloatLit(_)

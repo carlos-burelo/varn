@@ -13,14 +13,14 @@ mod resolution;
 pub use resolution::Resolution;
 
 mod node;
-pub use node::{ TirExport,
-    Span, TirExpr, TirExprKind, TirStmt, TirFunction, TirModule, TirBinOp, TirUnOp, TirArg,
-    TirArrayEl, TirObjectEntry, TirClassDef, TirClassMember, TirClassAccessor, TirVariantDef,
-    TirImport, TirImportSpec, TirImportKind, TirUpvalue,
+pub use node::{
+    Span, TirArg, TirArrayEl, TirBinOp, TirClassAccessor, TirClassDef, TirClassMember, TirExport,
+    TirExpr, TirExprKind, TirFunction, TirImport, TirImportKind, TirImportSpec, TirModule,
+    TirObjectEntry, TirStmt, TirUnOp, TirUpvalue, TirVariantDef,
 };
 
 mod tables;
-pub use tables::{ClassInfo, FieldInfo, VtableEntry, EnumInfo, VariantInfo, Signature};
+pub use tables::{ClassInfo, EnumInfo, FieldInfo, Signature, VariantInfo, VtableEntry};
 
 mod verify;
 pub use verify::{verify_module, VerifyError};

@@ -12,8 +12,8 @@ use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
     box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool, def_const_int,
-    emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool,
-    unbox_f64_coerce, use_boxed, use_f64, use_int,
+    emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
+    use_boxed, use_f64, use_int,
 };
 use super::super::fields;
 use super::super::floats;
@@ -176,7 +176,17 @@ pub(crate) fn dispatch_opcode(
                 // unreferenced, which is what keeps the function a leaf — see
                 // `guard_overflow`.
                 let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
-                let w = guard_overflow(b, cc, exec_ctx, leaf_ctx_helper, helper, r, overflow, s1, s2);
+                let w = guard_overflow(
+                    b,
+                    cc,
+                    exec_ctx,
+                    leaf_ctx_helper,
+                    helper,
+                    r,
+                    overflow,
+                    s1,
+                    s2,
+                );
                 b.def_var(vars[first_reg], w);
             }
         }
@@ -293,7 +303,17 @@ pub(crate) fn dispatch_opcode(
                 // placeholder in a leaf lowering, so the raise block must
                 // recover a real pointer through the getter instead.
                 let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
-                let w = guard_overflow(b, cc, exec_ctx, leaf_ctx_helper, helper, r, overflow, s, imm_v);
+                let w = guard_overflow(
+                    b,
+                    cc,
+                    exec_ctx,
+                    leaf_ctx_helper,
+                    helper,
+                    r,
+                    overflow,
+                    s,
+                    imm_v,
+                );
                 b.def_var(vars[first_reg], w);
             }
         }

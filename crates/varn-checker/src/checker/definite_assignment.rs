@@ -10,9 +10,7 @@
 use super::Checker;
 use rustc_hash::FxHashSet;
 use std::rc::Rc;
-use varn_core::ast::{
-    ArrowBody, Decl, Expr, ExprKind, MatchBody, Program, Stmt, StmtKind,
-};
+use varn_core::ast::{ArrowBody, Decl, Expr, ExprKind, MatchBody, Program, Stmt, StmtKind};
 use varn_core::{Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]
@@ -101,7 +99,11 @@ impl<'r> Checker<'r> {
             }
             StmtKind::Break { .. } | StmtKind::Continue { .. } => flow.diverged = true,
 
-            StmtKind::If { test, consequent, alternate } => {
+            StmtKind::If {
+                test,
+                consequent,
+                alternate,
+            } => {
                 self.da_expr(test, flow);
                 let mut a = flow.clone();
                 self.da_stmt(consequent, &mut a);
@@ -118,7 +120,12 @@ impl<'r> Checker<'r> {
                 inner.diverged = false;
                 self.da_stmt(body, &mut inner);
             }
-            StmtKind::For { init, test, update, body } => {
+            StmtKind::For {
+                init,
+                test,
+                update,
+                body,
+            } => {
                 if let Some(fi) = init {
                     match fi.as_ref() {
                         varn_core::ast::ForInit::Expr(e) => self.da_expr(e, flow),
@@ -144,8 +151,12 @@ impl<'r> Checker<'r> {
                     self.da_expr(u, &mut inner);
                 }
             }
-            StmtKind::ForIn { right, body, left, .. }
-            | StmtKind::ForOf { right, body, left, .. } => {
+            StmtKind::ForIn {
+                right, body, left, ..
+            }
+            | StmtKind::ForOf {
+                right, body, left, ..
+            } => {
                 self.da_expr(right, flow);
                 let mut inner = flow.clone();
                 inner.diverged = false;
@@ -155,7 +166,10 @@ impl<'r> Checker<'r> {
                 self.da_stmt(body, &mut inner);
             }
 
-            StmtKind::Switch { discriminant, cases } => {
+            StmtKind::Switch {
+                discriminant,
+                cases,
+            } => {
                 self.da_expr(discriminant, flow);
                 let mut acc: Option<Flow> = None;
                 let mut has_default = false;
@@ -188,7 +202,11 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            StmtKind::Try { block, catches, finally } => {
+            StmtKind::Try {
+                block,
+                catches,
+                finally,
+            } => {
                 let mut t = flow.clone();
                 self.da_stmt(block, &mut t);
                 let mut c = flow.clone();
@@ -296,7 +314,9 @@ fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Rc<str>> {
                     go(r, out);
                 }
             }
-            Pattern::Object { properties, rest, .. } => {
+            Pattern::Object {
+                properties, rest, ..
+            } => {
                 for pr in properties {
                     go(&pr.value, out);
                 }
@@ -348,14 +368,29 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
         ExprKind::Tuple { elements } => elements.iter().for_each(&mut *f),
         ExprKind::Unary { operand, .. }
         | ExprKind::Update { operand, .. }
-        | ExprKind::Paren { expression: operand }
+        | ExprKind::Paren {
+            expression: operand,
+        }
         | ExprKind::Await { argument: operand }
         | ExprKind::Spawn { argument: operand }
-        | ExprKind::NonNull { expression: operand }
-        | ExprKind::Try { expression: operand }
-        | ExprKind::As { expression: operand, .. }
-        | ExprKind::Satisfies { expression: operand, .. }
-        | ExprKind::Is { expression: operand, .. } => f(operand),
+        | ExprKind::NonNull {
+            expression: operand,
+        }
+        | ExprKind::Try {
+            expression: operand,
+        }
+        | ExprKind::As {
+            expression: operand,
+            ..
+        }
+        | ExprKind::Satisfies {
+            expression: operand,
+            ..
+        }
+        | ExprKind::Is {
+            expression: operand,
+            ..
+        } => f(operand),
         ExprKind::Yield { argument, .. } => {
             if let Some(x) = argument {
                 f(x);
@@ -364,16 +399,26 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
         ExprKind::Binary { left, right, .. }
         | ExprKind::Logical { left, right, .. }
         | ExprKind::Pipeline { left, right }
-        | ExprKind::Range { start: left, end: right, .. } => {
+        | ExprKind::Range {
+            start: left,
+            end: right,
+            ..
+        } => {
             f(left);
             f(right);
         }
-        ExprKind::Conditional { test, consequent, alternate } => {
+        ExprKind::Conditional {
+            test,
+            consequent,
+            alternate,
+        } => {
             f(test);
             f(consequent);
             f(alternate);
         }
-        ExprKind::Member { object, property, .. } => {
+        ExprKind::Member {
+            object, property, ..
+        } => {
             f(object);
             f(property);
         }

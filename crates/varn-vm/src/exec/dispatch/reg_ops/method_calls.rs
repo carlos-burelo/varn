@@ -283,7 +283,8 @@ impl ExecCtx {
                                 && arg_count <= nc.proto.arity
                             {
                                 if cs < cache_len && !is_megamorphic {
-                                    let val = Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
+                                    let val =
+                                        Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
                                     self.populate_method_ic(
                                         closure,
                                         cs,

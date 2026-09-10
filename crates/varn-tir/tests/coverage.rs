@@ -9,10 +9,19 @@ use varn_tir::*;
 fn module() -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
-        classes: vec![ClassInfo::new(Rc::from("P"), None, vec![("x".into(), BackendTy::Int)])],
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
+        classes: vec![ClassInfo::new(
+            Rc::from("P"),
+            None,
+            vec![("x".into(), BackendTy::Int)],
+        )],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -28,13 +37,18 @@ fn module() -> TirModule {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     }
 }
 
 fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
-    TirExpr { kind, ty, res, span: Span::EMPTY }
+    TirExpr {
+        kind,
+        ty,
+        res,
+        span: Span::EMPTY,
+    }
 }
 
 /// Dynamics are counted per reason, not as one number. An honest host
@@ -64,14 +78,27 @@ fn dynamics_are_counted_by_reason() {
 #[test]
 fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
     let mut m = module();
-    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "x".into(),
+        },
         BackendTy::Int,
-        Resolution::ByName { name: "x".into(), why: DynReason::Unannotated },
+        Resolution::ByName {
+            name: "x".into(),
+            why: DynReason::Unannotated,
+        },
     )));
 
-    assert!(verify_module(&m).is_ok(), "a lost opportunity is not an error");
+    assert!(
+        verify_module(&m).is_ok(),
+        "a lost opportunity is not an error"
+    );
     let c = Coverage::of(&m);
     assert_eq!(c.name_dispatch, 1);
 }
@@ -80,9 +107,16 @@ fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
 #[test]
 fn the_static_ratio_is_reported() {
     let mut m = module();
-    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "x".into(),
+        },
         BackendTy::Int,
         Resolution::FieldSlot(0),
     )));

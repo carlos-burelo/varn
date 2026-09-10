@@ -29,15 +29,30 @@ impl StrOp {
 
 /// `str` method name -> wire byte, for receivers statically typed `str`.
 pub const METHOD_ENTRIES: &[(&str, u8)] = &[
-    (crate::MemberKey::CharCodeAt.as_str(), StrOp::CharCodeAt.wire()),
-    (crate::MemberKey::CodePointAt.as_str(), StrOp::CodePointAt.wire()),
-    (crate::MemberKey::Substring.as_str(), StrOp::Substring.wire()),
+    (
+        crate::MemberKey::CharCodeAt.as_str(),
+        StrOp::CharCodeAt.wire(),
+    ),
+    (
+        crate::MemberKey::CodePointAt.as_str(),
+        StrOp::CodePointAt.wire(),
+    ),
+    (
+        crate::MemberKey::Substring.as_str(),
+        StrOp::Substring.wire(),
+    ),
     (crate::MemberKey::Slice.as_str(), StrOp::Slice.wire()),
     (crate::MemberKey::Substr.as_str(), StrOp::Substr.wire()),
     (crate::MemberKey::At.as_str(), StrOp::At.wire()),
     (crate::MemberKey::IndexOf.as_str(), StrOp::IndexOf.wire()),
-    (crate::MemberKey::LastIndexOf.as_str(), StrOp::LastIndexOf.wire()),
-    (crate::MemberKey::StartsWith.as_str(), StrOp::StartsWith.wire()),
+    (
+        crate::MemberKey::LastIndexOf.as_str(),
+        StrOp::LastIndexOf.wire(),
+    ),
+    (
+        crate::MemberKey::StartsWith.as_str(),
+        StrOp::StartsWith.wire(),
+    ),
     (crate::MemberKey::EndsWith.as_str(), StrOp::EndsWith.wire()),
     (crate::MemberKey::Includes.as_str(), StrOp::Includes.wire()),
     (crate::MemberKey::CharCode.as_str(), StrOp::CharCode.wire()),

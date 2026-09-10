@@ -202,7 +202,6 @@ impl NativeCtx for ExecCtx {
         }
     }
 
-
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
         self.heap.alloc_native_fn(f, name)
     }

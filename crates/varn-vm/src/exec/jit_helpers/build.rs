@@ -81,7 +81,9 @@ unsafe fn build_shaped_from_ptr(
     let required = base + start_reg + count;
     if ctx_ref.stack.len() < required {
         if ctx_ref.stack.capacity() < required {
-            ctx_ref.stack.reserve((required - ctx_ref.stack.len()).max(256));
+            ctx_ref
+                .stack
+                .reserve((required - ctx_ref.stack.len()).max(256));
         }
         ctx_ref.stack.resize(required, VmValue::null());
     }

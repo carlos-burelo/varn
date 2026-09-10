@@ -1,9 +1,9 @@
-pub mod compare_tiers;
 pub mod add;
 pub mod bench;
 pub mod build;
 pub mod cache;
 pub mod check;
+pub mod compare_tiers;
 pub mod completions;
 pub mod debug;
 pub mod doctor;

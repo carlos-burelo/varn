@@ -10,14 +10,22 @@ fn module_with_point() -> TirModule {
     let _ = types.intern(BackendTy::Int);
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![ClassInfo::new(
             Rc::from("Point"),
             None,
-            vec![("x".into(), BackendTy::Int), ("label".into(), BackendTy::Str)],
+            vec![
+                ("x".into(), BackendTy::Int),
+                ("label".into(), BackendTy::Str),
+            ],
         )],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -33,13 +41,18 @@ fn module_with_point() -> TirModule {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     }
 }
 
 fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
-    TirExpr { kind, ty, res, span: Span::EMPTY }
+    TirExpr {
+        kind,
+        ty,
+        res,
+        span: Span::EMPTY,
+    }
 }
 
 fn int(v: i64) -> TirExpr {
@@ -155,7 +168,11 @@ fn a_subclass_is_assignable_to_its_parent() {
 fn int_addition_is_int() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Binary { op: TirBinOp::Add, lhs: Box::new(int(1)), rhs: Box::new(int(2)) },
+        TirExprKind::Binary {
+            op: TirBinOp::Add,
+            lhs: Box::new(int(1)),
+            rhs: Box::new(int(2)),
+        },
         BackendTy::Int,
         Resolution::None,
     )));
@@ -167,12 +184,20 @@ fn int_addition_is_int() {
 fn a_lying_result_type_is_rejected() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Binary { op: TirBinOp::Add, lhs: Box::new(int(1)), rhs: Box::new(int(2)) },
+        TirExprKind::Binary {
+            op: TirBinOp::Add,
+            lhs: Box::new(int(1)),
+            rhs: Box::new(int(2)),
+        },
         BackendTy::Str,
         Resolution::None,
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("Add")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("Add")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// Mixing representations without an explicit Cast is rejected: it is exactly
@@ -180,14 +205,26 @@ fn a_lying_result_type_is_rejected() {
 #[test]
 fn mixed_operands_without_a_cast_are_rejected() {
     let mut m = module_with_point();
-    let f = expr(TirExprKind::FloatLit(1.5), BackendTy::Float, Resolution::None);
+    let f = expr(
+        TirExprKind::FloatLit(1.5),
+        BackendTy::Float,
+        Resolution::None,
+    );
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Binary { op: TirBinOp::Add, lhs: Box::new(int(1)), rhs: Box::new(f) },
+        TirExprKind::Binary {
+            op: TirBinOp::Add,
+            lhs: Box::new(int(1)),
+            rhs: Box::new(f),
+        },
         BackendTy::Float,
         Resolution::None,
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("Cast")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("Cast")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A comparison produces Bool whatever its operands are.
@@ -195,12 +232,20 @@ fn mixed_operands_without_a_cast_are_rejected() {
 fn comparison_produces_bool() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Binary { op: TirBinOp::Lt, lhs: Box::new(int(1)), rhs: Box::new(int(2)) },
+        TirExprKind::Binary {
+            op: TirBinOp::Lt,
+            lhs: Box::new(int(1)),
+            rhs: Box::new(int(2)),
+        },
         BackendTy::Int, // wrong on purpose
         Resolution::None,
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("Bool")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("Bool")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A field read's type must be the field's DECLARED type. This is the check
@@ -215,12 +260,19 @@ fn a_field_read_must_have_the_declared_type() {
     );
     // slot 0 is `x: int`, but the node claims Str.
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "x".into(),
+        },
         BackendTy::Str,
         Resolution::FieldSlot(0),
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("declared")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("declared")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// The same read with the right type passes.
@@ -233,7 +285,10 @@ fn a_correct_field_read_verifies() {
         Resolution::Local(LocalId(0)),
     );
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "x".into(),
+        },
         BackendTy::Int,
         Resolution::FieldSlot(0),
     )));
@@ -245,7 +300,9 @@ fn a_correct_field_read_verifies() {
 fn method_call_arity_mismatch_is_rejected() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -254,8 +311,14 @@ fn method_call_arity_mismatch_is_rejected() {
         )],
         enums: vec![],
         signatures: vec![
-            Signature { params: vec![BackendTy::Int], return_ty: BackendTy::Void },
-            Signature { params: vec![], return_ty: BackendTy::Void },
+            Signature {
+                params: vec![BackendTy::Int],
+                return_ty: BackendTy::Void,
+            },
+            Signature {
+                params: vec![],
+                return_ty: BackendTy::Void,
+            },
         ],
         functions: vec![],
         globals: vec![],
@@ -272,7 +335,7 @@ fn method_call_arity_mismatch_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
 
@@ -292,7 +355,11 @@ fn method_call_arity_mismatch_is_rejected() {
         Resolution::VtableSlot(0),
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("argument")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("argument")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A method call with the right arity passes.
@@ -300,7 +367,9 @@ fn method_call_arity_mismatch_is_rejected() {
 fn method_call_with_correct_arity_verifies() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -309,8 +378,14 @@ fn method_call_with_correct_arity_verifies() {
         )],
         enums: vec![],
         signatures: vec![
-            Signature { params: vec![BackendTy::Int], return_ty: BackendTy::Void },
-            Signature { params: vec![], return_ty: BackendTy::Void },
+            Signature {
+                params: vec![BackendTy::Int],
+                return_ty: BackendTy::Void,
+            },
+            Signature {
+                params: vec![],
+                return_ty: BackendTy::Void,
+            },
         ],
         functions: vec![],
         globals: vec![],
@@ -327,7 +402,7 @@ fn method_call_with_correct_arity_verifies() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
 
@@ -358,7 +433,11 @@ fn if_condition_must_be_bool() {
         else_body: vec![],
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("Bool")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("Bool")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// An if condition that is Bool passes.
@@ -366,7 +445,11 @@ fn if_condition_must_be_bool() {
 fn if_with_bool_condition_verifies() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::If {
-        cond: expr(TirExprKind::BoolLit(true), BackendTy::Bool, Resolution::None),
+        cond: expr(
+            TirExprKind::BoolLit(true),
+            BackendTy::Bool,
+            Resolution::None,
+        ),
         then_body: vec![],
         else_body: vec![],
     });
@@ -382,7 +465,11 @@ fn loop_condition_must_be_bool() {
         body: vec![],
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("Bool")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("Bool")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A loop condition that is Bool passes.
@@ -390,7 +477,11 @@ fn loop_condition_must_be_bool() {
 fn loop_with_bool_condition_verifies() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Loop {
-        cond: expr(TirExprKind::BoolLit(true), BackendTy::Bool, Resolution::None),
+        cond: expr(
+            TirExprKind::BoolLit(true),
+            BackendTy::Bool,
+            Resolution::None,
+        ),
         body: vec![],
     });
     assert!(verify_module(&m).is_ok());
@@ -402,11 +493,15 @@ fn let_type_mismatch_is_rejected() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(1),
-        ty: BackendTy::Str, // declared Str
+        ty: BackendTy::Str,  // declared Str
         init: Some(int(42)), // initialized with Int
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("declares")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A let binding with matching types verifies.
@@ -428,7 +523,11 @@ fn return_type_mismatch_is_rejected() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Return(Some(int(42)))); // Int, but function returns Void
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("return type")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A return statement with the right type verifies.
@@ -436,10 +535,15 @@ fn return_type_mismatch_is_rejected() {
 fn return_with_correct_type_verifies() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Int,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -455,7 +559,7 @@ fn return_with_correct_type_verifies() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42))));
@@ -475,10 +579,15 @@ fn bare_return_in_void_function_verifies() {
 fn bare_return_in_non_void_function_is_rejected() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Int,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -494,12 +603,16 @@ fn bare_return_in_non_void_function_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(None));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("return type")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A let binding declared Nullable(T) initialized with T is valid (assignability).
@@ -510,10 +623,15 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -529,7 +647,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -548,10 +666,15 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -567,7 +690,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -580,7 +703,11 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
         )),
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("declares")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A return of Never is valid in any function (Never inhabits every type).
@@ -588,10 +715,15 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
 fn return_of_never_type_is_valid_anywhere() {
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Int,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -607,7 +739,7 @@ fn return_of_never_type_is_valid_anywhere() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -625,10 +757,15 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Nullable(int_id) }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Nullable(int_id),
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -644,7 +781,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(int(42)))); // returning Int
@@ -658,10 +795,15 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Int }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Int,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -677,7 +819,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
@@ -686,7 +828,11 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
         Resolution::None,
     ))));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("return type")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("return type")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A method call with argument T where parameter is Nullable(T) passes.
@@ -696,7 +842,9 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -709,7 +857,10 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
                 params: vec![BackendTy::Nullable(int_id)],
                 return_ty: BackendTy::Void,
             },
-            Signature { params: vec![], return_ty: BackendTy::Void },
+            Signature {
+                params: vec![],
+                return_ty: BackendTy::Void,
+            },
         ],
         functions: vec![],
         globals: vec![],
@@ -726,7 +877,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
 
@@ -754,7 +905,9 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
     let int_id = types.intern(BackendTy::Int);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![ClassInfo::new_with_methods(
             Rc::from("Point"),
             None,
@@ -767,7 +920,10 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
                 params: vec![BackendTy::Int],
                 return_ty: BackendTy::Void,
             },
-            Signature { params: vec![], return_ty: BackendTy::Void },
+            Signature {
+                params: vec![],
+                return_ty: BackendTy::Void,
+            },
         ],
         functions: vec![],
         globals: vec![],
@@ -784,7 +940,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
 
@@ -807,7 +963,11 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         Resolution::VtableSlot(0),
     )));
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("argument")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("argument")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// PERMISSIVENESS CHECK: Nullable(Int) must NOT accept Str.
@@ -818,10 +978,15 @@ fn let_declared_nullable_int_init_str_should_fail() {
     let nullable_int = BackendTy::Nullable(int_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -837,7 +1002,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -850,7 +1015,11 @@ fn let_declared_nullable_int_init_str_should_fail() {
         )),
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("declares")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// PERMISSIVENESS CHECK: Nullable(Int) must NOT accept Nullable(Str).
@@ -863,10 +1032,15 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
     let nullable_str = BackendTy::Nullable(str_id);
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -882,7 +1056,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
     m.top_level.body.push(TirStmt::Let {
@@ -895,7 +1069,11 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         )),
     });
     let errs = verify_module(&m).unwrap_err();
-    assert!(errs.iter().any(|e| e.message.contains("declares")), "got: {:?}", errs);
+    assert!(
+        errs.iter().any(|e| e.message.contains("declares")),
+        "got: {:?}",
+        errs
+    );
 }
 
 /// A deeply nested chain of `Nullable` terminates and is not falsely
@@ -926,10 +1104,15 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
 
     let mut m = TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -945,7 +1128,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     };
 
@@ -953,12 +1136,20 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
         ty: deeply_nullable,
-        init: Some(expr(TirExprKind::IntLit(42), BackendTy::Int, Resolution::None)),
+        init: Some(expr(
+            TirExprKind::IntLit(42),
+            BackendTy::Int,
+            Resolution::None,
+        )),
     });
 
     // The key assertion: verify_module must RETURN, not hang, and must not
     // falsely reject a merely-deep (non-cyclic) chain once the bound
     // saturates.
     let result = verify_module(&m);
-    assert!(result.is_ok(), "deeply nested chain caused verification failure: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "deeply nested chain caused verification failure: {:?}",
+        result
+    );
 }

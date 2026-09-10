@@ -101,11 +101,17 @@ impl<'m> Builder<'m> {
                             out.push(v);
                         }
                     }
-                    TirStmt::If { then_body, else_body, .. } => {
+                    TirStmt::If {
+                        then_body,
+                        else_body,
+                        ..
+                    } => {
                         walk(then_body, pinned, out);
                         walk(else_body, pinned, out);
                     }
-                    TirStmt::Try { body, catch_body, .. } => {
+                    TirStmt::Try {
+                        body, catch_body, ..
+                    } => {
                         walk(body, pinned, out);
                         walk(catch_body, pinned, out);
                     }
@@ -123,7 +129,11 @@ impl<'m> Builder<'m> {
     /// HIR path both store. Imported / host names stay bare — they arrive as
     /// `Resolution::ByName`, which never reaches this.
     fn gname(&self, name: &str) -> Rc<str> {
-        Rc::from(format!("{}::{}", self.tir.source_file.replace('\\', "/"), name))
+        Rc::from(format!(
+            "{}::{}",
+            self.tir.source_file.replace('\\', "/"),
+            name
+        ))
     }
 
     /// Force `v` to `target`, inserting a `Cast` when the representation
@@ -132,7 +142,13 @@ impl<'m> Builder<'m> {
         if self.value_ty(v) == target {
             v
         } else {
-            self.emit(InstKind::Cast { operand: v, ty: target }, target)
+            self.emit(
+                InstKind::Cast {
+                    operand: v,
+                    ty: target,
+                },
+                target,
+            )
         }
     }
 
@@ -181,12 +197,20 @@ impl<'m> Builder<'m> {
 
     fn emit(&mut self, kind: InstKind, ty: HirType) -> Value {
         let dest = self.new_value(ty);
-        self.block_mut(self.current).insts.push(Inst { dest: Some(dest), kind, line: 0 });
+        self.block_mut(self.current).insts.push(Inst {
+            dest: Some(dest),
+            kind,
+            line: 0,
+        });
         dest
     }
 
     fn emit_effect(&mut self, kind: InstKind) {
-        self.block_mut(self.current).insts.push(Inst { dest: None, kind, line: 0 });
+        self.block_mut(self.current).insts.push(Inst {
+            dest: None,
+            kind,
+            line: 0,
+        });
     }
 
     fn write_var(&mut self, var: VarId, block: BlockId, value: Value) {
@@ -202,13 +226,15 @@ impl<'m> Builder<'m> {
     }
 
     fn read_var_recursive(&mut self, var: VarId, block: BlockId) -> Result<Value> {
-        let ty = *self
-            .var_ty
-            .get(&var)
-            .ok_or(OptError::Unsupported("from_tir: read of undefined variable"))?;
+        let ty = *self.var_ty.get(&var).ok_or(OptError::Unsupported(
+            "from_tir: read of undefined variable",
+        ))?;
         if !self.sealed[block.0 as usize] {
             let phi = self.add_block_param(block, ty);
-            self.incomplete_phis.entry(block).or_default().push((var, phi));
+            self.incomplete_phis
+                .entry(block)
+                .or_default()
+                .push((var, phi));
             self.write_var(var, block, phi);
             return Ok(phi);
         }
@@ -250,7 +276,13 @@ impl<'m> Builder<'m> {
                 debug_assert_eq!(args.len(), pos);
                 args.push(arg);
             }
-            Terminator::Branch { then_blk, then_args, else_blk, else_args, .. } => {
+            Terminator::Branch {
+                then_blk,
+                then_args,
+                else_blk,
+                else_args,
+                ..
+            } => {
                 if *then_blk == block {
                     then_args.push(arg);
                 }
@@ -324,7 +356,10 @@ impl<'m> Builder<'m> {
                         self.emit_effect(InstKind::PopTry);
                     }
                     let from = self.current;
-                    self.set_term(Terminator::Jump { target: c.break_target, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: c.break_target,
+                        args: vec![],
+                    });
                     self.add_pred(c.break_target, from);
                 }
             }
@@ -334,11 +369,18 @@ impl<'m> Builder<'m> {
                         self.emit_effect(InstKind::PopTry);
                     }
                     let from = self.current;
-                    self.set_term(Terminator::Jump { target: c.continue_target, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: c.continue_target,
+                        args: vec![],
+                    });
                     self.add_pred(c.continue_target, from);
                 }
             }
-            TirStmt::If { cond, then_body, else_body } => {
+            TirStmt::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
                 let c = self.lower_expr(cond)?;
                 let then_blk = self.new_block();
                 let else_blk = self.new_block();
@@ -360,7 +402,10 @@ impl<'m> Builder<'m> {
                 self.lower_block(then_body)?;
                 if self.is_open() {
                     let cur = self.current;
-                    self.set_term(Terminator::Jump { target: join, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: join,
+                        args: vec![],
+                    });
                     self.add_pred(join, cur);
                 }
 
@@ -368,7 +413,10 @@ impl<'m> Builder<'m> {
                 self.lower_block(else_body)?;
                 if self.is_open() {
                     let cur = self.current;
-                    self.set_term(Terminator::Jump { target: join, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: join,
+                        args: vec![],
+                    });
                     self.add_pred(join, cur);
                 }
 
@@ -380,7 +428,10 @@ impl<'m> Builder<'m> {
                 let body_blk = self.new_block();
                 let exit = self.new_block();
                 let from = self.current;
-                self.set_term(Terminator::Jump { target: head, args: vec![] });
+                self.set_term(Terminator::Jump {
+                    target: head,
+                    args: vec![],
+                });
                 self.add_pred(head, from);
 
                 self.current = head;
@@ -413,7 +464,10 @@ impl<'m> Builder<'m> {
                         self.emit_effect(InstKind::CloseUpvalues { targets: closes });
                     }
                     let cur = self.current;
-                    self.set_term(Terminator::Jump { target: head, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: head,
+                        args: vec![],
+                    });
                     self.add_pred(head, cur);
                 }
                 self.loops.pop();
@@ -422,7 +476,11 @@ impl<'m> Builder<'m> {
                 self.seal_block(exit);
                 self.current = exit;
             }
-            TirStmt::Try { body, catch_local, catch_body } => {
+            TirStmt::Try {
+                body,
+                catch_local,
+                catch_body,
+            } => {
                 let try_entry = self.current;
                 let landing = self.new_block();
                 let exit = self.new_block();
@@ -435,7 +493,10 @@ impl<'m> Builder<'m> {
                 if self.is_open() {
                     self.emit_effect(InstKind::PopTry);
                     let from = self.current;
-                    self.set_term(Terminator::Jump { target: exit, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: exit,
+                        args: vec![],
+                    });
                     self.add_pred(exit, from);
                 }
 
@@ -447,7 +508,10 @@ impl<'m> Builder<'m> {
                 self.lower_block(catch_body)?;
                 if self.is_open() {
                     let from = self.current;
-                    self.set_term(Terminator::Jump { target: exit, args: vec![] });
+                    self.set_term(Terminator::Jump {
+                        target: exit,
+                        args: vec![],
+                    });
                     self.add_pred(exit, from);
                 }
 
@@ -482,21 +546,30 @@ impl<'m> Builder<'m> {
                 let d = s.parse().unwrap_or_default();
                 Ok(self.emit(InstKind::ConstDecimal(d), HirType::Ref))
             }
-            TirExprKind::BigIntLit(n) => {
-                Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Ref))
-            }
-            TirExprKind::RangeLit { start, end, inclusive } => {
+            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Ref)),
+            TirExprKind::RangeLit {
+                start,
+                end,
+                inclusive,
+            } => {
                 let s = self.lower_expr(start)?;
                 let e2 = self.lower_expr(end)?;
                 Ok(self.emit(
-                    InstKind::Range { start: s, end: e2, inclusive: *inclusive },
+                    InstKind::Range {
+                        start: s,
+                        end: e2,
+                        inclusive: *inclusive,
+                    },
                     HirType::Ref,
                 ))
             }
             TirExprKind::ObjectRest { object, skip_keys } => {
                 let o = self.lower_expr(object)?;
                 Ok(self.emit(
-                    InstKind::ObjectRest { object: o, skip_keys: skip_keys.clone() },
+                    InstKind::ObjectRest {
+                        object: o,
+                        skip_keys: skip_keys.clone(),
+                    },
                     HirType::Ref,
                 ))
             }
@@ -504,7 +577,11 @@ impl<'m> Builder<'m> {
                 let r = self.lower_expr(recv)?;
                 let argv = self.lower_args(args)?;
                 Ok(self.emit(
-                    InstKind::ExtensionCall { func: func.clone(), recv: r, args: argv },
+                    InstKind::ExtensionCall {
+                        func: func.clone(),
+                        recv: r,
+                        args: argv,
+                    },
                     ty,
                 ))
             }
@@ -516,8 +593,12 @@ impl<'m> Builder<'m> {
                 let mut r = self.lower_expr(rhs)?;
                 let is_cmp = matches!(
                     op,
-                    TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le
-                        | TirBinOp::Gt | TirBinOp::Ge
+                    TirBinOp::Eq
+                        | TirBinOp::Ne
+                        | TirBinOp::Lt
+                        | TirBinOp::Le
+                        | TirBinOp::Gt
+                        | TirBinOp::Ge
                 );
                 // An arithmetic node whose result type is a scalar (the checker
                 // widened, e.g. `int - int` used where a `float` is wanted)
@@ -552,16 +633,27 @@ impl<'m> Builder<'m> {
                     ty
                 };
                 Ok(self.emit(
-                    InstKind::Binary { op: bin_op(*op), lhs: l, rhs: r, ty: op_ty },
+                    InstKind::Binary {
+                        op: bin_op(*op),
+                        lhs: l,
+                        rhs: r,
+                        ty: op_ty,
+                    },
                     result_ty,
                 ))
             }
             TirExprKind::Unary { op, operand } => {
                 let v = self.lower_expr(operand)?;
                 match op {
-                    TirUnOp::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
+                    TirUnOp::IsNull => {
+                        Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
+                    }
                     _ => Ok(self.emit(
-                        InstKind::Unary { op: un_op(*op), operand: v, ty },
+                        InstKind::Unary {
+                            op: un_op(*op),
+                            operand: v,
+                            ty,
+                        },
                         ty,
                     )),
                 }
@@ -570,7 +662,11 @@ impl<'m> Builder<'m> {
                 let v = self.lower_expr(operand)?;
                 Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
             }
-            TirExprKind::Select { cond, then_val, else_val } => {
+            TirExprKind::Select {
+                cond,
+                then_val,
+                else_val,
+            } => {
                 let c = self.lower_expr(cond)?;
                 self.lower_select(c, then_val, else_val, ty)
             }
@@ -578,8 +674,14 @@ impl<'m> Builder<'m> {
             TirExprKind::Field { object, name } => {
                 let obj = self.lower_expr(object)?;
                 let kind = match &e.res {
-                    Resolution::FieldSlot(slot) => InstKind::GetFixedField { object: obj, slot: *slot },
-                    _ => InstKind::GetProperty { object: obj, name: name.clone() },
+                    Resolution::FieldSlot(slot) => InstKind::GetFixedField {
+                        object: obj,
+                        slot: *slot,
+                    },
+                    _ => InstKind::GetProperty {
+                        object: obj,
+                        name: name.clone(),
+                    },
                 };
                 Ok(self.emit(kind, ty))
             }
@@ -587,9 +689,15 @@ impl<'m> Builder<'m> {
                 let obj = self.lower_expr(object)?;
                 let idx = self.lower_expr(index)?;
                 let kind = if matches!(self.value_ty(obj), HirType::Array(_)) {
-                    InstKind::ArrayGetIndex { object: obj, index: idx }
+                    InstKind::ArrayGetIndex {
+                        object: obj,
+                        index: idx,
+                    }
                 } else {
-                    InstKind::GetIndex { object: obj, index: idx }
+                    InstKind::GetIndex {
+                        object: obj,
+                        index: idx,
+                    }
                 };
                 Ok(self.emit(kind, ty))
             }
@@ -612,7 +720,11 @@ impl<'m> Builder<'m> {
                 let r = self.lower_expr(recv)?;
                 let argv = self.lower_args(args)?;
                 Ok(self.emit(
-                    InstKind::MethodCall { recv: r, name: name.clone(), args: argv },
+                    InstKind::MethodCall {
+                        recv: r,
+                        name: name.clone(),
+                        args: argv,
+                    },
                     ty,
                 ))
             }
@@ -644,8 +756,13 @@ impl<'m> Builder<'m> {
                     .map(|v| v.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
                 let enum_val = self.emit(InstKind::LoadGlobal(ename), HirType::Ref);
-                let variant =
-                    self.emit(InstKind::GetProperty { object: enum_val, name: vname }, HirType::Ref);
+                let variant = self.emit(
+                    InstKind::GetProperty {
+                        object: enum_val,
+                        name: vname,
+                    },
+                    HirType::Ref,
+                );
                 if args.is_empty() {
                     Ok(variant)
                 } else {
@@ -654,13 +771,16 @@ impl<'m> Builder<'m> {
             }
 
             TirExprKind::ArrayLit(els) => {
-                let any_spread =
-                    els.iter().any(|el| matches!(el, varn_tir::TirArrayEl::Spread(_)));
+                let any_spread = els
+                    .iter()
+                    .any(|el| matches!(el, varn_tir::TirArrayEl::Spread(_)));
                 if any_spread {
                     let mut vals: Vec<(Value, bool)> = Vec::with_capacity(els.len());
                     for el in els {
                         match el {
-                            varn_tir::TirArrayEl::Expr(x) => vals.push((self.lower_expr(x)?, false)),
+                            varn_tir::TirArrayEl::Expr(x) => {
+                                vals.push((self.lower_expr(x)?, false))
+                            }
                             varn_tir::TirArrayEl::Spread(x) => {
                                 vals.push((self.lower_expr(x)?, true))
                             }
@@ -706,7 +826,8 @@ impl<'m> Builder<'m> {
                     .iter()
                     .any(|e| matches!(e, varn_tir::TirObjectEntry::Spread(_)));
                 if any_spread {
-                    let mut parts: Vec<(Option<Rc<str>>, Value)> = Vec::with_capacity(entries.len());
+                    let mut parts: Vec<(Option<Rc<str>>, Value)> =
+                        Vec::with_capacity(entries.len());
                     for entry in entries {
                         match entry {
                             varn_tir::TirObjectEntry::Field { name, value } => {
@@ -756,7 +877,13 @@ impl<'m> Builder<'m> {
             }
             TirExprKind::VariantPayload { value, field, .. } => {
                 let v = self.lower_expr(value)?;
-                Ok(self.emit(InstKind::GetFixedField { object: v, slot: *field }, ty))
+                Ok(self.emit(
+                    InstKind::GetFixedField {
+                        object: v,
+                        slot: *field,
+                    },
+                    ty,
+                ))
             }
             TirExprKind::TypeTest { value, class } => {
                 let v = self.lower_expr(value)?;
@@ -785,10 +912,19 @@ impl<'m> Builder<'m> {
             TirExprKind::IterInit { source, is_async } => {
                 let src = self.lower_expr(source)?;
                 let sym = self.emit(
-                    InstKind::GetSymbol { object: src, is_async: *is_async },
+                    InstKind::GetSymbol {
+                        object: src,
+                        is_async: *is_async,
+                    },
                     HirType::Ref,
                 );
-                Ok(self.emit(InstKind::IterCall { callee: sym, recv: src }, ty))
+                Ok(self.emit(
+                    InstKind::IterCall {
+                        callee: sym,
+                        recv: src,
+                    },
+                    ty,
+                ))
             }
 
             TirExprKind::SuperCall { args } => {
@@ -798,7 +934,10 @@ impl<'m> Builder<'m> {
             TirExprKind::SuperMethodCall { name, args } => {
                 let argv = self.lower_args(args)?;
                 Ok(self.emit(
-                    InstKind::SuperMethodCall { name: name.clone(), args: argv },
+                    InstKind::SuperMethodCall {
+                        name: name.clone(),
+                        args: argv,
+                    },
                     ty,
                 ))
             }
@@ -806,7 +945,10 @@ impl<'m> Builder<'m> {
             TirExprKind::Closure { func, upvalues } => {
                 let src = upvalues.iter().map(|u| upvalue_src(*u)).collect();
                 Ok(self.emit(
-                    InstKind::MakeClosure { func: func.0, upvalues_src: src },
+                    InstKind::MakeClosure {
+                        func: func.0,
+                        upvalues_src: src,
+                    },
                     HirType::Ref,
                 ))
             }
@@ -815,7 +957,12 @@ impl<'m> Builder<'m> {
 
     /// Lower a `Call` / `New` argument list. Returns the spread-tagged form
     /// when any argument is a spread; a named argument is not modelled.
-    fn lower_call(&mut self, callee: Value, args: &[varn_tir::TirArg], ty: HirType) -> Result<Value> {
+    fn lower_call(
+        &mut self,
+        callee: Value,
+        args: &[varn_tir::TirArg],
+        ty: HirType,
+    ) -> Result<Value> {
         let mut vals: Vec<(Value, bool)> = Vec::with_capacity(args.len());
         let mut any_spread = false;
         for a in args {
@@ -827,14 +974,22 @@ impl<'m> Builder<'m> {
                 }
                 // Named arguments are lowered positionally in written order —
                 // precise reordering against the callee signature is later work.
-                varn_tir::TirArg::Named { value, .. } => vals.push((self.lower_expr(value)?, false)),
+                varn_tir::TirArg::Named { value, .. } => {
+                    vals.push((self.lower_expr(value)?, false))
+                }
             }
         }
         if any_spread {
             Ok(self.emit(InstKind::CallSpread { callee, args: vals }, ty))
         } else {
             let plain = vals.into_iter().map(|(v, _)| v).collect();
-            Ok(self.emit(InstKind::Call { callee, args: plain }, ty))
+            Ok(self.emit(
+                InstKind::Call {
+                    callee,
+                    args: plain,
+                },
+                ty,
+            ))
         }
     }
 
@@ -865,7 +1020,10 @@ impl<'m> Builder<'m> {
                     self.emit_effect(InstKind::StoreUpvalue { index: *uv, value });
                 }
                 Resolution::ByName { name, .. } => {
-                    self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value });
+                    self.emit_effect(InstKind::StoreGlobal {
+                        name: name.clone(),
+                        value,
+                    });
                 }
                 Resolution::GlobalSlot(n) => {
                     let raw = self
@@ -882,17 +1040,27 @@ impl<'m> Builder<'m> {
             TirExprKind::Field { object, name } => {
                 let obj = self.lower_expr(object)?;
                 let kind = match &target.res {
-                    Resolution::FieldSlot(slot) => {
-                        InstKind::SetFixedField { object: obj, value, slot: *slot }
-                    }
-                    _ => InstKind::SetProperty { object: obj, name: name.clone(), value },
+                    Resolution::FieldSlot(slot) => InstKind::SetFixedField {
+                        object: obj,
+                        value,
+                        slot: *slot,
+                    },
+                    _ => InstKind::SetProperty {
+                        object: obj,
+                        name: name.clone(),
+                        value,
+                    },
                 };
                 self.emit_effect(kind);
             }
             TirExprKind::Index { object, index } => {
                 let obj = self.lower_expr(object)?;
                 let idx = self.lower_expr(index)?;
-                self.emit_effect(InstKind::SetIndex { object: obj, index: idx, value });
+                self.emit_effect(InstKind::SetIndex {
+                    object: obj,
+                    index: idx,
+                    value,
+                });
             }
             _ => return Err(OptError::Unsupported("from_tir: assign target")),
         }
@@ -934,10 +1102,10 @@ impl<'m> Builder<'m> {
                     .ok_or(OptError::Unsupported("from_tir: global slot out of range"))?;
                 Ok(self.emit(InstKind::LoadGlobal(self.gname(&raw)), ty))
             }
-            Resolution::ModuleSlot { .. } => {
-                Err(OptError::Unsupported("from_tir: module slot"))
+            Resolution::ModuleSlot { .. } => Err(OptError::Unsupported("from_tir: module slot")),
+            Resolution::ByName { name, .. } => {
+                Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty))
             }
-            Resolution::ByName { name, .. } => Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty)),
             // A bare reference to a free function — a namespace object entry, a
             // function value passed around. Load the global it is stored under.
             Resolution::DirectFn(f) => {
@@ -982,13 +1150,19 @@ impl<'m> Builder<'m> {
         self.current = then_blk;
         let tv = self.lower_expr(then_val)?;
         let tfrom = self.current;
-        self.set_term(Terminator::Jump { target: join, args: vec![tv] });
+        self.set_term(Terminator::Jump {
+            target: join,
+            args: vec![tv],
+        });
         self.add_pred(join, tfrom);
 
         self.current = else_blk;
         let ev = self.lower_expr(else_val)?;
         let efrom = self.current;
-        self.set_term(Terminator::Jump { target: join, args: vec![ev] });
+        self.set_term(Terminator::Jump {
+            target: join,
+            args: vec![ev],
+        });
         self.add_pred(join, efrom);
 
         self.seal_block(join);
@@ -1074,25 +1248,38 @@ impl<'m> Builder<'m> {
     fn build_exports(&mut self, export_slots: &[Rc<str>]) {
         let slot_of = |name: &str| export_slots.iter().position(|n| n.as_ref() == name);
         for exp in &self.tir.exports {
-            let Some(slot) = slot_of(&exp.exported) else { continue };
+            let Some(slot) = slot_of(&exp.exported) else {
+                continue;
+            };
             let value = match &exp.reexport_from {
-                None => self.emit(InstKind::LoadGlobal(self.gname(&exp.local)), HirType::Dynamic),
+                None => self.emit(
+                    InstKind::LoadGlobal(self.gname(&exp.local)),
+                    HirType::Dynamic,
+                ),
                 Some(src) => {
                     let m = self.emit(
-                        InstKind::LoadModule { source: src.clone() },
+                        InstKind::LoadModule {
+                            source: src.clone(),
+                        },
                         HirType::Ref,
                     );
                     if exp.namespace {
                         m
                     } else {
                         self.emit(
-                            InstKind::GetProperty { object: m, name: exp.local.clone() },
+                            InstKind::GetProperty {
+                                object: m,
+                                name: exp.local.clone(),
+                            },
                             HirType::Dynamic,
                         )
                     }
                 }
             };
-            self.emit_effect(InstKind::StoreModuleSlot { value, slot: slot as u16 });
+            self.emit_effect(InstKind::StoreModuleSlot {
+                value,
+                slot: slot as u16,
+            });
         }
     }
 
@@ -1103,18 +1290,28 @@ impl<'m> Builder<'m> {
             if imp.is_type_only {
                 continue;
             }
-            let mod_v =
-                self.emit(InstKind::LoadModule { source: imp.source.clone() }, HirType::Ref);
+            let mod_v = self.emit(
+                InstKind::LoadModule {
+                    source: imp.source.clone(),
+                },
+                HirType::Ref,
+            );
             for spec in &imp.specs {
                 let name = self.gname(&spec.local);
                 let val = match &spec.kind {
                     TirImportKind::Namespace => mod_v,
                     TirImportKind::Default => self.emit(
-                        InstKind::GetProperty { object: mod_v, name: Rc::from("default") },
+                        InstKind::GetProperty {
+                            object: mod_v,
+                            name: Rc::from("default"),
+                        },
                         HirType::Dynamic,
                     ),
                     TirImportKind::Named(n) => self.emit(
-                        InstKind::GetProperty { object: mod_v, name: n.clone() },
+                        InstKind::GetProperty {
+                            object: mod_v,
+                            name: n.clone(),
+                        },
                         HirType::Dynamic,
                     ),
                 };
@@ -1136,13 +1333,19 @@ impl<'m> Builder<'m> {
             None => None,
         };
         let mut class_v = self.emit(
-            InstKind::MakeClass { name: def.name.clone(), super_class: super_v },
+            InstKind::MakeClass {
+                name: def.name.clone(),
+                super_class: super_v,
+            },
             HirType::Ref,
         );
 
         for v in &def.variants {
             let variant_v = self.emit(
-                InstKind::MakeEnumVariant { tag: v.tag, meta: v.meta.clone() },
+                InstKind::MakeEnumVariant {
+                    tag: v.tag,
+                    meta: v.meta.clone(),
+                },
                 HirType::Ref,
             );
             self.emit_effect(InstKind::DefineStatic {
@@ -1158,7 +1361,11 @@ impl<'m> Builder<'m> {
         // `field_tags` vec the child never sized.
         let inherited = def
             .parent
-            .or_else(|| def.class_id.and_then(|c| self.tir.class(c)).and_then(|ci| ci.parent))
+            .or_else(|| {
+                def.class_id
+                    .and_then(|c| self.tir.class(c))
+                    .and_then(|ci| ci.parent)
+            })
             .and_then(|p| self.tir.class(p))
             .map(|p| p.fields.len())
             // `extends` a native class the table doesn't hold — the checker
@@ -1169,7 +1376,11 @@ impl<'m> Builder<'m> {
             .class_id
             .and_then(|cid| self.tir.class(cid))
             .map(|ci| {
-                ci.fields.iter().skip(inherited).map(|f| (f.name.clone(), f.ty)).collect()
+                ci.fields
+                    .iter()
+                    .skip(inherited)
+                    .map(|f| (f.name.clone(), f.ty))
+                    .collect()
             })
             .unwrap_or_default();
         for (fname, fty) in fields {
@@ -1194,7 +1405,10 @@ impl<'m> Builder<'m> {
 
         for m in &def.methods {
             let mut mv = self.emit(
-                InstKind::MakeClosure { func: m.func.0, upvalues_src: vec![] },
+                InstKind::MakeClosure {
+                    func: m.func.0,
+                    upvalues_src: vec![],
+                },
                 HirType::Ref,
             );
             // `@a @b method()` — apply `b` (innermost) first: `deco(method,
@@ -1217,8 +1431,13 @@ impl<'m> Builder<'m> {
                     },
                     HirType::Ref,
                 );
-                let result =
-                    self.emit(InstKind::Call { callee: deco_v, args: vec![mv, ctx] }, HirType::Ref);
+                let result = self.emit(
+                    InstKind::Call {
+                        callee: deco_v,
+                        args: vec![mv, ctx],
+                    },
+                    HirType::Ref,
+                );
                 let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
                 mv = self.select_value(isnull, mv, result, HirType::Ref)?;
             }
@@ -1232,7 +1451,10 @@ impl<'m> Builder<'m> {
 
         for a in &def.accessors {
             let av = self.emit(
-                InstKind::MakeClosure { func: a.func.0, upvalues_src: vec![] },
+                InstKind::MakeClosure {
+                    func: a.func.0,
+                    upvalues_src: vec![],
+                },
                 HirType::Ref,
             );
             self.emit_effect(InstKind::DefineAccessor {
@@ -1246,8 +1468,13 @@ impl<'m> Builder<'m> {
 
         for deco in def.decorators.iter().rev() {
             let deco_v = self.lower_expr(deco)?;
-            let result =
-                self.emit(InstKind::Call { callee: deco_v, args: vec![class_v] }, HirType::Ref);
+            let result = self.emit(
+                InstKind::Call {
+                    callee: deco_v,
+                    args: vec![class_v],
+                },
+                HirType::Ref,
+            );
             let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
             class_v = self.select_value(isnull, class_v, result, HirType::Ref)?;
         }
@@ -1259,10 +1486,19 @@ impl<'m> Builder<'m> {
 
         for blk in &def.static_blocks {
             let fv = self.emit(
-                InstKind::MakeClosure { func: blk.0, upvalues_src: vec![] },
+                InstKind::MakeClosure {
+                    func: blk.0,
+                    upvalues_src: vec![],
+                },
                 HirType::Ref,
             );
-            self.emit(InstKind::Call { callee: fv, args: vec![] }, HirType::Dynamic);
+            self.emit(
+                InstKind::Call {
+                    callee: fv,
+                    args: vec![],
+                },
+                HirType::Dynamic,
+            );
         }
 
         for v in &def.variants {
@@ -1270,7 +1506,10 @@ impl<'m> Builder<'m> {
                 continue;
             }
             let recv = self.emit(
-                InstKind::GetProperty { object: class_v, name: v.name.clone() },
+                InstKind::GetProperty {
+                    object: class_v,
+                    name: v.name.clone(),
+                },
                 HirType::Ref,
             );
             let mut args = Vec::with_capacity(v.const_args.len());
@@ -1278,7 +1517,11 @@ impl<'m> Builder<'m> {
                 args.push(self.lower_expr(a)?);
             }
             self.emit(
-                InstKind::MethodCall { recv, name: Rc::from("constructor"), args },
+                InstKind::MethodCall {
+                    recv,
+                    name: Rc::from("constructor"),
+                    args,
+                },
                 HirType::Dynamic,
             );
         }
@@ -1313,10 +1556,16 @@ impl<'m> Builder<'m> {
         let ep = self.add_block_param(else_blk, ty);
         let phi = self.add_block_param(join, ty);
         self.current = then_blk;
-        self.set_term(Terminator::Jump { target: join, args: vec![tp] });
+        self.set_term(Terminator::Jump {
+            target: join,
+            args: vec![tp],
+        });
         self.add_pred(join, then_blk);
         self.current = else_blk;
-        self.set_term(Terminator::Jump { target: join, args: vec![ep] });
+        self.set_term(Terminator::Jump {
+            target: join,
+            args: vec![ep],
+        });
         self.add_pred(join, else_blk);
         self.seal_block(join);
         self.current = join;
@@ -1364,7 +1613,10 @@ fn build_inner(
                 continue;
             }
             let fv = b.emit(
-                InstKind::MakeClosure { func: i as u32, upvalues_src: vec![] },
+                InstKind::MakeClosure {
+                    func: i as u32,
+                    upvalues_src: vec![],
+                },
                 HirType::Ref,
             );
             // Extension functions are mangled to a globally-unique name and
@@ -1418,23 +1670,29 @@ pub fn build_module(tir: &TirModule) -> Result<Vec<SsaFunc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
     use varn_tir::{
         BackendTy as B, ClassInfo, Resolution as R, Signature, Span, TirExpr, TirExprKind as K,
         TirModule, TyTable,
     };
-    use std::rc::Rc;
 
     fn module(top_body: Vec<TirStmt>, params: Vec<B>) -> TirModule {
         let mut types = TyTable::default();
         let _ = types.intern(B::Never);
         TirModule {
             source_file: Rc::from("t.vn"),
-            imports: vec![], exports: vec![],            types,
+            imports: vec![],
+            exports: vec![],
+            types,
             classes: vec![ClassInfo::new(Rc::from("C"), None, vec![])],
             enums: vec![],
-            signatures: vec![Signature { params: vec![], return_ty: B::Void }],
+            signatures: vec![Signature {
+                params: vec![],
+                return_ty: B::Void,
+            }],
             functions: vec![],
-            globals: vec![], global_names: vec![],
+            globals: vec![],
+            global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
                 name: Rc::from("<module>"),
@@ -1453,7 +1711,12 @@ mod tests {
     }
 
     fn e(kind: K, ty: B) -> TirExpr {
-        TirExpr { kind, ty, res: R::None, span: Span::EMPTY }
+        TirExpr {
+            kind,
+            ty,
+            res: R::None,
+            span: Span::EMPTY,
+        }
     }
 
     #[test]
@@ -1513,7 +1776,10 @@ mod tests {
     fn a_closure_lowers_to_make_closure() {
         let m = module(
             vec![TirStmt::Expr(e(
-                K::Closure { func: varn_tir::FnId(0), upvalues: vec![] },
+                K::Closure {
+                    func: varn_tir::FnId(0),
+                    upvalues: vec![],
+                },
                 B::Dynamic(varn_tir::DynReason::Unannotated),
             ))],
             vec![],
@@ -1529,12 +1795,18 @@ mod tests {
     fn a_new_expression_lowers_to_a_call() {
         let m = module(
             vec![TirStmt::Expr(e(
-                K::New { class: varn_tir::ClassId(0), args: vec![] },
+                K::New {
+                    class: varn_tir::ClassId(0),
+                    args: vec![],
+                },
                 B::Class(varn_tir::ClassId(0)),
             ))],
             vec![],
         );
         let f = build_function(&m, &m.top_level).unwrap();
-        assert!(f.blocks[0].insts.iter().any(|i| matches!(i.kind, InstKind::Call { .. })));
+        assert!(f.blocks[0]
+            .insts
+            .iter()
+            .any(|i| matches!(i.kind, InstKind::Call { .. })));
     }
 }

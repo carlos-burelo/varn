@@ -114,7 +114,8 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             }
             Err(RuntimeError::new(format!(
                 "cannot set property '{}': no such field on class {:?}",
-                key, cls.map(|c| c.name.clone())
+                key,
+                cls.map(|c| c.name.clone())
             )))
         }
         Some(HeapObj::Object(o)) => {
@@ -330,7 +331,9 @@ fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
         // An `Instance` extracts to an opaque handle onto its own heap slot;
         // `get_class` is the single authority that reads the class off it.
         Value::VmValue(payload) => {
-            let vref = payload.as_any().downcast_ref::<crate::closure::VmValueRef>()?;
+            let vref = payload
+                .as_any()
+                .downcast_ref::<crate::closure::VmValueRef>()?;
             get_class(vref.0, heap)
         }
         _ => {
@@ -566,36 +569,37 @@ fn resolve_instance_meta_property(
             ResolvedProperty::Built(Value::Str(Rc::from(cls.name.as_str())))
         }
         Some(MemberKey::Class) => ResolvedProperty::Built(Value::Class(Rc::clone(cls))),
-        Some(MemberKey::Fields) => ResolvedProperty::Built(Value::Array(
-            varn_types::value::ArrayRef::new(
+        Some(MemberKey::Fields) => {
+            ResolvedProperty::Built(Value::Array(varn_types::value::ArrayRef::new(
                 cls.root_shape
                     .borrow()
                     .ordered_names()
                     .iter()
                     .map(|k| Value::Str(Rc::clone(k)))
                     .collect(),
-            ),
-        )),
-        Some(MemberKey::Methods) => ResolvedProperty::Built(Value::Array(
-            varn_types::value::ArrayRef::new(
+            )))
+        }
+        Some(MemberKey::Methods) => {
+            ResolvedProperty::Built(Value::Array(varn_types::value::ArrayRef::new(
                 cls.method_map
                     .borrow()
                     .keys()
                     .map(|k| Value::Str(Rc::clone(k)))
                     .collect(),
-            ),
-        )),
-        Some(key @ (MemberKey::Keys | MemberKey::Values | MemberKey::Entries | MemberKey::HasOwn)) => {
+            )))
+        }
+        Some(
+            key @ (MemberKey::Keys | MemberKey::Values | MemberKey::Entries | MemberKey::HasOwn),
+        ) => {
             let snapshot = Value::Object(varn_types::value::ObjRef::from_pairs(
                 cls.get_or_compute_layout()
                     .fields
                     .iter()
                     .filter(|f| f.offset as usize + 16 <= inst.payload_size as usize)
                     .map(|f| {
-                        (
-                            Rc::clone(&f.name),
-                            unsafe { inst.read_vm_value(f.offset as usize) },
-                        )
+                        (Rc::clone(&f.name), unsafe {
+                            inst.read_vm_value(f.offset as usize)
+                        })
                     }),
             ));
             let native = match key {

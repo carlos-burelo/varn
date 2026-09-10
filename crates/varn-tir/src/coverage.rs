@@ -104,7 +104,11 @@ impl Coverage {
                     self.walk_expr(e);
                 }
             }
-            TirStmt::If { cond, then_body, else_body } => {
+            TirStmt::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
                 self.walk_expr(cond);
                 for s in then_body.iter().chain(else_body) {
                     self.walk_stmt(s);
@@ -116,7 +120,9 @@ impl Coverage {
                     self.walk_stmt(s);
                 }
             }
-            TirStmt::Try { body, catch_body, .. } => {
+            TirStmt::Try {
+                body, catch_body, ..
+            } => {
                 for s in body.iter().chain(catch_body) {
                     self.walk_stmt(s);
                 }
@@ -214,7 +220,11 @@ impl Coverage {
             TirExprKind::Discriminant { value }
             | TirExprKind::VariantPayload { value, .. }
             | TirExprKind::TypeTest { value, .. } => self.walk_expr(value),
-            TirExprKind::Select { cond, then_val, else_val } => {
+            TirExprKind::Select {
+                cond,
+                then_val,
+                else_val,
+            } => {
                 self.walk_expr(cond);
                 self.walk_expr(then_val);
                 self.walk_expr(else_val);
@@ -222,7 +232,9 @@ impl Coverage {
             TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
             TirExprKind::IterInit { source, .. } => self.walk_expr(source),
             TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
-                for a in args { self.walk_expr(a.value()); }
+                for a in args {
+                    self.walk_expr(a.value());
+                }
             }
             TirExprKind::RangeLit { start, end, .. } => {
                 self.walk_expr(start);
@@ -232,7 +244,9 @@ impl Coverage {
             TirExprKind::ObjectRest { object, .. } => self.walk_expr(object),
             TirExprKind::ExtensionCall { recv, args, .. } => {
                 self.walk_expr(recv);
-                for a in args { self.walk_expr(a.value()); }
+                for a in args {
+                    self.walk_expr(a.value());
+                }
             }
             TirExprKind::IntLit(_)
             | TirExprKind::FloatLit(_)

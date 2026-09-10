@@ -60,7 +60,9 @@ pub(crate) extern "C" fn jit_call(
                     let required_len = callee_base + closure.proto.register_count as usize;
                     let required_cap = required_len + 32;
                     if ctx_ref.stack.capacity() < required_cap {
-                        ctx_ref.stack.reserve((required_cap - ctx_ref.stack.len()).max(256));
+                        ctx_ref
+                            .stack
+                            .reserve((required_cap - ctx_ref.stack.len()).max(256));
                     }
                     if ctx_ref.stack.len() < required_len {
                         ctx_ref.stack.resize(required_len, VmValue::null());

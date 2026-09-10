@@ -9,10 +9,19 @@ use varn_tir::*;
 fn empty_module() -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
-        classes: vec![ClassInfo::new(Rc::from("P"), None, vec![("x".into(), BackendTy::Int)])],
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
+        classes: vec![ClassInfo::new(
+            Rc::from("P"),
+            None,
+            vec![("x".into(), BackendTy::Int)],
+        )],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -28,13 +37,18 @@ fn empty_module() -> TirModule {
             this_class: None,
             is_async: false,
             is_generator: false,
-        has_rest: false,
+            has_rest: false,
         },
     }
 }
 
 fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
-    TirExpr { kind, ty, res, span: Span::EMPTY }
+    TirExpr {
+        kind,
+        ty,
+        res,
+        span: Span::EMPTY,
+    }
 }
 
 /// A module with nothing wrong passes.
@@ -48,7 +62,10 @@ fn an_empty_module_verifies() {
 fn a_dangling_class_id_is_rejected() {
     let mut m = empty_module();
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::New { class: ClassId(99), args: vec![] },
+        TirExprKind::New {
+            class: ClassId(99),
+            args: vec![],
+        },
         BackendTy::Class(ClassId(99)),
         Resolution::None,
     )));
@@ -64,10 +81,17 @@ fn a_dangling_class_id_is_rejected() {
 #[test]
 fn an_out_of_range_field_slot_is_rejected() {
     let mut m = empty_module();
-    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.locals.push(BackendTy::Class(ClassId(0)));
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "nope".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "nope".into(),
+        },
         BackendTy::Int,
         Resolution::FieldSlot(7), // the class has one field
     )));
@@ -83,10 +107,17 @@ fn an_out_of_range_field_slot_is_rejected() {
 #[test]
 fn a_field_slot_on_non_class_receiver_is_rejected() {
     let mut m = empty_module();
-    let recv = expr(TirExprKind::Var, BackendTy::Int, Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Int,
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.locals.push(BackendTy::Int);
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "nope".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "nope".into(),
+        },
         BackendTy::Int,
         Resolution::FieldSlot(0),
     )));
@@ -102,10 +133,18 @@ fn a_field_slot_on_non_class_receiver_is_rejected() {
 #[test]
 fn an_out_of_range_vtable_slot_is_rejected() {
     let mut m = empty_module();
-    let recv = expr(TirExprKind::Var, BackendTy::Class(ClassId(0)), Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Class(ClassId(0)),
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.locals.push(BackendTy::Class(ClassId(0)));
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::MethodCall { recv: Box::new(recv), name: "m".into(), args: vec![] },
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "m".into(),
+            args: vec![],
+        },
         BackendTy::Void,
         Resolution::VtableSlot(3), // the class has no methods
     )));
@@ -121,10 +160,18 @@ fn an_out_of_range_vtable_slot_is_rejected() {
 #[test]
 fn a_vtable_slot_on_non_class_receiver_is_rejected() {
     let mut m = empty_module();
-    let recv = expr(TirExprKind::Var, BackendTy::Int, Resolution::Local(LocalId(0)));
+    let recv = expr(
+        TirExprKind::Var,
+        BackendTy::Int,
+        Resolution::Local(LocalId(0)),
+    );
     m.top_level.locals.push(BackendTy::Int);
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::MethodCall { recv: Box::new(recv), name: "m".into(), args: vec![] },
+        TirExprKind::MethodCall {
+            recv: Box::new(recv),
+            name: "m".into(),
+            args: vec![],
+        },
         BackendTy::Void,
         Resolution::VtableSlot(0),
     )));
@@ -168,7 +215,8 @@ fn out_of_range_local_is_rejected() {
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        errs.iter()
+            .any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
         "expected an out-of-range local error, got: {:?}",
         errs
     );
@@ -185,7 +233,8 @@ fn out_of_range_param_is_rejected() {
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("parameter") && e.message.contains("out of range")),
+        errs.iter()
+            .any(|e| e.message.contains("parameter") && e.message.contains("out of range")),
         "expected an out-of-range parameter error, got: {:?}",
         errs
     );
@@ -210,7 +259,8 @@ fn dangling_type_in_tuple_is_rejected() {
 
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("ClassId(99)") && e.message.contains("no entry")),
+        errs.iter()
+            .any(|e| e.message.contains("ClassId(99)") && e.message.contains("no entry")),
         "expected a dangling class in tuple error, got: {:?}",
         errs
     );
@@ -257,7 +307,10 @@ fn a_dangling_type_handle_on_a_field_object_does_not_panic() {
     );
     m.top_level.locals.push(BackendTy::Nullable(TyId(999)));
     m.top_level.body.push(TirStmt::Expr(expr(
-        TirExprKind::Field { object: Box::new(recv), name: "x".into() },
+        TirExprKind::Field {
+            object: Box::new(recv),
+            name: "x".into(),
+        },
         BackendTy::Int,
         Resolution::FieldSlot(0),
     )));
@@ -306,7 +359,8 @@ fn out_of_range_let_local_is_rejected() {
     });
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        errs.iter()
+            .any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
         "expected an out-of-range Let local error, got: {:?}",
         errs
     );
@@ -323,7 +377,8 @@ fn out_of_range_try_catch_local_is_rejected() {
     });
     let errs = verify_module(&m).unwrap_err();
     assert!(
-        errs.iter().any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
+        errs.iter()
+            .any(|e| e.message.contains("LocalId") && e.message.contains("out of range")),
         "expected an out-of-range Try catch local error, got: {:?}",
         errs
     );
@@ -348,4 +403,3 @@ fn a_dangling_vtable_sig_is_rejected() {
         errs
     );
 }
-

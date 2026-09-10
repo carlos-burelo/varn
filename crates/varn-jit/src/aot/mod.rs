@@ -32,9 +32,8 @@ pub fn compile_to_object(
     proto: &varn_types::FunctionProto,
     isa: &OwnedTargetIsa,
 ) -> Result<AotOutput, String> {
-    let obj_builder =
-        ObjectBuilder::new(isa.clone(), "varn_aot_module", default_libcall_names())
-            .map_err(|e| format!("aot: ObjectBuilder: {e}"))?;
+    let obj_builder = ObjectBuilder::new(isa.clone(), "varn_aot_module", default_libcall_names())
+        .map_err(|e| format!("aot: ObjectBuilder: {e}"))?;
     let mut module = ObjectModule::new(obj_builder);
 
     // --- Declare external runtime helpers ---
@@ -65,13 +64,7 @@ pub fn compile_to_object(
         builder.seal_block(entry_block);
 
         // Walk the bytecode and emit CLIF IR for the module body
-        emit_module_body(
-            &mut builder,
-            &mut module,
-            main_id,
-            proto,
-            &rt_helpers,
-        )?;
+        emit_module_body(&mut builder, &mut module, main_id, proto, &rt_helpers)?;
 
         // Return 0 (success)
         let zero = builder.ins().iconst(types::I64, 0);

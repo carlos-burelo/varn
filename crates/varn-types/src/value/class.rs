@@ -106,9 +106,7 @@ impl ClassObj {
     }
 
     pub fn find_by_id(id: u32) -> Option<Rc<Self>> {
-        CLASS_REGISTRY.with(|reg| {
-            reg.borrow().get(&id).and_then(|w| w.upgrade())
-        })
+        CLASS_REGISTRY.with(|reg| reg.borrow().get(&id).and_then(|w| w.upgrade()))
     }
 
     pub fn init_root_shape(self: &Rc<Self>) {

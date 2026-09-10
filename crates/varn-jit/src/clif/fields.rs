@@ -16,7 +16,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::alloc::AllocCtx;
 use super::emit::{
     self, box_or_pass, call_helper_void, meta_is_float, state_meta_int, unbox_f64_coerce,
-    use_boxed, unbox_int, HEAP_KIND,
+    unbox_int, use_boxed, HEAP_KIND,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -102,7 +102,9 @@ fn emit_object_field_addr(
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
-    let is_inst = b.ins().icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let is_inst = b
+        .ins()
+        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
     let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
     let is_valid = b.ins().bor(is_inst, is_obj);
     let ok = b.create_block();
@@ -201,9 +203,7 @@ pub(super) fn emit_get_fixed_field(
         b.ins().brif(ok_cache, fast_blk, &[], unhoisted_blk, &[]);
 
         b.switch_to_block(fast_blk);
-        let val = b
-            .ins()
-            .load(load_ty, MemFlags::trusted(), base, load_off);
+        let val = b.ins().load(load_ty, MemFlags::trusted(), base, load_off);
         b.ins().jump(cont, &[val.into()]);
 
         b.switch_to_block(unhoisted_blk);
@@ -242,9 +242,7 @@ pub(super) fn emit_get_fixed_field(
         let field = emit_object_field_addr(b, c, obj, slot, slow, false);
         // `field` points to the VmValue start; +8 reaches the payload.
         let fld_off = if narrow { 8i32 } else { 0i32 };
-        let val = b
-            .ins()
-            .load(load_ty, MemFlags::trusted(), field, fld_off);
+        let val = b.ins().load(load_ty, MemFlags::trusted(), field, fld_off);
         b.ins().jump(cont, &[val.into()]);
     }
 
@@ -382,7 +380,8 @@ pub(super) fn emit_set_fixed_field(
         b.ins().brif(ok_local, fast_local, &[], miss_local, &[]);
 
         b.switch_to_block(fast_local);
-        b.ins().store(MemFlags::trusted(), val128, local_base, slot_off);
+        b.ins()
+            .store(MemFlags::trusted(), val128, local_base, slot_off);
         b.ins().jump(cont, &[]);
 
         b.switch_to_block(miss_local);
@@ -396,7 +395,8 @@ pub(super) fn emit_set_fixed_field(
             slow,
         );
         b.def_var(local_var, computed_base);
-        b.ins().store(MemFlags::trusted(), val128, computed_base, slot_off);
+        b.ins()
+            .store(MemFlags::trusted(), val128, computed_base, slot_off);
         b.ins().jump(cont, &[]);
     } else {
         let field = emit_object_field_addr(b, c, obj, slot, slow, true);

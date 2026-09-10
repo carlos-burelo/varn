@@ -80,7 +80,13 @@ pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags) {
         let mut detail = c
             .by_op
             .iter()
-            .map(|(op, n)| if *n == 1 { op.clone() } else { format!("{op}×{n}") })
+            .map(|(op, n)| {
+                if *n == 1 {
+                    op.clone()
+                } else {
+                    format!("{op}×{n}")
+                }
+            })
             .collect::<Vec<_>>()
             .join(" ");
         if !c.members.is_empty() {

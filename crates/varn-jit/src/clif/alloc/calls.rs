@@ -42,8 +42,9 @@ pub(crate) fn emit_call(
                 let cont_blk = b.create_block();
 
                 let (callee_tag, callee_payload) = b.ins().isplit(callee);
-                let expected_tag =
-                    b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                let expected_tag = b
+                    .ins()
+                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
                 let expected_payload = b.ins().iconst(types::I64, ct.expected_bits as i64);
                 let tag_matches = b.ins().icmp(IntCC::Equal, callee_tag, expected_tag);
                 let payload_matches = b.ins().icmp(IntCC::Equal, callee_payload, expected_payload);
@@ -90,16 +91,16 @@ pub(crate) fn emit_call(
                                 super::super::emit::box_f64(b, f)
                             }
                             _ => {
-                                let tag_v = b.ins().iconst(
-                                    types::I64,
-                                    varn_types::vm_value::KIND_HEAP as i64,
-                                );
+                                let tag_v = b
+                                    .ins()
+                                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
                                 b.ins().iconcat(tag_v, val)
                             }
                         }
                     };
                     let slot_off = (slot * 16) as i32;
-                    b.ins().store(MemFlags::trusted(), val128, data_base, slot_off);
+                    b.ins()
+                        .store(MemFlags::trusted(), val128, data_base, slot_off);
                 }
 
                 def_result(b, actx, dest, instance_nv);

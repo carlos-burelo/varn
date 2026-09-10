@@ -8,7 +8,12 @@ use std::rc::Rc;
 use varn_tir::*;
 
 fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
-    TirExpr { kind, ty, res, span: Span::EMPTY }
+    TirExpr {
+        kind,
+        ty,
+        res,
+        span: Span::EMPTY,
+    }
 }
 
 fn int(v: i64) -> TirExpr {
@@ -34,10 +39,15 @@ fn func(name: &str, is_async: bool, is_generator: bool, body: Vec<TirStmt>) -> T
 fn module(top_level: TirFunction) -> TirModule {
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types: TyTable::default(),
+        imports: vec![],
+        exports: vec![],
+        types: TyTable::default(),
         classes: vec![],
         enums: vec![],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -53,7 +63,9 @@ fn errors_of(m: &TirModule) -> Vec<VerifyError> {
 #[test]
 fn await_in_a_non_async_function_is_rejected() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::Await { future: Box::new(int(1)) },
+        TirExprKind::Await {
+            future: Box::new(int(1)),
+        },
         BackendTy::Int,
         Resolution::None,
     ))];
@@ -64,7 +76,9 @@ fn await_in_a_non_async_function_is_rejected() {
 #[test]
 fn await_in_an_async_function_is_fine() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::Await { future: Box::new(int(1)) },
+        TirExprKind::Await {
+            future: Box::new(int(1)),
+        },
         BackendTy::Int,
         Resolution::None,
     ))];
@@ -75,7 +89,10 @@ fn await_in_an_async_function_is_fine() {
 #[test]
 fn yield_in_a_non_generator_is_rejected() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::Yield { value: Some(Box::new(int(1))), delegate: false },
+        TirExprKind::Yield {
+            value: Some(Box::new(int(1))),
+            delegate: false,
+        },
         BackendTy::Dynamic(DynReason::NotYetSupported),
         Resolution::None,
     ))];
@@ -86,7 +103,10 @@ fn yield_in_a_non_generator_is_rejected() {
 #[test]
 fn is_null_must_produce_bool() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::Unary { op: TirUnOp::IsNull, operand: Box::new(int(1)) },
+        TirExprKind::Unary {
+            op: TirUnOp::IsNull,
+            operand: Box::new(int(1)),
+        },
         BackendTy::Int, // wrong: an IsNull is a Bool
         Resolution::None,
     ))];
@@ -97,12 +117,16 @@ fn is_null_must_produce_bool() {
 #[test]
 fn discriminant_of_a_non_enum_is_rejected() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::Discriminant { value: Box::new(int(1)) },
+        TirExprKind::Discriminant {
+            value: Box::new(int(1)),
+        },
         BackendTy::Int,
         Resolution::None,
     ))];
     let m = module(func("<module>", false, false, body));
-    assert!(errors_of(&m).iter().any(|e| e.message.contains("not an enum")));
+    assert!(errors_of(&m)
+        .iter()
+        .any(|e| e.message.contains("not an enum")));
 }
 
 fn module_with_enum(top_level: TirFunction) -> TirModule {
@@ -110,7 +134,9 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
     let _ = types.intern(BackendTy::Int);
     TirModule {
         source_file: Rc::from("test.vn"),
-        imports: vec![], exports: vec![],        types,
+        imports: vec![],
+        exports: vec![],
+        types,
         classes: vec![],
         enums: vec![EnumInfo {
             name: Rc::from("Shape"),
@@ -120,7 +146,10 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
                 payload: vec![BackendTy::Int],
             }],
         }],
-        signatures: vec![Signature { params: vec![], return_ty: BackendTy::Void }],
+        signatures: vec![Signature {
+            params: vec![],
+            return_ty: BackendTy::Void,
+        }],
         functions: vec![],
         globals: vec![],
         global_names: vec![],
@@ -139,9 +168,16 @@ fn variant_payload_with_the_wrong_type_is_rejected() {
     let mut top = func("<module>", false, false, vec![]);
     top.locals = vec![BackendTy::Enum(EnumId(0))];
     top.body = vec![TirStmt::Expr(expr(
-        TirExprKind::VariantPayload { value: Box::new(recv), tag: 0, field: 0 },
+        TirExprKind::VariantPayload {
+            value: Box::new(recv),
+            tag: 0,
+            field: 0,
+        },
         BackendTy::Str, // the Circle payload field is Int
-        Resolution::EnumVariant { enum_id: EnumId(0), tag: 0 },
+        Resolution::EnumVariant {
+            enum_id: EnumId(0),
+            tag: 0,
+        },
     ))];
     let m = module_with_enum(top);
     assert!(errors_of(&m).iter().any(|e| e.message.contains("field 0")));
@@ -157,23 +193,37 @@ fn variant_payload_out_of_range_field_is_rejected() {
     let mut top = func("<module>", false, false, vec![]);
     top.locals = vec![BackendTy::Enum(EnumId(0))];
     top.body = vec![TirStmt::Expr(expr(
-        TirExprKind::VariantPayload { value: Box::new(recv), tag: 0, field: 7 },
+        TirExprKind::VariantPayload {
+            value: Box::new(recv),
+            tag: 0,
+            field: 7,
+        },
         BackendTy::Int,
-        Resolution::EnumVariant { enum_id: EnumId(0), tag: 0 },
+        Resolution::EnumVariant {
+            enum_id: EnumId(0),
+            tag: 0,
+        },
     ))];
     let m = module_with_enum(top);
-    assert!(errors_of(&m).iter().any(|e| e.message.contains("out of range")));
+    assert!(errors_of(&m)
+        .iter()
+        .any(|e| e.message.contains("out of range")));
 }
 
 #[test]
 fn type_test_naming_a_missing_class_is_rejected() {
     let body = vec![TirStmt::Expr(expr(
-        TirExprKind::TypeTest { value: Box::new(int(1)), class: ClassId(9) },
+        TirExprKind::TypeTest {
+            value: Box::new(int(1)),
+            class: ClassId(9),
+        },
         BackendTy::Bool,
         Resolution::None,
     ))];
     let m = module(func("<module>", false, false, body));
-    assert!(errors_of(&m).iter().any(|e| e.message.contains("TypeTest names ClassId(9)")));
+    assert!(errors_of(&m)
+        .iter()
+        .any(|e| e.message.contains("TypeTest names ClassId(9)")));
 }
 
 #[test]

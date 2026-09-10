@@ -42,7 +42,11 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
                 check_return_none(m, f, errors);
             }
         }
-        TirStmt::If { cond, then_body, else_body } => {
+        TirStmt::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
             walk_expr(m, f, cond, errors);
             check_condition(m, "if", cond, errors);
             for s in then_body.iter().chain(else_body) {
@@ -56,7 +60,9 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
                 walk_stmt(m, f, s, errors);
             }
         }
-        TirStmt::Try { body, catch_body, .. } => {
+        TirStmt::Try {
+            body, catch_body, ..
+        } => {
             for s in body.iter().chain(catch_body) {
                 walk_stmt(m, f, s, errors);
             }
@@ -199,7 +205,9 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
         TirExprKind::ObjectKeys { operand } => walk_expr(m, f, operand, errors),
         TirExprKind::IterInit { source, .. } => walk_expr(m, f, source, errors),
         TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
-            for a in args { walk_arg(m, f, a, errors); }
+            for a in args {
+                walk_arg(m, f, a, errors);
+            }
         }
         TirExprKind::RangeLit { start, end, .. } => {
             walk_expr(m, f, start, errors);
@@ -209,9 +217,15 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
         TirExprKind::ObjectRest { object, .. } => walk_expr(m, f, object, errors),
         TirExprKind::ExtensionCall { recv, args, .. } => {
             walk_expr(m, f, recv, errors);
-            for a in args { walk_arg(m, f, a, errors); }
+            for a in args {
+                walk_arg(m, f, a, errors);
+            }
         }
-        TirExprKind::Select { cond, then_val, else_val } => {
+        TirExprKind::Select {
+            cond,
+            then_val,
+            else_val,
+        } => {
             walk_expr(m, f, cond, errors);
             walk_expr(m, f, then_val, errors);
             walk_expr(m, f, else_val, errors);
@@ -248,7 +262,10 @@ fn check_variant_payload(
     };
     let Some(variant) = m.enum_info(id).and_then(|ei| ei.variant_at(tag)) else {
         errors.push(VerifyError::new(
-            format!("VariantPayload names tag {tag}, which EnumId({}) has no variant for", id.0),
+            format!(
+                "VariantPayload names tag {tag}, which EnumId({}) has no variant for",
+                id.0
+            ),
             e.span,
         ));
         return;
@@ -290,12 +307,7 @@ fn assignable(m: &TirModule, from: BackendTy, to: BackendTy) -> bool {
 
 const ASSIGNABLE_DEPTH_LIMIT: usize = 32;
 
-fn assignable_with_depth(
-    m: &TirModule,
-    from: BackendTy,
-    to: BackendTy,
-    depth: usize,
-) -> bool {
+fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: usize) -> bool {
     if depth > ASSIGNABLE_DEPTH_LIMIT {
         // Cycle detected or pathologically deep nesting. Return true so a
         // cyclic type doesn't become a false positive; the real error is in
@@ -319,7 +331,10 @@ fn assignable_with_depth(
     // so a call argument is assignable across it. Arithmetic stays strict:
     // `check_binary` compares by equality, not through here.
     if from == BackendTy::Int
-        && matches!(to, BackendTy::Float | BackendTy::Decimal | BackendTy::BigInt)
+        && matches!(
+            to,
+            BackendTy::Float | BackendTy::Decimal | BackendTy::BigInt
+        )
     {
         return true;
     }
@@ -462,7 +477,10 @@ fn check_index(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: &mut Vec<Ve
         let elem = m.types.get(el);
         if e.ty != elem {
             errors.push(VerifyError::new(
-                format!("indexing an array of {:?} must produce {:?}, node says {:?}", elem, elem, e.ty),
+                format!(
+                    "indexing an array of {:?} must produce {:?}, node says {:?}",
+                    elem, elem, e.ty
+                ),
                 e.span,
             ));
         }
@@ -476,12 +494,7 @@ fn is_positional(args: &[TirArg]) -> bool {
     args.iter().all(|a| matches!(a, TirArg::Expr(_)))
 }
 
-fn check_direct_call(
-    m: &TirModule,
-    e: &TirExpr,
-    args: &[TirArg],
-    errors: &mut Vec<VerifyError>,
-) {
+fn check_direct_call(m: &TirModule, e: &TirExpr, args: &[TirArg], errors: &mut Vec<VerifyError>) {
     let Resolution::DirectFn(f) = &e.res else {
         return;
     };
@@ -598,12 +611,7 @@ fn check_method_call(
     }
 }
 
-fn check_condition(
-    _m: &TirModule,
-    context: &str,
-    cond: &TirExpr,
-    errors: &mut Vec<VerifyError>,
-) {
+fn check_condition(_m: &TirModule, context: &str, cond: &TirExpr, errors: &mut Vec<VerifyError>) {
     // Skip if condition is Dynamic
     if matches!(cond.ty, BackendTy::Dynamic(_)) {
         return;
@@ -617,12 +625,7 @@ fn check_condition(
     }
 }
 
-fn check_let(
-    m: &TirModule,
-    declared_ty: BackendTy,
-    init: &TirExpr,
-    errors: &mut Vec<VerifyError>,
-) {
+fn check_let(m: &TirModule, declared_ty: BackendTy, init: &TirExpr, errors: &mut Vec<VerifyError>) {
     // The initializer must be assignable TO the declared type
     if !assignable(m, init.ty, declared_ty) {
         errors.push(VerifyError::new(
@@ -635,12 +638,7 @@ fn check_let(
     }
 }
 
-fn check_return(
-    m: &TirModule,
-    f: &TirFunction,
-    returned: &TirExpr,
-    errors: &mut Vec<VerifyError>,
-) {
+fn check_return(m: &TirModule, f: &TirFunction, returned: &TirExpr, errors: &mut Vec<VerifyError>) {
     // The returned value must be assignable TO the function's return_ty
     if !assignable(m, returned.ty, f.return_ty) {
         errors.push(VerifyError::new(
@@ -653,11 +651,7 @@ fn check_return(
     }
 }
 
-fn check_return_none(
-    _m: &TirModule,
-    f: &TirFunction,
-    errors: &mut Vec<VerifyError>,
-) {
+fn check_return_none(_m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>) {
     // Skip if function return type is Dynamic
     if matches!(f.return_ty, BackendTy::Dynamic(_)) {
         return;

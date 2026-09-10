@@ -44,7 +44,10 @@ pub struct Tables {
 /// Signature 0 is always the empty `() -> void`, so a function with no
 /// computed signature still names a real entry.
 fn seed_signatures() -> Vec<Signature> {
-    vec![Signature { params: vec![], return_ty: BackendTy::Void }]
+    vec![Signature {
+        params: vec![],
+        return_ty: BackendTy::Void,
+    }]
 }
 
 pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
@@ -84,7 +87,12 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
     let classes = build_classes(bind, tt, &names, &class_names, &mut signatures);
     let enums = build_enums(bind, tt, &names, &enum_names);
 
-    Tables { classes, enums, signatures, names }
+    Tables {
+        classes,
+        enums,
+        signatures,
+        names,
+    }
 }
 
 fn build_classes(
@@ -147,12 +155,11 @@ fn build_one_class(
     let mut method_names: Vec<Rc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Rc<str>, varn_tir::SigId> = FxHashMap::default();
 
-    let mut push_method =
-        |key: Rc<str>, sig: varn_tir::SigId, order: &mut Vec<Rc<str>>| {
-            if method_sig.insert(key.clone(), sig).is_none() {
-                order.push(key);
-            }
-        };
+    let mut push_method = |key: Rc<str>, sig: varn_tir::SigId, order: &mut Vec<Rc<str>>| {
+        if method_sig.insert(key.clone(), sig).is_none() {
+            order.push(key);
+        }
+    };
 
     for m in members {
         if m.is_static {
@@ -184,8 +191,10 @@ fn build_one_class(
         }
     }
 
-    let methods: Vec<(Rc<str>, varn_tir::SigId)> =
-        method_names.into_iter().map(|n| (n.clone(), method_sig[&n])).collect();
+    let methods: Vec<(Rc<str>, varn_tir::SigId)> = method_names
+        .into_iter()
+        .map(|n| (n.clone(), method_sig[&n]))
+        .collect();
 
     let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
     ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods)
@@ -236,13 +245,14 @@ fn build_enums(
                         payload: bind
                             .sum_variant_fields
                             .get(vn)
-                            .map(|fs| {
-                                fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect()
-                            })
+                            .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect())
                             .unwrap_or_default(),
                     })
                     .collect();
-                return EnumInfo { name: name.clone(), variants };
+                return EnumInfo {
+                    name: name.clone(),
+                    variants,
+                };
             }
 
             // Payload variants of an `enum` decl: names and order from
@@ -274,10 +284,17 @@ fn build_enums(
                         .get(&v.name)
                         .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect())
                         .unwrap_or_default();
-                    VariantInfo { name: v.name.clone(), tag: tag as u16, payload }
+                    VariantInfo {
+                        name: v.name.clone(),
+                        tag: tag as u16,
+                        payload,
+                    }
                 })
                 .collect();
-            EnumInfo { name: name.clone(), variants }
+            EnumInfo {
+                name: name.clone(),
+                variants,
+            }
         })
         .collect()
 }

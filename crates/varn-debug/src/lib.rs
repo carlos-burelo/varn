@@ -16,8 +16,8 @@ pub mod summary;
 pub mod symbols;
 pub mod tiers;
 pub mod tir;
-pub mod typeloss;
 pub mod tokens;
+pub mod typeloss;
 
 pub use cap_trace::debug_cap_trace;
 pub use flags::{print_phases, DebugFlags};

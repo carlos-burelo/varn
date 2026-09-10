@@ -52,10 +52,7 @@ pub(crate) fn try_fast_jit_method(
     let hit = ACTIVE_METHODS.with(|cell| {
         let mut b = cell.borrow_mut();
         if let Some(ref mut c) = b[slot_idx] {
-            if c.caller_proto == caller_proto
-                && c.class_id == class_id
-                && c.name_idx == name_idx
-            {
+            if c.caller_proto == caller_proto && c.class_id == class_id && c.name_idx == name_idx {
                 if c.jit_fn.is_none() {
                     c.jit_fn = c.closure.hot_jit_fn();
                 }

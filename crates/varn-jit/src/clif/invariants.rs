@@ -67,8 +67,13 @@ fn leaf_ctx_dereferenced(func: &Function, inst: Inst, ctx: &Context, out: &mut V
     };
     let opcode = func.dfg.insts[inst].opcode();
     let addr = match opcode {
-        Opcode::Load | Opcode::Uload8 | Opcode::Sload8 | Opcode::Uload16 | Opcode::Sload16
-        | Opcode::Uload32 | Opcode::Sload32 => func.dfg.inst_args(inst).first().copied(),
+        Opcode::Load
+        | Opcode::Uload8
+        | Opcode::Sload8
+        | Opcode::Uload16
+        | Opcode::Sload16
+        | Opcode::Uload32
+        | Opcode::Sload32 => func.dfg.inst_args(inst).first().copied(),
         Opcode::Store | Opcode::Istore8 | Opcode::Istore16 | Opcode::Istore32 => {
             func.dfg.inst_args(inst).get(1).copied()
         }

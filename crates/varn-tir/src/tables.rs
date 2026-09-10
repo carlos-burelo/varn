@@ -94,7 +94,10 @@ impl ClassInfo {
                 entry.sig = m_sig;
             } else {
                 // New method: append a new entry
-                vtable.push(VtableEntry { name: m_name, sig: m_sig });
+                vtable.push(VtableEntry {
+                    name: m_name,
+                    sig: m_sig,
+                });
             }
         }
 
@@ -116,7 +119,10 @@ impl ClassInfo {
     }
 
     pub fn method_slot(&self, name: &str) -> Option<u16> {
-        self.vtable.iter().position(|e| e.name.as_ref() == name).map(|i| i as u16)
+        self.vtable
+            .iter()
+            .position(|e| e.name.as_ref() == name)
+            .map(|i| i as u16)
     }
 
     pub fn method_at(&self, slot: u16) -> Option<&VtableEntry> {

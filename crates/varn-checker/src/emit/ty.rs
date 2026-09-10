@@ -182,9 +182,18 @@ mod tests {
     #[test]
     fn scalars_map_directly() {
         let mut tt = table();
-        assert_eq!(lower_type(&prim(TypeTag::Int), &mut tt, &NoNames), BackendTy::Int);
-        assert_eq!(lower_type(&prim(TypeTag::Char), &mut tt, &NoNames), BackendTy::Char);
-        assert_eq!(lower_type(&prim(TypeTag::Str), &mut tt, &NoNames), BackendTy::Str);
+        assert_eq!(
+            lower_type(&prim(TypeTag::Int), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::Char), &mut tt, &NoNames),
+            BackendTy::Char
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::Str), &mut tt, &NoNames),
+            BackendTy::Str
+        );
         assert_eq!(
             lower_type(&prim(TypeTag::Decimal), &mut tt, &NoNames),
             BackendTy::Decimal
@@ -213,7 +222,10 @@ mod tests {
     #[test]
     fn int_or_null_is_nullable_int_not_dynamic() {
         let mut tt = table();
-        let ty = t(TypeKind::Union(vec![prim(TypeTag::Int), prim(TypeTag::Null)]));
+        let ty = t(TypeKind::Union(vec![
+            prim(TypeTag::Int),
+            prim(TypeTag::Null),
+        ]));
         let BackendTy::Nullable(id) = lower_type(&ty, &mut tt, &NoNames) else {
             panic!("expected Nullable");
         };
@@ -223,7 +235,10 @@ mod tests {
     #[test]
     fn a_real_union_stays_dynamic_union() {
         let mut tt = table();
-        let ty = t(TypeKind::Union(vec![prim(TypeTag::Int), prim(TypeTag::Str)]));
+        let ty = t(TypeKind::Union(vec![
+            prim(TypeTag::Int),
+            prim(TypeTag::Str),
+        ]));
         assert_eq!(
             lower_type(&ty, &mut tt, &NoNames),
             BackendTy::Dynamic(DynReason::Union)

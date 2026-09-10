@@ -45,7 +45,10 @@ fn enter_module(tir: &TirModule) -> ModuleScope {
 /// through `compile_module` / `compile_closure`.
 pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> FunctionProto {
     let ptr = CUR_TIR.with(|c| c.get());
-    assert!(!ptr.is_null(), "from_tir: closure emitted outside a module scope");
+    assert!(
+        !ptr.is_null(),
+        "from_tir: closure emitted outside a module scope"
+    );
     // SAFETY: `ptr` was set by `enter_module` from a live `&TirModule` whose
     // borrow outlives this call (it is on the stack of `compile_module`).
     let tir: &TirModule = unsafe { &*ptr };
@@ -106,7 +109,9 @@ pub(crate) fn compile_closure(
     let f = tir
         .functions
         .get(idx as usize)
-        .ok_or(OptError::Unsupported("from_tir: closure index out of range"))?;
+        .ok_or(OptError::Unsupported(
+            "from_tir: closure index out of range",
+        ))?;
     compile_one(tir, f, false, source_file, &[])
 }
 

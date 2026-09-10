@@ -393,7 +393,11 @@ impl FunctionProto {
                     let dst = (code[ip] >> 8) as usize;
                     let src = (code[ip + 1] >> 8) as usize;
                     if dst < sources.len() {
-                        sources[dst] = if src < sources.len() { sources[src] } else { None };
+                        sources[dst] = if src < sources.len() {
+                            sources[src]
+                        } else {
+                            None
+                        };
                     }
                     ip += 2;
                 }

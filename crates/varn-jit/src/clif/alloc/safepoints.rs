@@ -8,7 +8,9 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, unbox_int};
+use super::super::emit::{
+    call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, unbox_int,
+};
 use super::super::kinds::K;
 use super::super::liveness::Liveness;
 use crate::JitHelpers;
@@ -226,7 +228,8 @@ pub(crate) fn store_home(
 ) {
     let Some(&var) = actx.vars.get(reg) else {
         let null_val = super::super::emit::box_null(b);
-        b.ins().store(MemFlags::trusted(), null_val, fb, (reg * 16) as i32);
+        b.ins()
+            .store(MemFlags::trusted(), null_val, fb, (reg * 16) as i32);
         return;
     };
     let raw = b.use_var(var);

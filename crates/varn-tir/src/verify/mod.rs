@@ -19,7 +19,10 @@ pub struct VerifyError {
 
 impl VerifyError {
     pub fn new(message: impl Into<String>, span: Span) -> Self {
-        VerifyError { message: message.into(), span }
+        VerifyError {
+            message: message.into(),
+            span,
+        }
     }
 }
 
@@ -30,5 +33,9 @@ pub fn verify_module(m: &TirModule) -> Result<(), Vec<VerifyError>> {
     let mut errors = Vec::new();
     wellformed::check(m, &mut errors);
     coherence::check(m, &mut errors);
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }

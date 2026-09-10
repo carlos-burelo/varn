@@ -158,10 +158,7 @@ fn parse_variant_tuple_pattern(
     })
 }
 
-fn parse_variant_record_pattern(
-    s: &mut TokenStream,
-    name: String,
-) -> Result<MatchPattern, String> {
+fn parse_variant_record_pattern(s: &mut TokenStream, name: String) -> Result<MatchPattern, String> {
     use varn_core::ast::MatchBinding;
     s.advance();
     // `Variant { x, y }` — a variant pattern whose payload is destructured by
@@ -179,7 +176,10 @@ fn parse_variant_record_pattern(
         if s.eat(TokenKind::Colon) {
             parse_match_pattern(s)?;
         }
-        bindings.push(MatchBinding { name: field_name, range });
+        bindings.push(MatchBinding {
+            name: field_name,
+            range,
+        });
         if !s.eat(TokenKind::Comma) {
             break;
         }

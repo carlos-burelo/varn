@@ -38,8 +38,12 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
             .map_err(|e| CliError::fatal(format!("AOT compilation failed: {e}")))?;
 
         let obj_path = Path::new(&out_path).with_extension("obj");
-        std::fs::write(&obj_path, &aot_output.object_bytes)
-            .map_err(|e| CliError::fatal(format!("cannot write object file '{}': {e}", obj_path.display())))?;
+        std::fs::write(&obj_path, &aot_output.object_bytes).map_err(|e| {
+            CliError::fatal(format!(
+                "cannot write object file '{}': {e}",
+                obj_path.display()
+            ))
+        })?;
 
         if args.verbose {
             terminal::tagged("AOT", format!("linking object file to '{}'...", out_path));
@@ -200,7 +204,13 @@ fn add_system_lib_paths(cmd: &mut Command) {
         if let Ok(entries) = std::fs::read_dir(vs_base) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                for edition in &["Insiders", "Community", "Professional", "Enterprise", "BuildTools"] {
+                for edition in &[
+                    "Insiders",
+                    "Community",
+                    "Professional",
+                    "Enterprise",
+                    "BuildTools",
+                ] {
                     let msvc_dir = p.join(edition).join("VC").join("Tools").join("MSVC");
                     if msvc_dir.exists() {
                         if let Ok(versions) = std::fs::read_dir(&msvc_dir) {
