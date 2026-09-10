@@ -156,8 +156,7 @@ impl ExecCtx {
                 VmUpvalue::closed(fork.heap.intern(val))
             })
             .collect();
-        let mut proto = Rc::clone(&task.closure.proto);
-        crate::globals::resolve_in_proto(Rc::make_mut(&mut proto), &mut fork.globals);
+        let proto = Rc::clone(&task.closure.proto);
         let mut vm_closure =
             VmClosure::with_upvalues(proto, upvalues, Rc::new(constants), fork.settings);
         // The spawned function keeps its home module's global region. A task

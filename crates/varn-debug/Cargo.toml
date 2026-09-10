@@ -10,7 +10,6 @@ varn-tir      = { path = "../varn-tir" }
 varn-types    = { path = "../varn-types" }
 varn-compiler = { path = "../varn-compiler" }
 varn-jit      = { path = "../varn-jit" }
-varn-vm       = { path = "../varn-vm" }
 rustc-hash    = { workspace = true }
 iced-x86      = "1"
 

@@ -14,7 +14,6 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use varn_core::{ModuleId, OpCode};
-use varn_types::chunk::FunctionProto;
 use varn_types::Closure;
 
 pub struct Vm {
@@ -190,20 +189,6 @@ impl Vm {
         }
         result.sort_by_key(|(_, c)| Reverse(*c));
         result
-    }
-
-    /// Bind `proto`'s global accesses to this VM's slot indices.
-    ///
-    /// Only the ENTRY proto needs this from outside: every other proto — every
-    /// module, in every VM, from `precompiled` or from a `ModuleLoader` — is
-    /// resolved by `ExecCtx::eval_module_proto` as it enters. The entry proto
-    /// is the one that never passes through there.
-    ///
-    /// Deliberately NOT folded into [`Vm::run`]: the bench harness builds a
-    /// fresh VM and calls `run` inside the timed region, so resolving there
-    /// would charge every measured iteration for work that belongs to setup.
-    pub fn resolve_globals(&mut self, proto: &mut FunctionProto) {
-        crate::globals::resolve_in_proto(proto, &mut self.ctx.globals);
     }
 }
 

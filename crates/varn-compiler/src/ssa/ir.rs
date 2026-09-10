@@ -146,6 +146,9 @@ pub enum InstKind {
     /// Module-global read at a region-relative slot the checker numbered.
     LoadGlobalIdx(u32),
 
+    /// Prelude / host global read at its absolute native-layout index.
+    LoadNativeGlobalIdx(u32),
+
     LoadUpvalue(u32),
 
     StoreGlobal {
@@ -425,6 +428,9 @@ pub enum InstKind {
 
     ExtensionCall {
         func: Rc<str>,
+        /// Module-global slot of the mangled function, when it was numbered
+        /// (always, for a well-formed module). `None` falls back to a name load.
+        slot: Option<u32>,
         recv: Value,
         args: Vec<Value>,
     },

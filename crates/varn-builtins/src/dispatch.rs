@@ -321,6 +321,61 @@ pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Rc<
     out
 }
 
+/// The ordered names of the native / prelude global region — the layout
+/// `GlobalStore::with_native_layout` builds, computed WITHOUT a heap so the
+/// compiler can emit `LoadNativeGlobalIdx` against it directly.
+///
+/// Order: `["print", "assert"]` (only if registered) followed by every other
+/// name sorted. The name set mirrors `register_globals_vm`: `isIsolate`, the
+/// `globals` module's own fields (the entry kinds `build_module` materialises),
+/// and `core` when a `core` module exists. Frozen on first call.
+pub fn native_global_layout() -> &'static [&'static str] {
+    static LAYOUT: OnceLock<Vec<&'static str>> = OnceLock::new();
+    LAYOUT.get_or_init(|| {
+        // Entry kinds `build_module` skips for the `globals` module object —
+        // class-qualified members that exist only for op-id dispatch. Keep in
+        // sync with the `continue` arm in `build_module`.
+        const SKIP_KINDS: &[u8] = &[0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15];
+
+        let mut names: Vec<&'static str> = vec!["isIsolate"];
+        let mut has_core = false;
+        for e in all_native_ops() {
+            if e.module_id() == "core" {
+                has_core = true;
+            }
+            if e.module_id() == "globals"
+                && e.namespace_path().is_empty()
+                && !SKIP_KINDS.contains(&e.entry_kind)
+            {
+                names.push(e.symbol_name());
+            }
+        }
+        if has_core {
+            names.push("core");
+        }
+        names.sort_unstable();
+        names.dedup();
+
+        let mut out: Vec<&'static str> = Vec::with_capacity(names.len());
+        for p in ["print", "assert"] {
+            if let Some(pos) = names.iter().position(|n| *n == p) {
+                out.push(names.remove(pos));
+            }
+        }
+        out.extend(names);
+        out
+    })
+}
+
+/// Index of a name in [`native_global_layout`], or `None` when it is not a
+/// prelude symbol.
+pub fn native_global_index(name: &str) -> Option<u32> {
+    native_global_layout()
+        .iter()
+        .position(|n| *n == name)
+        .map(|i| i as u32)
+}
+
 fn collect_module_fields(
     module_id: &str,
     module_nv: VmValue,

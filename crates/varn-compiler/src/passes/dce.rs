@@ -115,6 +115,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | ConstNull
         | LoadGlobal(_)
         | LoadGlobalIdx(_)
+        | LoadNativeGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | ModuleSlot { .. }

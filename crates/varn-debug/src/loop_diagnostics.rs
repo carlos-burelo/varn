@@ -15,16 +15,11 @@ const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
 const YELLOW: &str = "\x1b[33m";
 
-/// This view runs on bytecode straight out of `emit`, before the
-/// global-slot resolution pass (`resolve_globals_in_proto`, run at VM
-/// startup) rewrites `LoadGlobal`/`StoreGlobal`/`DefineGlobal` (a
-/// name-lookup FFI call) to `LoadGlobalIdx`/`StoreGlobalIdx`/
-/// `DefineGlobalIdx` (a single register-indexed read/write, and the ONLY
-/// form `varn_jit::is_alloc_free_op` accepts — correctly, since that's the
-/// only form the real JIT compiler ever sees). A loop whose only
-/// disqualifying instructions are these three is fully alloc-free post-
-/// resolution; this scan answers that question so the verdict below can
-/// say so instead of reporting a real allocation hazard.
+/// The compiler emits the indexed global opcodes directly, so
+/// `is_alloc_free_op` already covers them. A name-keyed `LoadGlobal` /
+/// `StoreGlobal` / `DefineGlobal` only survives for a genuinely dynamic name
+/// now; it is still a hash lookup, not an allocation, so a loop whose only
+/// disqualifying instructions are those stays alloc-free.
 fn alloc_free_ignoring_global_resolution(
     code: &[u16],
     constants: &[varn_types::PoolEntry],

@@ -149,20 +149,6 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
 
-    /// Which `GlobalStore` this proto's global accesses are already bound to,
-    /// or `0` for none. Set by `varn_vm::globals::resolve_in_proto`, which
-    /// skips a proto whose id already matches the store it is handed.
-    ///
-    /// Not a "resolved yet?" bool: slot indices are only meaningful inside one
-    /// store, and a VM (an isolate worker, say) that inherits a proto resolved
-    /// against a different store must redo the work, not trust it. Recording
-    /// the identity is what makes the fast path safe.
-    ///
-    /// Skipped by serde: it names a store that exists in one process only.
-    #[serde(skip)]
-    #[serde(default)]
-    pub globals_id: std::cell::Cell<u64>,
-
     /// Address of this proto's Cranelift RAW entry — the unboxed
     /// `fn(exec_ctx, args…) -> i64` body, callable clif→clif without going
     /// back through the VM frame loop. `0` means "no direct entry": either

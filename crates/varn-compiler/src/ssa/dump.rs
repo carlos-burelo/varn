@@ -70,6 +70,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::LoadGlobal(name) => format!("global {name}"),
         InstKind::LoadGlobalIdx(slot) => format!("global @{slot}"),
+        InstKind::LoadNativeGlobalIdx(slot) => format!("native-global @{slot}"),
         InstKind::LoadUpvalue(uv) => format!("upvalue #{uv}"),
         InstKind::StoreGlobal { name, value } => format!("storeglobal {name} = {}", val(*value)),
         InstKind::StoreGlobalIdx { slot, value } => {
@@ -208,7 +209,9 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::SuperMethodCall { name, args } => {
             format!("supercall super.{name}{}", args_list(args))
         }
-        InstKind::ExtensionCall { func, recv, args } => {
+        InstKind::ExtensionCall {
+            func, recv, args, ..
+        } => {
             format!("extcall {func}({}{})", val(*recv), {
                 let a = args.iter().map(|v| val(*v)).collect::<Vec<_>>().join(", ");
                 if a.is_empty() {

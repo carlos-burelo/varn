@@ -64,26 +64,7 @@ pub fn execute_with_caps(
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
 
-    // Pre-binding the module map to THIS VM's store is an optimisation, not the
-    // contract: `eval_module_proto` re-resolves any proto whose recorded store
-    // id does not match the VM evaluating it, which is what keeps isolate
-    // workers (their own store) correct. Doing it here means the main VM's
-    // modules — re-evaluated once per run by the bench harness — hit that
-    // check instead of rewriting themselves every iteration.
-    let mut optimized_precompiled_map = (*precompiled).clone();
-    for module_proto_rc in optimized_precompiled_map.values_mut() {
-        machine.resolve_globals(Rc::make_mut(module_proto_rc));
-    }
-    machine.ctx.precompiled = Rc::new(optimized_precompiled_map);
-
-    let mut optimized_proto = proto;
-    machine.resolve_globals(&mut optimized_proto);
-
-    let main_closure = Rc::new(Closure::new(
-        Rc::new(optimized_proto),
-        Vec::new(),
-        Vec::new(),
-    ));
+    let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
 
     let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
     let mut export_map = FxHashMap::default();

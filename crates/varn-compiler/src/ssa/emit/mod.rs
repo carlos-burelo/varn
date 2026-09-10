@@ -171,7 +171,6 @@ pub fn emit_function_meta(
         return_kind,
         resolved_shapes: RefCell::new(Vec::new()),
         jit_entry: Cell::new(None),
-        globals_id: Cell::new(0),
         clif_raw: Cell::new(0),
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),

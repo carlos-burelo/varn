@@ -20,6 +20,11 @@ pub enum Resolution {
     /// Numbered at compile time, so `LoadGlobalIdx` is emitted directly and
     /// the runtime rewriting pass disappears.
     GlobalSlot(u32),
+
+    /// A native / prelude symbol (`print`, `assert`, …) at its fixed index in
+    /// `GlobalStore::with_native_layout` — the host boundary, numbered by
+    /// `varn_builtins::native_global_layout()`. Emitted as `LoadNativeGlobalIdx`.
+    NativeGlobal(u32),
     ModuleSlot {
         module: ModuleId,
         slot: u32,

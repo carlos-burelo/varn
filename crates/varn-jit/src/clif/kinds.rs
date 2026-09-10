@@ -256,11 +256,8 @@ pub(crate) fn apply_kinds(
         | OpCode::ArrayExtend
         | OpCode::MakeClass
         | OpCode::GetSuper
-        // `resolve_in_proto` is meant to rewrite every one of these into
-        // `LoadGlobalIdx`, but the fallthrough for an unlisted opcode LEAVES
-        // the destination's kind alone, so a survivor inherits whatever the
-        // register last held — an `Int` param, and then the callee is passed
-        // as a raw i64. Listing it costs nothing when the rewrite did happen.
+        // A name-keyed `LoadGlobal` only survives for a genuinely dynamic name
+        // now (the compiler emits the indexed forms directly); still boxed.
         | OpCode::LoadGlobal
         | OpCode::LoadNativeGlobalIdx
         | OpCode::LoadUpvalue

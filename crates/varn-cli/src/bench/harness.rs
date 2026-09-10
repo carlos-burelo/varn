@@ -17,8 +17,7 @@ use crate::error::CliError;
 ///
 /// The four call sites that used to build this inline (timed run, e2e run, and
 /// two profiling runs) drifted apart in exactly the way that makes a benchmark
-/// lie: one of them forgot `resolve_globals`, so it measured an
-/// unresolved-globals interpreter path no user ever hits.
+/// lie — one measured a path no user hits — so they share this factory.
 pub struct VmFactory {
     pub globals: varn_vm::GlobalStore,
     pub heap: varn_vm::Heap,

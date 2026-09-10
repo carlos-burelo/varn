@@ -174,12 +174,8 @@ impl ExecCtx {
     fn eval_module_proto(
         &mut self,
         resolved: ModuleId,
-        mut proto: std::rc::Rc<varn_types::FunctionProto>,
+        proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
-        // Prelude-global rewrite (a fixed layout, so a shared proto needs no
-        // per-store rebinding — see `globals::resolve`).
-        crate::globals::resolve_shared(&mut proto, &mut self.globals);
-
         // Reserve this module's own contiguous global-slot region. `module_base`
         // rides on the closure below; `LoadGlobalIdx` / `StoreGlobalIdx` are
         // relative to it. Every eval gets a fresh region in its own store.

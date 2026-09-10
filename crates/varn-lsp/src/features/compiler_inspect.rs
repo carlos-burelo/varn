@@ -239,6 +239,7 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         }
         LoadGlobal(name) => format!("LoadGlobal \"{name}\""),
         LoadGlobalIdx(slot) => format!("LoadGlobalIdx @{slot}"),
+        LoadNativeGlobalIdx(slot) => format!("LoadNativeGlobalIdx @{slot}"),
         StoreGlobal { name, value } => format!("StoreGlobal \"{name}\" = v{}", value.0),
         StoreGlobalIdx { slot, value } => format!("StoreGlobalIdx @{slot} = v{}", value.0),
         LoadUpvalue(idx) => format!("LoadUpvalue [{idx}]"),
@@ -443,7 +444,9 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
                 .join(", ");
             format!("super.{name}({args_str})")
         }
-        ExtensionCall { func, recv, args } => {
+        ExtensionCall {
+            func, recv, args, ..
+        } => {
             let args_str = args
                 .iter()
                 .map(|a| format!("v{}", a.0))

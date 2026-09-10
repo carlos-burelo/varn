@@ -104,6 +104,11 @@ pub(super) fn emit_value(
                 .map_err(|_| OptError::Unsupported("ssa-emit: global slot exceeds u16"))?;
             chunk.emit_rc(OpCode::LoadGlobalIdx, d, slot, line);
         }
+        InstKind::LoadNativeGlobalIdx(slot) => {
+            let slot = u16::try_from(*slot)
+                .map_err(|_| OptError::Unsupported("ssa-emit: native global slot exceeds u16"))?;
+            chunk.emit_rc(OpCode::LoadNativeGlobalIdx, d, slot, line);
+        }
         InstKind::LoadUpvalue(uv) => {
             chunk.emit(OpCode::LoadUpvalue, line);
             chunk.write(Chunk::pack(d, *uv as u8), line);
@@ -507,9 +512,24 @@ pub(super) fn emit_value(
             );
         }
 
-        InstKind::ExtensionCall { func, recv, args } => {
-            let idx = chunk.add_str(func);
-            chunk.emit_rc(OpCode::LoadGlobal, call_base, idx, line);
+        InstKind::ExtensionCall {
+            func,
+            slot,
+            recv,
+            args,
+        } => {
+            match slot {
+                Some(s) => {
+                    let s = u16::try_from(*s).map_err(|_| {
+                        OptError::Unsupported("ssa-emit: extension global slot exceeds u16")
+                    })?;
+                    chunk.emit_rc(OpCode::LoadGlobalIdx, call_base, s, line);
+                }
+                None => {
+                    let idx = chunk.add_str(func);
+                    chunk.emit_rc(OpCode::LoadGlobal, call_base, idx, line);
+                }
+            }
             chunk.emit_rr(OpCode::Move, call_base + 1, reg[recv.0 as usize], line);
             for (i, a) in args.iter().enumerate() {
                 chunk.emit_rr(

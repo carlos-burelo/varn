@@ -31,6 +31,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | ConstNull
         | LoadGlobal(_)
         | LoadGlobalIdx(_)
+        | LoadNativeGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | MakeClosure { .. }
@@ -180,6 +181,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | ConstNull
         | LoadGlobal(_)
         | LoadGlobalIdx(_)
+        | LoadNativeGlobalIdx(_)
         | LoadUpvalue(_)
         | LoadCaptured { .. }
         | MakeClosure { .. }

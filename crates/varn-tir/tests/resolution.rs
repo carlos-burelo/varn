@@ -23,6 +23,7 @@ fn the_three_dispatch_states_are_distinguishable() {
         Resolution::StaticField(1),
         Resolution::VtableSlot(7),
         Resolution::GlobalSlot(12),
+        Resolution::NativeGlobal(4),
         Resolution::Local(LocalId(0)),
         Resolution::Param(2),
         Resolution::Upvalue(1),

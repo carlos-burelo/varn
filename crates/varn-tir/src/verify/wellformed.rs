@@ -468,12 +468,14 @@ fn check_res(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
                 ));
             }
         }
-        // StaticField, ModuleSlot, Intrinsic, NativeOp, Upvalue, ByName, and None
-        // have no backing tables in this crate and cannot be validated here
+        // StaticField, ModuleSlot, Intrinsic, NativeOp, NativeGlobal, Upvalue,
+        // ByName, and None have no backing tables in this crate and cannot be
+        // validated here
         Resolution::StaticField(_)
         | Resolution::ModuleSlot { .. }
         | Resolution::Intrinsic(_)
         | Resolution::NativeOp(_)
+        | Resolution::NativeGlobal(_)
         | Resolution::Upvalue(_)
         | Resolution::ByName { .. }
         | Resolution::None => {}

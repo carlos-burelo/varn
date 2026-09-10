@@ -2,8 +2,9 @@
 //! comparison operators compiled code cannot inline.
 //!
 //! Globals are absent on purpose: `clif::globals` emits the indexed load and
-//! store inline off `ExecCtx.globals`, and the name-keyed forms no longer
-//! survive `varn_vm::globals::resolve_in_proto`.
+//! store inline off `ExecCtx.globals`, and the compiler emits those indexed
+//! forms directly — a name-keyed `LoadGlobal` only survives for a genuinely
+//! dynamic name, which bails.
 //!
 //! Everything here is a pure value operation over the running `ExecCtx` —
 //! no frame is pushed and no call is made.

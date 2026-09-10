@@ -610,6 +610,7 @@ impl<'m> Builder<'m> {
                 Ok(self.emit(
                     InstKind::ExtensionCall {
                         func: func.clone(),
+                        slot: self.gslot(func),
                         recv: r,
                         args: argv,
                     },
@@ -742,6 +743,9 @@ impl<'m> Builder<'m> {
                             .map(|tf| tf.name.clone())
                             .ok_or(OptError::Unsupported("from_tir: DirectFn out of range"))?;
                         self.emit(self.global_load(&name), HirType::Ref)
+                    }
+                    Resolution::NativeGlobal(n) => {
+                        self.emit(InstKind::LoadNativeGlobalIdx(*n), HirType::Ref)
                     }
                     _ => self.lower_expr(callee)?,
                 };
@@ -1129,6 +1133,7 @@ impl<'m> Builder<'m> {
             Resolution::Param(i) => self.load_var(VarId::Param(*i), ty),
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
             Resolution::GlobalSlot(n) => Ok(self.emit(InstKind::LoadGlobalIdx(*n), ty)),
+            Resolution::NativeGlobal(n) => Ok(self.emit(InstKind::LoadNativeGlobalIdx(*n), ty)),
             Resolution::ModuleSlot { .. } => Err(OptError::Unsupported("from_tir: module slot")),
             Resolution::ByName { name, .. } => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty))
@@ -1641,17 +1646,9 @@ fn build_inner(
                 },
                 HirType::Ref,
             );
-            // Extension functions are mangled to a globally-unique name and
-            // called by that bare name (`InstKind::ExtensionCall`); those stay
-            // name-keyed. Everything else is a numbered module global.
-            let store = if f.name.starts_with("__ext") {
-                InstKind::StoreGlobal {
-                    name: f.name.clone(),
-                    value: fv,
-                }
-            } else {
-                b.global_store(&f.name, fv)
-            };
+            // Every free function — including the mangled `__ext*` extension
+            // members — is a numbered module global.
+            let store = b.global_store(&f.name, fv);
             b.emit_effect(store);
         }
         // Populate export slots for functions / classes now, before any

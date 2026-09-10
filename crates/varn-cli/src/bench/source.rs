@@ -203,17 +203,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
 
-    let mut optimized_proto = proto.clone();
-    init_vm.resolve_globals(&mut optimized_proto);
-
-    // Pre-bind the module map to this store so the per-run `eval_module_proto`
-    // hits its already-resolved check instead of rewriting every module inside
-    // the timed region. Correctness still comes from that check, not from here.
-    let mut optimized_precompiled_map = (*precompiled).clone();
-    for module_proto_rc in optimized_precompiled_map.values_mut() {
-        init_vm.resolve_globals(Rc::make_mut(module_proto_rc));
-    }
-    let optimized_precompiled = Rc::new(optimized_precompiled_map);
+    let optimized_proto = proto.clone();
+    let optimized_precompiled = Rc::clone(&precompiled);
 
     init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
@@ -291,18 +282,12 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
         });
 
-        let mut proto =
-            compile_via_tir(&program, &check_result, export_names_of(&program.filename))
-                .map_err(|e| format!("compile failed: {}", e))?;
+        let proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
+            .map_err(|e| format!("compile failed: {}", e))?;
 
         varn_builtins::reset_testing_counters();
 
         let mut machine = factory.build();
-
-        // Real runs resolve global names to indices before executing
-        // (pipeline::execute); without this the e2e phase measures an
-        // unresolved-globals interpreter path no user ever hits.
-        machine.resolve_globals(&mut proto);
         let closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
         run_vm_to_completion(&mut machine, closure)
     })?;

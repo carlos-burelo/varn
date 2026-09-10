@@ -1,7 +1,3 @@
-mod resolve;
-
-pub use resolve::{resolve_in_proto, resolve_shared};
-
 use crate::heap::Heap;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
@@ -13,23 +9,6 @@ pub struct GlobalStore {
     pub values: Vec<VmValue>,
     names: FxHashMap<Rc<str>, usize>,
     pub idx_to_name: Vec<Rc<str>>,
-    /// Identity of this name→index mapping, so a proto can record which store
-    /// it was resolved against and [`resolve_in_proto`] can skip the work the
-    /// second time. NEVER read by compiled code — it must stay AFTER `values`,
-    /// whose data pointer the JIT loads at a fixed `globals_offset + 8`.
-    ///
-    /// A `Clone` keeps the id on purpose: `define` only ever appends, so every
-    /// index handed out before the clone still means the same name in both
-    /// copies. That is what lets the bench harness resolve once and hand the
-    /// store to a fresh VM per run.
-    id: u64,
-}
-
-/// Ids start at 1 — `0` on a proto means "never resolved against any store".
-fn next_store_id() -> u64 {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(1);
-    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 impl GlobalStore {
@@ -38,35 +17,36 @@ impl GlobalStore {
             values: Vec::new(),
             names: FxHashMap::default(),
             idx_to_name: Vec::new(),
-            id: next_store_id(),
         }
     }
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
-        let native_map = varn_builtins::dispatch::register_globals_vm(heap);
+        // `native_global_layout()` is the authority on ORDER (and the checker
+        // emits `LoadNativeGlobalIdx` against it); `register_globals_vm` only
+        // supplies the values.
+        let mut native_map = varn_builtins::register_globals_vm(heap);
+        let order = varn_builtins::native_global_layout();
 
-        let mut values = Vec::new();
+        let mut values = Vec::with_capacity(order.len());
         let mut names = FxHashMap::default();
-        let mut idx_to_name: Vec<Rc<str>> = Vec::new();
+        let mut idx_to_name: Vec<Rc<str>> = Vec::with_capacity(order.len());
 
-        let prioritized = ["print", "assert"];
-        let mut remaining = native_map;
-        for &name in &prioritized {
-            if let Some(val) = remaining.remove(name) {
-                let idx = values.len();
-                let rc_name: Rc<str> = Rc::from(name);
-                idx_to_name.push(rc_name.clone());
-                names.insert(rc_name, idx);
-                values.push(val);
-            }
+        for &name in order {
+            let rc_name: Rc<str> = Rc::from(name);
+            let val = native_map.remove(name).unwrap_or(VmValue::null());
+            names.insert(rc_name.clone(), values.len());
+            idx_to_name.push(rc_name);
+            values.push(val);
         }
 
-        let mut entries: Vec<(Rc<str>, VmValue)> = remaining.into_iter().collect();
-        entries.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
-
-        for (name, val) in entries {
-            idx_to_name.push(name.clone());
-            names.insert(name, values.len());
+        // Anything the value map carried that the layout did not name (should be
+        // nothing) is appended sorted — it stays reachable by name, just not at
+        // a compile-time-known index.
+        let mut leftover: Vec<(Rc<str>, VmValue)> = native_map.into_iter().collect();
+        leftover.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
+        for (name, val) in leftover {
+            names.insert(name.clone(), values.len());
+            idx_to_name.push(name);
             values.push(val);
         }
 
@@ -74,7 +54,6 @@ impl GlobalStore {
             values,
             names,
             idx_to_name,
-            id: next_store_id(),
         }
     }
 
@@ -156,15 +135,6 @@ impl GlobalStore {
         unsafe {
             *self.values.get_unchecked_mut(idx) = value;
         }
-    }
-
-    pub(crate) fn resolve_index(&self, name: &str) -> Option<usize> {
-        self.names.get(name).copied()
-    }
-
-    /// Identity of this name→index mapping. See the `id` field.
-    pub(crate) fn id(&self) -> u64 {
-        self.id
     }
 }
 

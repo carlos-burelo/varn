@@ -8,9 +8,11 @@
 //! `LoadGlobalIdx` / `StoreGlobalIdx` carry a slot RELATIVE to the running
 //! closure's module region; the lowering loads `module_base` from the closure
 //! param (`closure_module_base_offset`) and adds it. `LoadNativeGlobalIdx` is
-//! absolute. A name-keyed `LoadGlobal` still reaches here for a genuinely
-//! dynamic name and bails — the function drops to the interpreter. Diagnose
-//! with `VARN_CLIF_TRACE=1 VARN_JIT_TIER=1`.
+//! absolute. The compiler emits these directly (the checker numbers module
+//! globals, `varn_builtins::native_global_layout` numbers the prelude), so a
+//! name-keyed `LoadGlobal` reaching here means a genuinely dynamic name — it
+//! bails, and the function drops to the interpreter. Diagnose with
+//! `VARN_CLIF_TRACE=1 VARN_JIT_TIER=1`.
 
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::{FunctionBuilder, Variable};

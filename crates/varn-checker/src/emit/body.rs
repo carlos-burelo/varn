@@ -320,6 +320,10 @@ impl<'a> FnEmitter<'a> {
         if let Some(&slot) = self.m.globals.get(name) {
             return Resolution::GlobalSlot(slot);
         }
+        // A prelude / host symbol at its fixed native-layout index.
+        if let Some(idx) = varn_builtins::native_global_index(name) {
+            return Resolution::NativeGlobal(idx);
+        }
         Resolution::ByName {
             name: Rc::from(name),
             why: DynReason::Unannotated,
@@ -3209,9 +3213,12 @@ impl<'a> FnEmitter<'a> {
                 Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
                     Resolution::DirectFn(varn_tir::FnId(fn_id))
                 }
-                _ => Resolution::ByName {
-                    name: name.clone(),
-                    why: DynReason::Unannotated,
+                _ => match c.res {
+                    Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
+                    _ => Resolution::ByName {
+                        name: name.clone(),
+                        why: DynReason::Unannotated,
+                    },
                 },
             };
             return TirExpr {

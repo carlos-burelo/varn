@@ -65,6 +65,11 @@ pub fn emit_module(
             collect_decl_names(d, &mut declared);
         }
     }
+    // `extension X on T { … }` members become mangled free functions
+    // (`__ext_{label}_{name}`) stored as module globals and called by that name
+    // (`InstKind::ExtensionCall`). Number them like any other module global so
+    // the call site is `LoadGlobalIdx`, not a name lookup the JIT bails on.
+    collect_extension_names(program, &mut declared);
 
     let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
@@ -652,6 +657,31 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
         _ => {}
+    }
+}
+
+/// The mangled global names of every `extension` member — same strings
+/// `emit_extensions` produces, so they get numbered as module globals.
+fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>) {
+    use varn_core::ast::ExtensionMember;
+    for stmt in &program.body {
+        let StmtKind::Decl(d) = &stmt.kind else {
+            continue;
+        };
+        let Decl::Extension(ext) = d.as_ref() else {
+            continue;
+        };
+        let Some(label) = extension_target_label(&ext.target) else {
+            continue;
+        };
+        for member in &ext.members {
+            let name: Rc<str> = match member {
+                ExtensionMember::Method(f) => Rc::from(format!("__ext_{label}_{}", f.id)),
+                ExtensionMember::Getter { key, .. } => Rc::from(format!("__extget_{label}_{key}")),
+                ExtensionMember::Setter { key, .. } => Rc::from(format!("__extset_{label}_{key}")),
+            };
+            out.insert(name);
+        }
     }
 }
 

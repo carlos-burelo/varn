@@ -2335,6 +2335,7 @@ dependencies = [
  "postcard",
  "rustc-hash 1.1.0",
  "serde",
+ "varn-builtins",
  "varn-core",
  "varn-lexer",
  "varn-modules",
@@ -2399,7 +2400,6 @@ dependencies = [
  "varn-jit",
  "varn-tir",
  "varn-types",
- "varn-vm",
 ]
 
 [[package]]
