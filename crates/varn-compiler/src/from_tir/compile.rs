@@ -43,7 +43,7 @@ fn enter_module(tir: &TirModule) -> ModuleScope {
 /// set by the enclosing `enter_module`. Panics if called outside one — that
 /// only happens if a `from_tir` SSA function reached emission without going
 /// through `compile_module` / `compile_closure`.
-pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> FunctionProto {
+pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> Result<FunctionProto> {
     let ptr = CUR_TIR.with(|c| c.get());
     assert!(
         !ptr.is_null(),
@@ -52,10 +52,7 @@ pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> FunctionProto 
     // SAFETY: `ptr` was set by `enter_module` from a live `&TirModule` whose
     // borrow outlives this call (it is on the stack of `compile_module`).
     let tir: &TirModule = unsafe { &*ptr };
-    match compile_closure(tir, idx, source_file) {
-        Ok(p) => p,
-        Err(e) => panic!("from_tir: closure {idx} failed: {e:?}"),
-    }
+    compile_closure(tir, idx, source_file)
 }
 
 fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
