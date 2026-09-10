@@ -32,6 +32,8 @@ pub(super) struct ModuleCtx<'a> {
     pub ext_members: &'a FxHashMap<u32, Rc<str>>,
 
     pub ext_set_members: &'a FxHashMap<u32, Rc<str>>,
+
+    pub core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -267,6 +269,24 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Class(c) => self.m.classes.get(c.0 as usize),
             _ => None,
         }
+    }
+
+    /// The op-id-addressable core class a receiver type belongs to, if any.
+    /// Never returns a user class — only the native reference types whose
+    /// runtime tag is guaranteed to match the static type. The numeric
+    /// primitives are deliberately excluded: implicit coercion (`int` → `bigint`
+    /// / `decimal` / `float`) leaves the value int-tagged while the static type
+    /// says otherwise, so an op-id keyed on the static type would misdispatch.
+    fn core_class_name(&self, ty: BackendTy) -> Option<&'static str> {
+        use varn_core::TypeTag as T;
+        let tag = match ty.non_nullable(self.tt) {
+            BackendTy::Array(_) => T::Array,
+            BackendTy::Str => T::Str,
+            BackendTy::Map(..) => T::Map,
+            BackendTy::Set(_) => T::Set,
+            _ => return None,
+        };
+        varn_core::op_id::core_class_name(tag)
     }
 
     fn expr_ty(&mut self, e: &Expr) -> BackendTy {
@@ -3247,6 +3267,26 @@ impl<'a> FnEmitter<'a> {
         let targs = self.lower_call_args(call_id, args);
 
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
+
+        // Core-type instance method → direct op-id dispatch.
+        if all_positional {
+            if let Some(cls) = self.core_class_name(recv.ty) {
+                if self.m.core_ops.contains(&(Rc::from(cls), Rc::clone(&name))) {
+                    let op_id = varn_core::op_id::core_method_op_id(cls, &name);
+                    return TirExpr {
+                        kind: TirExprKind::MethodCall {
+                            recv: Box::new(recv),
+                            name,
+                            args: targs,
+                        },
+                        ty,
+                        res: Resolution::NativeOp(op_id),
+                        span,
+                    };
+                }
+            }
+        }
+
         let res = self
             .class_of(recv.ty)
             .and_then(|ci| ci.method_slot(&name).map(|s| (s, ci)))

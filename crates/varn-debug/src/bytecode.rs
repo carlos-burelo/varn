@@ -401,6 +401,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 format!("r{} = callself ({} args @ r{})", hi(w1), hi(w2), lo(w2))
             }
             OpCode::InvokeVirtual => {
+                let cs = op_val >> 8;
                 let w1 = w!();
                 let name_idx = w!();
                 let w3 = w!();
@@ -408,11 +409,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     hint = format!("{:?}", c);
                 }
                 format!(
-                    "r{} = r{}.vtable[{}]({} args)",
+                    "r{} = r{}.<virtual>({} args)  [cs={}]",
                     hi(w1),
                     lo(w1),
-                    name_idx,
-                    hi(w3)
+                    hi(w3),
+                    cs
                 )
             }
 

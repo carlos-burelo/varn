@@ -108,6 +108,14 @@ pub fn emit_module(
         global_names[slot as usize] = name.clone();
     }
 
+    // Core-type instance methods that are op-id-addressable at runtime: a
+    // `recv.method(args)` whose receiver is statically a core class and whose
+    // method is one of that class's native instance methods lowers straight to
+    // `CallNativeOp`, skipping the runtime string-name + inline-cache lookup.
+    // Guarded to non-static, non-async, non-generator `Method` members so the
+    // emitted op-id is guaranteed to resolve.
+    let core_ops = core_method_ops(bind);
+
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
     // arity check agrees).
@@ -160,6 +168,7 @@ pub fn emit_module(
         ext_calls,
         ext_members,
         ext_set_members,
+        core_ops: &core_ops,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -335,6 +344,7 @@ struct MCtx<'a> {
     ext_calls: &'a FxHashMap<u32, Rc<str>>,
     ext_members: &'a FxHashMap<u32, Rc<str>>,
     ext_set_members: &'a FxHashMap<u32, Rc<str>>,
+    core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
 }
 
 impl<'a> MCtx<'a> {
@@ -349,8 +359,37 @@ impl<'a> MCtx<'a> {
             ext_calls: self.ext_calls,
             ext_members: self.ext_members,
             ext_set_members: self.ext_set_members,
+            core_ops: self.core_ops,
         }
     }
+}
+
+/// `(core class name, method name)` pairs a `CallNativeOp` may be emitted for:
+/// every non-static, non-async, non-generator instance `Method` of each loaded
+/// core class. Empty when no core contracts are in scope.
+fn core_method_ops(bind: &BindResult) -> FxHashSet<(Rc<str>, Rc<str>)> {
+    let mut out = FxHashSet::default();
+    let Some(core) = bind.core.as_ref() else {
+        return out;
+    };
+    for tag in varn_core::op_id::CORE_CLASSES {
+        let Some(cname) = varn_core::op_id::core_class_name(tag) else {
+            continue;
+        };
+        let Some(info) = core.class_members.get(cname) else {
+            continue;
+        };
+        for m in &info.members {
+            if matches!(m.kind, crate::types::ClassMemberKind::Method)
+                && !m.is_static
+                && !m.is_async
+                && !m.is_generator
+            {
+                out.insert((Rc::from(cname), m.name.clone()));
+            }
+        }
+    }
+    out
 }
 
 fn is_value_symbol(kind: crate::symbol::SymbolKind) -> bool {

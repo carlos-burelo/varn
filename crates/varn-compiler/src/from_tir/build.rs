@@ -719,6 +719,18 @@ impl<'m> Builder<'m> {
             TirExprKind::MethodCall { recv, name, args } => {
                 let r = self.lower_expr(recv)?;
                 let argv = self.lower_args(args)?;
+                // A core-type method the checker resolved to a stable op-id:
+                // dispatch it directly, no name lookup, no inline cache.
+                if let Resolution::NativeOp(op_id) = &e.res {
+                    return Ok(self.emit(
+                        InstKind::CallNativeOp {
+                            object: r,
+                            args: argv,
+                            op_id: *op_id,
+                        },
+                        ty,
+                    ));
+                }
                 Ok(self.emit(
                     InstKind::MethodCall {
                         recv: r,
