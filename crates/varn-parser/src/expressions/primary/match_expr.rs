@@ -160,25 +160,35 @@ fn parse_variant_tuple_pattern(
 
 fn parse_variant_record_pattern(
     s: &mut TokenStream,
-    _name: String,
+    name: String,
 ) -> Result<MatchPattern, String> {
+    use varn_core::ast::MatchBinding;
     s.advance();
-    let mut fields: Vec<(std::rc::Rc<str>, Option<MatchPattern>)> = Vec::new();
+    // `Variant { x, y }` — a variant pattern whose payload is destructured by
+    // field name. Bindings are collected in written order, which matches the
+    // variant's declared field order for the common case.
+    let mut bindings: Vec<MatchBinding> = Vec::new();
+    let mut rest = false;
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
+        if s.eat(TokenKind::DotDotDot) {
+            rest = true;
+            break;
+        }
+        let range = s.range();
         let field_name = s.expect_id()?;
-        let sub = if s.eat(TokenKind::Colon) {
-            Some(parse_match_pattern(s)?)
-        } else {
-            None
-        };
-        fields.push((field_name, sub));
+        if s.eat(TokenKind::Colon) {
+            parse_match_pattern(s)?;
+        }
+        bindings.push(MatchBinding { name: field_name, range });
         if !s.eat(TokenKind::Comma) {
             break;
         }
     }
     s.expect(TokenKind::RBrace)?;
-    Ok(MatchPattern::Record {
-        fields,
-        rest: false,
+    let _ = rest;
+    Ok(MatchPattern::EnumVariant {
+        enum_name: name.clone().into(),
+        variant_name: name.into(),
+        bindings,
     })
 }
