@@ -2683,7 +2683,19 @@ impl<'a> FnEmitter<'a> {
             return (lhs, rhs, ty);
         }
 
-        let common = if l == BackendTy::Float || r == BackendTy::Float {
+        // `+` on a string operand is concatenation regardless of what the
+        // other side is (matches `infer_binary_type`'s checking-phase rule) —
+        // this must be checked before the `Float` arm below, or `str + float`
+        // resolves to `Float` and casts the string literal to a float. The
+        // typed `AddFloat` opcode that produces trusts its operands
+        // unconditionally (unlike the interpreter's `AddFloat`, which falls
+        // back to generic `add` on a non-numeric operand), so that mistyping
+        // wasn't just slow — it silently corrupted the value.
+        let common = if op == TirBinOp::Add
+            && (matches!(l, BackendTy::Str) || matches!(r, BackendTy::Str))
+        {
+            BackendTy::Str
+        } else if l == BackendTy::Float || r == BackendTy::Float {
             BackendTy::Float
         } else if matches!(l, BackendTy::Str) || matches!(r, BackendTy::Str) {
             BackendTy::Str
