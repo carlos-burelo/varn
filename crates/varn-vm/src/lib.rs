@@ -7,6 +7,8 @@ pub mod exec;
 pub(crate) mod frame;
 pub(crate) mod frame_stack;
 pub(crate) mod gc;
+pub mod gc_report;
+pub mod gc_trace;
 pub(crate) mod generator;
 pub mod globals;
 pub(crate) mod heap;

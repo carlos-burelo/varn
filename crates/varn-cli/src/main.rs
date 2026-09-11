@@ -72,6 +72,7 @@ fn main() {
     }
 
     varn_vm::alloc_profile::init();
+    varn_vm::gc_trace::init();
     let result = dispatch(cli.command);
     varn_vm::alloc_profile::report();
 

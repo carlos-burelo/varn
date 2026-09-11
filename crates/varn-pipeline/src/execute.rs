@@ -159,6 +159,9 @@ pub fn execute_with_caps(
             }
         }
     }
+    if _debug.gc {
+        eprintln!("{}", machine.gc_report());
+    }
     Ok(())
 }
 

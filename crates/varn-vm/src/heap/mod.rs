@@ -10,6 +10,7 @@ pub(crate) mod access;
 pub(crate) mod aggregates;
 pub(crate) mod core;
 pub(crate) mod gc;
+pub(crate) mod gc_report;
 pub(crate) mod intern;
 pub(crate) mod jit;
 pub(crate) mod map_keys;

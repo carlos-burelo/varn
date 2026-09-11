@@ -67,6 +67,12 @@ pub struct DebugFlags {
     /// Counts only, no per-safepoint rows.
     pub roots_summary: bool,
 
+    /// `gc` — post-mortem nursery/old-gen/interner snapshot, printed once the
+    /// program finishes running. Unlike every other phase, this one needs an
+    /// actual run: there is no heap state to report before the program has
+    /// allocated anything. See [`Self::needs_execution`].
+    pub gc: bool,
+
     /// Substring filter applied to function names by the per-function dumps.
     /// Without it, `-p bytecode` on a real module prints every function.
     pub fn_filter: Option<String>,
@@ -95,6 +101,10 @@ pub const PHASES: &[(&str, &str)] = &[
     ("graph", "grafo de módulos"),
     ("caps", "traza de capabilities"),
     ("info", "metadatos del módulo"),
+    (
+        "gc",
+        "nursery/old-gen/interners al terminar de correr (única fase que ejecuta el programa)",
+    ),
     ("all", "todo lo anterior"),
 ];
 
@@ -113,6 +123,10 @@ pub fn print_phases() {
     eprintln!("\nFiltros:");
     eprintln!("  --fn <nombre>   limita los volcados por función a las que coincidan");
     eprintln!("  types:N  types:all  expr:N   rango de líneas");
+    eprintln!("\nVariables de entorno relacionadas con `-p gc`:");
+    eprintln!(
+        "  VARN_GC_TRACE=1   una línea por colección menor, según ocurre (cualquier comando)"
+    );
 }
 
 pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
@@ -270,6 +284,7 @@ impl DebugFlags {
                     "tiers" => flags.tiers = true,
                     "bails" => flags.bails = true,
                     "roots" => flags.roots = true,
+                    "gc" => flags.gc = true,
                     "summary" => flags.summary = true,
                     "typeloss" => flags.typeloss = true,
                     "clif" => flags.clif_all_on(),
@@ -307,6 +322,15 @@ impl DebugFlags {
             }
         }
         Ok(flags)
+    }
+
+    /// Every other phase reads the compiled program (AST/bytecode/CLIF/...)
+    /// without running it — `vn debug` always sets `no_run: true`. `gc` is
+    /// the one phase that needs the program to have actually executed (there
+    /// is no heap to report on before it has allocated anything), so this is
+    /// what `vn debug`'s command handler checks to override that.
+    pub fn needs_execution(&self) -> bool {
+        self.gc
     }
 
     /// Whether any phase is on.

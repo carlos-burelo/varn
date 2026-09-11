@@ -123,6 +123,14 @@ impl Vm {
         self.ctx.heap.hotspot = Some(counters);
     }
 
+    /// Snapshot of nursery/old-gen counters, interner sizes, and a live-object
+    /// histogram — `vn debug -p gc`'s data. Read-only; taking it costs one
+    /// pass over both generations to build the histogram, so it's meant for
+    /// end-of-run reporting, not a per-iteration check.
+    pub fn gc_report(&self) -> crate::gc_report::GcReport {
+        self.ctx.heap.gc_report()
+    }
+
     pub fn take_hotspots(&mut self) -> Option<HotspotCounters> {
         self.ctx.heap.hotspot = None;
         self.ctx

@@ -161,6 +161,12 @@ impl Nursery {
         self.objects.get(idx as usize)?.as_ref()
     }
 
+    /// Every live object currently in the nursery — for `vn debug -p gc`'s
+    /// histogram, not a hot path.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &HeapObj> {
+        self.objects.iter().filter_map(|o| o.as_ref())
+    }
+
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         self.objects.get_mut(idx as usize)?.as_mut()
@@ -217,6 +223,7 @@ impl Nursery {
         extra_root_packed: &[u32],
     ) {
         self.minor_gc_count += 1;
+        let trace = crate::gc_trace::note_start(self.objects.len(), self.minor_gc_promoted);
         let mut worklist = std::mem::take(&mut self.worklist);
         worklist.clear();
         // Reused across every scanned object: one promoted object per scan
@@ -269,6 +276,7 @@ impl Nursery {
         self.objects.clear();
         self.forwarding.clear();
         self.worklist = worklist;
+        crate::gc_trace::note_end(trace, self.minor_gc_count, self.minor_gc_promoted);
     }
 
     #[inline]
