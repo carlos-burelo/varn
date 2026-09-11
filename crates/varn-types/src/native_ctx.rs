@@ -105,6 +105,15 @@ pub trait NativeCtx {
     fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
         self.str_owned(v).map(std::rc::Rc::from)
     }
+    /// Whether `v`'s string is entirely ASCII. Backed by a per-string cached
+    /// flag where the representation has one (`HeapStr`'s ascii bit) — O(1)
+    /// amortized, not a fresh scan — so callers that need this per element of
+    /// a sequential scan (`charCodeAt` in a loop, say) don't pay O(n) per
+    /// call and turn an O(n) walk into O(n²). The default here (a fresh scan)
+    /// is correct but only cheap for callers that don't hammer it in a loop.
+    fn str_is_ascii(&self, v: VmValue) -> bool {
+        self.str_repr_borrowed(v).is_ascii()
+    }
 
     fn array_len(&self, arr: VmValue) -> usize;
     fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue>;

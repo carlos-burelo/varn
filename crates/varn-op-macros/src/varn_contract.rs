@@ -77,6 +77,14 @@ enum Mapped {
     Bool,
     Char,
     Str,
+    /// A `str` receiver specifically (never a plain `str`-typed argument —
+    /// those stay `Str`, marshalled straight to `&str`). Passed through as
+    /// the full `VnStr` (a `Deref<Target = str>`, so existing method bodies
+    /// that treat `this` as `&str` need no change) instead of collapsing to
+    /// `&str` immediately, so a method can read `this.is_ascii()` /
+    /// `this.char_code_at()` without re-deriving what the marshal layer
+    /// already knows. See `receiver_mapped`.
+    StrRecv,
     Array,
     Dynamic,
     Void,
@@ -127,7 +135,7 @@ fn mapped_tag_path(m: &Mapped) -> TS2 {
         Mapped::Float => quote! { Float },
         Mapped::Bool => quote! { Bool },
         Mapped::Char => quote! { Char },
-        Mapped::Str => quote! { Str },
+        Mapped::Str | Mapped::StrRecv => quote! { Str },
         Mapped::Array => quote! { Array },
         Mapped::Dynamic | Mapped::Void | Mapped::Opt(_) => quote! { Dynamic },
     };
@@ -137,6 +145,9 @@ fn mapped_tag_path(m: &Mapped) -> TS2 {
 fn receiver_mapped(class: &str) -> Mapped {
     if class == IntrinsicType::Array.as_str() {
         return Mapped::Array;
+    }
+    if TypeTag::from_str(class) == Some(TypeTag::Str) {
+        return Mapped::StrRecv;
     }
     TypeTag::from_str(class)
         .map(scalar_mapped)
@@ -150,6 +161,8 @@ fn param_ty(m: &Mapped) -> TS2 {
         Mapped::Bool => quote!(bool),
         Mapped::Char => quote!(char),
         Mapped::Str => quote!(&str),
+        // The full marshalled value, not collapsed to `&str` — see `Mapped::StrRecv`.
+        Mapped::StrRecv => quote!(&::varn_types::VnStr),
         Mapped::Array => quote!(::varn_types::VnArray),
         Mapped::Dynamic => quote!(::varn_types::VmValue),
         Mapped::Void => quote!(()),
@@ -164,7 +177,7 @@ fn owned_ty(m: &Mapped) -> TS2 {
     match m {
         // Zero-copy: Rc clone / inline SSO buffer instead of an owned
         // String allocation per call.
-        Mapped::Str => quote!(::varn_types::VnStr),
+        Mapped::Str | Mapped::StrRecv => quote!(::varn_types::VnStr),
         Mapped::Opt(inner) => {
             let i = owned_ty(inner);
             quote!(::core::option::Option<#i>)
@@ -188,6 +201,8 @@ fn ret_ty(m: &Mapped) -> TS2 {
 fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
     match m {
         Mapped::Str => quote!(#binding.as_str()),
+        // Passed by reference, not collapsed to `&str` — see `Mapped::StrRecv`.
+        Mapped::StrRecv => quote!(&#binding),
         Mapped::Opt(inner) if matches!(**inner, Mapped::Str) => {
             quote!(#binding.as_ref().map(|s| s.as_str()))
         }
@@ -864,7 +879,7 @@ fn map_to_arg_type_token(m: &Mapped) -> TS2 {
         Mapped::Float => quote!(::varn_types::ArgType::Float),
         Mapped::Bool => quote!(::varn_types::ArgType::Bool),
         Mapped::Char => quote!(::varn_types::ArgType::Char),
-        Mapped::Str => quote!(::varn_types::ArgType::Str),
+        Mapped::Str | Mapped::StrRecv => quote!(::varn_types::ArgType::Str),
         Mapped::Array => quote!(::varn_types::ArgType::Generic),
         Mapped::Dynamic => quote!(::varn_types::ArgType::Generic),
         Mapped::Void => quote!(::varn_types::ArgType::Void),

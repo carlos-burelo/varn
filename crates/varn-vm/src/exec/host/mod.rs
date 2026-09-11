@@ -61,6 +61,22 @@ impl NativeCtx for ExecCtx {
         self.heap.str_owned(v)
     }
 
+    // Both delegate to `Heap`'s `NativeCtx` impl — its `str_shared` is a
+    // refcount bump (no copy) and `str_is_ascii` reads `HeapStr`'s cached
+    // flag (O(1) amortized). Missing these here meant every native method
+    // called through `ExecCtx` (which is every `CallNativeOp` site) fell
+    // through to the trait's defaults instead: `str_shared` copying the
+    // whole string per call, `str_is_ascii` re-scanning it per call — an
+    // O(n) cost repeated on every element of a sequential scan, i.e. the
+    // very thing the cached flag exists to avoid.
+    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
+        self.heap.str_shared(v)
+    }
+
+    fn str_is_ascii(&self, v: VmValue) -> bool {
+        self.heap.str_is_ascii(v)
+    }
+
     fn is_string(&self, v: VmValue) -> bool {
         v.is_sso()
             || (v.is_heap() && matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Str(_))))

@@ -91,6 +91,21 @@ impl NativeCtx for Heap {
         None
     }
 
+    fn str_is_ascii(&self, v: VmValue) -> bool {
+        if v.is_sso() {
+            let mut buf = [0u8; 5];
+            return v.sso_as_str(&mut buf).is_ascii();
+        }
+        if v.is_heap() {
+            if let Some(HeapObj::Str(s)) = self.get_by_idx(v.as_heap_idx()) {
+                // `HeapStr::is_ascii` memoizes on the string itself (a `Cell`
+                // flag) — this is O(1) amortized, not a fresh scan.
+                return s.is_ascii();
+            }
+        }
+        false
+    }
+
     fn array_len(&self, arr: VmValue) -> usize {
         crate::heap_array::array_len(self, arr)
     }
