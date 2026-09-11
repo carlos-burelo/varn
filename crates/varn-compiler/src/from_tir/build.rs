@@ -703,6 +703,41 @@ impl<'m> Builder<'m> {
             }
             TirExprKind::Cast { operand } => {
                 let v = self.lower_expr(operand)?;
+                if ty == HirType::Float && self.value_ty(v) != HirType::Float {
+                    // `as float` on an operand not ALREADY statically float
+                    // (almost always `dynamic` — a value straight off CSV/JSON/
+                    // FFI) must really convert: `InstKind::Cast` compiles to a
+                    // bare `Move` (see ssa/emit/values.rs), which leaves an
+                    // underlying int `VmValue` exactly as it was — `typeof`
+                    // still reports `int` after the cast. That was invisible
+                    // as long as nothing downstream cared, but the checker
+                    // ALSO gives this register `SlotKind::Float` from here on
+                    // (it is declared/used as a float), so any JIT-compiled
+                    // caller unboxes it through the float coercion its
+                    // internal float-register representation requires — and
+                    // silently gets a genuine float where the interpreter
+                    // still has an int, a real value divergence the moment
+                    // that result crosses back into a plain boxed `VmValue`
+                    // (an object/array field, e.g. `tests/benchmarks/
+                    // bench_csv_etl.vn`'s `"base_amount": amt`).
+                    //
+                    // Fixed by making the CAST ITSELF convert, via the
+                    // generic (dynamically-dispatched) `Add` opcode's
+                    // existing, already-consistent int+float coercion —
+                    // `v + 0.0` — rather than inventing a new opcode for a
+                    // conversion this one already performs correctly and
+                    // identically across the interpreter and every JIT tier.
+                    let zero = self.emit(InstKind::ConstFloat(0.0), HirType::Float);
+                    return Ok(self.emit(
+                        InstKind::Binary {
+                            op: HirBinOp::Add,
+                            lhs: v,
+                            rhs: zero,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Float,
+                    ));
+                }
                 Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
             }
             TirExprKind::Select {
