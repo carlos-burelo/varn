@@ -164,7 +164,13 @@ pub struct HotspotCounters {
     pub fn_calls: FxHashMap<Rc<str>, CallEntry>,
     pub method_calls: FxHashMap<Rc<str>, CallEntry>,
     pub native_calls: FxHashMap<Rc<str>, u64>,
-    pub total_native_ns: u64,
+    /// Wall time actually spent inside each native op, by name — `rdtsc`,
+    /// calibrated once (see `ExecCtx::invoke_native`). Split by name, not
+    /// just summed, because a count alone can't tell a cheap-and-frequent op
+    /// from an expensive-and-frequent one: `charCodeAt` and `.length` can
+    /// both show a million calls, and only the time breaks the tie. Keyed by
+    /// the same resolved name as `native_calls`, so the two line up.
+    pub native_ns: FxHashMap<Rc<str>, u64>,
     pub global_accesses: FxHashMap<Rc<str>, u64>,
     pub alloc_types: FxHashMap<&'static str, u64>,
 }
@@ -196,6 +202,10 @@ impl HotspotCounters {
 
     pub(crate) fn record_native_call(&mut self, name: &str) {
         *self.native_calls.entry(Rc::from(name)).or_default() += 1;
+    }
+
+    pub(crate) fn record_native_ns(&mut self, name: &str, ns: u64) {
+        *self.native_ns.entry(Rc::from(name)).or_default() += ns;
     }
 
     pub(crate) fn record_global_access(&mut self, name: Rc<str>) {

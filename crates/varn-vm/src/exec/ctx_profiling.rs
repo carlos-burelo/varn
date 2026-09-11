@@ -116,6 +116,14 @@ impl ExecCtx {
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);
         }
+        // Resolved independently of whatever name (if any) the caller passed
+        // to the adjacent `record_call_native` — this is a raw function
+        // pointer, so the builtin registry is the only source of truth
+        // available here, same fallback `record_call_native` itself uses
+        // when it has no source-level name. Good enough for timing: the
+        // rare case where a closure (not a registered builtin) reaches this
+        // path buckets under "<nativo sin nombre>" instead of losing the ns.
+        let name = varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>");
 
         #[cfg(target_arch = "x86_64")]
         {
@@ -142,7 +150,7 @@ impl ExecCtx {
             let end = unsafe { std::arch::x86_64::_rdtsc() };
             let ns = ((end.saturating_sub(start)) as f64 / cycles_per_ns) as u64;
             if let Some(ref h) = self.hotspot_counters {
-                h.borrow_mut().total_native_ns += ns;
+                h.borrow_mut().record_native_ns(name, ns);
             }
             r
         }
@@ -153,7 +161,7 @@ impl ExecCtx {
             let r = (f)(self as &mut dyn varn_types::NativeCtx, args);
             let ns = start.elapsed().as_nanos() as u64;
             if let Some(ref h) = self.hotspot_counters {
-                h.borrow_mut().total_native_ns += ns;
+                h.borrow_mut().record_native_ns(name, ns);
             }
             r
         }

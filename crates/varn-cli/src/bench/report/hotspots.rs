@@ -112,15 +112,34 @@ pub fn print_hotspots(h: &HotspotCounters) {
 
     if !h.native_calls.is_empty() {
         section("Llamadas nativas");
+        // By time, not count: a count alone can't tell a cheap-and-frequent
+        // op from an expensive-and-frequent one, and the expensive one is
+        // the one worth looking at. `native_ns` is missing an entry (name
+        // resolved to nothing, or the op never actually ran through the
+        // timed path) for a count that has one — falls back to 0, not hidden.
         let mut entries: Vec<_> = h.native_calls.iter().collect();
-        entries.sort_by(|a, b| b.1.cmp(a.1));
+        entries.sort_by_key(|(name, count)| {
+            std::cmp::Reverse(h.native_ns.get(*name).copied().unwrap_or(0).max(**count))
+        });
         for (name, count) in entries.iter().take(TOP_N) {
-            terminal::log(row(name, fmt_num(**count)));
+            let ns = h.native_ns.get(*name).copied().unwrap_or(0);
+            let note = if ns > 0 {
+                let avg_ns = ns / (**count).max(1);
+                format!(
+                    "{:.3} ms total, {} ns/llamada",
+                    ns as f64 / 1_000_000.0,
+                    avg_ns
+                )
+            } else {
+                "sin tiempo medido".to_string()
+            };
+            terminal::log(row_note(name, fmt_num(**count), note));
         }
-        if h.total_native_ns > 0 {
+        let total_ns: u64 = h.native_ns.values().sum();
+        if total_ns > 0 {
             terminal::log(row(
                 "tiempo nativo total",
-                format!("{:.3} ms", h.total_native_ns as f64 / 1_000_000.0),
+                format!("{:.3} ms", total_ns as f64 / 1_000_000.0),
             ));
         }
     }
