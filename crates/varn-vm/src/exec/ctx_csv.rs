@@ -357,6 +357,44 @@ pub(crate) fn stringify_csv(
                         }
                     }
                 }
+                Some(HeapObj::Map(first_map)) => {
+                    let map_b = first_map.borrow();
+                    let prop_names: Vec<(varn_types::value::MapKey, String)> = map_b
+                        .keys()
+                        .map(|k| {
+                            let name = ctx.heap.str_repr(k.0);
+                            (*k, name)
+                        })
+                        .collect();
+                    drop(map_b);
+
+                    // Write Header
+                    for (i, (_, name)) in prop_names.iter().enumerate() {
+                        if i > 0 {
+                            out.push(delim_char);
+                        }
+                        write_csv_cell(&mut out, name, delim_char);
+                    }
+                    out.push('\n');
+
+                    // Write Rows
+                    for item in items {
+                        if !item.is_heap() {
+                            continue;
+                        }
+                        if let Some(HeapObj::Map(map)) = ctx.heap.get(item.as_heap_idx()) {
+                            let m = map.borrow();
+                            for (slot, (k, _)) in prop_names.iter().enumerate() {
+                                if slot > 0 {
+                                    out.push(delim_char);
+                                }
+                                let val = m.get(k).copied().unwrap_or_else(VmValue::null);
+                                write_vm_value_csv(&mut out, ctx, val, delim_char);
+                            }
+                            out.push('\n');
+                        }
+                    }
+                }
                 Some(HeapObj::Array(_first_row)) => {
                     for item in items {
                         if !item.is_heap() {

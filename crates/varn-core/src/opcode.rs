@@ -211,12 +211,16 @@ pub enum OpCode {
     /// word. Unlike `LoadGlobalIdx` (module-relative, `module_base` added at
     /// run time) this index is absolute.
     LoadNativeGlobalIdx,
+
+    BuildMap,
+    MapGetIndex,
+    MapSetIndex,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::LoadNativeGlobalIdx as u8 {
+        if v <= OpCode::MapSetIndex as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

@@ -622,6 +622,10 @@ pub(crate) fn dispatch_opcode(
             let actx = actx.ok_or("clif: BuildArray outside alloc fn")?;
             alloc::emit_build_array(b, actx, state, code, ip);
         }
+        OpCode::BuildMap => {
+            let actx = actx.ok_or("clif: BuildMap outside alloc fn")?;
+            alloc::emit_build_map(b, actx, state, code, ip);
+        }
         OpCode::ArrayPush => {
             let actx = actx.ok_or("clif: ArrayPush outside alloc fn")?;
             alloc::emit_array_push(b, actx, state, code, ip);
@@ -753,11 +757,11 @@ pub(crate) fn dispatch_opcode(
             let actx = actx.ok_or("clif: GetSuper outside alloc fn")?;
             super::super::classes::emit_get_super(b, actx, state, code, ip);
         }
-        OpCode::GetIndex => {
+        OpCode::GetIndex | OpCode::MapGetIndex => {
             let actx = actx.ok_or("clif: GetIndex outside alloc fn")?;
             alloc::emit_get_index(b, actx, state, code, ip);
         }
-        OpCode::SetIndex => {
+        OpCode::SetIndex | OpCode::MapSetIndex => {
             let actx = actx.ok_or("clif: SetIndex outside alloc fn")?;
             alloc::emit_set_index(b, actx, state, code, ip);
         }

@@ -124,7 +124,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         // Fixed slots and statically-typed array elements are plain memory:
         // the checker proved the receiver's shape, so no accessor can run.
-        GetFixedField { .. } | ArrayGetIndex { .. } => true,
+        GetFixedField { .. } | ArrayGetIndex { .. } | MapGetIndex { .. } => true,
 
         // Type tests and tag reads inspect the value, never dispatch.
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
@@ -136,6 +136,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | BuildTuple { .. }
         | BuildObject { .. }
         | BuildRecord { .. }
+        | BuildMap { .. }
         | MakeClosure { .. }
         | MakeEnumVariant { .. }
         | Range { .. } => true,
@@ -215,6 +216,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | SetFixedField { .. }
         | SetIndex { .. }
         | ArraySetIndex { .. }
+        | MapSetIndex { .. }
         | ObjectMerge { .. } => false,
 
         // Class construction mutates the class object being built.

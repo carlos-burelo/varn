@@ -83,7 +83,9 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*lhs);
             f(*rhs);
         }
-        GetIndex { object, index } | ArrayGetIndex { object, index } => {
+        GetIndex { object, index }
+        | ArrayGetIndex { object, index }
+        | MapGetIndex { object, index } => {
             f(*object);
             f(*index);
         }
@@ -132,6 +134,11 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             object,
             index,
             value,
+        }
+        | MapSetIndex {
+            object,
+            index,
+            value,
         } => {
             f(*object);
             f(*index);
@@ -158,6 +165,10 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             elements.iter().for_each(|e| f(*e))
         }
         BuildObject { pairs } | BuildRecord { pairs } => pairs.iter().for_each(|(_, v)| f(*v)),
+        BuildMap { pairs } => pairs.iter().for_each(|(k, v)| {
+            f(*k);
+            f(*v);
+        }),
         CallSpread { callee, args } => {
             f(*callee);
             args.iter().for_each(|(a, _)| f(*a));
@@ -231,7 +242,9 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             f(lhs);
             f(rhs);
         }
-        GetIndex { object, index } | ArrayGetIndex { object, index } => {
+        GetIndex { object, index }
+        | ArrayGetIndex { object, index }
+        | MapGetIndex { object, index } => {
             f(object);
             f(index);
         }
@@ -279,6 +292,11 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             object,
             index,
             value,
+        }
+        | MapSetIndex {
+            object,
+            index,
+            value,
         } => {
             f(object);
             f(index);
@@ -304,6 +322,10 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             elements.iter_mut().for_each(f)
         }
         BuildObject { pairs } | BuildRecord { pairs } => pairs.iter_mut().for_each(|(_, v)| f(v)),
+        BuildMap { pairs } => pairs.iter_mut().for_each(|(k, v)| {
+            f(k);
+            f(v);
+        }),
         CallSpread { callee, args } => {
             f(callee);
             args.iter_mut().for_each(|(a, _)| f(a));

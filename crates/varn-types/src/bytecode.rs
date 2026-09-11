@@ -236,9 +236,26 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
             }
         }
 
-        OpCode::GetIndex | OpCode::ArrayGetIndex => s(2, Some(dest0), vec![hi1, lo1]),
+        OpCode::BuildMap => {
+            let start = lo1 as usize;
+            let count = hi2 as usize;
+            let dest = hi1;
+            let mut uses = vec![];
+            for i in 0..(count * 2) {
+                uses.push((start + i) as u8);
+            }
+            InstrInfo {
+                len: 3,
+                def: Some(dest),
+                uses,
+                call_args: None,
+                opaque: false,
+            }
+        }
 
-        OpCode::SetIndex | OpCode::ArraySetIndex => s(2, None, vec![dest0, hi1, lo1]),
+        OpCode::GetIndex | OpCode::ArrayGetIndex | OpCode::MapGetIndex => s(2, Some(dest0), vec![hi1, lo1]),
+
+        OpCode::SetIndex | OpCode::ArraySetIndex | OpCode::MapSetIndex => s(2, None, vec![dest0, hi1, lo1]),
 
         OpCode::ObjectMerge => s(2, Some(dest0), vec![hi1]),
 

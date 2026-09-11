@@ -184,6 +184,15 @@ pub(super) fn emit_value(
                 line,
             );
         }
+        InstKind::MapGetIndex { object, index } => {
+            chunk.emit_rrr(
+                OpCode::MapGetIndex,
+                d,
+                reg[object.0 as usize],
+                reg[index.0 as usize],
+                line,
+            );
+        }
 
         InstKind::MethodCall { recv, name, args } => {
             let name_idx = chunk.add_str(name);
@@ -296,6 +305,20 @@ pub(super) fn emit_value(
             chunk.emit(OpCode::BuildRecord, line);
             chunk.write(Chunk::pack(d, start_reg), line);
             chunk.write(shape_idx, line);
+        }
+        InstKind::BuildMap { pairs } => {
+            for (i, (k, v)) in pairs.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + (i * 2) as u8, reg[k.0 as usize], line);
+                chunk.emit_rr(
+                    OpCode::Move,
+                    call_base + (i * 2 + 1) as u8,
+                    reg[v.0 as usize],
+                    line,
+                );
+            }
+            chunk.emit(OpCode::BuildMap, line);
+            chunk.write(Chunk::pack(d, call_base), line);
+            chunk.write(Chunk::pack(pairs.len() as u8, 0), line);
         }
         InstKind::ToString { operand } => {
             chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], line);
@@ -652,6 +675,7 @@ pub(super) fn emit_value(
         | InstKind::SetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::MapSetIndex { .. }
         | InstKind::ObjectMerge { .. }
         | InstKind::AssertNotNull { .. }
         | InstKind::StoreGlobal { .. }

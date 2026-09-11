@@ -197,6 +197,7 @@ pub(crate) fn apply_kinds(
         // yields garbage. Int consumers unbox at the use instead.
         OpCode::GetProperty
         | OpCode::BuildArray
+        | OpCode::BuildMap
         | OpCode::BuildTuple
         | OpCode::BuildObjectWithShape
         | OpCode::BuildRecord
@@ -247,6 +248,7 @@ pub(crate) fn apply_kinds(
         | OpCode::StrLength
         | OpCode::ArrayPop
         | OpCode::GetIndex
+        | OpCode::MapGetIndex
         | OpCode::GetPropertyMaybe
         | OpCode::BindMethod
         | OpCode::ObjectKeys

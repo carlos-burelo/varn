@@ -221,6 +221,17 @@ impl ExecCtx {
                 self.stack[base + first_reg] = result;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::MapGetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let obj_reg = hi(w1);
+                let idx_reg = lo(w1);
+                let obj = self.stack[base + obj_reg];
+                let key_nv = self.stack[base + idx_reg];
+                let result = self.exec_map_get_index(obj, key_nv)?;
+                self.stack[base + first_reg] = result;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::SetIndex => {
                 let w1 = code[*ip];
                 *ip += 1;
@@ -243,6 +254,17 @@ impl ExecCtx {
                 self.exec_array_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::MapSetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let idx_reg = hi(w1);
+                let val_reg = lo(w1);
+                let obj = self.stack[base + first_reg];
+                let idx = self.stack[base + idx_reg];
+                let val = self.stack[base + val_reg];
+                self.exec_map_set_index(obj, idx, val)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::BuildArray | OpCode::BuildTuple => {
                 let is_tuple = op == OpCode::BuildTuple;
                 let w1 = code[*ip];
@@ -261,6 +283,23 @@ impl ExecCtx {
                 } else {
                     self.heap.alloc_array_vm(elems)
                 };
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
+            OpCode::BuildMap => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let w2 = code[*ip];
+                *ip += 1;
+                let (dest, start_reg) = (hi(w1), lo(w1));
+                let count = hi(w2);
+                let mut map = varn_types::value::ValueMap::default();
+                for i in 0..count {
+                    let k_nv = self.stack[base + start_reg + i * 2];
+                    let v_nv = self.stack[base + start_reg + i * 2 + 1];
+                    let key = self.heap.canonical_map_key(k_nv);
+                    map.insert(key, v_nv);
+                }
+                self.stack[base + dest] = self.heap.alloc_map_vm(map);
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildObject => {

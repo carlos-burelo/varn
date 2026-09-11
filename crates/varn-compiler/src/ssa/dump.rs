@@ -89,6 +89,9 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ArrayGetIndex { object, index } => {
             format!("arraygetindex {}[{}]", val(*object), val(*index))
         }
+        InstKind::MapGetIndex { object, index } => {
+            format!("mapgetindex {}[{}]", val(*object), val(*index))
+        }
         InstKind::SetProperty {
             object,
             name,
@@ -130,6 +133,18 @@ fn inst_kind(kind: &InstKind) -> String {
                 val(*value)
             )
         }
+        InstKind::MapSetIndex {
+            object,
+            index,
+            value,
+        } => {
+            format!(
+                "mapsetindex {}[{}] = {}",
+                val(*object),
+                val(*index),
+                val(*value)
+            )
+        }
         InstKind::ObjectMerge { target, source } => {
             format!("objectmerge {} <- {}", val(*target), val(*source))
         }
@@ -155,6 +170,14 @@ fn inst_kind(kind: &InstKind) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("record {{{inner}}}")
+        }
+        InstKind::BuildMap { pairs } => {
+            let inner = pairs
+                .iter()
+                .map(|(k, v)| format!("{}: {}", val(*k), val(*v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("map {{{inner}}}")
         }
         InstKind::ObjectRest { object, skip_keys } => {
             format!("objectrest {} skip={:?}", val(*object), skip_keys)

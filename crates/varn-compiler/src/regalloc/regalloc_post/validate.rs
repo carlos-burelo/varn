@@ -109,6 +109,30 @@ pub(crate) fn verify_build_array_constraints(
                         }
                     }
                 }
+            } else if matches!(op, OpCode::BuildMap) {
+                let w1 = if offset + 1 < code.len() {
+                    code[offset + 1]
+                } else {
+                    0
+                };
+                let w2 = if offset + 2 < code.len() {
+                    code[offset + 2]
+                } else {
+                    0
+                };
+                let start = (w1 & 0xff) as u8;
+                let count = (w2 >> 8) as u8;
+                let total_regs = count * 2;
+                if total_regs > 1 {
+                    let mapped_start = mapping.get(&start).copied().unwrap_or(start);
+                    for i in 1..total_regs {
+                        let orig = start.wrapping_add(i);
+                        let mapped = mapping.get(&orig).copied().unwrap_or(orig);
+                        if mapped != mapped_start.wrapping_add(i) {
+                            return false;
+                        }
+                    }
+                }
             }
         }
 

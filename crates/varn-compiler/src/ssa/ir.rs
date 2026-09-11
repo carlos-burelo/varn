@@ -196,6 +196,11 @@ pub enum InstKind {
         index: Value,
     },
 
+    MapGetIndex {
+        object: Value,
+        index: Value,
+    },
+
     SetProperty {
         object: Value,
         name: Rc<str>,
@@ -215,6 +220,12 @@ pub enum InstKind {
     },
 
     ArraySetIndex {
+        object: Value,
+        index: Value,
+        value: Value,
+    },
+
+    MapSetIndex {
         object: Value,
         index: Value,
         value: Value,
@@ -262,6 +273,10 @@ pub enum InstKind {
 
     BuildRecord {
         pairs: Vec<(Rc<str>, Value)>,
+    },
+
+    BuildMap {
+        pairs: Vec<(Value, Value)>,
     },
 
     ObjectRest {

@@ -236,7 +236,21 @@ impl Type {
         }
         match &self.0 {
             TypeKind::Union(members) => {
-                let mut kept: Vec<Type> = members.iter().filter(|m| *m != other).cloned().collect();
+                let mut kept: Vec<Type> = members
+                    .iter()
+                    .filter(|m| {
+                        if *m == other {
+                            return false;
+                        }
+                        if let (TypeKind::Array(_), TypeKind::Array(_)) = (&m.0, &other.0) {
+                            if other.0 == TypeKind::Array(Box::new(Type::Dynamic)) || *m == other {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                    .cloned()
+                    .collect();
                 if kept.is_empty() {
                     Type::Never
                 } else if kept.len() == 1 {

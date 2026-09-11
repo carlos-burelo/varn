@@ -178,7 +178,9 @@ struct LoopFacts {
 /// loop body executes zero times.
 fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     match kind {
-        InstKind::GetFixedField { .. } | InstKind::ArrayGetIndex { .. } => facts.memory_stable,
+        InstKind::GetFixedField { .. }
+        | InstKind::ArrayGetIndex { .. }
+        | InstKind::MapGetIndex { .. } => facts.memory_stable,
 
         InstKind::Binary { op, ty, .. } => {
             let typed = matches!(ty, HirType::Int | HirType::Float);
@@ -236,6 +238,8 @@ fn is_transparent(kind: &InstKind) -> bool {
             | InstKind::SetFixedField { .. }
             | InstKind::ArrayGetIndex { .. }
             | InstKind::ArraySetIndex { .. }
+            | InstKind::MapGetIndex { .. }
+            | InstKind::MapSetIndex { .. }
             | InstKind::IsNull { .. }
             | InstKind::IsArray { .. }
             | InstKind::GetEnumTag { .. }

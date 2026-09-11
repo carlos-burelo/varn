@@ -217,6 +217,35 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
+        (TypeKind::Generic(dn, args, _), TypeKind::Object(inf_fields))
+            if dn.as_ref() == IntrinsicType::Map.as_str()
+                && (args.len() == 1 || args.len() == 2) =>
+        {
+            let (key_ty, val_ty) = if args.len() == 2 {
+                (&args[0], &args[1])
+            } else {
+                (&Type::Str, &args[0])
+            };
+            let key_compat = types_compatible_impl(key_ty, &Type::Str, bind, cache, in_progress);
+            if !key_compat {
+                return false;
+            }
+            inf_fields.iter().all(|im| match im {
+                ObjectTypeMember::Property { ty, .. } => {
+                    types_compatible_impl(val_ty, ty, bind, cache, in_progress)
+                }
+                ObjectTypeMember::Index {
+                    key_ty: ik,
+                    value_ty: iv,
+                    ..
+                } => {
+                    types_compatible_impl(key_ty, ik, bind, cache, in_progress)
+                        && types_compatible_impl(val_ty, iv, bind, cache, in_progress)
+                }
+                _ => false,
+            })
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::Map), TypeKind::Object(_)) => true,
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Object(inf_fields)) => {
             if let Some(bind) = bind {
@@ -232,6 +261,28 @@ pub(super) fn types_compatible_impl(
                 return !is_known_named(bind, dn);
             }
             true
+        }
+        (TypeKind::Object(decl_fields), TypeKind::Generic(in_, args, _))
+            if in_.as_ref() == IntrinsicType::Map.as_str()
+                && (args.len() == 1 || args.len() == 2) =>
+        {
+            let (key_ty, val_ty) = if args.len() == 2 {
+                (&args[0], &args[1])
+            } else {
+                (&Type::Str, &args[0])
+            };
+            decl_fields.iter().all(|dm| match dm {
+                ObjectTypeMember::Index {
+                    key_ty: dk,
+                    value_ty: dv,
+                    ..
+                } => {
+                    types_compatible_impl(dk, key_ty, bind, cache, in_progress)
+                        && types_compatible_impl(dv, val_ty, bind, cache, in_progress)
+                }
+                ObjectTypeMember::Property { optional: true, .. } => true,
+                _ => false,
+            })
         }
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i))
         | (TypeKind::Object(decl_fields), TypeKind::Generic(in_, _, origin_i)) => {

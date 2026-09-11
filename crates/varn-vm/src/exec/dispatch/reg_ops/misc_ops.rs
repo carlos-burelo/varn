@@ -125,6 +125,25 @@ impl ExecCtx {
         crate::exec::collections::array_set_index(obj, idx, val, &mut self.heap)
     }
 
+    #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_map_get_index(
+        &mut self,
+        obj: VmValue,
+        key_nv: VmValue,
+    ) -> VmResult<VmValue> {
+        crate::exec::collections::map_get_index(obj, key_nv, &mut self.heap)
+    }
+
+    #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_map_set_index(
+        &mut self,
+        obj: VmValue,
+        idx: VmValue,
+        val: VmValue,
+    ) -> VmResult<()> {
+        crate::exec::collections::map_set_index(obj, idx, val, &mut self.heap)
+    }
+
     pub(crate) fn exec_object_rest(
         &mut self,
         obj: VmValue,

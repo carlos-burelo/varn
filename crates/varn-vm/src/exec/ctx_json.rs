@@ -35,6 +35,8 @@ fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
     } else if val.is_heap() {
         if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = ctx.heap.get(val.as_heap_idx()) {
             o.borrow().len() * 48 + 32
+        } else if let Some(HeapObj::Map(m)) = ctx.heap.get(val.as_heap_idx()) {
+            m.borrow().len() * 48 + 32
         } else {
             128
         }
@@ -151,6 +153,23 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                 out.push('}');
                 return;
             }
+            Some(HeapObj::Map(m)) => {
+                let map = m.borrow();
+                out.push('{');
+                let mut first = true;
+                for (k, &v) in map.iter() {
+                    if !first {
+                        out.push(',');
+                    }
+                    first = false;
+                    let key_s = ctx.heap.str_repr(k.0);
+                    write_json_str(&key_s, out);
+                    out.push(':');
+                    write_json_vm(ctx, v, out);
+                }
+                out.push('}');
+                return;
+            }
             _ => {}
         }
     }
@@ -194,6 +213,21 @@ fn write_value_json(val: &Value, ctx: &ExecCtx, out: &mut String) {
                 }
                 first = false;
                 write_json_str(k.as_ref(), out);
+                out.push(':');
+                write_json_vm(ctx, nv, out);
+            }
+            out.push('}');
+        }
+        Value::Map(m) => {
+            out.push('{');
+            let mut first = true;
+            for (k, &nv) in m.borrow().iter() {
+                if !first {
+                    out.push(',');
+                }
+                first = false;
+                let key_s = ctx.heap.str_repr(k.0);
+                write_json_str(&key_s, out);
                 out.push(':');
                 write_json_vm(ctx, nv, out);
             }

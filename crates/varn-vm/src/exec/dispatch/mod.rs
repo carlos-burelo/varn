@@ -400,7 +400,10 @@ impl ExecCtx {
                     | OpCode::Instanceof
                     | OpCode::Typeof
                     | OpCode::IsNull
-                    | OpCode::IsArray => {
+                    | OpCode::IsArray
+                    | OpCode::BuildMap
+                    | OpCode::MapGetIndex
+                    | OpCode::MapSetIndex => {
                         if let Some(flow) = tryv!((*ctx).exec_objects_collections_op(
                             op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )) {

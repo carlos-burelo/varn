@@ -338,9 +338,40 @@ impl<'r> Checker<'r> {
                         {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
+                                let original_ty = self
+                                    .symbol_types
+                                    .get(&id)
+                                    .cloned()
+                                    .or_else(|| bind.arena.get(id).ty.clone());
                                 if is_true_branch {
-                                    narrowings.push((id, (**target_type).clone()));
-                                } else if let Some(original_ty) = &bind.arena.get(id).ty {
+                                    if let Some(orig) = &original_ty {
+                                        let matched: Vec<Type> = match &orig.0 {
+                                            TypeKind::Union(members) => members
+                                                .iter()
+                                                .filter(|m| match (&m.0, &target_type.0) {
+                                                    (TypeKind::Array(_), TypeKind::Array(_)) => {
+                                                        true
+                                                    }
+                                                    _ => **m == **target_type,
+                                                })
+                                                .cloned()
+                                                .collect(),
+                                            _ => vec![(**target_type).clone()],
+                                        };
+                                        if !matched.is_empty() {
+                                            let narrowed = if matched.len() == 1 {
+                                                matched.into_iter().next().unwrap()
+                                            } else {
+                                                Type::union(matched)
+                                            };
+                                            narrowings.push((id, narrowed));
+                                        } else {
+                                            narrowings.push((id, (**target_type).clone()));
+                                        }
+                                    } else {
+                                        narrowings.push((id, (**target_type).clone()));
+                                    }
+                                } else if let Some(original_ty) = &original_ty {
                                     let narrowed = original_ty.minus(target_type);
                                     if narrowed != *original_ty {
                                         narrowings.push((id, narrowed));

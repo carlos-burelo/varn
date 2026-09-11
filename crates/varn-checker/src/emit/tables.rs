@@ -7,7 +7,7 @@
 
 use crate::binder::BindResult;
 use crate::emit::ty::{lower_type, NameResolver};
-use crate::types::{ClassMemberKind, FunctionType, Type};
+use crate::types::{ClassMemberKind, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::TypeKind;
@@ -208,18 +208,25 @@ fn build_one_class(
 /// today, which would make every `return x` inside it fail coherence.
 fn intern_signature(
     ty: &Type,
-    _tt: &mut TyTable,
-    _names: &NameIndex,
+    tt: &mut TyTable,
+    names: &NameIndex,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
-    let arity = match ty.kind() {
-        TypeKind::Fn(FunctionType { params, .. }) => params.len(),
-        _ => 0,
+    let (params, return_ty) = match ty.kind() {
+        TypeKind::Fn(f) => {
+            let p_tys: Vec<BackendTy> = f
+                .params
+                .iter()
+                .map(|p| lower_type(&p.ty, tt, names))
+                .collect();
+            (p_tys, BackendTy::Dynamic(varn_tir::DynReason::Unannotated))
+        }
+        _ => (vec![], BackendTy::Dynamic(varn_tir::DynReason::Unannotated)),
     };
     let id = signatures.len() as u32;
     signatures.push(Signature {
-        params: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); arity],
-        return_ty: BackendTy::Dynamic(varn_tir::DynReason::Unannotated),
+        params,
+        return_ty,
     });
     varn_tir::SigId(id)
 }

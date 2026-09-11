@@ -4,29 +4,8 @@ use std::sync::OnceLock;
 
 pub type RuntimeString = Rc<str>;
 
-/// Canonicalized `Map`/`Set` key. The wrapped `VmValue`'s bit pattern is
-/// content-canonical — produced by `Heap::canonical_map_key`: SSO/int/bool/
-/// null/float(-0 normalized) are canonical by representation; heap strings,
-/// chars, decimals and bigints canonicalize through the content interners
-/// (old-gen, so minor GC never moves them); everything else keys by
-/// identity (its packed heap index). Hash and equality are therefore plain
-/// u64 operations — no heap access, no fat-enum walk.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct MapKey(pub crate::vm_value::VmValue);
+pub use super::map::{MapKey, MapRef, ValueMap};
 
-impl std::hash::Hash for MapKey {
-    #[inline(always)]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Delegates to `VmValue`'s bit hash so that widening the value
-        // representation is a change to `vm_value.rs` and not to this map.
-        self.0.hash(state);
-    }
-}
-
-/// Backing storage for the language's `Map`/`Set`. FxHash: these are
-/// single-user, non-adversarial containers, and SipHash dominated lookup
-/// cost. Keys are canonicalized `VmValue`s; values are raw `VmValue`s.
-pub type ValueMap = rustc_hash::FxHashMap<MapKey, crate::vm_value::VmValue>;
 pub type ValueSet = rustc_hash::FxHashSet<MapKey>;
 
 /// Handle to a property object. The fields live inside this same allocation
@@ -169,51 +148,6 @@ impl std::hash::Hash for ArrayRef {
 impl std::fmt::Debug for ArrayRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ArrayRef({:p})", self.0)
-    }
-}
-
-#[derive(Clone)]
-pub struct MapRef(pub Rc<RefCell<ValueMap>>);
-
-impl MapRef {
-    pub fn new(data: ValueMap) -> Self {
-        Self(Rc::new(RefCell::new(data)))
-    }
-
-    pub fn read(&self) -> std::cell::Ref<'_, ValueMap> {
-        self.0.borrow()
-    }
-
-    pub fn write(&self) -> std::cell::RefMut<'_, ValueMap> {
-        self.0.borrow_mut()
-    }
-
-    pub fn borrow(&self) -> std::cell::Ref<'_, ValueMap> {
-        self.0.borrow()
-    }
-
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, ValueMap> {
-        self.0.borrow_mut()
-    }
-}
-
-impl PartialEq for MapRef {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for MapRef {}
-
-impl std::hash::Hash for MapRef {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
-    }
-}
-
-impl std::fmt::Debug for MapRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MapRef({:p})", self.0)
     }
 }
 

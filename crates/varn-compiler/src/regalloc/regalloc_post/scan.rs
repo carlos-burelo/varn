@@ -103,6 +103,24 @@ pub(crate) fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) 
                         blocks.push((start, count));
                     }
                 }
+                OpCode::BuildMap => {
+                    let w1 = if offset + 1 < code.len() {
+                        code[offset + 1]
+                    } else {
+                        0
+                    };
+                    let w2 = if offset + 2 < code.len() {
+                        code[offset + 2]
+                    } else {
+                        0
+                    };
+                    let start = (w1 & 0xff) as u8;
+                    let count = (w2 >> 8) as u8;
+                    let total_regs = count * 2;
+                    if total_regs > 1 {
+                        blocks.push((start, total_regs));
+                    }
+                }
                 OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
                     let w1 = if offset + 1 < code.len() {
                         code[offset + 1]

@@ -39,6 +39,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     | InstKind::BuildTuple { .. }
                     | InstKind::BuildObject { .. }
                     | InstKind::BuildRecord { .. }
+                    | InstKind::BuildMap { .. }
                     | InstKind::BuildStr { .. }
                     | InstKind::MakeClosure { .. }
                     | InstKind::MakeClass { .. }

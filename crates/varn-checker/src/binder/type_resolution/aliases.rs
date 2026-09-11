@@ -1,6 +1,5 @@
-use crate::types::{ObjectTypeMember, Type, TypeContext};
-use std::rc::Rc;
-use varn_core::{IntrinsicType, TypeKind, TypeTag};
+use crate::types::{Type, TypeContext};
+use varn_core::{IntrinsicType, TypeKind};
 
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
@@ -11,18 +10,6 @@ pub(super) fn try_stdlib_generic_alias(
     args: &[Type],
     ctx: Option<&dyn TypeContext>,
 ) -> Option<Type> {
-    if name == "Record" && args.len() == 2 {
-        let key_ty = &args[0];
-        let value_ty = &args[1];
-        if matches!(key_ty.0, TypeKind::Intrinsic(TypeTag::Str)) {
-            return Some(Type::object(vec![ObjectTypeMember::Index {
-                param_name: Rc::from("key"),
-                key_ty: Box::new(key_ty.clone()),
-                value_ty: Box::new(value_ty.clone()),
-            }]));
-        }
-    }
-
     let bind_rc = ctx?.resolver()?.stdlib_bind("core:types")?;
 
     let (params, alias_node) = bind_rc.get_alias_node_local(name)?;

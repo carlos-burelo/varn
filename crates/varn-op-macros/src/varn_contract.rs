@@ -113,6 +113,7 @@ fn classify(t: &TypeNode) -> Mapped {
             .map(scalar_mapped)
             .unwrap_or(Mapped::Dynamic),
         TypeKind::Intrinsic(TypeTag::Void) => Mapped::Void,
+        TypeKind::TypePredicate { .. } => Mapped::Bool,
         TypeKind::Array(_) => Mapped::Array,
         TypeKind::Union(members) if members.len() == 2 => {
             if matches!(members[1].kind, TypeKind::Intrinsic(TypeTag::Null)) {

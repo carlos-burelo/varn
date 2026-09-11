@@ -21,6 +21,25 @@ pub(crate) extern "C" fn jit_build_array(
     }
 }
 
+pub(crate) extern "C" fn jit_build_map(
+    ctx: *mut ExecCtx,
+    base: usize,
+    start_reg: usize,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let mut map = varn_types::value::ValueMap::default();
+        for i in 0..count {
+            let k_nv = ctx_ref.stack[base + start_reg + i * 2];
+            let v_nv = ctx_ref.stack[base + start_reg + i * 2 + 1];
+            let key = ctx_ref.heap.canonical_map_key(k_nv);
+            map.insert(key, v_nv);
+        }
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_map_vm(map);
+    }
+}
+
 pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmValue, count: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;

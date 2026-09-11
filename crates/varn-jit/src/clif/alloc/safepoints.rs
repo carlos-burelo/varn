@@ -63,6 +63,7 @@ pub(crate) fn has_alloc_scan(
             OpCode::from_u8(code[ip] as u8),
             Some(
                 OpCode::BuildArray
+                    | OpCode::BuildMap
                     | OpCode::BuildTuple
                     | OpCode::BuildObject
                     | OpCode::BuildObjectWithShape
@@ -129,6 +130,8 @@ pub(crate) fn has_alloc_scan(
                     | OpCode::WrapSpread
                     | OpCode::GetIndex
                     | OpCode::SetIndex
+                    | OpCode::MapGetIndex
+                    | OpCode::MapSetIndex
             )
         ) {
             return Ok(true);

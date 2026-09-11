@@ -3,6 +3,7 @@ mod buffer;
 mod class;
 mod closure;
 mod constructors;
+mod map;
 mod module;
 mod object;
 mod sendable;

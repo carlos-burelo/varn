@@ -51,6 +51,7 @@ macro_rules! jit_helper_abi {
             /// `fn(ctx, closure, obj, val, name_idx, cs_idx, ip)`.
             set_property_flat => jit_set_property_flat,
             build_array => jit_build_array,
+            build_map => jit_build_map,
             build_str => jit_build_str,
             negate => jit_negate,
             logical_not => jit_logical_not,

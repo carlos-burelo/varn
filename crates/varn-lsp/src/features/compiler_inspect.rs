@@ -283,7 +283,15 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
             format!("v{}[v{}] = v{}", object.0, index.0, value.0)
         }
         ArrayGetIndex { object, index } => format!("v{}[v{}]", object.0, index.0),
+        MapGetIndex { object, index } => format!("v{}[v{}]", object.0, index.0),
         ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
+            format!("v{}[v{}] = v{}", object.0, index.0, value.0)
+        }
+        MapSetIndex {
             object,
             index,
             value,
@@ -332,6 +340,14 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("record {{{p_str}}}")
+        }
+        BuildMap { pairs } => {
+            let p_str = pairs
+                .iter()
+                .map(|(k, v)| format!("v{}: v{}", k.0, v.0))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("map {{{p_str}}}")
         }
         ToString { operand } => format!("toString(v{})", operand.0),
         BuildStr { parts } => {

@@ -93,14 +93,14 @@ fn build_fn_index(proto: &FunctionProto) -> std::collections::HashMap<u16, Strin
     map
 }
 
-pub fn debug_bytecode(proto: &FunctionProto, _flags: &crate::flags::DebugFlags) {
+pub fn debug_bytecode(proto: &FunctionProto, flags: &crate::flags::DebugFlags) {
     Section::new("bytecode")
         .subtitle("...")
         .color(|c| c.yellow())
         .print();
 
     let mut total_words = 0;
-    print_proto(proto, 0, &mut total_words);
+    print_proto(proto, 0, &mut total_words, flags);
 
     Section::new("bytecode")
         .subtitle(format!("{} bytecode words", total_words))
@@ -114,12 +114,22 @@ fn lo(w: u16) -> usize {
     (w & 0xFF) as usize
 }
 
-fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
-    let indent = "  ".repeat(depth);
+fn print_proto(
+    proto: &FunctionProto,
+    depth: usize,
+    total: &mut usize,
+    flags: &crate::flags::DebugFlags,
+) {
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
+    let matches_filter = flags
+        .fn_filter
+        .as_ref()
+        .is_none_or(|needle| name.contains(needle.as_str()));
+
+    let indent = "  ".repeat(depth);
     let state_size_flag =
         (proto.state_size != 0).then(|| format!("state_size={}", proto.state_size));
-    let flags: Vec<&str> = [
+    let proto_flags: Vec<&str> = [
         proto.is_async.then_some("async"),
         proto.is_generator.then_some("gen"),
         proto.has_this.then_some("has_this"),
@@ -129,20 +139,21 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
     .flatten()
     .chain(state_size_flag.as_deref())
     .collect();
-    let flags_str = if flags.is_empty() {
+    let flags_str = if proto_flags.is_empty() {
         String::new()
     } else {
-        format!("  {DIM}[{}]{R}", flags.join(", "))
+        format!("  {DIM}[{}]{R}", proto_flags.join(", "))
     };
 
-    terminal::log(format!(
-        "{indent}{} {} (arity: {}, regs: {}, upvalues: {}){flags_str}",
-        chalk("fn").bold(),
-        chalk(name).blue(),
-        proto.arity,
-        proto.register_count,
-        proto.upvalue_count,
-    ));
+    if matches_filter {
+        terminal::log(format!(
+            "{indent}{} {} (arity: {}, regs: {}, upvalues: {}){flags_str}",
+            chalk("fn").bold(),
+            chalk(name).blue(),
+            proto.arity,
+            proto.register_count,
+            proto.upvalue_count,
+        ));
 
     if !proto.chunk.constants.is_empty() {
         terminal::log(format!(
@@ -322,11 +333,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 format!("r{} |= r{}", hi(w1), lo(w1))
             }
-            OpCode::GetIndex | OpCode::ArrayGetIndex => {
+            OpCode::GetIndex | OpCode::ArrayGetIndex | OpCode::MapGetIndex => {
                 let w1 = w!();
                 format!("r{} = r{}[r{}]", hi(op_val), hi(w1), lo(w1))
             }
-            OpCode::SetIndex | OpCode::ArraySetIndex => {
+            OpCode::SetIndex | OpCode::ArraySetIndex | OpCode::MapSetIndex => {
                 let w1 = w!();
                 format!("r{}[r{}] = r{}", hi(op_val), hi(w1), lo(w1))
             }
@@ -524,6 +535,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let w2 = w!();
                 format!("r{} = #[r{}..+{}]", hi(w1), lo(w1), hi(w2))
+            }
+            OpCode::BuildMap => {
+                let w1 = w!();
+                let w2 = w!();
+                format!("r{} = map[r{}..+{} pairs]", hi(w1), lo(w1), hi(w2))
             }
             OpCode::BuildObject => {
                 let w1 = w!();
@@ -758,16 +774,17 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         ));
     }
 
-    crate::loop_diagnostics::print_loop_diagnostics(
-        &proto.chunk.code,
-        &proto.chunk.constants,
-        &indent,
-    );
-    terminal::blank();
+        crate::loop_diagnostics::print_loop_diagnostics(
+            &proto.chunk.code,
+            &proto.chunk.constants,
+            &indent,
+        );
+        terminal::blank();
+    }
 
     for entry in &proto.chunk.constants {
         if let varn_types::PoolEntry::Function(nested) = entry {
-            print_proto(nested, depth + 1, total);
+            print_proto(nested, if matches_filter { depth + 1 } else { depth }, total, flags);
         }
     }
 }

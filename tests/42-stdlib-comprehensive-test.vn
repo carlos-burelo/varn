@@ -210,13 +210,13 @@ async function runComprehensiveTest(): Task<void> {
     let readonlyVar: Readonly<{ a: bool }> = { a: true };
     let requiredVar: Required<{ x?: int, y?: str }> = { x: 10, y: "yes" };
     let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
-    let recordVar: Record<str, int> = { "tested": 100 };
+    let recordVar: Map<str, int> = { "tested": 100 };
 
     assert("std:types partial compile value", partialVar.x === 42);
     assert("std:types readonly compile value", readonlyVar.a === true);
     assert("std:types required compile value", requiredVar.x === 10 && requiredVar.y === "yes");
     assert("std:types mutable compile value", mutableVar.a === false);
-    assert("std:types record compile value", recordVar["tested"] === 100);
+    assert("std:types map compile value", recordVar["tested"] === 100);
 }
 
 await runComprehensiveTest()

@@ -1,11 +1,17 @@
-
-const scores: Record<str, int> = {
+const scores: Map<str, int> = {
     "alice": 95,
     "bob": 87,
     "charlie": 72
 }
-assert("record get alice",   scores["alice"] === 95)
-assert("record get bob",     scores["bob"] === 87)
-assert("record get charlie", scores["charlie"] === 72)
+assert("map get alice",   scores["alice"] === 95)
+assert("map get bob",     scores["bob"] === 87)
+assert("map get charlie", scores["charlie"] === 72)
 
-print("[PASSED] 24. Record type ")
+scores["dave"] = 60
+assert("map set dave",    scores["dave"] === 60)
+
+const rec = #{ x: 10, y: 20 }
+assert("record prop x", rec.x === 10)
+assert("record prop y", rec.y === 20)
+
+print("[PASSED] 24. Map and Record types")

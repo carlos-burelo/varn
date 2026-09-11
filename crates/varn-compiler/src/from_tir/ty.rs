@@ -27,11 +27,19 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
 
         BackendTy::Decimal
         | BackendTy::BigInt
-        | BackendTy::Map(..)
-        | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Enum(_)
         | BackendTy::Fn(_) => HirType::Ref,
+
+        BackendTy::Map(k, v) => {
+            let k_inner = resolve(k, tir, out);
+            let v_inner = resolve(v, tir, out);
+            HirType::Map(out.intern(k_inner), out.intern(v_inner))
+        }
+        BackendTy::Set(el) => {
+            let inner = resolve(el, tir, out);
+            HirType::Set(out.intern(inner))
+        }
 
         BackendTy::Array(el) => {
             let inner = resolve(el, tir, out);

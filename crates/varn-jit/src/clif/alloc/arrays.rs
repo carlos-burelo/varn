@@ -42,6 +42,40 @@ pub(crate) fn emit_build_array(
     def_result(b, actx, dest, res);
 }
 
+pub(crate) fn emit_build_map(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let w1 = code[ip + 1];
+    let w2 = code[ip + 2];
+    let dest = (w1 >> 8) as usize;
+    let start = (w1 & 0xFF) as usize;
+    let count = (w2 >> 8) as usize;
+
+    let fb = frame_base_addr(b, actx);
+    for i in 0..(count * 2) {
+        store_home(b, actx, state, fb, start + i);
+    }
+    let start_v = b.ins().iconst(types::I64, start as i64);
+    let count_v = b.ins().iconst(types::I64, count as i64);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.build_map,
+        &[actx.exec_ctx, actx.base, start_v, count_v],
+    );
+    let res = b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
+    def_result(b, actx, dest, res);
+}
+
 pub(crate) fn emit_array_push(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,

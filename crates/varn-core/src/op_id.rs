@@ -66,6 +66,21 @@ pub fn array_push_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Array.name(), "push"))
 }
 
+pub fn str_starts_with_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "startsWith"))
+}
+
+pub fn str_ends_with_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "endsWith"))
+}
+
+pub fn str_slice_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "slice"))
+}
+
 /// The core builtin classes whose instance methods are natively registered
 /// (via the `varn_contract!` invocations in `varn-builtins/src/modules/
 /// primitives/*`) and are therefore op-id-addressable.

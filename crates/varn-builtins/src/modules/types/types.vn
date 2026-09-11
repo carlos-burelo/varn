@@ -18,10 +18,6 @@ export type Readonly<T> = { readonly [K in keyof T]: T[K] }
  */
 export type Mutable<T> = { [K in keyof T]: T[K] }
 
-/**
- * Constructs an object type with keys K and values of type T.
- */
-export type Record<K extends str, T> = { [P in K]: T }
 
 /**
  * Constructs a type by picking a set of properties K from T.

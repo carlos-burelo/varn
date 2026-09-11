@@ -120,9 +120,19 @@ fn lower_kind(
         // non-discriminated union and stays honestly dynamic.
         TypeKind::Union(members) => lower_union(members, tt, names),
 
+        // An object type with a single index signature is lowered to Map<K, V>.
         // An object type with named members reads like an index signature to
         // the backend: no slots, all by-name.
-        TypeKind::Object(_) => BackendTy::Dynamic(DynReason::IndexSignature),
+        TypeKind::Object(members) => {
+            if members.len() == 1 {
+                if let crate::types::ObjectTypeMember::Index { key_ty, value_ty, .. } = &members[0] {
+                    let k = lower_type(key_ty, tt, names);
+                    let v = lower_type(value_ty, tt, names);
+                    return BackendTy::Map(tt.intern(k), tt.intern(v));
+                }
+            }
+            BackendTy::Dynamic(DynReason::IndexSignature)
+        }
 
         // Types with no precise TIR representation: opaque dynamic.
         TypeKind::Fn(_)

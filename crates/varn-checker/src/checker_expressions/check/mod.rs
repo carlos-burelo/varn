@@ -7,7 +7,7 @@ use super::helpers::{base_type, closest_in_list, op_str};
 use super::infer::member_binary::normalize_for_binary;
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
+use crate::types::{Type, TypeContext};
 use std::rc::Rc;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, TemplatePart};
@@ -341,7 +341,28 @@ impl<'r> Checker<'r> {
                 self.is_assignment_target = true;
                 self.check_expr(target, bind);
                 self.is_assignment_target = prev;
-                self.check_expr(value, bind);
+
+                let target_ty = if let ExprKind::Identifier { name } = &target.kind {
+                    let scope = bind.scopes.get(self.current_scope);
+                    scope
+                        .resolve(name.as_ref(), &bind.scopes)
+                        .and_then(|id| {
+                            self.symbol_types
+                                .get(&id)
+                                .cloned()
+                                .or_else(|| bind.arena.get(id).ty.clone())
+                        })
+                        .unwrap_or_else(|| self.infer_type(target, bind))
+                } else {
+                    self.infer_type(target, bind)
+                };
+
+                let target_expected = if target_ty.is_dynamic() {
+                    None
+                } else {
+                    Some(target_ty.clone())
+                };
+                self.with_expected(target_expected, |c| c.check_expr(value, bind));
 
                 self.check_extension_assignment(target, bind);
 
@@ -374,20 +395,6 @@ impl<'r> Checker<'r> {
                     }
                 }
 
-                let target_ty = if let ExprKind::Identifier { name } = &target.kind {
-                    let scope = bind.scopes.get(self.current_scope);
-                    scope
-                        .resolve(name.as_ref(), &bind.scopes)
-                        .and_then(|id| {
-                            self.symbol_types
-                                .get(&id)
-                                .cloned()
-                                .or_else(|| bind.arena.get(id).ty.clone())
-                        })
-                        .unwrap_or_else(|| self.infer_type(target, bind))
-                } else {
-                    self.infer_type(target, bind)
-                };
                 let value_ty = self.infer_type(value, bind);
                 let is_empty_array_val = value_ty.is_dynamic()
                     && matches!(&value.kind, ExprKind::Array { elements } if elements.is_empty());
@@ -410,25 +417,46 @@ impl<'r> Checker<'r> {
                 ..
             } => self.check_call_expr(callee, args, type_args, &expr.range, expr.id, bind),
             ExprKind::New { callee, args, .. } => {
-                if let ExprKind::Identifier { name: cls_name } = &callee.kind {
-                    if self.abstract_classes.contains(cls_name.as_ref()) {
+                let cls_name = match &callee.kind {
+                    ExprKind::Identifier { name } => Some(name.as_ref()),
+                    ExprKind::Member {
+                        property,
+                        computed: false,
+                        ..
+                    } => match &property.kind {
+                        ExprKind::Identifier { name } => Some(name.as_ref()),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(name) = cls_name {
+                    if self.abstract_classes.contains(name) {
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::AbstractMethodNotImplemented,
-                                format!("cannot instantiate abstract class '{cls_name}'"),
+                                format!("cannot instantiate abstract class '{name}'"),
                             )
                             .with_range(expr.range),
                         );
                     }
                 }
                 self.check_expr(callee, bind);
-                for arg in args {
-                    match arg {
-                        varn_core::ast::Arg::Positional(e) => self.check_expr(e, bind),
-                        varn_core::ast::Arg::Named { value, .. } => self.check_expr(value, bind),
-                        varn_core::ast::Arg::Spread(e) => self.check_expr(e, bind),
-                    }
-                }
+                let view = crate::binder::BindView::new(bind, self.resolver);
+                let ctor_params = cls_name
+                    .and_then(|cn| {
+                        view.get_class_members(cn, None).and_then(|members| {
+                            members.iter().find_map(|m| {
+                                if m.kind == crate::types::ClassMemberKind::Constructor {
+                                    if let TypeKind::Fn(ft) = &m.ty.0 {
+                                        return Some(ft.params.clone());
+                                    }
+                                }
+                                None
+                            })
+                        })
+                    })
+                    .unwrap_or_default();
+                self.check_call_args_with_context(args, &ctor_params, bind);
             }
 
             ExprKind::Conditional {

@@ -338,17 +338,17 @@ pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping:
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
-                OpCode::BuildArray | OpCode::BuildTuple => {
+                OpCode::BuildArray | OpCode::BuildTuple | OpCode::BuildMap => {
                     let start = lo1 as usize;
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
                 }
 
-                OpCode::GetIndex | OpCode::ArrayGetIndex => {
+                OpCode::GetIndex | OpCode::ArrayGetIndex | OpCode::MapGetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
-                OpCode::SetIndex | OpCode::ArraySetIndex => {
+                OpCode::SetIndex | OpCode::ArraySetIndex | OpCode::MapSetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }

@@ -55,4 +55,9 @@ impl HeapInner {
         let oref = ObjRef::with_shape(Rc::clone(shape), values);
         VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
     }
+
+    pub(crate) fn alloc_map_vm(&mut self, map: varn_types::value::ValueMap) -> VmValue {
+        let mref = varn_types::value::MapRef::new(map);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Map(mref)))
+    }
 }

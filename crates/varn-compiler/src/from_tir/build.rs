@@ -771,6 +771,11 @@ impl<'m> Builder<'m> {
                         object: obj,
                         index: idx,
                     }
+                } else if matches!(self.value_ty(obj), HirType::Map(_, _)) {
+                    InstKind::MapGetIndex {
+                        object: obj,
+                        index: idx,
+                    }
                 } else {
                     InstKind::GetIndex {
                         object: obj,
@@ -836,6 +841,15 @@ impl<'m> Builder<'m> {
                 // A core-type method the checker resolved to a stable op-id:
                 // dispatch it directly, no name lookup, no inline cache.
                 if let Resolution::NativeOp(op_id) = &e.res {
+                    if *op_id == varn_core::op_id::array_push_op_id() && argv.len() == 1 {
+                        return Ok(self.emit(
+                            InstKind::ArrayPush {
+                                array: r,
+                                value: argv[0],
+                            },
+                            ty,
+                        ));
+                    }
                     return Ok(self.emit(
                         InstKind::CallNativeOp {
                             object: r,
@@ -947,6 +961,22 @@ impl<'m> Builder<'m> {
                 Ok(self.emit(InstKind::BuildRecord { pairs }, ty))
             }
             TirExprKind::ObjectLit { entries } => {
+                if matches!(ty, HirType::Map(_, _)) {
+                    let mut pairs = Vec::with_capacity(entries.len());
+                    for entry in entries {
+                        match entry {
+                            varn_tir::TirObjectEntry::Field { name, value } => {
+                                let key_val = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                                let v = self.lower_expr(value)?;
+                                pairs.push((key_val, v));
+                            }
+                            varn_tir::TirObjectEntry::Spread(x) => {
+                                let _ = self.lower_expr(x)?;
+                            }
+                        }
+                    }
+                    return Ok(self.emit(InstKind::BuildMap { pairs }, ty));
+                }
                 let any_spread = entries
                     .iter()
                     .any(|e| matches!(e, varn_tir::TirObjectEntry::Spread(_)));
@@ -1193,11 +1223,26 @@ impl<'m> Builder<'m> {
             TirExprKind::Index { object, index } => {
                 let obj = self.lower_expr(object)?;
                 let idx = self.lower_expr(index)?;
-                self.emit_effect(InstKind::SetIndex {
-                    object: obj,
-                    index: idx,
-                    value,
-                });
+                let kind = if matches!(self.value_ty(obj), HirType::Array(_)) {
+                    InstKind::ArraySetIndex {
+                        object: obj,
+                        index: idx,
+                        value,
+                    }
+                } else if matches!(self.value_ty(obj), HirType::Map(_, _)) {
+                    InstKind::MapSetIndex {
+                        object: obj,
+                        index: idx,
+                        value,
+                    }
+                } else {
+                    InstKind::SetIndex {
+                        object: obj,
+                        index: idx,
+                        value,
+                    }
+                };
+                self.emit_effect(kind);
             }
             _ => return Err(OptError::Unsupported("from_tir: assign target")),
         }

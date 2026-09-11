@@ -129,6 +129,43 @@ pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> Vm
 }
 
 #[inline(always)]
+pub(crate) fn map_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap_idx();
+        if let Some(HeapObj::Map(m)) = heap.get(heap_idx) {
+            let found = heap
+                .lookup_map_key(key)
+                .and_then(|k| m.borrow().get(&k).copied());
+            return Ok(found.unwrap_or_else(VmValue::null));
+        }
+    }
+    get_index(obj, key, heap)
+}
+
+#[inline(always)]
+pub(crate) fn map_set_index(
+    obj: VmValue,
+    key: VmValue,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap_idx();
+        let maybe_m = match heap.get(heap_idx) {
+            Some(HeapObj::Map(m)) => Some(m.clone()),
+            _ => None,
+        };
+        if let Some(m) = maybe_m {
+            let k = heap.canonical_map_key(key);
+            m.borrow_mut().insert(k, val);
+            heap.write_barrier(heap_idx, val);
+            return Ok(());
+        }
+    }
+    set_index(obj, key, val, heap)
+}
+
+#[inline(always)]
 pub(crate) fn array_set_index(
     obj: VmValue,
     key: VmValue,
@@ -238,6 +275,12 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                 Ok(VmValue::null())
             }
         }
+        Some(HeapObj::Map(m)) => {
+            let found = heap
+                .lookup_map_key(key)
+                .and_then(|k| m.borrow().get(&k).copied());
+            Ok(found.unwrap_or_else(VmValue::null))
+        }
         _ => Err(RuntimeError::new("OpGetIndex: not indexable")),
     }
 }
@@ -283,6 +326,13 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
                 let key_s = heap.str_repr(key);
                 o.set_field_str(&key_s, val);
             }
+            heap.write_barrier(heap_idx, val);
+            Ok(())
+        }
+        Some(HeapObj::Map(m)) => {
+            let m = m.clone();
+            let k = heap.canonical_map_key(key);
+            m.borrow_mut().insert(k, val);
             heap.write_barrier(heap_idx, val);
             Ok(())
         }
@@ -350,9 +400,22 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
 
 pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()) {
+        let heap_idx = obj.as_heap_idx();
+        let maybe_obj = match heap.get(heap_idx) {
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(o.clone()),
+            _ => None,
+        };
+        if let Some(o) = maybe_obj {
             let keys: Vec<Value> = o.borrow().keys().map(|k| Value::Str(k.clone())).collect();
             return Ok(heap.alloc_array(keys));
+        }
+        let maybe_map = match heap.get(heap_idx) {
+            Some(HeapObj::Map(m)) => Some(m.clone()),
+            _ => None,
+        };
+        if let Some(m) = maybe_map {
+            let keys: Vec<VmValue> = m.borrow().keys().map(|k| k.0).collect();
+            return Ok(heap.alloc_array_vm(keys));
         }
     }
     Err(RuntimeError::new("OpObjectKeys: not an object"))
@@ -360,14 +423,41 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 
 pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()) {
+        let heap_idx = obj.as_heap_idx();
+        let maybe_obj = match heap.get(heap_idx) {
+            Some(HeapObj::Object(o)) => Some((false, o.clone())),
+            Some(HeapObj::Record(o)) => Some((true, o.clone())),
+            _ => None,
+        };
+        if let Some((is_record, o)) = maybe_obj {
             let kept: Vec<(Rc<str>, VmValue)> = o
                 .borrow()
                 .iter()
                 .filter(|(k, _)| !exclude.iter().any(|e| e.as_str() == k.as_ref()))
                 .collect();
             let oref = ObjRef::from_pairs(kept);
-            return Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))));
+            let result_obj = if is_record {
+                HeapObj::Record(oref)
+            } else {
+                HeapObj::Object(oref)
+            };
+            return Ok(VmValue::from_heap_idx(heap.alloc(result_obj)));
+        }
+        let maybe_map = match heap.get(heap_idx) {
+            Some(HeapObj::Map(m)) => Some(m.clone()),
+            _ => None,
+        };
+        if let Some(m) = maybe_map {
+            let entries: Vec<(varn_types::value::MapKey, VmValue)> =
+                m.borrow().iter().map(|(k, v)| (*k, *v)).collect();
+            let mut new_m = varn_types::value::ValueMap::default();
+            for (k, v) in entries {
+                let s = heap.str_repr(k.0);
+                if !exclude.iter().any(|e| e.as_str() == s.as_str()) {
+                    new_m.insert(k, v);
+                }
+            }
+            return Ok(heap.alloc_map_vm(new_m));
         }
     }
     Err(RuntimeError::new("OpObjectRest: not an object"))
@@ -384,7 +474,8 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
     // An `Instance` has no `ObjData` to iterate: its fields live in a flat
     // payload addressed by the class layout, which is also their name order.
     if spread.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(spread.as_heap_idx()) {
+        let spread_idx = spread.as_heap_idx();
+        if let Some(HeapObj::Instance(inst)) = heap.get(spread_idx) {
             let inst = inst.clone();
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                 for field in &cls.get_or_compute_layout().fields {
@@ -394,6 +485,19 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
                             .insert(field.name.clone(), unsafe { inst.read_vm_value(offset) });
                     }
                 }
+            }
+            return Ok(target);
+        }
+        let maybe_map = match heap.get(spread_idx) {
+            Some(HeapObj::Map(m)) => Some(m.clone()),
+            _ => None,
+        };
+        if let Some(m) = maybe_map {
+            let entries: Vec<(varn_types::value::MapKey, VmValue)> =
+                m.borrow().iter().map(|(k, v)| (*k, *v)).collect();
+            for (k, nv) in entries {
+                let s = heap.str_repr(k.0);
+                target_obj.insert(Rc::from(s.as_str()), nv);
             }
             return Ok(target);
         }

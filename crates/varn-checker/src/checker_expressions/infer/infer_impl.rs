@@ -435,6 +435,27 @@ impl<'r> Checker<'r> {
             {
                 Type::Str
             }
+            TypeKind::Generic(name, args, _)
+                if name.as_ref() == IntrinsicType::Map.as_str() =>
+            {
+                if args.len() == 2 {
+                    args[1].clone()
+                } else if args.len() == 1 {
+                    args[0].clone()
+                } else {
+                    Type::Dynamic
+                }
+            }
+            TypeKind::Intrinsic(TypeTag::Map) => Type::Dynamic,
+            TypeKind::Object(members) => {
+                members
+                    .iter()
+                    .find_map(|m| match m {
+                        ObjectTypeMember::Index { value_ty, .. } => Some((**value_ty).clone()),
+                        _ => None,
+                    })
+                    .unwrap_or(Type::Dynamic)
+            }
             _ => Type::Dynamic,
         }
     }
@@ -445,6 +466,54 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
         _expr: &Expr,
     ) -> Type {
+        let has_methods = properties.iter().any(|p| {
+            matches!(
+                p,
+                varn_core::ast::ObjectProp::Method { .. }
+                    | varn_core::ast::ObjectProp::Getter { .. }
+                    | varn_core::ast::ObjectProp::Setter { .. }
+            )
+        });
+        if !has_methods {
+            if let Some(expected) = &self.expected_type {
+                let exp = expected.non_nullified();
+                let is_map = match &exp.0 {
+                    TypeKind::Generic(name, args, _) => {
+                        name.as_ref() == IntrinsicType::Map.as_str()
+                            && (args.len() == 1 || args.len() == 2)
+                    }
+                    TypeKind::Intrinsic(TypeTag::Map) => true,
+                    TypeKind::Object(members) if members.len() == 1 => {
+                        matches!(&members[0], ObjectTypeMember::Index { .. })
+                    }
+                    _ => false,
+                };
+                if is_map {
+                    for prop in properties {
+                        if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
+                            self.infer_type(value, bind);
+                        }
+                    }
+                    if let TypeKind::Object(members) = &exp.0 {
+                        if let ObjectTypeMember::Index {
+                            key_ty, value_ty, ..
+                        } = &members[0]
+                        {
+                            let map_name: Rc<str> = Rc::from(IntrinsicType::Map.as_str());
+                            return Type(
+                                TypeKind::Generic(
+                                    map_name,
+                                    vec![(**key_ty).clone(), (**value_ty).clone()],
+                                    None,
+                                ),
+                                false,
+                            );
+                        }
+                    }
+                    return exp;
+                }
+            }
+        }
         let mut members = Vec::new();
         for prop in properties {
             match prop {

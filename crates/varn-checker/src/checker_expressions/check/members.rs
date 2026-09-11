@@ -57,7 +57,55 @@ impl<'r> Checker<'r> {
     ) {
         self.check_expr(object, bind);
         if computed {
-            self.check_expr(property, bind);
+            if matches!(property.kind, ExprKind::Range { .. }) {
+                self.check_expr(property, bind);
+                return;
+            }
+            let obj_ty = self.infer_type(object, bind);
+            let check_ty = obj_ty.non_nullified();
+            let key_expected = match &check_ty.0 {
+                TypeKind::Generic(name, args, _)
+                    if name.as_ref() == varn_core::IntrinsicType::Map.as_str() =>
+                {
+                    if args.len() == 2 {
+                        Some(args[0].clone())
+                    } else if args.len() == 1 {
+                        Some(Type::Str)
+                    } else {
+                        None
+                    }
+                }
+                TypeKind::Object(members) => members.iter().find_map(|m| match m {
+                    ObjectTypeMember::Index { key_ty, .. } => Some((**key_ty).clone()),
+                    _ => None,
+                }),
+                TypeKind::Array(_) => Some(Type::Int),
+                _ => None,
+            };
+            if let Some(expected_k) = key_expected {
+                self.with_expected(Some(expected_k.clone()), |c| c.check_expr(property, bind));
+                let actual_k = self.infer_type(property, bind);
+                let is_range_slice = matches!(
+                    check_ty.0,
+                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str)
+                ) && matches!(actual_k.0, TypeKind::Intrinsic(varn_core::TypeTag::Range));
+                if !actual_k.is_dynamic()
+                    && !is_range_slice
+                    && !self.types_compatible_cached(&expected_k, &actual_k, Some(bind))
+                {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TypeMismatch,
+                            format!(
+                                "type mismatch: index key is '{actual_k}', expected '{expected_k}'"
+                            ),
+                        )
+                        .with_range(*property.range()),
+                    );
+                }
+            } else {
+                self.check_expr(property, bind);
+            }
             return;
         }
 

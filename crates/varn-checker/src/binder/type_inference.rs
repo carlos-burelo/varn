@@ -163,6 +163,26 @@ fn infer_member(
             TypeKind::Named(name, _) if name.as_ref() == varn_core::IntrinsicType::Str.as_str() => {
                 Type::Str
             }
+            TypeKind::Generic(name, args, _)
+                if name.as_ref() == varn_core::IntrinsicType::Map.as_str() =>
+            {
+                if args.len() == 2 {
+                    args[1].clone()
+                } else if args.len() == 1 {
+                    args[0].clone()
+                } else {
+                    Type::Dynamic
+                }
+            }
+            TypeKind::Object(members) => members
+                .iter()
+                .find_map(|m| match m {
+                    crate::types::ObjectTypeMember::Index { value_ty, .. } => {
+                        Some((**value_ty).clone())
+                    }
+                    _ => None,
+                })
+                .unwrap_or(Type::Dynamic),
             _ => Type::Dynamic,
         };
     }

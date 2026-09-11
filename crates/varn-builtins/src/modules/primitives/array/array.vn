@@ -27,6 +27,6 @@ export declare class Array<T> {
     lastIndexOf(search: T): int;
     toString(): str;
 
-    static isArray(obj: dynamic): bool;
+    static isArray(obj: dynamic): obj is dynamic[];
     static from(value: dynamic): T[];
 }

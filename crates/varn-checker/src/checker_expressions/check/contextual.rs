@@ -80,6 +80,16 @@ impl<'r> Checker<'r> {
             } else {
                 let resolved = match &ty.0 {
                     TypeKind::Object(m) => m.clone(),
+                    TypeKind::Generic(name, args, _)
+                        if name.as_ref() == varn_core::IntrinsicType::Map.as_str()
+                            && args.len() == 2 =>
+                    {
+                        vec![ObjectTypeMember::Index {
+                            param_name: std::rc::Rc::from("key"),
+                            key_ty: Box::new(args[0].clone()),
+                            value_ty: Box::new(args[1].clone()),
+                        }]
+                    }
                     TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
                         let view = crate::binder::BindView::new(bind, self.resolver);
                         let members = view
@@ -130,6 +140,7 @@ impl<'r> Checker<'r> {
                             ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == k => {
                                 Some(ty.clone())
                             }
+                            ObjectTypeMember::Index { value_ty, .. } => Some((**value_ty).clone()),
                             _ => None,
                         })
                     });

@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::chunk::{Literal, PoolEntry};
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
+use super::super::emit::{box_bool, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
 use super::super::kinds::K;
 use super::safepoints::{
     box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
@@ -26,6 +26,71 @@ pub(crate) fn emit_call_native_op(
         Some(PoolEntry::Literal(Literal::Int(i))) => *i as u64,
         _ => return Err("clif: native op-id not an int constant".into()),
     };
+
+    let str_starts_with_id = varn_core::op_id::str_starts_with_op_id();
+    if op_id == str_starts_with_id && total == 2 {
+        let recv_r = dest;
+        let search_r = dest + 1;
+        let recv = box_or_load_home(b, actx, state, recv_r);
+        let search = box_or_load_home(b, actx, state, search_r);
+        let (recv_tag, recv_payload) = b.ins().isplit(recv);
+        let (search_tag, search_payload) = b.ins().isplit(search);
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_starts_with_intrinsic,
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+        );
+        let boxed = box_bool(b, res);
+        def_result(b, actx, dest, boxed);
+        return Ok(());
+    }
+
+    let str_ends_with_id = varn_core::op_id::str_ends_with_op_id();
+    if op_id == str_ends_with_id && total == 2 {
+        let recv_r = dest;
+        let search_r = dest + 1;
+        let recv = box_or_load_home(b, actx, state, recv_r);
+        let search = box_or_load_home(b, actx, state, search_r);
+        let (recv_tag, recv_payload) = b.ins().isplit(recv);
+        let (search_tag, search_payload) = b.ins().isplit(search);
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_ends_with_intrinsic,
+            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+        );
+        let boxed = box_bool(b, res);
+        def_result(b, actx, dest, boxed);
+        return Ok(());
+    }
+
+    let str_slice_id = varn_core::op_id::str_slice_op_id();
+    if op_id == str_slice_id && total == 2 {
+        let recv_r = dest;
+        let idx_r = dest + 1;
+        let recv = box_or_load_home(b, actx, state, recv_r);
+        let idx = box_or_load_home(b, actx, state, idx_r);
+        let (recv_tag, recv_payload) = b.ins().isplit(recv);
+        let (idx_tag, idx_payload) = b.ins().isplit(idx);
+        let regs = live_boxed(actx, state);
+        flush_boxed(b, actx, state, &regs);
+        call_helper_void(
+            b,
+            actx.cc,
+            actx.helpers.str_slice,
+            &[actx.exec_ctx, recv_tag, recv_payload, idx_tag, idx_payload],
+        );
+        reload_boxed(b, actx, state, &regs);
+        let res = b.ins().load(
+            types::I128,
+            MemFlags::trusted(),
+            actx.exec_ctx,
+            actx.helpers.jit_native_result_offset as i32,
+        );
+        def_result(b, actx, dest, res);
+        return Ok(());
+    }
 
     let fb = frame_base_addr(b, actx);
     for r in dest..(dest + total).min(actx.nregs) {

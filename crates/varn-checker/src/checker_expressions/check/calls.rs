@@ -152,7 +152,7 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn check_call_args_with_context(
+    pub(super) fn check_call_args_with_context(
         &mut self,
         args: &[Arg],
         params: &[FunctionParam],
