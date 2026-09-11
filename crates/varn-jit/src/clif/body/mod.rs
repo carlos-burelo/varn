@@ -202,6 +202,7 @@ pub(super) fn lower_raw(
         narrow_roots,
         cur_ip: std::cell::Cell::new(0),
         safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
+        caller_epoch: linker.current_epoch(),
     });
 
     let reg_offset = 1;

@@ -191,6 +191,77 @@ impl Default for JitStrLayout {
     }
 }
 
+/// Probed layout for the fully-inlined frame-aware `Call` fast path
+/// (`emit_vm_call`'s open-coded push): everything it needs to walk a callee
+/// `VmValue` down to a runnable compiled entry, and to push/pop a
+/// `CallFrame` by hand, without a Rust call — for the steady-state case
+/// where `ctx.frames`/`ctx.stack` already have the capacity for it.
+///
+/// Every field here is either `offset_of!` on a struct this workspace owns
+/// (`FunctionProto`, `VmClosure`, `frame::CallFrame`, `ExecCtx`) — exact by
+/// construction, not probed — or, for the two things it does NOT own
+/// (`Vec<T>`'s internal layout, `Option<HeapObj>`'s niche), measured the same
+/// way `JitArrayLayout`/`JitObjectLayout` measure theirs.
+///
+/// What is deliberately NOT here: the `Rc<VmClosure>` strong-count offset.
+/// It reuses the `RcBox = {strong, weak, value}` assumption this codebase
+/// already leans on unprobed elsewhere (`Heap::rcbox_ptr_for_validation`,
+/// `Heap::nursery_len_byte_offset_from_rcbox`) — `value_ptr - 16` — rather
+/// than adding a second, redundant statement of the same constant.
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct JitFrameLayout {
+    /// Discriminant byte value of `HeapObj::VmClosure` (niche-shared with
+    /// `Option`, same probing technique as `JitArrayLayout::array_tag`).
+    pub closure_tag: usize,
+    /// Slot base → the closure payload's `Rc<VmClosure>` pointer (i.e. its
+    /// `Rc::as_ptr` — the VALUE address, control block at `-16`).
+    pub closure_payload_off: usize,
+    /// `VmClosure` base → its `proto: Rc<FunctionProto>` field, i.e. the raw
+    /// pointer bits of that `Rc` (its `Rc::as_ptr`).
+    pub closure_proto_off: usize,
+    /// `FunctionProto` base → `jit_entry: Cell<usize>` (0 = not published).
+    pub proto_jit_entry_off: usize,
+    /// `FunctionProto` base → `jit_epoch: Cell<u64>`. Compared against the
+    /// CALLER's own compile-time epoch (an `iconst` baked at lowering time,
+    /// not a fresh read) — sound because the caller only executes at all
+    /// while that same epoch is current; see the doc at its one call site.
+    pub proto_jit_epoch_off: usize,
+    /// `FunctionProto` base → `register_count: u16`.
+    pub proto_register_count_off: usize,
+    /// `FunctionProto` base → `has_rest: bool` (1 byte).
+    pub proto_has_rest_off: usize,
+    /// `FunctionProto` base → `is_async: bool` (1 byte).
+    pub proto_is_async_off: usize,
+    /// `FunctionProto` base → `is_generator: bool` (1 byte).
+    pub proto_is_generator_off: usize,
+    /// `size_of::<frame::CallFrame>()`.
+    pub frame_size: usize,
+    pub frame_closure_ptr_off: usize,
+    /// `CallFrame._owned_closure: Option<Rc<VmClosure>>` — null-pointer
+    /// niched (probed, not assumed: see the probe for the exact check).
+    pub frame_owned_closure_off: usize,
+    pub frame_ip_off: usize,
+    pub frame_base_off: usize,
+    /// `CallFrame.current_class: Option<Rc<ClassObj>>` — same null-pointer
+    /// niche as `frame_owned_closure_off`.
+    pub frame_current_class_off: usize,
+    /// `CallFrame.return_reg: u16` — a plain sentinel-valued field (see its
+    /// doc in `frame.rs`), not an `Option`, so no niche to probe here.
+    pub frame_return_reg_off: usize,
+    /// `ExecCtx.frames: Vec<CallFrame>` — its raw ptr/len/cap words' offsets
+    /// from the `ExecCtx` base (`offset_of!(ExecCtx, frames) + <vec word
+    /// off>`, same probe technique `stack_data_offset` already uses for
+    /// `ctx.stack`).
+    pub frames_ptr_offset: usize,
+    pub frames_len_offset: usize,
+    pub frames_cap_offset: usize,
+    /// `ExecCtx.stack: Vec<VmValue>`'s len/cap words (its ptr word is
+    /// `JitHelpers::stack_data_offset`, probed once already).
+    pub stack_len_offset: usize,
+    pub stack_cap_offset: usize,
+}
+
 /// Generates [`JitHelpers`] from the one shared list in
 /// [`crate::jit_helper_abi`]. Every entry there becomes a `usize` holding a
 /// host function address; the tail below is hand-written because those
@@ -263,6 +334,16 @@ macro_rules! define_jit_helpers {
         /// Byte offset of ExecCtx.jit_call_closure_ptr — `jit_prepare_static_call`'s
         /// scratch output for the resolved `*const VmClosure`.
         pub jit_call_closure_ptr_offset: usize,
+        /// Probed layout for the fully-inlined frame-aware `Call` fast path.
+        /// See [`JitFrameLayout`].
+        pub frame_layout: JitFrameLayout,
+        /// Mirrors `varn_vm::exec::jit_helpers::calls::MAX_CALL_DEPTH` — the
+        /// inline fast path's own call-depth guard has to agree with the
+        /// Rust-side one it declines to instead of enforcing its own,
+        /// independent limit. Threaded through rather than duplicated as a
+        /// literal in `varn-jit` (which cannot import the VM-side constant
+        /// directly — no dependency in that direction).
+        pub max_call_depth: usize,
         }
     };
 }

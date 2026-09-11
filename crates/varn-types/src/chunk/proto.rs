@@ -51,7 +51,7 @@ pub struct ExceptionRange {
     pub err_reg: u8,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
     pub name: Option<Rc<str>>,
@@ -145,9 +145,18 @@ pub struct FunctionProto {
     #[serde(skip, default)]
     pub resolved_shapes: RefCell<Vec<(u32, Rc<crate::Shape>)>>,
 
+    /// Address of this proto's compiled WRAPPER entry (the uniform `JitFn`
+    /// ABI — see `varn_jit::JitFn`), or `0` if none is published yet. Was
+    /// `Cell<Option<usize>>`; changed to match `clif_raw`'s convention below
+    /// (0-sentinel, not `Option`) so JIT-generated code can load and compare
+    /// this cell directly — `Option<usize>` has no spare bit pattern to niche
+    /// its discriminant into (every `usize` bit pattern is a valid `usize`),
+    /// so its in-memory shape is not something generated code could safely
+    /// read without probing the compiler's choice out first, and a real
+    /// entry address is never 0 either way.
     #[serde(skip)]
     #[serde(default)]
-    pub jit_entry: std::cell::Cell<Option<usize>>,
+    pub jit_entry: std::cell::Cell<usize>,
 
     /// Address of this proto's Cranelift RAW entry — the unboxed
     /// `fn(exec_ctx, args…) -> i64` body, callable clif→clif without going

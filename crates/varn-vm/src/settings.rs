@@ -16,7 +16,7 @@ pub struct ExecSettings {
     ///
     /// The interpreter is not a legacy path kept alive by this flag: it is the
     /// VM's base tier, and any function the JIT declines to compile
-    /// (`jit_entry == None`) runs there regardless. This only closes the door
+    /// (`jit_entry == 0`) runs there regardless. This only closes the door
     /// into compiled code, which is what makes it useful for splitting a
     /// misbehaviour into "representation" vs "codegen".
     pub no_jit: bool,

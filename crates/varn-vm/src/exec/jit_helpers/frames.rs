@@ -58,7 +58,7 @@ pub(crate) extern "C" fn jit_prepare_call(
                 // Return destination for a possible interpreted resume after
                 // an exception unwind (fast machine-return store is skipped
                 // in that case).
-                frame.return_reg = Some(call_dest);
+                frame.return_reg = call_dest;
                 ctx_ref.frames.push(frame);
                 return closure as *const crate::closure::VmClosure;
             }
@@ -102,7 +102,7 @@ pub(crate) extern "C" fn jit_prepare_call(
                                     .pending_constructors
                                     .push((returning_frame_idx, instance_nv));
                                 let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
-                                frame.return_reg = Some(call_dest);
+                                frame.return_reg = call_dest;
                                 ctx_ref.frames.push(frame);
                                 return ctor_closure_ptr;
                             }

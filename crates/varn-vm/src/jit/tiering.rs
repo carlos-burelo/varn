@@ -183,10 +183,11 @@ impl VmClosure {
         {
             return None;
         }
-        self.proto
-            .jit_entry
-            .get()
-            .map(|e| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(e) })
+        let e = self.proto.jit_entry.get();
+        if e == 0 {
+            return None;
+        }
+        Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(e) })
     }
 
     /// Count one frame entry and lower the proto once it proves hot.
@@ -219,7 +220,7 @@ impl VmClosure {
         // buffer under its own epoch rather than dropping it — an outer
         // context may still be executing it (a nested run can reach a proto
         // its caller is in).
-        let previous = if self.proto.jit_entry.get().is_some() {
+        let previous = if self.proto.jit_entry.get() != 0 {
             if self.proto.jit_epoch.get() == epoch
                 || crate::clif_link::adopt_if_inherited(&self.proto)
             {
@@ -243,7 +244,7 @@ impl VmClosure {
                 self.proto
                     .jit_serial
                     .set(crate::clif_link::stamp_compile_serial());
-                self.proto.jit_entry.set(Some(entry_usize));
+                self.proto.jit_entry.set(entry_usize);
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
                 // Publish the direct entry LAST: a call site that observes a
                 // non-zero `clif_raw` must find fully installed code behind it.
@@ -252,7 +253,7 @@ impl VmClosure {
             }
             Err(_) => {
                 self.proto.jit_failed.set(true);
-                self.proto.jit_entry.set(None);
+                self.proto.jit_entry.set(0);
                 self.proto.clif_raw.set(0);
                 self.proto.jit_epoch.set(0);
                 if let Some((old_epoch, code)) = previous {

@@ -62,7 +62,7 @@ impl ExecCtx {
                             }
                         }
                         let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                        frame.return_reg = Some(dest as u16);
+                        frame.return_reg = dest as u16;
                         self.record_call_vm_fast();
                         self.frames.push(frame);
                         return Ok(true);
@@ -161,7 +161,7 @@ impl ExecCtx {
                                     self.stack.resize(required, VmValue::null());
                                 }
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                                frame.return_reg = Some(dest as u16);
+                                frame.return_reg = dest as u16;
                                 frame.current_class = owner;
                                 self.record_call_vm_fast();
                                 self.frames.push(frame);
@@ -254,7 +254,7 @@ impl ExecCtx {
                                 }
                             }
                             let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                            frame.return_reg = Some(dest as u16);
+                            frame.return_reg = dest as u16;
                             self.record_call_vm_fast();
                             self.frames.push(frame);
                             return Ok(true);
@@ -295,7 +295,7 @@ impl ExecCtx {
                                 self.stack.resize(required, VmValue::null());
                             }
                             let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
-                            frame.return_reg = Some(dest as u16);
+                            frame.return_reg = dest as u16;
                             self.record_call_vm_fast();
                             self.frames.push(frame);
                             return Ok(true);
@@ -315,7 +315,7 @@ impl ExecCtx {
         self.dispatch_prepared_call(prepared)?;
 
         if self.frames.len() > frame_idx + 1 {
-            self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
             let last = self.frames.last().unwrap();
             let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {
@@ -380,8 +380,7 @@ impl ExecCtx {
                 }
                 let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
                 frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
-                frame.return_reg = Some(dest as u16);
-                frame.caller_base = Some(base);
+                frame.return_reg = dest as u16;
                 self.record_call_vm_fast();
                 self.frames.push(frame);
                 return Ok(true);
@@ -427,7 +426,7 @@ impl ExecCtx {
                 }
                 let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
                 frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
-                frame.return_reg = Some(dest as u16);
+                frame.return_reg = dest as u16;
                 self.record_call_vm_fast();
                 self.frames.push(frame);
                 return Ok(true);
@@ -442,7 +441,7 @@ impl ExecCtx {
         let prepared = self.prepare_call(callee, arg_count)?;
         self.dispatch_prepared_call(prepared)?;
         if self.frames.len() > frame_idx + 1 {
-            self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
             let last = self.frames.last().unwrap();
             let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {
@@ -498,7 +497,7 @@ impl ExecCtx {
         self.dispatch_prepared_call(prepared)?;
 
         if self.frames.len() > frame_idx + 1 {
-            self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
             let last = self.frames.last().unwrap();
             let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {

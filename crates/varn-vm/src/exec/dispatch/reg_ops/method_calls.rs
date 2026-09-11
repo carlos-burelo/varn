@@ -513,7 +513,7 @@ impl ExecCtx {
         self.dispatch_prepared_call(prepared)?;
 
         if self.frames.len() > frame_idx + 1 {
-            self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
             let last = self.frames.last().unwrap();
             let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {
@@ -639,8 +639,7 @@ impl ExecCtx {
             self.stack[final_base + 1 + rest_idx] = rest_nv;
         }
         let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
-        frame.return_reg = Some(dest as u16);
-        frame.caller_base = Some(base);
+        frame.return_reg = dest as u16;
         frame.current_class = owner_class;
         self.frames.push(frame);
         Ok(true)

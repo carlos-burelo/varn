@@ -273,20 +273,30 @@ fn emit_helper_call_window(
 
 /// Calls an arbitrary (possibly frame-aware) closure without crossing back
 /// into the generic VM dispatch when the callee turns out to already have
-/// compiled code: `jit_prepare_static_call` pushes the callee's `CallFrame`
-/// and hands back its wrapper's entry point, which this function then calls
-/// DIRECTLY (`call_indirect`, matching `build_wrapper`'s exact ABI — see
-/// `abi.rs`) instead of asking Rust to make that call for it. Declines (`0`
-/// back) fall to the unchanged `clif_call_fallback` path — async/generator/
-/// rest closures, class construction, native functions, or nothing compiled
-/// yet.
+/// compiled code. Three tiers, fastest first:
+///
+/// 1. [`emit_inline_frame_push`] — everything (heap walk, Rc bump,
+///    `CallFrame` construction, `ctx.frames`/`ctx.stack` bookkeeping) done as
+///    CLIF instructions, no Rust call, for the steady-state case where both
+///    Vecs already have room. Declines to tier 2 for any reason it doesn't
+///    apply — see that function's doc for the full list.
+/// 2. `jit_prepare_static_call` — the same push, but as ONE Rust call
+///    (needed the moment either Vec must grow, since growing a `Vec` in
+///    place from hand-written CLIF is out of scope here — see the
+///    follow-up note on the commit this landed in).
+/// 3. `clif_call_fallback` — full generic VM dispatch. Async/generator/rest
+///    closures, class construction, native functions, or nothing compiled
+///    yet.
+///
+/// Tiers 1 and 2 both funnel into the SAME `call_indirect` to the callee's
+/// wrapper ([`emit_wrapper_call_and_finish`]) once they have a
+/// `(wrapper_addr, closure_ptr, callee_base)` triple ready — that call, and
+/// the cleanup after it, does not care which tier produced them.
 ///
 /// `dest`/`next_ip` feed the exception-unwind protocol
 /// (`ExecCtx::jit_resume_ip`/`jit_call_dest`, see their docs in varn-vm):
-/// written before EITHER call, so a caught throw below this call can resume
-/// this (interpreted) caller from the right place. Unused by the two active
-/// paths today (nothing reads them but `jit_prepare_static_call` itself) —
-/// this is what lets that reader exist at all.
+/// written before every tier, so a caught throw below this call can resume
+/// this (interpreted) caller from the right place.
 #[allow(clippy::too_many_arguments)]
 fn emit_vm_call(
     b: &mut FunctionBuilder,
@@ -324,38 +334,95 @@ fn emit_vm_call(
         actx.helpers.jit_call_dest_offset as i32,
     );
 
-    let wrapper_addr = call_helper(
+    let try_medium = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I128);
+
+    // --- Tier 1: fully inline. ---
+    let (wrapper_addr, closure_ptr, callee_base) = emit_inline_frame_push(
+        b,
+        actx,
+        callee_tag,
+        callee_payload,
+        src,
+        total,
+        dest,
+        try_medium,
+    );
+    let res1 = emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_base);
+    b.ins().jump(merge, &[res1.into()]);
+
+    // --- Tier 2: one Rust call to resolve + push (handles growth). ---
+    b.switch_to_block(try_medium);
+    let wrapper_addr2 = call_helper(
         b,
         actx.cc,
         actx.helpers.jit_prepare_static_call,
         &[actx.exec_ctx, callee_tag, callee_payload, src, n],
     );
-    let took_fast = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr, 0);
+    let took_medium = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr2, 0);
+    let medium = b.create_block();
+    b.ins().brif(took_medium, medium, &[], slow, &[]);
 
-    let fast = b.create_block();
-    let slow = b.create_block();
-    let merge = b.create_block();
-    b.append_block_param(merge, types::I128);
-    b.ins().brif(took_fast, fast, &[], slow, &[]);
-
-    b.switch_to_block(fast);
-    let stack_ptr = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.stack_data_offset as i32,
-    );
-    let callee_base = b.ins().load(
+    b.switch_to_block(medium);
+    let callee_base2 = b.ins().load(
         types::I64,
         MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_call_base_offset as i32,
     );
-    let closure_ptr = b.ins().load(
+    let closure_ptr2 = b.ins().load(
         types::I64,
         MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_call_closure_ptr_offset as i32,
+    );
+    let res2 = emit_wrapper_call_and_finish(b, actx, wrapper_addr2, closure_ptr2, callee_base2);
+    b.ins().jump(merge, &[res2.into()]);
+
+    // --- Tier 3: full generic dispatch. ---
+    b.switch_to_block(slow);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.clif_call_fallback,
+        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
+    );
+    let slow_res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
+    b.ins().jump(merge, &[slow_res.into()]);
+
+    b.switch_to_block(merge);
+    let res = b.block_params(merge)[0];
+    reload_boxed(b, actx, state, &regs);
+    res
+}
+
+/// The `call_indirect` shared by tiers 1 and 2 of [`emit_vm_call`], plus the
+/// cleanup after it: `jit_finish_static_call` pops the frame whichever tier
+/// pushed, closes any upvalues captured out of it, and truncates the stack
+/// window back down. That part stays a Rust call in both tiers — it walks
+/// `ctx.open_upvalues` (a `Vec` this function does not hand-roll a push/pop
+/// for) and is a no-op read-and-return the overwhelming majority of the
+/// time (no upvalue was ever opened at or above `callee_base`), so it is a
+/// cheap call even when it cannot be skipped outright.
+fn emit_wrapper_call_and_finish(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    wrapper_addr: cranelift_codegen::ir::Value,
+    closure_ptr: cranelift_codegen::ir::Value,
+    callee_base: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let stack_ptr = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.stack_data_offset as i32,
     );
     let is_windows = actx.cc == cranelift_codegen::isa::CallConv::WindowsFastcall;
     let wrapper_res = if is_windows {
@@ -410,27 +477,249 @@ fn emit_vm_call(
         actx.helpers.jit_finish_static_call,
         &[actx.exec_ctx, callee_base],
     );
-    b.ins().jump(merge, &[wrapper_res.into()]);
+    wrapper_res
+}
 
-    b.switch_to_block(slow);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.clif_call_fallback,
-        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
-    );
-    let slow_res = b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_native_result_offset as i32,
-    );
-    b.ins().jump(merge, &[slow_res.into()]);
+/// Tier 1 of [`emit_vm_call`]: walks `callee` down to a compiled entry and
+/// hand-writes a `CallFrame` into `ctx.frames`, extends `ctx.stack` with its
+/// arguments, and bumps the callee closure's `Rc` strong count — all as CLIF
+/// instructions. No Rust call anywhere in this function.
+///
+/// Falls to `slow` (declines) the moment ANY of the following holds, in the
+/// order checked: `callee` is not a heap value; the heap slot is not a
+/// `HeapObj::VmClosure`; its proto has no published `jit_entry` yet; that
+/// proto was compiled under a different VM epoch than this caller (see
+/// [`super::super::lower::ClifLinker::current_epoch`]); the closure is
+/// async, a generator, or takes `...rest`; its `register_count` is somehow
+/// smaller than this call's own argument count (defensive — should never
+/// hold); `ctx.frames` or `ctx.stack` do not already have the spare
+/// capacity this push needs (including the same `MAX_CALL_DEPTH` guard
+/// `jit_guard_call_depth` enforces on the Rust-side tier); or the argument
+/// window falls outside the caller's own live stack range (defensive —
+/// should also never hold). Every one of these is exactly what
+/// `jit_prepare_static_call` (tier 2) checks too; this is a narrower,
+/// faster path layered in FRONT of it, never a replacement for it.
+///
+/// On success (falls through — does not jump), returns
+/// `(wrapper_addr, closure_ptr, callee_base)`, with the frame already
+/// pushed, `ctx.stack` already sized and populated (extra registers past
+/// the arguments null-filled, matching what `Vec::resize(.., VmValue::
+/// null())` would have produced), and `jit_frame_prepushed` already set to
+/// `1` — everything [`emit_wrapper_call_and_finish`] needs.
+#[allow(clippy::too_many_arguments)]
+fn emit_inline_frame_push(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    callee_tag: cranelift_codegen::ir::Value,
+    callee_payload: cranelift_codegen::ir::Value,
+    src: cranelift_codegen::ir::Value,
+    total: usize,
+    dest: usize,
+    slow: cranelift_codegen::ir::Block,
+) -> (
+    cranelift_codegen::ir::Value,
+    cranelift_codegen::ir::Value,
+    cranelift_codegen::ir::Value,
+) {
+    use super::super::emit::{box_null, HEAP_KIND, KIND_MASK};
+    let m = MemFlags::trusted();
+    let al = actx.helpers.array_layout;
+    let fl = actx.helpers.frame_layout;
 
-    b.switch_to_block(merge);
-    let res = b.block_params(merge)[0];
-    reload_boxed(b, actx, state, &regs);
-    res
+    // --- Heap walk: callee must be a `HeapObj::VmClosure`. ---
+    let tagbits = b.ins().band_imm(callee_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tagbits, HEAP_KIND);
+    let walk = b.create_block();
+    b.ins().brif(is_heap, walk, &[], slow, &[]);
+    b.switch_to_block(walk);
+
+    let raw = b.ins().band_imm(callee_payload, 0xFFFF_FFFF);
+    let rc = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, actx.helpers.heap_field_offset as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let base_old = b
+        .ins()
+        .load(types::I64, m, rc, (al.slots_vec_off + al.slots_ptr_off) as i32);
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (al.nursery_slots_vec_off + al.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let sbase = b.ins().select(old_bit, base_old, base_nur);
+    let sidx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm(sidx, al.slot_size as i64);
+    let slot_addr = b.ins().iadd(sbase, byte_off);
+
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_closure = b.ins().icmp_imm(IntCC::Equal, tagb, fl.closure_tag as i64);
+    let got_closure = b.create_block();
+    b.ins().brif(is_closure, got_closure, &[], slow, &[]);
+    b.switch_to_block(got_closure);
+
+    // Raw stored `Rc<VmClosure>` bits are the RCBOX BASE (`{strong, weak,
+    // value}`'s start), not `Rc::as_ptr()`'s value — see the probe's doc.
+    let closure_rcbox = b.ins().load(types::I64, m, slot_addr, fl.closure_payload_off as i32);
+    let closure_val = b.ins().iadd_imm(closure_rcbox, 16);
+
+    // --- Proto walk + eligibility. ---
+    let proto_rcbox = b.ins().load(types::I64, m, closure_val, fl.closure_proto_off as i32);
+    let proto_val = b.ins().iadd_imm(proto_rcbox, 16);
+
+    let entry = b.ins().load(types::I64, m, proto_val, fl.proto_jit_entry_off as i32);
+    let has_entry = b.ins().icmp_imm(IntCC::NotEqual, entry, 0);
+    let check_epoch = b.create_block();
+    b.ins().brif(has_entry, check_epoch, &[], slow, &[]);
+    b.switch_to_block(check_epoch);
+
+    let epoch = b.ins().load(types::I64, m, proto_val, fl.proto_jit_epoch_off as i32);
+    let caller_epoch = b.ins().iconst(types::I64, actx.caller_epoch as i64);
+    let epoch_ok = b.ins().icmp(IntCC::Equal, epoch, caller_epoch);
+    let check_shape = b.create_block();
+    b.ins().brif(epoch_ok, check_shape, &[], slow, &[]);
+    b.switch_to_block(check_shape);
+
+    let has_rest = b.ins().uload8(types::I64, m, proto_val, fl.proto_has_rest_off as i32);
+    let is_async = b.ins().uload8(types::I64, m, proto_val, fl.proto_is_async_off as i32);
+    let is_gen = b
+        .ins()
+        .uload8(types::I64, m, proto_val, fl.proto_is_generator_off as i32);
+    let bad1 = b.ins().bor(has_rest, is_async);
+    let bad = b.ins().bor(bad1, is_gen);
+    let eligible = b.ins().icmp_imm(IntCC::Equal, bad, 0);
+    let check_regs = b.create_block();
+    b.ins().brif(eligible, check_regs, &[], slow, &[]);
+    b.switch_to_block(check_regs);
+
+    let register_count = b
+        .ins()
+        .uload16(types::I64, m, proto_val, fl.proto_register_count_off as i32);
+    let total_c = b.ins().iconst(types::I64, total as i64);
+    let enough_regs = b
+        .ins()
+        .icmp(IntCC::UnsignedGreaterThanOrEqual, register_count, total_c);
+    let check_frame_cap = b.create_block();
+    b.ins().brif(enough_regs, check_frame_cap, &[], slow, &[]);
+    b.switch_to_block(check_frame_cap);
+
+    // --- Capacity: ctx.frames (plus the same depth guard the Rust tier
+    // enforces), then ctx.stack. ---
+    let frames_len = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.frames_len_offset as i32);
+    let frames_cap = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.frames_cap_offset as i32);
+    let has_frame_room = b.ins().icmp(IntCC::UnsignedLessThan, frames_len, frames_cap);
+    let depth_c = b.ins().iconst(types::I64, actx.helpers.max_call_depth as i64);
+    let under_depth = b.ins().icmp(IntCC::UnsignedLessThan, frames_len, depth_c);
+    let frame_room_ok = b.ins().band(has_frame_room, under_depth);
+    let check_stack_cap = b.create_block();
+    b.ins().brif(frame_room_ok, check_stack_cap, &[], slow, &[]);
+    b.switch_to_block(check_stack_cap);
+
+    let stack_len = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.stack_len_offset as i32);
+    let stack_cap = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.stack_cap_offset as i32);
+    let need_args = b.ins().iadd_imm(src, total as i64);
+    let args_fit = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, need_args, stack_len);
+    let required_len = b.ins().iadd(stack_len, register_count);
+    let required_cap = b.ins().iadd_imm(required_len, 32);
+    let stack_fits = b
+        .ins()
+        .icmp(IntCC::UnsignedLessThanOrEqual, required_cap, stack_cap);
+    let room_ok = b.ins().band(args_fit, stack_fits);
+    let commit = b.create_block();
+    b.ins().brif(room_ok, commit, &[], slow, &[]);
+    b.switch_to_block(commit);
+
+    // --- All checks passed: commit the push. ---
+    let callee_base = stack_len;
+
+    // Bump the closure's Rc strong count (RcBox's first word).
+    let strong = b.ins().load(types::I64, m, closure_rcbox, 0);
+    let strong1 = b.ins().iadd_imm(strong, 1);
+    b.ins().store(m, strong1, closure_rcbox, 0);
+
+    // Hand-write the CallFrame at frames[frames_len].
+    let frames_ptr = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.frames_ptr_offset as i32);
+    let frame_byte_off = b.ins().imul_imm(frames_len, fl.frame_size as i64);
+    let frame_addr = b.ins().iadd(frames_ptr, frame_byte_off);
+    let zero = b.ins().iconst(types::I64, 0);
+    let mut w = 0usize;
+    while w < fl.frame_size {
+        b.ins().store(m, zero, frame_addr, w as i32);
+        w += 8;
+    }
+    // closure_ptr: *const VmClosure — the VALUE pointer.
+    b.ins().store(m, closure_val, frame_addr, fl.frame_closure_ptr_off as i32);
+    // _owned_closure: Option<Rc<VmClosure>>, Some(_) — its raw bits are the
+    // RCBOX base, same convention as the read straight off the heap slot.
+    b.ins()
+        .store(m, closure_rcbox, frame_addr, fl.frame_owned_closure_off as i32);
+    b.ins().store(m, callee_base, frame_addr, fl.frame_base_off as i32);
+    let dest_c = b.ins().iconst(types::I64, dest as i64);
+    b.ins()
+        .istore16(m, dest_c, frame_addr, fl.frame_return_reg_off as i32);
+    // ip and current_class stay at the memset zero — 0 and None, matching
+    // `CallFrame::new`/`new_owned`'s own defaults for a plain function call.
+
+    let frames_len1 = b.ins().iadd_imm(frames_len, 1);
+    b.ins()
+        .store(m, frames_len1, actx.exec_ctx, fl.frames_len_offset as i32);
+
+    // Copy the arguments (compile-time unrolled — `total` is fixed per call
+    // site) and null-fill the registers past them (a runtime loop — the
+    // callee's `register_count` is not known until this point).
+    let stack_ptr = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, actx.helpers.stack_data_offset as i32);
+    let callee_byte = b.ins().imul_imm(callee_base, 16);
+    let dst_base = b.ins().iadd(stack_ptr, callee_byte);
+    let src_byte = b.ins().imul_imm(src, 16);
+    let src_base = b.ins().iadd(stack_ptr, src_byte);
+    for i in 0..total {
+        let val = b.ins().load(types::I128, m, src_base, (i * 16) as i32);
+        b.ins().store(m, val, dst_base, (i * 16) as i32);
+    }
+
+    let i_var = b.declare_var(types::I64);
+    b.def_var(i_var, total_c);
+    let loop_hdr = b.create_block();
+    let loop_body = b.create_block();
+    let loop_done = b.create_block();
+    b.ins().jump(loop_hdr, &[]);
+
+    b.switch_to_block(loop_hdr);
+    let i_val = b.use_var(i_var);
+    let more = b.ins().icmp(IntCC::UnsignedLessThan, i_val, register_count);
+    b.ins().brif(more, loop_body, &[], loop_done, &[]);
+
+    b.switch_to_block(loop_body);
+    let null_v = box_null(b);
+    let i_byte = b.ins().imul_imm(i_val, 16);
+    let extra_addr = b.ins().iadd(dst_base, i_byte);
+    b.ins().store(m, null_v, extra_addr, 0);
+    let i_next = b.ins().iadd_imm(i_val, 1);
+    b.def_var(i_var, i_next);
+    b.ins().jump(loop_hdr, &[]);
+
+    b.switch_to_block(loop_done);
+    b.ins()
+        .store(m, required_len, actx.exec_ctx, fl.stack_len_offset as i32);
+    let one = b.ins().iconst(types::I64, 1);
+    b.ins()
+        .store(m, one, actx.exec_ctx, actx.helpers.frame_prepushed_offset as i32);
+
+    let wrapper_addr = entry;
+    (wrapper_addr, closure_val, callee_base)
 }
 
 /// Direct self-recursion. A frame-aware lowering cannot pass its own `base` to

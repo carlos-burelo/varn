@@ -14,7 +14,7 @@ use crate::value::VmValue;
 /// Rust stack (the JIT invokes the callee's `jit_entry` directly), so without
 /// this guard deep recursion aborts the host process instead of producing a
 /// catchable runtime error.
-const MAX_CALL_DEPTH: usize = 10000;
+pub(crate) const MAX_CALL_DEPTH: usize = 10000;
 
 #[inline(always)]
 pub(super) unsafe fn jit_guard_call_depth(ctx: &mut ExecCtx) {
@@ -450,7 +450,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
             ctx_ref.stack.resize(required_len, VmValue::null());
         }
         let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
-        frame.return_reg = Some(call_dest);
+        frame.return_reg = call_dest;
         let closure_ptr = frame.closure_ptr as usize;
         // The frame must keep the closure alive on its own: the call site
         // makes the actual wrapper call itself, after this function (and its

@@ -201,9 +201,9 @@ pub(super) unsafe fn run_compiled_frame(
         (*ctx).modules.insert(module_id, cached);
     }
 
-    if let Some(return_reg) = frame.return_reg {
+    if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
         let caller_base = (*ctx).frames.last().map(|f| f.base).unwrap_or(0);
-        (*ctx).stack[caller_base + return_reg as usize] = final_val;
+        (*ctx).stack[caller_base + frame.return_reg as usize] = final_val;
     }
 
     if (*ctx).frames.len() == depth {

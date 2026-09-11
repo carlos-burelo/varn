@@ -98,6 +98,16 @@ pub trait ClifLinker {
     fn static_class_target(&self, _global_idx: usize) -> Option<ClifClassTarget> {
         None
     }
+    /// The VM epoch THIS compilation is happening under, baked into the
+    /// lowered body as an `iconst` for the inline frame-aware `Call` fast
+    /// path's callee-epoch guard (see `AllocCtx::caller_epoch`'s doc). `0` —
+    /// the default, and `NoLinker`'s only answer — can never match a real
+    /// callee's `jit_epoch` (a published `jit_entry` always stamps a nonzero
+    /// one), so a linker with no real epoch to report just makes that guard
+    /// permanently decline, same as it declining for any other reason.
+    fn current_epoch(&self) -> u64 {
+        0
+    }
 }
 
 /// Linker that never links — used by paths without a VM context.

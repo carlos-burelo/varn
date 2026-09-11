@@ -83,7 +83,7 @@ pub(crate) fn stamp_compile_serial() -> u64 {
 #[cold]
 pub(crate) fn adopt_if_inherited(proto: &Rc<FunctionProto>) -> bool {
     let owner = proto.jit_epoch.get();
-    if owner == 0 || proto.jit_entry.get().is_none() {
+    if owner == 0 || proto.jit_entry.get() == 0 {
         return false;
     }
     let epoch = current_epoch();
@@ -181,7 +181,7 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
             // Already recompiled for a live context; that owner clears it.
             continue;
         }
-        proto.jit_entry.set(None);
+        proto.jit_entry.set(0);
         proto.clif_raw.set(0);
         proto.jit_code.replace(None);
         proto.jit_epoch.set(0);
@@ -305,5 +305,14 @@ impl ClifLinker for CtxLinker {
             payload_size: layout.payload_size,
             trivial_plan,
         })
+    }
+
+    fn current_epoch(&self) -> u64 {
+        // Same value `compile_jit` stamps into `proto.jit_epoch` right after
+        // this compilation finishes — read here, at lowering time, so the
+        // inline fast path can bake it as an immediate instead of needing a
+        // live epoch source at runtime (which `varn-jit` has none of; it
+        // does not depend on `varn-vm`).
+        current_epoch()
     }
 }

@@ -268,7 +268,7 @@ impl ExecCtx {
                             "stack overflow: call depth exceeded 10000",
                         ));
                     }
-                    frame.return_reg = None;
+                    frame.return_reg = crate::frame::CallFrame::NO_RETURN_REG;
                     let required = frame.base + frame.closure().proto.register_count as usize;
                     if self.stack.len() < required {
                         self.stack.resize(required, VmValue::null());
@@ -315,7 +315,7 @@ impl ExecCtx {
                                 "stack overflow: call depth exceeded 10000",
                             ));
                         }
-                        frame.return_reg = Some(dest as u16);
+                        frame.return_reg = dest as u16;
                         let required = frame.base + frame.closure().proto.register_count as usize;
                         if self.stack.len() < required {
                             self.stack.resize(required, VmValue::null());

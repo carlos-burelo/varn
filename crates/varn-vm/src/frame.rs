@@ -14,14 +14,30 @@ pub struct CallFrame {
     pub ip: usize,
     pub base: usize,
     pub current_class: Option<Rc<varn_types::ClassObj>>,
-    pub return_reg: Option<u16>,
-    pub caller_base: Option<usize>,
+    /// The caller-frame register this call's return value lands in, or
+    /// [`Self::NO_RETURN_REG`]. Was `Option<u16>` — changed because `u16` has
+    /// no spare bit pattern to niche the discriminant into, so `Option<u16>`'s
+    /// in-memory shape is not something JIT-generated code can safely write
+    /// without probing it out of the compiler first. Every field here except
+    /// this one already niches to a null pointer for `None`/`0`, which is a
+    /// guarantee this codebase already leans on elsewhere (see
+    /// `Heap::rcbox_ptr_for_validation`'s `RcBox` layout assumption) — a
+    /// sentinel `u16` gets the same "one representation, JIT can write it
+    /// directly" property without adding a new one.
+    pub return_reg: u16,
 }
 
 unsafe impl Send for CallFrame {}
 unsafe impl Sync for CallFrame {}
 
 impl CallFrame {
+    /// Sentinel for "no return register" — this frame's result (if any) is
+    /// not written back into a caller register (e.g. the top-level module
+    /// frame, which has no caller). `u16::MAX` because register indices are
+    /// encoded in an 8-bit bytecode operand field elsewhere in the pipeline,
+    /// so no real register slot can ever reach it.
+    pub const NO_RETURN_REG: u16 = u16::MAX;
+
     pub(crate) fn new(closure: &VmClosure, base: usize) -> Self {
         Self {
             closure_ptr: closure as *const VmClosure,
@@ -29,8 +45,7 @@ impl CallFrame {
             ip: 0,
             base,
             current_class: None,
-            return_reg: None,
-            caller_base: None,
+            return_reg: Self::NO_RETURN_REG,
         }
     }
 
@@ -41,8 +56,7 @@ impl CallFrame {
             ip: 0,
             base,
             current_class: None,
-            return_reg: None,
-            caller_base: None,
+            return_reg: Self::NO_RETURN_REG,
         }
     }
 

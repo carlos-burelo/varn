@@ -23,6 +23,15 @@ pub enum SlotKind {
     Dynamic,
 }
 
+impl Default for SlotKind {
+    /// `Dynamic` — matches `proto.rs`'s pre-existing `slot_kind_dynamic()`
+    /// serde default for `FunctionProto::return_kind`, the only place this
+    /// type's default previously had a name.
+    fn default() -> Self {
+        SlotKind::Dynamic
+    }
+}
+
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct RegisterMeta {
     pub kind: SlotKind,
