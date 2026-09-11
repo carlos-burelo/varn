@@ -36,6 +36,16 @@ struct LoopCtx {
 
 struct Builder<'m> {
     tir: &'m TirModule,
+    /// The function currently being lowered, if it's addressable by
+    /// `Resolution::DirectFn` (a named free function/method body, not the
+    /// module top-level). A `Call` whose callee resolves to this same id is
+    /// this function calling itself by name — lowered as `InstKind::SelfCall`
+    /// instead of a `LoadGlobalIdx` + generic `Call`, which is what lets the
+    /// JIT recognize it as `OpCode::CallSelf` and take the direct
+    /// hardware-call fast path instead of forcing the whole function
+    /// frame-aware just because it contains a call. See
+    /// `TirExprKind::Call`'s `Resolution::DirectFn` arm.
+    self_fn: Option<varn_tir::FnId>,
     /// SSA-side type table for the class-name / element handles that
     /// `lower_ty` re-interns into.
     ssa_types: crate::hir::TyTable,
@@ -65,6 +75,7 @@ impl<'m> Builder<'m> {
     fn with_pinned(tir: &'m TirModule, pinned: FxHashSet<VarId>) -> Self {
         let mut b = Builder {
             tir,
+            self_fn: None,
             ssa_types: crate::hir::TyTable::default(),
             blocks: Vec::new(),
             values: Vec::new(),
@@ -750,6 +761,24 @@ impl<'m> Builder<'m> {
                         ty,
                     ));
                 }
+                // This function calling itself by name (`fib` inside `fib`'s
+                // own body): skip the `LoadGlobalIdx` + generic `Call` and
+                // emit `SelfCall` directly. `OpCode::CallSelf` is not in the
+                // JIT's allocation scan (`Call` is — any function containing
+                // one is forced frame-aware, which permanently denies it the
+                // direct hardware-call fast path), so a self-recursive
+                // function with no other reason to be frame-aware compiles as
+                // a true leaf and recurses with a bare `call` instruction
+                // instead of the boxed-argument VM helper. `SelfCall` has no
+                // spread slot, so a spread call (`fib(...args)`) still falls
+                // through to the general path below.
+                if let Resolution::DirectFn(f) = &e.res {
+                    if Some(*f) == self.self_fn {
+                        if let Some(v) = self.try_lower_self_call(args, ty)? {
+                            return Ok(v);
+                        }
+                    }
+                }
                 let cv = match &e.res {
                     Resolution::DirectFn(f) => {
                         let name = self
@@ -1052,6 +1081,25 @@ impl<'m> Builder<'m> {
                 ty,
             ))
         }
+    }
+
+    /// `InstKind::SelfCall` has no spread slot (see `SelfCall { args: Vec<Value> }`
+    /// in `ssa::ir`), so a spread self-call falls back: `Ok(None)` tells the
+    /// caller to take the normal `DirectFn` (`LoadGlobalIdx` + `Call`/`CallSpread`)
+    /// path instead. Named/positional args lower the same as `lower_call`.
+    fn try_lower_self_call(
+        &mut self,
+        args: &[varn_tir::TirArg],
+        ty: HirType,
+    ) -> Result<Option<Value>> {
+        if args
+            .iter()
+            .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+        {
+            return Ok(None);
+        }
+        let argv = self.lower_args(args)?;
+        Ok(Some(self.emit(InstKind::SelfCall { args: argv }, ty)))
     }
 
     fn lower_args(&mut self, args: &[varn_tir::TirArg]) -> Result<Vec<Value>> {
@@ -1618,12 +1666,16 @@ impl<'m> Builder<'m> {
 /// Build one `SsaFunc` from a `TirFunction`. `register_module_fns` is set for
 /// the module top level, which stores every free function / method as a
 /// global by qualified name (the convention the callee side reads back).
-pub fn build_function(tir: &TirModule, func: &TirFunction) -> Result<SsaFunc> {
-    build_inner(tir, func, false, &[])
+pub fn build_function(
+    tir: &TirModule,
+    func: &TirFunction,
+    self_fn: Option<varn_tir::FnId>,
+) -> Result<SsaFunc> {
+    build_inner(tir, func, false, &[], self_fn)
 }
 
 pub fn build_top_level(tir: &TirModule, export_slots: &[Rc<str>]) -> Result<SsaFunc> {
-    build_inner(tir, &tir.top_level, true, export_slots)
+    build_inner(tir, &tir.top_level, true, export_slots, None)
 }
 
 fn build_inner(
@@ -1631,10 +1683,12 @@ fn build_inner(
     func: &TirFunction,
     register_module_fns: bool,
     export_slots: &[Rc<str>],
+    self_fn: Option<varn_tir::FnId>,
 ) -> Result<SsaFunc> {
     let mut pinned = super::ctor_summary::captured_vars(func);
     pinned.extend(super::ctor_summary::try_pinned_vars(func));
     let mut b = Builder::with_pinned(tir, pinned.clone());
+    b.self_fn = self_fn;
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
 
@@ -1697,9 +1751,9 @@ fn build_inner(
 /// Build every function in the module: top level first, then the rest.
 pub fn build_module(tir: &TirModule) -> Result<Vec<SsaFunc>> {
     let mut out = Vec::with_capacity(tir.functions.len() + 1);
-    out.push(build_function(tir, &tir.top_level)?);
-    for f in &tir.functions {
-        out.push(build_function(tir, f)?);
+    out.push(build_function(tir, &tir.top_level, None)?);
+    for (i, f) in tir.functions.iter().enumerate() {
+        out.push(build_function(tir, f, Some(varn_tir::FnId(i as u32)))?);
     }
     Ok(out)
 }
@@ -1767,7 +1821,7 @@ mod tests {
             B::Int,
         );
         let m = module(vec![TirStmt::Return(Some(add))], vec![]);
-        let f = build_function(&m, &m.top_level).unwrap();
+        let f = build_function(&m, &m.top_level, None).unwrap();
         assert_eq!(f.blocks.len(), 1);
         assert!(matches!(f.blocks[0].term, Terminator::Return(Some(_))));
     }
@@ -1783,7 +1837,7 @@ mod tests {
             }],
             vec![],
         );
-        let f = build_function(&m, &m.top_level).unwrap();
+        let f = build_function(&m, &m.top_level, None).unwrap();
         assert!(f.blocks.len() >= 3);
     }
 
@@ -1805,7 +1859,7 @@ mod tests {
             ],
             vec![],
         );
-        let f = build_function(&m, &m.top_level).unwrap();
+        let f = build_function(&m, &m.top_level, None).unwrap();
         assert!(matches!(f.blocks[0].term, Terminator::Return(Some(_))));
     }
 
@@ -1821,7 +1875,7 @@ mod tests {
             ))],
             vec![],
         );
-        let f = build_function(&m, &m.top_level).unwrap();
+        let f = build_function(&m, &m.top_level, None).unwrap();
         assert!(f.blocks[0]
             .insts
             .iter()
@@ -1840,7 +1894,7 @@ mod tests {
             ))],
             vec![],
         );
-        let f = build_function(&m, &m.top_level).unwrap();
+        let f = build_function(&m, &m.top_level, None).unwrap();
         assert!(f.blocks[0]
             .insts
             .iter()
