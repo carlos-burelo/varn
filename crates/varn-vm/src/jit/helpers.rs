@@ -65,6 +65,8 @@ macro_rules! fill_jit_helpers {
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
             jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),
             jit_call_dest_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_dest),
+            jit_call_base_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_base),
+            jit_call_closure_ptr_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_closure_ptr),
         }
     }};
 }

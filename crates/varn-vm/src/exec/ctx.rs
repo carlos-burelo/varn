@@ -86,6 +86,15 @@ pub struct ExecCtx {
     /// *interpreted* after an exception unwind, its `Return` writes the result
     /// to the caller's slot (the fast path's machine-return store never ran).
     pub jit_call_dest: usize,
+    /// Scratch outputs of `jit_prepare_static_call` — the callee frame's
+    /// `base` and its resolved `*const VmClosure`, as a plain address. The
+    /// values aren't knowable at the CLIF call site before the call (`base`
+    /// is `ctx.stack.len()` at call time; the closure pointer needs a heap
+    /// lookup), so the call site reads them back from here immediately
+    /// after, then makes the wrapper call itself. Never holds a value across
+    /// anything else — read once, right after the call that wrote it.
+    pub jit_call_base: usize,
+    pub jit_call_closure_ptr: usize,
     /// An ON-STACK REPLACEMENT request raised by `OpCode::Loop` when a proto's
     /// back edges crossed the threshold, holding the loop-header ip to resume
     /// at. The opcode cannot service it itself — entering compiled code means
@@ -149,6 +158,8 @@ impl ExecCtx {
             jit_frame_prepushed: 0,
             jit_resume_ip: 0,
             jit_call_dest: 0,
+            jit_call_base: 0,
+            jit_call_closure_ptr: 0,
             osr_request: None,
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
@@ -318,6 +329,8 @@ impl ExecCtx {
             jit_frame_prepushed: 0,
             jit_resume_ip: 0,
             jit_call_dest: 0,
+            jit_call_base: 0,
+            jit_call_closure_ptr: 0,
             osr_request: None,
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,

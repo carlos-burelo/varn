@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
-    call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, use_f64, use_int,
+    call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, use_f64, use_int,
 };
 use super::super::kinds::K;
 use super::safepoints::{
@@ -107,7 +107,7 @@ pub(crate) fn emit_call(
                 b.ins().jump(cont_blk, &[]);
 
                 b.switch_to_block(slow_blk);
-                let slow_res = emit_vm_call(b, actx, state, callee, arg_start, total);
+                let slow_res = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
                 def_result(b, actx, dest, slow_res);
                 b.ins().jump(cont_blk, &[]);
 
@@ -132,7 +132,7 @@ pub(crate) fn emit_call(
     });
 
     let Some(t) = direct else {
-        let res = emit_vm_call(b, actx, state, callee, arg_start, total);
+        let res = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
         def_result(b, actx, dest, res);
         return Ok(());
     };
@@ -222,7 +222,7 @@ pub(crate) fn emit_call(
     b.ins().jump(merge, &[boxed_fast.into()]);
 
     b.switch_to_block(slow);
-    let boxed_slow = emit_vm_call(b, actx, state, callee, arg_start, total);
+    let boxed_slow = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
     b.ins().jump(merge, &[boxed_slow.into()]);
 
     b.switch_to_block(merge);
@@ -271,6 +271,23 @@ fn emit_helper_call_window(
     )
 }
 
+/// Calls an arbitrary (possibly frame-aware) closure without crossing back
+/// into the generic VM dispatch when the callee turns out to already have
+/// compiled code: `jit_prepare_static_call` pushes the callee's `CallFrame`
+/// and hands back its wrapper's entry point, which this function then calls
+/// DIRECTLY (`call_indirect`, matching `build_wrapper`'s exact ABI — see
+/// `abi.rs`) instead of asking Rust to make that call for it. Declines (`0`
+/// back) fall to the unchanged `clif_call_fallback` path — async/generator/
+/// rest closures, class construction, native functions, or nothing compiled
+/// yet.
+///
+/// `dest`/`next_ip` feed the exception-unwind protocol
+/// (`ExecCtx::jit_resume_ip`/`jit_call_dest`, see their docs in varn-vm):
+/// written before EITHER call, so a caught throw below this call can resume
+/// this (interpreted) caller from the right place. Unused by the two active
+/// paths today (nothing reads them but `jit_prepare_static_call` itself) —
+/// this is what lets that reader exist at all.
+#[allow(clippy::too_many_arguments)]
 fn emit_vm_call(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
@@ -278,17 +295,142 @@ fn emit_vm_call(
     callee: cranelift_codegen::ir::Value,
     arg_start: usize,
     total: usize,
+    dest: usize,
+    next_ip: usize,
 ) -> cranelift_codegen::ir::Value {
     let (callee_tag, callee_payload) = b.ins().isplit(callee);
-    emit_helper_call_window(
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let fb = frame_base_addr(b, actx);
+    for r in arg_start..(arg_start + total).min(actx.nregs) {
+        store_home(b, actx, state, fb, r);
+    }
+    let src = b.ins().iadd_imm(actx.base, arg_start as i64);
+    let n = b.ins().iconst(types::I64, total as i64);
+
+    let resume_ip_v = b.ins().iconst(types::I64, next_ip as i64);
+    b.ins().store(
+        MemFlags::trusted(),
+        resume_ip_v,
+        actx.exec_ctx,
+        actx.helpers.jit_resume_ip_offset as i32,
+    );
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
+    b.ins().store(
+        MemFlags::trusted(),
+        dest_v,
+        actx.exec_ctx,
+        actx.helpers.jit_call_dest_offset as i32,
+    );
+
+    let wrapper_addr = call_helper(
         b,
-        actx,
-        state,
+        actx.cc,
+        actx.helpers.jit_prepare_static_call,
+        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
+    );
+    let took_fast = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr, 0);
+
+    let fast = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I128);
+    b.ins().brif(took_fast, fast, &[], slow, &[]);
+
+    b.switch_to_block(fast);
+    let stack_ptr = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.stack_data_offset as i32,
+    );
+    let callee_base = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_call_base_offset as i32,
+    );
+    let closure_ptr = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_call_closure_ptr_offset as i32,
+    );
+    let is_windows = actx.cc == cranelift_codegen::isa::CallConv::WindowsFastcall;
+    let wrapper_res = if is_windows {
+        // Mirrors `build_wrapper`'s Windows struct-return convention exactly:
+        // a caller-allocated 16-byte slot for (tag, payload), passed as the
+        // first (special StructReturn) argument.
+        let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            16,
+            4,
+        ));
+        let sret = b.ins().stack_addr(types::I64, slot, 0);
+        let mut sig = cranelift_codegen::ir::Signature::new(actx.cc);
+        sig.params.push(cranelift_codegen::ir::AbiParam::special(
+            types::I64,
+            cranelift_codegen::ir::ArgumentPurpose::StructReturn,
+        ));
+        for _ in 0..4 {
+            sig.params
+                .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        }
+        let sig_ref = b.import_signature(sig);
+        b.ins().call_indirect(
+            sig_ref,
+            wrapper_addr,
+            &[sret, stack_ptr, closure_ptr, callee_base, actx.exec_ctx],
+        );
+        let tag = b.ins().load(types::I64, MemFlags::trusted(), sret, 0);
+        let payload = b.ins().load(types::I64, MemFlags::trusted(), sret, 8);
+        b.ins().iconcat(tag, payload)
+    } else {
+        let mut sig = cranelift_codegen::ir::Signature::new(actx.cc);
+        for _ in 0..4 {
+            sig.params
+                .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        }
+        sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        let sig_ref = b.import_signature(sig);
+        let call = b.ins().call_indirect(
+            sig_ref,
+            wrapper_addr,
+            &[stack_ptr, closure_ptr, callee_base, actx.exec_ctx],
+        );
+        let results = b.inst_results(call);
+        let (tag, payload) = (results[0], results[1]);
+        b.ins().iconcat(tag, payload)
+    };
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.jit_finish_static_call,
+        &[actx.exec_ctx, callee_base],
+    );
+    b.ins().jump(merge, &[wrapper_res.into()]);
+
+    b.switch_to_block(slow);
+    call_helper_void(
+        b,
+        actx.cc,
         actx.helpers.clif_call_fallback,
-        &[callee_tag, callee_payload],
-        arg_start,
-        total,
-    )
+        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
+    );
+    let slow_res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
+    );
+    b.ins().jump(merge, &[slow_res.into()]);
+
+    b.switch_to_block(merge);
+    let res = b.block_params(merge)[0];
+    reload_boxed(b, actx, state, &regs);
+    res
 }
 
 /// Direct self-recursion. A frame-aware lowering cannot pass its own `base` to

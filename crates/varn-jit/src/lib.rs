@@ -257,6 +257,12 @@ macro_rules! define_jit_helpers {
         /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
         /// as the callee frame's return_reg for correct interpreted-resume returns.
         pub jit_call_dest_offset: usize,
+        /// Byte offset of ExecCtx.jit_call_base — `jit_prepare_static_call`'s
+        /// scratch output for the callee frame's `base`.
+        pub jit_call_base_offset: usize,
+        /// Byte offset of ExecCtx.jit_call_closure_ptr — `jit_prepare_static_call`'s
+        /// scratch output for the resolved `*const VmClosure`.
+        pub jit_call_closure_ptr_offset: usize,
         }
     };
 }
