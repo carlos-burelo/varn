@@ -2,4 +2,6 @@
 export { List } from "std:collections/list";
 export { Stack } from "std:collections/stack";
 export { Queue } from "std:collections/queue";
+export { PriorityQueue } from "std:collections/priority_queue";
+export { LRUCache } from "std:collections/lru";
 

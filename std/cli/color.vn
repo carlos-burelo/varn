@@ -1,0 +1,94 @@
+export namespace Color {
+    export const RESET: str = "\x1b[0m";
+    export const BOLD: str = "\x1b[1m";
+    export const DIM: str = "\x1b[2m";
+    export const ITALIC: str = "\x1b[3m";
+    export const UNDERLINE: str = "\x1b[4m";
+
+    export const BLACK: str = "\x1b[30m";
+    export const RED: str = "\x1b[31m";
+    export const GREEN: str = "\x1b[32m";
+    export const YELLOW: str = "\x1b[33m";
+    export const BLUE: str = "\x1b[34m";
+    export const MAGENTA: str = "\x1b[35m";
+    export const CYAN: str = "\x1b[36m";
+    export const WHITE: str = "\x1b[37m";
+    export const GRAY: str = "\x1b[90m";
+
+    export const BG_BLACK: str = "\x1b[40m";
+    export const BG_RED: str = "\x1b[41m";
+    export const BG_GREEN: str = "\x1b[42m";
+    export const BG_YELLOW: str = "\x1b[43m";
+    export const BG_BLUE: str = "\x1b[44m";
+    export const BG_MAGENTA: str = "\x1b[45m";
+    export const BG_CYAN: str = "\x1b[46m";
+    export const BG_WHITE: str = "\x1b[47m";
+
+    export function bold(text: str): str {
+        return Color.BOLD + text + Color.RESET;
+    }
+
+    export function dim(text: str): str {
+        return Color.DIM + text + Color.RESET;
+    }
+
+    export function italic(text: str): str {
+        return Color.ITALIC + text + Color.RESET;
+    }
+
+    export function underline(text: str): str {
+        return Color.UNDERLINE + text + Color.RESET;
+    }
+
+    export function red(text: str): str {
+        return Color.RED + text + Color.RESET;
+    }
+
+    export function green(text: str): str {
+        return Color.GREEN + text + Color.RESET;
+    }
+
+    export function yellow(text: str): str {
+        return Color.YELLOW + text + Color.RESET;
+    }
+
+    export function blue(text: str): str {
+        return Color.BLUE + text + Color.RESET;
+    }
+
+    export function magenta(text: str): str {
+        return Color.MAGENTA + text + Color.RESET;
+    }
+
+    export function cyan(text: str): str {
+        return Color.CYAN + text + Color.RESET;
+    }
+
+    export function gray(text: str): str {
+        return Color.GRAY + text + Color.RESET;
+    }
+
+    export function white(text: str): str {
+        return Color.WHITE + text + Color.RESET;
+    }
+
+    export function stripAnsi(text: str): str {
+        let result: str = "";
+        let inEscape: bool = false;
+        let length: int = text.length;
+
+        for (let index = 0; index < length; index = index + 1) {
+            let character = text[index];
+            if (character === "\x1b") {
+                inEscape = true;
+            } else if (inEscape) {
+                if (character === "m") {
+                    inEscape = false;
+                }
+            } else {
+                result = result + character;
+            }
+        }
+        return result;
+    }
+}

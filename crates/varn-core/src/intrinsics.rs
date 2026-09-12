@@ -40,6 +40,16 @@ impl IntrinsicType {
     pub const DateTime: Self = Self(TypeTag::DateTime);
     pub const Duration: Self = Self(TypeTag::Duration);
     pub const UUID: Self = Self(TypeTag::UUID);
+    pub const I8: Self = Self(TypeTag::I8);
+    pub const I16: Self = Self(TypeTag::I16);
+    pub const I32: Self = Self(TypeTag::I32);
+    pub const U8: Self = Self(TypeTag::U8);
+    pub const U16: Self = Self(TypeTag::U16);
+    pub const U32: Self = Self(TypeTag::U32);
+    pub const U64: Self = Self(TypeTag::U64);
+    pub const F32: Self = Self(TypeTag::F32);
+    pub const Span: Self = Self(TypeTag::Span);
+    pub const TypedArray: Self = Self(TypeTag::TypedArray);
 
     pub const fn as_str(self) -> &'static str {
         self.0.name()
@@ -72,6 +82,16 @@ impl IntrinsicType {
             "Error" => Some(Self::Error),
             "TypeError" => Some(Self::TypeError),
             "RangeError" => Some(Self::RangeError),
+            "i8" => Some(Self::I8),
+            "i16" => Some(Self::I16),
+            "i32" => Some(Self::I32),
+            "u8" => Some(Self::U8),
+            "u16" => Some(Self::U16),
+            "u32" => Some(Self::U32),
+            "u64" => Some(Self::U64),
+            "f32" => Some(Self::F32),
+            "Span" => Some(Self::Span),
+            "TypedArray" => Some(Self::TypedArray),
             _ => None,
         }
     }

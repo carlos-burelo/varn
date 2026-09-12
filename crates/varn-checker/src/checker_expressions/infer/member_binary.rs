@@ -118,9 +118,7 @@ pub(super) fn infer_binary_type(
                 | BinaryOp::Shl
                 | BinaryOp::Shr
                 | BinaryOp::UShr => {
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Int))
-                        && matches!(r.0, TypeKind::Intrinsic(TypeTag::Int))
-                    {
+                    if l.is_int() && r.is_int() {
                         return Type::intrinsic(TypeTag::Int);
                     }
                     Type::Dynamic.tainted()

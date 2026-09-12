@@ -41,7 +41,7 @@ flowchart TD
 | `std:http` | Cliente (`fetch`) y Servidor HTTP declarativo alineado 100% al estándar Web (`Request`, `Response`, `Headers`). | `varn-builtins::net` |
 | `std:fs` | Sistema de archivos (lectura, escritura, streams, permisos). | `varn-builtins::fs` |
 | `std:io` | Entrada/Salida estándar (`stdin`, `stdout`, `stderr`). | `varn-builtins::io` |
-| `std:task` | Concurrencia, `TaskGroup`, `parallel`, `spawnIsolate`. | `varn-runtime` |
+| `std:task` | Concurrencia, `TaskGroup`, `parallel`, `spawnIsolate`, sincronización (`Mutex`, `Semaphore`, `Barrier`). | `varn-runtime` |
 | `std:crypto` | Hashing (SHA256, MD5) y encriptación. | `varn-builtins::crypto` |
 | `std:time` | Medición de tiempo, temporizadores y formateo de fechas. | `varn-builtins::time` |
 | `std:json` | Serialización y parsing ultrarrápido de JSON. | `varn-builtins::json` |
@@ -50,14 +50,21 @@ flowchart TD
 | `std:math` | Operaciones matemáticas y funciones trigonométricas. | `varn-core::numeric` |
 | `std:testing` | Framework de pruebas unitarias y aserciones. | `varn-builtins::testing` |
 | `std:result` | Tipos algebraicos monádicos `Option<T>` y `Result<T, E>`. | — |
-| `std:collections` | Estructuras de datos avanzadas (`Deque`, `PriorityQueue`). | — |
+| `std:collections` | Estructuras de datos avanzadas (`List`, `Stack`, `Queue`, `PriorityQueue`, `LRUCache`). | — |
+| `std:cli` | Parser de argumentos CLI, formateo de tablas y colores ANSI terminal (`Color`, `Table`). | — |
+| `std:log` | Logger estructurado configurable con niveles (Debug, Info, Warn, Error). | — |
+| `std:encoding` | Encoders/Decoders Base64, Hex, CSV y utilidades de encoding. | `varn-builtins::crypto` |
 | `std:markdown` | Parser de Markdown CommonMark/GFM a AST, renderizado a HTML y utilidades de extracción. | — |
 
 ---
 
-## 3. Arquitectura del Bundle `.vnb`
+## 3. Arquitectura del Bundle `.vnb` (Build-Time Zero-Runtime Discovery)
 
-Para distribuir el lenguaje en un **único ejecutable autónomo sin dependencias de archivos externos**, el script de compilación `crates/varn-cli/build.rs` compila automáticamente las fuentes de `std/` en un bundle binario comprimido `.vnb`:
+Para distribuir el lenguaje en un **único ejecutable autónomo sin dependencias de archivos externos**, el compilador elimina la necesidad de un archivo de manifiesto estático como `std.json`. En su lugar, el script de compilación `crates/varn-cli/build.rs` y el cargador de la stdlib descubren dinámicamente y de forma recursiva todos los módulos de `std/` **en tiempo de compilación**, indexándolos en el bundle binario `.vnb`:
+
+- `std/<module>/mod.vn` se mapea canónicamente a `std:<module>`.
+- `std/<module>/<submodule>.vn` se mapea a `std:<module>/<submodule>`.
+- Cero sobrecarga o I/O en tiempo de ejecución.
 
 ```mermaid
 flowchart LR

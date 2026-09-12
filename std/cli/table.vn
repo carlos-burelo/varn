@@ -1,0 +1,63 @@
+import { Color } from "std:cli/color";
+
+export class Table {
+    private _headers: str[];
+    private _rows: str[][];
+
+    constructor(headers: str[]) {
+        this._headers = headers;
+        this._rows = [];
+    }
+
+    addRow(row: str[]): void {
+        this._rows.push(row);
+    }
+
+    render(): str {
+        let colWidths: int[] = [];
+        for (let col = 0; col < this._headers.length; col = col + 1) {
+            colWidths.push(Color.stripAnsi(this._headers[col]).length);
+        }
+
+        for (let r = 0; r < this._rows.length; r = r + 1) {
+            let row = this._rows[r];
+            for (let c = 0; c < row.length; c = c + 1) {
+                let cellLen = Color.stripAnsi(row[c]).length;
+                if (c >= colWidths.length) {
+                    colWidths.push(cellLen);
+                } else if (cellLen > colWidths[c]) {
+                    colWidths[c] = cellLen;
+                }
+            }
+        }
+
+        let separator = "+";
+        for (let w = 0; w < colWidths.length; w = w + 1) {
+            separator = separator + "-".repeat(colWidths[w] + 2) + "+";
+        }
+
+        let output = separator + "\n|";
+        for (let h = 0; h < this._headers.length; h = h + 1) {
+            let cell = this._headers[h];
+            let visibleLen = Color.stripAnsi(cell).length;
+            let pad = colWidths[h] - visibleLen;
+            output = output + " " + cell + " ".repeat(pad) + " |";
+        }
+        output = output + "\n" + separator + "\n";
+
+        for (let i = 0; i < this._rows.length; i = i + 1) {
+            let row = this._rows[i];
+            output = output + "|";
+            for (let j = 0; j < colWidths.length; j = j + 1) {
+                let cell = j < row.length ? row[j] : "";
+                let visibleLen = Color.stripAnsi(cell).length;
+                let pad = colWidths[j] - visibleLen;
+                output = output + " " + cell + " ".repeat(pad) + " |";
+            }
+            output = output + "\n";
+        }
+
+        output = output + separator;
+        return output;
+    }
+}

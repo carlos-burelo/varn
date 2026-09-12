@@ -1,0 +1,19 @@
+import { base64Enc$, base64Dec$ } from "runtime:crypto";
+
+export namespace Base64 {
+    export function encode(data: str): str {
+        return base64Enc$(data);
+    }
+
+    export function decode(data: str): str {
+        return base64Dec$(data);
+    }
+}
+
+export function base64Encode(data: str): str {
+    return Base64.encode(data);
+}
+
+export function base64Decode(data: str): str {
+    return Base64.decode(data);
+}

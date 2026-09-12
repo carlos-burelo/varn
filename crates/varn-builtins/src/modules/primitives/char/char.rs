@@ -14,7 +14,14 @@ varn_contract! {
 
         fn toString(_ctx: &mut dyn NativeCtx, this: char) -> String { this.to_string() }
         fn toStr(_ctx: &mut dyn NativeCtx, this: char) -> String { this.to_string() }
-        fn charCodeAt(_ctx: &mut dyn NativeCtx, this: char) -> i64 { this as i64 }
+        fn charCodeAt(_ctx: &mut dyn NativeCtx, this: char, pos: Option<i64>) -> i64 {
+            if let Some(p) = pos {
+                if p != 0 {
+                    return -1;
+                }
+            }
+            this as i64
+        }
 
         fn isAlphabetic(_ctx: &mut dyn NativeCtx, this: char) -> bool { this.is_alphabetic() }
         fn isAlphanumeric(_ctx: &mut dyn NativeCtx, this: char) -> bool { this.is_alphanumeric() }

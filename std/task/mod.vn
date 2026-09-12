@@ -26,4 +26,10 @@ export {
     clearTimeout
 } from "std:task/combinators";
 
+export {
+    Mutex,
+    Semaphore,
+    WaitGroup
+} from "std:task/sync";
+
 export { Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle } from "core:intrinsics";

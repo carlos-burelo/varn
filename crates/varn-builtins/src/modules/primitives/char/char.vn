@@ -3,7 +3,7 @@ export declare class char {
 
     toString(): str;
     toStr(): str;
-    charCodeAt(): int;
+    charCodeAt(pos?: int): int;
     isAlphabetic(): bool;
     isAlphanumeric(): bool;
     isDigit(): bool;

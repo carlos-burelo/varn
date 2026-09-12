@@ -1,0 +1,101 @@
+import { channel$, Channel } from "runtime:task";
+
+export class Mutex {
+    private _lockChannel: Channel<bool>;
+
+    constructor() {
+        this._lockChannel = channel$<bool>(1);
+        this._lockChannel.tx.send(true);
+    }
+
+    async lock(): Task<void> {
+        await this._lockChannel.rx.receive();
+    }
+
+    unlock(): void {
+        this._lockChannel.tx.send(true);
+    }
+
+    async withLock<T>(action: () => Task<T>): Task<T> {
+        await this.lock();
+        try {
+            let result = await action();
+            this.unlock();
+            return result;
+        } catch (error) {
+            this.unlock();
+            throw error;
+        }
+    }
+}
+
+export class Semaphore {
+    private _permitsChannel: Channel<bool>;
+    private _capacity: int;
+
+    constructor(initialPermits: int) {
+        if (initialPermits <= 0) {
+            throw new Error("Semaphore capacity must be greater than zero");
+        }
+        this._capacity = initialPermits;
+        this._permitsChannel = channel$<bool>(initialPermits);
+        for (let index = 0; index < initialPermits; index = index + 1) {
+            this._permitsChannel.tx.send(true);
+        }
+    }
+
+    async acquire(): Task<void> {
+        await this._permitsChannel.rx.receive();
+    }
+
+    release(): void {
+        this._permitsChannel.tx.send(true);
+    }
+
+    async withPermit<T>(action: () => Task<T>): Task<T> {
+        await this.acquire();
+        try {
+            let result = await action();
+            this.release();
+            return result;
+        } catch (error) {
+            this.release();
+            throw error;
+        }
+    }
+}
+
+export class WaitGroup {
+    private _counter: int;
+    private _waiters: Channel<bool>;
+
+    constructor() {
+        this._counter = 0;
+        this._waiters = channel$<bool>(100);
+    }
+
+    add(delta: int = 1): void {
+        this._counter = this._counter + delta;
+        if (this._counter < 0) {
+            throw new Error("Negative WaitGroup counter");
+        }
+    }
+
+    done(): void {
+        this.add(-1);
+        if (this._counter === 0) {
+            this._notifyWaiters();
+        }
+    }
+
+    async wait(): Task<void> {
+        if (this._counter === 0) {
+            return;
+        }
+        await this._waiters.rx.receive();
+    }
+
+    private _notifyWaiters(): void {
+        this._waiters.tx.send(true);
+    }
+}

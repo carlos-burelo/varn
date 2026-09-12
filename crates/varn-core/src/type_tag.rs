@@ -37,6 +37,16 @@ pub enum TypeTag {
     DateTime,
     Duration,
     UUID,
+    I8,
+    I16,
+    I32,
+    U8,
+    U16,
+    U32,
+    U64,
+    F32,
+    Span,
+    TypedArray,
 }
 
 impl TypeTag {
@@ -76,6 +86,16 @@ impl TypeTag {
             Self::Error => "Error",
             Self::TypeError => "TypeError",
             Self::RangeError => "RangeError",
+            Self::I8 => "i8",
+            Self::I16 => "i16",
+            Self::I32 => "i32",
+            Self::U8 => "u8",
+            Self::U16 => "u16",
+            Self::U32 => "u32",
+            Self::U64 => "u64",
+            Self::F32 => "f32",
+            Self::Span => "Span",
+            Self::TypedArray => "TypedArray",
         }
     }
 
@@ -105,6 +125,16 @@ impl TypeTag {
             "Range" => Some(Self::Range),
             "Buffer" => Some(Self::Buffer),
             "enum" => Some(Self::Enum),
+            "i8" => Some(Self::I8),
+            "i16" => Some(Self::I16),
+            "i32" => Some(Self::I32),
+            "u8" => Some(Self::U8),
+            "u16" => Some(Self::U16),
+            "u32" => Some(Self::U32),
+            "u64" => Some(Self::U64),
+            "f32" => Some(Self::F32),
+            "Span" => Some(Self::Span),
+            "TypedArray" => Some(Self::TypedArray),
             _ => None,
         }
     }
@@ -125,6 +155,14 @@ impl TypeTag {
                 | Self::BigInt
                 | Self::Decimal
                 | Self::Symbol
+                | Self::I8
+                | Self::I16
+                | Self::I32
+                | Self::U8
+                | Self::U16
+                | Self::U32
+                | Self::U64
+                | Self::F32
         )
     }
 }
@@ -160,9 +198,9 @@ impl TypeTag {
     /// none — the conservative reading, and the one a truncated or
     /// forward-version operand must get.
     pub const fn from_u8(raw: u8) -> Self {
-        if raw <= Self::UUID as u8 {
+        if raw <= Self::TypedArray as u8 {
             // SAFETY: `TypeTag` is `#[repr(u8)]` with contiguous discriminants
-            // from `Null = 0` through `UUID`, and `raw` is inside that range.
+            // from `Null = 0` through `TypedArray`, and `raw` is inside that range.
             unsafe { std::mem::transmute::<u8, Self>(raw) }
         } else {
             Self::Dynamic
@@ -172,9 +210,10 @@ impl TypeTag {
     /// A tag with no unboxed representation falls back to a whole `VmValue`.
     pub const fn field_repr(self) -> FieldRepr {
         let (size, align, is_gc_ref) = match self {
-            TypeTag::Bool => (1, 1, false),
-            TypeTag::Char => (4, 4, false),
-            TypeTag::Int | TypeTag::Float => (8, 8, false),
+            TypeTag::Bool | TypeTag::I8 | TypeTag::U8 => (1, 1, false),
+            TypeTag::I16 | TypeTag::U16 => (2, 2, false),
+            TypeTag::Char | TypeTag::I32 | TypeTag::U32 | TypeTag::F32 => (4, 4, false),
+            TypeTag::Int | TypeTag::U64 | TypeTag::Float => (8, 8, false),
             TypeTag::Str
             | TypeTag::Array
             | TypeTag::Map
@@ -183,6 +222,8 @@ impl TypeTag {
             | TypeTag::Class
             | TypeTag::Function
             | TypeTag::Task
+            | TypeTag::Buffer
+            | TypeTag::TypedArray
             | TypeTag::Generator => (8, 8, true),
             _ => (16, 8, true),
         };

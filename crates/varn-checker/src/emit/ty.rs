@@ -152,8 +152,15 @@ fn lower_kind(
 
 fn lower_tag(tag: TypeTag) -> BackendTy {
     match tag {
-        TypeTag::Int => BackendTy::Int,
-        TypeTag::Float => BackendTy::Float,
+        TypeTag::Int
+        | TypeTag::I8
+        | TypeTag::I16
+        | TypeTag::I32
+        | TypeTag::U8
+        | TypeTag::U16
+        | TypeTag::U32
+        | TypeTag::U64 => BackendTy::Int,
+        TypeTag::Float | TypeTag::F32 => BackendTy::Float,
         TypeTag::Bool => BackendTy::Bool,
         TypeTag::Char => BackendTy::Char,
         TypeTag::Str => BackendTy::Str,
@@ -237,6 +244,38 @@ mod tests {
         assert_eq!(
             lower_type(&prim(TypeTag::Decimal), &mut tt, &NoNames),
             BackendTy::Decimal
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::I8), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::I16), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::I32), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::U8), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::U16), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::U32), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::U64), &mut tt, &NoNames),
+            BackendTy::Int
+        );
+        assert_eq!(
+            lower_type(&prim(TypeTag::F32), &mut tt, &NoNames),
+            BackendTy::Float
         );
     }
 

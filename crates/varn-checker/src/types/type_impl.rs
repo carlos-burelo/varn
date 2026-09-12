@@ -15,6 +15,14 @@ impl Type {
     pub const Null: Type = Type(TypeKind::Intrinsic(TypeTag::Null), false);
     pub const Never: Type = Type(TypeKind::Intrinsic(TypeTag::Never), false);
     pub const Dynamic: Type = Type(TypeKind::Intrinsic(TypeTag::Dynamic), false);
+    pub const I8: Type = Type(TypeKind::Intrinsic(TypeTag::I8), false);
+    pub const I16: Type = Type(TypeKind::Intrinsic(TypeTag::I16), false);
+    pub const I32: Type = Type(TypeKind::Intrinsic(TypeTag::I32), false);
+    pub const U8: Type = Type(TypeKind::Intrinsic(TypeTag::U8), false);
+    pub const U16: Type = Type(TypeKind::Intrinsic(TypeTag::U16), false);
+    pub const U32: Type = Type(TypeKind::Intrinsic(TypeTag::U32), false);
+    pub const U64: Type = Type(TypeKind::Intrinsic(TypeTag::U64), false);
+    pub const F32: Type = Type(TypeKind::Intrinsic(TypeTag::F32), false);
     pub const This: Type = Type(TypeKind::This, false);
     pub fn intrinsic(tag: TypeTag) -> Self {
         Type(TypeKind::Intrinsic(tag), false)
@@ -143,10 +151,47 @@ impl Type {
     }
 
     pub fn is_int(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Int))
+        matches!(
+            self.0,
+            TypeKind::Intrinsic(
+                TypeTag::Int
+                    | TypeTag::I8
+                    | TypeTag::I16
+                    | TypeTag::I32
+                    | TypeTag::U8
+                    | TypeTag::U16
+                    | TypeTag::U32
+                    | TypeTag::U64
+            )
+        )
+    }
+    pub fn is_granular_int(&self) -> bool {
+        matches!(
+            self.0,
+            TypeKind::Intrinsic(
+                TypeTag::I8
+                    | TypeTag::I16
+                    | TypeTag::I32
+                    | TypeTag::U8
+                    | TypeTag::U16
+                    | TypeTag::U32
+                    | TypeTag::U64
+            )
+        )
     }
     pub fn is_float(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Float))
+        matches!(
+            self.0,
+            TypeKind::Intrinsic(TypeTag::Float | TypeTag::F32)
+        )
+    }
+    pub fn is_numeric(&self) -> bool {
+        self.is_int()
+            || self.is_float()
+            || matches!(
+                self.0,
+                TypeKind::Intrinsic(TypeTag::Decimal | TypeTag::BigInt)
+            )
     }
     pub fn is_str(&self) -> bool {
         matches!(self.0, TypeKind::Intrinsic(TypeTag::Str))

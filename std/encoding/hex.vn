@@ -1,0 +1,63 @@
+import { toString$, fromBytes$ } from "runtime:buffer";
+
+const HEX_CHARS: str = "0123456789abcdef";
+
+function byteToHex(byteValue: int): str {
+    let remainder = byteValue;
+    let high = 0;
+    while (remainder >= 16) {
+        remainder = remainder - 16;
+        high = high + 1;
+    }
+    let low = remainder;
+    return HEX_CHARS[high] + HEX_CHARS[low];
+}
+
+function hexCharToNibble(character: str): int {
+    let code = character.charCodeAt(0);
+    if (code >= 48 && code <= 57) {
+        return code - 48;
+    }
+    if (code >= 97 && code <= 102) {
+        return code - 97 + 10;
+    }
+    if (code >= 65 && code <= 70) {
+        return code - 65 + 10;
+    }
+    throw new Error("invalid hex character: " + character);
+}
+
+export namespace Hex {
+    export function encode(data: str): str {
+        let result: str = "";
+        let length: int = data.length;
+        for (let index = 0; index < length; index = index + 1) {
+            let charCode = data.charCodeAt(index);
+            result = result + byteToHex(charCode);
+        }
+        return result;
+    }
+
+    export function decode(hexString: str): str {
+        if (hexString.length % 2 !== 0) {
+            throw new Error("invalid hex string length");
+        }
+        let bytes: int[] = [];
+        let length: int = hexString.length;
+        for (let index = 0; index < length; index = index + 2) {
+            let high = hexCharToNibble(hexString[index]);
+            let low = hexCharToNibble(hexString[index + 1]);
+            let byteVal = high * 16 + low;
+            bytes.push(byteVal);
+        }
+        return toString$(fromBytes$(bytes));
+    }
+}
+
+export function hexEncode(data: str): str {
+    return Hex.encode(data);
+}
+
+export function hexDecode(hexString: str): str {
+    return Hex.decode(hexString);
+}

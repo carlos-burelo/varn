@@ -8,14 +8,32 @@
 
 | Tipo | Descripción | Ejemplo literal |
 |------|-------------|----------------|
-| `int` | Entero de 64 bits con signo | `42`, `-7`, `0` |
-| `float` | Flotante de 64 bits | `3.14`, `1.0`, `-0.5` |
+| `int` | Entero canónico de 64 bits con signo | `42`, `-7`, `0` |
+| `float` | Flotante canónico de 64 bits | `3.14`, `1.0`, `-0.5` |
 | `decimal` | Decimal de precisión arbitraria | `1.5d`, `99.25d` |
 | `bigint` | Entero de precisión arbitraria | `100n`, `1n` |
 | `bool` | Booleano | `true`, `false` |
 | `char` | Carácter Unicode | `'a'`, `'Z'`, `'!'` |
 | `str` | Cadena de texto inmutable | `"hello"`, `"""raw"""` |
 | `null` | Ausencia de valor | `null` |
+
+### 1.1 Tipos Numéricos Granulares y Widening Estático
+
+Varn soporta tipos numéricos de precisión granular con semántica de dimensionamiento estático, layout eficiente en memoria e interoperabilidad con los tipos canónicos `int` y `float`:
+
+| Tipo | Rango / Descripción | Widening Automático Hacia |
+|------|---------------------|---------------------------|
+| `i8` | Con signo, 8 bits (`-128..=127`) | `int`, `float`, `i16`, `i32` |
+| `i16` | Con signo, 16 bits (`-32,768..=32,767`) | `int`, `float`, `i32` |
+| `i32` | Con signo, 32 bits (`-2,147,483,648..=2,147,483,647`) | `int`, `float` |
+| `u8` | Sin signo, 8 bits (`0..=255`) | `int`, `float`, `u16`, `u32`, `u64`, `i16`, `i32` |
+| `u16` | Sin signo, 16 bits (`0..=65,535`) | `int`, `float`, `u32`, `u64`, `i32` |
+| `u32` | Sin signo, 32 bits (`0..=4,294,967,295`) | `int`, `float`, `u64` |
+| `u64` | Sin signo, 64 bits (`0..=18,446,744,073,709,551,615`) | `int` (rango no negativo), `float` |
+| `f32` | Flotante IEEE-754 de precisión simple (32 bits) | `float` |
+
+- **Widening**: Cualquier tipo numérico granular es automáticamente asignable a los tipos canónicos `int` o `float` sin conversiones manuales ni penalizaciones en runtime.
+- **Validación Estática de Rango**: Los literales enteros asignados a tipos granulares se validan estáticamente en tiempo de compilación para garantizar que se encuentren dentro de los límites del tipo (e.g. `let x: i8 = 200` genera un error `TypeMismatch` inmediato en build time).
 
 Todos son tipos canónicos únicos; **nunca** se aceptan aliases como `string`, `boolean`, `integer`.
 

@@ -49,9 +49,9 @@ pub enum StdProvenance {
     Embedded,
 }
 
-/// A directory holding `std.json` is a std source tree. Nothing else is.
+/// A directory holding `std.json` or `math/mod.vn` is a std source tree.
 pub fn classify(path: &Path) -> Option<StdSource> {
-    (path.is_dir() && path.join(STD_MANIFEST_FILE).is_file())
+    (path.is_dir() && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
         .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 

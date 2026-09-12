@@ -11,7 +11,7 @@ use crate::types::{Type, TypeContext};
 use std::rc::Rc;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, TemplatePart};
-use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind, TypeTag};
+use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind};
 
 impl<'r> Checker<'r> {
     /// Emit the literal-overflow diagnostic for `expr`.
@@ -304,13 +304,8 @@ impl<'r> Checker<'r> {
                     && !is_type_param_b(r_base, self)
                 {
                     let is_numeric = |t: &Type| {
-                        matches!(
-                            &t.0,
-                            TypeKind::Intrinsic(TypeTag::Int)
-                                | TypeKind::Intrinsic(TypeTag::Float)
-                                | TypeKind::Intrinsic(TypeTag::Decimal)
-                                | TypeKind::Intrinsic(TypeTag::BigInt)
-                        ) || matches!(&t.0, TypeKind::Named(n, _) if n.as_ref() == IntrinsicType::Decimal.as_str())
+                        t.is_numeric()
+                            || matches!(&t.0, TypeKind::Named(n, _) if n.as_ref() == IntrinsicType::Decimal.as_str())
                     };
                     let same_numeric = is_numeric(l_base) && is_numeric(r_base);
                     let valid = match op {

@@ -1,0 +1,78 @@
+type CacheEntry<V> = {
+    key: str,
+    value: V
+};
+
+export class LRUCache<V> {
+    private _capacity: int;
+    private _entries: CacheEntry<V>[];
+
+    constructor(capacity: int) {
+        if (capacity <= 0) {
+            throw new Error("LRUCache capacity must be greater than zero");
+        }
+        this._capacity = capacity;
+        this._entries = [];
+    }
+
+    get(key: str): V? {
+        for (let index = 0; index < this._entries.length; index = index + 1) {
+            let entry = this._entries[index];
+            if (entry.key === key) {
+                this._entries.splice(index, 1);
+                this._entries.push(entry);
+                return entry.value;
+            }
+        }
+        return null;
+    }
+
+    set(key: str, value: V): void {
+        for (let index = 0; index < this._entries.length; index = index + 1) {
+            let entry = this._entries[index];
+            if (entry.key === key) {
+                entry.value = value;
+                this._entries.splice(index, 1);
+                this._entries.push(entry);
+                return;
+            }
+        }
+
+        if (this._entries.length >= this._capacity) {
+            this._entries.splice(0, 1);
+        }
+
+        this._entries.push({ key: key, value: value });
+    }
+
+    has(key: str): bool {
+        for (let index = 0; index < this._entries.length; index = index + 1) {
+            if (this._entries[index].key === key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    delete(key: str): bool {
+        for (let index = 0; index < this._entries.length; index = index + 1) {
+            if (this._entries[index].key === key) {
+                this._entries.splice(index, 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    get size(): int {
+        return this._entries.length;
+    }
+
+    get capacity(): int {
+        return this._capacity;
+    }
+
+    clear(): void {
+        this._entries = [];
+    }
+}

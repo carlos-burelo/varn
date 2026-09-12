@@ -30,9 +30,15 @@ impl<'r> Checker<'r> {
                             let init_ty = self.infer_type(init_expr, bind);
                             let is_empty_array = init_ty.is_dynamic()
                                 && matches!(&init_expr.kind, ExprKind::Array { elements } if elements.is_empty());
-                            if !is_empty_array
-                                && !self.types_compatible_cached(ann_ty, &init_ty, Some(bind))
-                            {
+                            let mut is_compatible = self.types_compatible_cached(ann_ty, &init_ty, Some(bind));
+                            if is_compatible && ann_ty.is_granular_int() {
+                                if let ExprKind::IntLiteral { value, .. } = &init_expr.kind {
+                                    if !crate::checker::compat::literal_fits_type(ann_ty, *value) {
+                                        is_compatible = false;
+                                    }
+                                }
+                            }
+                            if !is_empty_array && !is_compatible {
                                 self.emit(
                                     Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                         "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"

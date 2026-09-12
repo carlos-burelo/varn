@@ -21,10 +21,81 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
 
         (a, b) if a == b => true,
 
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Float),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Int), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::I8
+                    | varn_core::TypeTag::I16
+                    | varn_core::TypeTag::I32
+                    | varn_core::TypeTag::U8
+                    | varn_core::TypeTag::U16
+                    | varn_core::TypeTag::U32
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::I32), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Int
+                    | varn_core::TypeTag::I8
+                    | varn_core::TypeTag::I16
+                    | varn_core::TypeTag::U8
+                    | varn_core::TypeTag::U16
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::I16), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Int | varn_core::TypeTag::I8 | varn_core::TypeTag::U8
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::I8), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(inf_tag, varn_core::TypeTag::Int)
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::U64), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Int
+                    | varn_core::TypeTag::U8
+                    | varn_core::TypeTag::U16
+                    | varn_core::TypeTag::U32
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::U32), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Int | varn_core::TypeTag::U8 | varn_core::TypeTag::U16
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::U16), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(inf_tag, varn_core::TypeTag::Int | varn_core::TypeTag::U8)
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::U8), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(inf_tag, varn_core::TypeTag::Int)
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Int
+                    | varn_core::TypeTag::F32
+                    | varn_core::TypeTag::I8
+                    | varn_core::TypeTag::I16
+                    | varn_core::TypeTag::I32
+                    | varn_core::TypeTag::U8
+                    | varn_core::TypeTag::U16
+                    | varn_core::TypeTag::U32
+            )
+        }
+        (TypeKind::Intrinsic(varn_core::TypeTag::F32), TypeKind::Intrinsic(inf_tag)) => {
+            matches!(
+                inf_tag,
+                varn_core::TypeTag::Float
+                    | varn_core::TypeTag::Int
+                    | varn_core::TypeTag::I8
+                    | varn_core::TypeTag::I16
+                    | varn_core::TypeTag::U8
+                    | varn_core::TypeTag::U16
+            )
+        }
         (
             TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
@@ -37,6 +108,22 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
             TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
         ) => true,
+        _ => false,
+    }
+}
+
+pub(crate) fn literal_fits_type(target: &Type, int_val: i64) -> bool {
+    match &target.0 {
+        TypeKind::Intrinsic(varn_core::TypeTag::I8) => (i8::MIN as i64..=i8::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::I16) => (i16::MIN as i64..=i16::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::I32) => (i32::MIN as i64..=i32::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::U8) => (0..=u8::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::U16) => (0..=u16::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::U32) => (0..=u32::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::U64) => int_val >= 0,
+        TypeKind::Intrinsic(varn_core::TypeTag::Int) => true,
+        TypeKind::Intrinsic(varn_core::TypeTag::Float | varn_core::TypeTag::F32) => true,
+        TypeKind::Intrinsic(varn_core::TypeTag::Decimal | varn_core::TypeTag::BigInt | varn_core::TypeTag::Dynamic) => true,
         _ => false,
     }
 }
@@ -99,22 +186,9 @@ pub(super) fn types_compatible_impl(
 
         (a, b) if a == b => true,
 
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Float),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
-            TypeKind::Intrinsic(varn_core::TypeTag::Float),
-        ) => true,
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
+        (TypeKind::Intrinsic(_), TypeKind::Intrinsic(_)) => {
+            simple_types_compatible(declared, inferred)
+        }
         (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
 

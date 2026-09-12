@@ -156,7 +156,15 @@ impl<'r> Checker<'r> {
         let value_ty = self.infer_type(value, bind);
         let is_empty_array_val = value_ty.is_dynamic()
             && matches!(&value.kind, ExprKind::Array { elements } if elements.is_empty());
-        if !is_empty_array_val && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind)) {
+        let mut is_compatible = self.types_compatible_cached(&target_ty, &value_ty, Some(bind));
+        if is_compatible && target_ty.is_granular_int() {
+            if let ExprKind::IntLiteral { value: int_val, .. } = &value.kind {
+                if !crate::checker::compat::literal_fits_type(&target_ty, *int_val) {
+                    is_compatible = false;
+                }
+            }
+        }
+        if !is_empty_array_val && !is_compatible {
             self.emit(
                 Diagnostic::error(ErrorCode::TypeMismatch, format!("type mismatch: cannot assign '{value_ty}' to '{target_ty}'"))
                     .with_range(*range),

@@ -314,9 +314,10 @@ impl<'r> Checker<'r> {
                 varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
                 varn_core::ast::operators::UnaryOp::BitNot => {
                     let inner = self.infer_type(operand, bind);
-                    match &inner.0 {
-                        TypeKind::Intrinsic(TypeTag::Int) => Type::intrinsic(TypeTag::Int),
-                        _ => Type::Dynamic,
+                    if inner.is_int() {
+                        Type::intrinsic(TypeTag::Int)
+                    } else {
+                        Type::Dynamic
                     }
                 }
             },
@@ -435,17 +436,14 @@ impl<'r> Checker<'r> {
         }
         let prop_ty = self.infer_type(property, bind);
         match &obj_ty.0 {
-            TypeKind::Array(inner) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {
+            TypeKind::Array(inner) if prop_ty.is_int() => {
                 (**inner).clone()
             }
-            TypeKind::Intrinsic(TypeTag::Str)
-                if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
-            {
+            TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => {
                 Type::Str
             }
             TypeKind::Named(name, _)
-                if name.as_ref() == IntrinsicType::Str.as_str()
-                    && matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
+                if name.as_ref() == IntrinsicType::Str.as_str() && prop_ty.is_int() =>
             {
                 Type::Str
             }

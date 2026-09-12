@@ -13,7 +13,7 @@ varn-tir      = { path = "../varn-tir" }
 # `LoadNativeGlobalIdx` against. Builds under `--workspace` (feature-unified);
 # `cargo -p varn-checker` in isolation needs `-p varn-cli` context because
 # varn-builtins is not standalone-buildable.
-varn-builtins = { path = "../varn-builtins", default-features = false }
+varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 rustc-hash    = { workspace = true }
 serde         = { workspace = true, features = ["rc"] }
 postcard      = { workspace = true }
