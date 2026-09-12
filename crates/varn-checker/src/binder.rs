@@ -60,7 +60,11 @@ impl TypeContext for Binder<'_> {
     ) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = self.resolver.module_bind(origin) {
+                if let Some(rb) = self
+                    .resolver
+                    .module_bind(origin)
+                    .or_else(|| self.resolver.stdlib_bind(origin))
+                {
                     return rb.type_members.interfaces.get(name).cloned();
                 }
             }
@@ -71,7 +75,11 @@ impl TypeContext for Binder<'_> {
     fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = self.resolver.module_bind(origin) {
+                if let Some(rb) = self
+                    .resolver
+                    .module_bind(origin)
+                    .or_else(|| self.resolver.stdlib_bind(origin))
+                {
                     return rb.type_members.classes.get(name).map(|e| e.members.clone());
                 }
             }
@@ -89,7 +97,11 @@ impl TypeContext for Binder<'_> {
     ) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = self.resolver.module_bind(origin) {
+                if let Some(rb) = self
+                    .resolver
+                    .module_bind(origin)
+                    .or_else(|| self.resolver.stdlib_bind(origin))
+                {
                     return rb.type_members.namespaces.get(name).cloned();
                 }
             }
@@ -100,7 +112,11 @@ impl TypeContext for Binder<'_> {
     fn get_enum_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = self.resolver.module_bind(origin) {
+                if let Some(rb) = self
+                    .resolver
+                    .module_bind(origin)
+                    .or_else(|| self.resolver.stdlib_bind(origin))
+                {
                     return rb.type_members.enums.get(name).cloned();
                 }
             }

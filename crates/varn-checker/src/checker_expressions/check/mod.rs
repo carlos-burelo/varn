@@ -97,14 +97,20 @@ impl<'r> Checker<'r> {
                 params,
                 return_type,
                 body,
+                is_async,
                 ..
             } => {
                 let saved_expected = self.expected_return_type.take();
 
-                self.expected_return_type = return_type
+                let resolved_ret = return_type
                     .as_ref()
                     .map(|rt| self.resolve_type_node_cached(rt, bind))
                     .or_else(|| self.expected_return_from_fn_type());
+                self.expected_return_type = if *is_async {
+                    resolved_ret.map(|t| crate::types::awaited(&t))
+                } else {
+                    resolved_ret
+                };
 
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
@@ -146,7 +152,8 @@ impl<'r> Checker<'r> {
                 match body.as_ref() {
                     ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
                     ArrowBody::Expr(e) => {
-                        self.check_expr(e, bind);
+                        let expected_ret = self.expected_return_type.clone();
+                        self.with_expected(expected_ret, |c| c.check_expr(e, bind));
                         let actual = self.infer_type(e, bind);
                         if let Some(expected) = self.expected_return_type.clone() {
                             let is_tp = matches!(&expected.0, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
@@ -180,12 +187,22 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Function {
-                return_type, body, ..
+                return_type,
+                body,
+                is_async,
+                ..
             } => {
                 let saved_expected = self.expected_return_type.take();
                 self.expected_return_type = return_type
                     .as_ref()
-                    .map(|rt| self.resolve_type_node_cached(rt, bind));
+                    .map(|rt| {
+                        let ty = self.resolve_type_node_cached(rt, bind);
+                        if *is_async {
+                            crate::types::awaited(&ty)
+                        } else {
+                            ty
+                        }
+                    });
 
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {

@@ -240,7 +240,9 @@ impl<'r> BindView<'r> {
         if origin == self.bind.source_file.as_ref() {
             return None;
         }
-        self.resolver.module_bind(origin)
+        self.resolver
+            .module_bind(origin)
+            .or_else(|| self.resolver.stdlib_bind(origin))
     }
 }
 
@@ -300,6 +302,20 @@ impl TypeContext for BindView<'_> {
             sym.type_params.iter().map(|s| s.to_string()).collect(),
             *node.clone(),
         ))
+    }
+
+    fn resolve_type_alias(&self, name: &str, origin: Option<&str>) -> Option<Type> {
+        if let Some(foreign_bind) = self.foreign(origin) {
+            let foreign_view = BindView::new(&foreign_bind, self.resolver);
+            return foreign_view.resolve_type_alias(name, None);
+        }
+        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let id = scope.resolve(name, &self.bind.scopes)?;
+        let sym = self.bind.arena.get(id);
+        if sym.kind == crate::binder::SymbolKind::TypeAlias {
+            return sym.ty.clone();
+        }
+        None
     }
 
     fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {

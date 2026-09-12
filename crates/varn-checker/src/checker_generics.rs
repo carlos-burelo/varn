@@ -7,19 +7,6 @@ use std::rc::Rc;
 use varn_core::ast::{Arg, ArrowBody, Expr, ExprKind, Param, Stmt, StmtKind, TypeNode};
 use varn_core::TypeKind;
 
-pub(crate) fn build_generic_mapping(
-    class_name: &str,
-    type_args: &[Type],
-    checker: &mut Checker,
-    bind: &BindResult,
-) -> FxHashMap<Rc<str>, Type> {
-    let type_params = checker.symbol_type_params_any(class_name, bind);
-    type_params
-        .iter()
-        .zip(type_args.iter())
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect()
-}
 
 pub(crate) fn build_call_mapping(
     callee: &Expr,

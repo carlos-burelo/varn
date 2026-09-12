@@ -160,6 +160,9 @@ pub(crate) fn infer_call_type(
                     }
                     return Some(Type::generic(name.clone(), args));
                 }
+                if name.as_ref() == IntrinsicType::Map.as_str() {
+                    return Some(Type::generic(name.clone(), vec![Type::Dynamic]));
+                }
                 return Some(Type::named(name.clone()));
             }
             None

@@ -245,9 +245,13 @@ pub(super) fn types_compatible_impl(
                 _ => false,
             })
         }
-        (TypeKind::Intrinsic(varn_core::TypeTag::Map), TypeKind::Object(_)) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Map), TypeKind::Object(_))
+        | (TypeKind::Object(_), TypeKind::Intrinsic(varn_core::TypeTag::Map)) => true,
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Object(inf_fields)) => {
+            if dn.as_ref() == IntrinsicType::Map.as_str() {
+                return true;
+            }
             if let Some(bind) = bind {
                 if let Some(decl_members) = named_members(bind, dn, origin_d.as_deref()) {
                     return class_members_match_object(
@@ -286,6 +290,9 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i))
         | (TypeKind::Object(decl_fields), TypeKind::Generic(in_, _, origin_i)) => {
+            if in_.as_ref() == IntrinsicType::Map.as_str() {
+                return true;
+            }
             if let Some(bind) = bind {
                 if let Some(inf_members) = named_members(bind, in_, origin_i.as_deref()) {
                     return object_matches_class_members(
@@ -300,19 +307,29 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
-        (TypeKind::Named(dn, _), _) => {
+        (TypeKind::Named(dn, _), _) if dn.as_ref() == IntrinsicType::Map.as_str() => true,
+        (_, TypeKind::Named(in_, _)) if in_.as_ref() == IntrinsicType::Map.as_str() => true,
+        (TypeKind::Named(dn, origin_d), _) => {
+            use crate::types::TypeContext;
             if let Some(bind) = bind {
-                !is_known_named(bind, dn)
-            } else {
-                true
+                if let Some(expanded) = bind.resolve_type_alias(dn, origin_d.as_deref()) {
+                    if &expanded != declared {
+                        return types_compatible_impl(&expanded, inferred, Some(bind), cache, in_progress);
+                    }
+                }
             }
+            false
         }
-        (_, TypeKind::Named(in_, _)) => {
+        (_, TypeKind::Named(in_, origin_i)) => {
+            use crate::types::TypeContext;
             if let Some(bind) = bind {
-                !is_known_named(bind, in_)
-            } else {
-                true
+                if let Some(expanded) = bind.resolve_type_alias(in_, origin_i.as_deref()) {
+                    if &expanded != inferred {
+                        return types_compatible_impl(declared, &expanded, Some(bind), cache, in_progress);
+                    }
+                }
             }
+            false
         }
         (TypeKind::Generic(name, args, _origin), _)
             if name.as_ref() == IntrinsicType::Task.as_str() && args.len() == 1 =>
@@ -456,6 +473,24 @@ pub(super) fn types_compatible_impl(
                         }
                     }
                     _ => {}
+                }
+            }
+
+            let has_index_decl = decl_fields
+                .iter()
+                .any(|m| matches!(m, ObjectTypeMember::Index { .. }));
+            if !has_index_decl {
+                for im in inf_fields {
+                    if let ObjectTypeMember::Property { name: iname, .. } = im {
+                        let exists_in_decl = decl_fields.iter().any(|dm| match dm {
+                            ObjectTypeMember::Property { name: dname, .. } => dname == iname,
+                            ObjectTypeMember::Method { name: dname, .. } => dname == iname,
+                            _ => false,
+                        });
+                        if !exists_in_decl {
+                            return false;
+                        }
+                    }
                 }
             }
             true

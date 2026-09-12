@@ -97,6 +97,12 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                 return prim;
             }
 
+            if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(name.as_ref())) {
+                if params.is_empty() {
+                    return resolve_type_node(&alias_node, ctx);
+                }
+            }
+
             if let Some(resolved) = ctx.and_then(|c| c.resolve_symbol(name.as_ref())) {
                 return resolved;
             }

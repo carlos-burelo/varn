@@ -62,7 +62,7 @@ function once<T>(f: () => T): () => T {
             result = f()
             ran = true
         }
-        return result
+        return result as T
     }
 }
 

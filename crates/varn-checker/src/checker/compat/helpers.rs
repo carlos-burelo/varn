@@ -58,7 +58,7 @@ pub(super) fn compatible_named(
 
     match (decl_members, inf_members) {
         (Some(decl), Some(inf)) => class_members_compatible(&decl, &inf, bind, cache, in_progress),
-        _ => !is_known_named(bind, declared) || !is_known_named(bind, inferred),
+        _ => false,
     }
 }
 

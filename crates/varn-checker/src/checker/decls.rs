@@ -71,7 +71,14 @@ impl<'r> Checker<'r> {
                 self.expected_return_type = f
                     .return_type
                     .as_ref()
-                    .map(|rt| self.resolve_type_node_cached(rt, bind));
+                    .map(|rt| {
+                        let ty = self.resolve_type_node_cached(rt, bind);
+                        if f.modifiers.is_async {
+                            crate::types::awaited(&ty)
+                        } else {
+                            ty
+                        }
+                    });
 
                 let saved_scope = self.current_scope;
                 let next_scope = self.next_child_scope(bind);
@@ -79,6 +86,13 @@ impl<'r> Checker<'r> {
                     self.current_scope = fn_scope;
                     self.record_scope_span(f.range.start.offset, f.range.end.offset, fn_scope);
                 }
+                let mut injected_tps = Vec::new();
+                for tp in &f.type_params {
+                    let tp_name: Rc<str> = Rc::from(tp.name.as_str());
+                    self.active_type_params.insert(tp_name.clone());
+                    injected_tps.push(tp_name);
+                }
+
                 let is_gen = f.modifiers.is_generator;
                 let old_yields = if is_gen {
                     self.yielded_types.replace(Vec::new())
@@ -131,6 +145,9 @@ impl<'r> Checker<'r> {
 
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;
+                for tp in &injected_tps {
+                    self.active_type_params.remove(tp.as_ref());
+                }
             }
 
             Decl::Class(c) => {
@@ -253,12 +270,20 @@ impl<'r> Checker<'r> {
                         ClassMember::Method {
                             return_type,
                             body: Some(body),
+                            modifiers,
                             ..
                         } => {
                             let saved_expected = self.expected_return_type.take();
                             self.expected_return_type = return_type
                                 .as_ref()
-                                .map(|rt| self.resolve_type_node_cached(rt, bind));
+                                .map(|rt| {
+                                    let ty = self.resolve_type_node_cached(rt, bind);
+                                    if modifiers.is_async {
+                                        crate::types::awaited(&ty)
+                                    } else {
+                                        ty
+                                    }
+                                });
 
                             let saved_in_function = self.in_function;
                             self.in_function = true;
@@ -540,7 +565,14 @@ impl<'r> Checker<'r> {
                             self.expected_return_type = method
                                 .return_type
                                 .as_ref()
-                                .map(|rt| self.resolve_type_node_cached(rt, bind));
+                                .map(|rt| {
+                                    let ty = self.resolve_type_node_cached(rt, bind);
+                                    if method.modifiers.is_async {
+                                        crate::types::awaited(&ty)
+                                    } else {
+                                        ty
+                                    }
+                                });
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;

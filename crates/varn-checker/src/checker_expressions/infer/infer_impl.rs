@@ -64,6 +64,12 @@ impl<'r> Checker<'r> {
                                 args,
                                 origin.as_ref().map(|s| s.to_string()),
                             )
+                        } else if name.as_ref() == IntrinsicType::Map.as_str() {
+                            Type::generic_with_origin(
+                                name.to_string(),
+                                vec![Type::Dynamic],
+                                origin.as_ref().map(|s| s.to_string()),
+                            )
                         } else {
                             Type::named_with_origin(
                                 name.to_string(),
@@ -84,6 +90,8 @@ impl<'r> Checker<'r> {
                                     .map(|a| self.resolve_type_node_cached(a, bind))
                                     .collect();
                                 Type::generic(name.to_string(), args)
+                            } else if name.as_ref() == IntrinsicType::Map.as_str() {
+                                Type::generic(name.to_string(), vec![Type::Dynamic])
                             } else {
                                 Type::named(name.to_string())
                             }
@@ -371,20 +379,26 @@ impl<'r> Checker<'r> {
                             let ty = self.infer_type(e, bind);
                             tys.push(ty);
                         }
-                        varn_core::ast::MatchBody::Block(_) => {
-                            tys.push(Type::Void);
+                        varn_core::ast::MatchBody::Block(stmt) => {
+                            if stmt_terminates(stmt) {
+                                tys.push(Type::Never);
+                            } else {
+                                tys.push(Type::Void);
+                            }
                         }
                     }
                 }
-                if tys.is_empty() {
-                    Type::Dynamic
-                } else {
-                    let first = tys[0].clone();
-                    if tys.iter().all(|t| t == &first) {
-                        first
+                let non_never: Vec<Type> = tys.iter().filter(|t| !t.is_never()).cloned().collect();
+                if non_never.is_empty() {
+                    if tys.is_empty() {
+                        Type::Dynamic
                     } else {
-                        Type::union(tys)
+                        Type::Never
                     }
+                } else if non_never.len() == 1 {
+                    non_never.into_iter().next().unwrap()
+                } else {
+                    Type::union(non_never)
                 }
             }
             ExprKind::Pipeline { left, right } => {
@@ -668,5 +682,13 @@ fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Rc<str>> {
             Some(Rc::from(n.as_str()))
         }
         _ => None,
+    }
+}
+
+fn stmt_terminates(stmt: &varn_core::ast::Stmt) -> bool {
+    match &stmt.kind {
+        varn_core::ast::StmtKind::Return { .. } | varn_core::ast::StmtKind::Throw { .. } => true,
+        varn_core::ast::StmtKind::Block { stmts } => stmts.last().is_some_and(stmt_terminates),
+        _ => false,
     }
 }

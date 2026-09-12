@@ -1,8 +1,5 @@
-use rustc_hash::FxHashMap;
-
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::{build_generic_mapping, map_generics_cached};
 use crate::types::Type;
 use varn_core::ast::{Expr, ExprKind};
 use varn_core::TypeKind;
@@ -36,44 +33,14 @@ pub(super) fn infer_member_type(
     };
 
     match &obj_ty.0 {
-        TypeKind::Named(class_name, _origin) | TypeKind::Generic(class_name, _, _origin) => {
-            let mapping = if let TypeKind::Generic(_, type_args, _orig) = &obj_ty.0 {
-                build_generic_mapping(class_name.as_ref(), type_args, checker, bind)
-            } else {
-                FxHashMap::default()
-            };
-
-            if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
-                let m_ty = res.0;
-                if !m_ty.is_dynamic() {
-                    return map_generics_cached(checker, &m_ty, &mapping);
-                }
-            }
-        }
-
-        TypeKind::Array(elem) => {
+        TypeKind::Array(_elem) => {
             if prop_name.as_ref() == varn_core::MemberKey::Length.as_str() {
                 return Type::intrinsic(TypeTag::Int);
             }
-
-            let effective_elem = if prop_name.as_ref() == "flat" {
-                match &elem.0 {
-                    varn_core::TypeKind::Array(inner) => *inner.clone(),
-                    _ => *elem.clone(),
-                }
-            } else {
-                *elem.clone()
-            };
-            let mapping = build_generic_mapping(
-                varn_core::IntrinsicType::Array.as_str(),
-                &[effective_elem],
-                checker,
-                bind,
-            );
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    return map_generics_cached(checker, &m_ty, &mapping);
+                    return m_ty;
                 }
             }
         }

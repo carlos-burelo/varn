@@ -133,14 +133,20 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             build_fn_type(params, return_type, false, ctx, ret)
         }
         ExprKind::Match { cases, .. } => {
-            if let Some(first) = cases.first() {
-                match &first.body {
-                    MatchBody::Expr(e) => infer_expr_type(e, ctx),
-                    MatchBody::Block(_) => Type::Dynamic,
+            let mut expr_arm_ty = None;
+            for case in cases {
+                match &case.body {
+                    MatchBody::Expr(e) => {
+                        let ty = infer_expr_type(e, ctx);
+                        if !ty.is_dynamic() && !ty.is_never() {
+                            expr_arm_ty = Some(ty);
+                            break;
+                        }
+                    }
+                    MatchBody::Block(_) => {}
                 }
-            } else {
-                Type::Dynamic
             }
+            expr_arm_ty.unwrap_or(Type::Dynamic)
         }
         ExprKind::Object { properties } => infer_object(properties, ctx),
         ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
@@ -340,6 +346,13 @@ fn infer_new(
 ) -> Type {
     if let ExprKind::Identifier { name } = &callee.kind {
         if type_args.is_empty() {
+            if name.as_ref() == varn_core::IntrinsicType::Map.as_str() {
+                return Type::generic_with_origin(
+                    name.to_string(),
+                    vec![Type::Dynamic],
+                    ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
+                );
+            }
             return Type::named_with_origin(
                 name.to_string(),
                 ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),

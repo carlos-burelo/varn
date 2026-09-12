@@ -166,12 +166,22 @@ impl<'r> Checker<'r> {
                     }
                 }
                 ObjectProp::Method {
-                    return_type, body, ..
+                    return_type,
+                    body,
+                    is_async,
+                    ..
                 } => {
                     let saved_expected = self.expected_return_type.take();
                     self.expected_return_type = return_type
                         .as_ref()
-                        .map(|rt| self.resolve_type_node_cached(rt, bind));
+                        .map(|rt| {
+                            let ty = self.resolve_type_node_cached(rt, bind);
+                            if *is_async {
+                                crate::types::awaited(&ty)
+                            } else {
+                                ty
+                            }
+                        });
 
                     let saved_scope = self.current_scope;
                     if let Some(fn_scope) = self.next_child_scope(bind) {

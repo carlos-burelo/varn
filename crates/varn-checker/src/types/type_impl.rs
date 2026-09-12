@@ -157,6 +157,9 @@ impl Type {
     pub fn is_void(&self) -> bool {
         matches!(self.0, TypeKind::Intrinsic(TypeTag::Void))
     }
+    pub fn is_never(&self) -> bool {
+        matches!(self.0, TypeKind::Intrinsic(TypeTag::Never))
+    }
 
     pub fn to_type_tag(&self) -> TypeTag {
         match &self.0 {
