@@ -112,6 +112,17 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 },
             ))
         }
+        TokenKind::Try => {
+            s.advance();
+            let operand = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
+            Ok(s.expr(
+                full_range,
+                ExprKind::Try {
+                    expression: Box::new(operand),
+                },
+            ))
+        }
         TokenKind::PlusPlus => {
             s.advance();
             let o = parse_unary_expr(s)?;
@@ -374,17 +385,6 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 );
             }
 
-            TokenKind::Question if !is_ternary_question(s) => {
-                let op_range = s.range();
-                s.advance();
-                let full_range = expr.range().to(op_range);
-                expr = s.expr(
-                    full_range,
-                    ExprKind::Try {
-                        expression: Box::new(expr),
-                    },
-                );
-            }
             TokenKind::Template | TokenKind::TemplateHead => {
                 let template_expr = super::primary::parse_template(s)?;
                 let start_range = *expr.range();
@@ -455,34 +455,6 @@ fn looks_like_generic_call(s: &TokenStream) -> bool {
     }
 }
 
-fn is_ternary_question(s: &TokenStream) -> bool {
-    matches!(
-        s.peek_kind(1),
-        TokenKind::Dot
-            | TokenKind::LBracket
-            | TokenKind::Question
-            | TokenKind::Identifier
-            | TokenKind::Str
-            | TokenKind::IntegerLiteral
-            | TokenKind::FloatLiteral
-            | TokenKind::True
-            | TokenKind::False
-            | TokenKind::Null
-            | TokenKind::LParen
-            | TokenKind::LBrace
-            | TokenKind::Minus
-            | TokenKind::Bang
-            | TokenKind::Tilde
-            | TokenKind::Plus
-            | TokenKind::New
-            | TokenKind::Await
-            | TokenKind::Yield
-            | TokenKind::Typeof
-            | TokenKind::Void
-            | TokenKind::PlusPlus
-            | TokenKind::MinusMinus
-    )
-}
 
 fn try_parse_generic_call(
     s: &mut TokenStream,

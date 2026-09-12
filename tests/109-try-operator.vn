@@ -1,0 +1,99 @@
+enum Result<T, E> {
+    Ok(val: T),
+    Err(err: E)
+}
+
+enum Option<T> {
+    Some(val: T),
+    None
+}
+
+function parse_positive(n: int): Result<int, str> {
+    if (n <= 0) {
+        return Result.Err("must be positive");
+    }
+    return Result.Ok(n * 2);
+}
+
+let test_direct = parse_positive(5);
+let test_direct_val = match (test_direct) {
+    Ok(val) => val,
+    Err(_) => 0
+};
+print("test_direct_val is:", test_direct_val);
+
+function compute_result(a: int, b: int): Result<int, str> {
+    let x: int = try parse_positive(a);
+    let y: int = try parse_positive(b);
+    return Result.Ok(x + y);
+}
+
+let ok_res = compute_result(5, 10);
+let ok_val = match (ok_res) {
+    Ok(v) => v,
+    Err(_) => 0
+};
+let debug_msg = match (ok_res) {
+    Ok(v) => "Ok: " + v,
+    Err(e) => "Err: " + e
+};
+print("debug_msg:", debug_msg);
+print("ok_val is:", ok_val);
+assert("try Result unwraps Ok values", ok_val == 30);
+
+let err_res = compute_result(-2, 10);
+let err_msg = match (err_res) {
+    Ok(_) => "unexpected",
+    Err(e) => e
+};
+assert("try Result propagates Err", err_msg == "must be positive");
+
+function find_user_id(name: str): Option<int> {
+    if (name == "alice") {
+        return Option.Some(101);
+    }
+    return Option.None;
+}
+
+function get_user_score(name: str): Option<int> {
+    let uid: int = try find_user_id(name);
+    return Option.Some(uid + 50);
+}
+
+let some_opt = get_user_score("alice");
+let some_val = match (some_opt) {
+    Some(s) => s,
+    None => -1
+};
+assert("try Option unwraps Some", some_val == 151);
+
+let none_opt = get_user_score("bob");
+let is_none = match (none_opt) {
+    Some(_) => false,
+    None => true
+};
+assert("try Option propagates None", is_none == true);
+
+function get_suffix(s: str?): str? {
+    let non_null_str: str = try s;
+    return non_null_str + "_suffix";
+}
+
+let suffixed_ok = get_suffix("test");
+assert("try nullable unwraps non-null", suffixed_ok == "test_suffix");
+
+let suffixed_null = get_suffix(null);
+assert("try nullable propagates null", suffixed_null == null);
+
+let cond = true;
+let ternary_unary_neg = cond ? -1 : 1;
+assert("ternary with negative branch parses cleanly", ternary_unary_neg == -1);
+
+let ternary_unary_not = cond ? !false : false;
+assert("ternary with logical not parses cleanly", ternary_unary_not == true);
+
+let opt_chain: str? = "hello";
+let opt_len = opt_chain?.length ?? 0;
+assert("optional chaining and null coalescing remain intact", opt_len == 5);
+
+print("TRY OPERATOR TESTS PASSED");

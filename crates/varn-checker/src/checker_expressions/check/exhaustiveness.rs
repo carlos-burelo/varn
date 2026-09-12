@@ -61,6 +61,9 @@ impl<'r> Checker<'r> {
                         match &c.pattern {
                             MatchPattern::Wildcard => true,
                             MatchPattern::Identifier(name) => name.as_ref() == vname.as_ref(),
+                            MatchPattern::EnumVariant { variant_name, .. } => {
+                                variant_name.as_ref() == vname.as_ref()
+                            }
                             MatchPattern::Record { fields, .. } => {
                                 fields.first().is_some_and(|(key, sub)| {
                                     key.as_ref() == "__variant__"

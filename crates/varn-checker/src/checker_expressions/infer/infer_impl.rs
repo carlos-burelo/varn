@@ -278,6 +278,19 @@ impl<'r> Checker<'r> {
                 }
                 ty
             }
+            ExprKind::Try { expression } => {
+                let ty = self.infer_type(expression, bind);
+                match &ty.0 {
+                    TypeKind::Generic(name, args, _)
+                        if (name.as_ref() == "Result" || name.as_ref() == "Option")
+                            && !args.is_empty() =>
+                    {
+                        args[0].clone()
+                    }
+                    _ if ty.is_nullable() => ty.non_nullified(),
+                    _ => Type::Dynamic,
+                }
+            }
             ExprKind::Logical { op, left, right } => {
                 let l_ty = self.infer_type(left, bind);
                 let r_ty = self.infer_type(right, bind);

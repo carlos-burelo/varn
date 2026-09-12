@@ -2594,6 +2594,145 @@ impl<'a> FnEmitter<'a> {
                 };
             }
 
+            ExprKind::Try { expression } => {
+                let inner = self.lower_expr(expression);
+                let hoisted = self.hoist(inner);
+                let span = hoisted.span;
+
+                // Case 1: Enum (Result or Option)
+                if let BackendTy::Enum(eid) = hoisted.ty.non_nullable(self.tt) {
+                    if let Some(info) = self.m.enums.get(eid.0 as usize) {
+                        let is_err_res = info.variants.iter().find(|v| v.name.as_ref() == "Err");
+                        let is_ok_res = info.variants.iter().find(|v| v.name.as_ref() == "Ok");
+                        if let (Some(err_var), Some(ok_var)) = (is_err_res, is_ok_res) {
+                            let disc = TirExpr {
+                                kind: TirExprKind::Discriminant {
+                                    value: Box::new(hoisted.clone()),
+                                },
+                                ty: BackendTy::Int,
+                                res: Resolution::None,
+                                span,
+                            };
+                            let cond = TirExpr {
+                                kind: TirExprKind::Binary {
+                                    op: TirBinOp::Eq,
+                                    lhs: Box::new(disc),
+                                    rhs: Box::new(TirExpr {
+                                        kind: TirExprKind::IntLit(err_var.tag as i64),
+                                        ty: BackendTy::Int,
+                                        res: Resolution::None,
+                                        span,
+                                    }),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            };
+                            self.pending.push(TirStmt::If {
+                                cond,
+                                then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
+                                else_body: vec![],
+                            });
+                            return TirExpr {
+                                kind: TirExprKind::VariantPayload {
+                                    value: Box::new(hoisted),
+                                    tag: ok_var.tag,
+                                    field: 0,
+                                },
+                                ty,
+                                res: Resolution::EnumVariant {
+                                    enum_id: eid,
+                                    tag: ok_var.tag,
+                                },
+                                span,
+                            };
+                        }
+
+                        let is_none_opt = info.variants.iter().find(|v| v.name.as_ref() == "None");
+                        let is_some_opt = info.variants.iter().find(|v| v.name.as_ref() == "Some");
+                        if let (Some(none_var), Some(some_var)) = (is_none_opt, is_some_opt) {
+                            let disc = TirExpr {
+                                kind: TirExprKind::Discriminant {
+                                    value: Box::new(hoisted.clone()),
+                                },
+                                ty: BackendTy::Int,
+                                res: Resolution::None,
+                                span,
+                            };
+                            let cond = TirExpr {
+                                kind: TirExprKind::Binary {
+                                    op: TirBinOp::Eq,
+                                    lhs: Box::new(disc),
+                                    rhs: Box::new(TirExpr {
+                                        kind: TirExprKind::IntLit(none_var.tag as i64),
+                                        ty: BackendTy::Int,
+                                        res: Resolution::None,
+                                        span,
+                                    }),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            };
+                            self.pending.push(TirStmt::If {
+                                cond,
+                                then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
+                                else_body: vec![],
+                            });
+                            return TirExpr {
+                                kind: TirExprKind::VariantPayload {
+                                    value: Box::new(hoisted),
+                                    tag: some_var.tag,
+                                    field: 0,
+                                },
+                                ty,
+                                res: Resolution::EnumVariant {
+                                    enum_id: eid,
+                                    tag: some_var.tag,
+                                },
+                                span,
+                            };
+                        }
+                    }
+                }
+
+                // Case 2: Nullable type (T?)
+                if matches!(hoisted.ty, BackendTy::Nullable(_)) {
+                    let null_ty = BackendTy::Nullable(self.tt.intern(BackendTy::Never));
+                    let null_expr = TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: null_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                    let cond = TirExpr {
+                        kind: TirExprKind::Unary {
+                            op: TirUnOp::IsNull,
+                            operand: Box::new(hoisted.clone()),
+                        },
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
+                    self.pending.push(TirStmt::If {
+                        cond,
+                        then_body: vec![TirStmt::Return(Some(null_expr))],
+                        else_body: vec![],
+                    });
+                    let non_null_ty = hoisted.ty.non_nullable(self.tt);
+                    return TirExpr {
+                        kind: TirExprKind::Cast {
+                            operand: Box::new(hoisted),
+                        },
+                        ty: non_null_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+
+                return hoisted;
+            }
+
             _ => None,
         };
 

@@ -171,6 +171,28 @@ function describir(estado: Estado): str {
 }
 ```
 
+### Manejo Canónico de Errores y Operador `try`
+
+Varn provee el operador prefijo `try <expr>` para desempaquetar y propagar errores anticipadamente sin anidamiento de bloques `match`, soportando `Result<T, E>`, `Option<T>` y tipos anulables (`T?`):
+
+```Varn
+enum Result<T, E> { Ok(val: T), Err(err: E) }
+
+function parsear(s: str): Result<int, str> {
+    if (s == "") { return Result.Err("cadena vacía") }
+    return Result.Ok(42)
+}
+
+function calcularTotal(a: str, b: str): Result<int, str> {
+    const x: int = try parsear(a)
+    const y: int = try parsear(b)
+    return Result.Ok(x + y)
+}
+
+const res = calcularTotal("10", "20")
+assert("try Result", match res { Ok(v) => v, Err(_) => 0 } === 84)
+```
+
 ### Funciones, Closures y Argumentos Nombrados
 
 ```Varn

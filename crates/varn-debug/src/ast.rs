@@ -788,7 +788,7 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
             print_expr(expression, &child_indent, true);
         }
         ExprKind::Try { expression } => {
-            terminal::log(format!("{indent}{marker}{} ?", chalk("TryExpr").bold()));
+            terminal::log(format!("{indent}{marker}try {}", chalk("TryExpr").bold()));
             print_expr(expression, &child_indent, true);
         }
         ExprKind::As {

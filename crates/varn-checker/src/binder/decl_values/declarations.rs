@@ -285,6 +285,11 @@ impl<'r> super::super::Binder<'r> {
             .collect();
         self.define(e.id.to_string(), sym);
 
+        self.sum_type_variants.insert(
+            e.id.clone(),
+            e.members.iter().map(|m| m.id.clone()).collect(),
+        );
+
         let mut variants_info = Vec::new();
 
         for member in e.members.iter() {

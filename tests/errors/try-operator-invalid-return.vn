@@ -1,0 +1,13 @@
+enum Result<T, E> {
+    Ok(val: T),
+    Err(err: E)
+}
+
+function produce(): Result<int, str> {
+    return Result.Ok(10);
+}
+
+function bad_caller(): int {
+    let x: int = try produce();
+    return x;
+}

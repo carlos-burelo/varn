@@ -36,6 +36,19 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             }
         }
         ExprKind::NonNull { expression } => infer_expr_type(expression, ctx),
+        ExprKind::Try { expression } => {
+            let inner = infer_expr_type(expression, ctx);
+            match &inner.0 {
+                TypeKind::Generic(name, args, _)
+                    if (name.as_ref() == "Result" || name.as_ref() == "Option")
+                        && !args.is_empty() =>
+                {
+                    args[0].clone()
+                }
+                _ if inner.is_nullable() => inner.non_nullified(),
+                _ => inner,
+            }
+        }
         ExprKind::Logical {
             op, left, right, ..
         } => match op {

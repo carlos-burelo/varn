@@ -254,7 +254,86 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Spawn { argument } => self.check_expr(argument, bind),
-            ExprKind::Try { expression } => self.check_expr(expression, bind),
+            ExprKind::Try { expression } => {
+                self.check_expr(expression, bind);
+                let expr_ty = self.infer_type(expression, bind);
+
+                let is_result = matches!(&expr_ty.0, TypeKind::Generic(name, _, _) if name.as_ref() == "Result");
+                let is_option = matches!(&expr_ty.0, TypeKind::Generic(name, _, _) if name.as_ref() == "Option");
+                let is_nullable = expr_ty.is_nullable();
+
+                if !expr_ty.is_dynamic() && !is_result && !is_option && !is_nullable {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TypeMismatch,
+                            format!("operator 'try' can only be applied to 'Result', 'Option', or nullable types, found '{expr_ty}'"),
+                        )
+                        .with_range(expr.range),
+                    );
+                    return;
+                }
+
+                let Some(expected_ret) = self.expected_return_type.clone() else {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TypeMismatch,
+                            "operator 'try' cannot be used outside of a function".to_string(),
+                        )
+                        .with_range(expr.range),
+                    );
+                    return;
+                };
+
+                if expected_ret.is_dynamic() {
+                    return;
+                }
+
+                if is_result {
+                    let ret_is_result = matches!(&expected_ret.0, TypeKind::Generic(name, _, _) if name.as_ref() == "Result");
+                    if !ret_is_result {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TypeMismatch,
+                                format!("operator 'try' on 'Result' requires enclosing function to return 'Result', found '{expected_ret}'"),
+                            )
+                            .with_range(expr.range),
+                        );
+                    } else if let (TypeKind::Generic(_, args_e, _), TypeKind::Generic(_, args_r, _)) = (&expr_ty.0, &expected_ret.0) {
+                        if args_e.len() >= 2 && args_r.len() >= 2 {
+                            let err_e = &args_e[1];
+                            let err_r = &args_r[1];
+                            if !self.types_compatible_cached(err_r, err_e, Some(bind)) {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::TypeMismatch,
+                                        format!("cannot propagate error type '{err_e}' into return type '{err_r}'"),
+                                    )
+                                    .with_range(expr.range),
+                                );
+                            }
+                        }
+                    }
+                } else if is_option {
+                    let ret_is_option = matches!(&expected_ret.0, TypeKind::Generic(name, _, _) if name.as_ref() == "Option");
+                    if !ret_is_option {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TypeMismatch,
+                                format!("operator 'try' on 'Option' requires enclosing function to return 'Option', found '{expected_ret}'"),
+                            )
+                            .with_range(expr.range),
+                        );
+                    }
+                } else if is_nullable && !expected_ret.is_nullable() {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TypeMismatch,
+                            format!("operator 'try' on nullable type requires enclosing function to return a nullable type, found '{expected_ret}'"),
+                        )
+                        .with_range(expr.range),
+                    );
+                }
+            }
             ExprKind::Yield { argument, .. } => {
                 let ty = if let Some(arg) = argument {
                     self.check_expr(arg, bind);
