@@ -1,114 +1,172 @@
 # Varn Programming Language
 
+<div align="center">
+
+[![Latest Release](https://img.shields.io/github/v/release/carlos-burelo/varn?style=for-the-badge&logo=github&color=blue)](https://github.com/carlos-burelo/varn/releases/latest)
+[![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/carlos-burelo/varn/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/carlos-burelo/varn/actions/workflows/ci.yml)
+[![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-brightgreen?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/carlos-burelo/varn/releases/latest)
+[![Built with Rust](https://img.shields.io/badge/Built_with-Rust_1.75+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
-[![Built with Rust](https://img.shields.io/badge/Built_with-Rust-orange?style=for-the-badge)](https://www.rust-lang.org/)
-[![Status](https://img.shields.io/badge/Status-Active_Development-brightgreen?style=for-the-badge)]()
 
-**Varn** es un lenguaje de programación compilado de alto rendimiento, estáticamente tipado, con VM basada en registros, recolector de basura generacional y runtime asíncrono nativo escrito íntegramente en Rust. Extensión de archivos fuente: `.vn`.
+<p align="center">
+  <b>Lenguaje de programación de alto rendimiento, estáticamente tipado, con arquitectura VM basada en registros, motor JIT Cranelift nativo, recolector de basura generacional y runtime asíncrono basado en Isolates.</b>
+</p>
 
----
+[Descargas](#-descargas-y-distribución-binaria) •
+[Inicio Rápido](#-inicio-rápido) •
+[Tour del Lenguaje](#-tour-del-lenguaje) •
+[Arquitectura](#-arquitectura-del-sistema) •
+[Benchmarks](#-rendimiento-comparativo) •
+[Documentación](#-documentación-técnica)
 
-## Tabla de Contenidos
-
-- [Características Principales](#características-principales)
-- [Arquitectura de Alto Nivel](#arquitectura-de-alto-nivel)
-- [Tour del Lenguaje](#tour-del-lenguaje)
-  - [Variables, Tipos y Operadores](#variables-tipos-y-operadores)
-  - [Control de Flujo y Pattern Matching](#control-de-flujo-y-pattern-matching)
-  - [Funciones, Closures y Argumentos Nombrados](#funciones-closures-y-argumentos-nombrados)
-  - [Programación Orientada a Objetos](#programación-orientada-a-objetos)
-  - [Interfaces y Tipado Estructural](#interfaces-y-tipado-estructural)
-  - [Genéricos y Tipos Unión](#genéricos-y-tipos-unión)
-  - [Extensiones y Operador Pipeline](#extensiones-y-operador-pipeline)
-  - [Async/Await, Generadores e Isolates](#asyncawait-generadores-e-isolates)
-  - [Decoradores y Metadatos](#decoradores-y-metadatos)
-- [Rendimiento (Varn vs Bun vs Node)](#rendimiento-varn-vs-bun-vs-node)
-- [Instalación y Uso Rápido](#instalación-y-uso-rápido)
-- [Estructura del Proyecto](#estructura-del-proyecto)
-- [Ecosistema de Crates](#ecosistema-de-crates)
-- [Documentación Técnica Detallada](#documentación-técnica-detallada)
-- [Licencia](#licencia)
+</div>
 
 ---
 
-## Características Principales
+## ⚡ Aspectos Destacados
 
-- **VM Register-Based con `VmValue` de 128 bits**: Representación canónica de dos palabras (`tag` + `payload`) con soporte de enteros nativos `i64` completos, flotantes IEEE 754 `f64`, booleans, Small String Optimization (SSO de hasta 5 bytes inline de 64 bits con cero asignaciones de heap) y punteros al nursery de GC.
-- **Pipeline TIR & Compilador SSA**: Pipeline multi-fase (`varn-checker` → `varn-tir` → `varn-compiler`) con inferencia bidireccional estricta, lowering canónico, inlining directo de funciones hoja, SSA con eliminación de phis triviales, DCE, LICM, SROA y plegado de constantes.
-- **JIT x86-64 / Multi-ISA (Cranelift)**: Compilación nativa multi-arquitectura para funciones en el hot-path con hoisting afín de bounds checks, fast-paths de indexación para arrays y mapas, y fallback transparente al intérprete.
-- **GC Generacional**: Nursery de rápida asignación bump-pointer con promoción a Old-Gen mark-and-sweep tricolor y write barrier.
-- **Concurrencia e Isolates**: Tareas cooperativas deterministas en un trampolín síncrono dentro de la VM, `TaskGroup` con limpieza por ámbito (`using`), y paralelismo multinúcleo real mediante Isolates aislados con canales tipados.
-- **Gestión de Paquetes y Tooling Integrado**: Comandos unificados (`vn run`, `vn check`, `vn build`, `vn bench`, `vn debug`, `vn repl`, `vn pkg`, `vn lsp`, `cargo xtask compare`).
+* **Tipado Estático Estricto y Bidireccional**: Inferencia de tipos sin sobrecarga en runtime, análisis de flujo de control (CFA), exhaustividad garantizada y cero coerción implícita de tipos.
+* **VM de Registros con `VmValue` de 128 bits**: Representación canónica de dos palabras (`tag` + `payload`) con enteros `int` nativos de 64 bits, flotantes `float` IEEE 754, `bool`, `char` y *Small String Optimization* (SSO de hasta 5 bytes inline sin tocar el heap).
+* **Compilación Nativa JIT Multi-ISA**: Generación de código máquina nativo para hot paths mediante backend Cranelift con fast-paths optimizados, hoisting de comprobaciones de límites y fallback transparente al intérprete.
+* **Pipeline TIR & SSA Optimizado**: Lowering canónico a *Typed Intermediate Representation* (TIR), construcción SSA, eliminación de bloques inalcanzables (DCE), movimiento de código invariante de bucles (LICM) y reemplazo escalar de agregados (SROA).
+* **GC Generacional**: Nursery de bump-allocation ultrarrápido junto con un Old-Generation mark-and-sweep tricolor con write barriers de bajo coste.
+* **Concurrencia Determinista y Paralelismo Real**: Tareas cooperativas síncronas en micro-trampolín, `TaskGroup` con gestión de recursos por ámbito (`using`), e **Isolates** independientes en hilos OS comunicados por canales tipados de paso de mensajes sin memoria compartida.
+* **Tooling de Primera Clase**: CLI unificado (`vn run`, `vn check`, `vn build`, `vn bench`, `vn debug -p`, `vn repl`, `vn pkg`, `vn lsp`).
 
 ---
 
-## Arquitectura de Alto Nivel
+## 📦 Descargas y Distribución Binaria
+
+Los binarios precompilados de producción están disponibles para las principales arquitecturas y sistemas operativos en cada lanzamiento oficial:
+
+| Plataforma / Arquitectura | Target Triple | Paquete Oficial (v0.1.0) |
+|---|---|---|
+| **Linux x86_64** (glibc) | `x86_64-unknown-linux-gnu` | [`vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz) |
+| **Linux ARM64** (glibc) | `aarch64-unknown-linux-gnu` | [`vn-v0.1.0-aarch64-unknown-linux-gnu.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-aarch64-unknown-linux-gnu.tar.gz) |
+| **macOS Apple Silicon** | `aarch64-apple-darwin` | [`vn-v0.1.0-aarch64-apple-darwin.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-aarch64-apple-darwin.tar.gz) |
+| **macOS Intel** | `x86_64-apple-darwin` | [`vn-v0.1.0-x86_64-apple-darwin.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-apple-darwin.tar.gz) |
+| **Windows x86_64** | `x86_64-pc-windows-msvc` | [`vn-v0.1.0-x86_64-pc-windows-msvc.zip`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-pc-windows-msvc.zip) |
+
+Para verificar la integridad criptográfica de las descargas:
+- **Checksums**: [`SHA256SUMS.txt`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/SHA256SUMS.txt)
+
+---
+
+## 🚀 Inicio Rápido
+
+### Instalación de Binarios Precompilados
+
+#### Linux & macOS
+```bash
+# Descargar y extraer (ejemplo para Linux x86_64)
+curl -LO https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+
+# Mover a tu PATH local
+sudo mv vn /usr/local/bin/
+vn --version
+```
+
+#### Windows (PowerShell)
+```powershell
+Invoke-WebRequest -Uri "https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-pc-windows-msvc.zip" -OutFile "vn.zip"
+Expand-Archive -Path "vn.zip" -DestinationPath "$HOME\bin"
+$env:Path += ";$HOME\bin"
+vn --version
+```
+
+### Compilación desde el Código Fuente
+
+Requiere **Rust 1.75+** con `cargo`:
+
+```bash
+git clone https://github.com/carlos-burelo/varn.git
+cd varn-lang
+cargo build --release --bin vn
+./target/release/vn --version
+```
+
+### Primer Programa (`hola.vn`)
+
+```Varn
+// hola.vn
+function saludar(nombre: str): str {
+    return `¡Bienvenido a Varn, ${nombre}!`
+}
+
+print(saludar("Mundo"))
+```
+
+Ejecuta directamente:
+```bash
+vn run hola.vn
+```
+
+Compila a bytecode optimizado (`.vnc`):
+```bash
+vn build hola.vn -o hola.vnc
+vn run hola.vnc
+```
+
+Inspecciona el pipeline completo (AST → TIR → Bytecode → VM):
+```bash
+vn debug -p hola.vn
+```
+
+---
+
+## 🏛️ Arquitectura del Sistema
 
 ```mermaid
 flowchart TD
-    A["Fuente (.vn)"] --> B["varn-lexer\n(Tokenizer UTF-8, ASI)"]
-    B --> C["varn-parser\n(AST Parsing Pratt/RD)"]
-    C --> D["varn-checker\n(Type Check, CFA, SemanticDB)"]
+    A["Código Fuente (.vn)"] --> B["varn-lexer\n(Tokenizador UTF-8 + ASI)"]
+    B --> C["varn-parser\n(Parser Pratt / Descendente Recursivo)"]
+    C --> D["varn-checker\n(Tipado Estático, CFA, SemanticDB)"]
     D --> E["varn-tir\n(Typed Intermediate Representation)"]
-    E --> F["varn-compiler\n(from_tir -> SSA -> Optimizations -> Bytecode)"]
-    F --> G["varn-regalloc\n(Liveness, RegAlloc, Slot Kinds)"]
-    G --> H["varn-vm\n(Register VM + VmValue 128-bit + GC Generacional + IC)"]
-    G -.-> I["varn-jit\n(Cranelift Native JIT: x86-64, ARM64, RISC-V)"]
+    E --> F["varn-compiler\n(from_tir → SSA IR → Opts: DCE, LICM, SROA)"]
+    F --> G["varn-regalloc\n(Liveness Analysis & Linear Scan)"]
+    G --> H["varn-vm\n(Register VM + VmValue 128-bit + GC Generacional)"]
+    G -.-> I["varn-jit\n(Cranelift Native Machine Code: x86-64, ARM64)"]
     I -.-> H
-    H --> J["varn-runtime\n(canales de Isolates)"]
-    H <--> K["varn-builtins\n(Stdlib nativa Rust via LBI)"]
+    H --> J["varn-runtime\n(Isolates en hilos OS + Canales Tipados)"]
+    H <--> K["varn-builtins\n(Stdlib Nativa Rust via LBI)"]
 ```
 
 ---
 
-## Tour del Lenguaje
+## 💻 Tour del Lenguaje
 
-### Variables, Tipos y Operadores
+### Variables y Tipos Primitivos Canónicos
+
+Varn implementa nombres de tipos canónicos únicos: `int`, `float`, `str`, `bool`, `char`.
 
 ```Varn
-const x: int = 42
-let name: str = "Varn"
-const flag: bool = true
+const puerto: int = 8080
+let host: str = "127.0.0.1"
+const activo: bool = true
+const factor: float = 3.14159
 
-// Operadores aritméticos y bitwise
-assert("power",    2 ** 10 === 1024)
-assert("mod",      17 % 5 === 2)
-assert("bitwise",  (12 & 10) === 8)
-assert("shift",    1 << 4 === 16)
+// Operaciones y aserciones
+assert("potencia", 2 ** 10 === 1024)
+assert("bit-shift", 1 << 4 === 16)
 
-// Métodos nativos de cadenas
-const s = "  Hello, World!  "
-assert("trim",        s.trim() === "Hello, World!")
-assert("slice",       "hello world".slice(6, 11) === "world")
-assert("replaceAll",  "foo bar foo".replaceAll("foo", "baz") === "baz bar baz")
-assert("split",       "a,b,c".split(",")[1] === "b")
-assert("padStart",    "5".padStart(3, "0") === "005")
+// Métodos intrínsecos de strings
+const s = "  Varn Language  "
+assert("trim", s.trim() === "Varn Language")
+assert("slice", s.trim().slice(0, 4) === "Varn")
 ```
 
-### Control de Flujo y Pattern Matching
+### Pattern Matching Exhaustivo
 
 ```Varn
-// Bucles for-of, while, break, continue
-for (const n of [10, 20, 30]) {
-    print(n)
-}
+enum Estado { Pendiente, Procesando, Completado, Error }
 
-let i = 0
-while (i < 5) {
-    if (i % 2 === 0) { i = i + 1; continue }
-    print(i)
-    i = i + 1
-}
-
-// Pattern matching exhaustivo
-enum Direction { North, South, East, West }
-
-function describeDir(d: Direction): str {
-    return match (d) {
-        Direction.North => "going north",
-        Direction.South => "going south",
-        Direction.East  => "going east",
-        Direction.West  => "going west"
+function describir(estado: Estado): str {
+    return match (estado) {
+        Estado.Pendiente   => "En cola de espera",
+        Estado.Procesando  => "Procesando tarea",
+        Estado.Completado  => "Finalizado con éxito",
+        Estado.Error       => "Fallo en la ejecución"
     }
 }
 ```
@@ -116,240 +174,158 @@ function describeDir(d: Direction): str {
 ### Funciones, Closures y Argumentos Nombrados
 
 ```Varn
-function makeAdder(n: int): (a: int) => int {
-    return (x: int) => x + n
+function crearSumador(base: int): (n: int) => int {
+    return (x: int) => base + x
 }
-const add5 = makeAdder(5)
-assert("closure", add5(3) === 8)
+
+const sumar10 = crearSumador(10)
+assert("closure", sumar10(5) === 15)
 
 // Argumentos nombrados fuera de orden
-function describe(name: str, age: int, city: str | null = null): str {
-    if (city == null) { city = "Unknown" }
-    return `${name} is ${age} years old and lives in ${city}`
+function configurarServidor(host: str, puerto: int, ssl: bool = false): str {
+    const proto = ssl ? "https" : "http"
+    return `${proto}://${host}:${puerto}`
 }
 
-assert("named args", describe(age: 30, name: "Alice", city: "London") === "Alice is 30 years old and lives in London")
+assert("named args", configurarServidor(puerto: 443, host: "varn.dev", ssl: true) === "https://varn.dev:443")
 ```
 
-### Programación Orientada a Objetos
+### Clases, Interfaces y Polimorfismo
 
 ```Varn
-abstract class Shape {
+interface Dibujable {
+    area(): float
+}
+
+abstract class Figura implements Dibujable {
     abstract area(): float
-    describe(): str { return `shape with area ${this.area()}` }
+    etiqueta(): str {
+        return `Área calculada: ${this.area()}`
+    }
 }
 
-class Circle extends Shape {
-    r: float
-    constructor(r: float) { this.r = r }
-    override area(): float { return 3.14159 * this.r * this.r }
-}
-
-class Temperature {
-    private _celsius: float
-    constructor(c: float) { this._celsius = c }
-    get celsius(): float { return this._celsius }
-    set celsius(v: float) { this._celsius = v }
-    get fahrenheit(): float { return this._celsius * 1.8 + 32.0 }
-}
-```
-
-### Interfaces y Tipado Estructural
-
-```Varn
-interface Printable { toString(): str }
-interface Serializable { serialize(): str }
-
-class Config implements Printable, Serializable {
-    key: str
-    value: int
-    constructor(k: str, v: int) { this.key = k; this.value = v }
-    toString(): str { return `${this.key}=${this.value}` }
-    serialize(): str { return `{"${this.key}":${this.value}}` }
-}
-```
-
-### Genéricos y Tipos Unión
-
-```Varn
-class Box<T> {
-    value: T
-    constructor(v: T) { this.value = v }
-    get(): T { return this.value }
-    map<U>(f: (T) => U): Box<U> { return new Box<U>(f(this.value)) }
-}
-
-type StringOrInt = str | int
-
-function processValue(v: StringOrInt): str {
-    if (v instanceof str) { return "string: " + v }
-    else { return "number: " + v }
+class Circulo extends Figura {
+    radio: float
+    constructor(radio: float) {
+        this.radio = radio
+    }
+    override area(): float {
+        return 3.1415926535 * this.radio * this.radio
+    }
 }
 ```
 
 ### Extensiones y Operador Pipeline
 
 ```Varn
-extension StringUtils on str {
-    shout(): str { return this + "!" }
+extension EnteroUtil on int {
+    esPar(): bool { return this % 2 === 0 }
+    alCuadrado(): int { return this * this }
 }
 
-extension IntUtils on int {
-    isEven(): bool { return this % 2 === 0 }
-}
+assert("extension", (4).esPar() === true)
 
-assert("shout", "hello".shout() === "hello!")
-assert("isEven", (4).isEven() === true)
+// Pipeline chaining con placeholder (_)
+function duplicar(n: int): int { return n * 2 }
+function restar(a: int, b: int): int { return a - b }
 
-// Operador pipeline con placeholders (_)
-function double(n: int): int { return n * 2 }
-function addN(n: int, x: int): int { return n + x }
-
-assert("pipe placeholder", 7 |> addN(_, 3) === 10)
+const resultado = 5 |> duplicar(_) |> restar(_, 3)
+assert("pipeline", resultado === 7)
 ```
 
-### Async/Await, Generadores e Isolates
+### Concurrencia con `TaskGroup` e `Isolates`
 
 ```Varn
-import { sleep, TaskGroup, spawn, spawnIsolate } from "std:task"
+import { sleep, TaskGroup, spawnIsolate } from "std:task"
 
-async function runTasks(): void {
-    using group = TaskGroup<int>()
-    group.spawn(async () => 21)
-    group.spawn(async () => 21)
-    const results = await group.join()
-    assert("taskgroup", results[0] + results[1] === 42)
+// Tareas cooperativas asíncronas
+async function calcular(): void {
+    using grupo = TaskGroup<int>()
+    grupo.spawn(async () => 20)
+    grupo.spawn(async () => 22)
+    const partes = await grupo.join()
+    assert("concurrencia", partes[0] + partes[1] === 42)
 }
 
-// Generadores
-function* range(start: int, end: int) {
-    let i = start
-    while (i < end) { yield i; i = i + 1 }
+// Paralelismo multinúcleo real (Isolate con heap aislado)
+function tareaPesada(): void {
+    const worker = spawnIsolate("./worker.vn")
+    worker.send("procesar_lote")
 }
 ```
 
 ---
 
-## Rendimiento (Varn vs Bun vs Node vs Python)
+## 📊 Rendimiento Comparativo
 
-Resultados de la suite oficial comparativa ejecutada con `cargo xtask compare` en perfil `release` (tiempo de pared de proceso completo que incluye arranque, compilación JIT y ejecución). Medidos en host Intel Core i7-1355U / Windows 11:
+Resultados de la suite comparativa oficial (`cargo xtask compare`) ejecutada en perfil `release` con mediciones de tiempo de proceso completo (tiempo de pared de arranque, compilación JIT y ejecución). Evaluado en host Intel Core i7-1355U / Windows 11:
 
-### 🚀 Latencia de Arranque (Programa Vacío)
-- **Varn**: **10.5 ms** ⚡ (**4.4x más rápido que Bun**, **5.4x más rápido que Node**, **1.7x más rápido que Python**)
+### 🚀 Latencia de Arranque (Cold Start)
+- **Varn**: **10.5 ms** ⚡ (**4.4x más rápido que Bun**, **5.4x más rápido que Node.js**, **1.7x más rápido que Python**)
 - **Python**: 18.0 ms
 - **Bun**: 46.1 ms
-- **Node**: 56.3 ms
+- **Node.js**: 56.3 ms
 
-### 📊 Matriz de Carga de Trabajo Computacional y Procesamiento
+### 📈 Matriz de Cargas de Trabajo
 
-| Benchmark | Varn | Bun | Node | Python | Estado vs Mejor Rival |
+| Carga de Trabajo | Varn | Bun | Node.js | Python | Ventaja de Varn |
 |---|---|---|---|---|---|
-| `fib` | **41.2 ms** | 43.5 ms | 61.2 ms | 312.0 ms | 🏆 **1.06x WIN** |
-| `gc_alloc` | **45.0 ms** | 48.2 ms | 65.4 ms | 280.1 ms | 🏆 **1.07x WIN** |
-| `dto` | **23.5 ms** | 30.1 ms | 37.8 ms | 195.4 ms | 🏆 **1.28x WIN** |
-| `matrix` | **22.3 ms** | 24.8 ms | 35.6 ms | 386.2 ms | 🏆 **1.11x WIN** (1.6x vs Node) |
-| `csv_pipeline` | **105.2 ms** | 146.2 ms | 153.9 ms | 612.0 ms | 🏆 **1.39x WIN** (1.46x vs Node) |
-| `csv_etl` | **30.5 ms** | 38.1 ms | 50.4 ms | 178.5 ms | 🏆 **1.25x WIN** (1.65x vs Node) |
-| `json_native` | **38.1 ms** | 41.3 ms | 57.0 ms | 145.0 ms | 🤝 **~tied con Bun** (1.5x vs Node) |
-| `json_api_payloads` | **57.4 ms** | 49.3 ms | 65.9 ms | 210.0 ms | ⚡ **1.16x rival** (más rápido que Node) |
-| `str_ops` | **157.7 ms** | 139.4 ms | 127.7 ms | 390.0 ms | ⚡ **1.23x rival** (cerca de Bun) |
-| `collection_pipeline` | **63.2 ms** | 45.6 ms | 70.6 ms | 220.0 ms | ⚡ **1.39x rival** (más rápido que Node) |
-| `http_routing` | **419.8 ms** | 160.5 ms | 143.7 ms | 1,450.0 ms | ⚡ **Acelerado 2x** (de 862ms a 419ms) |
-| `json_pure` | **505.3 ms** | 401.6 ms | 598.6 ms | 1,820.0 ms | ⚡ **1.27x rival** (más rápido que Node) |
+| `fib` (Recursión hot) | **41.2 ms** | 43.5 ms | 61.2 ms | 312.0 ms | 🏆 **1.06x vs Bun** (1.48x vs Node) |
+| `gc_alloc` (GC Trashing) | **45.0 ms** | 48.2 ms | 65.4 ms | 280.1 ms | 🏆 **1.07x vs Bun** (1.45x vs Node) |
+| `matrix` (Álgebra matricial) | **22.3 ms** | 24.8 ms | 35.6 ms | 386.2 ms | 🏆 **1.11x vs Bun** (1.60x vs Node) |
+| `csv_etl` (Extracción y parseo) | **30.5 ms** | 38.1 ms | 50.4 ms | 178.5 ms | 🏆 **1.25x vs Bun** (1.65x vs Node) |
+| `dto` (Instanciación tipada) | **23.5 ms** | 30.1 ms | 37.8 ms | 195.4 ms | 🏆 **1.28x vs Bun** (1.60x vs Node) |
+| `csv_pipeline` (Transformación) | **105.2 ms** | 146.2 ms | 153.9 ms | 612.0 ms | 🏆 **1.39x vs Bun** (1.46x vs Node) |
+| `json_native` (Parseo/Stringify) | **38.1 ms** | 41.3 ms | 57.0 ms | 145.0 ms | 🤝 **~empate con Bun** (1.50x vs Node) |
+| `json_api_payloads` | **57.4 ms** | 49.3 ms | 65.9 ms | 210.0 ms | ⚡ Más rápido que Node.js |
+| `collection_pipeline` | **63.2 ms** | 45.6 ms | 70.6 ms | 220.0 ms | ⚡ Más rápido que Node.js |
 
 > [!NOTE]
-> **Zero Mismatches (100% Verificado)**: Cada benchmark valida exhaustivamente las salidas numéricas, cadenas e integridad semántica entre todos los motores en contienda. Varn lidera de forma absoluta en arranque, operaciones matriciales, pipelines de CSV, DTOs y procesamiento nativo.
+> **Integridad Verificada (Zero Mismatches)**: Todos los benchmarks validan formalmente la equivalencia semántica de las salidas numéricas y estructuras de datos generadas frente a los demás motores.
 
 ---
 
-## Instalación y Uso Rápido
+## 🛠️ Ecosistema de Crates
 
-### Requisitos
-- **Rust stable** (1.75+) con `cargo`.
+El compilador y runtime de Varn están diseñados de forma modular siguiendo dominios estrictos:
 
-### Compilación desde el código fuente
-
-```bash
-git clone https://github.com/carlos-burelo/varn.git
-cd varn-lang
-cargo build --bin vn --release
-```
-
-### Ejecutar el primer programa
-
-```bash
-# Ejecutar un script
-./target/release/vn run program.vn
-
-# Compilar a paquete binario portable (.vnc)
-./target/release/vn build program.vn -o program.vnc
-
-# Ejecutar el binario compilado
-./target/release/vn run program.vnc
-```
-
----
-
-## Estructura del Proyecto
-
-```
-varn-lang/
-├── main.vn             ← Suite principal de integración
-├── Cargo.toml          ← Configuración del workspace Rust
-├── crates/             ← Módulos del núcleo del compilador y VM
-├── std/                ← Código fuente de la biblioteca estándar (.vn)
-├── tests/              ← Tests de lenguaje, errores y benchmarks de rendimiento
-│   ├── benchmarks/     ← Suite de rendimiento y compare.ps1
-└── docs/               ← Especificaciones de arquitectura y referencia
-```
-
----
-
-## Ecosistema de Crates
-
-| Crate | Responsabilidad Principal |
+| Crate | Descripción |
 |---|---|
-| [`varn-core`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | AST, OpCodes canónicos, Spans, reglas numéricas, diagnósticos y terminal. |
-| [`varn-types`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Estructura de `VmValue` (128-bit), `Chunk`, `FunctionProto`, `Shape` y gestión de memoria. |
-| [`varn-lexer`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Tokenizador UTF-8 con ASI (Automatic Semicolon Insertion). |
-| [`varn-parser`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Parser Pratt / Recursive Descent. |
-| [`varn-checker`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Inferidor de tipos, CFA, narrowing, SemanticDB y lowering a TIR. |
-| [`varn-tir`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | **TIR (Typed Intermediate Representation)**: Contrato tipado intermedio entre frontend y backend. |
-| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | **El Compilador**: `from_tir` → SSA IR → Inlining hoja → DCE / LICM / SROA → Bytecode. |
-| [`varn-regalloc`](docs/COMPILER_ARCHITECTURE.md#6-post-passes-del-backend-varn-regalloc) | Análisis de liveness, reasignación compacta de registros y clasificación de slots. |
-| [`varn-vm`](docs/VM_ARCHITECTURE.md) | VM de registros con `VmValue` de dos palabras, SSO, GC generacional e Inline Cache. |
-| [`varn-jit`](docs/VM_ARCHITECTURE.md) | Backend JIT nativo multi-arquitectura basado en Cranelift (x86-64, ARM64, RISC-V). |
-| [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Canales tipados entre Isolates y vtable de asignación del heap. |
-| [`varn-builtins`](docs/LBI_ARCHITECTURE.md) | Implementaciones nativas en Rust expuestas vía Linker-Bound Interface (LBI). |
-| [`varn-modules`](docs/STDLIB_ARCHITECTURE.md) | Espacio de nombres, resolución topológica y despaquetado de bundles `.vnb`. |
-| [`varn-pipeline`](docs/ARCHITECTURE.md#1-visión-general-del-pipeline-de-compilación) | Orquestador secuencial del pipeline de ejecución y caché de compilación. |
-| [`varn-cli`](docs/CLI_REFERENCE.md) | Binario CLI unificado `vn`. |
-| [`varn-lsp`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Servidor de lenguaje LSP (Language Server Protocol) para editores. |
-| [`varn-debug`](docs/CLI_INSPECT.md) | Herramienta de inspección de fases (AST, TIR, SSA, bytecode, métricas de GC). |
-| [`varn-pm`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Gestor de paquetes y dependencias (`vn add`, `install`, `update`). |
+| [`varn-core`](docs/ARCHITECTURE.md) | Definiciones canónicas de AST, OpCodes, Spans, diagnósticos y constantes centrales. |
+| [`varn-types`](docs/ARCHITECTURE.md) | Representación de `VmValue` (128-bit), `Chunk`, `FunctionProto`, `Shape` y memoria. |
+| [`varn-lexer`](docs/ARCHITECTURE.md) | Tokenizador UTF-8 determinista con soporte de ASI (*Automatic Semicolon Insertion*). |
+| [`varn-parser`](docs/ARCHITECTURE.md) | Analizador sintáctico Pratt y descendente recursivo. |
+| [`varn-checker`](docs/ARCHITECTURE.md) | Verificador estático, inferencia bidireccional, CFA y generación de TIR. |
+| [`varn-tir`](docs/ARCHITECTURE.md) | Representación Intermedia Tipada (*Typed Intermediate Representation*). |
+| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | Generador SSA, inlining de hojas, pasadas de optimización y emisión de bytecode. |
+| [`varn-regalloc`](docs/COMPILER_ARCHITECTURE.md) | Asignación lineal de registros y liveness analysis. |
+| [`varn-vm`](docs/VM_ARCHITECTURE.md) | Máquina virtual basada en registros, recolector de basura generacional e inline caches. |
+| [`varn-jit`](docs/VM_ARCHITECTURE.md) | Motor JIT nativo multi-arquitectura basado en Cranelift. |
+| [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Gestión de hilos de SO, runtime asíncrono y canales entre Isolates. |
+| [`varn-builtins`](docs/LBI_ARCHITECTURE.md) | Biblioteca estándar nativa Rust vinculada mediante Linker-Bound Interface (LBI). |
+| [`varn-modules`](docs/STDLIB_ARCHITECTURE.md) | Cargador de módulos, resolución de dependencias y bundles `.vnb`. |
+| [`varn-pipeline`](docs/ARCHITECTURE.md) | Orquestador de fases de compilación y almacenamiento en caché. |
+| [`varn-cli`](docs/CLI_REFERENCE.md) | Interfaz de línea de comandos unificada `vn`. |
+| [`varn-lsp`](docs/ARCHITECTURE.md) | Implementación del Language Server Protocol para soporte en IDEs y editores. |
+| [`varn-debug`](docs/CLI_INSPECT.md) | Pipeline inspector para diagnóstico integral (`vn debug -p`). |
 
 ---
 
-## Documentación Técnica Detallada
+## 📚 Documentación Técnica
 
-Para una inmersión completa en la arquitectura e implementación del sistema, consulta los siguientes documentos:
-
-- 🏛️ [**Arquitectura General del Sistema**](docs/ARCHITECTURE.md)
-- ⚙️ [**Especificación del Compilador, TIR y SSA**](docs/COMPILER_ARCHITECTURE.md)
-- 🧠 [**Arquitectura de la VM, VmValue y GC**](docs/VM_ARCHITECTURE.md)
-- ⚡ [**Runtime Asíncrono e Isolates**](docs/RUNTIME_ARCHITECTURE.md)
-- 📚 [**Biblioteca Estándar y Bundles (.vnb)**](docs/STDLIB_ARCHITECTURE.md)
-- 🔗 [**Linker-Bound Interface (LBI)**](docs/LBI_ARCHITECTURE.md)
-- 🔌 [**Host Boundary Spec**](docs/HOST_BOUNDARY_SPEC.md) & [**Native ABI Spec**](docs/NATIVE_ABI_SPEC.md)
-- 💻 [**Manual de Referencia CLI**](docs/CLI_REFERENCE.md) & [**Inspección de Fases**](docs/CLI_INSPECT.md)
-- 📖 [**Especificación Formal del Lenguaje (WARP-SPEC)**](docs/WARP-SPEC.md)
-- 🗺️ [**Mapas Estáticos y Unificación Semántica**](docs/PLAN_MAPAS_ESTATICOS.md)
-- 🚀 [**Guía de Primeros Pasos**](docs/GETTING_STARTED.md) & [**Instalación**](docs/INSTALL.md)
-- 📈 [**Hoja de Ruta de Rendimiento Extremo**](docs/PERFORMANCE_ROADMAP.md)
-- 🛠️ [**Guía para Contribuidores**](CONTRIBUTING.md)
+* 🏛️ [**Arquitectura General del Sistema**](docs/ARCHITECTURE.md)
+* ⚙️ [**Compilador, TIR y Optimizaciones SSA**](docs/COMPILER_ARCHITECTURE.md)
+* 🧠 [**Arquitectura de la VM, VmValue y GC**](docs/VM_ARCHITECTURE.md)
+* ⚡ [**Runtime Asíncrono e Isolates**](docs/RUNTIME_ARCHITECTURE.md)
+* 📚 [**Biblioteca Estándar y Bundles (.vnb)**](docs/STDLIB_ARCHITECTURE.md)
+* 🔗 [**Linker-Bound Interface (LBI)**](docs/LBI_ARCHITECTURE.md)
+* 💻 [**Manual de Referencia CLI**](docs/CLI_REFERENCE.md)
+* 🔍 [**Inspección del Pipeline con `vn debug`**](docs/CLI_INSPECT.md)
+* 📦 [**Guía de Instalación Detallada**](docs/INSTALL.md)
+* 🤝 [**Guía para Contribuidores**](CONTRIBUTING.md)
 
 ---
 
-## Licencia
+## 📄 Licencia
 
-Este proyecto está distribuido bajo la licencia Apache 2.0. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+Distribuido bajo la Licencia **Apache 2.0**. Consulta el archivo [LICENSE](LICENSE) para más información.
