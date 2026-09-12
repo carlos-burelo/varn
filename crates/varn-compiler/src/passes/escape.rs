@@ -29,7 +29,7 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::hir::ctor_summary::{CtorSummaries, SlotInit};
+use crate::from_tir::ctor_summary::{CtorSummaries, SlotInit};
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::verify::inst_uses;
 

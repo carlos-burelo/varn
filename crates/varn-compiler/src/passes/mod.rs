@@ -11,7 +11,7 @@ pub mod redundant_guards;
 pub mod state_machine;
 pub mod tco;
 
-use crate::hir::ctor_summary::CtorSummaries;
+use crate::from_tir::ctor_summary::CtorSummaries;
 use crate::ssa::ir::SsaFunc;
 
 /// Optimize without cross-function knowledge. `escape` needs constructor

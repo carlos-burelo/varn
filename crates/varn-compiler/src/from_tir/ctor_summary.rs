@@ -12,13 +12,50 @@
 
 #![allow(dead_code)]
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use varn_tir::{Resolution, TirExpr, TirExprKind, TirModule, TirStmt};
 
-use crate::hir::ctor_summary::{CtorSummaries, SlotInit};
 use crate::ssa::ir::VarId;
+
+/// Where one field slot's value comes from once the constructor has run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlotInit {
+    /// Constructor parameter `n` — i.e. the call site's argument `n`.
+    Param(u32),
+    /// Never written by the constructor, so the slot reads as null.
+    Null,
+}
+
+/// Qualified or bare class global -> per-slot initializer, in declared field order.
+pub type CtorSummaries = FxHashMap<Rc<str>, Vec<SlotInit>>;
+
+thread_local! {
+    static CURRENT: RefCell<Rc<CtorSummaries>> = RefCell::new(Rc::new(CtorSummaries::default()));
+}
+
+/// Scoped summaries guard in force for the module being lowered.
+pub struct Scope(Rc<CtorSummaries>);
+
+impl Scope {
+    pub fn enter(summaries: CtorSummaries) -> Self {
+        let prev = CURRENT.with(|c| c.replace(Rc::new(summaries)));
+        Scope(prev)
+    }
+}
+
+impl Drop for Scope {
+    fn drop(&mut self) {
+        CURRENT.with(|c| *c.borrow_mut() = Rc::clone(&self.0));
+    }
+}
+
+/// Current summaries for the module being compiled; empty outside a `Scope`.
+pub fn current() -> Rc<CtorSummaries> {
+    CURRENT.with(|c| Rc::clone(&c.borrow()))
+}
 
 /// Parent locals / params captured by a nested closure. They must be pinned to
 /// a fixed frame slot and read / written through `LoadCaptured` /
@@ -188,6 +225,12 @@ pub fn collect(tir: &TirModule) -> CtorSummaries {
             continue;
         }
         if let Some(slots) = summarize(ctor, ci.fields.len()) {
+            let qualified: Rc<str> = Rc::from(format!(
+                "{}::{}",
+                tir.source_file.replace('\\', "/"),
+                ci.name
+            ));
+            out.insert(qualified, slots.clone());
             out.insert(ci.name.clone(), slots);
         }
     }
