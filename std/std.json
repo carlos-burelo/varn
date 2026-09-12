@@ -38,10 +38,6 @@
             "pure": true
         },
         {
-            "id": "std:collections/dict",
-            "pure": true
-        },
-        {
             "id": "std:collections",
             "pure": true
         },
