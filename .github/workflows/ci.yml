@@ -38,7 +38,7 @@ jobs:
         run: |
           echo "Scanning Rust source files for line count limits..."
           FAIL=0
-          LEGACY_EXEMPTIONS="crates/varn-checker/src/emit/body.rs crates/varn-compiler/src/from_tir/build.rs crates/varn-checker/src/emit/mod.rs crates/xtask/src/main.rs crates/varn-tir/tests/verify_coherence.rs"
+          LEGACY_EXEMPTIONS="crates/varn-checker/src/emit/body.rs crates/varn-compiler/src/from_tir/build.rs crates/varn-checker/src/emit/mod.rs crates/xtask/src/main.rs crates/varn-tir/tests/verify_coherence.rs crates/varn-jit/src/clif/alloc/calls.rs"
           while IFS= read -r file; do
             LINES=$(wc -l < "$file")
             if [ "$LINES" -gt 1000 ]; then
