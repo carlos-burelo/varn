@@ -1,0 +1,229 @@
+import { tcpRead$, tcpWrite$, tcpClose$ } from "runtime:net";
+import { Headers } from "std:http/headers";
+import { JSON, Json } from "std:json";
+import { spawn } from "std:task";
+
+export class RawResponse {
+    status: int = 200;
+    statusText: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+export function parseRawResponse(raw: str): RawResponse? {
+    let headerEnd = raw.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return null;
+    
+    let headerPart = raw.slice(0, headerEnd);
+    let bodyPart = raw.slice(headerEnd + 4);
+    
+    let lines = headerPart.split("\r\n");
+    if (lines.length === 0) return null;
+    
+    let resp = new RawResponse();
+    
+    let firstLine = lines[0];
+    let parts = firstLine.split(" ");
+    if (parts.length >= 2) {
+        resp.status = int.parse(parts[1]);
+        if (parts.length >= 3) {
+            resp.statusText = parts[2];
+        }
+    }
+    
+    for (let i = 1; i < lines.length; i = i + 1) {
+        let line = lines[i];
+        let colon = line.indexOf(":");
+        if (colon > 0) {
+            let key = line.slice(0, colon).trim().toLowerCase();
+            let val = line.slice(colon + 1).trim();
+            resp.headers[key] = val;
+        }
+    }
+    
+    resp.body = bodyPart;
+    return resp;
+}
+
+export async function readHttpResponse(connId: int): Task<RawResponse?> {
+    let raw = "";
+    let resp: RawResponse? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead$(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            resp = parseRawResponse(raw);
+            if (resp !== null) {
+                let contentLenStr = resp.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = int.parse(contentLenStr);
+                    if (resp.body.length >= contentLen) {
+                        resp.body = resp.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                } else {
+                    keepReading = false;
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return resp;
+}
+
+export class HttpResponse {
+    connId: int;
+    isSent: bool = false;
+    private statusCode: int = 200;
+    private responseHeaders: { [key: str]: str } = {};
+    private responseContentType: str = "text/plain";
+    private setCookies: str[] = [];
+
+    constructor(connId: int) {
+        this.connId = connId;
+        this.responseHeaders = {};
+        this.setCookies = [];
+    }
+
+    status(code: int): HttpResponse {
+        this.statusCode = code;
+        return this;
+    }
+
+    header(name: str, value: str): HttpResponse {
+        this.responseHeaders[name] = value;
+        return this;
+    }
+
+    type(contentType: str): HttpResponse {
+        this.responseContentType = contentType;
+        return this;
+    }
+
+    setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): HttpResponse {
+        let cookieStr = name + "=" + value;
+        if (options !== null) {
+            if (options.maxAge !== null) {
+                cookieStr = cookieStr + "; Max-Age=" + options.maxAge;
+            }
+            if (options.path !== null) {
+                cookieStr = cookieStr + "; Path=" + options.path;
+            } else {
+                cookieStr = cookieStr + "; Path=/";
+            }
+            if (options.httpOnly) {
+                cookieStr = cookieStr + "; HttpOnly";
+            }
+            if (options.secure) {
+                cookieStr = cookieStr + "; Secure";
+            }
+            if (options.sameSite !== null) {
+                cookieStr = cookieStr + "; SameSite=" + options.sameSite;
+            }
+        }
+        this.setCookies.push(cookieStr);
+        return this;
+    }
+
+    send(body: str): void {
+        if (this.isSent) return;
+        
+        let statusText = "OK";
+        if (this.statusCode === 404) statusText = "Not Found";
+        else if (this.statusCode === 201) statusText = "Created";
+        else if (this.statusCode === 204) statusText = "No Content";
+        else if (this.statusCode === 413) statusText = "Payload Too Large";
+        else if (this.statusCode === 500) statusText = "Internal Server Error";
+        
+        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
+        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
+        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n";
+        
+        for (let name in this.responseHeaders) {
+            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
+        }
+        for (let c of this.setCookies) {
+            responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
+        }
+        
+        responseStr = responseStr + "\r\n" + body;
+        
+        spawn(this._writeAndClose(responseStr));
+        this.isSent = true;
+    }
+
+    private async _writeAndClose(data: str): Task<void> {
+        await tcpWrite$(this.connId, data);
+        tcpClose$(this.connId);
+    }
+
+    json(data: Json): void {
+        this.type("application/json").send(JSON.stringify(data));
+    }
+
+    html(htmlContent: str): void {
+        this.type("text/html").send(htmlContent);
+    }
+}
+
+export class Response {
+    status: int = 200;
+    statusText: str = "OK";
+    ok: bool = true;
+    body: str = "";
+    headers: Headers = new Headers({});
+    url: str = "";
+
+    constructor(
+        bodyOrStatus: dynamic = "",
+        statusOrStatusText: dynamic = 200,
+        headersOrOk: dynamic = {},
+        bodyPos: str = "",
+        headersPos: dynamic = {}
+    ) {
+        if (typeof bodyOrStatus === "int" || typeof bodyOrStatus === "float") {
+            let st = bodyOrStatus as int;
+            this.status = st;
+            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : (st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status")));
+            this.ok = st >= 200 && st < 300;
+            this.body = bodyPos;
+            this.headers = new Headers(headersPos);
+        } else {
+            this.body = typeof bodyOrStatus === "str" ? bodyOrStatus : "";
+            let st = (typeof statusOrStatusText === "int" || typeof statusOrStatusText === "float") ? (statusOrStatusText as int) : 200;
+            this.status = st;
+            this.statusText = st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status"));
+            this.ok = st >= 200 && st < 300;
+            this.headers = new Headers(headersOrOk);
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
+
+    json(): Json {
+        return JSON.parse(this.body);
+    }
+}
+
+export function json(data: Json, status: int = 200, headers: dynamic = {}): Response {
+    let body = JSON.stringify(data);
+    let h = new Headers(headers);
+    if (!h.has("content-type")) {
+        h.set("Content-Type", "application/json");
+    }
+    let res = new Response(body, status, h.toObject());
+    return res;
+}
+
+export function redirect(url: str, status: int = 302): Response {
+    let hdrs = { "Location": url };
+    return new Response("", status, hdrs);
+}
+
+export function error(status: int = 500, message: str = "Internal Server Error"): Response {
+    return new Response(message, status, { "Content-Type": "text/plain" });
+}

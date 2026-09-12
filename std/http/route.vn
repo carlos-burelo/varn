@@ -1,0 +1,58 @@
+export class DynamicRoute {
+    method: str;
+    segments: str[];
+    paramNames: { [key: int]: str };
+    isWildcard: bool;
+    handler: dynamic;
+
+    constructor(method: str, pattern: str, handler: dynamic) {
+        this.method = method.toUpperCase();
+        this.handler = handler;
+        this.isWildcard = pattern === "*";
+        this.segments = [];
+        this.paramNames = {};
+
+        if (!this.isWildcard) {
+            let segs = pattern.split("/");
+            for (let i = 0; i < segs.length; i = i + 1) {
+                let s = segs[i];
+                if (s.startsWith(":")) {
+                    this.segments.push(":");
+                    this.paramNames[i] = s.slice(1);
+                } else {
+                    this.segments.push(s);
+                }
+            }
+        }
+    }
+
+    match(method: str, pathSegments: str[]): { [key: str]: str }? {
+        if (this.method !== "*" && this.method !== method) {
+            return null;
+        }
+
+        if (this.isWildcard) {
+            return {};
+        }
+
+        if (this.segments.length !== pathSegments.length) {
+            return null;
+        }
+
+        let params: { [key: str]: str } = {};
+        for (let i = 0; i < this.segments.length; i = i + 1) {
+            let seg = this.segments[i];
+            let reqSeg = pathSegments[i];
+            if (seg === ":") {
+                let paramName = this.paramNames[i];
+                if (paramName !== null) {
+                    params[paramName] = reqSeg;
+                }
+            } else if (seg !== reqSeg) {
+                return null;
+            }
+        }
+
+        return params;
+    }
+}

@@ -1,0 +1,16 @@
+export class HttpStatus {
+    static Ok = #{ code: 200, message: "OK" };
+    static Created = #{ code: 201, message: "Created" };
+    static Accepted = #{ code: 202, message: "Accepted" };
+    static NoContent = #{ code: 204, message: "No Content" };
+    static MovedPermanently = #{ code: 301, message: "Moved Permanently" };
+    static Found = #{ code: 302, message: "Found" };
+    static BadRequest = #{ code: 400, message: "Bad Request" };
+    static Unauthorized = #{ code: 401, message: "Unauthorized" };
+    static Forbidden = #{ code: 403, message: "Forbidden" };
+    static NotFound = #{ code: 404, message: "Not Found" };
+    static MethodNotAllowed = #{ code: 405, message: "Method Not Allowed" };
+    static InternalServerError = #{ code: 500, message: "Internal Server Error" };
+    static BadGateway = #{ code: 502, message: "Bad Gateway" };
+    static ServiceUnavailable = #{ code: 503, message: "Service Unavailable" };
+}

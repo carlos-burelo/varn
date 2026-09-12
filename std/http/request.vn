@@ -1,0 +1,141 @@
+import { tcpRead$, parseHttpRequest$ } from "runtime:net";
+import { Headers } from "std:http/headers";
+import { JSON, Json } from "std:json";
+
+export class RawRequest {
+    method: str = "";
+    path: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+export function parseRawRequest(raw: str): RawRequest? {
+    let parsed: dynamic = parseHttpRequest$(raw);
+    if (parsed === null) return null;
+    
+    let req = new RawRequest();
+    req.method = parsed.method;
+    req.path = parsed.path;
+    req.headers = parsed.headers;
+    req.body = parsed.body;
+    return req;
+}
+
+export async function readHttpRequest(connId: int, maxContentLength: int = 10485760): Task<RawRequest?> {
+    let raw = "";
+    let req: RawRequest? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead$(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            if (raw.length > maxContentLength + 65536) {
+                throw new Error("413 Payload Too Large");
+            }
+            req = parseRawRequest(raw);
+            if (req !== null) {
+                let contentLenStr = req.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = int.parse(contentLenStr);
+                    if (contentLen > maxContentLength) {
+                        throw new Error("413 Payload Too Large");
+                    }
+                    if (req.body.length >= contentLen) {
+                        req.body = req.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                } else {
+                    keepReading = false;
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return req;
+}
+
+export class Request {
+    url: str = "";
+    method: str = "GET";
+    headers: Headers = new Headers({});
+    body: str = "";
+    path: str = "";
+    query: { [key: str]: str } = {};
+    params: { [key: str]: str } = {};
+    cookies: { [key: str]: str } = {};
+
+    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: dynamic = {}, body: str = "") {
+        this.url = url;
+        this.path = url;
+        this.query = {};
+        this.params = {};
+        this.cookies = {};
+        if (typeof methodOrInit === "object" && methodOrInit !== null) {
+            let m = methodOrInit["method"];
+            if (m !== null) {
+                this.method = m;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(methodOrInit["headers"]);
+            let b = methodOrInit["body"];
+            if (b !== null) {
+                this.body = b;
+            } else {
+                this.body = "";
+            }
+        } else {
+            if (typeof methodOrInit === "str") {
+                this.method = methodOrInit;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(headers);
+            this.body = body;
+        }
+
+        // Parse Cookies
+        let cookieHdr = this.headers.get("cookie");
+        if (cookieHdr !== null) {
+            let cookieStr = cookieHdr as str;
+            if (cookieStr.length > 0) {
+                let pairs = cookieStr.split(";");
+                for (let p of pairs) {
+                    let eq = p.indexOf("=");
+                    if (eq > 0) {
+                        let k = p.slice(0, eq).trim();
+                        let v = p.slice(eq + 1).trim();
+                        this.cookies[k] = v;
+                    }
+                }
+            }
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
+
+    json(): Json {
+        if (this.body.length === 0) return null;
+        return JSON.parse(this.body);
+    }
+
+    formData(): { [key: str]: str } {
+        let res: { [key: str]: str } = {};
+        if (this.body.length === 0) return res;
+        let pairs = this.body.split("&");
+        for (let p of pairs) {
+            let eq = p.indexOf("=");
+            if (eq > 0) {
+                let k = p.slice(0, eq);
+                let v = p.slice(eq + 1);
+                res[k] = v;
+            }
+        }
+        return res;
+    }
+}
+
+export class HttpRequest extends Request {}

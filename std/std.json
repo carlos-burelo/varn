@@ -211,6 +211,21 @@
             "id": "std:ws"
         },
         {
+            "id": "std:http/status"
+        },
+        {
+            "id": "std:http/headers"
+        },
+        {
+            "id": "std:http/route"
+        },
+        {
+            "id": "std:http/request"
+        },
+        {
+            "id": "std:http/response"
+        },
+        {
             "id": "std:http/core"
         },
         {

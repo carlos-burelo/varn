@@ -1,0 +1,59 @@
+export class Headers {
+    private _map: { [key: str]: str } = {};
+
+    constructor(init?: dynamic) {
+        this._map = {};
+        if (init !== null && typeof init === "object") {
+            for (let k in init) {
+                this.set(k, init[k]);
+            }
+        }
+    }
+
+    get(name: str): str? {
+        let key = name.toLowerCase();
+        return this._map[key];
+    }
+
+    set(name: str, value: str): void {
+        let key = name.toLowerCase();
+        this._map[key] = value;
+    }
+
+    has(name: str): bool {
+        let key = name.toLowerCase();
+        return this._map[key] !== null;
+    }
+
+    delete(name: str): void {
+        let key = name.toLowerCase();
+        let newMap: { [key: str]: str } = {};
+        for (let k in this._map) {
+            if (k !== key) {
+                newMap[k] = this._map[k];
+            }
+        }
+        this._map = newMap;
+    }
+
+    append(name: str, value: str): void {
+        let key = name.toLowerCase();
+        let existing = this._map[key];
+        if (existing !== null) {
+            this._map[key] = existing + ", " + value;
+        } else {
+            this._map[key] = value;
+        }
+    }
+
+    toObject(): { [key: str]: str } {
+        let result: { [key: str]: str } = {};
+        for (let k in this._map) {
+            let v = this._map[k];
+            if (v !== null) {
+                result[k] = v;
+            }
+        }
+        return result;
+    }
+}
