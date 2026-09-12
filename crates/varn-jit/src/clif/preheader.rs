@@ -112,32 +112,58 @@ pub(super) fn emit_region_caches(
                     // Check if this array has a bounds-hoistable access pattern.
                     let bh = region.bounds_hoistable.iter().find(|bh| bh.array_reg == r);
                     if let (Some(bh), Some(bound_reg)) = (bh, region.induction_bound) {
-                        // Emit: max_index < len?
-                        // For base+offset: (base + bound) <= len  (with overflow check)
-                        // For direct:       bound <= len
                         let bound = b.use_var(vars[bound_reg]);
                         let bounds_ok = b.create_block();
                         let bounds_bad = b.create_block();
 
-                        if let Some(base_r) = bh.base_reg {
-                            let base = b.use_var(vars[base_r]);
-                            // Checked add: base + bound. If it overflows, bounds fail.
-                            let (sum, ovf) = b.ins().uadd_overflow(base, bound);
-                            let no_ovf = b.create_block();
-                            b.ins().brif(ovf, bounds_bad, &[], no_ovf, &[]);
-                            b.switch_to_block(no_ovf);
-                            // sum <= len  ⟺  !(sum > len)  ⟺  sum unsigned-le len
-                            let ok = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, sum, len);
-                            b.ins().brif(ok, bounds_ok, &[], bounds_bad, &[]);
-                        } else {
-                            // Direct case: bound <= len
-                            let ok = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, bound, len);
-                            b.ins().brif(ok, bounds_ok, &[], bounds_bad, &[]);
-                        }
+                        // If bound == 0, the loop runs 0 times so bounds are trivially safe.
+                        let is_zero = b.ins().icmp_imm(IntCC::Equal, bound, 0);
+                        let not_zero = b.create_block();
+                        b.ins().brif(is_zero, bounds_ok, &[], not_zero, &[]);
+                        b.switch_to_block(not_zero);
+
+                        // Since loop condition is `k < bound`, maximum k is `bound - 1`.
+                        let max_k = b.ins().iadd_imm(bound, -1);
+
+                        let max_idx = match (bh.stride_reg, bh.base_reg) {
+                            (Some(stride_r), Some(base_r)) => {
+                                let stride = b.use_var(vars[stride_r]);
+                                let base = b.use_var(vars[base_r]);
+                                let (prod, ovf1) = b.ins().umul_overflow(max_k, stride);
+                                let no_ovf1 = b.create_block();
+                                b.ins().brif(ovf1, bounds_bad, &[], no_ovf1, &[]);
+                                b.switch_to_block(no_ovf1);
+
+                                let (sum, ovf2) = b.ins().uadd_overflow(prod, base);
+                                let no_ovf2 = b.create_block();
+                                b.ins().brif(ovf2, bounds_bad, &[], no_ovf2, &[]);
+                                b.switch_to_block(no_ovf2);
+                                sum
+                            }
+                            (None, Some(base_r)) => {
+                                let base = b.use_var(vars[base_r]);
+                                let (sum, ovf) = b.ins().uadd_overflow(base, max_k);
+                                let no_ovf = b.create_block();
+                                b.ins().brif(ovf, bounds_bad, &[], no_ovf, &[]);
+                                b.switch_to_block(no_ovf);
+                                sum
+                            }
+                            (Some(stride_r), None) => {
+                                let stride = b.use_var(vars[stride_r]);
+                                let (prod, ovf) = b.ins().umul_overflow(max_k, stride);
+                                let no_ovf = b.create_block();
+                                b.ins().brif(ovf, bounds_bad, &[], no_ovf, &[]);
+                                b.switch_to_block(no_ovf);
+                                prod
+                            }
+                            (None, None) => max_k,
+                        };
+
+                        // max_idx < len  (guarantees access in [0..len))
+                        let ok = b.ins().icmp(IntCC::UnsignedLessThan, max_idx, len);
+                        b.ins().brif(ok, bounds_ok, &[], bounds_bad, &[]);
 
                         // Bounds OK: proceed with real data.
-                        // bounds_guaranteed was already set statically in vars.rs
-                        // because the preheader zeros data on failure.
                         b.switch_to_block(bounds_ok);
                         b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
 

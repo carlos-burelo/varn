@@ -29,6 +29,10 @@ pub(crate) extern "C" fn jit_build_map(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        if count == 0 {
+            ctx_ref.jit_native_result = ctx_ref.heap.alloc_empty_map_vm();
+            return;
+        }
         let mut map = varn_types::value::ValueMap::default();
         for i in 0..count {
             let k_nv = ctx_ref.stack[base + start_reg + i * 2];

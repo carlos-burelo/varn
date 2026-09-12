@@ -57,26 +57,32 @@ impl HeapInner {
         if !v.is_heap() {
             return MapKey(v);
         }
-        enum Canon {
-            Str(String),
-            Char(char),
-            BigInt(i128),
-            Decimal(rust_decimal::Decimal),
-            Identity,
-        }
-        let canon = match self.get_by_idx(v.as_heap_idx()) {
-            Some(HeapObj::Str(s)) => Canon::Str(s.as_str().to_owned()),
-            Some(HeapObj::Char(c)) => Canon::Char(*c),
-            Some(HeapObj::BigInt(b)) => Canon::BigInt(*b),
-            Some(HeapObj::Decimal(d)) => Canon::Decimal(**d),
-            _ => Canon::Identity,
+        let str_action = match self.get_by_idx(v.as_heap_idx()) {
+            Some(HeapObj::Str(s)) => {
+                if let Some(k) = self.lookup_str_map_key(s.as_str()) {
+                    return k;
+                }
+                Some(s.as_str().to_owned())
+            }
+            _ => None,
         };
-        match canon {
-            Canon::Str(s) => MapKey(self.alloc_str_interned(s)),
-            Canon::Char(c) => MapKey(self.intern(Value::Char(c))),
-            Canon::BigInt(b) => MapKey(self.intern(Value::BigInt(Box::new(b)))),
-            Canon::Decimal(d) => MapKey(self.intern(Value::Decimal(Box::new(d)))),
-            Canon::Identity => MapKey(v),
+        if let Some(s_owned) = str_action {
+            return MapKey(self.alloc_str_interned(s_owned));
+        }
+        match self.get_by_idx(v.as_heap_idx()) {
+            Some(HeapObj::Char(c)) => {
+                let c = *c;
+                MapKey(self.intern(Value::Char(c)))
+            }
+            Some(HeapObj::BigInt(b)) => {
+                let b = *b;
+                MapKey(self.intern(Value::BigInt(Box::new(b))))
+            }
+            Some(HeapObj::Decimal(d)) => {
+                let d = **d;
+                MapKey(self.intern(Value::Decimal(Box::new(d))))
+            }
+            _ => MapKey(v),
         }
     }
 }

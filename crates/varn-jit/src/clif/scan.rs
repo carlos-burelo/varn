@@ -265,7 +265,8 @@ fn find_induction_info(
     let mut j = header;
     let mut cond_var: Option<usize> = None;
     let mut bound_var: Option<usize> = None;
-    while j < header + 16 && j < back_edge {
+    let scan_limit = (header + 64).min(back_edge);
+    while j < scan_limit {
         let jinfo = decode(code, j, pool)?;
         let jop = OpCode::from_u8(code[j] as u8)?;
         match jop {
@@ -322,8 +323,8 @@ fn find_induction_info(
 }
 
 /// Scans the loop body for `ArrayGetIndex` operations whose index is derived
-/// from the induction variable, either directly (`a[k]`) or via a
-/// loop-invariant base offset (`a[base + k]`).
+/// from the induction variable, either directly (`a[k]`), via a
+/// loop-invariant base offset (`a[base + k]`), or an affine pattern (`a[k * stride + base]`).
 fn find_bounds_hoistable(
     code: &[u16],
     pool: &[PoolEntry],
@@ -353,24 +354,15 @@ fn find_bounds_hoistable(
             let idx_reg = (code[j + 1] & 0xFF) as usize;
             // Only consider read-only arrays (they get view caches).
             if read_only.contains(&arr_reg) {
-                if idx_reg == cond_var {
-                    // Direct case: a[k]
+                if let Some(origin) =
+                    find_index_origin(code, pool, header, j, idx_reg, cond_var, redefined)
+                {
                     hoistable.push(emit::BoundsHoistable {
                         array_reg: arr_reg,
-                        base_reg: None,
+                        base_reg: origin.base_reg,
+                        stride_reg: origin.stride_reg,
                     });
-                } else {
-                    // Check if idx_reg was produced by AddInt(base, k) or AddInt(k, base)
-                    // by scanning backwards for the defining AddInt.
-                    if let Some((base, add_ip)) =
-                        find_addint_of(code, pool, header, j, idx_reg, cond_var, redefined)
-                    {
-                        hoistable.push(emit::BoundsHoistable {
-                            array_reg: arr_reg,
-                            base_reg: Some(base),
-                        });
-                        safe_arith.push(add_ip);
-                    }
+                    safe_arith.extend(origin.safe_ips);
                 }
             }
         }
@@ -384,12 +376,18 @@ fn find_bounds_hoistable(
     (hoistable, safe_arith)
 }
 
-/// Scans backwards from `before_ip` within the loop body to find an `AddInt`
-/// that defined `idx_reg` as `base + cond_var` or `cond_var + base`, where
-/// `base` is loop-invariant (not in `redefined`).
-///
-/// Returns `(base_reg, addint_ip)`.
-fn find_addint_of(
+struct IndexOrigin {
+    base_reg: Option<usize>,
+    stride_reg: Option<usize>,
+    safe_ips: Vec<usize>,
+}
+
+/// Identifies whether `idx_reg` is derived from `cond_var`:
+/// - `cond_var` directly
+/// - `cond_var + base` or `base + cond_var`
+/// - `cond_var * stride` or `stride * cond_var`
+/// - `(cond_var * stride) + base` or `base + (cond_var * stride)`
+fn find_index_origin(
     code: &[u16],
     pool: &[PoolEntry],
     header: usize,
@@ -397,30 +395,121 @@ fn find_addint_of(
     idx_reg: usize,
     cond_var: usize,
     redefined: &[usize],
-) -> Option<(usize, usize)> {
-    // Walk forward from header to before_ip, keeping the LAST definition of idx_reg.
-    let mut result: Option<(usize, usize)> = None;
+) -> Option<IndexOrigin> {
+    if idx_reg == cond_var {
+        return Some(IndexOrigin {
+            base_reg: None,
+            stride_reg: None,
+            safe_ips: Vec::new(),
+        });
+    }
+
+    // Walk forward from header to before_ip to find the LAST definition of idx_reg.
+    let mut def_op: Option<(OpCode, usize, usize, usize)> = None;
     let mut k = header;
     while k < before_ip {
         let kinfo = decode(code, k, pool)?;
         let kop = OpCode::from_u8(code[k] as u8)?;
-        if kop == OpCode::AddInt {
-            let dest = (code[k] >> 8) as usize;
-            if dest == idx_reg {
-                let w1 = code[k + 1];
-                let op1 = (w1 >> 8) as usize;
-                let op2 = (w1 & 0xFF) as usize;
-                if op1 == cond_var && !redefined.contains(&op2) {
-                    result = Some((op2, k));
-                } else if op2 == cond_var && !redefined.contains(&op1) {
-                    result = Some((op1, k));
-                } else {
-                    // AddInt defines idx_reg but not in the expected pattern.
-                    result = None;
+        match kop {
+            OpCode::AddInt | OpCode::MulInt => {
+                let dest = (code[k] >> 8) as usize;
+                if dest == idx_reg {
+                    let w1 = code[k + 1];
+                    let op1 = (w1 >> 8) as usize;
+                    let op2 = (w1 & 0xFF) as usize;
+                    def_op = Some((kop, op1, op2, k));
+                }
+            }
+            _ => {
+                let dest = (code[k] >> 8) as usize;
+                if dest == idx_reg {
+                    def_op = None;
                 }
             }
         }
         k += kinfo.len;
     }
-    result
+
+    let (op, op1, op2, def_ip) = def_op?;
+    match op {
+        OpCode::AddInt => {
+            // Pattern 1: AddInt(cond_var, base) or AddInt(base, cond_var)
+            if op1 == cond_var && !redefined.contains(&op2) {
+                return Some(IndexOrigin {
+                    base_reg: Some(op2),
+                    stride_reg: None,
+                    safe_ips: vec![def_ip],
+                });
+            }
+            if op2 == cond_var && !redefined.contains(&op1) {
+                return Some(IndexOrigin {
+                    base_reg: Some(op1),
+                    stride_reg: None,
+                    safe_ips: vec![def_ip],
+                });
+            }
+
+            // Pattern 2: AddInt(scaled, base) or AddInt(base, scaled)
+            let (scaled_reg, base_r) = if !redefined.contains(&op2) {
+                (op1, op2)
+            } else if !redefined.contains(&op1) {
+                (op2, op1)
+            } else {
+                return None;
+            };
+
+            // Scan backwards for the defining MulInt of scaled_reg
+            let mut mul_def: Option<(usize, usize, usize)> = None;
+            let mut m = header;
+            while m < def_ip {
+                let minfo = decode(code, m, pool)?;
+                let mop = OpCode::from_u8(code[m] as u8)?;
+                if mop == OpCode::MulInt {
+                    let dest = (code[m] >> 8) as usize;
+                    if dest == scaled_reg {
+                        let w1 = code[m + 1];
+                        let m_op1 = (w1 >> 8) as usize;
+                        let m_op2 = (w1 & 0xFF) as usize;
+                        mul_def = Some((m_op1, m_op2, m));
+                    }
+                } else if (code[m] >> 8) as usize == scaled_reg {
+                    mul_def = None;
+                }
+                m += minfo.len;
+            }
+
+            let (m_op1, m_op2, mul_ip) = mul_def?;
+            let stride_r = if m_op1 == cond_var && !redefined.contains(&m_op2) {
+                m_op2
+            } else if m_op2 == cond_var && !redefined.contains(&m_op1) {
+                m_op1
+            } else {
+                return None;
+            };
+
+            Some(IndexOrigin {
+                base_reg: Some(base_r),
+                stride_reg: Some(stride_r),
+                safe_ips: vec![def_ip, mul_ip],
+            })
+        }
+        OpCode::MulInt => {
+            // Pattern 3: MulInt(cond_var, stride) or MulInt(stride, cond_var)
+            let stride_r = if op1 == cond_var && !redefined.contains(&op2) {
+                op2
+            } else if op2 == cond_var && !redefined.contains(&op1) {
+                op1
+            } else {
+                return None;
+            };
+
+            Some(IndexOrigin {
+                base_reg: None,
+                stride_reg: Some(stride_r),
+                safe_ips: vec![def_ip],
+            })
+        }
+        _ => None,
+    }
 }
+

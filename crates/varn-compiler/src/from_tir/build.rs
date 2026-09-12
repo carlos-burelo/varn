@@ -65,6 +65,8 @@ struct Builder<'m> {
     pinned: FxHashSet<VarId>,
     next_synthetic: u32,
     current: BlockId,
+    inlining_params: Vec<Vec<Value>>,
+    inlining_stack: Vec<varn_tir::FnId>,
 }
 
 impl<'m> Builder<'m> {
@@ -89,6 +91,8 @@ impl<'m> Builder<'m> {
             pinned,
             next_synthetic: 0,
             current: BlockId(0),
+            inlining_params: Vec::new(),
+            inlining_stack: Vec::new(),
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;
@@ -818,6 +822,9 @@ impl<'m> Builder<'m> {
                             return Ok(v);
                         }
                     }
+                    if let Some(v) = self.try_inline_direct_call(*f, args, ty)? {
+                        return Ok(v);
+                    }
                 }
                 let cv = match &e.res {
                     Resolution::DirectFn(f) => {
@@ -1167,6 +1174,63 @@ impl<'m> Builder<'m> {
         Ok(Some(self.emit(InstKind::SelfCall { args: argv }, ty)))
     }
 
+    fn try_inline_direct_call(
+        &mut self,
+        f: varn_tir::FnId,
+        args: &[varn_tir::TirArg],
+        call_ty: HirType,
+    ) -> Result<Option<Value>> {
+        if self.inlining_stack.len() >= 4 || self.inlining_stack.contains(&f) {
+            return Ok(None);
+        }
+        if Some(f) == self.self_fn {
+            return Ok(None);
+        }
+        let Some(tf) = self.tir.function(f) else {
+            return Ok(None);
+        };
+        if tf.is_async || tf.is_generator || tf.has_rest || tf.has_this {
+            return Ok(None);
+        }
+        if tf.body.len() != 1 {
+            return Ok(None);
+        }
+        let TirStmt::Return(Some(ref ret_expr)) = tf.body[0] else {
+            return Ok(None);
+        };
+        if args.len() != tf.params.len()
+            || args
+                .iter()
+                .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+        {
+            return Ok(None);
+        }
+        if matches!(ret_expr.kind, TirExprKind::Closure { .. }) {
+            return Ok(None);
+        }
+
+        let mut argv = Vec::with_capacity(args.len());
+        for a in args {
+            match a {
+                varn_tir::TirArg::Expr(e) => argv.push(self.lower_expr(e)?),
+                varn_tir::TirArg::Named { value, .. } => argv.push(self.lower_expr(value)?),
+                varn_tir::TirArg::Spread(_) => return Ok(None),
+            }
+        }
+
+        self.inlining_stack.push(f);
+        self.inlining_params.push(argv);
+
+        let res = self.lower_expr(ret_expr);
+
+        self.inlining_params.pop();
+        self.inlining_stack.pop();
+
+        let v = res?;
+        let coerced = self.coerce(v, call_ty);
+        Ok(Some(coerced))
+    }
+
     fn lower_args(&mut self, args: &[varn_tir::TirArg]) -> Result<Vec<Value>> {
         let mut out = Vec::with_capacity(args.len());
         for a in args {
@@ -1273,7 +1337,14 @@ impl<'m> Builder<'m> {
     fn lower_var(&mut self, res: &Resolution, ty: HirType) -> Result<Value> {
         match res {
             Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
-            Resolution::Param(i) => self.load_var(VarId::Param(*i), ty),
+            Resolution::Param(i) => {
+                if let Some(args) = self.inlining_params.last() {
+                    if let Some(&arg_v) = args.get(*i as usize) {
+                        return Ok(arg_v);
+                    }
+                }
+                self.load_var(VarId::Param(*i), ty)
+            }
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
             Resolution::GlobalSlot(n) => Ok(self.emit(InstKind::LoadGlobalIdx(*n), ty)),
             Resolution::NativeGlobal(n) => Ok(self.emit(InstKind::LoadNativeGlobalIdx(*n), ty)),

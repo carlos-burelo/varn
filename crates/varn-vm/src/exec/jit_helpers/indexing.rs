@@ -69,6 +69,14 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                     return;
                 }
             }
+            Some(crate::heap::HeapObj::Map(m)) => {
+                let found = ctx_ref
+                    .heap
+                    .lookup_map_key(key)
+                    .and_then(|k| m.borrow().get(&k).copied());
+                (*ctx).jit_native_result = found.unwrap_or_else(VmValue::null);
+                return;
+            }
             _ => {}
         }
     }
@@ -92,7 +100,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
     let key = VmValue::from_raw_parts(key_tag, key_payload);
     let val = VmValue::from_raw_parts(val_tag, val_payload);
-    // Fast path: heap array or object
+    // Fast path: heap array or object or map
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
         let ctx_ref = &mut *ctx;
@@ -113,6 +121,19 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
                 }
                 a.push_vm(val);
             }
+            ctx_ref.heap.write_barrier(heap_idx, val);
+            return;
+        }
+        if let Some(crate::heap::HeapObj::Map(m)) = ctx_ref.heap.get_mut(heap_idx) {
+            let m = if std::rc::Rc::strong_count(&m.0) > 1 {
+                let cloned = m.borrow().clone();
+                *m = varn_types::value::MapRef::new(cloned);
+                m.clone()
+            } else {
+                m.clone()
+            };
+            let k = ctx_ref.heap.canonical_map_key(key);
+            m.borrow_mut().insert(k, val);
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;
         }

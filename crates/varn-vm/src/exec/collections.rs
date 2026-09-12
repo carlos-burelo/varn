@@ -151,8 +151,14 @@ pub(crate) fn map_set_index(
 ) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
-        let maybe_m = match heap.get(heap_idx) {
-            Some(HeapObj::Map(m)) => Some(m.clone()),
+        let maybe_m = match heap.get_mut(heap_idx) {
+            Some(HeapObj::Map(mref)) => {
+                if std::rc::Rc::strong_count(&mref.0) > 1 {
+                    let cloned = mref.borrow().clone();
+                    *mref = varn_types::value::MapRef::new(cloned);
+                }
+                Some(mref.clone())
+            }
             _ => None,
         };
         if let Some(m) = maybe_m {
@@ -332,6 +338,15 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
         Some(HeapObj::Map(m)) => {
             let m = m.clone();
             let k = heap.canonical_map_key(key);
+            if std::rc::Rc::strong_count(&m.0) > 1 {
+                if let Some(HeapObj::Map(mref)) = heap.get_mut(heap_idx) {
+                    let cloned = mref.borrow().clone();
+                    *mref = varn_types::value::MapRef::new(cloned);
+                    mref.borrow_mut().insert(k, val);
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
             m.borrow_mut().insert(k, val);
             heap.write_barrier(heap_idx, val);
             Ok(())

@@ -285,29 +285,47 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
         o if o == StrOp::Split as u8 => {
             let sep_val = arg(args, 1);
             if sep_val.is_null() {
-                let parts: Vec<&str> = s.split("").filter(|p| !p.is_empty()).collect();
-                let items: Vec<VmValue> = parts.into_iter().map(|p| heap.alloc_str(p)).collect();
+                let count = s.chars().count();
+                let mut items = Vec::with_capacity(count);
+                let mut buf = [0u8; 4];
+                for c in s.chars() {
+                    let ch_str = c.encode_utf8(&mut buf);
+                    items.push(heap.alloc_str(ch_str));
+                }
                 return Ok(heap.alloc_array_vm(items));
             }
             let (sep, _) = view(sep_val, heap, &mut needle_buf)?;
             if sep.is_empty() {
-                let parts: Vec<&str> = s.split("").filter(|p| !p.is_empty()).collect();
-                let items: Vec<VmValue> = parts.into_iter().map(|p| heap.alloc_str(p)).collect();
+                let count = s.chars().count();
+                let mut items = Vec::with_capacity(count);
+                let mut buf = [0u8; 4];
+                for c in s.chars() {
+                    let ch_str = c.encode_utf8(&mut buf);
+                    items.push(heap.alloc_str(ch_str));
+                }
                 return Ok(heap.alloc_array_vm(items));
             }
             let base_ptr = s.as_ptr() as usize;
-            let ranges: Vec<(usize, usize)> = s
-                .split(sep)
-                .map(|p| {
-                    let st = p.as_ptr() as usize - base_ptr;
-                    (st, st + p.len())
-                })
-                .collect();
-            let mut items = Vec::with_capacity(ranges.len());
-            for (bs, be) in ranges {
-                items.push(alloc_sub(heap, recv, &this, s, bs, be));
+            if sep.len() == 1 {
+                let sep_byte = sep.as_bytes()[0];
+                let count = s.as_bytes().iter().filter(|&&b| b == sep_byte).count() + 1;
+                let mut items = Vec::with_capacity(count);
+                for p in s.split(sep_byte as char) {
+                    let bs = p.as_ptr() as usize - base_ptr;
+                    let be = bs + p.len();
+                    items.push(alloc_sub(heap, recv, &this, s, bs, be));
+                }
+                Ok(heap.alloc_array_vm(items))
+            } else {
+                let sep_owned = sep.to_string();
+                let mut items = Vec::new();
+                for p in s.split(&sep_owned) {
+                    let bs = p.as_ptr() as usize - base_ptr;
+                    let be = bs + p.len();
+                    items.push(alloc_sub(heap, recv, &this, s, bs, be));
+                }
+                Ok(heap.alloc_array_vm(items))
             }
-            Ok(heap.alloc_array_vm(items))
         }
         _ => Err(RuntimeError::new(format!("str intrinsic: unknown op {op}"))),
     }

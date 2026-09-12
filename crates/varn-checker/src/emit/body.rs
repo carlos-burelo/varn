@@ -762,6 +762,35 @@ impl<'a> FnEmitter<'a> {
             None => {}
         }
 
+        if !has_continue(body) {
+            let cond = test.map(|t| self.lower_cond(t)).unwrap_or_else(|| bool_lit(true));
+            let cond_pending = std::mem::take(&mut self.pending);
+            let has_cond_pending = !cond_pending.is_empty();
+            let mut loop_body = if has_cond_pending {
+                let mut p = cond_pending;
+                p.push(TirStmt::If {
+                    cond: cond.clone(),
+                    then_body: vec![],
+                    else_body: vec![TirStmt::Break],
+                });
+                p
+            } else {
+                Vec::new()
+            };
+            loop_body.extend(self.lower_stmt_as_block(body));
+            if let Some(u) = update {
+                let ue = self.lower_expr(u);
+                loop_body.extend(std::mem::take(&mut self.pending));
+                loop_body.push(TirStmt::Expr(ue));
+            }
+            let loop_cond = if has_cond_pending { bool_lit(true) } else { cond };
+            out.push(TirStmt::Loop {
+                cond: loop_cond,
+                body: loop_body,
+            });
+            return out;
+        }
+
         let first = self.fresh_local(BackendTy::Bool);
         out.push(TirStmt::Let {
             local: first,
@@ -3467,4 +3496,47 @@ fn bin_op(op: BinaryOp) -> Option<TirBinOp> {
         BinaryOp::UShr => TirBinOp::Ushr,
         BinaryOp::Instanceof | BinaryOp::In => return None,
     })
+}
+
+fn has_continue(stmt: &Stmt) -> bool {
+    fn check(stmt: &Stmt, in_nested_loop: bool) -> bool {
+        match &stmt.kind {
+            StmtKind::Continue { label } => {
+                if in_nested_loop {
+                    label.is_some()
+                } else {
+                    true
+                }
+            }
+            StmtKind::Block { stmts } => stmts.iter().any(|s| check(s, in_nested_loop)),
+            StmtKind::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                check(consequent, in_nested_loop)
+                    || alternate.as_ref().map_or(false, |a| check(a, in_nested_loop))
+            }
+            StmtKind::Switch { cases, .. } => {
+                cases.iter().any(|c| c.body.iter().any(|s| check(s, in_nested_loop)))
+            }
+            StmtKind::Try {
+                block,
+                catches,
+                finally,
+            } => {
+                check(block, in_nested_loop)
+                    || catches.iter().any(|c| check(&c.body, in_nested_loop))
+                    || finally.as_ref().map_or(false, |f| check(f, in_nested_loop))
+            }
+            StmtKind::Labeled { body, .. } => check(body, in_nested_loop),
+            StmtKind::While { body, .. }
+            | StmtKind::DoWhile { body, .. }
+            | StmtKind::For { body, .. }
+            | StmtKind::ForIn { body, .. }
+            | StmtKind::ForOf { body, .. } => check(body, true),
+            _ => false,
+        }
+    }
+    check(stmt, false)
 }

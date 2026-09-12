@@ -154,6 +154,9 @@ pub(crate) fn dispatch_opcode(
             if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
                 let v = b.ins().iadd(s1, s2);
                 b.def_var(vars[first_reg], v);
+            } else if op == OpCode::MulInt && arr.loops.is_bounds_safe_arith(ip) {
+                let v = b.ins().imul(s1, s2);
+                b.def_var(vars[first_reg], v);
             } else {
                 let (r, overflow, helper) = match op {
                     OpCode::AddInt => {

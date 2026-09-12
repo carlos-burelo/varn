@@ -292,6 +292,10 @@ impl ExecCtx {
                 *ip += 1;
                 let (dest, start_reg) = (hi(w1), lo(w1));
                 let count = hi(w2);
+                if count == 0 {
+                    self.stack[base + dest] = self.heap.alloc_empty_map_vm();
+                    return Ok(Some(ObjectFlow::ContinueInstruction));
+                }
                 let mut map = varn_types::value::ValueMap::default();
                 for i in 0..count {
                     let k_nv = self.stack[base + start_reg + i * 2];
@@ -342,14 +346,11 @@ impl ExecCtx {
                     .resolved_shape(shape_idx)
                     .expect("invalid shape");
                 let count = shape.property_names.len();
-                let mut values = Vec::with_capacity(count);
-                for i in 0..count {
-                    values.push(self.stack[base + start_reg + i]);
-                }
+                let slice = &self.stack[base + start_reg..base + start_reg + count];
                 self.stack[base + dest] = if is_record {
-                    self.heap.alloc_record_with_shape(&shape, values)
+                    self.heap.alloc_record_with_shape_slice(&shape, slice)
                 } else {
-                    self.heap.alloc_object_with_shape(&shape, values)
+                    self.heap.alloc_object_with_shape_slice(&shape, slice)
                 };
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }

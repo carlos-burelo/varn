@@ -187,7 +187,7 @@ varn_contract! {
                         let byte = sep.as_bytes()[0];
                         let count = this.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
                         let mut out = Vec::with_capacity(count);
-                        for p in this.split(sep) {
+                        for p in this.split(byte as char) {
                             out.push(ctx.alloc_str(p));
                         }
                         out
@@ -196,8 +196,13 @@ varn_contract! {
                     }
                 }
                 None => {
+                    let count = this.chars().count();
+                    let mut out = Vec::with_capacity(count);
                     let mut buf = [0u8; 4];
-                    this.chars().map(|c| ctx.alloc_str(c.encode_utf8(&mut buf))).collect()
+                    for c in this.chars() {
+                        out.push(ctx.alloc_str(c.encode_utf8(&mut buf)));
+                    }
+                    out
                 }
             }
         }

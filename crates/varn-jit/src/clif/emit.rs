@@ -474,9 +474,12 @@ pub(crate) struct ObjRegionCache {
 pub(crate) struct BoundsHoistable {
     /// Register of the array receiver.
     pub array_reg: usize,
-    /// Register of the loop-invariant base, if the index pattern is `base + k`.
-    /// `None` if the index is directly the induction variable.
+    /// Register of the loop-invariant base, if the index pattern is `base + k` or `base + k * stride`.
+    /// `None` if the index has no additive base.
     pub base_reg: Option<usize>,
+    /// Register of the loop-invariant stride, if the index pattern is `k * stride` or `base + k * stride`.
+    /// `None` if the index has unit stride (stride = 1).
+    pub stride_reg: Option<usize>,
 }
 
 /// One loop region and everything hoistable out of it.
