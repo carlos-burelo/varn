@@ -312,7 +312,11 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(param_ty) = param_ty {
-                if !self.types_compatible_cached(param_ty, &arg_ty, Some(bind)) {
+                let expr = match arg {
+                    Arg::Positional(e) | Arg::Spread(e) => Some(e),
+                    Arg::Named { value, .. } => Some(value),
+                };
+                if !self.value_assignable_to(param_ty, &arg_ty, expr, Some(bind)) {
                     let msg = if let Some(lbl) = label_opt {
                         format!(
                             "named argument '{lbl}' of type '{arg_ty}' is not assignable to parameter of type '{param_ty}'"
@@ -380,8 +384,12 @@ impl<'r> Checker<'r> {
                     )
                     && param_accepts_array;
 
+                let expr = match arg {
+                    Arg::Positional(e) | Arg::Spread(e) => Some(e),
+                    Arg::Named { value, .. } => Some(value),
+                };
                 if !is_empty_array_arg
-                    && !self.types_compatible_cached(param_ty, effective_arg_ty, Some(bind))
+                    && !self.value_assignable_to(param_ty, effective_arg_ty, expr, Some(bind))
                 {
                     self.emit(
                         Diagnostic::error(ErrorCode::TypeMismatch, format!(

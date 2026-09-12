@@ -42,15 +42,6 @@ pub(super) fn collect_exports(
                         out.insert(name.to_string(), s);
                     }
                 }
-                if let Decl::SumType(st) = declaration.as_ref() {
-                    for variant in &st.variants {
-                        if let Some(sym) = lookup_global(bind, &variant.name) {
-                            let mut s = sym.clone();
-                            s.origin_module = Some(abs_path.to_owned().into());
-                            out.insert(variant.name.to_string(), s);
-                        }
-                    }
-                }
                 if let Decl::Enum(e) = declaration.as_ref() {
                     for member in &e.members {
                         if let Some(sym) = lookup_global(bind, &member.id) {
@@ -186,7 +177,6 @@ fn decl_primary_name(decl: &Decl) -> Option<Rc<str>> {
         Decl::TypeAlias(t) => Some(t.id.clone()),
         Decl::Namespace(n) => Some(n.id.clone()),
         Decl::Struct(s) => Some(s.id.clone()),
-        Decl::SumType(s) => Some(s.id.clone()),
         _ => None,
     }
 }

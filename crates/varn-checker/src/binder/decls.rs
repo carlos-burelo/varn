@@ -28,7 +28,6 @@ impl<'r> super::Binder<'r> {
             Decl::Extension(e) => self.bind_extension(e),
             Decl::Import(i) => self.bind_import(i),
             Decl::Export(e) => self.bind_export(e),
-            Decl::SumType(t) => self.bind_sum_type(t),
         }
     }
 

@@ -1,0 +1,20 @@
+// expect: error[VN3001]
+class Point {
+    x: int
+    y: int
+    constructor(x: int, y: int) {
+        this.x = x
+        this.y = y
+    }
+}
+
+class Vector {
+    x: int
+    y: int
+    constructor(x: int, y: int) {
+        this.x = x
+        this.y = y
+    }
+}
+
+const p: Point = new Vector(10, 20)

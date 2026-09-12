@@ -633,6 +633,19 @@ impl<'r> Checker<'r> {
         )
     }
 
+    pub(crate) fn value_assignable_to(
+        &mut self,
+        target_ty: &Type,
+        init_ty: &Type,
+        init_expr: Option<&varn_core::ast::Expr>,
+        bind: Option<&BindResult>,
+    ) -> bool {
+        if self.types_compatible_cached(target_ty, init_ty, bind) {
+            return true;
+        }
+        compat::expr_satisfies_target_type(target_ty, init_ty, init_expr)
+    }
+
     pub(crate) fn mark_infer_env_dirty(&mut self) {
         self.infer_env_rev = self.infer_env_rev.wrapping_add(1);
         if self.infer_cache.len() > 16_384 {

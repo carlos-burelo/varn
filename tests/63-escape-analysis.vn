@@ -105,13 +105,15 @@ class EaSwapA {
   v: int
   constructor(v: int) { this.v = v }
 }
-class EaSwapB {
-  v: int
-  constructor(v: int) { this.v = v * 1000 }
-}
 class EaSwapped {
   v: int
   constructor(v: int) { this.v = v }
+}
+class EaSwapB extends EaSwapped {
+  constructor(v: int) {
+    super(v)
+    this.v = v * 1000
+  }
 }
 EaSwapped = EaSwapB
 function eaSwappedRead(n: int): int { const s = new EaSwapped(n); return s.v }
@@ -123,8 +125,14 @@ class EaNested {
   v: int
   constructor(v: int) { this.v = v }
 }
+class EaNestedSwap extends EaNested {
+  constructor(v: int) {
+    super(v)
+    this.v = v * 1000
+  }
+}
 let eaFlag = true
-if (eaFlag) { EaNested = EaSwapB }
+if (eaFlag) { EaNested = EaNestedSwap }
 function eaNestedRead(n: int): int { const s = new EaNested(n); return s.v }
 assert("ea: rebinding inside a nested block is still seen", eaNestedRead(7) === 7000)
 

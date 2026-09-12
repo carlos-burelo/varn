@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use varn_core::ast::{Pattern, SumTypeDecl};
+use varn_core::ast::Pattern;
 
 use super::super::type_inference::infer_expr_type;
 use super::super::type_resolution::resolve_type_node;
@@ -143,76 +143,5 @@ impl<'r> super::super::Binder<'r> {
                 self.bind_pattern(argument, kind, line, doc, ty);
             }
         }
-    }
-
-    pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
-        let mut pe_sym =
-            Symbol::new(SymbolKind::TypeAlias, t.id.clone(), t.range.start.line).with_type(
-                Type::named_with_origin(t.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
-            );
-        // Expose the alias' generic parameters so consumers (e.g. match-variant
-        // payload typing) can substitute them with concrete type arguments.
-        pe_sym.type_params = t
-            .type_params
-            .iter()
-            .map(|tp| Rc::from(tp.name.as_str()))
-            .collect();
-        self.define(t.id.to_string(), pe_sym);
-
-        let mut variant_names = Vec::new();
-
-        for v in &t.variants {
-            variant_names.push(v.name.clone());
-
-            let fields: Vec<(Rc<str>, Type)> = v
-                .fields
-                .iter()
-                .map(|f| {
-                    let ty = resolve_type_node(&f.ty, Some(self));
-                    (f.name.clone(), ty)
-                })
-                .collect();
-
-            self.sum_variant_parent.insert(v.name.clone(), t.id.clone());
-            self.sum_variant_fields
-                .insert(v.name.clone(), fields.clone());
-
-            if v.fields.is_empty() {
-                let sym = Symbol::new(SymbolKind::Const, v.name.clone(), v.range.start.line)
-                    .with_type(Type::named_with_origin(
-                        t.id.clone(),
-                        Some(Rc::from(self.source_file.as_ref())),
-                    ));
-                self.define(v.name.to_string(), sym);
-            } else {
-                let params: Vec<crate::types::FunctionParam> = fields
-                    .iter()
-                    .map(|(fname, fty)| crate::types::FunctionParam {
-                        name: Some(fname.clone()),
-                        ty: fty.clone(),
-                        optional: false,
-                        is_rest: false,
-                    })
-                    .collect();
-                let fn_ty = Type::fn_(crate::types::FunctionType {
-                    params,
-                    return_type: Box::new(Type::named_with_origin(
-                        t.id.clone(),
-                        Some(Rc::from(self.source_file.as_ref())),
-                    )),
-                    is_arrow: false,
-                    type_params: t
-                        .type_params
-                        .iter()
-                        .map(|tp| Rc::from(tp.name.as_str()))
-                        .collect(),
-                });
-                let sym = Symbol::new(SymbolKind::Function, v.name.clone(), v.range.start.line)
-                    .with_type(fn_ty);
-                self.define(v.name.to_string(), sym);
-            }
-        }
-
-        self.sum_type_variants.insert(t.id.clone(), variant_names);
     }
 }

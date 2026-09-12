@@ -392,7 +392,7 @@ impl<'r> Checker<'r> {
                     }
 
                     if let Some(ann_ty) = &ann_ty_opt {
-                        if !self.types_compatible_cached(ann_ty, &init_ty, Some(bind)) {
+                        if !self.value_assignable_to(ann_ty, &init_ty, Some(init), Some(bind)) {
                             self.emit(
                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                     "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"
@@ -431,7 +431,7 @@ impl<'r> Checker<'r> {
                     let is_empty_array = init_ty.is_dynamic()
                         && matches!(&init_expr.kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
                     if !is_empty_array
-                        && !self.types_compatible_cached(ann_ty, &init_ty, Some(bind))
+                        && !self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind))
                     {
                         self.emit(
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(

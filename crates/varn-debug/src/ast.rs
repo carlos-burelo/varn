@@ -443,21 +443,6 @@ fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
                 terminal::log(format!("{child_indent}{mk}{}", chalk(&f.name).cyan()));
             }
         }
-        Decl::SumType(s) => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk("SumTypeDecl").bold(),
-                chalk(&s.id).blue()
-            ));
-            for (idx, v) in s.variants.iter().enumerate() {
-                let mk = if idx == s.variants.len() - 1 {
-                    "└── "
-                } else {
-                    "├── "
-                };
-                terminal::log(format!("{child_indent}{mk}{}", chalk(&v.name).yellow()));
-            }
-        }
     }
 }
 

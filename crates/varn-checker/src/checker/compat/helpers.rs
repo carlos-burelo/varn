@@ -1,6 +1,6 @@
 use super::types_compatible_impl;
 use crate::binder::BindView;
-use crate::types::{ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type};
+use crate::types::{ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type, TypeContext};
 use crate::types::{FunctionParam, FunctionType};
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_core::TypeKind;
@@ -52,6 +52,22 @@ pub(super) fn compatible_named(
     let Some(bind) = bind else {
         return true;
     };
+
+    if bind.get_class_members(declared, origin_decl).is_some() {
+        if bind.get_class_members(inferred, origin_inf).is_none() {
+            return false;
+        }
+        let mut current = inferred;
+        loop {
+            if current == declared {
+                return true;
+            }
+            match bind.bind.get_class_parent(current) {
+                Some(parent) => current = parent,
+                None => return false,
+            }
+        }
+    }
 
     let decl_members = named_members(bind, declared, origin_decl);
     let inf_members = named_members(bind, inferred, origin_inf);

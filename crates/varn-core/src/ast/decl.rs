@@ -18,7 +18,6 @@ pub enum Decl {
     Export(ExportDecl),
     Extension(ExtensionDecl),
     Struct(StructDecl),
-    SumType(SumTypeDecl),
 }
 
 impl Decl {
@@ -35,7 +34,6 @@ impl Decl {
             Decl::Export(d) => d.id(),
             Decl::Extension(d) => d.ast_id,
             Decl::Struct(d) => d.ast_id,
-            Decl::SumType(d) => d.ast_id,
         }
     }
 
@@ -52,35 +50,11 @@ impl Decl {
             Decl::Export(d) => d.range(),
             Decl::Extension(d) => &d.range,
             Decl::Struct(d) => &d.range,
-            Decl::SumType(d) => &d.range,
         }
     }
 }
 
 use std::rc::Rc;
-
-#[derive(Clone, Debug)]
-pub struct SumTypeDecl {
-    pub id: Rc<str>,
-    pub ast_id: AstId,
-    pub type_params: Vec<TypeParam>,
-    pub variants: Vec<SumVariant>,
-    pub doc: Option<String>,
-    pub range: SourceRange,
-}
-
-#[derive(Clone, Debug)]
-pub struct SumVariant {
-    pub name: Rc<str>,
-    pub fields: Vec<SumField>,
-    pub range: SourceRange,
-}
-
-#[derive(Clone, Debug)]
-pub struct SumField {
-    pub name: Rc<str>,
-    pub ty: TypeNode,
-}
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
