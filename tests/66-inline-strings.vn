@@ -4,7 +4,7 @@
 // Rc. It must be invisible: same contents, same comparisons, same slicing,
 // same length, whichever representation a given string happens to take.
 
-function isStr(n: int): string { return "ab" + n }
+function isStr(n: int): str { return "ab" + n }
 
 // Straddle the boundaries: 3 bytes (SSO), 8 bytes (inline), 40 bytes (past the
 // inline capacity, so out of line behind an Rc).
@@ -18,12 +18,11 @@ const at37 = "0123456789012345678901234567890123456"
 const at38 = "01234567890123456789012345678901234567"
 assert("inline: exactly at capacity",  ("" + at37) === at37)
 assert("inline: one past capacity",    ("" + at38) === at38)
-function lenOfStr(s: string): int { let d = "" + s; return d.length }
+function lenOfStr(s: str): int { return s.length }
 assert("inline: capacity length",      lenOfStr(at37) === 37)
 assert("inline: past-capacity length", lenOfStr(at38) === 38)
 
-// Length must agree across representations. Read through an inferred binding:
-// the static `string` type exposes no `.length`, only the dynamic one does.
+// Length must agree across representations.
 function lenOf(n: int): int { let d = "ab" + n; return d.length }
 assert("inline: length sso",    lenOf(1) === 3)
 assert("inline: length inline", lenOf(123456) === 8)
@@ -38,14 +37,14 @@ assert("inline: inline string concatenated again", (isStr(123456) + "!") === "ab
 // Slicing reads the bytes through a different route than concat. An inline
 // string cannot hand out a zero-copy view (its bytes move with the heap slot),
 // so this exercises the copying fallback.
-function sliceOf(n: int, from: int): string { let d = "ab" + n; return d.slice(from) }
+function sliceOf(n: int, from: int): str { let d = "ab" + n; return d.slice(from) }
 assert("inline: slice of an inline string", sliceOf(123456, 2) === "123456")
 assert("inline: slice to empty", sliceOf(123456, 8) === "")
 assert("inline: slice whole", sliceOf(123456, 0) === "ab123456")
 
 // Non-ASCII: multi-byte content must round-trip and report byte-correct
 // boundaries, since the inline bytes are stored raw.
-function utf8Str(n: int): string { return "héllo-ñ" + n }
+function utf8Str(n: int): str { return "héllo-ñ" + n }
 assert("inline: non-ascii round trip", utf8Str(7) === "héllo-ñ7")
 assert("inline: non-ascii concatenated again", (utf8Str(7) + "!") === "héllo-ñ7!")
 
