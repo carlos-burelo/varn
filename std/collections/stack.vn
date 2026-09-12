@@ -27,4 +27,12 @@ export class Stack<S> {
     get isEmpty(): bool {
         return this.items.length === 0;
     }
+
+    clear(): void {
+        this.items = [];
+    }
+
+    toArray(): S[] {
+        return this.items.slice();
+    }
 }

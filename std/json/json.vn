@@ -7,6 +7,14 @@ export namespace JSON {
         return parse$(text) as T;
     }
 
+    export function tryParse<T = Json>(text: str): T? {
+        try {
+            return parse$(text) as T;
+        } catch {
+            return null;
+        }
+    }
+
     export function stringify(value: dynamic, space?: int): str {
         return stringify$(value);
     }

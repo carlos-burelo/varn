@@ -28,7 +28,5 @@ export function uuidV4(): str {
 }
 
 export function isValidUuid(s: str): bool {
-    if (s.length !== 36) return false;
-    if (s[8] !== "-" || s[13] !== "-" || s[18] !== "-" || s[23] !== "-") return false;
-    return true;
+    return uuidValidate$(s);
 }

@@ -7,7 +7,8 @@ export {
     basename,
     extname,
     isAbsolute,
-    join
+    join,
+    resolve
 } from "std:path/utils";
 
 import {
@@ -18,7 +19,8 @@ import {
     basename,
     extname,
     isAbsolute,
-    join
+    join,
+    resolve
 } from "std:path/utils";
 
 export namespace Path {
@@ -30,4 +32,5 @@ export namespace Path {
     export const extname = extname;
     export const isAbsolute = isAbsolute;
     export const join = join;
+    export const resolve = resolve;
 }

@@ -1,4 +1,4 @@
-import { platform } from "std:sys";
+import { platform, cwd } from "std:sys";
 
 export const sep = platform() === "windows" ? "\\" : "/";
 export const delimiter = platform() === "windows" ? ";" : ":";
@@ -239,4 +239,31 @@ export function join(...segments: str[]): str {
         }
     }
     return normalize(out);
+}
+
+export function resolve(...segments: str[]): str {
+    let resolved = "";
+    for (let i = segments.length - 1; i >= 0; i = i - 1) {
+        let seg = segments[i];
+        if (seg.length > 0) {
+            if (resolved.length === 0) {
+                resolved = seg;
+            } else if (!seg.endsWith(sep) && !resolved.startsWith(sep)) {
+                resolved = seg + sep + resolved;
+            } else {
+                resolved = seg + resolved;
+            }
+            if (isAbsolute(resolved)) {
+                return normalize(resolved);
+            }
+        }
+    }
+    let curDir = cwd();
+    if (resolved.length === 0) {
+        return curDir;
+    }
+    if (!curDir.endsWith(sep) && !resolved.startsWith(sep)) {
+        return normalize(curDir + sep + resolved);
+    }
+    return normalize(curDir + resolved);
 }

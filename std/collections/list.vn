@@ -20,6 +20,27 @@ export class List<T> {
         return this.items.length;
     }
 
+    get isEmpty(): bool {
+        return this.items.length === 0;
+    }
+
+    contains(item: T): bool {
+        return this.items.includes(item);
+    }
+
+    removeAt(index: int): T? {
+        if (index < 0 || index >= this.items.length) {
+            return null;
+        }
+        let removed = this.items[index];
+        this.items.splice(index, 1);
+        return removed;
+    }
+
+    clear(): void {
+        this.items = [];
+    }
+
     toArray(): T[] {
         return this.items.slice();
     }
