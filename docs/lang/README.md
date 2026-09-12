@@ -54,7 +54,7 @@ Especificación completa del lenguaje Varn, generada a partir de la suite de pru
 | 21 | Async/await, `spawn`, `parallel`, `TaskGroup` | [async_concurrency.md](async_concurrency.md) |
 | 22 | Recursión directa y mutua | [functions_methods.md](functions_methods.md) |
 | 23 | Clases complejas: Builder pattern, LinkedList genérica | [classes_objects.md](classes_objects.md) |
-| 24 | `Record<K, V>` como mapa tipado | [types.md](types.md) |
+| 24 | Mapas tipados (`Map<K, V>`) y Records `#{…}` | [types.md](types.md) |
 | 25 | Extension methods en `str`, clases e `int` | [classes_objects.md](classes_objects.md) |
 | 26 | Coerción numérica implícita (widening) | [types.md](types.md) |
 | 27 | Decoradores de clase y método, `MetaKey` | [classes_objects.md](classes_objects.md) |

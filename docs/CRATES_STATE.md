@@ -1,6 +1,6 @@
 # Estado e Inventario de Crates del Workspace
 
-Matriz de estado, jerarquía de dependencias y tamaños de los **17 crates** consolidados del workspace de **Varn**.
+Matriz de estado, jerarquía de dependencias y tamaños de los **20 crates** consolidados del workspace de **Varn**.
 
 Los tamaños son líneas de Rust medidas sobre el árbol actual. Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (1139 aserciones en 83 test suites) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -26,10 +26,13 @@ graph TD
     CLI --> Debug["varn-debug"]
 
     Pipeline --> Checker["varn-checker"]
+    Pipeline --> TIR["varn-tir"]
     Pipeline --> Opt["varn-compiler"]
     Pipeline --> VM["varn-vm"]
     Pipeline --> Modules["varn-modules"]
 
+    Checker --> TIR
+    Opt --> TIR
     Opt --> Core["varn-core"]
     Opt --> Types["varn-types"]
 
@@ -54,6 +57,9 @@ graph TD
     Lexer --> Core
     Parser --> Core
     Modules --> Core
+    TIR --> Core
+    RT["varn-rt"]
+    Xtask["xtask"]
 ```
 
 Queda una arista de deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT.md) §4):
@@ -69,38 +75,41 @@ Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p ls
 | Crate | Dominio | Líneas | Estabilidad |
 |---|---|---|---|
 | `varn-vm` | Ejecución | 19 027 | Estable |
-| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode + RegAlloc) | 17 222 | Estable |
+| `varn-compiler` | Compilador (TIR→SSA→bytecode + RegAlloc) | 17 222 | Estable |
 | `varn-checker` | Frontend | 16 576 | Estable |
-| `varn-jit` | JIT x86-64 (Cranelift) | 8 625 | En evolución |
+| `varn-jit` | JIT x86-64 / ARM64 (Cranelift) | 8 625 | En evolución |
 | `varn-lsp` | Servidor LSP | 7 437 | En evolución |
-| `varn-types` | Modelo de datos de runtime y bytecode | 6 311 | Estable |
+| `varn-types` | Modelo de datos de runtime y bytecode (VmValue 128-bit) | 6 311 | Estable |
 | `varn-core` | AST, opcodes, tokens, diagnósticos, term, `TypeTag` | 5 180 | Estable |
 | `varn-cli` | CLI (`vn`) | 5 085 | Estable |
 | `varn-parser` | Frontend | 4 943 | Estable |
 | `varn-builtins` | Stdlib nativa (LBI) | 4 312 | Estable |
 | `varn-debug` | Inspección de fases | 3 294 | Herramienta |
+| `varn-tir` | Representación intermedia tipada canónica | 2 236 | Estable |
 | `varn-pipeline` | Orquestación de fases y caché | 1 908 | Estable |
 | `varn-lexer` | Frontend | 1 557 | Estable |
 | `varn-modules` | Resolución de módulos y bundle `.vnb` | 1 292 | Estable |
+| `xtask` | Benchmarks comparativos (`cargo xtask compare`) | 1 196 | Herramienta |
 | `varn-op-macros` | Proc-macro `varn_contract!` | 918 | Estable |
 | `varn-pm` | Gestor de paquetes | 802 | En evolución |
 | `varn-runtime` | Canales de isolates + vtable de heap | 381 | Estable |
+| `varn-rt` | Runtime estático para binarios AOT | 92 | Estable |
 
 ---
 
 ## 3. Descripción por Dominio Funcional
 
-### Frontend (`varn-lexer`, `varn-parser`, `varn-checker`)
-Tokenización con ASI, parser descendente con precedencia Pratt, y type-checker multi-fase que produce `TypedAST` + `SemanticDB`.
+### Frontend e IR Intermedio (`varn-lexer`, `varn-parser`, `varn-checker`, `varn-tir`)
+Tokenización con ASI, parser descendente con precedencia Pratt, y type-checker multi-fase que emite un `TirProgram` (`varn-tir`) con tipos y resoluciones canónicas en cada nodo.
 
 ### Compilador (`varn-compiler`)
-`varn-compiler` baja AST → HIR → SSA → bytecode, corre los passes de optimización e integra el análisis de registros (`regalloc`) para el liveness y la reasignación de registros sobre el bytecode emitido.
+Baja `TirProgram` vía `from_tir` → SSA → bytecode, ejecuta pases de inlining de leaf functions, DCE, phis triviales, desazucarado canónico de bucles, LICM, CSE, e integra el análisis y reasignación de registros (`regalloc`).
 
 ### Ejecución (`varn-vm`, `varn-jit`)
-VM de registros de 64 bits con NaN-boxing, GC generacional (nursery + mark-sweep) e inline caches. El JIT compila con Cranelift y comparte la tabla de helpers con la ruta de inspección `vn debug -p clif`.
+VM de registros de 128 bits (`VmValue` con tag + payload de 64 bits, nativo `i64`/`f64` y SSO hasta 5 bytes), GC generacional (nursery + mark-sweep), optimizaciones COW para mapas vacíos e inline caches. El JIT compila eager con Cranelift (x86-64 y ARM64) y comparte la tabla de helpers con la ruta de inspección `vn debug -p clif`.
 
-### Runtime (`varn-runtime`)
-Hoy expone exactamente dos cosas: los canales tipados entre isolates (`channel`) y la instalación de la vtable de asignación del heap (`init_heap`). La ejecución de `async`/`await` **no** vive aquí — ver [RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md).
+### Runtime (`varn-runtime`, `varn-rt`)
+`varn-runtime` expone canales tipados entre isolates (`channel`) y la vtable de asignación del heap (`init_heap`). `varn-rt` proporciona el runtime nativo mínimo para compilación AOT estática.
 
 ---
 

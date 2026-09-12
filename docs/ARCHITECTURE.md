@@ -9,8 +9,8 @@ Este documento ofrece una descripción técnica detallada e integral de la arqui
 - [1. Visión General del Pipeline de Compilación](#1-visión-general-del-pipeline-de-compilación)
 - [2. Arquitectura de Crates y Modularidad](#2-arquitectura-de-crates-y-modularidad)
 - [3. Frontend y Type Checker (`varn-checker`)](#3-frontend-y-type-checker-varn-checker)
-- [4. Compilador en SSA y Optimización (`varn-compiler` & `varn-regalloc`)](#4-compilador-en-ssa-y-optimización-varn-compiler--varn-regalloc)
-- [5. Machine Virtual Register-Based y NaN-Boxing (`varn-vm`)](#5-machine-virtual-register-based-y-nan-boxing-varn-vm)
+- [4. Compilador en SSA y Optimización (`varn-compiler`)](#4-compilador-en-ssa-y-optimización-varn-compiler)
+- [5. Máquina Virtual Basada en Registros y Representación `VmValue` (`varn-vm`)](#5-máquina-virtual-basada-en-registros-y-representación-vmvalue-varn-vm)
 - [6. Backend JIT x86-64 (`varn-jit`)](#6-backend-jit-x86-64-varn-jit)
 - [7. Concurrencia: `await` e Isolates](#7-concurrencia-await-e-isolates)
 - [8. Interfaz Nativa LBI (`varn-builtins`)](#8-interfaz-nativa-lbi-varn-builtins)
@@ -29,18 +29,18 @@ flowchart TD
         A["Fuente (.vn)"] --> B["varn-lexer\n(Tokens UTF-8, ASI)"]
         B --> C["varn-parser\n(AST Pratt / Recursive Descent)"]
         C --> D["varn-checker\n(Inferencia, CFA, Narrowing)"]
+        D --> E["varn-tir\n(TirProgram: Typed IR canónico)"]
     end
 
     subgraph Optimization ["Compilador & SSA"]
-        D --> E["TypedAST"]
-        E --> F["varn-compiler\n(HIR -> SSA -> Optimizations)"]
+        E --> F["varn-compiler\n(from_tir -> SSA -> Optimizations)"]
         F --> G["FunctionProto (Bytecode)"]
-        G --> H["varn-regalloc\n(Liveness & RegAlloc,\ninvocado desde varn-compiler)"]
+        G --> H["varn-compiler::regalloc\n(Liveness & RegAlloc)"]
     end
 
     subgraph Execution ["Runtime & Execution"]
         H --> I["varn-vm\n(Register Interpreter + GC + IC)"]
-        H -.-> J["varn-jit\n(x86-64 Eager Native Code)"]
+        H -.-> J["varn-jit\n(x86-64 / ARM64 Eager Native Code)"]
         J -.-> I
         I --> K["varn-runtime\n(canales de Isolates)"]
         I <--> L["varn-builtins\n(Stdlib Rust via LBI)"]
@@ -65,18 +65,20 @@ flowchart TD
 
 ## 2. Arquitectura de Crates y Modularidad
 
-El workspace son 17 crates consolidados. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
+El workspace son 20 crates consolidados. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
 
 | Crate | Categoría | Responsabilidad Principal |
 |---|---|---|
 | [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`), diagnósticos (`diagnostics/`), estilo de terminal (`term/`) y `TypeTag`. Sin dependencias internas. |
-| [`varn-types`](#) | Base | Tipos compartidos por VM y compilador: `VmValue`, `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ObjData`/`ObjRef`, `Shape`. |
+| [`varn-types`](#) | Base | Tipos compartidos por VM y compilador: `VmValue` (128-bit two-word + SSO), `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ObjData`/`ObjRef`, `Shape`. |
 | [`varn-lexer`](#) | Frontend | Tokenizador streaming UTF-8 con inserción automática de puntos y comas (ASI). |
 | [`varn-parser`](#) | Frontend | Parser en descenso recursivo + operador de precedencia Pratt (`|>`, ternarios, named args). |
-| [`varn-checker`](#) | Frontend | Type-checker multi-fase. Produce `TypedAST` y `SemanticDB`. |
-| [`varn-compiler`](COMPILER_ARCHITECTURE.md) | Compilador | Transformación `TypedAST` → `HIR` → `SSA`. Passes de inlining, DCE, TCO, const-folding y análisis de registros (`regalloc/`). |
-| [`varn-vm`](VM_ARCHITECTURE.md) | Ejecución | VM basada en registros en 64 bits con NaN-Boxing, GC generacional (nursery + old-gen mark-sweep) e Inline Cache polimórfico. |
-| [`varn-jit`](VM_ARCHITECTURE.md) | Ejecución | Backend JIT nativo para x86-64 que compila eager funciones en hot path. |
+| [`varn-checker`](#) | Frontend | Type-checker multi-fase. Produce `TypedAST`, `SemanticDB` y genera el `TirProgram`. |
+| [`varn-tir`](#) | Frontend / IR | Representación intermedia tipada canónica (`TirProgram`, `TirExpr`, `TirStmt`, `TirType`). Desacopla la semántica del checker de la generación de código. |
+| [`varn-compiler`](COMPILER_ARCHITECTURE.md) | Compilador | Transformación `TirProgram` (vía `from_tir`) → `SSA`. Passes de inlining, DCE, TCO, const-folding y análisis de registros (`regalloc/`). |
+| [`varn-vm`](VM_ARCHITECTURE.md) | Ejecución | VM basada en registros de 128 bits (`VmValue` con tag + payload de 64 bits, nativo `i64`/`f64` y SSO hasta 5 bytes), GC generacional (nursery + old-gen mark-sweep) e Inline Cache polimórfico. |
+| [`varn-jit`](VM_ARCHITECTURE.md) | Ejecución | Backend JIT nativo para x86-64 y ARM64 (Cranelift) que compila eager funciones en hot path. |
+| [`varn-rt`](#) | Runtime Base | Runtime estático mínimo para ejecutables AOT y soporte compartido. |
 | [`varn-runtime`](RUNTIME_ARCHITECTURE.md) | Ejecución | Canales tipados entre Isolates (hilos independientes) y vtable de asignación del heap. La suspensión de `async`/`await` la implementa `varn-vm`, no este crate. |
 | [`varn-op-macros`](LBI_ARCHITECTURE.md) | Stdlib Host | Proc-macro `varn_contract!`: cruza el contrato `.vn` con la implementación Rust y emite las entradas de la tabla de ops nativa. |
 | [`varn-lsp`](#) | Herramienta | Servidor LSP (hover, completion, semantic tokens, inlay hints). |
@@ -86,6 +88,7 @@ El workspace son 17 crates consolidados. El inventario completo con tamaños y e
 | [`varn-pipeline`](#) | Orquestación | Orquesta el flujo de ejecución completo y gestiona la caché de bytecode en disco. |
 | [`varn-cli`](CLI_REFERENCE.md) | Herramienta | Punto de entrada del ejecutable CLI `vn`. |
 | [`varn-debug`](CLI_INSPECT.md) | Herramienta | Inspección profunda de fases AST, HIR, SSA, bytecode y métricas de VM. |
+| [`xtask`](#) | Herramienta | Runner de tareas y benchmarking comparativo automatizado (`cargo xtask compare`). |
 
 ---
 
@@ -100,50 +103,64 @@ El workspace son 17 crates consolidados. El inventario completo con tamaños y e
 
 ---
 
-## 4. Compilador en SSA y Optimización (`varn-compiler` & `varn-regalloc`)
+## 4. Compilador en SSA y Optimización (`varn-compiler`)
 
-El compilador transforma la representación de alto nivel en bytecode para la VM:
+El compilador transforma la representación intermedia tipada canónica (`TirProgram`) en bytecode para la VM a través del módulo `from_tir`:
 
 ```mermaid
 flowchart LR
-    A["TypedAST"] --> B["HIR"]
-    B --> C["SSA Construction"]
-    C --> D["Fixed-Point Optimization Loop\n(Inlining, DCE, TCO, Const Fold)"]
+    A["TirProgram / TirModule"] --> B["from_tir Lowering"]
+    B --> C["Construcción de Grafo SSA"]
+    C --> D["Bucle de Optimización de Punto Fijo\n(Inlining, DCE, TCO, Const Fold, LICM, CSE)"]
     D --> E["FunctionProto Bytecode"]
-    E --> F["varn-regalloc\n(Liveness & RegAlloc)"]
+    E --> F["varn-compiler::regalloc\n(Liveness & RegAlloc)"]
 ```
 
 > [!NOTE]
-> `varn-regalloc` no es una fase que corra después de `varn-compiler`: es una **dependencia** suya. `varn_compiler::compile_module` llama a `varn_regalloc::run_post_passes` sobre el `FunctionProto` ya emitido, recursivamente por cada función anidada del pool de constantes.
+> `varn-compiler` integra directamente el submódulo `regalloc`: `varn_compiler::compile_module` corre los post-passes de liveness y asignación compacta de registros sobre el `FunctionProto` ya emitido, recursivamente por cada función anidada del pool de constantes.
+
+Entre las optimizaciones destacadas del compilador figuran:
+- **Inlining de funciones hoja**: Las funciones simples sin llamadas anidadas (`is_leaf`) se inlinean directamente en el sitio de llamada (`try_inline_direct_call`), eliminando el frame overhead.
+- **Lowering limpio de bucles `for`**: Desazucarado canónico con variable de control nativa en lugar de flags booleanos sintéticos, permitiendo que LICM y Cranelift reconozcan las variables de inducción.
+- **Eliminación de phis triviales**: Simplificación de nodos $\phi$ redundantes antes del paso de DCE.
 
 ---
 
-## 5. Machine Virtual Register-Based y NaN-Boxing (`varn-vm`)
+## 5. Máquina Virtual Basada en Registros y Representación `VmValue` (`varn-vm`)
 
-###NaN-Boxing de 64 bits
+### Representación `VmValue` de 128 bits (Two-Word Layout) y SSO
 
-Todos los valores en la VM caben en una palabra de 64 bits utilizando el espacio de Quiet NaN del estándar IEEE 754:
+Varn utiliza una representación de dos palabras de 64 bits (16 bytes en total, `tag: u64`, `payload: u64`) en lugar de NaN-boxing. Al ser un lenguaje con tipos conocidos estáticamente antes de la emisión, un empaquetado forzado en 64 bits solo añadía costes de máscaras y limitaba los enteros a 48 bits.
 
 ```
-Double Precision Float:  [S EEEEEEEEEEE MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM]
-QNAN Marker:            [1 11111111111 11..........................................]
-Value Encoding:         [1 11111111111 11] [TAG 4-bit] [Payload 48-bit                 ]
+Word 0 (Tag, 64-bit):     [Reserved: 48 bits] [SSO Len: 8 bits] [Kind: 8 bits]
+Word 1 (Payload, 64-bit): [64-bit Native Value / Direct Pointer / SSO bytes (<= 5)]
 ```
 
-| Tipo de Dato | Tag de Codificación | Estructura del Payload |
-|---|---|---|
-| `float` | Non-QNAN | Valor flotante IEEE 754 estándar de 64 bits |
-| `null` | `0x01` | Cero |
-| `bool` | `0x02` / `0x03` | `0` para `false`, `1` para `true` |
-| `int` | `0x04` | Entero con signo de 48 bits (-140,737,488,355,328 a +140,737,488,355,327) |
-| Heap Pointer | `0x05` | Índice de 32 bits a la tabla de objetos del Heap |
+| Tipo de Dato | Kind (Byte 0 de Tag) | Tag Metadata (Bits 8-15) | Estructura del Payload (Word 1) |
+|---|---|---|---|
+| `null` | `0x00` (`KIND_NULL`) | `0` | `0` |
+| `bool` | `0x01` (`KIND_BOOL`) | `0` | `0` para `false`, `1` para `true` |
+| `int` | `0x02` (`KIND_INT`) | `0` | Entero con signo nativo de 64 bits (`i64` completo) |
+| `float` | `0x03` (`KIND_FLOAT`) | `0` | Flotante IEEE 754 de 64 bits (`f64` estándar) |
+| Heap Ref | `0x04` (`KIND_HEAP`) | `0` | Índice de 32 bits a la tabla de objetos (o puntero directo) |
+| SSO String | `0x05` (`KIND_SSO`) | Longitud (0 a 5 bytes) | Hasta 5 bytes UTF-8 inline empaquetados en little-endian |
+| Symbol | `0x06` (`KIND_SYMBOL`) | `0` | Identificador numérico de símbolo |
 
-### Recolector de Basura Generacional
+### Ventajas del Two-Word Layout frente al NaN-Boxing de 64 bits:
+1. **`int` es `i64` completo**: No hay restricciones de rango a 48 bits ni chequeos de desbordamiento artificiales para empaquetado.
+2. **Cero máscaras costosas**: Comparar un tipo es un único `cmp` contra una constante pequeña inmediata (0..6), que baja a una tabla de salto o dispatch directo.
+3. **Small String Optimization (SSO)**: Cadenas cortas de hasta 5 bytes (claves de mapas, identificadores comunes, códigos de estado) se almacenan inline en el payload de 64 bits sin alocar memoria en el heap.
+4. **Paridad de registros en arquitecturas modernas**: En x86-64 y AArch64, operar con dos palabras de 64 bits en registros no genera penalización frente a una palabra enmascarada con constantes de 64 bits cargadas desde memoria.
 
-- **Nursery**: Asignación ultrarrápida bump-pointer para objetos jóvenes.
+### Recolector de Basura Generacional y Optimizaciones de Memoria
+
+- **Nursery**: Asignación ultrarrápida bump-pointer para objetos jóvenes (`NURSERY_CAPACITY = 65 536`).
 - **Promotion**: El GC menor promueve a Old-Gen los objetos que sobreviven.
 - **Old-Gen**: Mark-and-sweep tricolor sobre memoria no móvil con free-list.
 - **Write Barrier**: Remembered set que registra referencias de Old-Gen a Nursery.
+- **COW para Mapas Vacíos (`alloc_empty_map_vm`)**: Los mapas creados vacíos `{}` comparten una instancia estática inmutable hasta la primera mutación, eliminando cientos de miles de alocaciones efímeras en frameworks web y deserialización.
+- **Construcción de Records por Slices (`alloc_record_with_shape_slice`)**: Creación optimizada de tuplas y records inmutables a partir de slices contiguos.
 
 ---
 

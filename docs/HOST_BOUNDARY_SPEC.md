@@ -29,38 +29,22 @@ flowchart LR
 
 ## 2. Conversión de Tipos (`VmValue` ↔ Rust)
 
-La conversión de tipos entre el formato NaN-boxed de 64 bits de la VM y las estructuras de datos nativas de Rust se realiza mediante primitivas optimizadas:
+La conversión de tipos entre el formato `VmValue` (128 bits: `tag: u64`, `payload: u64`) de la VM y las estructuras de datos nativas de Rust se realiza mediante primitivas optimizadas:
 
 | Tipo Varn | Representación `VmValue` | Tipo Rust | Método de Conversión |
 |---|---|---|---|
-| `int` | QNAN + Tag Int, payload de **48 bits** | `i64` (rango i48) | `val.to_int()` / `VmValue::from_int(n)` |
-| `float` | Standard IEEE 754 | `f64` | `val.to_float()` / `VmValue::from_float(f)` |
-| `bool` | QNAN + Tag Bool | `bool` | `val.to_bool()` / `VmValue::from_bool(b)` |
-| `str` | Pointer a Heap String | `&str` / `String` | `ctx.expect_string(val)` / `ctx.alloc_string(s)` |
-| `Array` | Pointer a Heap Object | `&[VmValue]` | `ctx.expect_array(val)` / `ctx.alloc_array(v)` |
+| `int` | `tag: KIND_INT`, payload de 64 bits | `i64` (completo) | `val.to_int()` / `VmValue::from_int(n)` |
+| `float` | `tag: KIND_FLOAT`, payload IEEE 754 | `f64` | `val.to_float()` / `VmValue::from_float(f)` |
+| `bool` | `tag: KIND_BOOL`, payload `0` o `1` | `bool` | `val.to_bool()` / `VmValue::from_bool(b)` |
+| `str` | SSO inline (hasta 5B) o Ptr a Heap String | `&str` / `String` | `ctx.expect_string(val)` / `ctx.alloc_string(s)` |
+| `Array` | Ptr a Heap Array | `&[VmValue]` | `ctx.expect_array(val)` / `ctx.alloc_array(v)` |
+| `Map` | Ptr a Heap Map | `&ValueMap` | `ctx.expect_map(val)` / `ctx.alloc_map()` |
 
-> **`int` es i48, no i64.** El tipo Rust del lado del host es `i64`, pero solo
-> los 48 bits bajos sobreviven al boxing: el payload del NaN-box es de 48 bits.
-> Rango representable: `-140737488355328 ..= 140737488355327`.
+> **`int` es `i64` nativo completo.** Con la adopción de `VmValue` de dos palabras (128 bits), todo `i64` cabe íntegramente en el payload de 64 bits. No hay máscaras ni truncamiento a 48 bits.
 >
-> **Aritmética:** dentro del lenguaje, una operación que sale de ese rango
-> **lanza `integer overflow`** — no envuelve, no satura y no promociona a
-> float. Reglas normativas en `varn-core/src/numeric.rs` (fuente única);
-> comportamiento fijado en `tests/53-int48-overflow.vn` y
-> `tests/errors/int-overflow-*.vn`.
+> **Aritmética:** dentro del lenguaje, la aritmética de enteros opera en 64 bits con detección de overflow. Reglas normativas en `varn-core/src/numeric.rs` (fuente única).
 >
-> **Cruce desde el host:** `VmValue::from_int` es para valores que el llamante
-> ya sabe en rango — lleva un `debug_assert`, pero en release **trunca**. Un
-> builtin que pueda producir un `i64` fuera de rango debe usar:
->
-> | Constructor | Cuándo |
-> |---|---|
-> | `VmValue::from_int(n)` | `n` ya probado en rango (el caso normal) |
-> | `VmValue::from_int_checked(n)` | `n` puede desbordar; devuelve `Option` |
-> | `VmValue::from_int_wrapping(n)` | el truncamiento es intencional (shifts) |
->
-> Compilar en perfil `dev` y correr `tests/main.vn` ejercita el `debug_assert`
-> sobre toda la stdlib; hoy pasa limpio.
+> **Cruce desde el host:** `VmValue::from_int(n)` acepta cualquier `i64` de forma exacta sin precondiciones de rango. Métodos compatibles como `from_int_checked` y `from_int_wrapping` se conservan para conveniencia y coherencia de llamadas.
 
 ---
 

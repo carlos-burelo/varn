@@ -1,22 +1,22 @@
 # Arquitectura de la Máquina Virtual y GC (`varn-vm` & `varn-jit`)
 
-Este documento especifica la implementación de la máquina virtual (VM) basada en registros de **Varn**, incluyendo la codificación NaN-Boxing en 64 bits, el Recolector de Basura (GC) generacional, la estructura de objetos en una sola asignación, el sistema de Inline Cache (IC) polimórfico y el backend JIT x86-64.
+Este documento especifica la implementación de la máquina virtual (VM) basada en registros de **Varn**, incluyendo la representación `VmValue` de 128 bits (Two-Word Layout) con Small String Optimization (SSO), el Recolector de Basura (GC) generacional, la estructura de objetos DST, el sistema de Inline Cache (IC) polimórfico, optimizaciones COW para mapas y el backend JIT Cranelift.
 
 ---
 
 ## Tabla de Contenidos
 
 - [1. Visión General de la VM](#1-visión-general-de-la-vm)
-- [2. Codificación NaN-Boxing en 64 bits](#2-codificación-nan-boxing-en-64-bits)
+- [2. Representación `VmValue` de 128 bits y SSO](#2-representación-vmvalue-de-128-bits-y-sso)
 - [3. Estructura de Memoria y Heap Generacional](#3-estructura-de-memoria-y-heap-generacional)
   - [Nursery & Asignación Bump Pointer](#nursery--asignación-bump-pointer)
   - [Promoción y Old-Gen Mark-and-Sweep](#promoción-y-old-gen-mark-and-sweep)
   - [Barrera de Escritura (*Write Barrier*)](#barrera-de-escritura-write-barrier)
-- [4. Estructura de Objetos DST en Una Asignación](#4-estructura-de-objetos-dst-en-una-asignación)
+- [4. Estructura de Objetos DST y Optimizaciones de Alocación](#4-estructura-de-objetos-dst-y-optimizaciones-de-alocación)
 - [5. Sistema de Inline Cache (IC) Polimórfico](#5-sistema-de-inline-cache-ic-polimórfico)
 - [6. CallFrames, Registros y Upvalues](#6-callframes-registros-y-upvalues)
 - [7. Resolución de Globals](#7-resolución-de-globals)
-- [8. Compilador JIT x86-64 (`varn-jit`)](#8-compilador-jit-x86-64-varn-jit)
+- [8. Compilador JIT x86-64 y ARM64 (`varn-jit`)](#8-compilador-jit-x86-64-y-arm64-varn-jit)
 
 ---
 
@@ -28,7 +28,7 @@ Este documento especifica la implementación de la máquina virtual (VM) basada 
 flowchart TD
     subgraph Execution Loop ["Bucle de Despacho de la VM"]
         A["Fetch OpCode"] --> B{"¿Tiene JIT Nativo?"}
-        B -- Sí --> C["Ejecutar Código Máquina x86-64"]
+        B -- Sí --> C["Ejecutar Código Máquina x86-64 / ARM64"]
         B -- No --> D["Intérprete por Registros (Switch Dispatch)"]
         D --> E["Acceso a Registros registers[base + slot]"]
         E --> F{"¿Modifica Propiedad?"}
@@ -38,33 +38,39 @@ flowchart TD
     end
 
     subgraph Memory ["Gestor de Memoria & Heap"]
-        D <--> I["NaN-Boxing Unbox/Box 64-bit"]
+        D <--> I["VmValue 128-bit (Two-Word + SSO)"]
         I <--> J["Nursery / Old-Gen GC"]
     end
 ```
 
 ---
 
-## 2. Codificación NaN-Boxing en 64 bits
+## 2. Representación `VmValue` de 128 bits y SSO
 
-Varn representa **todos los valores dinámicos** (`VmValue`) en una palabra de 64 bits de extensión escalar, eliminando la necesidad de asignaciones en el heap para números enteros, flotantes, booleans o nulos.
+Varn representa sus valores en tiempo de ejecución (`VmValue`) mediante una estructura de dos palabras de 64 bits (`tag: u64`, `payload: u64`, total 16 bytes).
 
 ```
-Double Precision Float:  [S EEEEEEEEEEE MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM]
-QNAN Marker:            [1 11111111111 11..........................................]
-Value Encoding:         [1 11111111111 11] [TAG 4-bit] [Payload 48-bit                 ]
+Word 0 (Tag, 64-bit):     [Reservado: 48 bits] [SSO Len: 8 bits] [Kind: 8 bits]
+Word 1 (Payload, 64-bit): [Valor Nativo i64 / f64 / Puntero Heap / SSO Bytes (0..5)]
 ```
 
-### Tabla de Máscaras y Tags Bitwise
+### Tabla de Kinds y Estructura de Valores
 
-| Tipo | QNAN Prefix | Tag Bits (4-bit) | Payload (48-bit) |
+| Tipo | Constante de Kind | Tag Metadata (Bits 8-15) | Estructura de Payload (Word 1) |
 |---|---|---|---|
-| `float` | `0x0000000000000000` (Valores IEEE 754 no QNAN) | N/A | Flotante IEEE 754 completo |
-| `null` | `0x7FF8000000000000` | `0x01` | Cero |
-| `false` | `0x7FF8000000000000` | `0x02` | Cero |
-| `true` | `0x7FF8000000000000` | `0x03` | Cero |
-| `int` | `0x7FF8000000000000` | `0x04` | Entero complemento a dos de 48 bits |
-| `pointer` | `0x7FF8000000000000` | `0x05` | Índice de 32 bits a la Heap Table |
+| `null` | `0x00` (`KIND_NULL`) | `0` | Cero |
+| `bool` | `0x01` (`KIND_BOOL`) | `0` | `0` para `false`, `1` para `true` |
+| `int` | `0x02` (`KIND_INT`) | `0` | Entero con signo nativo de 64 bits (`i64` completo) |
+| `float` | `0x03` (`KIND_FLOAT`) | `0` | Flotante IEEE 754 de 64 bits (`f64` estándar) |
+| Heap Ref | `0x04` (`KIND_HEAP`) | `0` | Índice de 32 bits a la tabla de objetos del heap |
+| SSO String | `0x05` (`KIND_SSO`) | Longitud (0 a 5 bytes) | Hasta 5 bytes UTF-8 inline empaquetados en little-endian |
+| Symbol | `0x06` (`KIND_SYMBOL`) | `0` | ID numérico de símbolo |
+
+### Razones del Retiro de NaN-Boxing:
+1. **Tipado Estático vs Dinámico**: En motores JS dinámicos, NaN-boxing compacta valores a 64 bits a costa de limitar enteros a 48 bits y pagar máscaras bitwise complejas en cada operación. En Varn, el compilador conoce los tipos estáticamente antes de emitir bytecode; la VM aprovecha directamente registros nativos de 64 bits en x86-64 y AArch64.
+2. **`int` es `i64` sin truncamiento**: Las operaciones aritméticas sobre `int` operan en el rango completo de `i64` sin máscaras ni reempaquetados forzados.
+3. **Small String Optimization (SSO) de 5 Bytes**: Cadenas cortas de hasta 5 caracteres (claves comunes de JSON, verbos HTTP, identificadores) se guardan directamente en el payload del `VmValue` sin alocar en el heap ni generar presión de recolección de basura.
+4. **Comparación Rápida de Tags**: Un `match` sobre el kind se resuelve con un simple `cmp` contra una constante pequeña de 8 bits (0..6), generando tablas de salto directas en ensamblador.
 
 ---
 
@@ -92,7 +98,7 @@ Cuando un objeto promovido en el Old-Gen almacena una referencia a un objeto jov
 
 ---
 
-## 4. Estructura de Objetos DST en Una Asignación
+## 4. Estructura de Objetos DST y Optimizaciones de Alocación
 
 Para maximizar la localidad de caché L1/L2 del procesador, los objetos de clase y registros en Varn se almacenan en una **única asignación continua de memoria** (*Dynamically Sized Type* DST):
 
@@ -106,13 +112,22 @@ Puntero del Heap                          Propiedades en Offsets Fijos
 
 Dado que la cabecera y el array de campos forman un bloque contiguo, el objeto **nunca se mueve en memoria**, garantizando la validez de punteros en código C/Rust nativo.
 
+### Optimizaciones Estáticas de Alocación
+
+1. **COW para Mapas Vacíos (`alloc_empty_map_vm`)**:
+   Los mapas creados vacíos (`let m: Map<str, str> = {}` o `{ [k: str]: str }`) devuelven una referencia estática compartida inmutable sin ninguna llamada al allocator. La primera operación de mutación (`m[k] = v` o `m.set(k, v)`) clona de forma diferida (Copy-On-Write) a una instancia mutable real. En benchmarks como `bench_http_routing`, esto erradica más de 500 000 alocaciones efímeras por corrida.
+2. **Construcción de Records y Tuplas por Slice (`alloc_record_with_shape_slice`)**:
+   Construye instancias de `Record` (`#{}`) y `Tuple` (`#[]`) pasando directamente un slice prestado de `VmValue` sin alocar vectores intermedios de paso en el frame.
+3. **Canonicidad de Claves de Mapa con Zero-Alloc (`lookup_str_map_key`)**:
+   La búsqueda en mapas compara directamente contra la representación SSO o el string del heap sin crear strings intermedios.
+4. **Fast Paths en JIT (`jit_array_get_fast`, `jit_array_set_fast`)**:
+   Acceso desindexado directo en memoria con bounds checks hoisteadas fuera de los bucles por Cranelift.
+
 ### El Allocator Está en el Camino Caliente
 
 Un objeto DST es *una* asignación, pero sigue siendo una asignación del allocator global por cada objeto que el programa construye. Eso pone al allocator dentro del bucle caliente de cualquier programa con objetos, y el de Windows (`HeapAlloc`) no está a la altura: medido con 2 millones de objetos que mueren jóvenes —el colector no llega a copiar nada—, alocar costaba ~90 ns por objeto frente a los ~24 ns de Bun.
 
 El binario `vn` instala **mimalloc** como `#[global_allocator]`. Baja el coste a ~60 ns por objeto, no cambia el tamaño del ejecutable (17,78 MB frente a 17,88 MB) y no penaliza el arranque (42 ms frente a 46 ms, programa vacío). Sobre los benchmarks reales, medido A/B con caché purgada y mediana de tres: `gc_alloc` −42 %, `dto` −43 %, `collection_pipeline` −39 %, `json_api_payloads` −41 %.
-
-Ese coste sigue siendo la distancia principal contra Bun en programas que construyen objetos. La vía siguiente es no llamar al allocator una vez por objeto — un arena por el que el nursery reparta a puntero móvil —, no seguir afinando el allocator.
 
 ---
 

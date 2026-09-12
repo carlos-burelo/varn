@@ -27,7 +27,7 @@ Bienvenido a **Varn**. Esta guía proporciona una visión completa para comenzar
 
 ## ¿Qué es Varn?
 
-Varn es un lenguaje compilado, estáticamente tipado, diseñado para combinar una sintaxis moderna y expresiva (inspirada en TypeScript) con el rendimiento de una máquina virtual basada en registros en 64 bits con NaN-boxing y un runtime asíncrono sobre Tokio.
+Varn es un lenguaje compilado, estáticamente tipado, diseñado para combinar una sintaxis moderna y expresiva (inspirada en TypeScript) con el rendimiento de una máquina virtual basada en registros de dos palabras (128 bits, `VmValue` con soporte nativo de `i64`, `f64` y SSO) y un runtime asíncrono cooperativo con Isolates.
 
 ---
 

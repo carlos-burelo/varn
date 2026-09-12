@@ -1,17 +1,18 @@
-# Arquitectura del Compilador y SSA (`varn-compiler` & `varn-regalloc`)
+# Arquitectura del Compilador y SSA (`varn-compiler` & `varn-tir`)
 
-Este documento detalla el diseño interno del compilador de **Varn**, comprendiendo la transformación del Árbol de Sintaxis Abstracta Tipado (`TypedAST`), la representación intermedia de alto nivel (`HIR`), la construcción en Forma de Asignación Única Estática (`SSA`), el bucle de optimizaciones de punto fijo y la emisión de bytecode optimizado.
+Este documento detalla el diseño interno del compilador de **Varn**, comprendiendo la transformación de la Representación Intermedia Tipada (`varn-tir`), el lowering a Forma de Asignación Única Estática (`SSA`), el bucle de optimizaciones de punto fijo, el inlining de funciones hoja y la emisión de bytecode optimizado.
 
 ---
 
 ## Tabla de Contenidos
 
 - [1. Visión General del Pipeline del Compilador](#1-visión-general-del-pipeline-del-compilador)
-- [2. Del AST Tipado al HIR (`varn-compiler`)](#2-del-ast-tipado-al-hir-varn-compiler)
+- [2. Del TIR al Grafo SSA (`varn-compiler::from_tir`)](#2-del-tir-al-grafo-ssa-varn-compilerfrom_tir)
 - [3. Representación Formas SSA (Static Single Assignment)](#3-representación-formas-ssa-static-single-assignment)
 - [4. Bucle de Optimizaciones de Punto Fijo](#4-bucle-de-optimizaciones-de-punto-fijo)
+  - [Inlining de Funciones Hoja Directo (`leaf_inlining`)](#inlining-de-funciones-hoja-directo-leaf_inlining)
   - [Propagación y Plegado de Constantes (`const_fold`)](#propagación-y-plegado-de-constantes-const_fold)
-  - [Eliminación de Código Muerto (`dce`)](#eliminación-de-código-muerto-dce)
+  - [Eliminación de Código Muerto y Phis Triviales (`dce`)](#eliminación-de-código-muerto-y-phis-triviales-dce)
   - [Optimización de Recursión Final (`tco`)](#optimización-de-recursión-final-tco)
   - [Acceso Directo a Campos por Shape (`fixed_fields`)](#acceso-directo-a-campos-por-shape-fixed_fields)
   - [Simplificación del Grafo de Flujo de Control (`cfg`)](#simplificación-del-grafo-de-flujo-de-control-cfg)
@@ -22,61 +23,64 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
   - [Identidades Algebraicas (`algebraic`)](#identidades-algebraicas-algebraic)
   - [Pase Post-Bucle: Máquinas de Estados (`state_machine`)](#pase-post-bucle-máquinas-de-estados-state_machine)
 - [5. Emisión de Bytecode y Estructura de `FunctionProto`](#5-emisión-de-bytecode-y-estructura-de-functionproto)
-- [6. Post-Passes del Backend (`varn-regalloc`)](#6-post-passes-del-backend-varn-regalloc)
+- [6. Post-Passes del Backend (`varn-compiler::regalloc`)](#6-post-passes-del-backend-varn-compilerregalloc)
   - [Análisis de Vida de Registros (`liveness`)](#análisis-de-vida-de-registros-liveness)
   - [Asignación de Registros Nativos (`regalloc_post`)](#asignación-de-registros-nativos-regalloc_post)
   - [Inferidor de Tipos de Slot (`slot_kinds`)](#inferidor-de-tipos-de-slot-slot_kinds)
+- [7. Frontend y Lowering Semántico](#7-frontend-y-lowering-semántico)
 
 ---
 
 ## 1. Visión General del Pipeline del Compilador
 
-El pipeline de compilación se divide estrictamente entre la fase de optimización semántica SSA (`varn-compiler`) y la fase de post-procesamiento de registros (`varn-regalloc`):
+El pipeline de compilación desacopla la semántica del checker mediante `varn-tir`, transformando el `TirProgram` en SSA y corriendo los pases de optimización y registros:
 
 ```mermaid
 flowchart TD
     subgraph Frontend Boundary
-        A["TypedAST + SemanticDB"]
+        A["varn-checker: Inferencia & Semántica"] --> B["varn-tir: TirProgram / TirModule\n(Tipos y resoluciones canónicas en el nodo)"]
     end
 
-    subgraph varn-compiler ["varn-compiler: Optimización & lowering SSA"]
-        A --> B["Lowering a HIR\n(High-Level IR)"]
-        B --> C["Construcción de Grafo SSA\n(Basic Blocks + phi nodes)"]
+    subgraph varn-compiler ["varn-compiler: Lowering SSA & Optimizaciones"]
+        B --> C["from_tir::build_module / build_function\n(Lowering directo a SSA con leaf inlining)"]
+        C --> D["Construcción de Grafo SSA\n(Basic Blocks + phi nodes)"]
 
         subgraph Loop ["Bucle de Optimización de Punto Fijo (optimize_with)"]
-            C --> D["tco\n(Tail Call Optimization)"]
-            D --> E["const_fold\n(Plegado de constantes)"]
-            E --> F["monomorphize"]
-            F --> G["algebraic\n(Identidades algebraicas)"]
-            G --> H["cse\n(Common Subexpression Elimination)"]
-            H --> I["fixed_fields\n(Acceso directo por Shape)"]
-            I --> J["escape\n(Análisis de escape)"]
-            J --> K["licm\n(Loop-Invariant Code Motion)"]
-            K --> L["dce\n(Dead Code Elimination)"]
-            L --> M["cfg\n(Simplificación de bloques)"]
-            M -.->|¿Cambios pendientes?| D
+            D --> E["tco\n(Tail Call Optimization)"]
+            E --> F["const_fold\n(Plegado de constantes)"]
+            F --> G["monomorphize"]
+            G --> H["algebraic\n(Identidades algebraicas)"]
+            H --> I["cse\n(Common Subexpression Elimination)"]
+            I --> J["fixed_fields\n(Acceso directo por Shape)"]
+            J --> K["escape\n(Análisis de escape)"]
+            K --> L["licm\n(Loop-Invariant Code Motion)"]
+            L --> M["dce & trivial phis\n(Dead Code Elimination)"]
+            M --> N["cfg\n(Simplificación de bloques)"]
+            N -.->|¿Cambios pendientes?| E
         end
 
-        Loop --> N["state_machine\n(Máquinas de estados: async / generator)"]
-        N --> O["Emisión a Bytecode Inicial\n(FunctionProto / Chunk)"]
+        Loop --> O["state_machine\n(Máquinas de estados: async / generator)"]
+        O --> P["Emisión a Bytecode Inicial\n(FunctionProto / Chunk)"]
     end
 
-    subgraph varn-regalloc ["varn-regalloc: Post-passes de registros"]
-        O --> P["liveness Analysis\n(Liveness ranges por registro)"]
-        P --> Q["regalloc_post\n(Reorganización compacta de registros)"]
-        Q --> R["slot_kinds Metadata\n(Clasificación float/int/ptr para JIT)"]
+    subgraph regalloc ["varn-compiler::regalloc"]
+        P --> Q["liveness Analysis\n(Liveness ranges por registro)"]
+        Q --> R["regalloc_post\n(Reorganización compacta de registros)"]
+        R --> S["slot_kinds Metadata\n(Clasificación float/int/ptr para JIT)"]
     end
 
-    R --> S["Bytecode Final Executable / JIT Input"]
+    S --> T["Bytecode Final Executable / JIT Input"]
 ```
 
 ---
 
-## 2. Del AST Tipado al HIR (`varn-compiler`)
+## 2. Del TIR al Grafo SSA (`varn-compiler::from_tir`)
 
-El lowering convierte el árbol sintáctico del checker en un Grafo de Flujo de Control (CFG) estructurado en HIR:
-- Se desazucaran constructos complejos: el operador pipeline (`|>`) se expande a llamadas de función estándar; las clases e interfaces se traducen a vtables e índices de campos.
-- Cada expresión produce una instrucción explícita con un registro destino asignado.
+El módulo `from_tir` (`build.rs`, `compile.rs`) es la pasarela canónica del compilador. Recibe un `TirModule` y genera funciones en forma SSA (`SsaFunc`):
+- **Resoluciones en el nodo**: A diferencia del antiguo pipeline basado en mapas auxiliares, cada nodo `TirExpr` y `TirStmt` contiene su `BackendTy` y su `Resolution` explícitos.
+- **Inlining Temprano de Funciones Hoja**: Antes de emitir un `Call`, `try_inline_direct_call` evalúa si el callee es una función hoja pura (`is_leaf`), sustituyendo los parámetros por los valores de los argumentos en el bloque actual e integrando el cuerpo sin sobrecarga de frame.
+- **Lowering Canónico de Bucles `for`**: Desazucara los bucles utilizando directamente las variables de inducción nativas (`int`) en el encabezado del bucle en vez de banderas booleanas intermedias, permitiendo que LICM mueva invariantes y que el JIT elimine comprobaciones de límites en matrices.
+- Cada expresión produce un `Value` SSA con registro y tipo asignado de forma determinista.
 
 ---
 
@@ -113,6 +117,9 @@ En la representación SSA:
 
 `varn-compiler` ejecuta un conjunto de pases iterativos hasta que el bytecode alcance un estado estable (*fixed-point*):
 
+### Inlining de Funciones Hoja Directo (`leaf_inlining`)
+En la fase de lowering `from_tir/build.rs`, antes de emitir una llamada `Call`, el compilador inspecciona el callee: si es una función hoja pura (`is_leaf`: sin llamadas internas ni efectos secundarios no acotados), se sustituyen los parámetros directamente por los operandos SSA en el bloque actual (`try_inline_direct_call`). Esto elimina el coste de creación de frames y salva hasta un 30% del tiempo en micro-helpers y funciones de acceso.
+
 ### Propagación y Plegado de Constantes (`const_fold`)
 Evalúa expresiones aritméticas y lógicas conocidas en tiempo de compilación utilizando la fuente canónica `numeric.rs`:
 ```Varn
@@ -122,8 +129,8 @@ const x = 2 + 3 * 4
 const x = 14
 ```
 
-### Eliminación de Código Muerto (`dce`)
-Identifica y elimina bloques básicos e instrucciones cuyos resultados no tengan efectos secundarios ni alimenten retornos de función.
+### Eliminación de Código Muerto y Phis Triviales (`dce`)
+Identifica y elimina bloques básicos e instrucciones cuyos resultados no tengan efectos secundarios ni alimenten retornos de función. Incluye el pase de **eliminación de phis triviales**: cualquier nodo $\phi$ cuyos operandos sean todos idénticos o referencias recursivas al propio $\phi$ se reemplaza inmediatamente por su valor único, reduciendo la presión de registros y destrabando pases posteriores de LICM y CSE.
 
 ### Optimización de Recursión Final (`tco`)
 Transforma llamadas recursivas finales en saltos directos (`Jump`), convirtiendo algoritmos recursivos en bucles de rendimiento $O(1)$ en pila.
@@ -179,9 +186,9 @@ El valor capturado sigue vivo sin ese operando: lo escribe `StoreCaptured` (un e
 
 ---
 
-## 6. Post-Passes del Backend (`varn-regalloc`)
+## 6. Post-Passes del Backend (`varn-compiler::regalloc`)
 
-Una vez emitido el bytecode inicial, `varn-regalloc` procesa el resultado:
+Una vez emitido el bytecode inicial, el submódulo `regalloc` procesa el resultado:
 
 ### Análisis de Vida de Registros (`liveness`)
 Calcula los intervalos de vida (*live ranges*) de cada registro virtual para determinar la interferencia de variables.

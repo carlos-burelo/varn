@@ -179,6 +179,9 @@ Declaración de variable mutable.
 
 ## M
 
+**`Map<K, V>`**  
+Contenedor asociativo dinámico clave→valor mutable. Soporta acceso indexado por corchetes (`m[k]`, `m[k] = v`), firmas de índice contextuales `{ [key: K]: V }` y API de métodos (`.get()`, `.set()`, `.has()`, `.delete()`, `.clear()`). Igualdad por referencia (`===`).
+
 **`match`**  
 Expresión de pattern matching. Puede coincidir con valores literales, enums, payload de enums y wildcards (`_`). También puede usarse con multi-valor (`2 | 3`).
 
@@ -226,10 +229,7 @@ Sintaxis compacta de constructor declarada en la firma de la clase: `class User(
 Literal de cadena delimitado por triple comilla. No procesa secuencias de escape.
 
 **Record (`#{…}`)**  
-Tipo inmutable de objeto con igualdad estructural profunda (`==`).
-
-**Record<K, V>**  
-Tipo de mapa clave→valor con claves de tipo `K` y valores de tipo `V`.
+Tipo compuesto nominal profundamente inmutable con igualdad estructural (`==`). Par nominal de `Tuple` (`#[…]`). No confundir con `Map<K, V>`.
 
 **`return`**  
 Devuelve un valor desde una función y termina su ejecución.

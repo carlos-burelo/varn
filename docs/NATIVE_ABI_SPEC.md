@@ -37,7 +37,7 @@ pub type NativeFn = fn(ctx: &mut CallContext, args: &[VmValue]) -> VmResult<VmVa
 ```
 
 - `ctx`: Puntero al contexto de ejecución (acceso al heap, internador de cadenas y registrador de raíces del GC).
-- `args`: Slice plano contiguo de 64 bits conteniendo los argumentos pasados en codificación NaN-Boxing.
+- `args`: Slice plano contiguo de estructuras `VmValue` (128 bits cada una: tag + payload de 64 bits con soporte de SSO hasta 5B).
 
 ---
 

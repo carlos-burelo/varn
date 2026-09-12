@@ -60,27 +60,50 @@ let r2 = #{ name: "Varn", version: 1 }
 assert("record eq true", r1 == r2)       // igualdad estructural
 ```
 
-### 2.4 `Record<K, V>` (Mapa tipado de clave→valor)
+### 2.4 Mapas (`Map<K, V>` y `{ [key: K]: V }`)
+
+Contenedores asociativos dinámicos mutables con acceso indexado y orientación a objetos:
 
 ```varn
-const scores: Record<str, int> = {   // tests/24-record.vn:2
+// Definición con tipo explícito Map<K, V> o firma de índice { [key: K]: V }
+const scores: Map<str, int> = {   // tests/24-record.vn:1
     "alice": 95,
     "bob": 87,
+    "charlie": 72
 }
-assert("record get alice", scores["alice"] === 95)
-```
+assert("map get alice",   scores["alice"] === 95)
+assert("map get bob",     scores["bob"] === 87)
+assert("map get charlie", scores["charlie"] === 72)
 
-### 2.5 Map y Set
+scores["dave"] = 60               // mutación indexada
+assert("map set dave",    scores["dave"] === 60)
 
-```varn
-const map = new Map<int>()    // tests/17-map-set.vn:2
+// Sintaxis con clase Map y métodos de colección
+const map = new Map<int>()        // tests/17-map-set.vn:2
 map.set("a", 1)
 assert("map size", map.size === 3)
 assert("map get",  map.get("b") === 2)
 assert("map has",  map.has("c"))
 map.delete("b")
 map.clear()
+```
 
+> [!NOTE]
+> `Map<K, V>` y `{ [key: K]: V }` son semánticamente idénticos y normalizados a nivel de TIR a `BackendTy::Map`.
+> La sintaxis `Record<K, V>` está estrictamente prohibida: la palabra `Record` se reserva exclusivamente para registros inmutables por valor (`#{}`).
+
+### 2.5 Matriz Comparativa Canónica de Tipos Contenedor
+
+| Tipo | Sintaxis de Creación | Sintaxis de Acceso | Igualdad | Mutabilidad |
+|---|---|---|---|---|
+| **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Referencia (`===`) | Mutable |
+| **`Record`** | `#{ name: "Alice", age: 30 }` | `rec.name` | Estructural profunda (`==`) | Inmutable |
+| **`Tuple`** | `#[ 1, "hello" ]` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
+| **`Map<K, V>`** | `{ "a": 1 }` o `new Map<K, V>()` | `m[k]`, `m.get(k)` | Referencia (`===`) | Mutable |
+
+### 2.6 Set
+
+```varn
 const set = new Set<str>()
 set.add("x")
 set.add("x")     // duplicado ignorado
