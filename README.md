@@ -285,6 +285,9 @@ La stdlib de Varn está estructurada en dominios cohesivos de alto nivel:
 * **`std:task`**: Concurrencia estructurada y sincronización cooperativa (`Mutex`, `Semaphore`, `WaitGroup`, `Channel`).
 * **`std:log`**: Observabilidad y logging estructurado dual (texto coloreado y JSON).
 * **`std:collections`**: Estructuras de datos eficientes (`PriorityQueue`, `LRUCache`, `List`, `Stack`, `Queue`).
+* **`std:net`**: Redes y transporte TCP (`TcpStream`, `TcpListener`, validación IP).
+* **`std:http`**: Servidor `HttpServer` con CORS, cliente de alto nivel `http` (`get`, `post`, `put`, `patch`, `del`) y `fetch`.
+* **`std:ws`**: WebSockets bidireccionales basados en eventos con `WebSocketReadyState`.
 
 ---
 

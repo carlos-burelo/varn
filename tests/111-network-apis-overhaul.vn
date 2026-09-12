@@ -1,0 +1,118 @@
+import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "std:net";
+import { HttpServer, Request, Response, HttpResponse, HttpStatus, json, http, fetch } from "std:http";
+import { WebSocket, WebSocketClient, WebSocketReadyState } from "std:ws";
+import { Process } from "std:process";
+import { delay, Task } from "std:task";
+import { assertEqual, assertTrue, assertFalse } from "std:test";
+
+print("=== Suite: Network APIs Overhaul (std:net, std:http, std:ws) ===");
+
+async function testTcpSockets(): Task<void> {
+    let testPort = 19876;
+    let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/helpers/tcp_echo_server.vn"]);
+
+    // Give child process a small moment to start listening
+    await delay(150);
+
+    let clientSock = await TcpStream.connect("127.0.0.1", testPort);
+    assertTrue(clientSock.isOpen);
+    assertEqual(clientSock.remoteHost, "127.0.0.1");
+    assertEqual(clientSock.remotePort, testPort);
+
+    await clientSock.writeAll("varn_test\n");
+    let echoMsg = await clientSock.read();
+    assertEqual(echoMsg.trim(), "ECHO:varn_test");
+    clientSock.close();
+
+    let exitInfo = proc.wait();
+    assertEqual(exitInfo.exitCode, 0);
+
+    print("  ✔ std:net (TcpListener, TcpStream connect/accept/read/write/close via separate process)");
+}
+
+function testNetIpUtils(): void {
+    assertTrue(isIP("127.0.0.1"));
+    assertTrue(isIP("::1"));
+    assertFalse(isIP("invalid-ip"));
+
+    assertTrue(isIPv4("192.168.1.1"));
+    assertFalse(isIPv4("::1"));
+
+    assertTrue(isIPv6("::1"));
+    assertTrue(isIPv6("fe80::1"));
+    assertFalse(isIPv6("192.168.1.1"));
+
+    print("  ✔ std:net (IP validation helpers)");
+}
+
+function testHttpServerAndClientApis(): void {
+    // 1. Response and HttpStatus
+    let res = json({ message: "Success", code: 200 });
+    assertEqual(res.status, 200);
+    assertTrue(res.ok);
+    assertEqual(res.statusText, "OK");
+    let parsedJson: dynamic = res.json();
+    assertEqual(parsedJson.message, "Success");
+
+    let errRes = new Response("Bad Request", 400);
+    assertEqual(errRes.status, 400);
+    assertFalse(errRes.ok);
+    assertEqual(errRes.statusText, "Bad Request");
+
+    // 2. HttpServer Routing & CORS
+    let app = new HttpServer();
+    app.cors("*", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
+
+    app.get("/api/items", (req: Request, res: HttpResponse) => {
+        return json([{ id: 1, name: "Item1" }]);
+    });
+
+    app.post("/api/items", (req: Request, res: HttpResponse) => {
+        return json({ created: true });
+    });
+
+    app.patch("/api/items/:id", (req: Request, res: HttpResponse) => {
+        return json({ updated: req.params["id"] });
+    });
+
+    app.delete("/api/items/:id", (req: Request, res: HttpResponse) => {
+        return json({ deleted: req.params["id"] });
+    });
+
+    assertTrue(app !== null);
+    assertEqual(app.port, 0);
+    assertFalse(app.isListening);
+
+    // 3. http client namespace helpers
+    assertTrue(http !== null);
+    assertTrue(http.get !== null);
+    assertTrue(http.post !== null);
+    assertTrue(http.put !== null);
+    assertTrue(http.patch !== null);
+    assertTrue(http.del !== null);
+
+    print("  ✔ std:http (HttpServer methods, CORS middleware, http client namespace)");
+}
+
+function testWebSocket(): void {
+    assertEqual(WebSocketReadyState.Connecting as int, 0);
+    assertEqual(WebSocketReadyState.Open as int, 1);
+    assertEqual(WebSocketReadyState.Closing as int, 2);
+    assertEqual(WebSocketReadyState.Closed as int, 3);
+
+    assertTrue(typeof WebSocket === "class");
+    assertTrue(typeof WebSocketClient === "class");
+
+    print("  ✔ std:ws (WebSocketReadyState, WebSocket class exports, WebSocketClient)");
+}
+
+async function main(): Task<void> {
+    await testTcpSockets();
+    testNetIpUtils();
+    testHttpServerAndClientApis();
+    testWebSocket();
+}
+
+await main();
+
+print("[PASSED] 111. Network APIs Overhaul (std:net, std:http, std:ws)");

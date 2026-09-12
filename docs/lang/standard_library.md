@@ -589,3 +589,92 @@ cache.set("b", "beta");
 cache.get("a"); // "a" se marca como reciente
 cache.set("c", "gamma"); // desaloja "b"
 ```
+
+---
+
+## 29. `std:net` — Redes de Bajo Nivel y Transporte TCP
+
+> Fuente: `tests/111-network-apis-overhaul.vn`
+
+```varn
+import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "std:net";
+
+// Servidor TCP
+let listener = TcpListener.listen(8080);
+let client = await listener.accept();
+let msg = await client.read();
+await client.writeAll("Eco: " + msg);
+client.close();
+listener.close();
+
+// Cliente TCP
+let sock = await TcpStream.connect("127.0.0.1", 8080);
+await sock.writeAll("Hola Servidor\n");
+let res = await sock.read();
+sock.close();
+
+// Validaciones IP
+isIPv4("192.168.1.1"); // true
+isIPv6("::1");          // true
+```
+
+---
+
+## 30. `std:http` — Cliente y Servidor HTTP Completo
+
+> Fuente: `tests/111-network-apis-overhaul.vn`
+
+```varn
+import { HttpServer, Request, Response, HttpResponse, json, http, fetch } from "std:http";
+
+// Servidor HTTP con CORS y enrutamiento
+let app = new HttpServer();
+app.cors("*", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+
+app.get("/api/users", (req: Request, res: HttpResponse) => {
+    return json([{ id: 1, name: "Alice" }]);
+});
+
+app.post("/api/users", (req: Request, res: HttpResponse) => {
+    return json({ created: true }, 201);
+});
+
+// Cliente HTTP por Namespace
+let getRes = await http.get("https://api.example.com/data");
+let postRes = await http.post("https://api.example.com/items", { name: "Nuevo" });
+let patchRes = await http.patch("https://api.example.com/items/1", { status: "active" });
+```
+
+---
+
+## 31. `std:ws` — WebSockets Bidireccionales
+
+> Fuente: `tests/111-network-apis-overhaul.vn`
+
+```varn
+import { WebSocket, WebSocketClient, WebSocketReadyState } from "std:ws";
+
+// Cliente WebSocket con ciclo de eventos
+let ws = new WebSocket("ws://localhost:8080/feed");
+
+ws.onOpen(() => {
+    ws.send("subscribirse");
+});
+
+ws.onMessage((data: str) => {
+    print("Recibido: " + data);
+});
+
+ws.onError((err: str) => {
+    print("Error: " + err);
+});
+
+ws.onClose(() => {
+    print("Conexión cerrada");
+});
+
+// Estados de conexión
+if (ws.readyState === WebSocketReadyState.Open) {
+    ws.send("ping");
+}
+```

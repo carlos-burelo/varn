@@ -61,12 +61,42 @@ export class HttpServer {
         return this._registerRoute("DELETE", pattern, handler);
     }
 
+    patch(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("PATCH", pattern, handler);
+    }
+
+    options(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("OPTIONS", pattern, handler);
+    }
+
     route(method: str, pattern: str, handler: dynamic): HttpServer {
         return this._registerRoute(method, pattern, handler);
     }
 
     all(pattern: str, handler: dynamic): HttpServer {
         return this._registerRoute("*", pattern, handler);
+    }
+
+    cors(origin: str = "*", methods: str = "GET,POST,PUT,DELETE,PATCH,OPTIONS", headers: str = "*"): HttpServer {
+        this.use(async (req: Request, res: HttpResponse, next: () => Task<void>): Task<void> => {
+            res.header("Access-Control-Allow-Origin", origin);
+            res.header("Access-Control-Allow-Methods", methods);
+            res.header("Access-Control-Allow-Headers", headers);
+            if (req.method.toUpperCase() === "OPTIONS") {
+                res.status(204).send("");
+                return;
+            }
+            await next();
+        });
+        return this;
+    }
+
+    get port(): int {
+        return this._port;
+    }
+
+    get isListening(): bool {
+        return this._isListening;
     }
 
     listen(port: int): void {

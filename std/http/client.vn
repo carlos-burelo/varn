@@ -39,16 +39,24 @@ async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key
     let writeRes = await tcpWrite$(connId, requestStr);
     if (writeRes === -1) {
         tcpClose$(connId);
-        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
-        return new Response(mock_body, 200, {});
+        let urlStr = parsedUrl.toString();
+        if (urlStr.startsWith("http://%/") || urlStr.startsWith("mock://")) {
+            let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + urlStr + "</body></html>";
+            return new Response(mock_body, 200, {});
+        }
+        throw new Error("NetworkError: Failed to write request to " + parsedUrl.host + ":" + parsedUrl.port);
     }
     
     const rawResp = await readHttpResponse(connId);
     tcpClose$(connId);
     
     if (rawResp === null) {
-        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
-        return new Response(mock_body, 200, {});
+        let urlStr = parsedUrl.toString();
+        if (urlStr.startsWith("http://%/") || urlStr.startsWith("mock://")) {
+            let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + urlStr + "</body></html>";
+            return new Response(mock_body, 200, {});
+        }
+        throw new Error("NetworkError: Empty response from " + parsedUrl.host + ":" + parsedUrl.port);
     }
     
     return new Response(
@@ -78,8 +86,11 @@ export async function fetch(
     
     let connId = await tcpConnect$(host, port);
     if (connId === -1) {
-        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
-        return new Response(mock_body, 200, {});
+        if (url.startsWith("http://%/") || url.startsWith("mock://")) {
+            let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
+            return new Response(mock_body, 200, {});
+        }
+        throw new Error("NetworkError: Could not connect to " + host + ":" + port);
     }
     
     let headerMap: { [key: str]: str } = {};
@@ -104,7 +115,34 @@ export async function put(url: str, body: str = "", headers: dynamic = {}): Task
     return await fetch(url, "PUT", headers, body);
 }
 
+export async function patch(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+    return await fetch(url, "PATCH", headers, body);
+}
+
 export async function del(url: str, headers: dynamic = {}): Task<Response> {
     return await fetch(url, "DELETE", headers, "");
 }
+
+export namespace http {
+    export async function get(url: str, headers: dynamic = {}): Task<Response> {
+        return await fetch(url, "GET", headers, "");
+    }
+
+    export async function post(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+        return await fetch(url, "POST", headers, body);
+    }
+
+    export async function put(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+        return await fetch(url, "PUT", headers, body);
+    }
+
+    export async function patch(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+        return await fetch(url, "PATCH", headers, body);
+    }
+
+    export async function del(url: str, headers: dynamic = {}): Task<Response> {
+        return await fetch(url, "DELETE", headers, "");
+    }
+}
+
 

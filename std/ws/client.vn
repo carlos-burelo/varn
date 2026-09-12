@@ -5,34 +5,119 @@ import {
     wsClose$
 } from "runtime:ws";
 
-export class WebSocketClient {
-    private _id: int = -1;
-    private _isOpen: bool = false;
+export enum WebSocketReadyState {
+    Connecting = 0,
+    Open = 1,
+    Closing = 2,
+    Closed = 3
+}
+
+export class WebSocket {
+    private _id: int;
+    private _url: str;
+    private _readyState: WebSocketReadyState;
+    private _onOpenListeners: Array<() => void>;
+    private _onMessageListeners: Array<(data: str) => void>;
+    private _onErrorListeners: Array<(err: str) => void>;
+    private _onCloseListeners: Array<() => void>;
 
     constructor(url: str) {
-        this._id = wsConnect$(url);
-        this._isOpen = this._id >= 0;
+        this._url = url;
+        this._onOpenListeners = [];
+        this._onMessageListeners = [];
+        this._onErrorListeners = [];
+        this._onCloseListeners = [];
+
+        this._readyState = WebSocketReadyState.Connecting;
+        let socketId = wsConnect$(url);
+        this._id = socketId;
+
+        if (socketId >= 0) {
+            this._readyState = WebSocketReadyState.Open;
+        } else {
+            this._readyState = WebSocketReadyState.Closed;
+        }
+    }
+
+    get readyState(): WebSocketReadyState {
+        return this._readyState;
     }
 
     get isOpen(): bool {
-        return this._isOpen;
+        return this._readyState === WebSocketReadyState.Open;
+    }
+
+    get url(): str {
+        return this._url;
+    }
+
+    get id(): int {
+        return this._id;
+    }
+
+    onOpen(handler: () => void): WebSocket {
+        this._onOpenListeners.push(handler);
+        if (this.isOpen) {
+            handler();
+        }
+        return this;
+    }
+
+    onMessage(handler: (data: str) => void): WebSocket {
+        this._onMessageListeners.push(handler);
+        return this;
+    }
+
+    onError(handler: (err: str) => void): WebSocket {
+        this._onErrorListeners.push(handler);
+        return this;
+    }
+
+    onClose(handler: () => void): WebSocket {
+        this._onCloseListeners.push(handler);
+        return this;
     }
 
     send(message: str): bool {
-        if (!this._isOpen) return false;
+        if (!this.isOpen) {
+            return false;
+        }
         return wsSend$(this._id, message);
     }
 
     receive(): str? {
-        if (!this._isOpen) return null;
-        return wsRead$(this._id);
+        if (!this.isOpen) {
+            return null;
+        }
+        let msg = wsRead$(this._id);
+        if (msg !== null) {
+            for (let i = 0; i < this._onMessageListeners.length; i = i + 1) {
+                let handler = this._onMessageListeners[i];
+                handler(msg as str);
+            }
+        }
+        return msg;
     }
 
     close(): void {
-        if (this._isOpen) {
-            wsClose$(this._id);
-            this._isOpen = false;
+        if (this._readyState !== WebSocketReadyState.Closed) {
+            this._readyState = WebSocketReadyState.Closing;
+            if (this._id >= 0) {
+                wsClose$(this._id);
+            }
+            this._readyState = WebSocketReadyState.Closed;
             this._id = -1;
+
+            for (let i = 0; i < this._onCloseListeners.length; i = i + 1) {
+                let handler = this._onCloseListeners[i];
+                handler();
+            }
         }
+    }
+}
+
+export class WebSocketClient extends WebSocket {
+    constructor(url: str) {
+        super(url);
     }
 }

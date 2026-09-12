@@ -168,6 +168,26 @@ export class HttpResponse {
     }
 }
 
+function getHttpStatusText(status: int): str {
+    if (status === 200) return "OK";
+    if (status === 201) return "Created";
+    if (status === 204) return "No Content";
+    if (status === 301) return "Moved Permanently";
+    if (status === 302) return "Found";
+    if (status === 304) return "Not Modified";
+    if (status === 400) return "Bad Request";
+    if (status === 401) return "Unauthorized";
+    if (status === 403) return "Forbidden";
+    if (status === 404) return "Not Found";
+    if (status === 405) return "Method Not Allowed";
+    if (status === 409) return "Conflict";
+    if (status === 429) return "Too Many Requests";
+    if (status === 500) return "Internal Server Error";
+    if (status === 502) return "Bad Gateway";
+    if (status === 503) return "Service Unavailable";
+    return "Status";
+}
+
 export class Response {
     status: int = 200;
     statusText: str = "OK";
@@ -186,7 +206,7 @@ export class Response {
         if (typeof bodyOrStatus === "int" || typeof bodyOrStatus === "float") {
             let st = bodyOrStatus as int;
             this.status = st;
-            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : (st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status")));
+            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : getHttpStatusText(st);
             this.ok = st >= 200 && st < 300;
             this.body = bodyPos;
             this.headers = new Headers(headersPos);
@@ -194,7 +214,7 @@ export class Response {
             this.body = typeof bodyOrStatus === "str" ? bodyOrStatus : "";
             let st = (typeof statusOrStatusText === "int" || typeof statusOrStatusText === "float") ? (statusOrStatusText as int) : 200;
             this.status = st;
-            this.statusText = st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status"));
+            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : getHttpStatusText(st);
             this.ok = st >= 200 && st < 300;
             this.headers = new Headers(headersOrOk);
         }
@@ -227,3 +247,5 @@ export function redirect(url: str, status: int = 302): Response {
 export function error(status: int = 500, message: str = "Internal Server Error"): Response {
     return new Response(message, status, { "Content-Type": "text/plain" });
 }
+
+

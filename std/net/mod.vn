@@ -1,5 +1,12 @@
 
 export {
+    TcpStream,
+    TcpListener,
+    connect,
+    listen
+} from "std:net/socket";
+
+export {
     encodeURIComponent,
     decodeURIComponent
 } from "std:net/encoding";
