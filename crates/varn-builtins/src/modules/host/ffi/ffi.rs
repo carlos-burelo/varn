@@ -5,7 +5,10 @@ use varn_types::{NativeCtx, VmValue, VnArray};
 pub struct FfiRuntime;
 
 #[derive(Debug)]
-struct LoadedLib(libloading::Library);
+struct LoadedLib {
+    lib: libloading::Library,
+    is_system_lib: bool,
+}
 
 const ERR_PERMISSION_DENIED: &str = "E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi";
 const HEADER_SIZE: usize = 16;
@@ -18,10 +21,16 @@ varn_contract! {
             if !ctx.has_capability("sys.ffi") {
                 return Err(ERR_PERMISSION_DENIED.to_string());
             }
+            let is_system_lib = path == "libc.so.6"
+                || path == "libc.so"
+                || path.starts_with("libc.")
+                || path == "libSystem.B.dylib"
+                || path.eq_ignore_ascii_case("kernel32.dll");
+            // INVARIANT: path is loaded via platform dynamic linker; if successful, handle is retained in ctx resources.
             unsafe {
                 let lib = libloading::Library::new(path)
                     .map_err(|e| format!("ffi.dlopen: failed to load '{path}': {e}"))?;
-                let resource_id = ctx.resources().insert(LoadedLib(lib));
+                let resource_id = ctx.resources().insert(LoadedLib { lib, is_system_lib });
                 Ok(resource_id as i64)
             }
         }
@@ -31,8 +40,14 @@ varn_contract! {
                 return Err(ERR_PERMISSION_DENIED.to_string());
             }
             let handle_id = libHandle as u32;
-            let closed = ctx.resources().remove::<LoadedLib>(handle_id).is_some();
-            Ok(closed)
+            if let Some(loaded) = ctx.resources().remove::<LoadedLib>(handle_id) {
+                if loaded.is_system_lib {
+                    std::mem::forget(loaded.lib);
+                }
+                Ok(true)
+            } else {
+                Ok(false)
+            }
         }
 
         fn dlsym(ctx: &mut dyn NativeCtx, libHandle: i64, symbol: &str) -> Result<i64, String> {
@@ -42,10 +57,11 @@ varn_contract! {
             let handle_id = libHandle as u32;
             let res = ctx.resources().get::<LoadedLib>(handle_id)
                 .ok_or_else(|| "ffi.dlsym: invalid library handle".to_string())?;
+            // INVARIANT: handle points to active LoadedLib; symbol query null-terminated.
             unsafe {
                 let c_str = std::ffi::CString::new(symbol)
                     .map_err(|e| format!("ffi.dlsym: invalid symbol name: {e}"))?;
-                let sym: libloading::Symbol<*const ()> = res.0.get(c_str.as_bytes_with_nul())
+                let sym: libloading::Symbol<*const ()> = res.lib.get(c_str.as_bytes_with_nul())
                     .map_err(|e| format!("ffi.dlsym: symbol '{symbol}' not found: {e}"))?;
                 let ptr = *sym as usize as i64;
                 Ok(ptr)
@@ -191,13 +207,14 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.readInt: null pointer dereference".to_string());
             }
+            // INVARIANT: addr is checked non-null and read_unaligned prevents alignment faults across architectures.
             unsafe {
                 let addr = (ptr + offset) as *const u8;
                 match size {
-                    1 => Ok(*addr as i8 as i64),
-                    2 => Ok(*(addr as *const i16) as i64),
-                    4 => Ok(*(addr as *const i32) as i64),
-                    8 => Ok(*(addr as *const i64)),
+                    1 => Ok(std::ptr::read_unaligned(addr as *const i8) as i64),
+                    2 => Ok(std::ptr::read_unaligned(addr as *const i16) as i64),
+                    4 => Ok(std::ptr::read_unaligned(addr as *const i32) as i64),
+                    8 => Ok(std::ptr::read_unaligned(addr as *const i64)),
                     _ => Err(format!("ffi.readInt: unsupported size {size}, expected 1, 2, 4 or 8")),
                 }
             }
@@ -210,13 +227,14 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.writeInt: null pointer dereference".to_string());
             }
+            // INVARIANT: addr is checked non-null and write_unaligned prevents alignment faults across architectures.
             unsafe {
                 let addr = (ptr + offset) as *mut u8;
                 match size {
-                    1 => *addr = val as u8,
-                    2 => *(addr as *mut i16) = val as i16,
-                    4 => *(addr as *mut i32) = val as i32,
-                    8 => *(addr as *mut i64) = val,
+                    1 => std::ptr::write_unaligned(addr as *mut u8, val as u8),
+                    2 => std::ptr::write_unaligned(addr as *mut i16, val as i16),
+                    4 => std::ptr::write_unaligned(addr as *mut i32, val as i32),
+                    8 => std::ptr::write_unaligned(addr as *mut i64, val),
                     _ => return Err(format!("ffi.writeInt: unsupported size {size}, expected 1, 2, 4 or 8")),
                 }
             }
@@ -230,12 +248,13 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.readFloat: null pointer dereference".to_string());
             }
+            // INVARIANT: addr is checked non-null and read_unaligned prevents alignment faults for f32/f64.
             unsafe {
                 let addr = (ptr + offset) as *const u8;
                 if isDouble {
-                    Ok(*(addr as *const f64))
+                    Ok(std::ptr::read_unaligned(addr as *const f64))
                 } else {
-                    Ok(*(addr as *const f32) as f64)
+                    Ok(std::ptr::read_unaligned(addr as *const f32) as f64)
                 }
             }
         }
@@ -247,12 +266,13 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.writeFloat: null pointer dereference".to_string());
             }
+            // INVARIANT: addr is checked non-null and write_unaligned prevents alignment faults for f32/f64.
             unsafe {
                 let addr = (ptr + offset) as *mut u8;
                 if isDouble {
-                    *(addr as *mut f64) = val;
+                    std::ptr::write_unaligned(addr as *mut f64, val);
                 } else {
-                    *(addr as *mut f32) = val as f32;
+                    std::ptr::write_unaligned(addr as *mut f32, val as f32);
                 }
             }
             Ok(())

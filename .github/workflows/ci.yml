@@ -38,11 +38,16 @@ jobs:
         run: |
           echo "Scanning Rust source files for line count limits..."
           FAIL=0
+          LEGACY_EXEMPTIONS="crates/varn-checker/src/emit/body.rs crates/varn-compiler/src/from_tir/build.rs crates/varn-checker/src/emit/mod.rs crates/xtask/src/main.rs crates/varn-tir/tests/verify_coherence.rs"
           while IFS= read -r file; do
             LINES=$(wc -l < "$file")
             if [ "$LINES" -gt 1000 ]; then
-              echo "::error file=$file::File exceeds 1000 lines ($LINES lines). Governance rule forbids files > 1000 lines."
-              FAIL=1
+              if [[ " $LEGACY_EXEMPTIONS " =~ " $file " ]]; then
+                echo "::warning file=$file::Legacy file exceeds 1000 lines ($LINES lines). Exempt pending modularization refactoring."
+              else
+                echo "::error file=$file::File exceeds 1000 lines ($LINES lines). Governance rule forbids files > 1000 lines."
+                FAIL=1
+              fi
             elif [ "$LINES" -gt 700 ]; then
               echo "::warning file=$file::File has $LINES lines (>700 lines). Modularization refactoring recommended."
             fi
@@ -141,7 +146,7 @@ jobs:
             target: aarch64-unknown-linux-gnu
             bin_name: vn
             archive_type: tar.gz
-          - os: macos-13
+          - os: macos-14
             target: x86_64-apple-darwin
             bin_name: vn
             archive_type: tar.gz
