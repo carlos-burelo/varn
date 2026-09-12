@@ -1,4 +1,3 @@
-// std:net — Network primitives, URL parsing, Query strings, IP validation and URI codecs
 
 export {
     encodeURIComponent,

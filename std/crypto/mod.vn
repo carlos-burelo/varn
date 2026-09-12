@@ -1,4 +1,3 @@
-// std:crypto — Cryptographic hashing, UUID generation, HMAC, Random bytes and encoding
 
 export {
     UUID,

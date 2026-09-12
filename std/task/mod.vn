@@ -1,4 +1,3 @@
-// std:task — Structured concurrency, async tasks, channels, isolates, timers and combinators
 
 export {
     channel,

@@ -1,4 +1,3 @@
-// std:result — Core Algebraic Data Types (Result<T, E> and Option<T>) for Varn
 
 export {
     Result,

@@ -13,21 +13,18 @@ export class Url {
         
         let rest = url;
         
-        // 1. Extract protocol
         let protoIdx = rest.indexOf("://");
         if (protoIdx >= 0) {
             out.protocol = rest.slice(0, protoIdx);
             rest = rest.slice(protoIdx + 3);
         }
         
-        // 2. Extract fragment
         let fragIdx = rest.indexOf("#");
         if (fragIdx >= 0) {
             out.fragment = rest.slice(fragIdx + 1);
             rest = rest.slice(0, fragIdx);
         }
         
-        // 3. Extract query
         let queryIdx = rest.indexOf("?");
         let queryStr = "";
         if (queryIdx >= 0) {
@@ -36,7 +33,6 @@ export class Url {
         }
         out.query = Query.parse(queryStr);
         
-        // 4. Extract path and host/port
         let pathIdx = rest.indexOf("/");
         let hostAndPort = rest;
         if (pathIdx >= 0) {
@@ -46,13 +42,11 @@ export class Url {
             out.path = "/";
         }
         
-        // 5. Extract host and port
         let portIdx = hostAndPort.indexOf(":");
         if (portIdx >= 0) {
             out.host = hostAndPort.slice(0, portIdx);
             let portStr = hostAndPort.slice(portIdx + 1);
             
-            // Convert portStr to integer
             let portVal = 0;
             let keepParsing = true;
             for (let i = 0; i < portStr.length; i = i + 1) {

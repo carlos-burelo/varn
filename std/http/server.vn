@@ -139,7 +139,6 @@ export class HttpServer {
 
                 let reqMethod = rawReq.method.toUpperCase();
 
-                // Tier 1: Fast O(1) Static Route Lookup
                 let staticKey = reqMethod + ":" + pathOnly;
                 let staticHandler = this._staticRoutes[staticKey];
                 if (staticHandler === null) {
@@ -150,7 +149,6 @@ export class HttpServer {
                     matchedHandler = staticHandler;
                     matchedParams = {};
                 } else if (this._dynamicRoutes.length > 0) {
-                    // Tier 2: Precompiled Dynamic Segment Matching
                     let pathSegments = pathOnly.split("/");
                     for (let route of this._dynamicRoutes) {
                         let params = route.match(reqMethod, pathSegments);
@@ -189,7 +187,6 @@ export class HttpServer {
                 
                 let resObj = new HttpResponse(connId);
 
-                // Run Middlewares + Route Handler Pipeline
                 let self = this;
                 let runPipeline = async (idx: int): Task<void> => {
                     if (idx < self._middlewares.length) {
@@ -223,9 +220,6 @@ export class HttpServer {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Bun.serve / WinterCG Standard serve() Initializer
-// -----------------------------------------------------------------------------
 export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
     let server = new HttpServer();
     if (typeof handlerOrOptions === "function") {
@@ -243,9 +237,6 @@ export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
     return server;
 }
 
-// -----------------------------------------------------------------------------
-// Web Standard fetch() Implementation
-// -----------------------------------------------------------------------------
 
 
 export function server(fetchHandler?: dynamic): HttpServer {

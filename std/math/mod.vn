@@ -1,4 +1,3 @@
-// std:math — Mathematical constants, trigonometry, logarithmic and algebraic intrinsics
 
 export {
     E,

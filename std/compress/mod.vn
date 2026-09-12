@@ -1,4 +1,3 @@
-// std:compress — Gzip, Deflate, Tar and Zip archive compression & extraction
 
 export { Compress } from "std:compress/gzip";
 export { Tar } from "std:compress/tar";

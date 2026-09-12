@@ -276,7 +276,15 @@
             "pure": true
         },
         {
+            "id": "std:markdown/inline",
+            "pure": true
+        },
+        {
             "id": "std:markdown/parser",
+            "pure": true
+        },
+        {
+            "id": "std:markdown/renderer",
             "pure": true
         },
         {

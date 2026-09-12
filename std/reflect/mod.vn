@@ -1,4 +1,3 @@
-// std:reflect — Runtime reflection, metadata annotations and dynamic object introspection
 
 export {
     ClassRef,

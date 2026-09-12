@@ -1,4 +1,3 @@
-// std:io — Standard I/O streams, terminal input/output, Reader/Writer interfaces
 
 export {
     Writer,

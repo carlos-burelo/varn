@@ -1,4 +1,3 @@
-// std:time — Comprehensive Date, Time, Duration and ISO-8601 parsing APIs
 
 export {
     TimeParts,

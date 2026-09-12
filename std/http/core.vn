@@ -1,4 +1,3 @@
-// std:http/core — Re-export coordinator for HTTP core protocol components
 
 export { HttpStatus } from "std:http/status";
 export { Headers } from "std:http/headers";

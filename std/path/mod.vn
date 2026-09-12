@@ -1,4 +1,3 @@
-// std:path — File path manipulation, cross-platform separators and normalization
 
 export {
     sep,

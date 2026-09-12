@@ -1,0 +1,237 @@
+import { MarkdownOptions, MarkdownNode, MarkdownHeading, MarkdownLink } from "std:markdown/ast";
+import { escapeHtmlStr, slugify as slugifyUtil } from "std:markdown/utils";
+
+export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
+    let optXhtml = options?.xhtml ?? false;
+    let optEscape = options?.escapeHtml ?? true;
+    let optBreaks = options?.breaks ?? false;
+
+    let brTag = optXhtml ? "<br />" : "<br>";
+    let hrTag = optXhtml ? "<hr />\n" : "<hr>\n";
+
+    if (node.type === "root") {
+        let out = "";
+        for (let child of node.children) {
+            out = out + renderAst(child, options);
+        }
+        return out;
+    }
+
+    if (node.type === "heading") {
+        let tag = "h" + node.level;
+        let inner = "";
+        for (let c of node.children) {
+            inner = inner + renderAst(c, options);
+        }
+        return "<" + tag + ">" + inner + "</" + tag + ">\n";
+    }
+
+    if (node.type === "paragraph") {
+        let inner = "";
+        for (let c of node.children) {
+            inner = inner + renderAst(c, options);
+        }
+        if (optBreaks) {
+            inner = inner.replaceAll("\n", brTag + "\n");
+        }
+        return "<p>" + inner + "</p>\n";
+    }
+
+    if (node.type === "code_block") {
+        let code = optEscape ? escapeHtmlStr(node.text) : node.text;
+        if (node.lang.length > 0) {
+            return "<pre><code class=\"language-" + escapeHtmlStr(node.lang) + "\">" + code + "\n</code></pre>\n";
+        }
+        return "<pre><code>" + code + "\n</code></pre>\n";
+    }
+
+    if (node.type === "blockquote") {
+        let inner = "";
+        for (let c of node.children) {
+            inner = inner + renderAst(c, options);
+        }
+        return "<blockquote>\n" + inner + "</blockquote>\n";
+    }
+
+    if (node.type === "list") {
+        let tag = node.ordered ? "ol" : "ul";
+        let startAttr = (node.ordered && node.start !== 1) ? (" start=\"" + node.start + "\"") : "";
+        let inner = "";
+        for (let c of node.children) {
+            inner = inner + renderAst(c, options);
+        }
+        return "<" + tag + startAttr + ">\n" + inner + "</" + tag + ">\n";
+    }
+
+    if (node.type === "list_item") {
+        let inner = "";
+        if (node.checked != null) {
+            let chk = node.checked ? " checked=\"\"" : "";
+            let inputTag = optXhtml ? ("<input type=\"checkbox\"" + chk + " disabled=\"\" /> ") : ("<input type=\"checkbox\"" + chk + " disabled> ");
+            inner = inputTag;
+        }
+        for (let c of node.children) {
+            inner = inner + renderAst(c, options);
+        }
+        return "<li>" + inner + "</li>\n";
+    }
+
+    if (node.type === "table") {
+        let headRow = node.children.length > 0 ? node.children[0] : null;
+        let thead = "";
+        if (headRow != null) {
+            let ths = "";
+            for (let i = 0; i < headRow.children.length; i = i + 1) {
+                let cell = headRow.children[i];
+                let alignAttr = "";
+                if (i < node.align.length && node.align[i] !== "none") {
+                    alignAttr = " align=\"" + node.align[i] + "\"";
+                }
+                let cellContent = "";
+                for (let c of cell.children) cellContent = cellContent + renderAst(c, options);
+                ths = ths + "<th" + alignAttr + ">" + cellContent + "</th>";
+            }
+            thead = "<thead>\n<tr>" + ths + "</tr>\n</thead>\n";
+        }
+
+        let tbodyRows = "";
+        for (let r = 1; r < node.children.length; r = r + 1) {
+            let row = node.children[r];
+            let tds = "";
+            for (let i = 0; i < row.children.length; i = i + 1) {
+                let cell = row.children[i];
+                let alignAttr = "";
+                if (i < node.align.length && node.align[i] !== "none") {
+                    alignAttr = " align=\"" + node.align[i] + "\"";
+                }
+                let cellContent = "";
+                for (let c of cell.children) cellContent = cellContent + renderAst(c, options);
+                tds = tds + "<td" + alignAttr + ">" + cellContent + "</td>";
+            }
+            tbodyRows = tbodyRows + "<tr>" + tds + "</tr>\n";
+        }
+        let tbody = tbodyRows.length > 0 ? ("<tbody>\n" + tbodyRows + "</tbody>\n") : "";
+
+        return "<table>\n" + thead + tbody + "</table>\n";
+    }
+
+    if (node.type === "thematic_break") {
+        return hrTag;
+    }
+
+    if (node.type === "text") {
+        return optEscape ? escapeHtmlStr(node.text) : node.text;
+    }
+
+    if (node.type === "inline_code") {
+        let code = optEscape ? escapeHtmlStr(node.text) : node.text;
+        return "<code>" + code + "</code>";
+    }
+
+    if (node.type === "bold") {
+        let inner = "";
+        for (let c of node.children) inner = inner + renderAst(c, options);
+        return "<strong>" + inner + "</strong>";
+    }
+
+    if (node.type === "italic") {
+        let inner = "";
+        for (let c of node.children) inner = inner + renderAst(c, options);
+        return "<em>" + inner + "</em>";
+    }
+
+    if (node.type === "strikethrough") {
+        let inner = "";
+        for (let c of node.children) inner = inner + renderAst(c, options);
+        return "<del>" + inner + "</del>";
+    }
+
+    if (node.type === "link") {
+        let inner = "";
+        for (let c of node.children) inner = inner + renderAst(c, options);
+        let titleAttr = node.title.length > 0 ? (" title=\"" + escapeHtmlStr(node.title) + "\"") : "";
+        return "<a href=\"" + escapeHtmlStr(node.url) + "\"" + titleAttr + ">" + inner + "</a>";
+    }
+
+    if (node.type === "image") {
+        let titleAttr = node.title.length > 0 ? (" title=\"" + escapeHtmlStr(node.title) + "\"") : "";
+        let altAttr = " alt=\"" + escapeHtmlStr(node.text) + "\"";
+        let srcAttr = " src=\"" + escapeHtmlStr(node.url) + "\"";
+        if (optXhtml) {
+            return "<img" + srcAttr + altAttr + titleAttr + " />";
+        }
+        return "<img" + srcAttr + altAttr + titleAttr + ">";
+    }
+
+    return "";
+}
+
+export function toPlainText(ast: MarkdownNode): str {
+    let out: str[] = [];
+
+    function walk(n: MarkdownNode): void {
+        if (n.type === "text" || n.type === "inline_code") {
+            out.push(n.text);
+        } else if (n.type === "code_block") {
+            out.push(n.text + "\n");
+        } else {
+            for (let c of n.children) {
+                walk(c);
+            }
+            if (n.type === "paragraph" || n.type === "heading" || n.type === "list_item" || n.type === "thematic_break") {
+                out.push("\n");
+            }
+        }
+    }
+
+    walk(ast);
+    return out.join("").trim();
+}
+
+export function extractHeadings(ast: MarkdownNode): MarkdownHeading[] {
+    let list: MarkdownHeading[] = [];
+
+    function walk(n: MarkdownNode): void {
+        if (n.type === "heading") {
+            list.push({
+                level: n.level,
+                text: n.text,
+                id: slugifyUtil(n.text)
+            });
+        }
+        for (let c of n.children) {
+            walk(c);
+        }
+    }
+
+    walk(ast);
+    return list;
+}
+
+export function extractLinks(ast: MarkdownNode): MarkdownLink[] {
+    let links: MarkdownLink[] = [];
+
+    function walk(n: MarkdownNode): void {
+        if (n.type === "link") {
+            links.push({
+                text: n.text,
+                url: n.url,
+                title: n.title,
+                isImage: false
+            });
+        } else if (n.type === "image") {
+            links.push({
+                text: n.text,
+                url: n.url,
+                title: n.title,
+                isImage: true
+            });
+        }
+        for (let c of n.children) {
+            walk(c);
+        }
+    }
+
+    walk(ast);
+    return links;
+}

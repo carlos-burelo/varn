@@ -1,3 +1,2 @@
-// std:ws — Lightweight WebSocket client and messaging protocol
 
 export { WebSocketClient } from "std:ws/client";

@@ -1,4 +1,3 @@
-// std:http — Web-standard (WinterCG / Bun) aligned HTTP client and server APIs for Varn.
 
 export { HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response, json, redirect, error } from "std:http/core";
 export { HttpServer, serve, server } from "std:http/server";

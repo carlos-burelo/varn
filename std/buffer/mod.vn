@@ -1,3 +1,2 @@
-// std:buffer — Binary data buffer operations, byte manipulation and slice conversions
 
 export { Buffer } from "std:buffer/buffer";

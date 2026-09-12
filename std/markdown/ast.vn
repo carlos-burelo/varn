@@ -1,4 +1,3 @@
-// std:markdown/ast — Markdown AST and data structures
 
 export interface MarkdownOptions {
     gfm?: bool;

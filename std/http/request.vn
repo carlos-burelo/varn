@@ -95,7 +95,6 @@ export class Request {
             this.body = body;
         }
 
-        // Parse Cookies
         let cookieHdr = this.headers.get("cookie");
         if (cookieHdr !== null) {
             let cookieStr = cookieHdr as str;

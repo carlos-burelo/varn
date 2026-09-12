@@ -1,0 +1,185 @@
+import { MarkdownNode } from "std:markdown/ast";
+import { findFrom, startsWithAt } from "std:markdown/utils";
+
+export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
+    let nodes: MarkdownNode[] = [];
+    let i = 0;
+    let buf = "";
+
+    function flushBuf(): void {
+        if (buf.length > 0) {
+            nodes.push(new MarkdownNode("text", buf));
+            buf = "";
+        }
+    }
+
+    while (i < text.length) {
+        if (text[i] === "\\" && i + 1 < text.length) {
+            buf = buf + text[i + 1];
+            i = i + 2;
+            continue;
+        }
+
+        if (text[i] === "`") {
+            let endBacktick = findFrom(text, "`", i + 1);
+            if (endBacktick !== -1) {
+                flushBuf();
+                let codeContent = text.slice(i + 1, endBacktick);
+                nodes.push(new MarkdownNode("inline_code", codeContent));
+                i = endBacktick + 1;
+                continue;
+            }
+        }
+
+        if (startsWithAt(text, "![", i)) {
+            let closeBracket = findFrom(text, "]", i + 2);
+            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+                let closeParen = findFrom(text, ")", closeBracket + 2);
+                if (closeParen !== -1) {
+                    flushBuf();
+                    let altText = text.slice(i + 2, closeBracket);
+                    let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
+                    let url = urlAndTitle;
+                    let title = "";
+                    let quoteIdx = urlAndTitle.indexOf("\"");
+                    if (quoteIdx !== -1) {
+                        url = urlAndTitle.slice(0, quoteIdx).trim();
+                        let endQuote = urlAndTitle.lastIndexOf("\"");
+                        if (endQuote > quoteIdx) {
+                            title = urlAndTitle.slice(quoteIdx + 1, endQuote);
+                        }
+                    }
+                    let imgNode = new MarkdownNode("image", altText);
+                    imgNode.url = url;
+                    imgNode.title = title;
+                    nodes.push(imgNode);
+                    i = closeParen + 1;
+                    continue;
+                }
+            }
+        }
+
+        if (text[i] === "[") {
+            let closeBracket = findFrom(text, "]", i + 1);
+            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+                let closeParen = findFrom(text, ")", closeBracket + 2);
+                if (closeParen !== -1) {
+                    flushBuf();
+                    let linkText = text.slice(i + 1, closeBracket);
+                    let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
+                    let url = urlAndTitle;
+                    let title = "";
+                    let quoteIdx = urlAndTitle.indexOf("\"");
+                    if (quoteIdx !== -1) {
+                        url = urlAndTitle.slice(0, quoteIdx).trim();
+                        let endQuote = urlAndTitle.lastIndexOf("\"");
+                        if (endQuote > quoteIdx) {
+                            title = urlAndTitle.slice(quoteIdx + 1, endQuote);
+                        }
+                    }
+                    let linkNode = new MarkdownNode("link", linkText);
+                    linkNode.url = url;
+                    linkNode.title = title;
+                    let innerTokens = parseInlineTokens(linkText, escapeHtml);
+                    for (let c of innerTokens) {
+                        linkNode.addChild(c);
+                    }
+                    nodes.push(linkNode);
+                    i = closeParen + 1;
+                    continue;
+                }
+            }
+        }
+
+        if (text[i] === "<") {
+            let closeAngle = findFrom(text, ">", i + 1);
+            if (closeAngle !== -1) {
+                let linkContent = text.slice(i + 1, closeAngle);
+                if (linkContent.startsWith("http://") || linkContent.startsWith("https://") || linkContent.startsWith("mailto:")) {
+                    flushBuf();
+                    let linkNode = new MarkdownNode("link", linkContent);
+                    linkNode.url = linkContent;
+                    linkNode.addChild(new MarkdownNode("text", linkContent));
+                    nodes.push(linkNode);
+                    i = closeAngle + 1;
+                    continue;
+                }
+            }
+        }
+
+        if (startsWithAt(text, "~~", i)) {
+            let endStrike = findFrom(text, "~~", i + 2);
+            if (endStrike !== -1) {
+                flushBuf();
+                let strikeContent = text.slice(i + 2, endStrike);
+                let strikeNode = new MarkdownNode("strikethrough");
+                let inner = parseInlineTokens(strikeContent, escapeHtml);
+                for (let c of inner) {
+                    strikeNode.addChild(c);
+                }
+                nodes.push(strikeNode);
+                i = endStrike + 2;
+                continue;
+            }
+        }
+
+        if (startsWithAt(text, "***", i) || startsWithAt(text, "___", i)) {
+            let marker = text.slice(i, i + 3);
+            let endIdx = findFrom(text, marker, i + 3);
+            if (endIdx !== -1) {
+                flushBuf();
+                let content = text.slice(i + 3, endIdx);
+                let boldNode = new MarkdownNode("bold");
+                let italicNode = new MarkdownNode("italic");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    italicNode.addChild(c);
+                }
+                boldNode.addChild(italicNode);
+                nodes.push(boldNode);
+                i = endIdx + 3;
+                continue;
+            }
+        }
+
+        if (startsWithAt(text, "**", i) || startsWithAt(text, "__", i)) {
+            let marker = text.slice(i, i + 2);
+            let endIdx = findFrom(text, marker, i + 2);
+            if (endIdx !== -1) {
+                flushBuf();
+                let content = text.slice(i + 2, endIdx);
+                let boldNode = new MarkdownNode("bold");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    boldNode.addChild(c);
+                }
+                nodes.push(boldNode);
+                i = endIdx + 2;
+                continue;
+            }
+        }
+
+        if (text[i] === "*" || text[i] === "_") {
+            let marker = text[i];
+            let endIdx = findFrom(text, marker, i + 1);
+            if (endIdx !== -1 && endIdx > i + 1) {
+                flushBuf();
+                let content = text.slice(i + 1, endIdx);
+                let italicNode = new MarkdownNode("italic");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    italicNode.addChild(c);
+                }
+                nodes.push(italicNode);
+                i = endIdx + 1;
+                continue;
+            }
+        }
+
+        buf = buf + text[i];
+        i = i + 1;
+    }
+
+    flushBuf();
+    return nodes;
+}

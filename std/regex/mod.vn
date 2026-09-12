@@ -1,3 +1,2 @@
-// std:regex — Regular expression compilation, matching, capture groups and string replacement
 
 export { RegexMatch, Regex } from "std:regex/regex";

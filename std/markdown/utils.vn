@@ -1,4 +1,3 @@
-// std:markdown/utils — String helpers, HTML escaping and slugification
 
 export function escapeHtmlStr(s: str): str {
     let res = s.replaceAll("&", "&amp;");

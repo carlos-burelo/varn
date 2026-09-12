@@ -8,7 +8,6 @@ export function normalize(p: str): str {
         return ".";
     }
     
-    // Check Windows drive prefix, e.g. "C:" or "C:\"
     let drive = "";
     let rest = p;
     if (p.length >= 2 && p[1] === ":") {
@@ -18,7 +17,6 @@ export function normalize(p: str): str {
     
     let isAbs = rest.startsWith("/") || rest.startsWith("\\");
     
-    // Split segments by / and \
     let normalizedPath = "";
     for (let i = 0; i < rest.length; i = i + 1) {
         let c = rest[i];
@@ -83,7 +81,6 @@ export function dirname(p: str): str {
         return ".";
     }
     
-    // Trim trailing separators
     let end = p.length;
     let keepTrimming = true;
     while (keepTrimming) {
@@ -103,12 +100,10 @@ export function dirname(p: str): str {
         return p[0];
     }
     
-    // Check if it's Windows drive letter like C:
     if (end === 2 && p[1] === ":") {
         return p;
     }
     
-    // Find last separator before end
     let i = end - 1;
     let foundSep = -1;
     let keepSearching = true;
@@ -172,7 +167,6 @@ export function basename(p: str, ext?: str): str {
         return "";
     }
     
-    // Trim trailing separators
     let end = p.length;
     let keepTrimming = true;
     while (keepTrimming) {
@@ -196,7 +190,6 @@ export function basename(p: str, ext?: str): str {
         return "";
     }
     
-    // Find last separator before end
     let start = 0;
     let i = end - 1;
     let keepSearching = true;
