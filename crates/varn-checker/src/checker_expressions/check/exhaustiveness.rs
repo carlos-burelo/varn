@@ -64,6 +64,19 @@ impl<'r> Checker<'r> {
                             MatchPattern::EnumVariant { variant_name, .. } => {
                                 variant_name.as_ref() == vname.as_ref()
                             }
+                            MatchPattern::Literal(lit) => {
+                                if let varn_core::ast::ExprKind::Member { property, .. } = &lit.kind {
+                                    if let varn_core::ast::ExprKind::Identifier { name } = &property.kind {
+                                        name.as_ref() == vname.as_ref()
+                                    } else {
+                                        false
+                                    }
+                                } else if let varn_core::ast::ExprKind::Identifier { name } = &lit.kind {
+                                    name.as_ref() == vname.as_ref()
+                                } else {
+                                    false
+                                }
+                            }
                             MatchPattern::Record { fields, .. } => {
                                 fields.first().is_some_and(|(key, sub)| {
                                     key.as_ref() == "__variant__"
