@@ -1,0 +1,31 @@
+import { LogLevel } from "std:log/level";
+import { Logger } from "std:log/logger";
+
+export { LogLevel } from "std:log/level";
+export { Logger } from "std:log/logger";
+
+export const logger: Logger = new Logger("root", LogLevel.Info);
+
+export function getLogger(name: str = "app", level: LogLevel = LogLevel.Info): Logger {
+    return new Logger(name, level);
+}
+
+export function trace(message: str, meta?: { [key: str]: dynamic }): void {
+    logger.trace(message, meta);
+}
+
+export function debug(message: str, meta?: { [key: str]: dynamic }): void {
+    logger.debug(message, meta);
+}
+
+export function info(message: str, meta?: { [key: str]: dynamic }): void {
+    logger.info(message, meta);
+}
+
+export function warn(message: str, meta?: { [key: str]: dynamic }): void {
+    logger.warn(message, meta);
+}
+
+export function error(message: str, meta?: { [key: str]: dynamic }): void {
+    logger.error(message, meta);
+}

@@ -457,3 +457,135 @@ const key = MetaKey.create<T>()
 key.set(ClassRef, value)
 key.get(ClassRef)         // T | null
 ```
+
+---
+
+## 24. `std:encoding` — Formatos y Datos
+
+> Fuente: `tests/110-stdlib-consolidation.vn`
+
+```varn
+import { JSON, CSV, Base64, Hex, TOML } from "std:encoding";
+
+// Base64
+let b64 = Base64.encode("Hello");
+let str = Base64.decode(b64);
+
+// Hex
+let hex = Hex.encode("Data");
+let data = Hex.decode(hex);
+
+// TOML
+let tomlStr = TOML.stringify({ server: { host: "localhost", port: 8080 } });
+let parsed = TOML.parse(tomlStr);
+
+// JSON & CSV
+let json = JSON.stringify({ ok: true });
+let csv = CSV.stringify([["a", "b"], ["1", "2"]]);
+```
+
+---
+
+## 25. `std:cli` — Terminal, Argumentos y Colores
+
+> Fuente: `tests/110-stdlib-consolidation.vn`
+
+```varn
+import { Color, Table, CLI, Prompt, prompt, confirm } from "std:cli";
+
+// Colores e Introspección ANSI
+let msg = Color.red("error");
+let plain = Color.stripAnsi(msg);
+let interactive = Color.isInteractive(); // bool (respeta NO_COLOR y TERM)
+
+// Tablas ASCII/ANSI
+let table = new Table(["ID", "Name"]);
+table.addRow(["1", "Alpha"]);
+let rendered = table.render();
+
+// Parser de Argumentos
+let args = CLI.parse(["--port=8080", "-v", "app.vn"]);
+// args.flags["port"] == "8080", args.positionals == ["app.vn"]
+
+// Prompts Interactivos
+let name = prompt("Nombre de usuario");
+let ok = confirm("¿Desea continuar?", true);
+```
+
+---
+
+## 26. `std:task` (Sincronización Concurrente)
+
+> Fuente: `tests/110-stdlib-consolidation.vn`
+
+```varn
+import { Mutex, Semaphore, WaitGroup, Task, spawn } from "std:task";
+
+// Mutex asíncrono
+let mutex = new Mutex();
+await mutex.withLock(async (): Task<void> => {
+    // sección crítica protegida
+});
+
+// Semáforo de capacidad concurrente
+let sem = new Semaphore(4);
+await sem.withPermit(async (): Task<void> => {
+    // máximo 4 tareas en paralelo
+});
+
+// WaitGroup (concurrencia cooperativa)
+let wg = new WaitGroup();
+wg.add(2);
+spawn((async (): Task<void> => { /* do work */ wg.done(); })());
+spawn((async (): Task<void> => { /* do work */ wg.done(); })());
+await wg.wait();
+```
+
+---
+
+## 27. `std:log` — Diagnóstico y Logging Estructurado
+
+> Fuente: `tests/110-stdlib-consolidation.vn`
+
+```varn
+import { LogLevel, Logger, getLogger, info, warn, error } from "std:log";
+
+// Logger configurable
+let logger = new Logger("api", LogLevel.Info, false, true);
+logger.info("Servidor iniciado", { "port": 3000 });
+
+// Modo JSON estructurado
+let jsonLogger = new Logger("service", LogLevel.Debug, true, false);
+jsonLogger.debug("Petición procesada", { "status": 200, "ms": 12 });
+
+// Sub-loggers contextuales
+let childLogger = logger.child("database");
+childLogger.warn("Conexión lenta detectada");
+
+// Helpers globales directos
+info("Mensaje global");
+error("Fallo crítico");
+```
+
+---
+
+## 28. `std:collections` — Estructuras de Datos Avanzadas
+
+> Fuente: `tests/110-stdlib-consolidation.vn`
+
+```varn
+import { PriorityQueue, LRUCache, List, Stack, Queue } from "std:collections";
+
+// PriorityQueue (Min-Heap default o comparador personalizado)
+let pq = new PriorityQueue<int>();
+pq.push(30);
+pq.push(10);
+let min = pq.pop(); // 10
+
+// LRUCache (evicción automática del menos recientemente usado)
+let cache = new LRUCache<str>(2);
+cache.set("a", "alpha");
+cache.set("b", "beta");
+cache.get("a"); // "a" se marca como reciente
+cache.set("c", "gamma"); // desaloja "b"
+```

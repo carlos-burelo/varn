@@ -2,4 +2,4 @@ export { Json, JSON } from "std:json";
 export { CsvOptions, CSV } from "std:csv";
 export { Base64, base64Encode, base64Decode } from "std:encoding/base64";
 export { Hex, hexEncode, hexDecode } from "std:encoding/hex";
-export { TOML, parseToml } from "std:encoding/toml";
+export { TOML, parseToml, stringifyToml } from "std:encoding/toml";

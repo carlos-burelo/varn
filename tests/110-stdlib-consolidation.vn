@@ -1,0 +1,204 @@
+import { JSON, Base64, Hex, TOML } from "std:encoding";
+import { Color, Table, CLI, Prompt, prompt, confirm, password } from "std:cli";
+import { Mutex, Semaphore, WaitGroup, delay, spawn, Task } from "std:task";
+import { LogLevel, Logger, getLogger } from "std:log";
+import { PriorityQueue, LRUCache } from "std:collections";
+import { assertEqual, assertTrue } from "std:test";
+
+print("=== Suite: Consolidated Stdlib Domains (encoding, cli, task/sync, log, collections) ===");
+
+async function testEncoding(): Task<void> {
+    // 1. Base64
+    let originalText = "Hello Varn Language!";
+    let encoded = Base64.encode(originalText);
+    let decoded = Base64.decode(encoded);
+    assertEqual(decoded, originalText);
+
+    // 2. Hex
+    let hexEncoded = Hex.encode("Varn");
+    let hexDecoded = Hex.decode(hexEncoded);
+    assertEqual(hexDecoded, "Varn");
+
+    // 3. TOML
+    let tomlSample = "[server]\nhost = \"localhost\"\nport = 8080\nenabled = true\n";
+    let parsedToml = TOML.parse(tomlSample);
+    let serverObj = parsedToml["server"] as { [key: str]: dynamic };
+    assertEqual(serverObj["host"], "localhost");
+    assertEqual(serverObj["port"], 8080);
+    assertEqual(serverObj["enabled"], true);
+
+    let stringifiedToml = TOML.stringify(parsedToml);
+    assertTrue(stringifiedToml.includes("[server]"));
+    assertTrue(stringifiedToml.includes("host = \"localhost\""));
+
+    print("  ✔ std:encoding (Base64, Hex, TOML parse/stringify)");
+}
+
+function testCli(): void {
+    // 1. Color & ANSI stripping
+    let styled = Color.red("critical error");
+    assertTrue(styled.includes("\x1b[31m"));
+    assertEqual(Color.stripAnsi(styled), "critical error");
+    let isTermInteractive = Color.isInteractive();
+    assertTrue(isTermInteractive === true || isTermInteractive === false);
+
+    // 2. Table
+    let table = new Table(["ID", "Name", "Role"]);
+    table.addRow(["1", "Alice", "Admin"]);
+    table.addRow(["2", "Bob", "User"]);
+    let renderedTable = table.render();
+    assertTrue(renderedTable.includes("Alice"));
+    assertTrue(renderedTable.includes("Admin"));
+    assertTrue(renderedTable.includes("+"));
+
+    // 3. CLI Args
+    let parsed = CLI.parse(["--env=production", "-v", "src/main.vn"]);
+    assertEqual(parsed.flags["env"], "production");
+    assertEqual(parsed.flags["v"], "true");
+    assertEqual(parsed.positionals.length, 1);
+    assertEqual(parsed.positionals[0], "src/main.vn");
+
+    // 4. Prompt exports
+    assertTrue(Prompt !== null);
+    assertTrue(prompt !== null);
+    assertTrue(confirm !== null);
+    assertTrue(password !== null);
+
+    print("  ✔ std:cli (Color/ANSI, Table, CLI.parse, Prompt)");
+}
+
+class SyncState {
+    counter: int = 0;
+    semCounter: int = 0;
+    wgProgress: int = 0;
+}
+
+let syncState = new SyncState();
+
+async function testTaskSync(): Task<void> {
+    // 1. Mutex
+    let mutex = new Mutex();
+    await mutex.withLock(async (): Task<void> => {
+        syncState.counter = syncState.counter + 5;
+    });
+    assertEqual(syncState.counter, 5);
+
+    // 2. Semaphore
+    let semaphore = new Semaphore(2);
+    await semaphore.withPermit(async (): Task<void> => {
+        syncState.semCounter = syncState.semCounter + 2;
+    });
+    assertEqual(syncState.semCounter, 2);
+
+    // 3. WaitGroup
+    let wg = new WaitGroup();
+    wg.add(2);
+
+    spawn((async (): Task<void> => {
+        await delay(5);
+        syncState.wgProgress = syncState.wgProgress + 1;
+        wg.done();
+    })());
+
+    spawn((async (): Task<void> => {
+        await delay(5);
+        syncState.wgProgress = syncState.wgProgress + 10;
+        wg.done();
+    })());
+
+    await wg.wait();
+    assertEqual(syncState.wgProgress, 11);
+
+    print("  ✔ std:task (Mutex, Semaphore, WaitGroup)");
+}
+
+let logCapturedLines: str[] = [];
+let logJsonLines: str[] = [];
+
+function testLog(): void {
+    let logger = new Logger("service", LogLevel.Info, false, false, (line: str): void => {
+        logCapturedLines.push(line);
+    });
+
+    // Level filtering
+    logger.debug("should be filtered");
+    assertEqual(logCapturedLines.length, 0);
+
+    logger.info("service initialized", { "port": 3000 });
+    assertEqual(logCapturedLines.length, 1);
+    assertTrue(logCapturedLines[0].includes("[INFO]"));
+    assertTrue(logCapturedLines[0].includes("(service)"));
+    assertTrue(logCapturedLines[0].includes("service initialized"));
+    assertTrue(logCapturedLines[0].includes("\"port\":3000"));
+
+    // JSON format output
+    let jsonLogger = new Logger("jsonApp", LogLevel.Debug, true, false, (line: str): void => {
+        logJsonLines.push(line);
+    });
+    jsonLogger.debug("testing json", { "ok": true });
+    assertEqual(logJsonLines.length, 1);
+
+    let parsedRecord = JSON.parse(logJsonLines[0]) as { [key: str]: dynamic };
+    assertEqual(parsedRecord["level"], "DEBUG");
+    assertEqual(parsedRecord["target"], "jsonApp");
+    assertEqual(parsedRecord["message"], "testing json");
+
+    // Child logger
+    let childLogger = logger.child("worker");
+    assertEqual(childLogger.name, "service.worker");
+
+    print("  ✔ std:log (LogLevel, Logger text/json, sinks, child loggers)");
+}
+
+function testCollections(): void {
+    // 1. PriorityQueue (Min-Heap default)
+    let minPq = new PriorityQueue<int>();
+    minPq.push(40);
+    minPq.push(10);
+    minPq.push(30);
+    minPq.push(20);
+    assertEqual(minPq.size, 4);
+    assertEqual(minPq.peek(), 10);
+    assertEqual(minPq.pop(), 10);
+    assertEqual(minPq.pop(), 20);
+    assertEqual(minPq.pop(), 30);
+    assertEqual(minPq.pop(), 40);
+    assertEqual(minPq.pop(), null);
+
+    // Custom comparator (Max-Heap)
+    let maxPq = new PriorityQueue<int>((a: int, b: int): int => {
+        if (a > b) return -1;
+        if (a < b) return 1;
+        return 0;
+    });
+    maxPq.push(15);
+    maxPq.push(95);
+    maxPq.push(42);
+    assertEqual(maxPq.pop(), 95);
+    assertEqual(maxPq.pop(), 42);
+    assertEqual(maxPq.pop(), 15);
+
+    // 2. LRUCache
+    let cache = new LRUCache<str>(2);
+    cache.set("key1", "val1");
+    cache.set("key2", "val2");
+    assertEqual(cache.get("key1"), "val1"); // key1 becomes most recently used
+    cache.set("key3", "val3"); // evicts key2 (LRU)
+    assertEqual(cache.get("key2"), null);
+    assertEqual(cache.get("key1"), "val1");
+    assertEqual(cache.get("key3"), "val3");
+
+    print("  ✔ std:collections (PriorityQueue min/max, LRUCache touch & eviction)");
+}
+
+async function main(): Task<void> {
+    await testEncoding();
+    testCli();
+    await testTaskSync();
+    testLog();
+    testCollections();
+}
+
+await main();
+
+print("[PASSED] 110. Canonical Stdlib Reorganization (std:encoding, std:cli, std:task, std:log, std:collections)");

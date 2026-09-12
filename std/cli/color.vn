@@ -1,3 +1,5 @@
+import { env$ } from "runtime:sys";
+
 export namespace Color {
     export const RESET: str = "\x1b[0m";
     export const BOLD: str = "\x1b[1m";
@@ -90,5 +92,21 @@ export namespace Color {
             }
         }
         return result;
+    }
+
+    export function isInteractive(): bool {
+        let noColor = env$("NO_COLOR");
+        if (noColor.length > 0) {
+            return false;
+        }
+        let term = env$("TERM");
+        if (term === "dumb") {
+            return false;
+        }
+        return true;
+    }
+
+    export function isatty(): bool {
+        return isInteractive();
     }
 }

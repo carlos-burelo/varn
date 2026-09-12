@@ -81,6 +81,31 @@ function parseTomlValue(valueText: str): dynamic {
     return parseInteger(raw);
 }
 
+function formatTomlValue(val: dynamic): str {
+    if (val === null) {
+        return "\"\"";
+    }
+    let valueType = val::type;
+    if (valueType === "str") {
+        return "\"" + (val as str) + "\"";
+    }
+    if (valueType === "bool") {
+        return (val as bool) ? "true" : "false";
+    }
+    if (valueType === "int" || valueType === "float") {
+        return "" + val;
+    }
+    if (valueType === "Array") {
+        let items: str[] = [];
+        let arr = val as dynamic[];
+        for (let i = 0; i < arr.length; i = i + 1) {
+            items.push(formatTomlValue(arr[i]));
+        }
+        return "[" + items.join(", ") + "]";
+    }
+    return "\"" + val + "\"";
+}
+
 export namespace TOML {
     export function parse(content: str): { [key: str]: dynamic } {
         let root: { [key: str]: dynamic } = {};
@@ -109,8 +134,54 @@ export namespace TOML {
         }
         return root;
     }
+
+    export function tryParse(content: str): { [key: str]: dynamic }? {
+        try {
+            return parse(content);
+        } catch {
+            return null;
+        }
+    }
+
+    export function stringify(value: { [key: str]: dynamic }): str {
+        let lines: str[] = [];
+        let sectionKeys: str[] = [];
+        let keys = value::keys();
+
+        for (let i = 0; i < keys.length; i = i + 1) {
+            let key = keys[i];
+            let val = value[key];
+            if (val !== null && (val::type === "Object" || val::type === "Map")) {
+                sectionKeys.push(key);
+            } else {
+                lines.push(key + " = " + formatTomlValue(val));
+            }
+        }
+
+        for (let s = 0; s < sectionKeys.length; s = s + 1) {
+            let sectionName = sectionKeys[s];
+            if (lines.length > 0) {
+                lines.push("");
+            }
+            lines.push("[" + sectionName + "]");
+            let sectionObj = value[sectionName] as { [key: str]: dynamic };
+            let subKeys = sectionObj::keys();
+            for (let j = 0; j < subKeys.length; j = j + 1) {
+                let subKey = subKeys[j];
+                let subVal = sectionObj[subKey];
+                lines.push(subKey + " = " + formatTomlValue(subVal));
+            }
+        }
+
+        return lines.join("\n");
+    }
 }
 
 export function parseToml(content: str): { [key: str]: dynamic } {
     return TOML.parse(content);
 }
+
+export function stringifyToml(value: { [key: str]: dynamic }): str {
+    return TOML.stringify(value);
+}
+

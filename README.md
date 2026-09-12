@@ -276,6 +276,16 @@ function tareaPesada(): void {
 }
 ```
 
+### Biblioteca Estándar Consolidada
+
+La stdlib de Varn está estructurada en dominios cohesivos de alto nivel:
+
+* **`std:encoding`**: Serialización de datos unificada (`JSON`, `CSV`, `TOML`, `Base64`, `Hex`).
+* **`std:cli`**: Terminal toolkit (`CLI.parse`, `Color` ANSI, `Table`, `Prompt` interactivo).
+* **`std:task`**: Concurrencia estructurada y sincronización cooperativa (`Mutex`, `Semaphore`, `WaitGroup`, `Channel`).
+* **`std:log`**: Observabilidad y logging estructurado dual (texto coloreado y JSON).
+* **`std:collections`**: Estructuras de datos eficientes (`PriorityQueue`, `LRUCache`, `List`, `Stack`, `Queue`).
+
 ---
 
 ## 📊 Rendimiento Comparativo
