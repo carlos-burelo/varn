@@ -1,5 +1,5 @@
 import { assertEqual, assertTrue, assertFalse } from "std:test";
-import { Stream } from "std:io";
+import { Stream, AsyncReader, AsyncWriter } from "std:io";
 import { TcpListener, TcpStream } from "std:net";
 import { Process } from "std:process";
 import { delay, Task } from "std:task";
@@ -43,9 +43,9 @@ function testBytesBasics(): void {
     print("  ✔ Bytes (allocation, indexing, slicing, hex/base64, non-UTF8 binary integrity)");
 }
 
-class MockChunkReader {
-    let chunks: Bytes[];
-    let idx: int = 0;
+class MockChunkReader implements AsyncReader {
+    chunks: Bytes[];
+    idx: int = 0;
 
     constructor(chunks: Bytes[]) {
         this.chunks = chunks;
@@ -61,9 +61,9 @@ class MockChunkReader {
     }
 }
 
-class MockChunkWriter {
-    let received: Bytes[] = [];
-    let flushed: bool = false;
+class MockChunkWriter implements AsyncWriter {
+    received: Bytes[] = [];
+    flushed: bool = false;
 
     async write(chunk: Bytes): Task<int> {
         this.received.push(chunk);
@@ -73,6 +73,8 @@ class MockChunkWriter {
     async flush(): Task<void> {
         this.flushed = true;
     }
+
+    close(): void {}
 }
 
 async function testStreamPipe(): Task<void> {

@@ -34,7 +34,6 @@ Bajo las reglas arquitectónicas del lenguaje (Regla 1: Prohibición absoluta de
     - `.fill(value: int, start?: int, end?: int): Bytes`
     - `.copy(target: Bytes, targetStart?: int, sourceStart?: int, sourceEnd?: int): int`
     - `Bytes.alloc(size: int): Bytes`
-    - `Bytes.from(data: dynamic): Bytes`
     - `Bytes.fromString(s: str): Bytes`
     - `Bytes.fromBytes(bytes: int[]): Bytes`
 
@@ -47,9 +46,11 @@ Bajo las reglas arquitectónicas del lenguaje (Regla 1: Prohibición absoluta de
 
 ### 3. Contratos de Streaming I/O y Backpressure (`std:io`)
 - En `std:io`:
-  - `Reader`: Interfaz con `read(size?: int): dynamic`, `readAll(): dynamic` y `pipeTo(dst: Writer): void`.
-  - `Writer`: Interfaz con `write(content: dynamic): dynamic`.
-  - `Stream.pipe(reader, writer, bufferSize)`: Tubería asíncrona con contrapresión natural garantizada por el modelo `await`, transfiriendo chunks sin saturar memoria.
+  - `AsyncReader`: Interfaz con `read(size?: int): Task<Bytes?>`.
+  - `AsyncWriter`: Interfaz con `write(data: Bytes): Task<int>`, `flush(): Task<void>`, `close(): void`.
+  - `Reader`: Interfaz síncrona de texto con `read(size?: int): str`, `readAll(): str` y `pipeTo(dst: Writer): void`.
+  - `Writer`: Interfaz síncrona de texto con `write(content: str): void`.
+  - `Stream.pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize?: int): Task<void>`: Tubería asíncrona fuertemente tipada con contrapresión natural garantizada por el modelo `await`, transfiriendo chunks sin saturar memoria ni recurrir a `dynamic`.
 
 ## Consecuencias
 - **Transparencia Binaria 100%**: Cualquier secuencia binaria arbitraria (incluyendo bytes nulos `0x00`, `0x80..0xFF`) se transmite y manipula sin alteración.

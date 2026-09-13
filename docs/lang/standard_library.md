@@ -144,8 +144,7 @@ bi.toFloat()    // float
 // Creación y fábrica
 const b = Bytes.alloc(1024)             // Bytes: asigna 1024 bytes inicializados a cero
 const fromStr = Bytes.fromString("Varn") // Bytes: a partir de texto UTF-8
-const fromArr = Bytes.fromBytes([0, 255])// Bytes: a partir de array numérico
-const b2 = Bytes.from(data)             // Bytes: conversión genérica
+const fromArr = Bytes.fromBytes([0, 255])// Bytes: a partir de array numérico int[]
 
 // Indexación directa (0..255)
 b[0] = 65                               // asignación por índice
@@ -715,9 +714,20 @@ if (ws.readyState === WebSocketReadyState.Open) {
 > Fuente: `tests/112-canonical-bytes-and-streams.vn`
 
 ```varn
-import { Stream, Reader, Writer } from "std:io";
+import { Stream, AsyncReader, AsyncWriter, Reader, Writer } from "std:io";
 
-// Tubería asíncrona con contrapresión garantizada mediante await
+// Contratos asíncronos para streaming binario de alto rendimiento
+export interface AsyncReader {
+    read(size?: int): Task<Bytes?>;
+}
+
+export interface AsyncWriter {
+    write(data: Bytes): Task<int>;
+    flush(): Task<void>;
+    close(): void;
+}
+
+// Tubería asíncrona fuertemente tipada con contrapresión garantizada mediante await
 await Stream.pipe(reader, writer, 4096);
 ```
 

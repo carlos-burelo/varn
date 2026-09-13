@@ -27,29 +27,34 @@ export async function readHttpRequest(connId: int, maxContentLength: int = 10485
     let keepReading = true;
     while (keepReading) {
         let chunk = await tcpRead$(connId, 4096);
-        if (chunk.length > 0) {
-            raw = raw + chunk;
-            if (raw.length > maxContentLength + 65536) {
-                throw new Error("413 Payload Too Large");
-            }
-            req = parseRawRequest(raw);
-            if (req !== null) {
-                let contentLenStr = req.headers["content-length"];
-                if (contentLenStr !== null) {
-                    let contentLen = int.parse(contentLenStr);
-                    if (contentLen > maxContentLength) {
-                        throw new Error("413 Payload Too Large");
-                    }
-                    if (req.body.length >= contentLen) {
-                        req.body = req.body.slice(0, contentLen);
+        if (chunk === null) {
+            keepReading = false;
+        } else {
+            let b = chunk as Bytes;
+            if (b.length > 0) {
+                raw = raw + b.toString();
+                if (raw.length > maxContentLength + 65536) {
+                    throw new Error("413 Payload Too Large");
+                }
+                req = parseRawRequest(raw);
+                if (req !== null) {
+                    let contentLenStr = req.headers["content-length"];
+                    if (contentLenStr !== null) {
+                        let contentLen = int.parse(contentLenStr);
+                        if (contentLen > maxContentLength) {
+                            throw new Error("413 Payload Too Large");
+                        }
+                        if (req.body.length >= contentLen) {
+                            req.body = req.body.slice(0, contentLen);
+                            keepReading = false;
+                        }
+                    } else {
                         keepReading = false;
                     }
-                } else {
-                    keepReading = false;
                 }
+            } else {
+                keepReading = false;
             }
-        } else {
-            keepReading = false;
         }
     }
     return req;

@@ -8,30 +8,26 @@ import {
     tcpCloseListener$
 } from "runtime:net";
 
-import { Reader, Writer } from "std:io";
+import { AsyncReader, AsyncWriter } from "std:io";
 
-export class TcpStream {
+export class TcpStream implements AsyncReader, AsyncWriter {
     private _connId: int;
     private _remoteHost: str;
     private _remotePort: int;
-    private _isOpen: bool;
+    private _isOpen: bool = true;
 
     constructor(connId: int, remoteHost: str = "127.0.0.1", remotePort: int = 0) {
         this._connId = connId;
         this._remoteHost = remoteHost;
         this._remotePort = remotePort;
-        this._isOpen = connId >= 0;
     }
 
     static async connect(host: str, port: int): Task<TcpStream> {
         let connId = await tcpConnect$(host, port);
-        if (connId < 0) {
-            throw new Error("TcpConnectError: Could not connect to " + host + ":" + port);
-        }
         return new TcpStream(connId, host, port);
     }
 
-    get id(): int {
+    get connId(): int {
         return this._connId;
     }
 
@@ -51,11 +47,7 @@ export class TcpStream {
         if (!this._isOpen) {
             return null;
         }
-        let raw: dynamic = await tcpRead$(this._connId, size);
-        if (raw === null) {
-            return null;
-        }
-        return raw as Bytes;
+        return await tcpRead$(this._connId, size);
     }
 
     async readText(size: int = 4096): Task<str> {
@@ -92,15 +84,12 @@ export class TcpStream {
         return merged;
     }
 
-    async write(data: dynamic): Task<int> {
+    async write(data: Bytes | str): Task<int> {
         if (!this._isOpen) {
             throw new Error("TcpWriteError: Socket is closed");
         }
-        let payload: dynamic = data;
-        if (typeof data === "object" && data !== null && (data as dynamic)._inner !== null) {
-            payload = (data as dynamic)._inner;
-        }
-        let written = await tcpWrite$(this._connId, payload);
+        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let written = await tcpWrite$(this._connId, b);
         if (written < 0) {
             this.close();
             throw new Error("TcpWriteError: Failed to write to socket");
@@ -108,27 +97,16 @@ export class TcpStream {
         return written;
     }
 
-    async writeAll(data: dynamic): Task<void> {
-        if (typeof data === "str") {
-            let remaining: str = data as str;
-            while (remaining.length > 0) {
-                let written = await this.write(remaining);
-                if (written <= 0) {
-                    break;
-                }
-                remaining = remaining.slice(written);
+    async writeAll(data: Bytes | str): Task<void> {
+        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let offset = 0;
+        while (offset < b.length) {
+            let chunk = b.slice(offset, b.length);
+            let written = await this.write(chunk);
+            if (written <= 0) {
+                break;
             }
-        } else {
-            let b: Bytes = Bytes.from(data);
-            let offset = 0;
-            while (offset < b.length) {
-                let chunk = b.slice(offset, b.length);
-                let written = await this.write(chunk);
-                if (written <= 0) {
-                    break;
-                }
-                offset = offset + written;
-            }
+            offset = offset + written;
         }
     }
 

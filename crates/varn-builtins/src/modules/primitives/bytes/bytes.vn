@@ -11,7 +11,6 @@ export declare class Bytes {
     copy(target: Bytes, targetStart?: int, sourceStart?: int, sourceEnd?: int): int;
 
     static alloc(size: int): Bytes;
-    static from(data: dynamic): Bytes;
     static fromString(s: str): Bytes;
     static fromBytes(bytes: int[]): Bytes;
 }

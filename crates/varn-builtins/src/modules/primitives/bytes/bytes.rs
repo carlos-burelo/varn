@@ -85,26 +85,6 @@ varn_contract! {
             ctx.alloc_buffer(size.max(0) as usize)
         }
 
-        fn from(ctx: &mut dyn NativeCtx, data: VmValue) -> VmValue {
-            if ctx.is_string(data) {
-                let s = ctx.str_repr(data);
-                ctx.alloc_buffer_from_bytes(s.as_bytes())
-            } else if ctx.is_buffer(data) {
-                data
-            } else if ctx.is_array(data) {
-                let len = ctx.array_len(data);
-                let mut raw = Vec::with_capacity(len);
-                for i in 0..len {
-                    if let Some(v) = ctx.array_get(data, i) {
-                        raw.push(ctx.as_int(v) as u8);
-                    }
-                }
-                ctx.alloc_buffer_from_bytes(&raw)
-            } else {
-                ctx.alloc_buffer(0)
-            }
-        }
-
         fn fromString(ctx: &mut dyn NativeCtx, s: &str) -> VmValue {
             ctx.alloc_buffer_from_bytes(s.as_bytes())
         }

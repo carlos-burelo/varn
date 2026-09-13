@@ -11,8 +11,18 @@ export {
 
 import { Task } from "std:task";
 
+export interface AsyncReader {
+    read(size?: int): Task<Bytes?>;
+}
+
+export interface AsyncWriter {
+    write(data: Bytes): Task<int>;
+    flush(): Task<void>;
+    close(): void;
+}
+
 export class Stream {
-    static async pipe(reader: dynamic, writer: dynamic, bufferSize: int = 4096): Task<void> {
+    static async pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize: int = 4096): Task<void> {
         let running = true;
         while (running) {
             let chunk = await reader.read(bufferSize);

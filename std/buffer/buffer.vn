@@ -1,5 +1,5 @@
 export class Buffer {
-    let _inner: Bytes;
+    private _inner: Bytes;
 
     constructor(inner: Bytes) {
         this._inner = inner;
@@ -9,8 +9,12 @@ export class Buffer {
         return new Buffer(Bytes.alloc(size));
     }
 
-    static from(data: dynamic): Buffer {
-        return new Buffer(Bytes.from(data));
+    static fromString(s: str): Buffer {
+        return new Buffer(Bytes.fromString(s));
+    }
+
+    static fromBytes(bytes: int[]): Buffer {
+        return new Buffer(Bytes.fromBytes(bytes));
     }
 
     get length(): int {
