@@ -107,6 +107,7 @@ impl HeapInner {
             Value::Range(r) => VmValue::from_heap_idx(self.alloc(HeapObj::Range(*r))),
             Value::Symbol(s) => self.alloc_symbol(s),
             Value::EnumVariant(e) => VmValue::from_heap_idx(self.alloc(HeapObj::EnumVariant(e))),
+            Value::Buffer(b) => self.alloc_vm_buffer(b),
             Value::Spread(v) => {
                 let inner = self.intern(*v);
                 VmValue::from_heap_idx(self.alloc(HeapObj::Spread(inner)))
@@ -200,7 +201,7 @@ impl HeapInner {
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
                 HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),
-                HeapObj::Buffer(_) => Value::VmValue(Box::new(VmValueRef(nv))),
+                HeapObj::Buffer(b) => Value::Buffer(b.clone()),
                 HeapObj::FrozenModule(_) => Value::Null,
             });
         }

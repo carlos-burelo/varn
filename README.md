@@ -26,6 +26,7 @@
 ## ⚡ Aspectos Destacados
 
 * **Tipado Estático Estricto y Bidireccional**: Inferencia de tipos sin sobrecarga en runtime, análisis de flujo de control (CFA), exhaustividad garantizada y cero coerción implícita de tipos.
+* **Memoria y Streaming Canónico (`Bytes`, `Stream`)**: Tipo de valor/referencia de primera clase `Bytes` con indexación nativa, slicing zero-copy, transparencia binaria 100% (cero corrupción UTF-8 en sockets) y tuberías asíncronas con contrapresión (`Stream.pipe`).
 * **VM de Registros con `VmValue` de 128 bits**: Representación canónica de dos palabras (`tag` + `payload`) con enteros `int` nativos de 64 bits, flotantes `float` IEEE 754, `bool`, `char` y *Small String Optimization* (SSO de hasta 5 bytes inline sin tocar el heap).
 * **Compilación Nativa JIT Multi-ISA**: Generación de código máquina nativo para hot paths mediante backend Cranelift con fast-paths optimizados, hoisting de comprobaciones de límites y fallback transparente al intérprete.
 * **Pipeline TIR & SSA Optimizado**: Lowering canónico a *Typed Intermediate Representation* (TIR), construcción SSA, eliminación de bloques inalcanzables (DCE), movimiento de código invariante de bucles (LICM) y reemplazo escalar de agregados (SROA).

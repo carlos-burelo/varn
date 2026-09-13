@@ -88,6 +88,10 @@ pub trait NativeCtx {
     fn buffer_to_string(&self, _v: VmValue) -> Option<String> {
         None
     }
+
+    fn buffer_to_bytes(&self, _v: VmValue) -> Option<Vec<u8>> {
+        None
+    }
     fn is_object(&self, _v: VmValue) -> bool {
         false
     }

@@ -50,21 +50,26 @@ export async function readHttpResponse(connId: int): Task<RawResponse?> {
     let resp: RawResponse? = null;
     let keepReading = true;
     while (keepReading) {
-        let chunk = await tcpRead$(connId, 4096);
-        if (chunk.length > 0) {
-            raw = raw + chunk;
-            resp = parseRawResponse(raw);
-            if (resp !== null) {
-                let contentLenStr = resp.headers["content-length"];
-                if (contentLenStr !== null) {
-                    let contentLen = int.parse(contentLenStr);
-                    if (resp.body.length >= contentLen) {
-                        resp.body = resp.body.slice(0, contentLen);
+        let chunk: dynamic = await tcpRead$(connId, 4096);
+        if (chunk !== null) {
+            let chunkStr = typeof chunk === "str" ? (chunk as str) : (new Bytes(chunk)).toString();
+            if (chunkStr.length > 0) {
+                raw = raw + chunkStr;
+                resp = parseRawResponse(raw);
+                if (resp !== null) {
+                    let contentLenStr = resp.headers["content-length"];
+                    if (contentLenStr !== null) {
+                        let contentLen = int.parse(contentLenStr);
+                        if (resp.body.length >= contentLen) {
+                            resp.body = resp.body.slice(0, contentLen);
+                            keepReading = false;
+                        }
+                    } else {
                         keepReading = false;
                     }
-                } else {
-                    keepReading = false;
                 }
+            } else {
+                keepReading = false;
             }
         } else {
             keepReading = false;
@@ -222,6 +227,10 @@ export class Response {
 
     text(): str {
         return this.body;
+    }
+
+    bytes(): Bytes {
+        return Bytes.fromString(this.body);
     }
 
     json(): Json {

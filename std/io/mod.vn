@@ -1,7 +1,6 @@
-
 export {
-    Writer,
     Reader,
+    Writer,
     write,
     writeln,
     print,
@@ -9,3 +8,23 @@ export {
     readLine,
     readAll
 } from "std:io/stream";
+
+import { Task } from "std:task";
+
+export class Stream {
+    static async pipe(reader: dynamic, writer: dynamic, bufferSize: int = 4096): Task<void> {
+        let running = true;
+        while (running) {
+            let chunk = await reader.read(bufferSize);
+            if (chunk === null) {
+                break;
+            }
+            let b = chunk as Bytes;
+            if (b.length === 0) {
+                break;
+            }
+            await writer.write(b);
+        }
+        await writer.flush();
+    }
+}

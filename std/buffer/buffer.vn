@@ -1,49 +1,35 @@
-import {
-    alloc$,
-    fromBytes$,
-    fromString$,
-    len$,
-    getByte$,
-    setByte$,
-    slice$,
-    toString$
-} from "runtime:buffer";
-
 export class Buffer {
-    let _inner: dynamic;
+    let _inner: Bytes;
 
-    constructor(inner: dynamic) {
+    constructor(inner: Bytes) {
         this._inner = inner;
     }
 
     static alloc(size: int): Buffer {
-        return new Buffer(alloc$(size));
+        return new Buffer(Bytes.alloc(size));
     }
 
     static from(data: dynamic): Buffer {
-        if (typeof data == "str") {
-            return new Buffer(fromString$(data as str));
-        }
-        return new Buffer(fromBytes$(data as int[]));
+        return new Buffer(Bytes.from(data));
     }
 
     get length(): int {
-        return len$(this._inner);
+        return this._inner.length;
     }
 
     getByte(index: int): int {
-        return getByte$(this._inner, index);
+        return this._inner.getByte(index);
     }
 
     setByte(index: int, value: int): void {
-        setByte$(this._inner, index, value);
+        this._inner.setByte(index, value);
     }
 
     slice(start: int, end: int): Buffer {
-        return new Buffer(slice$(this._inner, start, end));
+        return new Buffer(this._inner.slice(start, end));
     }
 
     toString(): str {
-        return toString$(this._inner);
+        return this._inner.toString();
     }
 }

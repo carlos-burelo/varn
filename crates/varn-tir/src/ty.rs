@@ -69,6 +69,7 @@ pub enum BackendTy {
     Char,
     // References with a known type.
     Str,
+    Bytes,
     Decimal,
     BigInt,
     Array(TyId),

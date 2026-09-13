@@ -136,6 +136,35 @@ bi.toInt()      // int
 bi.toFloat()    // float
 ```
 
+### `Bytes` — Bloque Canónico de Bytes Crudos
+
+> Fuente: `tests/112-canonical-bytes-and-streams.vn`
+
+```varn
+// Creación y fábrica
+const b = Bytes.alloc(1024)             // Bytes: asigna 1024 bytes inicializados a cero
+const fromStr = Bytes.fromString("Varn") // Bytes: a partir de texto UTF-8
+const fromArr = Bytes.fromBytes([0, 255])// Bytes: a partir de array numérico
+const b2 = Bytes.from(data)             // Bytes: conversión genérica
+
+// Indexación directa (0..255)
+b[0] = 65                               // asignación por índice
+const val = b[0]                        // int: 65
+
+// Inspección y slicing zero-copy
+b.length                                // int: tamaño en bytes
+b.getByte(index)                        // int: lectura segura
+b.setByte(index, val)                   // void: escritura de byte
+b.slice(start, end)                     // Bytes: sub-bloque sin copias
+b.copy(target, targetStart, srcStart)   // int: copia eficiente entre buffers
+
+// Formatos y representaciones
+b.toString()                            // str: decodificación UTF-8
+b.toHex()                               // str: representación hexadecimal ("48656c6c6f")
+b.toBase64()                            // str: codificación Base64 ("SGVsbG8=")
+b.fill(255)                             // Bytes: llena con valor byte
+```
+
 ---
 
 ## 2. Array — Métodos de Colección
@@ -678,3 +707,17 @@ if (ws.readyState === WebSocketReadyState.Open) {
     ws.send("ping");
 }
 ```
+
+---
+
+## 32. `std:io` — Streaming E/S con Backpressure
+
+> Fuente: `tests/112-canonical-bytes-and-streams.vn`
+
+```varn
+import { Stream, Reader, Writer } from "std:io";
+
+// Tubería asíncrona con contrapresión garantizada mediante await
+await Stream.pipe(reader, writer, 4096);
+```
+

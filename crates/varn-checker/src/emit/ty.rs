@@ -164,6 +164,7 @@ fn lower_tag(tag: TypeTag) -> BackendTy {
         TypeTag::Bool => BackendTy::Bool,
         TypeTag::Char => BackendTy::Char,
         TypeTag::Str => BackendTy::Str,
+        TypeTag::Bytes => BackendTy::Bytes,
         TypeTag::Decimal => BackendTy::Decimal,
         TypeTag::BigInt => BackendTy::BigInt,
         TypeTag::Void => BackendTy::Void,

@@ -1,0 +1,15 @@
+import { TcpListener } from "std:net";
+
+async function main() {
+    let listener = TcpListener.listen(19877);
+    let client = await listener.accept();
+    let data = await client.read(1024);
+    if (data !== null) {
+        let b = data as Bytes;
+        await client.writeAll(b);
+    }
+    client.close();
+    listener.close();
+}
+
+await main();

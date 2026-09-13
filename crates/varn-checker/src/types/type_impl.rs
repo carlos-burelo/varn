@@ -24,6 +24,7 @@ impl Type {
     pub const U64: Type = Type(TypeKind::Intrinsic(TypeTag::U64), false);
     pub const F32: Type = Type(TypeKind::Intrinsic(TypeTag::F32), false);
     pub const This: Type = Type(TypeKind::This, false);
+    pub const Bytes: Type = Type(TypeKind::Intrinsic(TypeTag::Bytes), false);
     pub fn intrinsic(tag: TypeTag) -> Self {
         Type(TypeKind::Intrinsic(tag), false)
     }
@@ -133,6 +134,7 @@ impl Type {
                 TypeTag::Char => Some(I::Char.as_str()),
                 TypeTag::Bool => Some(I::Bool.as_str()),
                 TypeTag::Symbol => Some(I::Symbol.as_str()),
+                TypeTag::Bytes => Some(I::Bytes.as_str()),
                 _ => None,
             },
             TypeKind::Array(_) => Some(I::Array.as_str()),
@@ -195,6 +197,9 @@ impl Type {
     }
     pub fn is_str(&self) -> bool {
         matches!(self.0, TypeKind::Intrinsic(TypeTag::Str))
+    }
+    pub fn is_bytes(&self) -> bool {
+        matches!(self.0, TypeKind::Intrinsic(TypeTag::Bytes))
     }
     pub fn is_bool(&self) -> bool {
         matches!(self.0, TypeKind::Intrinsic(TypeTag::Bool))

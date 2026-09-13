@@ -89,6 +89,21 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
+            TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+                if key == varn_core::MemberKey::Length.as_str() {
+                    return true;
+                }
+                if let Some(b) = &bind.core {
+                    if let Some(members) =
+                        b.class_members.get(varn_core::IntrinsicType::Bytes.as_str())
+                    {
+                        if members.members.iter().any(|m| m.name.as_ref() == key) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
             TypeKind::Intrinsic(_) => {
                 let name = ty.to_string();
                 if let Some(b) = &bind.core {

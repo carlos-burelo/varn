@@ -27,6 +27,7 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
 
         BackendTy::Decimal
         | BackendTy::BigInt
+        | BackendTy::Bytes
         | BackendTy::Tuple(_)
         | BackendTy::Enum(_)
         | BackendTy::Fn(_) => HirType::Ref,

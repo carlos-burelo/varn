@@ -303,6 +303,11 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         {
             Some(VmValue::from_int(a.len() as i64))
         }
+        Some(HeapObj::Buffer(b))
+            if key == varn_core::MemberKey::Length.as_str() =>
+        {
+            Some(VmValue::from_int(b.len() as i64))
+        }
         Some(HeapObj::Range(r)) => {
             if key == varn_core::MemberKey::Start.as_str() {
                 Some(VmValue::from_int(r.start))
@@ -420,6 +425,12 @@ fn resolve_specialized_value_property(
             }
             None
         }
+        Value::Buffer(b) => {
+            if key == varn_core::MemberKey::Length.as_str() {
+                return Some(Ok(Value::Int(b.len() as i64)));
+            }
+            None
+        }
         Value::Map(m) => {
             let found = heap
                 .lookup_str_map_key(key)
@@ -499,7 +510,7 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
                 return heap.get_intrinsic_class(IntrinsicType::Range.as_str())
             }
             Some(HeapObj::Buffer(_)) => {
-                return heap.get_intrinsic_class(IntrinsicType::Buffer.as_str())
+                return heap.get_intrinsic_class(IntrinsicType::Bytes.as_str())
             }
             Some(HeapObj::Generator(_)) => {
                 return heap.get_intrinsic_class(IntrinsicType::Generator.as_str())

@@ -298,6 +298,15 @@ impl NativeCtx for ExecCtx {
         None
     }
 
+    fn buffer_to_bytes(&self, v: VmValue) -> Option<Vec<u8>> {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                return Some(b.as_slice().to_vec());
+            }
+        }
+        None
+    }
+
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
         let orig_len = self.stack.len();
         self.stack.push(callee);

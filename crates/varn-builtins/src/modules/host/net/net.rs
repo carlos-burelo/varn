@@ -58,8 +58,15 @@ varn_contract! {
             Ok(ctx.intern(Value::TaskHandle(task)))
         }
 
-        fn tcpWrite(ctx: &mut dyn NativeCtx, conn_id: i64, data: &str) -> Result<VmValue, String> {
-            let task = driver().write(conn_id, data.as_bytes().to_vec());
+        fn tcpWrite(ctx: &mut dyn NativeCtx, conn_id: i64, data: VmValue) -> Result<VmValue, String> {
+            let bytes = if ctx.is_buffer(data) {
+                ctx.buffer_to_bytes(data).unwrap_or_default()
+            } else if let Some(s) = ctx.str_owned(data) {
+                s.into_bytes()
+            } else {
+                ctx.str_repr(data).into_bytes()
+            };
+            let task = driver().write(conn_id, bytes);
             Ok(ctx.intern(Value::TaskHandle(task)))
         }
 

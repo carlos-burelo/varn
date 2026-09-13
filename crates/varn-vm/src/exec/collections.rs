@@ -220,6 +220,16 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             let val = a.get_vm(idx).unwrap_or(VmValue::null());
             return Ok(val);
         }
+        if let Some(HeapObj::Buffer(b)) = heap.get(obj.as_heap_idx()) {
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                heap.as_int(key) as usize
+            };
+            let slice = b.as_slice();
+            let val = slice.get(idx).map(|&byte| VmValue::from_int(byte as i64)).unwrap_or(VmValue::null());
+            return Ok(val);
+        }
     }
     if obj.is_sso() {
         let mut buf = [0u8; 5];
@@ -349,6 +359,13 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             }
             m.borrow_mut().insert(k, val);
             heap.write_barrier(heap_idx, val);
+            Ok(())
+        }
+        Some(HeapObj::Buffer(b)) => {
+            let mut slice = b.as_mut_slice();
+            if idx_i < slice.len() {
+                slice[idx_i] = heap.as_int(val) as u8;
+            }
             Ok(())
         }
         _ => Err(RuntimeError::new("OpSetIndex: not indexable")),

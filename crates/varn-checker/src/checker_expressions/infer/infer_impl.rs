@@ -455,10 +455,18 @@ impl<'r> Checker<'r> {
             TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => {
                 Type::Str
             }
+            TypeKind::Intrinsic(TypeTag::Bytes) if prop_ty.is_int() => {
+                Type::Int
+            }
             TypeKind::Named(name, _)
                 if name.as_ref() == IntrinsicType::Str.as_str() && prop_ty.is_int() =>
             {
                 Type::Str
+            }
+            TypeKind::Named(name, _)
+                if name.as_ref() == IntrinsicType::Bytes.as_str() && prop_ty.is_int() =>
+            {
+                Type::Int
             }
             TypeKind::Generic(name, args, _)
                 if name.as_ref() == IntrinsicType::Map.as_str() =>

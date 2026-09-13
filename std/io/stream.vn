@@ -1,13 +1,13 @@
 import { write$, writeln$, flush$, readLine$ } from "runtime:io";
 
 export interface Writer {
-    write(content: str): void
+    write(content: dynamic): dynamic;
 }
 
 export interface Reader {
-    read(size?: int): str
-    readAll(): str
-    pipeTo(dst: Writer): void
+    read(size?: int): dynamic;
+    readAll(): dynamic;
+    pipeTo(dst: Writer): void;
 }
 
 export function write(...args: dynamic[]): void {

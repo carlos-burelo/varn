@@ -47,6 +47,7 @@ impl Value {
             Value::Float(d) => Ok(*d != 0.0 && !d.is_nan()),
             Value::Str(s) => Ok(!s.is_empty()),
             Value::Array(a) => Ok(!a.read().is_empty()),
+            Value::Buffer(b) => Ok(!b.is_empty()),
             _ => Ok(true),
         }
     }
@@ -81,6 +82,7 @@ impl Value {
             Value::Generator(_) => TypeTag::Generator,
             Value::Char(_) => TypeTag::Char,
             Value::EnumVariant(_) => TypeTag::Enum,
+            Value::Buffer(_) => TypeTag::Bytes,
             Value::VmValue(_payload) => TypeTag::VmRef,
         }
         .name()
@@ -143,6 +145,7 @@ impl std::hash::Hash for Value {
                 data.variant_tag.hash(state);
                 data.payload.hash(state);
             }
+            Value::Buffer(b) => b.len().hash(state),
             Value::VmValue(_) => {}
             Value::Module(m) => Rc::as_ptr(m).hash(state),
         }
@@ -177,7 +180,9 @@ impl PartialEq for Value {
                     && a.variant_tag == b.variant_tag
                     && a.payload == b.payload
             }
+            (Value::Buffer(a), Value::Buffer(b)) => a.as_slice().as_ref() == b.as_slice().as_ref(),
             (Value::VmValue(a), Value::VmValue(b)) => std::ptr::eq(a.as_any(), b.as_any()),
+            (Value::Module(a), Value::Module(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -278,6 +283,7 @@ impl fmt::Display for Value {
             Value::EnumVariant(data) => {
                 write!(f, "{}({})", data.variant_name, data.payload)
             }
+            Value::Buffer(b) => write!(f, "<Bytes len={}>", b.len()),
             Value::VmValue(payload) => write!(f, "{:?}", payload),
             Value::Module(m) => write!(f, "[module {}]", m.id.as_str()),
         }

@@ -2,6 +2,8 @@
 pub mod array;
 #[path = "bigint/bigint.rs"]
 pub mod bigint;
+#[path = "bytes/bytes.rs"]
+pub mod bytes;
 #[path = "bool/bool.rs"]
 pub mod bool;
 #[path = "char/char.rs"]

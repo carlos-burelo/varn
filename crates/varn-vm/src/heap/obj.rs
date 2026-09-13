@@ -79,7 +79,8 @@ impl HeapObj {
             HeapObj::Char(_) => TypeTag::Char,
             HeapObj::Generator(_) => TypeTag::Generator,
             HeapObj::Spread(_) => TypeTag::Array,
-            HeapObj::Buffer(_) | HeapObj::VmValue(_) => TypeTag::VmRef,
+            HeapObj::Buffer(_) => TypeTag::Bytes,
+            HeapObj::VmValue(_) => TypeTag::VmRef,
         }
     }
 }

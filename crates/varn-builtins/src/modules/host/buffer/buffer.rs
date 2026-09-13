@@ -71,5 +71,39 @@ varn_contract! {
             }
             ctx.buffer_to_string(buf).ok_or_else(|| "buffer.toString: invalid UTF-8".to_string())
         }
+
+        fn toHex(ctx: &mut dyn NativeCtx, buf: VmValue) -> Result<String, String> {
+            if !ctx.is_buffer(buf) {
+                return Err("buffer.toHex: argument is not a Buffer".to_string());
+            }
+            let bytes = ctx.buffer_to_bytes(buf).unwrap_or_default();
+            let mut out = String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                use std::fmt::Write;
+                let _ = write!(&mut out, "{:02x}", b);
+            }
+            Ok(out)
+        }
+
+        fn toBase64(ctx: &mut dyn NativeCtx, buf: VmValue) -> Result<String, String> {
+            if !ctx.is_buffer(buf) {
+                return Err("buffer.toBase64: argument is not a Buffer".to_string());
+            }
+            let bytes = ctx.buffer_to_bytes(buf).unwrap_or_default();
+            use base64::Engine;
+            Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+        }
+
+        fn fill(ctx: &mut dyn NativeCtx, buf: VmValue, val: i64) -> Result<(), String> {
+            if !ctx.is_buffer(buf) {
+                return Err("buffer.fill: argument is not a Buffer".to_string());
+            }
+            let len = ctx.buffer_len(buf);
+            let b = val as u8;
+            for i in 0..len {
+                ctx.buffer_set_byte(buf, i, b);
+            }
+            Ok(())
+        }
     }
 }

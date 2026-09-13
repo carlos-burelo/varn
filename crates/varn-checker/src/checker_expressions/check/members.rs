@@ -79,7 +79,7 @@ impl<'r> Checker<'r> {
                     ObjectTypeMember::Index { key_ty, .. } => Some((**key_ty).clone()),
                     _ => None,
                 }),
-                TypeKind::Array(_) => Some(Type::Int),
+                TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => Some(Type::Int),
                 _ => None,
             };
             if let Some(expected_k) = key_expected {
@@ -87,7 +87,7 @@ impl<'r> Checker<'r> {
                 let actual_k = self.infer_type(property, bind);
                 let is_range_slice = matches!(
                     check_ty.0,
-                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str)
+                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str | varn_core::TypeTag::Bytes)
                 ) && matches!(actual_k.0, TypeKind::Intrinsic(varn_core::TypeTag::Range));
                 if !actual_k.is_dynamic()
                     && !is_range_slice
@@ -242,6 +242,7 @@ impl<'r> Checker<'r> {
                     varn_core::TypeTag::Range => "core:range",
                     varn_core::TypeTag::Array => "core:array",
                     varn_core::TypeTag::Str => "core:str",
+                    varn_core::TypeTag::Bytes => "core:bytes",
                     varn_core::TypeTag::TaskHandle => "core:task",
                     _ => "core:primitives",
                 })),

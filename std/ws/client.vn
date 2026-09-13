@@ -78,11 +78,12 @@ export class WebSocket {
         return this;
     }
 
-    send(message: str): bool {
+    send(message: dynamic): bool {
         if (!this.isOpen) {
             return false;
         }
-        return wsSend$(this._id, message);
+        let msgStr = typeof message === "str" ? (message as str) : message.toString();
+        return wsSend$(this._id, msgStr);
     }
 
     receive(): str? {

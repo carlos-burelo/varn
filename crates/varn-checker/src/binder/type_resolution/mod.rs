@@ -34,6 +34,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
         TypeKind::Intrinsic(TypeTag::Null) => Type::Null,
         TypeKind::Intrinsic(TypeTag::Never) => Type::Never,
         TypeKind::Intrinsic(TypeTag::Dynamic) => Type::Dynamic,
+        TypeKind::Intrinsic(TypeTag::Bytes) => Type::Bytes,
         TypeKind::This => Type::This,
 
         TypeKind::Array(inner) => Type::array(resolve_type_node(inner, ctx)),

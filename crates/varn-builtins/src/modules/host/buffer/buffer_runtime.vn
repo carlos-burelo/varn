@@ -8,3 +8,6 @@ export declare function getByte$(buf: VmValue, index: int): int;
 export declare function setByte$(buf: VmValue, index: int, value: int): void;
 export declare function slice$(buf: VmValue, start: int, end: int): VmValue;
 export declare function toString$(buf: VmValue): str;
+export declare function toHex$(buf: VmValue): str;
+export declare function toBase64$(buf: VmValue): str;
+export declare function fill$(buf: VmValue, value: int): void;

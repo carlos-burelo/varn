@@ -403,6 +403,13 @@ impl<'r> Checker<'r> {
                     intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
                 }
             }
+            TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+                if key == varn_core::MemberKey::Length.as_str() {
+                    Some((Type::Int, None))
+                } else {
+                    intrinsic_member_info(bind, varn_core::IntrinsicType::Bytes.as_str(), key)
+                }
+            }
             // A tuple's length is known at check time — it is the arity of the
             // type itself. The runtime has always answered `.length` on a
             // tuple (the heap stores it as an array; `is_array` accepts

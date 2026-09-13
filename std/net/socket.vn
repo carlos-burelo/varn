@@ -8,6 +8,8 @@ import {
     tcpCloseListener$
 } from "runtime:net";
 
+import { Reader, Writer } from "std:io";
+
 export class TcpStream {
     private _connId: int;
     private _remoteHost: str;
@@ -45,34 +47,60 @@ export class TcpStream {
         return this._isOpen;
     }
 
-    async read(size: int = 4096): Task<str> {
+    async read(size: int = 4096): Task<Bytes?> {
         if (!this._isOpen) {
-            return "";
+            return null;
         }
-        let data = await tcpRead$(this._connId, size);
-        if (data.length === 0) {
-            return "";
+        let raw: dynamic = await tcpRead$(this._connId, size);
+        if (raw === null) {
+            return null;
         }
-        return data;
+        return raw as Bytes;
     }
 
-    async readAll(): Task<str> {
-        let result: str = "";
+    async readText(size: int = 4096): Task<str> {
+        let b = await this.read(size);
+        if (b === null) {
+            return "";
+        }
+        let valid = b as Bytes;
+        return valid.toString();
+    }
+
+    async readAll(): Task<Bytes> {
+        let chunks: Bytes[] = [];
+        let totalLen = 0;
         while (this._isOpen) {
             let chunk = await this.read(4096);
-            if (chunk.length === 0) {
+            if (chunk === null) {
                 break;
             }
-            result = result + chunk;
+            let valid = chunk as Bytes;
+            if (valid.length === 0) {
+                break;
+            }
+            chunks.push(valid);
+            totalLen = totalLen + valid.length;
         }
-        return result;
+        let merged = Bytes.alloc(totalLen);
+        let offset = 0;
+        for (let i = 0; i < chunks.length; i = i + 1) {
+            let c = chunks[i];
+            c.copy(merged, offset);
+            offset = offset + c.length;
+        }
+        return merged;
     }
 
-    async write(data: str): Task<int> {
+    async write(data: dynamic): Task<int> {
         if (!this._isOpen) {
             throw new Error("TcpWriteError: Socket is closed");
         }
-        let written = await tcpWrite$(this._connId, data);
+        let payload: dynamic = data;
+        if (typeof data === "object" && data !== null && (data as dynamic)._inner !== null) {
+            payload = (data as dynamic)._inner;
+        }
+        let written = await tcpWrite$(this._connId, payload);
         if (written < 0) {
             this.close();
             throw new Error("TcpWriteError: Failed to write to socket");
@@ -80,16 +108,31 @@ export class TcpStream {
         return written;
     }
 
-    async writeAll(data: str): Task<void> {
-        let remaining = data;
-        while (remaining.length > 0) {
-            let written = await this.write(remaining);
-            if (written <= 0) {
-                break;
+    async writeAll(data: dynamic): Task<void> {
+        if (typeof data === "str") {
+            let remaining: str = data as str;
+            while (remaining.length > 0) {
+                let written = await this.write(remaining);
+                if (written <= 0) {
+                    break;
+                }
+                remaining = remaining.slice(written);
             }
-            remaining = remaining.slice(written);
+        } else {
+            let b: Bytes = Bytes.from(data);
+            let offset = 0;
+            while (offset < b.length) {
+                let chunk = b.slice(offset, b.length);
+                let written = await this.write(chunk);
+                if (written <= 0) {
+                    break;
+                }
+                offset = offset + written;
+            }
         }
     }
+
+    async flush(): Task<void> {}
 
     close(): void {
         if (this._isOpen) {

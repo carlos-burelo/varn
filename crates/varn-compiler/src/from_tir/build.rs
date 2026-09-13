@@ -1476,6 +1476,7 @@ fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
         BackendTy::Float => T::Float,
         BackendTy::Bool => T::Bool,
         BackendTy::Str => T::Str,
+        BackendTy::Bytes => T::Bytes,
         BackendTy::Char => T::Char,
         BackendTy::Decimal => T::Decimal,
         BackendTy::BigInt => T::BigInt,

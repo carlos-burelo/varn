@@ -20,7 +20,7 @@ async function testTcpSockets(): Task<void> {
     assertEqual(clientSock.remotePort, testPort);
 
     await clientSock.writeAll("varn_test\n");
-    let echoMsg = await clientSock.read();
+    let echoMsg = await clientSock.readText();
     assertEqual(echoMsg.trim(), "ECHO:varn_test");
     clientSock.close();
 

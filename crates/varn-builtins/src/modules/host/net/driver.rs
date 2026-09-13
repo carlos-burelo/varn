@@ -246,17 +246,19 @@ impl IoDriver {
                         if let Some(pr) = stream_state.pending_read.take() {
                             let mut buf = vec![0u8; pr.len];
                             match stream_state.stream.read(&mut buf) {
+                                Ok(0) => {
+                                    pr.task.settle(Ok(Value::Null));
+                                }
                                 Ok(n) => {
                                     buf.truncate(n);
-                                    let s = String::from_utf8_lossy(&buf).into_owned();
-                                    pr.task
-                                        .settle(Ok(Value::Str(std::rc::Rc::from(s.as_str()))));
+                                    let vm_buf = varn_types::VmBuffer::from_bytes(&buf);
+                                    pr.task.settle(Ok(Value::Buffer(vm_buf)));
                                 }
                                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                     stream_state.pending_read = Some(pr);
                                 }
                                 Err(_) => {
-                                    pr.task.settle(Ok(Value::Str(std::rc::Rc::from(""))));
+                                    pr.task.settle(Ok(Value::Null));
                                 }
                             }
                         }
@@ -407,7 +409,7 @@ impl IoDriver {
             Some(s) => s,
             None => {
                 let t = AsyncTask::pending();
-                t.settle(Ok(Value::Str(std::rc::Rc::from(""))));
+                t.settle(Ok(Value::Null));
                 return t;
             }
         };
@@ -415,11 +417,11 @@ impl IoDriver {
         // Fast path: try immediate non-blocking read
         let mut buf = vec![0u8; len];
         match stream_state.stream.read(&mut buf) {
-            Ok(0) => AsyncTask::resolved(Value::Str(std::rc::Rc::from(""))),
+            Ok(0) => AsyncTask::resolved(Value::Null),
             Ok(n) => {
                 buf.truncate(n);
-                let s = String::from_utf8_lossy(&buf).into_owned();
-                AsyncTask::resolved(Value::Str(std::rc::Rc::from(s.as_str())))
+                let vm_buf = varn_types::VmBuffer::from_bytes(&buf);
+                AsyncTask::resolved(Value::Buffer(vm_buf))
             }
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 let task = AsyncTask::pending();
@@ -431,7 +433,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(_) => AsyncTask::resolved(Value::Str(std::rc::Rc::from(""))),
+            Err(_) => AsyncTask::resolved(Value::Null),
         }
     }
 
