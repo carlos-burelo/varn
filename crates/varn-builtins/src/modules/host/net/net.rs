@@ -127,5 +127,70 @@ varn_contract! {
             let task = driver().write(conn_id, out);
             Ok(ctx.intern(Value::TaskHandle(task)))
         }
+
+        fn udpBind(ctx: &mut dyn NativeCtx, host: &str, port: i64) -> Result<i64, String> {
+            if !ctx.check_net_listen(port) {
+                return Err(format!("SecurityError: Permission denied (net.listen) on port {port}"));
+            }
+            let addr = format!("{host}:{port}");
+            let socket = std::net::UdpSocket::bind(&addr).map_err(|e| format!("udpBind error: {e}"))?;
+            let id = NEXT_UDP_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            UDP_SOCKETS.write().unwrap().insert(id, std::sync::Arc::new(socket));
+            Ok(id)
+        }
+
+        fn udpSendTo(ctx: &mut dyn NativeCtx, socket_id: i64, host: &str, port: i64, data: VmValue) -> Result<i64, String> {
+            let sock = {
+                let map = UDP_SOCKETS.read().unwrap();
+                map.get(&socket_id).cloned().ok_or_else(|| format!("invalid UDP socket id {socket_id}"))?
+            };
+            let bytes = if ctx.is_buffer(data) {
+                ctx.buffer_to_bytes(data).unwrap_or_default()
+            } else if let Some(s) = ctx.str_owned(data) {
+                s.into_bytes()
+            } else {
+                ctx.str_repr(data).into_bytes()
+            };
+            let addr = format!("{host}:{port}");
+            let sent = sock.send_to(&bytes, &addr).map_err(|e| format!("udpSendTo error: {e}"))?;
+            Ok(sent as i64)
+        }
+
+        fn udpRecvFrom(ctx: &mut dyn NativeCtx, socket_id: i64, max_len: i64) -> Result<VmValue, String> {
+            let sock = {
+                let map = UDP_SOCKETS.read().unwrap();
+                map.get(&socket_id).cloned().ok_or_else(|| format!("invalid UDP socket id {socket_id}"))?
+            };
+            let task = varn_types::AsyncTask::pending();
+            let task_clone = task.clone();
+            std::thread::spawn(move || {
+                let mut buf = vec![0u8; max_len.max(64) as usize];
+                match sock.recv_from(&mut buf) {
+                    Ok((amt, src_addr)) => {
+                        buf.truncate(amt);
+                        let host_rc = std::rc::Rc::from(src_addr.ip().to_string().as_str());
+                        let packet_val = varn_types::value::new_array(vec![
+                            Value::Buffer(varn_types::VmBuffer::from_bytes(&buf)),
+                            Value::Str(host_rc),
+                            Value::Int(src_addr.port() as i64),
+                        ]);
+                        task_clone.settle(Ok(packet_val));
+                    }
+                    Err(_) => {
+                        task_clone.settle(Ok(Value::Null));
+                    }
+                }
+            });
+            Ok(ctx.intern(Value::TaskHandle(task)))
+        }
+
+        fn udpClose(_ctx: &mut dyn NativeCtx, socket_id: i64) -> Result<(), String> {
+            UDP_SOCKETS.write().unwrap().remove(&socket_id);
+            Ok(())
+        }
     }
 }
+
+static NEXT_UDP_ID: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
+static UDP_SOCKETS: std::sync::LazyLock<std::sync::RwLock<std::collections::HashMap<i64, std::sync::Arc<std::net::UdpSocket>>>> =
+    std::sync::LazyLock::new(|| std::sync::RwLock::new(std::collections::HashMap::new()));

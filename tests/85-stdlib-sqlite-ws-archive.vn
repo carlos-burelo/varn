@@ -44,12 +44,12 @@ describe("Level 1 StdLib Enhancements", () => {
         let gz = Compress.gzip(text);
         expect(gz.length > 0).toBe(true);
         let gunzipped = Compress.gunzip(gz);
-        assertEqual(gunzipped, text);
+        assertEqual(gunzipped.toString(), text);
 
         let def = Compress.deflate(text);
         expect(def.length > 0).toBe(true);
         let inflated = Compress.inflate(def);
-        assertEqual(inflated, text);
+        assertEqual(inflated.toString(), text);
 
         // Tar and Zip archive tests
         let testDir = "./tmp_test_archive";

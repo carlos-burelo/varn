@@ -22,7 +22,8 @@ export interface AsyncWriter {
 }
 
 export class Stream {
-    static async pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize: int = 4096): Task<void> {
+    static async pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize: int = 4096): Task<int> {
+        let total = 0;
         let running = true;
         while (running) {
             let chunk = await reader.read(bufferSize);
@@ -33,8 +34,10 @@ export class Stream {
             if (b.length === 0) {
                 break;
             }
-            await writer.write(b);
+            let written = await writer.write(b);
+            total = total + written;
         }
         await writer.flush();
+        return total;
     }
 }

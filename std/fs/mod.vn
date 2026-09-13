@@ -1,11 +1,13 @@
 
 export { Stats } from "std:fs/stats";
-export { File } from "std:fs/file";
+export { File, FileStream } from "std:fs/file";
 export {
     read,
     readText,
+    readBytes,
     write,
     writeText,
+    writeBytes,
     appendText,
     exists,
     stat,

@@ -9,7 +9,11 @@ export interface RawStats {
 
 export declare function open$(path: str, mode: str): int;
 export declare function readFd$(fd: int, len: int): str;
+export declare function readFdBytes$(fd: int, len: int): Bytes;
 export declare function writeFd$(fd: int, data: str): int;
+export declare function writeFdBytes$(fd: int, data: Bytes): int;
+export declare function readFileBytes$(path: str): Bytes;
+export declare function writeFileBytes$(path: str, data: Bytes): void;
 export declare function seek$(fd: int, offset: int, whence: int): int;
 export declare function close$(fd: int): void;
 export declare function exists$(path: str): bool;

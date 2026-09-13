@@ -2,6 +2,7 @@ import { tcpRead$, tcpWrite$, tcpClose$ } from "runtime:net";
 import { Headers } from "std:http/headers";
 import { JSON, Json } from "std:encoding";
 import { spawn } from "std:task";
+import { AsyncReader } from "std:io";
 
 export class RawResponse {
     status: int = 200;
@@ -157,6 +158,48 @@ export class HttpResponse {
         
         spawn(this._writeAndClose(responseStr));
         this.isSent = true;
+    }
+
+    async stream(reader: AsyncReader): Task<void> {
+        if (this.isSent) return;
+        this.isSent = true;
+
+        let statusText = "OK";
+        if (this.statusCode === 404) statusText = "Not Found";
+        else if (this.statusCode === 201) statusText = "Created";
+        else if (this.statusCode === 204) statusText = "No Content";
+        else if (this.statusCode === 500) statusText = "Internal Server Error";
+
+        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
+        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
+        responseStr = responseStr + "Transfer-Encoding: chunked\r\n";
+
+        for (let name in this.responseHeaders) {
+            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
+        }
+        for (let c of this.setCookies) {
+            responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
+        }
+        responseStr = responseStr + "\r\n";
+
+        await tcpWrite$(this.connId, responseStr);
+
+        let reading = true;
+        while (reading) {
+            let chunk = await reader.read(8192);
+            if (chunk === null) {
+                reading = false;
+            } else if (chunk.length === 0) {
+                reading = false;
+            } else {
+                let hexLen = chunk.length.toHex();
+                await tcpWrite$(this.connId, hexLen + "\r\n");
+                await tcpWrite$(this.connId, chunk);
+                await tcpWrite$(this.connId, "\r\n");
+            }
+        }
+        await tcpWrite$(this.connId, "0\r\n\r\n");
+        tcpClose$(this.connId);
     }
 
     private async _writeAndClose(data: str): Task<void> {

@@ -1,0 +1,65 @@
+import { udpBind$, udpSendTo$, udpRecvFrom$, udpClose$ } from "runtime:net";
+
+export type UdpPacket = {
+    data: Bytes,
+    host: str,
+    port: int
+};
+
+export class UdpSocket {
+    private _id: int;
+    private _host: str;
+    private _port: int;
+    private _isOpen: bool = true;
+
+    constructor(id: int, host: str, port: int) {
+        this._id = id;
+        this._host = host;
+        this._port = port;
+    }
+
+    static bind(port: int, host?: str): UdpSocket {
+        let bindHost = host ?? "0.0.0.0";
+        let id = udpBind$(bindHost, port);
+        if (id <= 0) {
+            throw new Error(`Failed to bind UDP socket on ${bindHost}:${port}`);
+        }
+        return new UdpSocket(id, bindHost, port);
+    }
+
+    send(host: str, port: int, data: Bytes | str): int {
+        if (!this._isOpen) throw new Error("UdpSocket is closed");
+        return udpSendTo$(this._id, host, port, data);
+    }
+
+    async recv(maxLen?: int): Task<UdpPacket?> {
+        if (!this._isOpen) throw new Error("UdpSocket is closed");
+        let raw = await udpRecvFrom$(this._id, maxLen ?? 65536);
+        if (raw === null) return null;
+        let parts = raw as [Bytes, str, int];
+        return #{
+            data: parts[0],
+            host: parts[1],
+            port: parts[2]
+        };
+    }
+
+    close(): void {
+        if (this._isOpen) {
+            this._isOpen = false;
+            udpClose$(this._id);
+        }
+    }
+
+    get isOpen(): bool {
+        return this._isOpen;
+    }
+
+    get localHost(): str {
+        return this._host;
+    }
+
+    get localPort(): int {
+        return this._port;
+    }
+}

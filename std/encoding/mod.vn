@@ -3,3 +3,4 @@ export { CsvOptions, CSV } from "std:encoding/csv";
 export { Base64, base64Encode, base64Decode } from "std:encoding/base64";
 export { Hex, hexEncode, hexDecode } from "std:encoding/hex";
 export { TOML, parseToml, stringifyToml } from "std:encoding/toml";
+export { MsgPack } from "std:encoding/msgpack";

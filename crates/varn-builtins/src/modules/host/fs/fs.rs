@@ -53,6 +53,20 @@ varn_contract! {
             String::from_utf8(buf).map_err(|e| e.to_string())
         }
 
+        fn readFdBytes(ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<VmValue, String> {
+            let file_arc = {
+                let map = FILES.read().unwrap();
+                map.get(&fd).cloned().ok_or_else(|| format!("invalid file descriptor {fd}"))?
+            };
+            let mut file = file_arc.lock().unwrap();
+
+            use std::io::Read;
+            let mut buf = vec![0u8; len as usize];
+            let bytes_read = file.read(&mut buf).map_err(|e| e.to_string())?;
+            buf.truncate(bytes_read);
+            Ok(ctx.alloc_buffer_from_bytes(&buf))
+        }
+
         fn writeFd(_ctx: &mut dyn NativeCtx, fd: i64, data: &str) -> Result<i64, String> {
             let file_arc = {
                 let map = FILES.read().unwrap();
@@ -63,6 +77,35 @@ varn_contract! {
             use std::io::Write;
             file.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
             Ok(data.len() as i64)
+        }
+
+        fn writeFdBytes(ctx: &mut dyn NativeCtx, fd: i64, data: VmValue) -> Result<i64, String> {
+            let file_arc = {
+                let map = FILES.read().unwrap();
+                map.get(&fd).cloned().ok_or_else(|| format!("invalid file descriptor {fd}"))?
+            };
+            let mut file = file_arc.lock().unwrap();
+
+            let bytes = ctx.buffer_to_bytes(data).ok_or_else(|| "expected Bytes".to_string())?;
+            use std::io::Write;
+            file.write_all(&bytes).map_err(|e| e.to_string())?;
+            Ok(bytes.len() as i64)
+        }
+
+        fn readFileBytes(ctx: &mut dyn NativeCtx, path: &str) -> Result<VmValue, String> {
+            if !ctx.check_fs_read(path) {
+                return Err(format!("SecurityError: Permission denied (fs.read) for path '{path}'"));
+            }
+            let bytes = fs::read(path).map_err(|e| e.to_string())?;
+            Ok(ctx.alloc_buffer_from_bytes(&bytes))
+        }
+
+        fn writeFileBytes(ctx: &mut dyn NativeCtx, path: &str, data: VmValue) -> Result<(), String> {
+            if !ctx.check_fs_write(path) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+            }
+            let bytes = ctx.buffer_to_bytes(data).ok_or_else(|| "expected Bytes".to_string())?;
+            fs::write(path, bytes).map_err(|e| e.to_string())
         }
 
         fn seek(_ctx: &mut dyn NativeCtx, fd: i64, offset: i64, whence: i64) -> Result<i64, String> {

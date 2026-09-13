@@ -13,3 +13,10 @@ export {
     randomHex,
     hmac
 } from "std:crypto/hash";
+
+export {
+    pbkdf2,
+    timingSafeEqual,
+    hashPassword,
+    verifyPassword
+} from "std:crypto/password";

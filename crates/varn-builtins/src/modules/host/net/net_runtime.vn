@@ -15,3 +15,8 @@ export declare function tcpClose$(connId: int): void;
 export declare function tcpCloseListener$(listenerId: int): void;
 export declare function parseHttpRequest$(raw: str): dynamic;
 export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: dynamic, body: str): Task<int>;
+
+export declare function udpBind$(host: str, port: int): int;
+export declare function udpSendTo$(socketId: int, host: str, port: int, data: Bytes | str): int;
+export declare function udpRecvFrom$(socketId: int, maxLen: int): Task<[Bytes, str, int]?>;
+export declare function udpClose$(socketId: int): void;

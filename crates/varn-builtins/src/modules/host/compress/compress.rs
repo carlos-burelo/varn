@@ -5,7 +5,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, VmValue, VnArray};
+use varn_types::{NativeCtx, VmValue};
 
 pub struct CompressRuntime;
 
@@ -52,44 +52,48 @@ varn_contract! {
     module: "runtime:compress",
     contract: "src/modules/host/compress/compress_runtime.vn",
     impl CompressRuntime {
-        fn gzip(_ctx: &mut dyn NativeCtx, data: &str) -> Result<Vec<VmValue>, String> {
+        fn gzip(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, String> {
+            let input_bytes = if let Some(b) = ctx.buffer_to_bytes(data) {
+                b
+            } else if ctx.is_string(data) {
+                ctx.str_repr(data).into_bytes()
+            } else {
+                return Err("gzip expects Bytes or str".to_string());
+            };
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(data.as_bytes()).map_err(|e| format!("gzip compression error: {e}"))?;
+            encoder.write_all(&input_bytes).map_err(|e| format!("gzip compression error: {e}"))?;
             let compressed = encoder.finish().map_err(|e| format!("gzip finish error: {e}"))?;
-            Ok(compressed.iter().map(|b| VmValue::from_int(*b as i64)).collect())
+            Ok(ctx.alloc_buffer_from_bytes(&compressed))
         }
 
-        fn gunzip(ctx: &mut dyn NativeCtx, bytes: VnArray) -> Result<String, String> {
-            let len = bytes.len(ctx);
-            let mut raw_bytes = Vec::with_capacity(len);
-            for i in 0..len {
-                let v = bytes.get(ctx, i).unwrap_or(VmValue::null());
-                raw_bytes.push(v.as_int() as u8);
-            }
+        fn gunzip(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, String> {
+            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "gunzip expects Bytes".to_string())?;
             let mut decoder = GzDecoder::new(&raw_bytes[..]);
-            let mut decompressed = String::new();
-            decoder.read_to_string(&mut decompressed).map_err(|e| format!("gunzip decompression error: {e}"))?;
-            Ok(decompressed)
+            let mut decompressed = Vec::new();
+            decoder.read_to_end(&mut decompressed).map_err(|e| format!("gunzip decompression error: {e}"))?;
+            Ok(ctx.alloc_buffer_from_bytes(&decompressed))
         }
 
-        fn deflate(_ctx: &mut dyn NativeCtx, data: &str) -> Result<Vec<VmValue>, String> {
+        fn deflate(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, String> {
+            let input_bytes = if let Some(b) = ctx.buffer_to_bytes(data) {
+                b
+            } else if ctx.is_string(data) {
+                ctx.str_repr(data).into_bytes()
+            } else {
+                return Err("deflate expects Bytes or str".to_string());
+            };
             let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(data.as_bytes()).map_err(|e| format!("deflate compression error: {e}"))?;
+            encoder.write_all(&input_bytes).map_err(|e| format!("deflate compression error: {e}"))?;
             let compressed = encoder.finish().map_err(|e| format!("deflate finish error: {e}"))?;
-            Ok(compressed.iter().map(|b| VmValue::from_int(*b as i64)).collect())
+            Ok(ctx.alloc_buffer_from_bytes(&compressed))
         }
 
-        fn inflate(ctx: &mut dyn NativeCtx, bytes: VnArray) -> Result<String, String> {
-            let len = bytes.len(ctx);
-            let mut raw_bytes = Vec::with_capacity(len);
-            for i in 0..len {
-                let v = bytes.get(ctx, i).unwrap_or(VmValue::null());
-                raw_bytes.push(v.as_int() as u8);
-            }
+        fn inflate(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, String> {
+            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "inflate expects Bytes".to_string())?;
             let mut decoder = ZlibDecoder::new(&raw_bytes[..]);
-            let mut decompressed = String::new();
-            decoder.read_to_string(&mut decompressed).map_err(|e| format!("inflate decompression error: {e}"))?;
-            Ok(decompressed)
+            let mut decompressed = Vec::new();
+            decoder.read_to_end(&mut decompressed).map_err(|e| format!("inflate decompression error: {e}"))?;
+            Ok(ctx.alloc_buffer_from_bytes(&decompressed))
         }
 
         fn tarCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, tar_path: &str) -> Result<bool, String> {

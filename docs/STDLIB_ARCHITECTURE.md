@@ -38,22 +38,23 @@ flowchart TD
 
 | Módulo | Descripción | Dependencias Nativas (Rust) |
 |---|---|---|
-| `std:http` | Cliente (`fetch`) y Servidor HTTP declarativo alineado 100% al estándar Web (`Request`, `Response`, `Headers`). | `varn-builtins::net` |
-| `std:fs` | Sistema de archivos (lectura, escritura, streams, permisos). | `varn-builtins::fs` |
-| `std:io` | Entrada/Salida estándar (`stdin`, `stdout`, `stderr`). | `varn-builtins::io` |
+| `std:http` | Cliente (`fetch`) y Servidor HTTP declarativo (`Request`, `Response`, `Headers`), y streaming chunked (`HttpResponse.stream`). | `varn-builtins::net` |
+| `std:fs` | Sistema de archivos (`File`, `FileStream` con `AsyncReader`/`AsyncWriter`, `readBytes`, `writeBytes`, `appendBytes`). | `varn-builtins::fs` |
+| `std:io` | Entrada/Salida estándar (`stdin`, `stdout`, `stderr`), contratos `Reader`, `Writer`, `AsyncReader`, `AsyncWriter` y `Stream.pipe`. | `varn-builtins::io` |
+| `std:net` | Redes y transporte: TCP (`TcpListener`, `TcpStream`), UDP (`UdpSocket`, `UdpPacket`), `Url`, `URLSearchParams`. | `varn-builtins::net` |
+| `std:compress` | Compresión binaria en memoria (`gzip`, `gunzip`, `deflate`, `inflate`) sobre `Bytes` y archivadores (`tar`, `zip`). | `varn-builtins::compress` |
 | `std:task` | Concurrencia, `TaskGroup`, `parallel`, `spawnIsolate`, sincronización (`Mutex`, `Semaphore`, `Barrier`). | `varn-runtime` |
-| `std:crypto` | Hashing (SHA256, MD5) y encriptación. | `varn-builtins::crypto` |
+| `std:crypto` | Hashing (SHA256, MD5, HMAC), cifrado (AES-GCM), KDF (`pbkdf2`, `hashPassword`, `verifyPassword`), `timingSafeEqual`, `randomBytes: Bytes`. | `varn-builtins::crypto` |
 | `std:time` | Medición de tiempo, temporizadores y formateo de fechas. | `varn-builtins::time` |
-| `std:json` | Serialización y parsing ultrarrápido de JSON. | `varn-builtins::json` |
+| `std:encoding` | Serialización unificada: JSON (`JSON.parse`, `JSON.stringify`), CSV (`CSV.parse`, `CSV.stringify`), MessagePack (`MsgPack.encode`, `MsgPack.decode`), Base64, Hex. | `varn-builtins::json`, `varn-builtins::crypto` |
 | `std:reflect` | Introspección de clases, decoradores y metadatos (`MetaKey`). | `varn-builtins::reflect` |
 | `std:sys` | Información del entorno de ejecución, OS, CPU y memoria. | `varn-builtins::sys` |
 | `std:math` | Operaciones matemáticas y funciones trigonométricas. | `varn-core::numeric` |
-| `std:testing` | Framework de pruebas unitarias y aserciones. | `varn-builtins::testing` |
+| `std:test` | Framework de pruebas unitarias y aserciones ricas. | `varn-builtins::testing` |
 | `std:result` | Tipos algebraicos monádicos `Option<T>` y `Result<T, E>`. | — |
 | `std:collections` | Estructuras de datos avanzadas (`List`, `Stack`, `Queue`, `PriorityQueue`, `LRUCache`). | — |
 | `std:cli` | Parser de argumentos CLI, formateo de tablas y colores ANSI terminal (`Color`, `Table`). | — |
 | `std:log` | Logger estructurado configurable con niveles (Debug, Info, Warn, Error). | — |
-| `std:encoding` | Encoders/Decoders Base64, Hex, CSV y utilidades de encoding. | `varn-builtins::crypto` |
 | `std:markdown` | Parser de Markdown CommonMark/GFM a AST, renderizado a HTML y utilidades de extracción. | — |
 
 ---

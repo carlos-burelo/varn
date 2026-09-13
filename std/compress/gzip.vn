@@ -6,19 +6,19 @@ import {
 } from "runtime:compress";
 
 export namespace Compress {
-    export function gzip(data: str): int[] {
+    export function gzip(data: Bytes | str): Bytes {
         return gzip$(data);
     }
 
-    export function gunzip(bytes: int[]): str {
+    export function gunzip(bytes: Bytes): Bytes {
         return gunzip$(bytes);
     }
 
-    export function deflate(data: str): int[] {
+    export function deflate(data: Bytes | str): Bytes {
         return deflate$(data);
     }
 
-    export function inflate(bytes: int[]): str {
+    export function inflate(bytes: Bytes): Bytes {
         return inflate$(bytes);
     }
 }
