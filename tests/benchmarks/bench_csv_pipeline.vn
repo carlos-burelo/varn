@@ -1,4 +1,4 @@
-import { CSV } from "std:csv";
+import { CSV } from "std:encoding";
 
 // 1. Generate 50,000 transaction records in CSV format
 let categories = ["Electronics", "Apparel", "Home", "Books", "Sports"];

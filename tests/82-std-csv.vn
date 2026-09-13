@@ -1,5 +1,4 @@
-import { CSV } from "std:csv";
-import { JSON } from "std:json";
+import { CSV, JSON } from "std:encoding";
 import { assert, assertEqual } from "std:test";
 
 // 1. Basic CSV parsing with header and automatic type coercion via CSV.parse

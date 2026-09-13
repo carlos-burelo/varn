@@ -1,2 +1,1 @@
-
-export { WebSocket, WebSocketClient, WebSocketReadyState } from "std:ws/client";
+export { WebSocket, WebSocketReadyState } from "std:ws/client";

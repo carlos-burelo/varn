@@ -1,6 +1,6 @@
 import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "std:net";
 import { HttpServer, Request, Response, HttpResponse, HttpStatus, json, http, fetch } from "std:http";
-import { WebSocket, WebSocketClient, WebSocketReadyState } from "std:ws";
+import { WebSocket, WebSocketReadyState } from "std:ws";
 import { Process } from "std:process";
 import { delay, Task } from "std:task";
 import { assertEqual, assertTrue, assertFalse } from "std:test";
@@ -101,9 +101,8 @@ function testWebSocket(): void {
     assertEqual(WebSocketReadyState.Closed as int, 3);
 
     assertTrue(typeof WebSocket === "class");
-    assertTrue(typeof WebSocketClient === "class");
 
-    print("  ✔ std:ws (WebSocketReadyState, WebSocket class exports, WebSocketClient)");
+    print("  ✔ std:ws (WebSocketReadyState, canonical WebSocket class)");
 }
 
 async function main(): Task<void> {

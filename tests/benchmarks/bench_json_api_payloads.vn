@@ -1,4 +1,4 @@
-import { JSON } from "std:json";
+import { JSON } from "std:encoding";
 
 // Real-world JSON API Payloads: Complex Nested Object Serialization, Deserialization, and Hierarchy Traversal
 

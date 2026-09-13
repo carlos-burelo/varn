@@ -10,8 +10,7 @@
 // 3. `JSON.stringify` matched heap objects by tag and destructured only two of
 //    the four variants those tags cover, so a tuple serialized as `[]` and a
 //    record as `{}` — well-formed JSON with the contents dropped.
-
-import { JSON } from "std:json"
+import { JSON } from "std:encoding";
 
 // ---------------------------------------------------------------- charCodeAt
 

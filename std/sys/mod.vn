@@ -12,6 +12,5 @@ export {
     args,
     exit,
     SystemInfoRecord,
-    getSystemInfo,
-    parseArgs
+    getSystemInfo
 } from "std:sys/args";

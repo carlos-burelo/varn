@@ -311,23 +311,9 @@ describe("Grupo de pruebas", () => {
 
 ---
 
-## 9. `std:csv`
+## 9. `std:encoding` (JSON, CSV, TOML, Base64, Hex)
 
-```varn
-CSV.parse(str)                        // con header
-CSV.parse(str, { delimiter: ";" })    // custom delimiter
-CSV.parse(str, { hasHeader: false })  // sin header → str[][]
-CSV.stringify(rows)                   // str: CSV con header
-```
-
----
-
-## 10. `std:json`
-
-```varn
-JSON.parse(jsonStr)        // object
-JSON.stringify(obj)        // str
-```
+> Ver sección dedicada: [24. `std:encoding` — Formatos y Datos](#24-stdenencoding--formatos-y-datos)
 
 ---
 

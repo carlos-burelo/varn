@@ -1,9 +1,9 @@
 import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
 import { Url } from "std:net";
-import { JSON, Json } from "std:json";
+import { JSON, Json } from "std:encoding";
 import { spawn } from "std:task";
 
-import { HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+import { HttpStatus, Headers, Request, HttpResponse, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
 
 export class HttpServer {
     private _port: int = 0;

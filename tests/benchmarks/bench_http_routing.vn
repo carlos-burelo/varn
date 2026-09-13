@@ -1,4 +1,4 @@
-import { JSON } from "std:json";
+import { JSON } from "std:encoding";
 
 // Real-world HTTP REST Router & Middleware Pipeline
 

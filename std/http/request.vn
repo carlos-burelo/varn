@@ -1,6 +1,6 @@
 import { tcpRead$, parseHttpRequest$ } from "runtime:net";
 import { Headers } from "std:http/headers";
-import { JSON, Json } from "std:json";
+import { JSON, Json } from "std:encoding";
 
 export class RawRequest {
     method: str = "";
@@ -141,5 +141,3 @@ export class Request {
         return res;
     }
 }
-
-export class HttpRequest extends Request {}

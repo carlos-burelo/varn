@@ -1,6 +1,6 @@
 
 export { HttpStatus } from "std:http/status";
 export { Headers } from "std:http/headers";
-export { RawRequest, parseRawRequest, readHttpRequest, Request, HttpRequest } from "std:http/request";
+export { RawRequest, parseRawRequest, readHttpRequest, Request } from "std:http/request";
 export { RawResponse, parseRawResponse, readHttpResponse, HttpResponse, Response, json, redirect, error } from "std:http/response";
 export { DynamicRoute } from "std:http/route";

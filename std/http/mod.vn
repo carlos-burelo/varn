@@ -1,14 +1,14 @@
 
-export { HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response, json, redirect, error } from "std:http/core";
+export { HttpStatus, Headers, Request, HttpResponse, Response, json, redirect, error } from "std:http/core";
 export { HttpServer, serve, server } from "std:http/server";
 export { fetch, get, post, put, patch, del, http } from "std:http/client";
 
-import { HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response, json, redirect, error } from "std:http/core";
+import { HttpStatus, Headers, Request, HttpResponse, Response, json, redirect, error } from "std:http/core";
 import { HttpServer, serve, server } from "std:http/server";
 import { fetch, get, post, put, patch, del, http } from "std:http/client";
 
 export const Http = {
-    HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response,
+    HttpStatus, Headers, Request, HttpResponse, Response,
     json, redirect, error,
     HttpServer, serve, server,
     fetch, get, post, put, patch, del, http

@@ -5,7 +5,6 @@ import {
     exit$,
     now$
 } from "runtime:sys";
-import { CLI } from "std:cli";
 
 export function platform(): str {
     return platform$();
@@ -31,13 +30,5 @@ export function getSystemInfo(): SystemInfoRecord {
         cwd: cwd$(),
         args: args$(),
         now: now$()
-    };
-}
-
-export function parseArgs(rawArgs?: str[]): { flags: { [key: str]: str }, positionals: str[] } {
-    let parsed = CLI.parse(rawArgs);
-    return #{
-        flags: parsed.flags,
-        positionals: parsed.positionals
     };
 }

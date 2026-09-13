@@ -24,14 +24,6 @@ export function randomHex(size: int): str {
     return randomHex$(size);
 }
 
-export function base64Enc(data: str): str {
-    return base64Enc$(data);
-}
-
-export function base64Dec(data: str): str {
-    return base64Dec$(data);
-}
-
 export function hmac(algo: str, key: str, data: str): str {
     return hmac$(algo, key, data);
 }

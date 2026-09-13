@@ -1,6 +1,6 @@
 import { tcpRead$, tcpWrite$, tcpClose$ } from "runtime:net";
 import { Headers } from "std:http/headers";
-import { JSON, Json } from "std:json";
+import { JSON, Json } from "std:encoding";
 import { spawn } from "std:task";
 
 export class RawResponse {

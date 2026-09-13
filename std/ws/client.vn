@@ -116,9 +116,3 @@ export class WebSocket {
         }
     }
 }
-
-export class WebSocketClient extends WebSocket {
-    constructor(url: str) {
-        super(url);
-    }
-}

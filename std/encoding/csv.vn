@@ -1,5 +1,10 @@
 import { parse$, stringify$ } from "runtime:csv";
-import { CsvOptions } from "std:csv/types";
+
+export interface CsvOptions {
+    delimiter?: str;
+    hasHeader?: bool;
+    trim?: bool;
+}
 
 export namespace CSV {
     export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {

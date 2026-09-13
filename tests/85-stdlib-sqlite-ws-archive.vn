@@ -3,7 +3,7 @@
 import { describe, test, expect, assertEqual } from "std:test";
 import { Database } from "std:sqlite";
 import { Compress, Tar, Zip } from "std:compress";
-import { WebSocketClient } from "std:ws";
+import { WebSocket } from "std:ws";
 import { exists, mkdir, write, remove, removeAll } from "std:fs";
 import { Path } from "std:path";
 
@@ -90,6 +90,6 @@ describe("Level 1 StdLib Enhancements", () => {
     });
 
     test("std:ws client API shape verification", () => {
-        expect(typeof WebSocketClient === "class").toBe(true);
+        expect(typeof WebSocket === "class").toBe(true);
     });
 });

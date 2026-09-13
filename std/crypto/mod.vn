@@ -11,7 +11,5 @@ export {
     sha512,
     randomBytes,
     randomHex,
-    base64Enc,
-    base64Dec,
     hmac
 } from "std:crypto/hash";
