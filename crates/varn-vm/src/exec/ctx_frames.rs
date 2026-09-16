@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::closure::{VmClosure, VmUpvalue};
 use crate::error::VmResult;
+use crate::frame_store::SlotAddr;
 use crate::value::VmValue;
 
 use super::calls::PreparedCall;
@@ -14,9 +15,13 @@ impl ExecCtx {
         callee_nv: VmValue,
         arg_count: usize,
     ) -> VmResult<PreparedCall> {
-        if let Some((prepared, needs_receiver)) =
-            super::calls::try_prepare_call_fast(callee_nv, arg_count, &self.stack, &self.heap)
-        {
+        if let Some((prepared, needs_receiver)) = super::calls::try_prepare_call_fast(
+            callee_nv,
+            arg_count,
+            &self.stage,
+            &self.heap,
+            &mut self.stack,
+        ) {
             if needs_receiver && callee_nv.is_heap() {
                 let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
                     self.heap.get(callee_nv.as_heap_idx())
@@ -29,19 +34,16 @@ impl ExecCtx {
                     let recv_nv = self.heap.intern(receiver);
                     match prepared {
                         PreparedCall::Frame(ref frame) => {
-                            if frame.base >= self.stack.len() {
-                                self.stack.push(recv_nv);
-                            } else {
-                                self.stack[frame.base] = recv_nv;
-                            }
+                            // El frame ya se materializó (r0 es DYN por
+                            // construcción): el receiver ocupa su slot.
+                            self.stack.unbox_into_reg(frame.base, 0, recv_nv)?;
                         }
                         PreparedCall::NativeImmediate(_, _)
                         | PreparedCall::RawNativeImmediate(_, _) => {
-                            let args_start = self.stack.len() - arg_count;
-                            if args_start >= self.stack.len() {
-                                self.stack.push(recv_nv);
+                            if self.stage.is_empty() {
+                                self.stage.push(recv_nv);
                             } else {
-                                self.stack[args_start] = recv_nv;
+                                self.stage[0] = recv_nv;
                             }
                         }
                         _ => {}
@@ -55,9 +57,10 @@ impl ExecCtx {
         super::calls::prepare_call(
             callee_nv,
             arg_count,
-            &mut self.stack,
+            &mut self.stage,
             &mut self.heap,
             self.settings,
+            &mut self.stack,
         )
     }
 
@@ -67,17 +70,19 @@ impl ExecCtx {
                 "stack overflow: call depth exceeded 10000",
             ));
         }
-        let base = self.stack.len();
-        let required = base + closure.proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
+        let alloc = self.stack.push_frame(&closure.proto);
         self.frames
-            .push(crate::frame::CallFrame::new_owned(closure, base));
+            .push(crate::frame::CallFrame::new_owned(closure, alloc));
         Ok(())
     }
 
-    pub(crate) fn capture_upvalue(&mut self, slot: usize) -> VmUpvalue {
+    /// Saca el resultado de staging (lo deja `prepare_call`/`dispatch` en los
+    /// caminos sin frame: nativas, `PushValue`, generadores).
+    pub(crate) fn stage_pop(&mut self) -> VmValue {
+        self.stage.pop().unwrap_or(VmValue::null())
+    }
+
+    pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {
         for (s, uv) in &self.open_upvalues {
             if *s == slot {
                 return uv.clone();
@@ -89,15 +94,41 @@ impl ExecCtx {
         up
     }
 
-    pub(crate) fn close_upvalues_above(&mut self, slot: usize) {
+    /// Cierra los upvalues abiertos dentro de la activación `alloc`
+    /// (retornos y unwind: cerrar ANTES de liberar, el close lee el slot).
+    pub(crate) fn close_upvalues_in(&mut self, alloc: usize) {
         if self.open_upvalues.is_empty() {
             return;
         }
+        let bases = self.stack.alloc_bases(alloc);
         for (s, uv) in self.open_upvalues.iter().rev() {
-            if *s >= slot {
+            if s.idx >= bases[s.class.index()] {
                 uv.close(&self.stack);
             }
         }
-        self.open_upvalues.retain(|(s, _)| *s < slot);
+        self.open_upvalues
+            .retain(|(s, _)| s.idx < bases[s.class.index()]);
+    }
+
+    /// Cierra los upvalues de la activación `alloc` desde el registro
+    /// `lowest` (`CloseUpvalue`: cierres de ámbito de bloque).
+    pub(crate) fn close_upvalues_from_reg(&mut self, alloc: usize, lowest: usize) {
+        if self.open_upvalues.is_empty() {
+            return;
+        }
+        let mut to_close = Vec::new();
+        for (s, _) in self.open_upvalues.iter() {
+            if let Some(reg) = self.stack.reg_of_addr(alloc, *s) {
+                if reg >= lowest {
+                    to_close.push(*s);
+                }
+            }
+        }
+        for s in &to_close {
+            if let Some((_, uv)) = self.open_upvalues.iter().find(|(a, _)| a == s) {
+                uv.close(&self.stack);
+            }
+        }
+        self.open_upvalues.retain(|(s, _)| !to_close.contains(s));
     }
 }

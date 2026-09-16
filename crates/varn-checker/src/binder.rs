@@ -8,6 +8,7 @@ use varn_core::ast::{ExprKind, ForInit, Program, Stmt, StmtKind, VarDeclarator};
 mod array_evolve;
 mod class;
 mod decl_values;
+mod definite_field_assignment;
 mod decls;
 mod imports;
 mod inference_utils;

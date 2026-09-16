@@ -1,12 +1,10 @@
 export class Headers {
     private _map: { [key: str]: str } = {};
 
-    constructor(init?: dynamic) {
+    constructor(init: { [key: str]: str } = {}) {
         this._map = {};
-        if (init !== null && typeof init === "object") {
-            for (let k in init) {
-                this.set(k, init[k]);
-            }
+        for (let k in init) {
+            this.set(k, init[k]);
         }
     }
 

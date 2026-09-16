@@ -15,20 +15,17 @@ export interface ClassRef {
 export interface FunctionRef {
     name: str;
     length: int;
-    apply(thisArg: dynamic, args?: dynamic[]): dynamic;
-    call(thisArg: dynamic, ...args: dynamic[]): dynamic;
-    bind(thisArg: dynamic, ...args: dynamic[]): FunctionRef;
 }
 
-export function defineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void {
+export function defineMetadata<K, V, T>(metadataKey: K, metadataValue: V, target: T): void {
     defineMetadata$(metadataKey, metadataValue, target);
 }
 
-export function getMetadata(metadataKey: dynamic, target: dynamic): dynamic {
+export function getMetadata<K, V, T>(metadataKey: K, target: T): V? {
     return getMetadata$(metadataKey, target);
 }
 
-export function hasMetadata(metadataKey: dynamic, target: dynamic): bool {
+export function hasMetadata<K, T>(metadataKey: K, target: T): bool {
     return hasMetadata$(metadataKey, target);
 }
 
@@ -36,23 +33,23 @@ export function createMetaKey(): str {
     return createMetaKey$();
 }
 
-export function setMetaKey(metaId: str, target: dynamic, value: dynamic): void {
+export function setMetaKey<V, T>(metaId: str, target: T, value: V): void {
     setMetaKey$(metaId, target, value);
 }
 
-export function getMetaKey(metaId: str, target: dynamic): dynamic {
+export function getMetaKey<V, T>(metaId: str, target: T): V? {
     return getMetaKey$(metaId, target);
 }
 
-export function hasMetaKey(metaId: str, target: dynamic): bool {
+export function hasMetaKey<T>(metaId: str, target: T): bool {
     return hasMetaKey$(metaId, target);
 }
 
-export function getMetadataKeys(target: dynamic): dynamic[] {
+export function getMetadataKeys<T>(target: T): str[] {
     return [];
 }
 
-export class MetaKey<T = dynamic> {
+export class MetaKey<T> {
     private metaId: str;
 
     constructor(metaId: str) {

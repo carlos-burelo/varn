@@ -32,7 +32,7 @@ impl ExecCtx {
                     .str_val(name_nv)
                     .ok_or_else(|| RuntimeError::new("LoadGlobal: non-string const"))?;
                 let val = self.globals.get_by_name(&name).unwrap_or(VmValue::null());
-                self.stack[base + first_reg] = val;
+                self.stack.unbox_into_reg(base, first_reg, val)?;
             }
             OpCode::StoreGlobal => {
                 let src = (code[*ip] >> 8) as usize;
@@ -44,7 +44,7 @@ impl ExecCtx {
                     .heap
                     .str_val(name_nv)
                     .ok_or_else(|| RuntimeError::new("StoreGlobal: non-string const"))?;
-                let val = self.stack[base + src];
+                let val = self.stack.box_reg(base, src);
                 self.globals.set_by_name(&name, val);
             }
             OpCode::DefineGlobal => {
@@ -57,14 +57,14 @@ impl ExecCtx {
                     .heap
                     .str_val(name_nv)
                     .ok_or_else(|| RuntimeError::new("DefineGlobal: non-string const"))?;
-                let val = self.stack[base + src];
+                let val = self.stack.box_reg(base, src);
                 self.globals.define(&name, val);
             }
             OpCode::LoadGlobalIdx => {
                 let idx = code[*ip] as usize;
                 *ip += 1;
                 let val = self.globals.get_by_index(idx).unwrap_or(VmValue::null());
-                self.stack[base + first_reg] = val;
+                self.stack.unbox_into_reg(base, first_reg, val)?;
                 self.record_hotspot_global(idx);
             }
             OpCode::StoreGlobalIdx => {
@@ -72,7 +72,7 @@ impl ExecCtx {
                 *ip += 1;
                 let idx = code[*ip] as usize;
                 *ip += 1;
-                let val = self.stack[base + src];
+                let val = self.stack.box_reg(base, src);
                 self.globals.set_by_index(idx, val);
             }
             OpCode::DefineGlobalIdx => {
@@ -80,7 +80,7 @@ impl ExecCtx {
                 *ip += 1;
                 let idx = code[*ip] as usize;
                 *ip += 1;
-                let val = self.stack[base + src];
+                let val = self.stack.box_reg(base, src);
                 self.globals.set_by_index(idx, val);
             }
             _ => {}

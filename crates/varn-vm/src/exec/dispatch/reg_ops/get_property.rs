@@ -124,13 +124,14 @@ impl ExecCtx {
 
             if let Some(v) = found_slot_val {
                 self.record_ic_hit_getprop();
-                self.stack[base + dest] = v;
+                self.stack.unbox_into_reg(base, dest, v)?;
                 return Ok(false);
             } else if let Some((method, owner)) = found_method {
                 self.record_ic_hit_getprop();
                 let receiver = self.heap.extract(obj);
                 let bound = crate::exec::props::bind_method_to_receiver(receiver, method, owner);
-                self.stack[base + dest] = self.heap.intern(bound);
+                let bound_nv = self.heap.intern(bound);
+                self.stack.unbox_into_reg(base, dest, bound_nv)?;
                 return Ok(false);
             } else if let Some(getter_val) = found_getter {
                 self.record_ic_hit_getprop();
@@ -141,7 +142,7 @@ impl ExecCtx {
 
         if name.as_ref() == varn_core::MemberKey::Length.as_str() {
             if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
-                self.stack[base + dest] = v;
+                self.stack.unbox_into_reg(base, dest, v)?;
                 if cs_idx < cache_len && !is_megamorphic {
                     let is_str = obj.is_sso()
                         || matches!(
@@ -189,7 +190,7 @@ impl ExecCtx {
         let val_res = crate::exec::props::get_property(obj, &name, &mut self.heap);
         match val_res {
             Ok(val) => {
-                self.stack[base + dest] = val;
+                self.stack.unbox_into_reg(base, dest, val)?;
             }
             Err(e) => {
                 return Err(crate::error::RuntimeError::new(format!("{}", e)));

@@ -6,6 +6,10 @@ import {
     queryOne$
 } from "runtime:sqlite";
 
+export type SqlParam = str | int | float | bool | null;
+
+export type SqlRow = { [key: str]: SqlParam };
+
 export class Database {
     private _id: int = -1;
     private _isOpen: bool = false;
@@ -20,17 +24,17 @@ export class Database {
         return exec$(this._id, sql);
     }
 
-    all(sql: str, ...params: dynamic[]): dynamic[] {
+    all(sql: str, ...params: SqlParam[]): SqlRow[] {
         if (!this._isOpen) return [];
         return queryAll$(this._id, sql, params);
     }
 
-    get(sql: str, ...params: dynamic[]): dynamic? {
+    get(sql: str, ...params: SqlParam[]): SqlRow? {
         if (!this._isOpen) return null;
         return queryOne$(this._id, sql, params);
     }
 
-    sql(strings: str[], ...values: dynamic[]): dynamic[] {
+    sql(strings: str[], ...values: SqlParam[]): SqlRow[] {
         if (!this._isOpen) return [];
         let query = "";
         for (let i = 0; i < strings.length; i = i + 1) {
@@ -42,7 +46,7 @@ export class Database {
         return queryAll$(this._id, query, values);
     }
 
-    sqlOne(strings: str[], ...values: dynamic[]): dynamic? {
+    sqlOne(strings: str[], ...values: SqlParam[]): SqlRow? {
         if (!this._isOpen) return null;
         let query = "";
         for (let i = 0; i < strings.length; i = i + 1) {
@@ -54,9 +58,9 @@ export class Database {
         return queryOne$(this._id, query, values);
     }
 
-    run(sql: str, ...params: dynamic[]): int {
+    run(sql: str, ...params: SqlParam[]): int {
         if (!this._isOpen) return 0;
-        let res = queryAll$(this._id, sql, params);
+        queryAll$(this._id, sql, params);
         return 1;
     }
 

@@ -1,29 +1,47 @@
 use std::collections::{HashMap, HashSet};
 
+use varn_types::register_meta::SlotKind;
+
 use super::scan::ScanResult;
 use crate::regalloc::liveness::LiveRange;
 
 /// Re-colour the function's registers by liveness, coalescing `Move` copies.
 ///
-/// Two constraints are hard, and both are correctness — not heuristics:
+/// Three constraints are hard, and all three are correctness — not heuristics:
 ///
 /// * **interference** — registers whose live ranges overlap never share a
 ///   colour;
 /// * **callee frame** — a register live across a call is coloured below that
 ///   call's argument window, so the callee's frame cannot clobber it. This is
 ///   the `max_allowed_color` ceiling.
+/// * **kind compatibility** — registers sharing a colour must share their
+///   `SlotKind`. Merging e.g. a float register with an int one would meet
+///   `register_meta` to `Dynamic`, erasing the type the SSA emitter proved
+///   (and, for floats, losing the native-f64 routing in the JIT).
 ///
 /// They can be jointly infeasible for a given assignment order: every colour
 /// under the ceiling may already belong to a neighbour. There is no third
 /// option — this pass cannot move an argument window — so infeasibility is
 /// reported as `None` and the caller leaves the function's allocation alone.
+///
+/// `kinds` is indexed by physical register number (the pre-coalescing
+/// `register_meta`); registers past its end read as `Dynamic`, matching
+/// `derive_register_meta`'s default.
 pub(crate) fn color_with_base(
     ranges: &[LiveRange],
     base: u8,
     copies: &[(u8, u8)],
     scan: &ScanResult,
     blocks: &[(u8, u8)],
+    kinds: &[SlotKind],
 ) -> Option<HashMap<u8, u8>> {
+    let kind_of = |reg: u8| kinds.get(reg as usize).copied().unwrap_or(SlotKind::Dynamic);
+    // Kind already occupying a new colour, if any. A colour takes the kind of
+    // the first vreg assigned to it; every later occupant must match.
+    let mut color_kind: HashMap<u8, SlotKind> = HashMap::new();
+    let compatible = |color_kind: &HashMap<u8, SlotKind>, color: u8, kind: SlotKind| {
+        color_kind.get(&color).is_none_or(|&k| k == kind)
+    };
     let mut coloring: HashMap<u8, u8> = HashMap::new();
 
     let ranges_by_vreg: HashMap<u8, &LiveRange> =
@@ -118,7 +136,19 @@ pub(crate) fn color_with_base(
                 target = coloring.get(&u).copied();
             }
             if let Some(c) = target {
-                if !neighbor_colors.contains(&c) && c >= base && c <= max_allowed_color {
+                // Coalescing merges both ends into one colour, so the ends
+                // must already share a kind — otherwise the merge would meet
+                // `register_meta` to `Dynamic`. Each block slot takes
+                // `c + offset`, so every slot must accept its occupant's kind.
+                let ends_share_kind = kind_of(u) == kind_of(v);
+                let slots_compatible = (0..count)
+                    .all(|off| compatible(&color_kind, c + off, kind_of(reg + off)));
+                if !neighbor_colors.contains(&c)
+                    && c >= base
+                    && c <= max_allowed_color
+                    && ends_share_kind
+                    && slots_compatible
+                {
                     color_opt = Some(c);
                     break;
                 }
@@ -127,15 +157,21 @@ pub(crate) fn color_with_base(
 
         let color = match color_opt {
             Some(c) => c,
-            // No colour satisfies both hard constraints at once. This pass
+            // No colour satisfies all hard constraints at once. This pass
             // cannot widen the search — moving an argument window is the
             // caller's allocation, not ours — so the function keeps the
             // registers the SSA emitter gave it.
-            None => (base..=max_allowed_color).find(|c| !neighbor_colors.contains(c))?,
+            None => (base..=max_allowed_color)
+                .find(|c| {
+                    !neighbor_colors.contains(c)
+                        && (0..count)
+                            .all(|off| compatible(&color_kind, c + off, kind_of(reg + off)))
+                })?,
         };
 
         for offset in 0..count {
             coloring.insert(reg + offset, color + offset);
+            color_kind.insert(color + offset, kind_of(reg + offset));
         }
     }
 

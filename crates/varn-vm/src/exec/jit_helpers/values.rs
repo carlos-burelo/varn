@@ -221,93 +221,19 @@ pub(crate) extern "C" fn jit_store_upvalue(
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
-        closure_ref.upvalues[uv_idx].write(val, &mut ctx_ref.stack);
+        if let Err(e) = closure_ref.upvalues[uv_idx].write(val, &mut ctx_ref.stack) {
+            super::construct::jit_propagate_error(ctx_ref, e);
+        }
     }
 }
-
 pub(crate) extern "C" fn jit_make_closure(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
     ip_offset: usize,
     base: usize,
 ) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let code = &closure_ref.proto.chunk.code;
-        let mut ip = ip_offset + 1;
-
-        let w1 = code[ip];
-
-        ip += 1;
-
-        let proto_idx = code[ip] as usize;
-
-        ip += 1;
-
-        let uv_count = (w1 & 0xFF) as usize;
-
-        let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
-            Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-            other => panic!("MakeClosure: invalid function proto at ip_offset={} proto_idx={} consts_len={} got={:?} in fn={:?}", ip_offset, proto_idx, closure_ref.proto.chunk.constants.len(), other, closure_ref.proto.name),
-        };
-
-        let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
-        if uv_count == 0 {
-            if let Some(&(_, cached_val)) = ctx_ref.static_closures.get(&proto_ptr) {
-                ctx_ref.jit_native_result = cached_val;
-                return;
-            }
-        }
-
-        let mut upvalues = Vec::with_capacity(uv_count);
-
-        for ___ in 0..uv_count {
-            let uv_desc = code[ip];
-
-            ip += 1;
-
-            let is_local = (uv_desc >> 8) != 0;
-
-            let index = (uv_desc & 0xFF) as usize;
-
-            if is_local {
-                let slot = base + index;
-
-                let captured = ctx_ref.capture_upvalue(slot);
-
-                upvalues.push(captured);
-            } else {
-                let captured = closure_ref.upvalues[index].clone();
-
-                upvalues.push(captured);
-            }
-        }
-
-        let constants = ctx_ref
-            .proto_constants
-            .entry(proto_ptr)
-            .or_insert_with(|| {
-                let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                    &proto,
-                    &mut ctx_ref.heap,
-                ));
-                (proto.clone(), resolved)
-            })
-            .1
-            .clone();
-
-        let mut new_closure = crate::closure::VmClosure::with_upvalues(
-            proto.clone(),
-            upvalues,
-            constants,
-            ctx_ref.settings,
-        );
-        new_closure.module_base = closure_ref.module_base;
-        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
-        if uv_count == 0 {
-            ctx_ref.static_closures.insert(proto_ptr, (proto, val));
-        }
-        ctx_ref.jit_native_result = val;
-    }
+    // K3-faseA: `base` llegaba en el layout contiguo antiguo y solo lo pasaba
+    // código generado. Fase B: restaurar de git.
+    let _ = (ctx, closure, ip_offset, base);
+    unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL");
 }

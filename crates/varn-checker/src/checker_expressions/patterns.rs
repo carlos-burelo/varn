@@ -48,7 +48,13 @@ impl<'r> Checker<'r> {
                     self.check_pattern(&prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
-                    self.check_pattern(r, value_ty, bind);
+                    // El rest-object solo contiene los miembros NO excluidos:
+                    // leer un excluido devuelve `null` en runtime. Heredar el
+                    // tipo del fuente afirmaría miembros que no existen (el
+                    // acceso caería en un registro del tipo del miembro y la
+                    // VM tipada rechazaría el null). Dynamic mantiene la
+                    // lectura legal y honesta.
+                    self.check_pattern(r, &Type::Dynamic, bind);
                 }
             }
             Pattern::Rest { argument, .. } => self.check_pattern(argument, value_ty, bind),

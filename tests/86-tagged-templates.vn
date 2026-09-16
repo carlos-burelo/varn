@@ -60,15 +60,15 @@ describe("Tagged Template Functions", () => {
         let isActive = 1;
         let rows = db.sql`SELECT id, name, role FROM users WHERE role = ${targetRole} AND active = ${isActive};`;
         assertEqual(rows.length, 1);
-        assertEqual(rows[0].name, "Alice");
-        assertEqual(rows[0].id, 1);
+        assertEqual(rows[0]["name"], "Alice");
+        assertEqual(rows[0]["id"], 1);
 
         let targetId = 2;
         let singleUser = db.sqlOne`SELECT id, name, role FROM users WHERE id = ${targetId};`;
         expect(singleUser !== null).toBe(true);
         if (singleUser !== null) {
-            assertEqual(singleUser?.name, "Bob");
-            assertEqual(singleUser?.role, "editor");
+            assertEqual(singleUser["name"], "Bob");
+            assertEqual(singleUser["role"], "editor");
         }
 
         db.close();

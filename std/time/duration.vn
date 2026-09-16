@@ -32,11 +32,14 @@ export class Duration {
         } else {
             let parts = input as DurationParts;
             let ms = 0;
-            if (parts.milliseconds !== null) ms = ms + parts.milliseconds;
-            if (parts.seconds !== null) ms = ms + parts.seconds * 1000;
-            if (parts.minutes !== null) ms = ms + parts.minutes * 60000;
-            if (parts.hours !== null) ms = ms + parts.hours * 3600000;
-            if (parts.days !== null) ms = ms + parts.days * 86400000;
+            // Los miembros de DurationParts son opcionales: el checker los
+            // expone como `T?` y la lectura de un campo ausente da null.
+            // `?? 0` es equivalente a la guardia `!== null` para esta suma.
+            ms = ms + (parts.milliseconds ?? 0);
+            ms = ms + (parts.seconds ?? 0) * 1000;
+            ms = ms + (parts.minutes ?? 0) * 60000;
+            ms = ms + (parts.hours ?? 0) * 3600000;
+            ms = ms + (parts.days ?? 0) * 86400000;
             return new Duration(ms);
         }
     }

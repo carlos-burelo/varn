@@ -4,42 +4,45 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use varn_types::{value::ObjRef, Value};
 
-/// Build an object literal from `count` contiguous stack values using a
-/// pre-resolved shape (see `FunctionProto::resolved_shape`), avoiding the
-/// per-key shape-transition lookups of the generic `build_object` path.
-/// Values are read in slot order, which matches the shape's key order.
+/// Build an object literal from `count` frame registers using a pre-resolved
+/// shape (see `FunctionProto::resolved_shape`), avoiding the per-key
+/// shape-transition lookups of the generic `build_object` path. Values are
+/// read in slot order, which matches the shape's key order.
 #[allow(dead_code)]
 pub(crate) fn build_object_with_shape(
-    stack: &[VmValue],
-    values_start: usize,
+    store: &crate::frame_store::FrameStore,
+    base: usize,
+    start_reg: usize,
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    build_with_shape(stack, values_start, shape, heap, true, false)
+    build_with_shape(store, base, start_reg, shape, heap, true, false)
 }
 
 #[allow(dead_code)]
 pub(crate) fn build_record_with_shape(
-    stack: &[VmValue],
-    values_start: usize,
+    store: &crate::frame_store::FrameStore,
+    base: usize,
+    start_reg: usize,
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    build_with_shape(stack, values_start, shape, heap, true, true)
+    build_with_shape(store, base, start_reg, shape, heap, true, true)
 }
 
 /// `may_hold_closure` lo decide el sitio de llamada cuando puede: si el backend
 /// sabe que todos los campos son valores desboxados, ninguno es una closure y el
 /// barrido que cierra upvalues sobra. El intérprete no lo sabe y pasa `true`.
 pub(crate) fn build_with_shape(
-    stack: &[VmValue],
-    values_start: usize,
+    store: &crate::frame_store::FrameStore,
+    base: usize,
+    start_reg: usize,
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
     may_hold_closure: bool,
     is_record: bool,
 ) -> VmValue {
-    let oref = build_shaped(stack, values_start, shape, heap, may_hold_closure);
+    let oref = build_shaped(store, base, start_reg, shape, heap, may_hold_closure);
     let obj = if is_record {
         HeapObj::Record(oref)
     } else {
@@ -72,8 +75,9 @@ fn alloc_timed(heap: &mut Heap, obj: HeapObj) -> VmValue {
 /// que el comentario de `ObjData::with_shape_slice` documenta como corregido
 /// para `JSON.parse`, y estaba en el camino principal de creación de objetos.
 fn build_shaped(
-    stack: &[VmValue],
-    values_start: usize,
+    store: &crate::frame_store::FrameStore,
+    base: usize,
+    start_reg: usize,
     shape: Rc<varn_types::Shape>,
     heap: &Heap,
     may_hold_closure: bool,
@@ -85,13 +89,13 @@ fn build_shaped(
     let t0 = if on { prof::read() } else { 0 };
     if may_hold_closure {
         for i in 0..count {
-            let val_nv = stack[values_start + i];
+            let val_nv = store.box_reg(base, start_reg + i);
             if val_nv.is_heap() {
                 // Sin clonar el closure: sólo se leen sus upvalues, y `close`
-                // toca la pila, no el heap.
+                // toca el almacén, no el heap.
                 if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
                     for uv in &nc.upvalues {
-                        uv.close(stack);
+                        uv.close(store);
                     }
                 }
             }
@@ -102,7 +106,13 @@ fn build_shaped(
     }
 
     let t1 = if on { prof::read() } else { 0 };
-    let oref = ObjRef::with_shape_slice(shape, &stack[values_start..values_start + count]);
+    // El frame por clases no es contiguo: se boxea a un Vec para el slice.
+    // Solo lo usa el helper JIT (vía `build_with_shape`); el intérprete va
+    // por `alloc_*_with_shape_slice` con su propio boxeo.
+    let vals: Vec<VmValue> = (0..count)
+        .map(|i| store.box_reg(base, start_reg + i))
+        .collect();
+    let oref = ObjRef::with_shape_slice(shape, &vals);
     if on {
         prof::record(prof::Seg::ObjDataAlloc, t1, prof::read());
     }
@@ -511,10 +521,8 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
             let inst = inst.clone();
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                 for field in &cls.get_or_compute_layout().fields {
-                    let offset = field.offset as usize;
-                    if offset + 16 <= inst.payload_size as usize {
-                        target_obj
-                            .insert(field.name.clone(), unsafe { inst.read_vm_value(offset) });
+                    if let Some(v) = inst.read_field(field) {
+                        target_obj.insert(field.name.clone(), v);
                     }
                 }
             }

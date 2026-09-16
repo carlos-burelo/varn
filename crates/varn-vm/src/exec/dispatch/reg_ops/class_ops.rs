@@ -38,9 +38,9 @@ impl ExecCtx {
                     .str_val(name_nv)
                     .ok_or_else(|| RuntimeError::new("MakeClass: non-string const"))?;
                 let cls = crate::exec::class::op_class(&name, &mut self.heap);
-                self.stack[base + dest] = cls;
+                self.stack.unbox_into_reg(base, dest, cls)?;
                 if super_reg != 0 {
-                    let super_nv = self.stack[base + super_reg];
+                    let super_nv = self.stack.box_reg(base, super_reg);
                     crate::exec::class::op_inherit(cls, super_nv, &mut self.heap)?;
                 }
             }
@@ -48,8 +48,8 @@ impl ExecCtx {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (class_reg, super_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let super_nv = self.stack[base + super_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let super_nv = self.stack.box_reg(base, super_reg);
                 crate::exec::class::op_inherit(class_nv, super_nv, &mut self.heap)?;
             }
             OpCode::Method => {
@@ -58,8 +58,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -73,8 +73,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -88,8 +88,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -103,8 +103,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -118,8 +118,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -133,8 +133,8 @@ impl ExecCtx {
                 let key_idx = code[*ip] as usize;
                 *ip += 1;
                 let (class_reg, fn_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let class_nv = self.stack[base + class_reg];
-                let fn_nv = self.stack[base + fn_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
+                let fn_nv = self.stack.box_reg(base, fn_reg);
                 let key_nv = closure.constants[key_idx];
                 let key = self
                     .heap
@@ -148,7 +148,7 @@ impl ExecCtx {
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
                 let class_reg = (w1 >> 8) as usize;
-                let class_nv = self.stack[base + class_reg];
+                let class_nv = self.stack.box_reg(base, class_reg);
                 let key_nv = closure.constants[name_idx];
                 let key = self
                     .heap
@@ -163,7 +163,7 @@ impl ExecCtx {
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
                 let (dest, obj_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let obj_nv = self.stack[base + obj_reg];
+                let obj_nv = self.stack.box_reg(base, obj_reg);
                 let key_nv = closure.constants[name_idx];
                 let key = self
                     .heap
@@ -194,7 +194,8 @@ impl ExecCtx {
                             }
                         },
                     }));
-                self.stack[base + dest] = self.heap.intern(bound);
+                let bound_nv = self.heap.intern(bound);
+                self.stack.unbox_into_reg(base, dest, bound_nv)?;
             }
             _ => {}
         }
@@ -220,7 +221,7 @@ impl ExecCtx {
             .heap
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("MakeEnumVariant: non-string const"))?;
-        let tag = self.stack[base + tag_reg].as_int();
+        let tag = self.stack.box_reg(base, tag_reg).as_int();
 
         let name_str = name.as_ref();
         let (name_part, fields_part) = match name_str.find(':') {
@@ -245,7 +246,8 @@ impl ExecCtx {
                 fields,
                 payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
             }));
-        self.stack[base + dest] = self.heap.intern(variant);
+        let iv = self.heap.intern(variant);
+        self.stack.unbox_into_reg(base, dest, iv)?;
         self.frames[frame_idx].ip = *ip;
         Ok(())
     }
@@ -315,7 +317,7 @@ impl ExecCtx {
             Value::Object(varn_types::value::ObjRef::from_pairs(
                 template.fields.iter().enumerate().map(|(idx, field_name)| {
                     let nv = if idx < arg_count {
-                        self.stack[base + arg_start + idx]
+                        self.stack.box_reg(base, arg_start + idx)
                     } else {
                         VmValue::null()
                     };
@@ -323,13 +325,13 @@ impl ExecCtx {
                 }),
             ))
         } else if arg_count == 1 {
-            let arg = self.stack[base + arg_start];
+            let arg = self.stack.box_reg(base, arg_start);
             self.heap.extract(arg)
         } else if arg_count > 1 {
             Value::Array(varn_types::value::ArrayRef::new(
                 (0..arg_count)
                     .map(|i| {
-                        let arg = self.stack[base + arg_start + i];
+                        let arg = self.stack.box_reg(base, arg_start + i);
                         self.heap.extract(arg)
                     })
                     .collect(),
@@ -420,24 +422,26 @@ impl ExecCtx {
         })?;
 
         if arg_count == 2 {
-            let s = self.stack[base + arg_start];
-            let e = self.stack[base + end_reg];
-            self.stack.push(s);
-            self.stack.push(e);
+            let s = self.stack.box_reg(base, arg_start);
+            let e = self.stack.box_reg(base, end_reg);
+            self.stage.clear();
+            self.stage.push(s);
+            self.stage.push(e);
         } else {
+            self.stage.clear();
             for i in 0..arg_count {
-                let v = self.stack[base + arg_start + i];
-                self.stack.push(v);
+                self.stage.push(self.stack.box_reg(base, arg_start + i));
             }
         }
 
         let result = crate::exec::advanced::invoke_runtime_static(
             &name,
-            &mut self.stack,
+            &mut self.stage,
             &mut self.heap,
             flag,
         )?;
-        self.stack[base + dest] = result;
+        self.stage.clear();
+        self.stack.unbox_into_reg(base, dest, result)?;
         self.frames[frame_idx].ip = *ip;
         Ok(())
     }

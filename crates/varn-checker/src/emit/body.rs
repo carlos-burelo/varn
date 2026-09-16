@@ -2096,6 +2096,19 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::As { expression, .. } => {
                 let inner = self.lower_expr(expression);
+                // `enumVal as int` means "this variant's raw value", not "the
+                // bits of the reference reinterpreted as an int" — the latter
+                // is what a bare `Cast` gives (it compiles to a `Move`,
+                // `ssa/emit/values.rs`), and a `Ref`-classed operand has no
+                // int bit pattern to reinterpret in the first place (the VM
+                // rejects the store outright once the destination register
+                // is genuinely `Gpr`). `.rawValue` is already how the
+                // language reads this value explicitly (`Status.Success.
+                // rawValue`); route the cast through the same lookup instead
+                // of inventing a second, narrower path to the same field.
+                if matches!(inner.ty, BackendTy::Enum(_)) && matches!(ty, BackendTy::Int) {
+                    return self.field_access(inner, Rc::from("rawValue"), ty, span);
+                }
                 return TirExpr {
                     kind: TirExprKind::Cast {
                         operand: Box::new(inner),
@@ -2763,6 +2776,48 @@ impl<'a> FnEmitter<'a> {
         let lhs = self.lower_expr(left);
         let rhs = self.lower_expr(right);
 
+        if op == BinaryOp::Eq || op == BinaryOp::NotEq {
+            let is_null_expr = |e: &TirExpr| -> bool {
+                matches!(e.kind, TirExprKind::NullLit)
+                    || e.ty.non_nullable(self.tt) == BackendTy::Never
+            };
+            let l_null = is_null_expr(&lhs);
+            let r_null = is_null_expr(&rhs);
+            if l_null || r_null {
+                let is_eq = op == BinaryOp::Eq;
+                if l_null && r_null {
+                    return TirExpr {
+                        kind: TirExprKind::BoolLit(is_eq),
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                let target = if r_null { lhs } else { rhs };
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::IsNull,
+                        operand: Box::new(target),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+                if is_eq {
+                    return is_null;
+                }
+                return TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::Not,
+                        operand: Box::new(is_null),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+        }
+
         let Some(top) = bin_op(op) else {
             if op == BinaryOp::Instanceof {
                 if let ExprKind::Identifier { name } = &right.kind {
@@ -2839,6 +2894,9 @@ impl<'a> FnEmitter<'a> {
                 BackendTy::Dynamic(DynReason::Unannotated)
             };
             return (lhs, rhs, ty);
+        }
+        if is_cmp && (l == BackendTy::Never || r == BackendTy::Never) {
+            return (lhs, rhs, BackendTy::Bool);
         }
         if l == r {
             let ty = if is_cmp {

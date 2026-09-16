@@ -247,12 +247,31 @@ impl<'r> Checker<'r> {
                 }
                 if let Some(members) = bind.type_members.classes.get(name) {
                     if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                        return Some((m.ty.clone(), m.symbol_id));
+                        // `is_optional` aquí también marca un campo que
+                        // ningún constructor garantiza asignar en todos sus
+                        // caminos (`binder::class::bind_class`) — se lee
+                        // `null` en runtime igual que un miembro de interfaz
+                        // ausente, así que se expone igual: `T | null`.
+                        let ty = if m.is_optional {
+                            Type::make_nullable(m.ty.clone())
+                        } else {
+                            m.ty.clone()
+                        };
+                        return Some((ty, m.symbol_id));
                     }
                 }
                 if let Some(members) = bind.type_members.interfaces.get(name) {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                        return Some((m.ty.clone(), m.symbol_id));
+                        // Miembro opcional de interface: puede ausentar en
+                        // runtime (objeto construido sin el campo) y la lectura
+                        // devuelve null. Exponerlo con el tipo plano minte —
+                        // misma razón que los miembros opcionales de Object.
+                        let ty = if m.is_optional {
+                            Type::make_nullable(m.ty.clone())
+                        } else {
+                            m.ty.clone()
+                        };
+                        return Some((ty, m.symbol_id));
                     }
                 }
                 if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
@@ -352,7 +371,29 @@ impl<'r> Checker<'r> {
             }
             TypeKind::Object(members) => members.iter().find(|m| m.name() == key).map(|m| {
                 let ty = match m {
+                    // Un miembro opcional puede AUSENTAR en runtime: el objeto
+                    // construido sin ese campo devuelve `null` al leerlo (la
+                    // VM tipada lo estampa en el registro del tipo del
+                    // miembro y rechaza el null). La verdad honesta es
+                    // `T | null` — el backend lo baja a Nullable y el null
+                    // viaja por el registro que corresponde.
+                    ObjectTypeMember::Property { ty, optional: true, .. } => {
+                        Type::make_nullable(ty.clone())
+                    }
                     ObjectTypeMember::Property { ty, .. } => ty.clone(),
+                    ObjectTypeMember::Method {
+                        params,
+                        return_type,
+
+                        is_arrow,
+                        optional: true,
+                        ..
+                    } => Type::make_nullable(Type::fn_(crate::types::FunctionType {
+                        params: params.clone(),
+                        return_type: return_type.clone(),
+                        is_arrow: *is_arrow,
+                        type_params: vec![],
+                    })),
                     ObjectTypeMember::Method {
                         params,
                         return_type,

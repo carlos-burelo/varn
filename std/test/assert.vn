@@ -17,7 +17,7 @@ export function incFailed(): void {
     failedCount = failedCount + 1;
 }
 
-export function isEq(a: dynamic, b: dynamic): bool {
+export function isEq<T>(a: T, b: T): bool {
     if (a === b || a == b) {
         return true;
     }
@@ -81,6 +81,14 @@ export function expect<T>(val: T): Expectation<T> {
     return new Expectation<T>(val);
 }
 
+// ── Compatibilidad con la suite existente ─────────────────────────────
+// `tests/` usa las formas flexibles originales (`assert("label", cond)`,
+// `assertEqual(label, actual, expected)`, `assertContains(arr, item)` …).
+// Estas 5 funciones aceptan la forma antigua Y la nueva mediante
+// desambiguación en runtime. Puente temporal hasta migrar `tests/` a la
+// API tipada; los helpers nuevos (`assertContainsItem`, `Expectation<T>`,
+// `assertNull<T>` …) quedan como API preferente.
+
 export function assert(a: dynamic, b?: dynamic): void {
     let cond: bool = false;
     let label: str = "assert";
@@ -102,7 +110,7 @@ export function assert(a: dynamic, b?: dynamic): void {
     passedCount = passedCount + 1;
 }
 
-export function assertEqual<T>(a: dynamic, b: dynamic, c?: dynamic): void {
+export function assertEqual(a: dynamic, b: dynamic, c?: dynamic): void {
     let label: str = "assertEqual";
     let actual: dynamic = a;
     let expected: dynamic = b;
@@ -184,26 +192,26 @@ export function assertFalse(a: dynamic, b?: dynamic): void {
     passedCount = passedCount + 1;
 }
 
-export function assertNull(val: dynamic, msg?: str): void {
+export function assertNull<T>(val: T?, msg: str = "assertNull"): void {
     if (val !== null) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertNull") + " (expected null, got " + val + ")");
+        throw new Error("ASSERT FAIL: " + msg + " (expected null, got " + val + ")");
     }
     passedCount = passedCount + 1;
 }
 
-export function assertNotNull(val: dynamic, msg?: str): void {
+export function assertNotNull<T>(val: T?, msg: str = "assertNotNull"): void {
     if (val === null) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertNotNull") + " (expected non-null value)");
+        throw new Error("ASSERT FAIL: " + msg + " (expected non-null value)");
     }
     passedCount = passedCount + 1;
 }
 
-export function assertNotEqual(a: dynamic, b: dynamic, msg?: str): void {
+export function assertNotEqual<T>(a: T, b: T, msg: str = "assertNotEqual"): void {
     if (isEq(a, b)) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertNotEqual") + " (expected values to differ, got " + a + ")");
+        throw new Error("ASSERT FAIL: " + msg + " (expected values to differ, got " + a + ")");
     }
     passedCount = passedCount + 1;
 }
@@ -227,18 +235,32 @@ export function assertContains(container: dynamic, item: dynamic, msg?: str): vo
     passedCount = passedCount + 1;
 }
 
-export function assertCloseTo(a: float, b: float, epsilon?: float, msg?: str): void {
-    let eps = epsilon ?? 0.00001;
-    let diff = a - b;
-    if (diff < 0.0) diff = -diff;
-    if (diff > eps) {
+export function assertContainsItem<T>(container: T[], item: T, msg: str = "assertContainsItem"): void {
+    let found = false;
+    for (let elem of container) {
+        if (isEq(elem, item)) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertCloseTo") + " (" + a + " is not close to " + b + " within " + eps + ")");
+        throw new Error("ASSERT FAIL: " + msg + " (array does not contain item)");
     }
     passedCount = passedCount + 1;
 }
 
-export function assertThrows(fn: () => void, expectedErr?: str, msg?: str): void {
+export function assertCloseTo(a: float, b: float, epsilon: float = 0.00001, msg: str = "assertCloseTo"): void {
+    let diff = a - b;
+    if (diff < 0.0) diff = -diff;
+    if (diff > epsilon) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + msg + " (" + a + " is not close to " + b + " within " + epsilon + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertThrows(fn: () => void, expectedErr: str = "", msg: str = "assertThrows"): void {
     let threw = false;
     let errMessage = "";
     try {
@@ -258,20 +280,20 @@ export function assertThrows(fn: () => void, expectedErr?: str, msg?: str): void
     }
     if (!threw) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertThrows") + " (function did not throw)");
+        throw new Error("ASSERT FAIL: " + msg + " (function did not throw)");
     }
-    if (expectedErr !== null && expectedErr.length > 0) {
+    if (expectedErr.length > 0) {
         if (!errMessage.includes(expectedErr)) {
             failedCount = failedCount + 1;
-            throw new Error("ASSERT FAIL: " + (msg ?? "assertThrows") + " (expected error containing '" + expectedErr + "', got '" + errMessage + "')");
+            throw new Error("ASSERT FAIL: " + msg + " (expected error containing '" + expectedErr + "', got '" + errMessage + "')");
         }
     }
     passedCount = passedCount + 1;
 }
 
-export function fail(msg?: str): void {
+export function fail(msg: str = "fail"): void {
     failedCount = failedCount + 1;
-    throw new Error("ASSERT FAIL: " + (msg ?? "fail"));
+    throw new Error("ASSERT FAIL: " + msg);
 }
 
 export function summary(): void {

@@ -1,26 +1,7 @@
-use std::mem::MaybeUninit;
-
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_types::{Value, VmArray};
-
-#[inline(always)]
-unsafe fn copy_args_to_buf(
-    stack: &[VmValue],
-    base: usize,
-    arg_start: usize,
-    arg_count: usize,
-    buf: &mut [MaybeUninit<VmValue>; 16],
-) -> usize {
-    let n = arg_count.min(16);
-    if n > 0 {
-        let src_ptr = stack.as_ptr().add(base + arg_start);
-        let dest_ptr = buf.as_mut_ptr() as *mut VmValue;
-        std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, n);
-    }
-    n
-}
 
 impl ExecCtx {
     pub(crate) fn exec_call_reg(
@@ -32,6 +13,9 @@ impl ExecCtx {
         dest: usize,
         frame_idx: usize,
     ) -> VmResult<bool> {
+        // Receiver pendiente para el camino lento (bound-method que no entró
+        // en vía rápida): ocupa staging[0] al preparar.
+        let mut pending_receiver: Option<VmValue> = None;
         if callee.is_heap() {
             let heap_idx = callee.as_heap_idx();
             if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx) {
@@ -44,24 +28,25 @@ impl ExecCtx {
                             let is_jit = nc.jit_fn().is_some();
                             self.record_hotspot_fn(fn_name, is_jit);
                         }
-                        let new_base = self.stack.len();
                         if self.frames.len() >= 10000 {
                             return Err(crate::error::RuntimeError::new(
                                 "stack overflow: call depth exceeded 10000",
                             ));
                         }
-                        let required = new_base + nc.proto.register_count as usize;
-                        if self.stack.len() < required {
-                            self.stack.resize(required, VmValue::null());
-                        }
-                        if arg_count > 0 {
-                            unsafe {
-                                let src = self.stack.as_ptr().add(base + arg_start);
-                                let dst = self.stack.as_mut_ptr().add(new_base);
-                                std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                        // La ventana ya trae [pad, args...] en el frame
+                        // llamante: se mueve directo a los registros del
+                        // callee (conversión por clase, sin boxeo intermedio
+                        // cuando las clases coinciden).
+                        let alloc = self.stack.push_frame(&nc.proto);
+                        for i in 0..arg_count {
+                            if let Err(e) =
+                                self.stack.mov_cross(alloc, i, base, arg_start + i)
+                            {
+                                self.stack.pop_frame();
+                                return Err(e);
                             }
                         }
-                        let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                        let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                         frame.return_reg = dest as u16;
                         self.record_call_vm_fast();
                         self.frames.push(frame);
@@ -81,41 +66,15 @@ impl ExecCtx {
                     varn_types::value::BoundMethodTarget::Native { func, name, .. } => {
                         let f = *func;
                         self.record_call_native(f, Some(name));
-                        let has_placeholder = base + arg_start < self.stack.len();
-                        let result = if has_placeholder {
-                            self.stack[base + arg_start] = receiver;
-                            if arg_count <= 16 {
-                                let mut buf: [MaybeUninit<VmValue>; 16] =
-                                    unsafe { MaybeUninit::uninit().assume_init() };
-                                let n = unsafe {
-                                    copy_args_to_buf(
-                                        &self.stack,
-                                        base,
-                                        arg_start,
-                                        arg_count,
-                                        &mut buf,
-                                    )
-                                };
-                                let slice = unsafe {
-                                    std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
-                                };
-                                self.invoke_native(f, slice)
-                            } else {
-                                let varn_args: Vec<VmValue> = (0..arg_count)
-                                    .map(|i| self.stack[base + arg_start + i])
-                                    .collect();
-                                self.invoke_native(f, &varn_args)
-                            }
+                        let args = self.stack.box_range(base, arg_start, arg_count);
+                        let mut args = args;
+                        if !args.is_empty() {
+                            args[0] = receiver;
                         } else {
-                            let mut varn_args = Vec::with_capacity(arg_count + 1);
-                            varn_args.push(receiver);
-                            for i in 0..arg_count {
-                                varn_args.push(self.stack[base + arg_start + i]);
-                            }
-                            self.invoke_native(f, &varn_args)
+                            args.push(receiver);
                         }
-                        .map_err(crate::error::RuntimeError::new)?;
-                        self.stack[base + dest] = result;
+                        let result = self.invoke_native(f, &args).map_err(crate::error::RuntimeError::new)?;
+                        self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }
                     varn_types::value::BoundMethodTarget::Vm {
@@ -134,33 +93,29 @@ impl ExecCtx {
                             {
                                 let nc = nc.clone();
                                 let owner = owner_class.clone();
-                                self.stack.push(VmValue::null());
-
-                                if arg_count == arity - 1 {
-                                    self.stack.push(receiver);
-                                    for i in 0..arg_count {
-                                        let v = self.stack[base + arg_start + i];
-                                        self.stack.push(v);
-                                    }
-                                } else {
-                                    self.stack.push(receiver);
-                                    for i in 1..arg_count {
-                                        let v = self.stack[base + arg_start + i];
-                                        self.stack.push(v);
-                                    }
-                                }
-
                                 if self.frames.len() >= 10000 {
                                     return Err(crate::error::RuntimeError::new(
                                         "stack overflow: call depth exceeded 10000",
                                     ));
                                 }
-                                let new_base = self.stack.len() - arity;
-                                let required = new_base + nc.proto.register_count as usize;
-                                if self.stack.len() < required {
-                                    self.stack.resize(required, VmValue::null());
+                                // Ventana: [receiver?, args...] → regs
+                                // [r0=receiver, r1..]. Con placeholder, el
+                                // receiver lo sustituye; sin él va delante.
+                                let alloc = self.stack.push_frame(&nc.proto);
+                                let mut dst = 0usize;
+                                self.stack.unbox_into_reg(alloc, dst, receiver)?;
+                                dst += 1;
+                                let first_arg = if arg_count == arity { 1 } else { 0 };
+                                for i in first_arg..arg_count {
+                                    if let Err(e) =
+                                        self.stack.mov_cross(alloc, dst, base, arg_start + i)
+                                    {
+                                        self.stack.pop_frame();
+                                        return Err(e);
+                                    }
+                                    dst += 1;
                                 }
-                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                                let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                                 frame.return_reg = dest as u16;
                                 frame.current_class = owner;
                                 self.record_call_vm_fast();
@@ -171,57 +126,23 @@ impl ExecCtx {
                     }
                 }
 
-                let has_placeholder = match &bm.target {
-                    varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
-                        if let Some(nc_w) = closure
-                            .as_any()
-                            .downcast_ref::<crate::closure::VmClosurePayload>()
-                        {
-                            arg_count == nc_w.0.proto.arity
-                        } else {
-                            false
-                        }
-                    }
-                    varn_types::value::BoundMethodTarget::Native { .. } => {
-                        base + arg_start < self.stack.len()
-                    }
-                };
-                if has_placeholder {
-                    self.stack[base + arg_start] = receiver;
-                }
+                // El receiver se estampa en staging[0] para el camino lento:
+                // el código anterior lo hacía siempre (con placeholder lo
+                // sustituía; sin él ocupaba el primer slot pusheado) y
+                // `prepare_call` lo re-aplica de forma idempotente.
+                pending_receiver = Some(receiver);
             } else {
                 match self.heap.get(callee.as_heap_idx()) {
                     Some(crate::heap::HeapObj::NativeFn(f, name)) => {
                         let f = *f;
                         let name_str = *name;
                         self.record_call_native(f, Some(name_str));
-                        let result = if arg_count <= 16 {
-                            let mut buf: [MaybeUninit<VmValue>; 16] =
-                                unsafe { MaybeUninit::uninit().assume_init() };
-                            let n = unsafe {
-                                copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
-                            };
-
-                            let slice = if n > 1 {
-                                unsafe {
-                                    std::slice::from_raw_parts(
-                                        buf.as_ptr().cast::<VmValue>().add(1),
-                                        n - 1,
-                                    )
-                                }
-                            } else {
-                                &[]
-                            };
-                            self.invoke_native(f, slice)
-                        } else {
-                            let varn_args: Vec<VmValue> = (0..arg_count)
-                                .map(|i| self.stack[base + arg_start + i])
-                                .collect();
-                            let slice = if arg_count > 1 { &varn_args[1..] } else { &[] };
-                            self.invoke_native(f, slice)
-                        }
-                        .map_err(crate::error::RuntimeError::new)?;
-                        self.stack[base + dest] = result;
+                        let args = self.stack.box_range(base, arg_start, arg_count);
+                        let slice = if args.len() > 1 { &args[1..] } else { &[] };
+                        let result = self
+                            .invoke_native(f, slice)
+                            .map_err(crate::error::RuntimeError::new)?;
+                        self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }
                     Some(crate::heap::HeapObj::VmClosure(nc))
@@ -236,24 +157,21 @@ impl ExecCtx {
                                 let is_jit = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(fn_name, is_jit);
                             }
-                            let new_base = self.stack.len();
                             if self.frames.len() >= 10000 {
                                 return Err(crate::error::RuntimeError::new(
                                     "stack overflow: call depth exceeded 10000",
                                 ));
                             }
-                            let required = new_base + nc.proto.register_count as usize;
-                            if self.stack.len() < required {
-                                self.stack.resize(required, VmValue::null());
-                            }
-                            if arg_count > 0 {
-                                unsafe {
-                                    let src = self.stack.as_ptr().add(base + arg_start);
-                                    let dst = self.stack.as_mut_ptr().add(new_base);
-                                    std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                            let alloc = self.stack.push_frame(&nc.proto);
+                            for i in 0..arg_count {
+                                if let Err(e) =
+                                    self.stack.mov_cross(alloc, i, base, arg_start + i)
+                                {
+                                    self.stack.pop_frame();
+                                    return Err(e);
                                 }
                             }
-                            let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                             frame.return_reg = dest as u16;
                             self.record_call_vm_fast();
                             self.frames.push(frame);
@@ -263,38 +181,58 @@ impl ExecCtx {
                             let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                             let is_jit2 = nc.jit_fn().is_some();
                             self.record_hotspot_fn(&fn_name2, is_jit2);
-                            let rest_idx = arity.saturating_sub(1);
-                            let regular_count = arg_count.min(rest_idx);
-                            for i in 0..regular_count {
-                                let v = self.stack[base + arg_start + i];
-                                self.stack.push(v);
-                            }
-                            for _ in regular_count..rest_idx {
-                                self.stack.push(VmValue::null());
-                            }
-                            let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                                (rest_idx..arg_count)
-                                    .map(|i| self.stack[base + arg_start + i])
-                                    .collect()
-                            } else {
-                                vec![]
-                            };
-                            let rest_nv = VmValue::from_heap_idx(
-                                self.heap
-                                    .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-                            );
-                            self.stack.push(rest_nv);
                             if self.frames.len() >= 10000 {
                                 return Err(crate::error::RuntimeError::new(
                                     "stack overflow: call depth exceeded 10000",
                                 ));
                             }
-                            let new_base = self.stack.len() - arity;
-                            let required = new_base + nc.proto.register_count as usize;
-                            if self.stack.len() < required {
-                                self.stack.resize(required, VmValue::null());
+                            let alloc = self.stack.push_frame(&nc.proto);
+                            let rest_idx = arity.saturating_sub(1);
+                            let regular_count = arg_count.min(rest_idx);
+                            let mut failed: Option<crate::error::RuntimeError> = None;
+                            for i in 0..regular_count {
+                                if let Err(e) =
+                                    self.stack.mov_cross(alloc, i, base, arg_start + i)
+                                {
+                                    failed = Some(e);
+                                    break;
+                                }
                             }
-                            let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
+                            if failed.is_none() {
+                                for i in regular_count..rest_idx {
+                                    // `null` de relleno (igual que antes).
+                                    if let Err(e) = self.stack.unbox_into_reg(
+                                        alloc,
+                                        i,
+                                        VmValue::null(),
+                                    ) {
+                                        failed = Some(e);
+                                        break;
+                                    }
+                                }
+                            }
+                            if failed.is_none() {
+                                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                                    (rest_idx..arg_count)
+                                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                                        .collect()
+                                } else {
+                                    vec![]
+                                };
+                                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
+                                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                                ));
+                                if let Err(e) =
+                                    self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
+                                {
+                                    failed = Some(e);
+                                }
+                            }
+                            if let Some(e) = failed {
+                                self.stack.pop_frame();
+                                return Err(e);
+                            }
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                             frame.return_reg = dest as u16;
                             self.record_call_vm_fast();
                             self.frames.push(frame);
@@ -306,9 +244,18 @@ impl ExecCtx {
             }
         }
 
+        // Camino lento: la ventana se prepara en staging y `prepare_call` la
+        // adopta (frames), la drena (nativas/generadores/async) o la empaqueta.
+        self.stage.clear();
         for i in 0..arg_count {
-            let v = self.stack[base + arg_start + i];
-            self.push(v);
+            self.stage.push(self.stack.box_reg(base, arg_start + i));
+        }
+        if let Some(recv) = pending_receiver {
+            if self.stage.is_empty() {
+                self.stage.push(recv);
+            } else {
+                self.stage[0] = recv;
+            }
         }
 
         let prepared = self.prepare_call(callee, arg_count)?;
@@ -316,21 +263,11 @@ impl ExecCtx {
 
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = dest as u16;
-            let last = self.frames.last().unwrap();
-            let req = last.base + last.closure().proto.register_count as usize;
-            if self.stack.len() < req {
-                self.stack.resize(req, VmValue::null());
-            }
             return Ok(true);
         }
 
-        let result = self.stack.pop().unwrap_or(VmValue::null());
-        let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure().proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
-        self.stack[base + dest] = result;
+        let result = self.stage_pop();
+        self.stack.unbox_into_reg(base, dest, result)?;
         Ok(false)
     }
 
@@ -346,10 +283,17 @@ impl ExecCtx {
         let closure_ptr = parent_frame.closure_ptr;
         let closure_ref = unsafe { &*closure_ptr };
 
-        let callee = if parent_frame.base > 0 {
-            self.stack[parent_frame.base - 1]
-        } else {
-            VmValue::null()
+        // Vía lenta: el callee es el propio closure. El código anterior lo
+        // leía de `stack[base-1]` (el slot bajo el frame), que no contiene el
+        // callee en ningún protocolo de staging: con frames del camino rápido
+        // es el último registro del llamante y con frames lentos el primer
+        // slot pusheado. La vía rápida (la única que los tests ejercitan) ni
+        // lo miraba. Aquí se materializa del `Rc` retenido (o null limpio si
+        // el frame es prestado, que `prepare_call` convierte en "not callable"
+        // en vez de basura reinterpretada).
+        let callee = match &parent_frame._owned_closure {
+            Some(rc) => self.heap.alloc_vm_closure(rc.clone()),
+            None => VmValue::null(),
         };
 
         if !closure_ref.proto.is_generator && !closure_ref.proto.is_async {
@@ -361,25 +305,21 @@ impl ExecCtx {
                     let is_jit = closure_ref.jit_fn().is_some();
                     self.record_hotspot_fn(fn_name, is_jit);
                 }
-                let new_base = self.stack.len();
                 if self.frames.len() >= 10000 {
                     return Err(crate::error::RuntimeError::new(
                         "stack overflow: call depth exceeded 10000",
                     ));
                 }
-                let required = new_base + closure_ref.proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
-                if arg_count > 0 {
-                    unsafe {
-                        let src = self.stack.as_ptr().add(base + arg_start);
-                        let dst = self.stack.as_mut_ptr().add(new_base);
-                        std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                let owned = self.frames[frame_idx]._owned_closure.clone();
+                let alloc = self.stack.push_frame(&closure_ref.proto);
+                for i in 0..arg_count {
+                    if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
+                        self.stack.pop_frame();
+                        return Err(e);
                     }
                 }
-                let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
-                frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
+                let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+                frame._owned_closure = owned;
                 frame.return_reg = dest as u16;
                 self.record_call_vm_fast();
                 self.frames.push(frame);
@@ -393,39 +333,53 @@ impl ExecCtx {
                     .to_owned();
                 let is_jit2 = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(&fn_name2, is_jit2);
-                let rest_idx = arity.saturating_sub(1);
-                let regular_count = arg_count.min(rest_idx);
-                for i in 0..regular_count {
-                    let v = self.stack[base + arg_start + i];
-                    self.stack.push(v);
-                }
-                for _ in regular_count..rest_idx {
-                    self.stack.push(VmValue::null());
-                }
-                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                    (rest_idx..arg_count)
-                        .map(|i| self.stack[base + arg_start + i])
-                        .collect()
-                } else {
-                    vec![]
-                };
-                let rest_nv = VmValue::from_heap_idx(
-                    self.heap
-                        .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-                );
-                self.stack.push(rest_nv);
                 if self.frames.len() >= 10000 {
                     return Err(crate::error::RuntimeError::new(
                         "stack overflow: call depth exceeded 10000",
                     ));
                 }
-                let new_base = self.stack.len() - arity;
-                let required = new_base + closure_ref.proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
+                let owned = self.frames[frame_idx]._owned_closure.clone();
+                let alloc = self.stack.push_frame(&closure_ref.proto);
+                let rest_idx = arity.saturating_sub(1);
+                let regular_count = arg_count.min(rest_idx);
+                let mut failed: Option<crate::error::RuntimeError> = None;
+                for i in 0..regular_count {
+                    if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
+                        failed = Some(e);
+                        break;
+                    }
                 }
-                let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
-                frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
+                if failed.is_none() {
+                    for i in regular_count..rest_idx {
+                        if let Err(e) =
+                            self.stack.unbox_into_reg(alloc, i, VmValue::null())
+                        {
+                            failed = Some(e);
+                            break;
+                        }
+                    }
+                }
+                if failed.is_none() {
+                    let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                        (rest_idx..arg_count)
+                            .map(|i| self.stack.box_reg(base, arg_start + i))
+                            .collect()
+                    } else {
+                        vec![]
+                    };
+                    let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
+                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                    ));
+                    if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
+                        failed = Some(e);
+                    }
+                }
+                if let Some(e) = failed {
+                    self.stack.pop_frame();
+                    return Err(e);
+                }
+                let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+                frame._owned_closure = owned;
                 frame.return_reg = dest as u16;
                 self.record_call_vm_fast();
                 self.frames.push(frame);
@@ -433,29 +387,19 @@ impl ExecCtx {
             }
         }
 
-        self.push(callee);
+        self.stage.clear();
+        self.stage.push(callee);
         for i in 0..arg_count {
-            let v = self.stack[base + arg_start + i];
-            self.push(v);
+            self.stage.push(self.stack.box_reg(base, arg_start + i));
         }
         let prepared = self.prepare_call(callee, arg_count)?;
         self.dispatch_prepared_call(prepared)?;
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = dest as u16;
-            let last = self.frames.last().unwrap();
-            let req = last.base + last.closure().proto.register_count as usize;
-            if self.stack.len() < req {
-                self.stack.resize(req, VmValue::null());
-            }
             return Ok(true);
         }
-        let result = self.stack.pop().unwrap_or(VmValue::null());
-        let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure().proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
-        self.stack[base + dest] = result;
+        let result = self.stage_pop();
+        self.stack.unbox_into_reg(base, dest, result)?;
         Ok(false)
     }
 
@@ -470,7 +414,7 @@ impl ExecCtx {
     ) -> VmResult<bool> {
         let mut expanded = Vec::new();
         for i in 0..arg_count {
-            let nv = self.stack[base + arg_start + i];
+            let nv = self.stack.box_reg(base, arg_start + i);
             match self.heap.extract(nv) {
                 Value::Spread(inner) => match *inner {
                     Value::Array(arr) => {
@@ -489,30 +433,21 @@ impl ExecCtx {
             }
         }
         let flat_count = expanded.len();
-        self.push(callee);
+        self.stage.clear();
+        self.stage.push(callee);
         for nv in expanded {
-            self.push(nv);
+            self.stage.push(nv);
         }
         let prepared = self.prepare_call(callee, flat_count)?;
         self.dispatch_prepared_call(prepared)?;
 
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = dest as u16;
-            let last = self.frames.last().unwrap();
-            let req = last.base + last.closure().proto.register_count as usize;
-            if self.stack.len() < req {
-                self.stack.resize(req, VmValue::null());
-            }
             return Ok(true);
         }
 
-        let result = self.stack.pop().unwrap_or(VmValue::null());
-        let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure().proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
-        self.stack[base + dest] = result;
+        let result = self.stage_pop();
+        self.stack.unbox_into_reg(base, dest, result)?;
         Ok(false)
     }
 }

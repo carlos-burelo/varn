@@ -172,7 +172,22 @@ fn build_one_class(
                 if !inherited_fields.contains_key(&m.name)
                     && seen_field.insert(m.name.clone(), ()).is_none()
                 {
-                    fields.push((m.name.clone(), lower_type(&m.ty, tt, names)));
+                    // `is_optional` en un field de clase (puesto por
+                    // `binder::class::bind_class` cuando ningún constructor
+                    // garantiza asignarlo) significa lo mismo que en una
+                    // interfaz: la lectura puede dar `null` en runtime.
+                    // `member_type.rs` ya lo expone así al checker — este es
+                    // el OTRO camino al mismo campo (`field_access` en
+                    // `emit/body.rs`, vía `ClassInfo.fields`), y sin este
+                    // mismo envoltorio el nodo TIR se tipaba con el `int`/
+                    // `float`/`Ref` puro: la VM tipada rechaza el `null` real
+                    // que ese campo sin escribir siempre pudo devolver.
+                    let field_ty = if m.is_optional {
+                        Type::make_nullable(m.ty.clone())
+                    } else {
+                        m.ty.clone()
+                    };
+                    fields.push((m.name.clone(), lower_type(&field_ty, tt, names)));
                 }
             }
             ClassMemberKind::Method | ClassMemberKind::Function => {

@@ -10,9 +10,9 @@ export class RawRequest {
 }
 
 export function parseRawRequest(raw: str): RawRequest? {
-    let parsed: dynamic = parseHttpRequest$(raw);
+    let parsed: RawRequest? = parseHttpRequest$(raw);
     if (parsed === null) return null;
-    
+
     let req = new RawRequest();
     req.method = parsed.method;
     req.path = parsed.path;
@@ -70,7 +70,10 @@ export class Request {
     params: { [key: str]: str } = {};
     cookies: { [key: str]: str } = {};
 
-    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: dynamic = {}, body: str = "") {
+    // Compat: acepta `method` posicional ("GET") o init estilo Web
+    // (`{method, headers, body}`). La forma init la usa la suite y el
+    // estándar Web; la posicional, el resto del std.
+    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: { [key: str]: str } = {}, body: str = "") {
         this.url = url;
         this.path = url;
         this.query = {};
@@ -102,9 +105,8 @@ export class Request {
 
         let cookieHdr = this.headers.get("cookie");
         if (cookieHdr !== null) {
-            let cookieStr = cookieHdr as str;
-            if (cookieStr.length > 0) {
-                let pairs = cookieStr.split(";");
+            if (cookieHdr.length > 0) {
+                let pairs = cookieHdr.split(";");
                 for (let p of pairs) {
                     let eq = p.indexOf("=");
                     if (eq > 0) {

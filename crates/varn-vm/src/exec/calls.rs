@@ -1,6 +1,7 @@
 use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
 use crate::error::{RuntimeError, VmResult};
 use crate::frame::CallFrame;
+use crate::frame_store::FrameStore;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
@@ -44,12 +45,57 @@ pub(crate) fn build_closure(
     Rc::new(VmClosure::new(proto, constants, settings))
 }
 
+/// La ventana de llamada son los ÚLTIMOS `arg_count` valores de staging: los
+/// caminos de método anteponen el `method_nv` fuera de la ventana (mismo
+/// convenio del `stack.len() - arg_count` anterior).
+#[inline]
+fn stage_window(staging: &[VmValue], arg_count: usize) -> &[VmValue] {
+    let start = staging.len().saturating_sub(arg_count);
+    &staging[start..]
+}
+
+/// Materializa un frame VM adoptando la ventana de staging.
+///
+/// La ventana se adopta ALINEADA A LA IZQUIERDA y SOLO hasta `arity`: `r0` es
+/// el callee/placeholder y `r1..` los args declarados en orden. Los registros
+/// restantes son TEMPORALES del cuerpo (tipados por `register_meta`): no
+/// adoptan valores de la ventana — un arg extra no declarado (los
+/// `(item, index, array)` que `map` pasa a un callback de 1 parámetro) o el
+/// valor de un temporal no puede acabar reinterpreto en un registro `Int`.
+/// Quedan en su default de clase (los temps se escriben antes de leerse, y el
+/// `null` == el padding del stack anterior).
+///
+/// La conversión a la clase de cada registro (ensanchado `int`→`float`
+/// incluido) hace de un desajuste un `type mismatch`, nunca basura
+/// reinterpretada.
+pub(crate) fn materialize_frame(
+    store: &mut FrameStore,
+    nc: &Rc<VmClosure>,
+    window: &[VmValue],
+) -> VmResult<CallFrame> {
+    let alloc = store.push_frame(&nc.proto);
+    let nparams = (nc.proto.arity as usize).min(nc.proto.register_count as usize);
+    for r in 0..nparams {
+        let v = window.get(r).copied().unwrap_or_else(VmValue::null);
+        if store.unbox_into_reg(alloc, r, v).is_err() {
+            store.pop_frame();
+            return Err(RuntimeError::new(format!(
+                "type mismatch: argument {} does not fit parameter of '{}'",
+                r,
+                nc.proto.name.as_deref().unwrap_or("<anon>")
+            )));
+        }
+    }
+    Ok(CallFrame::new(nc, alloc))
+}
+
 #[inline(always)]
 pub(crate) fn try_prepare_call_fast(
     callee_nv: VmValue,
     arg_count: usize,
-    stack: &[VmValue],
+    staging: &[VmValue],
     heap: &Heap,
+    store: &mut FrameStore,
 ) -> Option<(PreparedCall, bool)> {
     if !callee_nv.is_heap() {
         return None;
@@ -61,8 +107,11 @@ pub(crate) fn try_prepare_call_fast(
                 && !nc.proto.is_async
                 && (!nc.proto.has_rest || arg_count <= nc.proto.arity)
             {
-                let base = stack.len() - arg_count;
-                return Some((PreparedCall::Frame(CallFrame::new(nc, base)), false));
+                // La ventana lenta trae callee+args como los últimos
+                // `arg_count` valores de staging.
+                let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
+                let frame = materialize_frame(store, nc, &window).ok()?;
+                return Some((PreparedCall::Frame(frame), false));
             }
             None
         }
@@ -104,19 +153,20 @@ fn describe_generator(
     nc: &Rc<VmClosure>,
     arg_count: usize,
     current_class: Option<Rc<varn_types::ClassObj>>,
-    stack: &mut Vec<VmValue>,
+    staging: &mut Vec<VmValue>,
     heap: &mut Heap,
     settings: crate::settings::ExecSettings,
+    store: &FrameStore,
 ) -> PreparedCall {
-    let args_start = stack.len() - arg_count;
-    let args: Vec<VmValue> = stack.drain(args_start..).collect();
+    let args_start = staging.len() - arg_count;
+    let args: Vec<VmValue> = staging.drain(args_start..).collect();
     let constants = resolve_constants(&nc.proto, heap);
-    // Read AFTER the drain: an upvalue points at a stack location, and the
-    // argument window is gone by now.
+    // Leer DESPUÉS del drain con el store (los upvalues abiertos apuntan a
+    // slots del frame, no a staging).
     let upvalues = nc
         .upvalues
         .iter()
-        .map(|uv| VmUpvalue::closed(uv.read(stack)))
+        .map(|uv| VmUpvalue::closed(uv.read(store)))
         .collect();
     let mut gen_closure =
         VmClosure::with_upvalues(nc.proto.clone(), upvalues, Rc::new(constants), settings);
@@ -131,9 +181,10 @@ fn describe_generator(
 pub(crate) fn prepare_call(
     callee_nv: VmValue,
     arg_count: usize,
-    stack: &mut Vec<VmValue>,
+    staging: &mut Vec<VmValue>,
     heap: &mut Heap,
     settings: crate::settings::ExecSettings,
+    store: &mut FrameStore,
 ) -> VmResult<PreparedCall> {
     let mut arg_count = arg_count;
 
@@ -144,15 +195,15 @@ pub(crate) fn prepare_call(
         {
             HeapObj::VmClosure(nc) => {
                 let nc = nc.clone();
-                bundle_rest_args(&nc.proto, &mut arg_count, stack, heap);
+                bundle_rest_args(&nc.proto, &mut arg_count, staging, heap);
                 if nc.proto.is_generator {
                     return Ok(describe_generator(
-                        &nc, arg_count, None, stack, heap, settings,
+                        &nc, arg_count, None, staging, heap, settings, store,
                     ));
                 }
                 if nc.proto.is_async {
-                    let args_start = stack.len() - arg_count;
-                    let args: Vec<Value> = stack
+                    let args_start = staging.len().saturating_sub(arg_count);
+                    let args: Vec<Value> = staging
                         .drain(args_start..)
                         .map(|nv| heap.extract(nv))
                         .collect();
@@ -160,7 +211,7 @@ pub(crate) fn prepare_call(
                         .upvalues
                         .iter()
                         .map(|uv| {
-                            let nv = uv.read(stack);
+                            let nv = uv.read(store);
                             let val = heap.extract(nv);
                             varn_types::Upvalue {
                                 inner: std::rc::Rc::new(std::cell::RefCell::new(
@@ -188,8 +239,9 @@ pub(crate) fn prepare_call(
 
                     return Ok(PreparedCall::PushValue(heap.intern(task)));
                 }
-                let base = stack.len() - nc.proto.arity;
-                return Ok(PreparedCall::Frame(CallFrame::new(&nc, base)));
+                let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
+                let _ = arg_count;
+                return Ok(PreparedCall::Frame(materialize_frame(store, &nc, &window)?));
             }
             HeapObj::NativeFn(f, _name) => {
                 let func = *f;
@@ -200,13 +252,17 @@ pub(crate) fn prepare_call(
                 match bm.target {
                     BoundMethodTarget::Native { func, .. } => {
                         let recv_nv = heap.intern(bm.receiver);
-                        let args_start = stack.len() - arg_count;
                         let mut final_count = arg_count;
-                        if args_start >= stack.len() {
-                            stack.push(recv_nv);
+                        // El placeholder de callee es el PRIMER valor de la
+                        // ventana (los últimos `arg_count` de staging), no
+                        // `staging[0]`: los caminos de método anteponen el
+                        // `method_nv` fuera de la ventana.
+                        if staging.is_empty() {
+                            staging.push(recv_nv);
                             final_count = 1;
                         } else {
-                            stack[args_start] = recv_nv;
+                            let start = staging.len().saturating_sub(arg_count);
+                            staging[start] = recv_nv;
                         }
                         return Ok(PreparedCall::NativeImmediate(func, final_count));
                     }
@@ -224,33 +280,32 @@ pub(crate) fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
-                        // `arity` already counts register 0 — the callee slot the
-                        // caller stages as a null placeholder — plus the declared
-                        // params, so the receiver FILLS that slot rather than
-                        // shifting it. A caller that staged only the args (no
-                        // placeholder) is one short, and gets the receiver
-                        // inserted in front instead.
+                        // `arity` ya cuenta el registro 0 — el slot de callee
+                        // que el llamante prepara como placeholder null — más
+                        // los params declarados: el receiver RELLENA ese slot
+                        // en staging[0] en vez de desplazar.
                         let mut full_arg_count = arg_count;
-                        let base = stack.len() - arg_count;
-                        if base >= stack.len() {
-                            stack.push(recv_nv);
+                        if staging.is_empty() {
+                            staging.push(recv_nv);
                             full_arg_count = 1;
                         } else {
-                            stack[base] = recv_nv;
+                            let start = staging.len().saturating_sub(full_arg_count);
+                            staging[start] = recv_nv;
                         }
                         if nc.proto.is_generator {
                             return Ok(describe_generator(
                                 &nc,
                                 full_arg_count,
                                 owner_class,
-                                stack,
+                                staging,
                                 heap,
                                 settings,
+                                store,
                             ));
                         }
                         if nc.proto.is_async {
-                            let args_start = stack.len() - full_arg_count;
-                            let args: Vec<Value> = stack
+                            let args_start = staging.len().saturating_sub(full_arg_count);
+                            let args: Vec<Value> = staging
                                 .drain(args_start..)
                                 .map(|nv| heap.extract(nv))
                                 .collect();
@@ -258,7 +313,7 @@ pub(crate) fn prepare_call(
                                 .upvalues
                                 .iter()
                                 .map(|uv| {
-                                    let nv = uv.read(stack);
+                                    let nv = uv.read(store);
                                     let val = heap.extract(nv);
                                     varn_types::Upvalue {
                                         inner: std::rc::Rc::new(std::cell::RefCell::new(
@@ -287,9 +342,11 @@ pub(crate) fn prepare_call(
                             return Ok(PreparedCall::PushValue(heap.intern(task)));
                         }
                         if !nc.proto.is_generator && !nc.proto.is_async {
-                            bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
-                            let final_base = stack.len() - full_arg_count;
-                            let mut frame = CallFrame::new(&nc, final_base);
+                            bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
+                            let window: Vec<VmValue> =
+                                stage_window(staging, full_arg_count).to_vec();
+                            let _ = full_arg_count;
+                            let mut frame = materialize_frame(store, &nc, &window)?;
                             frame.current_class = owner_class;
                             if nc.proto.name.as_deref() == Some("constructor") {
                                 return Ok(PreparedCall::Constructor(frame, recv_nv));
@@ -306,12 +363,12 @@ pub(crate) fn prepare_call(
                 let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Instance(inst)));
                 if let Some(ctor) = cls.constructor() {
                     let mut full_arg_count = arg_count;
-                    let base = stack.len() - arg_count;
-                    if base >= stack.len() {
-                        stack.push(instance_nv);
+                    if staging.is_empty() {
+                        staging.push(instance_nv);
                         full_arg_count = 1;
                     } else {
-                        stack[base] = instance_nv;
+                        let start = staging.len().saturating_sub(full_arg_count);
+                        staging[start] = instance_nv;
                     }
                     match ctor {
                         Value::VmValue(payload) => {
@@ -319,9 +376,11 @@ pub(crate) fn prepare_call(
                                 payload.as_any().downcast_ref::<VmClosurePayload>()
                             {
                                 let nc = wrapper.0.clone();
-                                bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
-                                let final_base = stack.len() - full_arg_count;
-                                let mut frame = CallFrame::new_owned(nc, final_base);
+                                bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
+                                let window: Vec<VmValue> =
+                                    stage_window(staging, full_arg_count).to_vec();
+                                let _ = full_arg_count;
+                                let mut frame = materialize_frame(store, &nc, &window)?;
                                 frame.current_class = Some(cls.clone());
                                 return Ok(PreparedCall::Constructor(frame, instance_nv));
                             }
@@ -329,20 +388,19 @@ pub(crate) fn prepare_call(
                         Value::NativeFn(b) => {
                             let (f, _) = *b;
 
-                            let vm_args: Vec<VmValue> = stack.drain(base..).collect();
+                            let take = staging.len().saturating_sub(full_arg_count);
+                            let vm_args: Vec<VmValue> = staging.drain(take..).collect();
                             return Ok(PreparedCall::NativeConstructor(f, vm_args, instance_nv));
                         }
                         _ => {}
                     }
                 }
-                let args_start = stack.len() - arg_count;
-                stack.drain(args_start..);
+                staging.clear();
                 return Ok(PreparedCall::PushValue(instance_nv));
             }
             HeapObj::EnumVariant(data) => {
                 let data = data.clone();
-                let args_start = stack.len() - arg_count;
-                let mut args: Vec<VmValue> = stack.drain(args_start..).collect();
+                let mut args: Vec<VmValue> = staging.drain(..).collect();
 
                 if !args.is_empty() {
                     args.remove(0);
@@ -399,7 +457,7 @@ pub(crate) fn prepare_call(
 pub(crate) fn bundle_rest_args(
     proto: &FunctionProto,
     arg_count: &mut usize,
-    stack: &mut Vec<VmValue>,
+    staging: &mut Vec<VmValue>,
     heap: &mut Heap,
 ) {
     let arity = proto.arity;
@@ -407,24 +465,24 @@ pub(crate) fn bundle_rest_args(
         let rest_idx = arity.saturating_sub(1);
         if *arg_count > rest_idx {
             let num_to_bundle = *arg_count - rest_idx;
-            let start = stack.len() - num_to_bundle;
-            let items: Vec<VmValue> = stack.drain(start..).collect();
+            let start = staging.len() - num_to_bundle;
+            let items: Vec<VmValue> = staging.drain(start..).collect();
             let va = VmArray::new(items);
             let nv = VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Array(va)));
-            stack.push(nv);
+            staging.push(nv);
             *arg_count = rest_idx + 1;
         } else {
             for _ in *arg_count..rest_idx {
-                stack.push(VmValue::null());
+                staging.push(VmValue::null());
             }
             let aref = VmArray::new(vec![]);
             let nv = VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Array(aref)));
-            stack.push(nv);
+            staging.push(nv);
             *arg_count = rest_idx + 1;
         }
     } else if *arg_count < arity {
         for _ in *arg_count..arity {
-            stack.push(VmValue::null());
+            staging.push(VmValue::null());
         }
         *arg_count = arity;
     }

@@ -56,11 +56,14 @@ impl ExecCtx {
         let Some(frame) = self.frames.last() else {
             return;
         };
-        let slot = frame.base + dest_reg as usize;
-        if slot >= self.stack.len() {
-            self.stack.resize(slot + 1, VmValue::null());
+        let (base, nregs) = (frame.base, frame.closure().proto.register_count as usize);
+        self.stack.ensure_frame_size(base, nregs);
+        if (dest_reg as usize) < nregs {
+            // Como en el resume de generadores: en programas bien tipados no
+            // falla; si el valor no encaja se ignora y el programa verá el
+            // default del slot (el `await` ya se resolvió).
+            let _ = self.stack.unbox_into_reg(base, dest_reg as usize, nv);
         }
-        self.stack[slot] = nv;
     }
 
     /// Deliver a rejected `await` into the suspended frame, unwinding to its
@@ -72,7 +75,11 @@ impl ExecCtx {
         match self.try_handlers.pop() {
             Some(handler) => {
                 let thrown_val = err.thrown.unwrap_or(VmValue::null());
-                crate::exec::frame_ctrl::unwind_to_handler(self, handler, thrown_val);
+                // `err_reg` es `Dynamic` por construcción: infalible en la
+                // práctica. Si fallara, el rechazo queda sin manejar.
+                if crate::exec::frame_ctrl::unwind_to_handler(self, handler, thrown_val).is_err() {
+                    return Rejection::Unhandled(thrown);
+                }
                 Rejection::Caught
             }
             None => Rejection::Unhandled(thrown),
@@ -129,7 +136,7 @@ impl ExecCtx {
                 frame_idx,
                 op_ip,
                 line,
-                self.stack.len(),
+                self.stack.frame_count(),
                 self.try_handlers.len(),
                 op,
             ),
@@ -169,13 +176,10 @@ impl ExecCtx {
             .cloned()
             .map(|value| fork.heap.intern(value))
             .collect();
-        fork.stack.clear();
-        fork.stack.extend(stack_values);
-        let required = task.closure.proto.register_count as usize;
-        if fork.stack.len() < required {
-            fork.stack.resize(required, VmValue::null());
-        }
-        let mut frame = CallFrame::new_owned(closure, 0);
+        let alloc = fork.stack.push_frame(&task.closure.proto);
+        let nregs = task.closure.proto.register_count as usize;
+        fork.stack.adopt_values(alloc, 0, &stack_values, nregs);
+        let mut frame = CallFrame::new_owned(closure, alloc);
         frame.current_class = task.current_class.clone();
         fork.frames.push(frame);
 

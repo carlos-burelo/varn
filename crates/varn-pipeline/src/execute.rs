@@ -117,11 +117,16 @@ pub fn execute_with_caps(
                             let resolved_nv = machine.ctx.heap.intern(resolved);
 
                             if let Some(frame) = machine.ctx.frames.last() {
+                                // Fase A (frame por clases): el registro vive en
+                                // el almacén por clases y se escribe por su ruta
+                                // tipada; `Await` reescribe un registro DYN del
+                                // llamante (el resultado de la tarea), no un
+                                // escalar del frame.
                                 let base = frame.base;
-                                let slot = base + dest_reg as usize;
-                                if slot < machine.ctx.stack.len() {
-                                    machine.ctx.stack[slot] = resolved_nv;
-                                }
+                                let _ = machine
+                                    .ctx
+                                    .stack
+                                    .unbox_into_reg(base, dest_reg as usize, resolved_nv);
                             }
                         }
                         Err(thrown) => {

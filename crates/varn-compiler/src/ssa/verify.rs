@@ -423,9 +423,9 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstChar(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Int {
+                if dty != HirType::Ref {
                     return Err(format!(
-                        "ConstChar defines v{}: {dty:?}, expected Int",
+                        "ConstChar defines v{}: {dty:?}, expected Ref",
                         dest.0
                     ));
                 }

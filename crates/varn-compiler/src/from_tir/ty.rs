@@ -20,17 +20,21 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
         BackendTy::Float => HirType::Float,
         BackendTy::Bool => HirType::Bool,
         BackendTy::Str => HirType::Str,
-        // The SSA type has no scalar `Char`; a char is a tagged runtime value,
-        // not a raw int, so it must travel dynamically (a typed int register
-        // would read its NaN-box bits as garbage).
-        BackendTy::Char => HirType::Dynamic,
+        // `char` es `HeapObj::Char` internado: `Ref` es la
+        // proyección honesta (clase REF, con flush GC). `Dynamic` era
+        // conservador pero perdía la clase; `Int` (que usaba `build.rs` para
+        // el literal) era directamente falso.
+        BackendTy::Char => HirType::Ref,
+        // `decimal`/`bigint` son heap PERO con ensanchado `int` en llamadas
+        // (`coherence::assignable`: `Int` → `Decimal`/`BigInt`) y tolerancia
+        // `dynamic`: un registro REF no puede alojar el `int` sin allocar.
+        // `Dynamic` los aloja tal cual (igual que hoy el stack universal) y
+        // los opcodes genéricos ya los resuelven por tag.
+        BackendTy::Decimal | BackendTy::BigInt => HirType::Dynamic,
 
-        BackendTy::Decimal
-        | BackendTy::BigInt
-        | BackendTy::Bytes
-        | BackendTy::Tuple(_)
-        | BackendTy::Enum(_)
-        | BackendTy::Fn(_) => HirType::Ref,
+        BackendTy::Bytes | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) => {
+            HirType::Ref
+        }
 
         BackendTy::Map(k, v) => {
             let k_inner = resolve(k, tir, out);
@@ -125,8 +129,22 @@ mod tests {
             lower(B::Dynamic(DynReason::Unannotated), &m, &mut out),
             HirType::Dynamic
         );
-        assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Ref);
+        assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Dynamic);
         assert_eq!(lower(B::Void, &m, &mut out), HirType::Dynamic);
+    }
+
+    #[test]
+    fn heap_boxed_scalars_are_ref() {
+        // `char` es `HeapObj::Char` internado: `Ref`, nunca `Int` (mentía al
+        // regalloc/GC) ni `Dynamic` (degradaba la clase sin motivo).
+        // `decimal`/`bigint`, en cambio, aceptan `int` por ensanchado:
+        // `Dynamic` los aloja sin allocar.
+        let m = empty_module();
+        let mut out = SsaTyTable::default();
+        assert_eq!(lower(B::Char, &m, &mut out), HirType::Ref);
+        assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Dynamic);
+        assert_eq!(lower(B::BigInt, &m, &mut out), HirType::Dynamic);
+        assert_eq!(lower(B::Bytes, &m, &mut out), HirType::Ref);
     }
 
     #[test]

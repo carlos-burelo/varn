@@ -48,20 +48,23 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    // The SSA allocator (ssa/emit) keeps float and non-float values in
-    // separate registers so the backend can route native f64. This coalescing
-    // pass re-colours by liveness alone, so it could re-pack a float register
-    // with a non-float one — meeting `register_meta` to Dynamic and erasing the
-    // float type. Skip the whole pass for any function that owns a float
-    // register: it keeps the segregated allocation at the cost of not
-    // coalescing that function's Moves. Pure-int functions are unaffected.
-    if proto
-        .register_meta
-        .iter()
-        .any(|m| m.kind == varn_types::register_meta::SlotKind::Float)
-    {
-        return;
-    }
+    // The SSA allocator (ssa/emit) keeps each `SlotKind` in its own register
+    // pool so the backend can route native f64. This coalescing pass used to
+    // re-colour by liveness alone and could re-pack a float register with a
+    // non-float one — meeting `register_meta` to Dynamic and erasing the
+    // float type — so it skipped every function owning a float register.
+    // `color_with_base` is now kind-aware (kind compatibility is a hard
+    // constraint, like interference): no merge can degrade a kind, so float
+    // functions get their Moves coalesced too instead of being skipped.
+    let kinds: Vec<varn_types::register_meta::SlotKind> = (0..proto.register_count as usize)
+        .map(|r| {
+            proto
+                .register_meta
+                .get(r)
+                .map(|m| m.kind)
+                .unwrap_or(varn_types::register_meta::SlotKind::Dynamic)
+        })
+        .collect();
 
     let back_edges =
         varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
@@ -136,7 +139,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         }
     }
     let blocks = collect_consecutive_blocks(&proto.chunk.code, &proto.chunk.constants);
-    let raw_mapping = match color_with_base(&ranges, base, &copies, &scan, &blocks) {
+    let raw_mapping = match color_with_base(&ranges, base, &copies, &scan, &blocks, &kinds) {
         Some(m) => m,
         None => return,
     };
@@ -195,7 +198,9 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
 
     // register_meta was derived per pre-coalescing register (ssa/emit);
     // permute it through the same mapping, meeting kinds when two old
-    // registers merge into one.
+    // registers merge into one. The meet is now unreachable — the colourer
+    // only shares a colour between equal kinds — but stays as defence in
+    // depth: a `Dynamic` here is always safe, just less precise.
     if !proto.register_meta.is_empty() {
         use varn_types::register_meta::{RegisterMeta, SlotKind};
         let mut merged: Vec<Option<SlotKind>> = vec![None; new_register_count as usize];

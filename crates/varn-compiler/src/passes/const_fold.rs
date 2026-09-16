@@ -267,6 +267,10 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         InstKind::ConstFloat(_) => Some(HirType::Float),
         InstKind::ConstBool(_) => Some(HirType::Bool),
         InstKind::ConstStr(_) => Some(HirType::Str),
+        // Boxed en heap hoy: `char` es `Ref` (sin ensanchado hacia él);
+        // `decimal`/`bigint` aceptan `int` por ensanchado, así que `Dynamic`.
+        InstKind::ConstChar(_) => Some(HirType::Ref),
+        InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
         InstKind::ConstNull => Some(HirType::Dynamic),
         _ => None,
     }

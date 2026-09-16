@@ -6,6 +6,7 @@
 //! proto gets compiled lives in [`crate::jit::tiering`] — it is policy about
 //! code, not part of the value.
 
+use crate::frame_store::{FrameStore, SlotAddr};
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,11 +23,11 @@ pub struct VmUpvalue {
 #[derive(Debug, Clone)]
 pub struct VmUpvalueInner {
     pub value: VmValue,
-    pub stack_slot: Option<usize>,
+    pub stack_slot: Option<SlotAddr>,
 }
 
 impl VmUpvalue {
-    pub(crate) fn open(stack_slot: usize) -> Self {
+    pub(crate) fn open(stack_slot: SlotAddr) -> Self {
         Self {
             inner: Rc::new(RefCell::new(VmUpvalueInner {
                 value: VmValue::null(),
@@ -44,26 +45,29 @@ impl VmUpvalue {
         }
     }
 
-    pub(crate) fn read(&self, stack: &[VmValue]) -> VmValue {
+    pub(crate) fn read(&self, store: &FrameStore) -> VmValue {
         let g = self.inner.borrow_mut();
         match g.stack_slot {
-            Some(slot) => stack[slot],
+            Some(slot) => store.get_addr(slot),
             None => g.value,
         }
     }
 
-    pub(crate) fn write(&self, val: VmValue, stack: &mut [VmValue]) {
+    pub(crate) fn write(&self, val: VmValue, store: &mut FrameStore) -> crate::error::VmResult<()> {
         let mut g = self.inner.borrow_mut();
         match g.stack_slot {
-            Some(slot) => stack[slot] = val,
-            None => g.value = val,
+            Some(slot) => store.set_addr(slot, val),
+            None => {
+                g.value = val;
+                Ok(())
+            }
         }
     }
 
-    pub(crate) fn close(&self, stack: &[VmValue]) {
+    pub(crate) fn close(&self, store: &FrameStore) {
         let mut g = self.inner.borrow_mut();
         if let Some(slot) = g.stack_slot.take() {
-            g.value = stack[slot];
+            g.value = store.get_addr(slot);
         }
     }
 }

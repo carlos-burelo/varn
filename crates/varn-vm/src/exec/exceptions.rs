@@ -125,7 +125,11 @@ pub(crate) unsafe fn dispatch_to_handler(
     depth: usize,
 ) -> bool {
     if let Some(handler) = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) {
-        crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val);
+        // En programas bien tipados no falla (`err_reg` es `Dynamic`); si
+        // fallara, el error prosigue sin manejar en vez de perderse.
+        if crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val).is_err() {
+            return false;
+        }
         return true;
     }
     // Tabla lateral: coste cero mientras no se lanza nada.
@@ -139,18 +143,21 @@ pub(crate) unsafe fn dispatch_to_handler(
             .map(|r| (r.catch_ip as usize, r.err_reg as usize));
         let Some((catch_ip, err_reg)) = hit else {
             let popped = (*ctx).frames.pop().unwrap();
-            (*ctx).close_upvalues_above(popped.base);
+            (*ctx).close_upvalues_in(popped.base);
+            (*ctx).stack.pop_frame();
             continue;
         };
         let f2 = (*ctx).frames.len() - 1;
         let b2 = (*ctx).frames[f2].base;
-        let required_depth = b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
-        (*ctx).stack.truncate(required_depth);
-        let slot = b2 + err_reg;
-        if slot >= (*ctx).stack.len() {
-            (*ctx).stack.resize(slot + 1, VmValue::null());
+        let nregs = (*ctx).frames[f2].closure().proto.register_count as usize;
+        (*ctx).stack.ensure_frame_size(b2, nregs);
+        if (*ctx)
+            .stack
+            .unbox_into_reg(b2, err_reg, thrown_val)
+            .is_err()
+        {
+            return false;
         }
-        (*ctx).stack[slot] = thrown_val;
         (*ctx).frames[f2].ip = catch_ip;
         return true;
     }

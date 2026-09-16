@@ -256,9 +256,10 @@ impl ExecCtx {
             }
             varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {
                 let setter_nv2 = self.heap.intern(setter_val);
-                self.stack.push(setter_nv2);
-                self.stack.push(receiver);
-                self.stack.push(value);
+                self.stage.clear();
+                self.stage.push(setter_nv2);
+                self.stage.push(receiver);
+                self.stage.push(value);
                 let prepared = self
                     .prepare_call(setter_nv2, 2)
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
@@ -269,10 +270,6 @@ impl ExecCtx {
                         ));
                     }
                     frame.return_reg = crate::frame::CallFrame::NO_RETURN_REG;
-                    let required = frame.base + frame.closure().proto.register_count as usize;
-                    if self.stack.len() < required {
-                        self.stack.resize(required, VmValue::null());
-                    }
                     self.frames.push(frame);
                     let depth = self.frames.len() - 1;
                     self.run_until(depth)
@@ -303,8 +300,9 @@ impl ExecCtx {
             }
             varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {
                 let getter_nv2 = self.heap.intern(getter_val);
-                self.stack.push(getter_nv2);
-                self.stack.push(receiver);
+                self.stage.clear();
+                self.stage.push(getter_nv2);
+                self.stage.push(receiver);
                 let prepared = self
                     .prepare_call(getter_nv2, 1)
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
@@ -316,10 +314,6 @@ impl ExecCtx {
                             ));
                         }
                         frame.return_reg = dest as u16;
-                        let required = frame.base + frame.closure().proto.register_count as usize;
-                        if self.stack.len() < required {
-                            self.stack.resize(required, VmValue::null());
-                        }
                         self.frames.push(frame);
                         return Ok(true);
                     }
@@ -330,7 +324,7 @@ impl ExecCtx {
         };
         if let Some(result) = result_opt {
             let result_nv = self.heap.intern(result);
-            self.stack[base + dest] = result_nv;
+            self.stack.unbox_into_reg(base, dest, result_nv)?;
         }
         Ok(false)
     }

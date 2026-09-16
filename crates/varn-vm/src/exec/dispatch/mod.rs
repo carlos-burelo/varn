@@ -152,7 +152,7 @@ impl ExecCtx {
             loop {
                 if ip >= code_len {
                     (*ctx).frames.last_mut().unwrap().ip = ip;
-                    let res = (*ctx).reg_return(base, 0);
+                    let res = tryv!((*ctx).reg_return(base, 0));
                     if (*ctx).frames.len() == depth {
                         return Ok(res);
                     }
@@ -181,37 +181,10 @@ impl ExecCtx {
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
-                macro_rules! reg {
+                macro_rules! reg_box {
+                    // Lectura boxeada de un registro (cualquier clase).
                     ($r:expr) => {
-                        *({
-                            let idx = base + $r;
-                            #[cfg(debug_assertions)]
-                            {
-                                if idx >= (*ctx).stack.len() {
-                                    panic!(
-                                        "💥 [VM FATAL] Register Access Out Of Bounds!\n\
-                                         • Function: {}\n\
-                                         • Base index: {}\n\
-                                         • Target Register: r{}\n\
-                                         • Computed Index: {}\n\
-                                         • Current Stack Size: {}\n\
-                                         Please check compiler register allocation.",
-                                        closure.proto.name.as_deref().unwrap_or("<anonymous>"),
-                                        base,
-                                        $r,
-                                        idx,
-                                        (*ctx).stack.len()
-                                    );
-                                }
-                            }
-                            let stack_ptr = std::ptr::addr_of_mut!((*ctx).stack);
-                            #[cfg(debug_assertions)]
-                            {
-                                let stack_len = (*stack_ptr).len();
-                                assert!(idx < stack_len, "register OOB: idx={idx} len={stack_len}");
-                            }
-                            (*stack_ptr).as_mut_ptr().add(idx)
-                        })
+                        (*ctx).stack.box_reg(base, $r)
                     };
                 }
 
@@ -220,14 +193,16 @@ impl ExecCtx {
                         let gidx = closure.module_base as usize + code[ip] as usize;
                         ip += 1;
 
-                        reg!(first_reg) = (*ctx).globals.get_by_index_unchecked(gidx);
+                        let nv = (*ctx).globals.get_by_index_unchecked(gidx);
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, nv));
                         (*ctx).record_hotspot_global(gidx);
                     }
                     OpCode::LoadNativeGlobalIdx => {
                         let gidx = code[ip] as usize;
                         ip += 1;
 
-                        reg!(first_reg) = (*ctx).globals.get_by_index_unchecked(gidx);
+                        let nv = (*ctx).globals.get_by_index_unchecked(gidx);
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, nv));
                         (*ctx).record_hotspot_global(gidx);
                     }
                     OpCode::LoadConst => {
@@ -240,35 +215,37 @@ impl ExecCtx {
                             closure.constants.len()
                         );
                         let nv = unsafe { *closure.constants.get_unchecked(cidx) };
-                        reg!(first_reg) = nv;
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, nv));
                     }
                     OpCode::LoadNull => {
-                        reg!(first_reg) = crate::value::VmValue::null();
+                        tryv!((*ctx).stack.unbox_into_reg(
+                            base,
+                            first_reg,
+                            crate::value::VmValue::null()
+                        ));
                     }
                     OpCode::DefineGlobalIdx | OpCode::StoreGlobalIdx => {
                         let src = hi(code[ip]);
                         let gidx = closure.module_base as usize + code[ip + 1] as usize;
                         ip += 2;
-                        let val = reg!(src);
+                        let val = reg_box!(src);
                         (*ctx).globals.set_by_index_unchecked(gidx, val);
                     }
                     OpCode::LoadInt => {
                         let val = code[ip] as i16;
                         ip += 1;
-                        reg!(first_reg) = crate::value::VmValue::from_int(val as i64);
+                        tryv!((*ctx).stack.unbox_into_reg(
+                            base,
+                            first_reg,
+                            crate::value::VmValue::from_int(val as i64)
+                        ));
                     }
                     OpCode::Move => {
                         let w1 = code[ip];
                         ip += 1;
-                        let dest = base + first_reg;
-                        let src = base + hi(w1);
-                        let max_idx = dest.max(src);
-                        if max_idx >= (*ctx).stack.len() {
-                            (*ctx)
-                                .stack
-                                .resize(max_idx + 1, crate::value::VmValue::null());
-                        }
-                        (*ctx).stack[dest] = (*ctx).stack[src];
+                        // Sin `resize`: los registros viven dentro de
+                        // `register_count` por construcción del compilador.
+                        tryv!((*ctx).stack.mov(base, first_reg, hi(w1)));
                     }
                     OpCode::LoadGlobal
                     | OpCode::StoreGlobal
@@ -444,8 +421,9 @@ impl ExecCtx {
                     OpCode::GetEnumTag => {
                         let src = hi(code[ip]);
                         ip += 1;
-                        let v = reg![src];
-                        reg![first_reg] = tryv!((*ctx).exec_get_enum_tag(v));
+                        let v = reg_box!(src);
+                        let tag = tryv!((*ctx).exec_get_enum_tag(v));
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, tag));
                     }
 
                     OpCode::Try => {
@@ -470,7 +448,7 @@ impl ExecCtx {
                     OpCode::Throw => {
                         let w1 = code[ip];
                         let src = hi(w1);
-                        let val = reg![src];
+                        let val = reg_box!(src);
                         (*ctx).frames[frame_idx].ip = ip;
                         let err = crate::exec::exceptions::build_thrown_error(
                             val,
@@ -489,7 +467,7 @@ impl ExecCtx {
                         ip += 1;
                         let dest = hi(w1) as u8;
                         let src = lo(w1);
-                        let val = reg![src];
+                        let val = reg_box!(src);
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Yield {
                             value: val,
@@ -500,7 +478,7 @@ impl ExecCtx {
                     OpCode::Await => {
                         let src = hi(code[ip]);
                         ip += 1;
-                        let fut = reg![src];
+                        let fut = reg_box!(src);
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Await {
                             value: (*ctx).heap.extract(fut),
@@ -513,20 +491,9 @@ impl ExecCtx {
                         ip += 1;
                         let (dest, src) = (first_reg, hi(w1));
 
-                        let src_slot = base + src;
-                        if src_slot >= (*ctx).stack.len() {
-                            (*ctx)
-                                .stack
-                                .resize(src_slot + 1, crate::value::VmValue::null());
-                        }
-                        let task_val = reg![src];
-                        let dest_slot = base + dest;
-                        if dest_slot >= (*ctx).stack.len() {
-                            (*ctx)
-                                .stack
-                                .resize(dest_slot + 1, crate::value::VmValue::null());
-                        }
-                        reg![dest] = tryv!((*ctx).exec_spawn(task_val));
+                        let task_val = reg_box!(src);
+                        let spawned = tryv!((*ctx).exec_spawn(task_val));
+                        tryv!((*ctx).stack.unbox_into_reg(base, dest, spawned));
                     }
 
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
@@ -550,13 +517,37 @@ impl ExecCtx {
                         let wire_byte = (w1 >> 8) as u8;
 
                         let arg_count = (w1 & 0xFF) as usize;
-                        let args_start = base + first_reg;
-                        let result = tryv!(crate::exec::intrinsics::dispatch(
-                            wire_byte,
-                            &(*ctx).stack[args_start..args_start + arg_count],
-                            &mut (*ctx).heap,
-                        ));
-                        (*ctx).stack[base + first_reg] = result;
+                        // `base` es el id de la activación en `FrameStore`
+                        // (índice pequeño), no un offset de stack plano: los
+                        // registros se indexan directo dentro del frame, sin
+                        // sumarle `base`. `base + first_reg` era el cálculo
+                        // correcto en el `Vec<VmValue>` universal de antes de
+                        // la migración; sobrevivió aquí sin actualizarse y
+                        // desplazaba la ventana por el id de la activación
+                        // (`args_start` crecía con cada frame anidado hasta
+                        // salirse de `register_count`).
+                        let args_start = first_reg;
+                        // La ventana ya no es contigua (frame por clases): se
+                        // boxea a un buffer propio antes de invocar.
+                        let result = if arg_count <= 16 {
+                            let mut buf = [VmValue::null(); 16];
+                            for i in 0..arg_count {
+                                buf[i] = (*ctx).stack.box_reg(base, args_start + i);
+                            }
+                            tryv!(crate::exec::intrinsics::dispatch(
+                                wire_byte,
+                                &buf[..arg_count],
+                                &mut (*ctx).heap,
+                            ))
+                        } else {
+                            let boxed = (*ctx).stack.box_range(base, args_start, arg_count);
+                            tryv!(crate::exec::intrinsics::dispatch(
+                                wire_byte,
+                                &boxed,
+                                &mut (*ctx).heap,
+                            ))
+                        };
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }
 
                     OpCode::IntrinsicDirect => {
@@ -564,9 +555,9 @@ impl ExecCtx {
                         ip += 1;
                         let src = (w1 >> 8) as usize;
                         let wire_byte = (w1 & 0xFF) as u8;
-                        let x = (*ctx).stack[base + src];
+                        let x = (*ctx).stack.box_reg(base, src);
                         let result = tryv!(crate::exec::intrinsics::dispatch_unary(wire_byte, x));
-                        (*ctx).stack[base + first_reg] = result;
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }
 
                     OpCode::CallNativeOp => {
@@ -590,7 +581,7 @@ impl ExecCtx {
                                 "CallNativeOp: unknown op-id {op_id}"
                             ))
                         }));
-                        let receiver = (*ctx).stack[base + first_reg];
+                        let receiver = (*ctx).stack.box_reg(base, first_reg);
                         // Reuse the exact native-call path the inline cache uses,
                         // so error and profiling semantics are identical.
                         let result = tryv!((*ctx).call_native_with_receiver(
@@ -600,11 +591,7 @@ impl ExecCtx {
                             first_reg + 1,
                             total - 1,
                         ));
-                        let target_slot = base + first_reg;
-                        if (*ctx).stack.len() <= target_slot {
-                            (*ctx).stack.resize(target_slot + 1, VmValue::null());
-                        }
-                        (*ctx).stack[target_slot] = result;
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }
 
                     OpCode::LoadStaticFn => {
@@ -642,7 +629,7 @@ impl ExecCtx {
                                 .insert(proto_ptr, (proto.clone(), val));
                             val
                         };
-                        (*ctx).stack[base + dest] = val;
+                        tryv!((*ctx).stack.unbox_into_reg(base, dest, val));
                     }
 
                     OpCode::Nop => {}
@@ -657,23 +644,16 @@ impl ExecCtx {
         Ok(VmValue::null())
     }
 
-    pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmValue {
-        let val = self.stack[base + src];
+    pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmResult<VmValue> {
+        let val = self.stack.box_reg(base, src);
         let returning_frame_idx = self.frames.len().saturating_sub(1);
         let frame = self.frames.pop().unwrap();
-        self.close_upvalues_above(frame.base);
+        // Cerrar ANTES de liberar: el close lee el valor vivo del slot.
+        self.close_upvalues_in(frame.base);
+        self.stack.pop_frame();
 
         let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
             && !frame.closure().proto.chunk.source_file.is_empty();
-
-        if let Some(caller) = self.frames.last() {
-            let caller_req = caller.base + caller.closure().proto.register_count as usize;
-            if self.stack.len() < caller_req {
-                self.stack.resize(caller_req, VmValue::null());
-            } else {
-                self.stack.truncate(caller_req);
-            }
-        }
 
         let final_val =
             crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
@@ -687,10 +667,15 @@ impl ExecCtx {
         }
 
         if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
-            let caller_base = self.frames.last().map(|f| f.base).unwrap_or(0);
-            self.stack[caller_base + frame.return_reg as usize] = final_val;
+            // Sin llamante (retorno del frame raíz) no hay destino: equivale
+            // a NO_RETURN_REG. Con llamante, conversión a su clase.
+            if let Some(caller) = self.frames.last() {
+                let caller_base = caller.base;
+                self.stack
+                    .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)?;
+            }
         }
-        final_val
+        Ok(final_val)
     }
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {

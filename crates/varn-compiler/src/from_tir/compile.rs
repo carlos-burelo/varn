@@ -58,11 +58,30 @@ pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> Result<Functio
 fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
     let mut tt = SsaTyTable::default();
     let mut ty = |bt: BackendTy| -> HirType { lower_ty(bt, tir, &mut tt) };
+    // A defaulted param's home register is `Dynamic` (see
+    // `build::defaulted_param_mask` / `build_inner`): it must arrive able to
+    // hold `null` before the prologue applies the default. `derive_register_meta`
+    // would converge on `Dynamic` for it anyway once it meets that entry
+    // value's kind against this one, but declaring it here too keeps the
+    // ABI-facing `param_kinds` honest instead of relying on the meet to paper
+    // over a kind this function already knows is wrong.
+    let defaulted = super::build::defaulted_param_mask(&f.body, f.params.len());
     FnMeta {
         name: f.name.clone(),
         start_line: 1,
         nparams: f.params.len(),
-        param_kinds: f.params.iter().map(|p| slot_kind_of(ty(*p))).collect(),
+        param_kinds: f
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                if defaulted[i] {
+                    varn_types::register_meta::SlotKind::Dynamic
+                } else {
+                    slot_kind_of(ty(*p))
+                }
+            })
+            .collect(),
         return_kind: slot_kind_of(ty(f.return_ty)),
         has_rest: f.has_rest,
         is_async: f.is_async,

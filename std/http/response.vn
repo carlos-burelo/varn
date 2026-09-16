@@ -14,15 +14,15 @@ export class RawResponse {
 export function parseRawResponse(raw: str): RawResponse? {
     let headerEnd = raw.indexOf("\r\n\r\n");
     if (headerEnd < 0) return null;
-    
+
     let headerPart = raw.slice(0, headerEnd);
     let bodyPart = raw.slice(headerEnd + 4);
-    
+
     let lines = headerPart.split("\r\n");
     if (lines.length === 0) return null;
-    
+
     let resp = new RawResponse();
-    
+
     let firstLine = lines[0];
     let parts = firstLine.split(" ");
     if (parts.length >= 2) {
@@ -31,7 +31,7 @@ export function parseRawResponse(raw: str): RawResponse? {
             resp.statusText = parts[2];
         }
     }
-    
+
     for (let i = 1; i < lines.length; i = i + 1) {
         let line = lines[i];
         let colon = line.indexOf(":");
@@ -41,7 +41,7 @@ export function parseRawResponse(raw: str): RawResponse? {
             resp.headers[key] = val;
         }
     }
-    
+
     resp.body = bodyPart;
     return resp;
 }
@@ -51,9 +51,9 @@ export async function readHttpResponse(connId: int): Task<RawResponse?> {
     let resp: RawResponse? = null;
     let keepReading = true;
     while (keepReading) {
-        let chunk: dynamic = await tcpRead$(connId, 4096);
+        let chunk = await tcpRead$(connId, 4096);
         if (chunk !== null) {
-            let chunkStr = typeof chunk === "str" ? (chunk as str) : (new Bytes(chunk)).toString();
+            let chunkStr = (chunk as Bytes).toString();
             if (chunkStr.length > 0) {
                 raw = raw + chunkStr;
                 resp = parseRawResponse(raw);
@@ -135,27 +135,27 @@ export class HttpResponse {
 
     send(body: str): void {
         if (this.isSent) return;
-        
+
         let statusText = "OK";
         if (this.statusCode === 404) statusText = "Not Found";
         else if (this.statusCode === 201) statusText = "Created";
         else if (this.statusCode === 204) statusText = "No Content";
         else if (this.statusCode === 413) statusText = "Payload Too Large";
         else if (this.statusCode === 500) statusText = "Internal Server Error";
-        
+
         let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
         responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
         responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n";
-        
+
         for (let name in this.responseHeaders) {
             responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
         }
         for (let c of this.setCookies) {
             responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
         }
-        
+
         responseStr = responseStr + "\r\n" + body;
-        
+
         spawn(this._writeAndClose(responseStr));
         this.isSent = true;
     }
@@ -244,28 +244,12 @@ export class Response {
     headers: Headers = new Headers({});
     url: str = "";
 
-    constructor(
-        bodyOrStatus: dynamic = "",
-        statusOrStatusText: dynamic = 200,
-        headersOrOk: dynamic = {},
-        bodyPos: str = "",
-        headersPos: dynamic = {}
-    ) {
-        if (typeof bodyOrStatus === "int" || typeof bodyOrStatus === "float") {
-            let st = bodyOrStatus as int;
-            this.status = st;
-            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : getHttpStatusText(st);
-            this.ok = st >= 200 && st < 300;
-            this.body = bodyPos;
-            this.headers = new Headers(headersPos);
-        } else {
-            this.body = typeof bodyOrStatus === "str" ? bodyOrStatus : "";
-            let st = (typeof statusOrStatusText === "int" || typeof statusOrStatusText === "float") ? (statusOrStatusText as int) : 200;
-            this.status = st;
-            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : getHttpStatusText(st);
-            this.ok = st >= 200 && st < 300;
-            this.headers = new Headers(headersOrOk);
-        }
+    constructor(body: str = "", status: int = 200, headers: { [key: str]: str } = {}) {
+        this.body = body;
+        this.status = status;
+        this.statusText = getHttpStatusText(status);
+        this.ok = status >= 200 && status < 300;
+        this.headers = new Headers(headers);
     }
 
     text(): str {
@@ -281,23 +265,19 @@ export class Response {
     }
 }
 
-export function json(data: Json, status: int = 200, headers: dynamic = {}): Response {
+export function json(data: Json, status: int = 200, headers: { [key: str]: str } = {}): Response {
     let body = JSON.stringify(data);
     let h = new Headers(headers);
     if (!h.has("content-type")) {
         h.set("Content-Type", "application/json");
     }
-    let res = new Response(body, status, h.toObject());
-    return res;
+    return new Response(body, status, h.toObject());
 }
 
 export function redirect(url: str, status: int = 302): Response {
-    let hdrs = { "Location": url };
-    return new Response("", status, hdrs);
+    return new Response("", status, { "Location": url });
 }
 
 export function error(status: int = 500, message: str = "Internal Server Error"): Response {
     return new Response(message, status, { "Content-Type": "text/plain" });
 }
-
-

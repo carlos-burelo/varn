@@ -12,18 +12,10 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     args_start: usize,
     arg_count: usize,
 ) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let required = args_start + arg_count;
-        if ctx_ref.stack.len() < required {
-            ctx_ref.stack.resize(required, VmValue::null());
-        }
-        let args = &ctx_ref.stack[args_start..required];
-        match crate::exec::intrinsics::dispatch(wire_byte as u8, args, &mut ctx_ref.heap) {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
+    // K3-faseA: la ventana contigua ya no existe (frame por clases) y solo la
+    // recorría código generado. Fase B: restaurar de git.
+    let _ = (ctx, wire_byte, args_start, arg_count);
+    unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL");
 }
 
 /// Dedicated fast path for `charCodeAt(pos)` / `codePointAt(pos)`.

@@ -30,13 +30,7 @@ export class ChildProcess {
 
 export namespace Process {
     export function exec(command: str): ProcessResult {
-        let raw: dynamic = exec$(command);
-        return {
-            exitCode: raw.exitCode as int,
-            stdout: raw.stdout as str,
-            stderr: raw.stderr as str,
-            success: raw.success as bool
-        };
+        return exec$(command);
     }
 
     export function spawn(command: str, args: str[] = []): ChildProcess {

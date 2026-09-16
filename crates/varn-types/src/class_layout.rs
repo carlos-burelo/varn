@@ -46,6 +46,30 @@ pub struct ClassLayout {
 const SLOT_SIZE: u32 = 16;
 const SLOT_ALIGN: u32 = 8;
 
+/// Per-field physical size/align/gc-ref-ness for CLASS FIELD layout — not the
+/// same table as `TypeTag::field_repr` (used for e.g. FFI/array element
+/// sizing), because a class field has one representational constraint that
+/// table doesn't carry: `str` can be `KIND_SSO` (an inline 16-byte `VmValue`
+/// with no heap object at all, `vm_value.rs`'s `try_from_sso`), so a `str`
+/// field cannot be compacted to a bare 8-byte heap index — the value itself
+/// might not live on the heap. `char` is excluded for a different reason: it
+/// is always `HeapObj::Char` (K1), but reading/writing a compact scalar slot
+/// for it would need to intern/deref through the heap, which `InstanceData`
+/// (this crate, no heap access) cannot do. Both fall to the safe universal
+/// 16-byte `VmValue` slot, exactly like today. Everything else `field_repr`
+/// already calls a GC reference (`Array`/`Map`/`Set`/`Class`/`Bytes`/…) is
+/// ALWAYS `KIND_HEAP` in this runtime — no inline fast path exists for them —
+/// so those compact safely to a bare heap index.
+fn class_field_repr(tag: TypeTag) -> (u32, u32, bool) {
+    match tag {
+        TypeTag::Str | TypeTag::Char => (SLOT_SIZE, SLOT_ALIGN, true),
+        other => {
+            let r = other.field_repr();
+            (r.size, r.align, r.is_gc_ref)
+        }
+    }
+}
+
 impl ClassLayout {
     /// Creates a new empty class layout with default alignment of 8.
     pub fn new(name: impl Into<Rc<str>>, class_id: u32) -> Self {
@@ -79,13 +103,7 @@ impl ClassLayout {
         let mut gc_mask = 0u64;
 
         for (field_name, tag) in fields_in {
-            let is_gc = tag.field_repr().is_gc_ref;
-            // Instances still address fields by whole `VmValue` slots: every
-            // read and write path — `InstanceData::field_at`, the JIT's
-            // fixed-field emission, the collector's payload walk — moves
-            // sixteen bytes. `FieldLayout::type_tag` carries the declared type
-            // through so the layout can pack once those paths read it.
-            let (size, align) = (SLOT_SIZE, SLOT_ALIGN);
+            let (size, align, is_gc) = class_field_repr(*tag);
 
             max_align = max_align.max(align);
             // Align current offset up to field's required alignment
@@ -93,8 +111,19 @@ impl ClassLayout {
             cur_offset += padding;
 
             let offset = cur_offset;
-            if is_gc && offset / 8 < 64 {
-                gc_mask |= 1u64 << (offset / 8);
+            if is_gc {
+                // Mark every 8-byte word the field spans, not just its first
+                // — a 16-byte `Dynamic` field covers two words, and a mask
+                // that only ever set one bit per field was silently wrong for
+                // any multi-word GC-ref field the moment something finally
+                // read `gc_mask` (nothing does yet; this is the first
+                // consumer-shaped use, so it gets it right from the start).
+                let mut w = offset / 8;
+                let end_word = (offset + size).div_ceil(8);
+                while w < end_word && w < 64 {
+                    gc_mask |= 1u64 << w;
+                    w += 1;
+                }
             }
 
             cur_offset += size;

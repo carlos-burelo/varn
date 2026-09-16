@@ -25,7 +25,7 @@ pub(crate) use super::jit_helpers::*;
 
 #[repr(C)]
 pub struct ExecCtx {
-    pub stack: Vec<VmValue>,
+    pub stack: crate::frame_store::FrameStore,
     pub frames: crate::frame_stack::FrameStack,
     pub globals: GlobalStore,
     pub heap: Heap,
@@ -34,7 +34,7 @@ pub struct ExecCtx {
     pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     pub loader: Option<std::sync::Arc<dyn ModuleLoader + Send + Sync>>,
     pub settings: crate::settings::ExecSettings,
-    pub open_upvalues: Vec<(usize, VmUpvalue)>,
+    pub open_upvalues: Vec<(crate::frame_store::SlotAddr, VmUpvalue)>,
     pub pending_constructors: Vec<(usize, VmValue)>,
     pub pending_setters: Vec<(usize, VmValue)>,
     pub vm_suspend: Option<VmSuspend>,
@@ -115,6 +115,11 @@ pub struct ExecCtx {
     pub capabilities: varn_types::capabilities::CapabilitySet,
     pub metadata: FxHashMap<String, FxHashMap<String, VmValue>>,
     pub gc_root_scratch: Vec<VmValue>,
+    /// Staging para el protocolo lento de llamadas (P2): la ventana
+    /// callee+args como `Vec<VmValue>` contiguo, reutilizado entre llamadas.
+    /// `prepare_call` la consume de forma síncrona (adopta al frame o la
+    /// drena), así que nunca hay staging anidado vivo a la vez.
+    pub stage: Vec<VmValue>,
 }
 
 impl ExecCtx {
@@ -128,7 +133,7 @@ impl ExecCtx {
         }
 
         let mut ctx = Self {
-            stack: Vec::with_capacity(16384),
+            stack: crate::frame_store::FrameStore::new(),
             frames: crate::frame_stack::FrameStack::with_capacity(512),
             globals,
             heap,
@@ -166,6 +171,7 @@ impl ExecCtx {
             capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
             metadata: FxHashMap::default(),
             gc_root_scratch: Vec::with_capacity(1024),
+            stage: Vec::with_capacity(32),
         };
 
         if fresh {
@@ -299,7 +305,7 @@ impl ExecCtx {
 
     pub(crate) fn fork_for_task(&self) -> Self {
         Self {
-            stack: Vec::with_capacity(1024),
+            stack: crate::frame_store::FrameStore::new(),
             frames: crate::frame_stack::FrameStack::with_capacity(64),
             globals: self.globals.clone(),
             heap: self.heap.clone(),
@@ -337,23 +343,21 @@ impl ExecCtx {
             capabilities: self.capabilities.clone(),
             metadata: FxHashMap::default(),
             gc_root_scratch: Vec::with_capacity(1024),
+            stage: Vec::with_capacity(32),
         }
     }
 
     pub fn run_minor_gc(&mut self) {
-        let frame_top = self
-            .frames
-            .last()
-            .map(|f| f.base + f.closure().proto.register_count as usize)
-            .unwrap_or(0);
-        let active_stack_len = self.stack.len().max(frame_top);
-        if self.stack.len() < active_stack_len {
-            self.stack.resize(active_stack_len, VmValue::null());
-        }
+        // El almacén por clases dimensiona exacto por activación
+        // (`push_frame` extiende, `pop_frame` trunca): los tramos vivos son
+        // contiguos desde 0 y GPR/FPR ni se visitan — por construcción nunca
+        // son raíces. Solo DYN se filtra por tag y REF va directo.
+        let dyn_len = self.stack.dyn_.len();
 
         let mut all_vals = std::mem::take(&mut self.gc_root_scratch);
         all_vals.clear();
-        let needed_cap = active_stack_len
+        let needed_cap = dyn_len
+            + self.stage.len()
             + self.globals.values.len()
             + self.modules.len()
             + self.module_exports.len()
@@ -365,7 +369,16 @@ impl ExecCtx {
             all_vals.reserve(needed_cap - all_vals.capacity());
         }
 
-        all_vals.extend_from_slice(&self.stack[..active_stack_len]);
+        all_vals.extend_from_slice(&self.stack.dyn_);
+        // Call-window staging: boxed args/receiver/result sitting here
+        // between `exec_call_reg`'s slow path staging them and
+        // `prepare_call`/`dispatch_prepared_call` consuming them are live
+        // the same way any other pending value is — a heap ref parked here
+        // when a nested allocation trips this same safepoint (e.g. building
+        // a rest-args array) must survive nursery collection like everything
+        // else, not just what already made it into a register.
+        let stage_start = all_vals.len();
+        all_vals.extend_from_slice(&self.stage);
         let globals_start = all_vals.len();
         all_vals.extend_from_slice(&self.globals.values);
         let modules_start = all_vals.len();
@@ -401,9 +414,20 @@ impl ExecCtx {
         let jit_native_result_start = all_vals.len();
         all_vals.push(self.jit_native_result);
 
-        self.heap.minor_gc(&mut all_vals, &[]);
+        // TODO EL tramo, no solo `dyn_`: `all_vals` junta stack+stage+globals+
+        // módulos+... precisamente para que cada uno cuente como raíz. Pasar
+        // solo `[..dyn_len]` (como hacía esto) escaneaba los registros y
+        // dejaba globals/static_closures/etc. sin tocar — el nursery los
+        // wipea igual (`objects.clear()` es incondicional al final de
+        // `collect`), así que cualquier objeto SOLO alcanzable desde un
+        // global sobrevivía en el papel (la copia de vuelta no cambiaba nada)
+        // pero desaparecía del heap: el primer `heap.get` posterior a un
+        // minor GC con ese índice devolvía `None` — "invalid heap index" en
+        // la siguiente llamada a una función de nivel de módulo.
+        self.heap.minor_gc(&mut all_vals[..], &mut self.stack.refs, &[]);
 
-        self.stack[..active_stack_len].copy_from_slice(&all_vals[..active_stack_len]);
+        self.stack.dyn_.copy_from_slice(&all_vals[..dyn_len]);
+        self.stage.copy_from_slice(&all_vals[stage_start..globals_start]);
 
         let globals_slice = &all_vals[globals_start..modules_start];
         self.globals.values.copy_from_slice(globals_slice);
@@ -470,17 +494,10 @@ impl ExecCtx {
             return;
         }
         self.run_minor_gc();
-        let frame_top = self
-            .frames
-            .last()
-            .map(|f| f.base + f.closure().proto.register_count as usize)
-            .unwrap_or(0);
-        let active_stack_len = self.stack.len().max(frame_top);
-        if self.stack.len() < active_stack_len {
-            self.stack.resize(active_stack_len, VmValue::null());
-        }
         let mut roots: Vec<u32> = Vec::with_capacity(256);
-        for v in &self.stack[..active_stack_len] {
+        self.stack
+            .collect_roots(self.stack.dyn_.len(), self.stack.refs.len(), &mut roots);
+        for v in &self.stage {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }

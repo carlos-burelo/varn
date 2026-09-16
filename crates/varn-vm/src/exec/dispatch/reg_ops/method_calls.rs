@@ -35,7 +35,7 @@ impl ExecCtx {
         if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
             if let Some(built) = self.construct_enum_variant(&template, base, arg_start, arg_count)
             {
-                self.stack[base + dest] = built;
+                self.stack.unbox_into_reg(base, dest, built)?;
                 return Ok(false);
             }
         }
@@ -45,16 +45,16 @@ impl ExecCtx {
         if this_val.is_heap() {
             if let Some(crate::heap::HeapObj::Array(arr)) = self.heap.get(this_val.as_heap_idx()) {
                 if name.as_ref() == varn_core::MemberKey::Push.as_str() && arg_count == 1 {
-                    let val = self.stack[base + arg_start];
+                    let val = self.stack.box_reg(base, arg_start);
                     arr.push_vm(val);
                     self.heap.write_barrier(this_val.as_heap_idx(), val);
-                    self.stack[base + dest] = VmValue::null();
+                    self.stack.unbox_into_reg(base, dest, VmValue::null())?;
                     self.record_ic_hit_callmethod();
                     self.record_call_native(|_, _| Ok(VmValue::null()), Some("push"));
                     return Ok(false);
                 } else if name.as_ref() == varn_core::MemberKey::Pop.as_str() && arg_count == 0 {
                     let val = arr.pop_vm().unwrap_or(VmValue::null());
-                    self.stack[base + dest] = val;
+                    self.stack.unbox_into_reg(base, dest, val)?;
                     self.record_ic_hit_callmethod();
                     self.record_call_native(|_, _| Ok(VmValue::null()), Some("pop"));
                     return Ok(false);
@@ -73,7 +73,7 @@ impl ExecCtx {
             if name.as_ref() == varn_core::MemberKey::StartsWith.as_str() && arg_count == 1 {
                 let mut buf_a = [0u8; 5];
                 let mut buf_b = [0u8; 5];
-                let arg_val = self.stack[base + arg_start];
+                let arg_val = self.stack.box_reg(base, arg_start);
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
                 } else if let Some(crate::heap::HeapObj::Str(hs)) =
@@ -97,14 +97,14 @@ impl ExecCtx {
                     None
                 };
                 if let (Some(s), Some(p)) = (s_opt, p_opt) {
-                    self.stack[base + dest] = VmValue::from_bool(s.starts_with(p));
+                    self.stack.unbox_into_reg(base, dest, VmValue::from_bool(s.starts_with(p)))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
             } else if name.as_ref() == varn_core::MemberKey::EndsWith.as_str() && arg_count == 1 {
                 let mut buf_a = [0u8; 5];
                 let mut buf_b = [0u8; 5];
-                let arg_val = self.stack[base + arg_start];
+                let arg_val = self.stack.box_reg(base, arg_start);
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
                 } else if let Some(crate::heap::HeapObj::Str(hs)) =
@@ -128,14 +128,14 @@ impl ExecCtx {
                     None
                 };
                 if let (Some(s), Some(p)) = (s_opt, p_opt) {
-                    self.stack[base + dest] = VmValue::from_bool(s.ends_with(p));
+                    self.stack.unbox_into_reg(base, dest, VmValue::from_bool(s.ends_with(p)))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
             } else if name.as_ref() == varn_core::MemberKey::IndexOf.as_str() && arg_count == 1 {
                 let mut buf_a = [0u8; 5];
                 let mut buf_b = [0u8; 5];
-                let arg_val = self.stack[base + arg_start];
+                let arg_val = self.stack.box_reg(base, arg_start);
                 let s_opt = if this_val.is_sso() {
                     Some(this_val.sso_as_str(&mut buf_a))
                 } else if let Some(crate::heap::HeapObj::Str(hs)) =
@@ -170,7 +170,7 @@ impl ExecCtx {
                     } else {
                         -1
                     };
-                    self.stack[base + dest] = VmValue::from_int(idx);
+                    self.stack.unbox_into_reg(base, dest, VmValue::from_int(idx))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
@@ -250,7 +250,7 @@ impl ExecCtx {
                 self.record_call_native(f, Some(name.as_ref()));
                 let result =
                     self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
-                self.stack[base + dest] = result;
+                self.stack.unbox_into_reg(base, dest, result)?;
                 return Ok(false);
             }
 
@@ -327,7 +327,7 @@ impl ExecCtx {
                         self.record_call_native(f, Some(name.as_ref()));
                         let result = self
                             .call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
-                        self.stack[base + dest] = result;
+                        self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }
                     _ => {}
@@ -354,7 +354,7 @@ impl ExecCtx {
                 self.record_call_native(f, Some(name.as_ref()));
                 let result =
                     self.call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
-                self.stack[base + dest] = result;
+                self.stack.unbox_into_reg(base, dest, result)?;
                 return Ok(false);
             }
         }
@@ -424,7 +424,7 @@ impl ExecCtx {
         if let Some((f, receiver)) = native_call {
             self.record_call_native(f, Some(name.as_ref()));
             let result = self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
-            self.stack[base + dest] = result;
+            self.stack.unbox_into_reg(base, dest, result)?;
             return Ok(false);
         }
 
@@ -490,7 +490,8 @@ impl ExecCtx {
                 Some(crate::heap::HeapObj::NativeFn(..))
             );
 
-        self.push(method_nv);
+        self.stage.clear();
+        self.stage.push(method_nv);
 
         let skip_this = is_bound
             || is_static
@@ -499,13 +500,12 @@ impl ExecCtx {
             || is_namespace_native
             || is_plain_native;
         if !skip_this {
-            self.push(this_val);
+            self.stage.push(this_val);
         } else {
-            self.push(VmValue::null());
+            self.stage.push(VmValue::null());
         }
         for i in 0..arg_count {
-            let v = self.stack[base + arg_start + i];
-            self.push(v);
+            self.stage.push(self.stack.box_reg(base, arg_start + i));
         }
         let effective_count = arg_count + 1;
 
@@ -514,21 +514,11 @@ impl ExecCtx {
 
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = dest as u16;
-            let last = self.frames.last().unwrap();
-            let req = last.base + last.closure().proto.register_count as usize;
-            if self.stack.len() < req {
-                self.stack.resize(req, VmValue::null());
-            }
             return Ok(true);
         }
 
-        let result = self.stack.pop().unwrap_or(VmValue::null());
-        let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure().proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
-        self.stack[base + dest] = result;
+        let result = self.stage_pop();
+        self.stack.unbox_into_reg(base, dest, result)?;
         Ok(false)
     }
 
@@ -544,24 +534,15 @@ impl ExecCtx {
         let result = if arg_count < 16 {
             let mut buf = [VmValue::null(); 17];
             buf[0] = receiver;
-            if arg_count > 0 {
-                unsafe {
-                    let src_ptr = self.stack.as_ptr().add(base + arg_start);
-                    let dest_ptr = buf.as_mut_ptr().add(1);
-                    std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, arg_count);
-                }
+            for i in 0..arg_count {
+                buf[1 + i] = self.stack.box_reg(base, arg_start + i);
             }
             self.invoke_native(f, &buf[..arg_count + 1])
         } else {
             let mut args = Vec::with_capacity(arg_count + 1);
             args.push(receiver);
-            if arg_count > 0 {
-                unsafe {
-                    let src_ptr = self.stack.as_ptr().add(base + arg_start);
-                    let dest_ptr = args.as_mut_ptr().add(1);
-                    std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, arg_count);
-                    args.set_len(arg_count + 1);
-                }
+            for i in 0..arg_count {
+                args.push(self.stack.box_reg(base, arg_start + i));
             }
             self.invoke_native(f, &args)
         }
@@ -592,53 +573,64 @@ impl ExecCtx {
             self.record_hotspot_method(&method_key, is_jit);
         }
         // `arity` counts register 0 (the receiver here) plus the declared
-        // params, so the staged window is exactly `arity` slots wide: the
-        // receiver, the supplied args, and nulls for any param the call
-        // omitted.
-        let nparams = nc.proto.arity.saturating_sub(1);
-        let final_base = self.stack.len();
+        // params. Missing trailing args keep the frame defaults (DYN slots
+        // read `null`, exactly as the old null-padding; static classes read
+        // their zero value — only reachable when the caller under-applies,
+        // which the checker rejects for required params).
         if self.frames.len() >= 10000 {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));
         }
-        let required = final_base + nc.proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
+        let alloc = self.stack.push_frame(&nc.proto);
+        if let Err(e) = self.stack.unbox_into_reg(alloc, 0, this_val) {
+            self.stack.pop_frame();
+            return Err(e);
         }
-        self.stack[final_base] = this_val;
         if !nc.proto.has_rest {
-            if arg_count > 0 {
-                unsafe {
-                    let src = self.stack.as_ptr().add(base + arg_start);
-                    let dst = self.stack.as_mut_ptr().add(final_base + 1);
-                    std::ptr::copy_nonoverlapping(src, dst, arg_count);
+            let mut failed: Option<crate::error::RuntimeError> = None;
+            for i in 0..arg_count {
+                if let Err(e) = self.stack.mov_cross(alloc, 1 + i, base, arg_start + i) {
+                    failed = Some(e);
+                    break;
                 }
+            }
+            if let Some(e) = failed {
+                self.stack.pop_frame();
+                return Err(e);
             }
         } else {
+            let nparams = nc.proto.arity.saturating_sub(1);
             let rest_idx = nparams.saturating_sub(1);
             let regular_count = arg_count.min(rest_idx);
-            if regular_count > 0 {
-                unsafe {
-                    let src = self.stack.as_ptr().add(base + arg_start);
-                    let dst = self.stack.as_mut_ptr().add(final_base + 1);
-                    std::ptr::copy_nonoverlapping(src, dst, regular_count);
+            let mut failed: Option<crate::error::RuntimeError> = None;
+            for i in 0..regular_count {
+                if let Err(e) = self.stack.mov_cross(alloc, 1 + i, base, arg_start + i) {
+                    failed = Some(e);
+                    break;
                 }
             }
-            let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                (rest_idx..arg_count)
-                    .map(|i| self.stack[base + arg_start + i])
-                    .collect()
-            } else {
-                vec![]
-            };
-            let rest_nv = VmValue::from_heap_idx(
-                self.heap
-                    .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-            );
-            self.stack[final_base + 1 + rest_idx] = rest_nv;
+            if failed.is_none() {
+                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                    (rest_idx..arg_count)
+                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
+                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                ));
+                if let Err(e) = self.stack.unbox_into_reg(alloc, 1 + rest_idx, rest_nv) {
+                    failed = Some(e);
+                }
+            }
+            if let Some(e) = failed {
+                self.stack.pop_frame();
+                return Err(e);
+            }
         }
-        let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
+        let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
         frame.return_reg = dest as u16;
         frame.current_class = owner_class;
         self.frames.push(frame);

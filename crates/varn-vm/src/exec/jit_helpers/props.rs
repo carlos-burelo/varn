@@ -43,7 +43,7 @@ pub(crate) extern "C" fn jit_get_property(
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
-        ctx_ref.stack[base + args.dest]
+        ctx_ref.stack.box_reg(base, args.dest)
     }
 }
 
@@ -91,7 +91,7 @@ pub(crate) extern "C" fn jit_get_property_flat(
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
-        ctx_ref.jit_native_result = ctx_ref.stack[base + dest];
+        ctx_ref.jit_native_result = ctx_ref.stack.box_reg(base, dest);
     }
 }
 

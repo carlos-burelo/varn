@@ -14,69 +14,60 @@ use varn_types::NativeCtx;
 impl ExecCtx {
     /// Like `call_vm`, but for the JIT call fallback.
     ///
-    /// The caller's clif frame flushed its call window to home slots, so the
-    /// `arg_count` arguments — including the callee-placeholder null for a
-    /// regular call, or the receiver for an extension call — sit at
-    /// `stack[src..src + arg_count]`. Copy them to the stack top, where
-    /// `prepare_call` expects a callee's frame to begin, and hand `arg_count`
-    /// straight over, exactly mirroring the interpreter's `exec_call_reg`
-    /// fallback path.
+    /// Fase A del frame por clases: el llamador compilado ya no puede exponer
+    /// su ventana de argumentos como tramo contiguo del almacén — los home
+    /// slots viven en los vectores por clase (`FrameStore`) y solo el valor
+    /// completo tiene sentido fuera del frame. La ventana llega entonces
+    /// boxeada en `window`, con el callee/placeholder de los argumentos en el
+    /// primer slot (igual que flush-eaba el lowering antiguo a sus home
+    /// slots), y se trata como staging: `prepare_call` la materializa en la
+    /// región tipada del frame (`materialize_frame`), el mismo camino que
+    /// toda entrada host→VM.
+    ///
+    /// Fase B: ventana tipada directa (GPR/FPR/REF/DYN sin boxear) y el
+    /// fast-path `construct_staged_fast` de `new X()` restaurado de git.
     pub(crate) fn call_vm_window(
         &mut self,
         callee: VmValue,
-        src: usize,
-        arg_count: usize,
+        window: &[VmValue],
     ) -> crate::error::VmResult<VmValue> {
-        // The window is inside the caller's register file, which is allocated
-        // on frame entry — but a proto whose trailing registers were never
-        // written can leave the stack short of it.
-        if self.stack.len() < src + arg_count {
-            self.stack.resize(src + arg_count, VmValue::null());
-        }
-        let orig_len = self.stack.len();
-        self.stack.extend_from_within(src..src + arg_count);
-        // `new X()` is the single hottest shape reaching here from clif code.
-        // The template JIT's own call helper had this fast path; without it
-        // every construction pays prepare_call + a frame push + a nested
-        // run_until.
-        if callee.is_heap() {
-            if let Some(HeapObj::Class(cls)) = self.heap.get(callee.as_heap_idx()) {
-                let cls = cls.clone();
-                let callee_base = self.stack.len() - arg_count;
-                if let Some(v) =
-                    crate::exec::jit_helpers::construct_staged_fast(self, &cls, callee_base)
-                {
-                    self.stack.truncate(orig_len);
-                    self.record_call_vm_fast();
-                    return Ok(v);
-                }
-            }
-        }
+        self.stage.clear();
+        self.stage.extend_from_slice(window);
+        let arg_count = window.len();
         let prepared = match self.prepare_call(callee, arg_count) {
             Ok(p) => p,
             Err(e) => {
-                self.stack.truncate(orig_len);
+                self.stage.clear();
                 return Err(e);
             }
         };
         let res = match prepared {
-            PreparedCall::NativeImmediate(f, n) => {
-                let args_start = self.stack.len() - n;
-                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
-                (f)(self as &mut dyn NativeCtx, &vm_args).map_err(crate::error::RuntimeError::new)
+            PreparedCall::NativeImmediate(f, arg_count) => {
+                // La ventana vive al FINAL de staging (ver dispatch_prepared_call).
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
+                self.stage.clear();
+                (f)(self as &mut dyn NativeCtx, &vm_args)
+                    .map_err(crate::error::RuntimeError::new)
             }
-            PreparedCall::RawNativeImmediate(f, n) => {
-                let args_start = self.stack.len() - n;
-                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
-                let slice = if n > 0 { &vm_args[1..] } else { &vm_args[..] };
-                (f)(self as &mut dyn NativeCtx, slice).map_err(crate::error::RuntimeError::new)
+            PreparedCall::RawNativeImmediate(f, arg_count) => {
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
+                self.stage.clear();
+                let slice = if vm_args.len() > 0 {
+                    &vm_args[1..]
+                } else {
+                    &vm_args[..]
+                };
+                (f)(self as &mut dyn NativeCtx, slice)
+                    .map_err(crate::error::RuntimeError::new)
             }
             PreparedCall::Frame(frame) => {
+                // El frame ya trae su región tipada (`materialize_frame`):
+                // solo entra en la lista.
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
                 self.frames.push(frame);
                 self.run_until(depth)
             }
@@ -88,10 +79,6 @@ impl ExecCtx {
             } => Ok(self.build_generator(closure, args, current_class)),
             PreparedCall::Constructor(frame, instance_nv) => {
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
                 self.frames.push(frame);
                 self.pending_constructors.push((depth, instance_nv));
                 let _ = self.run_until(depth)?;
@@ -108,7 +95,7 @@ impl ExecCtx {
                 Ok(nv)
             }
         };
-        self.stack.truncate(orig_len);
+        self.stage.clear();
         res
     }
 

@@ -1,18 +1,18 @@
 import { spawn$, sleep$, parallel$, channel$, Channel } from "runtime:task";
 import { TaskHandle } from "core:intrinsics";
 
-export type TaskSettledResult<T = dynamic> = {
+export type TaskSettledResult<T> = {
     status: str,
     value?: T,
-    reason?: dynamic
+    reason?: str
 };
 
 export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
     return parallel$(tasks);
 }
 
-export function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T> {
-    return spawn$(target, ...args);
+export function spawn<T>(target: Task<T>): TaskHandle<T> {
+    return spawn$(target);
 }
 
 export function sleep(ms: int): TaskHandle<void> {
@@ -24,7 +24,7 @@ async function wrapSettledOne<T>(task: Task<T>): Task<TaskSettledResult<T>> {
         let val = await task;
         return { status: "fulfilled", value: val };
     } catch (err) {
-        return { status: "rejected", reason: err };
+        return { status: "rejected", reason: "" + err };
     }
 }
 
