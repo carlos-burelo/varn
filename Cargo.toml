@@ -21,6 +21,32 @@ members = [
     "crates/varn-rt",
     "crates/xtask",
 ]
+# varn-lsp desconectado del build por defecto durante la realineación con
+# IDEAS_BASE.md (fases AST-arena / checker / struct-value / enums /
+# generics): consume varn-core y varn-checker en cada fase y su propio
+# trabajo de actualización queda para después. Sigue siendo miembro del
+# workspace (comparte lockfile) — constrúyelo explícito con `-p varn-lsp`.
+default-members = [
+    "crates/varn-core",
+    "crates/varn-lexer",
+    "crates/varn-parser",
+    "crates/varn-checker",
+    "crates/varn-types",
+    "crates/varn-tir",
+    "crates/varn-op-macros",
+    "crates/varn-modules",
+    "crates/varn-builtins",
+    "crates/varn-runtime",
+    "crates/varn-cli",
+    "crates/varn-vm",
+    "crates/varn-debug",
+    "crates/varn-pm",
+    "crates/varn-jit",
+    "crates/varn-pipeline",
+    "crates/varn-compiler",
+    "crates/varn-rt",
+    "crates/xtask",
+]
 resolver = "2"
 
 [workspace.package]
