@@ -1,7 +1,7 @@
 use crate::types::Type;
-use std::rc::Rc;
 pub type SymbolId = usize;
 use varn_core::ast::TypeNode;
+use varn_core::Atom;
 use varn_core::SourceRange;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -50,22 +50,34 @@ impl SymbolKind {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     pub kind: SymbolKind,
-    pub name: Rc<str>,
+    // `Atom` is a per-parse interned index and does not (and should not)
+    // derive `serde::{Serialize, Deserialize}` — see
+    // `binder::types::TypeMembers::objects` for the established rationale.
+    // Every `Atom`-typed field below is skipped for the same reason; a
+    // reloaded (cached) `Symbol` needs its names re-resolved against a live
+    // interner by its caller, same as `BindResult::interner`.
+    #[serde(skip)]
+    pub name: Atom,
     pub ty: Option<Type>,
     pub line: u32,
     pub col: u32,
     pub has_explicit_type: bool,
     pub is_async: bool,
     pub is_generator: bool,
-    pub doc: Option<Rc<str>>,
-    pub type_params: Vec<Rc<str>>,
+    #[serde(skip)]
+    pub doc: Option<Atom>,
+    #[serde(skip)]
+    pub type_params: Vec<Atom>,
     pub type_param_constraints: Vec<Option<Type>>,
     pub offset: u32,
     #[serde(skip)]
     pub full_range: varn_core::SourceRange,
-    pub origin_module: Option<Rc<str>>,
-    pub re_export_path: Vec<Rc<str>>,
-    pub original_name: Option<Rc<str>>,
+    #[serde(skip)]
+    pub origin_module: Option<Atom>,
+    #[serde(skip)]
+    pub re_export_path: Vec<Atom>,
+    #[serde(skip)]
+    pub original_name: Option<Atom>,
     #[serde(skip)]
     pub alias_node: Option<Box<TypeNode>>,
     pub slot_idx: Option<usize>,
@@ -77,7 +89,7 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    pub fn new(kind: SymbolKind, name: Rc<str>, line: u32) -> Self {
+    pub fn new(kind: SymbolKind, name: Atom, line: u32) -> Self {
         Self {
             kind,
             name,
@@ -139,9 +151,9 @@ impl SymbolArena {
         self.symbols.is_empty()
     }
 
-    pub fn find_id_by_name_and_line(&self, name: &str, line: u32) -> Option<SymbolId> {
+    pub fn find_id_by_name_and_line(&self, name: Atom, line: u32) -> Option<SymbolId> {
         self.symbols
             .iter()
-            .position(|s| s.name.as_ref() == name && s.line == line)
+            .position(|s| s.name == name && s.line == line)
     }
 }

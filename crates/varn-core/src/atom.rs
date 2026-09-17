@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 /// Handle a un string interno, deduplicado. `Copy` — comparar dos `Atom` es
 /// comparar dos `u32`, nunca contenido de texto.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Atom(u32);
 
 /// Tabla de interning por sesión de compilación. Una instancia vive por

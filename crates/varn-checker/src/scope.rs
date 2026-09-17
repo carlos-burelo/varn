@@ -1,6 +1,6 @@
 use crate::symbol::SymbolId;
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use varn_core::Atom;
 pub type ScopeId = usize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -18,7 +18,11 @@ pub enum ScopeKind {
 pub struct CheckerScope {
     pub kind: ScopeKind,
     pub parent: Option<ScopeId>,
-    pub bindings: FxHashMap<Rc<str>, SymbolId>,
+    // `Atom` is a per-parse interned index and does not (and should not)
+    // derive `serde::{Serialize, Deserialize}` — see
+    // `binder::types::TypeMembers::objects` for the established rationale.
+    #[serde(skip)]
+    pub bindings: FxHashMap<Atom, SymbolId>,
     pub children: Vec<ScopeId>,
     pub ordered: Vec<SymbolId>,
 }
@@ -34,19 +38,19 @@ impl CheckerScope {
         }
     }
 
-    pub fn define(&mut self, name: Rc<str>, id: SymbolId) {
+    pub fn define(&mut self, name: Atom, id: SymbolId) {
         self.bindings.insert(name, id);
         self.ordered.push(id);
     }
 
-    pub fn lookup(&self, name: &str) -> Option<SymbolId> {
-        self.bindings.get(name).copied()
+    pub fn lookup(&self, name: Atom) -> Option<SymbolId> {
+        self.bindings.get(&name).copied()
     }
 
-    pub fn resolve<'s>(&'s self, name: &str, arena: &'s ScopeArena) -> Option<SymbolId> {
+    pub fn resolve<'s>(&'s self, name: Atom, arena: &'s ScopeArena) -> Option<SymbolId> {
         let mut current = self;
         loop {
-            if let Some(&id) = current.bindings.get(name) {
+            if let Some(&id) = current.bindings.get(&name) {
                 return Some(id);
             }
             {
