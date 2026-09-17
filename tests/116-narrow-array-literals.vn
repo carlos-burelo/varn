@@ -46,6 +46,15 @@ assert("campo de clase: literal de array angosto", new Palette().channels[2] == 
 let box: { xs: Array<i8> } = { xs: [-1, 1] }
 assert("propiedad de objeto: literal de array angosto", box.xs[1] == 1)
 
+// Una propiedad requerida NO angosta al lado no hunde al literal, y una
+// opcional puede omitirse. La que falta y es requerida si es error de
+// compilacion (tests/errors/narrow-array-object-missing-prop.vn).
+let mixed: { xs: Array<u8>, name: str } = { xs: [0, 255], name: "paleta" }
+assert("objeto mixto: propiedad angosta y propiedad plana juntas", mixed.name == "paleta" && mixed.xs[1] == 255)
+
+let partial: { xs: Array<i8>, name?: str } = { xs: [7] }
+assert("objeto: la propiedad opcional puede omitirse", partial.xs[0] == 7)
+
 let grid: Array<Array<i8>> = [[1, 2], [3, 4]]
 assert("anidado: Array<Array<i8>> acepta literales en rango", grid[1][1] == 4)
 

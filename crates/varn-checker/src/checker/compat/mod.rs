@@ -162,6 +162,29 @@ fn float_literal_fits_f32(value: f64) -> bool {
     !value.is_finite() || (value as f32).is_finite()
 }
 
+/// A *non*-narrow literal sitting in a recursive position — an object property
+/// next to the narrow one — still has to be answered, and `types_compatible` is
+/// not reachable from this pure function (it needs a `BindView`). Only literal
+/// kinds whose type is unambiguous are handled, and for those the answer is
+/// exactly what `types_compatible` would give, so this widens nothing: the
+/// function is only ever consulted after `types_compatible` already said no
+/// about the *whole* type.
+fn plain_literal_matches(target: &Type, expr: &varn_core::ast::Expr) -> bool {
+    use varn_core::ast::ExprKind;
+    use varn_core::TypeTag;
+    let TypeKind::Intrinsic(tag) = &target.0 else {
+        return false;
+    };
+    matches!(
+        (&expr.kind, tag),
+        (ExprKind::StrLiteral { .. }, TypeTag::Str)
+            | (ExprKind::BoolLiteral { .. }, TypeTag::Bool)
+            | (ExprKind::CharLiteral { .. }, TypeTag::Char)
+            | (ExprKind::IntLiteral { .. }, TypeTag::Int)
+            | (ExprKind::FloatLiteral { .. }, TypeTag::Float)
+    )
+}
+
 fn array_element_type(ty: &Type) -> Option<&Type> {
     match &ty.0 {
         TypeKind::Array(inner) => Some(inner),
@@ -238,23 +261,47 @@ pub(crate) fn expr_satisfies_target_type(
         if properties.is_empty() {
             return false;
         }
-        return properties.iter().all(|prop| match prop {
-            varn_core::ast::ObjectProp::Property { key, value, .. } => {
-                let key_str = match key {
-                    varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
-                        s.as_str()
-                    }
-                    _ => return false,
-                };
-                members.iter().any(|m| match m {
-                    ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {
-                        expr_satisfies_target_type(ty, ty, Some(value))
-                    }
-                    _ => false,
-                })
+        let mut present: Vec<&str> = Vec::with_capacity(properties.len());
+        for prop in properties {
+            let varn_core::ast::ObjectProp::Property { key, value, .. } = prop else {
+                return false;
+            };
+            let key_str = match key {
+                varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
+                    s.as_str()
+                }
+                _ => return false,
+            };
+            let matched = members.iter().any(|m| match m {
+                ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {
+                    expr_satisfies_target_type(ty, ty, Some(value))
+                        || plain_literal_matches(ty, value)
+                }
+                _ => false,
+            });
+            if !matched {
+                return false;
             }
+            present.push(key_str);
+        }
+        // Checking only the literal's own properties is not enough: this is an
+        // assignability answer, so a required member the literal omits has to
+        // reject too, or `{ xs: Array<i8>, name: str } = { xs: [1, 2] }` would
+        // leave a `str`-typed field holding null.
+        let required_missing = members.iter().any(|m| match m {
+            ObjectTypeMember::Property {
+                name,
+                optional: false,
+                ..
+            }
+            | ObjectTypeMember::Method {
+                name,
+                optional: false,
+                ..
+            } => !present.contains(&name.as_ref()),
             _ => false,
         });
+        return !required_missing;
     }
     false
 }
@@ -800,5 +847,58 @@ mod tests {
     #[test]
     fn spread_element_is_not_waved_through() {
         assert!(!accepts(&array_of(TypeTag::I8), "[...other]"));
+    }
+
+    fn prop(name: &str, ty: Type, optional: bool) -> ObjectTypeMember {
+        ObjectTypeMember::Property {
+            name: std::rc::Rc::from(name),
+            ty,
+            optional,
+            readonly: false,
+        }
+    }
+
+    /// The object-literal arm answers assignability, so an omitted *required*
+    /// member must reject — otherwise a `str`-typed field ends up holding null.
+    #[test]
+    fn object_literal_missing_required_property_is_rejected() {
+        let target = Type(
+            TypeKind::Object(vec![
+                prop("xs", array_of(TypeTag::I8), false),
+                prop("name", Type::Str, false),
+            ]),
+            false,
+        );
+        assert!(!accepts(&target, "{ xs: [1, 2] }"));
+    }
+
+    #[test]
+    fn object_literal_may_omit_an_optional_property() {
+        let target = Type(
+            TypeKind::Object(vec![
+                prop("xs", array_of(TypeTag::I8), false),
+                prop("name", Type::Str, true),
+            ]),
+            false,
+        );
+        assert!(accepts(&target, "{ xs: [1, 2] }"));
+        // Still value-checked: an out-of-range element rejects regardless.
+        assert!(!accepts(&target, "{ xs: [300] }"));
+    }
+
+    /// A required non-narrow property next to the narrow one must not sink the
+    /// whole literal, and must still be type-checked.
+    #[test]
+    fn object_literal_checks_plain_properties_too() {
+        let target = Type(
+            TypeKind::Object(vec![
+                prop("xs", array_of(TypeTag::I8), false),
+                prop("name", Type::Str, false),
+            ]),
+            false,
+        );
+        assert!(accepts(&target, "{ xs: [1, 2], name: \"ok\" }"));
+        assert!(!accepts(&target, "{ xs: [1, 2], name: 42 }"));
+        assert!(!accepts(&target, "{ xs: [300], name: \"ok\" }"));
     }
 }
