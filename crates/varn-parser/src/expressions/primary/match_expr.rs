@@ -83,26 +83,20 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
     let id_range = s.range();
     let name = s.consume_lexeme();
     if s.check(TokenKind::LParen) {
-        return parse_variant_tuple_pattern(s, name.to_string());
+        return parse_variant_tuple_pattern(s, name);
     }
     if s.check(TokenKind::LBrace) {
-        return parse_variant_record_pattern(s, name.to_string());
+        return parse_variant_record_pattern(s, name);
     }
 
     if s.check(TokenKind::Dot) {
-        let id_expr = s.expr(
-            id_range,
-            varn_core::ast::ExprKind::Identifier { name: name.clone() },
-        );
+        let id_expr = s.expr(id_range, varn_core::ast::ExprKind::Identifier { name });
         s.advance();
-        let prop_name = s.lexeme().to_owned();
-        let prop_tok = s.consume();
-        let prop_range = prop_tok.range;
+        let prop_name = s.consume_lexeme();
+        let prop_range = s.prev_range();
         let prop_expr = s.expr(
             prop_range,
-            varn_core::ast::ExprKind::Identifier {
-                name: prop_name.into(),
-            },
+            varn_core::ast::ExprKind::Identifier { name: prop_name },
         );
         let expr = s.expr(
             id_range.to(prop_range),
@@ -120,10 +114,10 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
 
 fn parse_variant_tuple_pattern(
     s: &mut TokenStream,
-    enum_name: String,
+    enum_name: varn_core::Atom,
 ) -> Result<MatchPattern, String> {
     use varn_core::ast::MatchBinding;
-    let variant_name = enum_name.clone();
+    let variant_name = enum_name;
     s.advance();
     let mut bindings: Vec<MatchBinding> = Vec::new();
     while !s.check(TokenKind::RParen) && !s.is_eof() {
@@ -131,7 +125,7 @@ fn parse_variant_tuple_pattern(
         if s.check(TokenKind::Placeholder) {
             s.advance();
             bindings.push(MatchBinding {
-                name: "_".into(),
+                name: s.interner.intern("_"),
                 range,
             });
         } else if s.check(TokenKind::Identifier) {
@@ -152,13 +146,16 @@ fn parse_variant_tuple_pattern(
     }
     s.expect(TokenKind::RParen)?;
     Ok(MatchPattern::EnumVariant {
-        enum_name: enum_name.into(),
-        variant_name: variant_name.into(),
+        enum_name,
+        variant_name,
         bindings,
     })
 }
 
-fn parse_variant_record_pattern(s: &mut TokenStream, name: String) -> Result<MatchPattern, String> {
+fn parse_variant_record_pattern(
+    s: &mut TokenStream,
+    name: varn_core::Atom,
+) -> Result<MatchPattern, String> {
     use varn_core::ast::MatchBinding;
     s.advance();
     // `Variant { x, y }` — a variant pattern whose payload is destructured by
@@ -187,8 +184,8 @@ fn parse_variant_record_pattern(s: &mut TokenStream, name: String) -> Result<Mat
     s.expect(TokenKind::RBrace)?;
     let _ = rest;
     Ok(MatchPattern::EnumVariant {
-        enum_name: name.clone().into(),
-        variant_name: name.into(),
+        enum_name: name,
+        variant_name: name,
         bindings,
     })
 }

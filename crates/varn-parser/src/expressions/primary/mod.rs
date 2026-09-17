@@ -6,7 +6,6 @@ use super::helpers::{parse_int_radix, split_regex, unescape_string};
 use super::{parse_call_args, parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
-use std::rc::Rc;
 use varn_core::ast::{ArrayEl, Expr, ExprKind};
 use varn_core::ParsedNumber;
 use varn_core::TokenKind;
@@ -26,21 +25,23 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         | TokenKind::HexLiteral => {
             let pre_parsed = s.parsed_num();
             let raw = s.consume_lexeme();
+            let raw_text = s.interner.resolve(raw);
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
-                _ => parse_int_radix(&raw)
-                    .ok_or_else(|| format!("integer literal `{}` overflows i64", raw))?,
+                _ => parse_int_radix(raw_text)
+                    .ok_or_else(|| format!("integer literal `{}` overflows i64", raw_text))?,
             };
             Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
         }
         TokenKind::FloatLiteral => {
             let pre_parsed = s.parsed_num();
             let raw = s.consume_lexeme();
+            let raw_text = s.interner.resolve(raw);
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
-                _ => raw
+                _ => raw_text
                     .parse()
-                    .map_err(|_| format!("invalid float literal: {}", raw))?,
+                    .map_err(|_| format!("invalid float literal: {}", raw_text))?,
             };
             Ok(s.expr(range, ExprKind::FloatLiteral { value, raw }))
         }
@@ -53,7 +54,8 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(range, ExprKind::DecimalLiteral { raw }))
         }
         TokenKind::RawStr => {
-            let value = s.consume_lexeme().to_string();
+            let atom = s.consume_lexeme();
+            let value = s.interner.resolve(atom).to_string();
             Ok(s.expr(range, ExprKind::StrLiteral { value }))
         }
         TokenKind::Str => {
@@ -80,7 +82,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         }
         TokenKind::RegularExpression => {
             let raw = s.consume_lexeme();
-            let (pattern, flags) = split_regex(&raw);
+            let (pattern, flags) = split_regex(s.interner.resolve(raw));
             Ok(s.expr(range, ExprKind::RegexLiteral { pattern, flags }))
         }
 
@@ -92,12 +94,8 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         }
         TokenKind::Placeholder => {
             s.advance();
-            Ok(s.expr(
-                range,
-                ExprKind::Identifier {
-                    name: Rc::from("_"),
-                },
-            ))
+            let name = s.interner.intern("_");
+            Ok(s.expr(range, ExprKind::Identifier { name }))
         }
 
         TokenKind::This => {

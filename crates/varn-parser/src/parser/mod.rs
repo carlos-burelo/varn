@@ -20,6 +20,25 @@ pub struct Parser {
     pub diagnostics: varn_core::DiagnosticBag,
 }
 
+// The entire recursive-descent parser is a tree of free functions threaded
+// with `&mut TokenStream` (see `stream.rs`), so the atom interner physically
+// lives on `TokenStream` alongside `errors`/`pending_doc`. `Deref`/`DerefMut`
+// make `parser.interner` resolve to `parser.stream.interner` so callers
+// outside this crate can use the field path the task interface promises,
+// without a second, unsynced interner living on `Parser` itself.
+impl std::ops::Deref for Parser {
+    type Target = TokenStream;
+    fn deref(&self) -> &TokenStream {
+        &self.stream
+    }
+}
+
+impl std::ops::DerefMut for Parser {
+    fn deref_mut(&mut self) -> &mut TokenStream {
+        &mut self.stream
+    }
+}
+
 impl Parser {
     pub fn new(tokens: Vec<varn_core::Token>, lexeme_buf: Rc<[u8]>, filename: Rc<str>) -> Self {
         Parser {

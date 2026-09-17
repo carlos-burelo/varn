@@ -33,9 +33,9 @@ fn parse_property_name(s: &mut TokenStream) -> Expr {
         s.push_error("expected a property name after `.`".to_owned(), range);
         return s.expr(range, ExprKind::Missing);
     }
-    let name = s.lexeme().to_owned();
-    let tok = s.consume();
-    s.expr(tok.range, ExprKind::Identifier { name: name.into() })
+    let name = s.consume_lexeme();
+    let range = s.prev_range();
+    s.expr(range, ExprKind::Identifier { name })
 }
 
 pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
@@ -74,13 +74,14 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             if s.kind() == TokenKind::IntegerLiteral
                 && s.lexeme().replace('_', "") == I64_MIN_MAGNITUDE
             {
-                let raw = s.consume_lexeme();
+                s.advance(); // consume the magnitude lexeme
                 let full_range = s.span_from(start_range);
+                let raw = s.interner.intern(&format!("-{}", I64_MIN_MAGNITUDE));
                 return Ok(s.expr(
                     full_range,
                     ExprKind::IntLiteral {
                         value: i64::MIN,
-                        raw: std::rc::Rc::from(format!("-{}", raw).as_str()),
+                        raw,
                     },
                 ));
             }
@@ -286,8 +287,11 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 s.advance();
                 let prop_expr = parse_property_name(s);
                 let prop_name = match &prop_expr.kind {
-                    ExprKind::Identifier { name } => name.clone(),
-                    _ => std::rc::Rc::from(s.lexeme()),
+                    ExprKind::Identifier { name } => *name,
+                    _ => {
+                        let text = s.lexeme().to_owned();
+                        s.interner.intern(&text)
+                    }
                 };
                 let prop_range = *prop_expr.range();
                 let start_range = *expr.range();
@@ -517,8 +521,9 @@ pub fn parse_call_args(
         } else if s.check(TokenKind::Identifier) && s.peek_kind(1) == TokenKind::Colon {
             let label = s.consume_lexeme();
             s.advance();
+            let label = s.interner.resolve(label).to_string();
             args.push(Arg::Named {
-                label: label.to_string(),
+                label,
                 value: parse_assign_expr(s)?,
             });
         } else {

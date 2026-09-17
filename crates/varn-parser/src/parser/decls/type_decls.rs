@@ -2,7 +2,6 @@ use super::class::member_key_name;
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
-use std::rc::Rc;
 use varn_core::ast::decl::{Decl, StructField};
 use varn_core::ast::{
     EnumDecl, EnumField, EnumMember, InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind,
@@ -107,7 +106,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         s.eat_semicolon();
         let full_range = s.span_from(mem_range);
         return Ok(InterfaceMember::Method {
-            key: key.into(),
+            key: s.interner.intern(&key),
             type_params,
             params,
             return_type,
@@ -128,7 +127,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
     s.eat_semicolon();
     let full_range = s.span_from(mem_range);
     Ok(InterfaceMember::Property {
-        key: key.into(),
+        key: s.interner.intern(&key),
         type_ann,
         optional,
         readonly,
@@ -168,7 +167,7 @@ pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
 }
 
 fn parse_sum_type_body(
-    id: Rc<str>,
+    id: varn_core::Atom,
     type_params: Vec<varn_core::ast::TypeParam>,
     range: varn_core::source::SourceRange,
     s: &mut TokenStream,
@@ -262,7 +261,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         s.expect(TokenKind::Colon)?;
                         name
                     } else {
-                        let n = Rc::from(format!("value{idx}").as_str());
+                        let n = s.interner.intern(&format!("value{idx}"));
                         idx += 1;
                         n
                     };

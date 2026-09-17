@@ -7,7 +7,8 @@ pub(crate) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
     let mut parts = vec![];
 
     let raw = s.consume_lexeme();
-    let literal_text = raw.trim_start_matches('`');
+    let raw_text = s.interner.resolve(raw).to_owned();
+    let literal_text = raw_text.trim_start_matches('`');
     let (literal_text, is_head) = if let Some(text) = literal_text.strip_suffix("${") {
         (text, true)
     } else {
@@ -24,10 +25,11 @@ pub(crate) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
         parts.push(TemplatePart::Interpolation(interp));
 
         let raw_cont = s.consume_lexeme();
-        let (content, is_tail) = if let Some(text) = raw_cont.strip_suffix('`') {
+        let raw_cont_text = s.interner.resolve(raw_cont).to_owned();
+        let (content, is_tail) = if let Some(text) = raw_cont_text.strip_suffix('`') {
             (text.strip_prefix('}').unwrap_or(text), true)
         } else {
-            let after_close = raw_cont.strip_prefix('}').unwrap_or(&raw_cont);
+            let after_close = raw_cont_text.strip_prefix('}').unwrap_or(&raw_cont_text);
             (after_close.trim_end_matches("${"), false)
         };
         parts.push(TemplatePart::Literal(unescape_string(content)));

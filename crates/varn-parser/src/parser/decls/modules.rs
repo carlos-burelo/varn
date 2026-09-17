@@ -83,12 +83,13 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
 
     s.expect(TokenKind::From)?;
     let source = s.consume_str();
+    let source = s.interner.intern(&source);
     let full_range = s.span_from(range);
 
     Ok(ImportDecl {
         ast_id: s.next_ast_id(),
         specifiers,
-        source: source.into(),
+        source,
         is_type,
         range: full_range,
     })
@@ -114,7 +115,8 @@ pub fn parse_export_decl(
         }
         s.expect(TokenKind::RBrace)?;
         let source = if s.eat(TokenKind::From) {
-            Some(s.consume_str().into())
+            let text = s.consume_str();
+            Some(s.interner.intern(&text))
         } else {
             None
         };
@@ -163,10 +165,11 @@ pub fn parse_export_decl(
         };
         s.expect(TokenKind::From)?;
         let source = s.consume_str();
+        let source = s.interner.intern(&source);
         let full_range = s.span_from(range);
         return Ok(ExportDecl::All {
             ast_id: s.next_ast_id(),
-            source: source.into(),
+            source,
             alias,
             range: full_range,
         });
@@ -195,7 +198,8 @@ pub fn parse_export_decl(
         }
         s.expect(TokenKind::RBrace)?;
         let source = if s.eat(TokenKind::From) {
-            Some(s.consume_str().into())
+            let text = s.consume_str();
+            Some(s.interner.intern(&text))
         } else {
             None
         };

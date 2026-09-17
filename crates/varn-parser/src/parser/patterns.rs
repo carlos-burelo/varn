@@ -98,7 +98,7 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             };
             let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
-                name: String::from("_").into(),
+                name: s.interner.intern("_"),
                 type_ann,
                 range: full_range,
             })

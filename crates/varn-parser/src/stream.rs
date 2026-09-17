@@ -16,6 +16,14 @@ pub struct TokenStream {
 
     split_count: u8,
     next_ast_id: AstId,
+
+    /// Owns the dedup table for every name the parser mints: identifiers,
+    /// raw literal text, labels, property keys. Lives here rather than on
+    /// `Parser` because the whole recursive-descent parser is a tree of free
+    /// functions threaded with `&mut TokenStream`, not `&mut Parser` —
+    /// exactly why `errors` and `pending_doc` live here too. `Parser`
+    /// derefs to `TokenStream`, so `parser.interner` still resolves.
+    pub interner: varn_core::AtomInterner,
 }
 
 impl TokenStream {
@@ -30,6 +38,7 @@ impl TokenStream {
             profile: ParseProfile::default(),
             split_count: 0,
             next_ast_id: 1,
+            interner: varn_core::AtomInterner::new(),
         }
     }
 
@@ -239,7 +248,7 @@ impl TokenStream {
         }
     }
 
-    pub fn expect_id(&mut self) -> Result<Rc<str>, String> {
+    pub fn expect_id(&mut self) -> Result<varn_core::Atom, String> {
         if self.kind().can_be_identifier() {
             let id = self.consume_lexeme();
             Ok(id)
@@ -253,10 +262,16 @@ impl TokenStream {
         }
     }
 
-    pub fn consume_lexeme(&mut self) -> Rc<str> {
-        let s: Rc<str> = Rc::from(self.lexeme());
+    /// Interns the current token's lexeme and advances past it. The
+    /// canonical source of `Atom`s during parsing — every identifier, raw
+    /// literal, label and property key that ends up in the AST is minted
+    /// here, so any two occurrences of the same text share one `Atom`.
+    pub fn consume_lexeme(&mut self) -> varn_core::Atom {
+        let tok = self.token().clone();
+        let text = tok.get_lexeme(&self.lexeme_buf);
+        let atom = self.interner.intern(text);
         self.advance();
-        s
+        atom
     }
 
     #[inline]

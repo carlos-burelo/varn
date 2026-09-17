@@ -87,12 +87,13 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
     let params = if s.check(TokenKind::LParen) {
         crate::parser::parse_params(s)?
     } else {
-        let param_name = s.lexeme().to_owned();
+        let param_text = s.lexeme().to_owned();
+        let param_name = s.interner.intern(&param_text);
         let tok = s.expect_token(TokenKind::Identifier)?;
         let param_range = tok.range;
         vec![Param {
             pattern: Pattern::Identifier {
-                name: param_name.into(),
+                name: param_name,
                 type_ann: None,
                 range: param_range,
             },

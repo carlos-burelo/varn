@@ -233,7 +233,7 @@ pub fn parse_class_member(
         };
         let full_range = s.span_from(range);
         return Ok(ClassMember::Getter {
-            key: key.into(),
+            key: s.interner.intern(&key),
             return_type,
             body,
             modifiers: mods,
@@ -257,7 +257,7 @@ pub fn parse_class_member(
         };
         let full_range = s.span_from(range);
         return Ok(ClassMember::Setter {
-            key: key.into(),
+            key: s.interner.intern(&key),
             param,
             body,
             modifiers: mods,
@@ -290,7 +290,7 @@ pub fn parse_class_member(
         };
         let full_range = s.span_from(range);
         return Ok(ClassMember::Method {
-            key: key.into(),
+            key: s.interner.intern(&key),
             type_params,
             params,
             return_type,
@@ -317,7 +317,7 @@ pub fn parse_class_member(
     s.eat_semicolon();
     let full_range = s.span_from(range);
     Ok(ClassMember::Property {
-        key: key.into(),
+        key: s.interner.intern(&key),
         type_ann,
         init,
         modifiers: mods,

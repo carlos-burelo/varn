@@ -127,13 +127,10 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             super::super::parse_assign_expr(s)?
         } else {
             let name = match &key {
-                PropKey::Identifier(n) => n.clone(),
+                PropKey::Identifier(n) => s.interner.intern(n),
                 _ => return Err(String::from("shorthand property must be an identifier")),
             };
-            s.expr(
-                prop_range,
-                varn_core::ast::ExprKind::Identifier { name: name.into() },
-            )
+            s.expr(prop_range, varn_core::ast::ExprKind::Identifier { name })
         };
 
         let computed = matches!(&key, PropKey::Computed(_));
@@ -153,14 +150,21 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
 
 fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
     match s.kind() {
-        TokenKind::Identifier => Ok(PropKey::Identifier(s.consume_lexeme().to_string())),
-        TokenKind::Str => Ok(PropKey::Str(s.consume_lexeme().to_string())),
+        TokenKind::Identifier => {
+            let atom = s.consume_lexeme();
+            Ok(PropKey::Identifier(s.interner.resolve(atom).to_string()))
+        }
+        TokenKind::Str => {
+            let atom = s.consume_lexeme();
+            Ok(PropKey::Str(s.interner.resolve(atom).to_string()))
+        }
         TokenKind::IntegerLiteral => {
             let pre_parsed = s.parsed_num();
             let raw = s.consume_lexeme();
+            let raw_text = s.interner.resolve(raw);
             let v = match pre_parsed {
                 Some(varn_core::ParsedNumber::Int(n)) => n,
-                _ => super::super::helpers::parse_int_radix(&raw).unwrap_or(0),
+                _ => super::super::helpers::parse_int_radix(raw_text).unwrap_or(0),
             };
             Ok(PropKey::Int(v))
         }
@@ -171,7 +175,8 @@ fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
             Ok(PropKey::Computed(expr))
         }
         _ if s.kind().can_be_identifier() || s.kind().is_keyword() => {
-            Ok(PropKey::Identifier(s.consume_lexeme().to_string()))
+            let atom = s.consume_lexeme();
+            Ok(PropKey::Identifier(s.interner.resolve(atom).to_string()))
         }
         _ => Err(format!("Expected property key, got {:?}", s.kind())),
     }

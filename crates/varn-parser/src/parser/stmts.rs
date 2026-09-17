@@ -7,7 +7,11 @@ use varn_core::TokenKind;
 
 pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
     while s.check(TokenKind::DocComment) {
-        let lexeme = s.consume_lexeme();
+        // Doc comments are prose, not names — they don't belong in the atom
+        // table, so they bypass `consume_lexeme` and keep the plain `Rc<str>`
+        // path `store_pending_doc`/`current_doc` already use.
+        let lexeme: std::rc::Rc<str> = std::rc::Rc::from(s.lexeme());
+        s.advance();
         s.store_pending_doc(lexeme);
     }
 
