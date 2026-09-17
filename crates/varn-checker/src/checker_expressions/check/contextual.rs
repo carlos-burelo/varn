@@ -24,9 +24,13 @@ impl<'r> Checker<'r> {
                 continue;
             }
 
-            let name = pattern_lead_name(&ap.pattern);
+            let name = pattern_lead_name(&ap.pattern, &bind.interner);
             let scope = bind.scopes.get(self.current_scope);
-            if let Some(sym_id) = scope.resolve(name, &bind.scopes) {
+            if let Some(sym_id) = bind
+                .interner
+                .get(name)
+                .and_then(|atom| scope.resolve(atom, &bind.scopes))
+            {
                 self.symbol_types.insert(sym_id, ep.ty.clone());
                 self.mark_infer_env_dirty();
             }

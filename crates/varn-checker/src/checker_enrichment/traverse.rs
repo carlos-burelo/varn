@@ -119,9 +119,13 @@ fn enrich_vars_recursive(
             if let Decl::Variable(v) = decl.as_ref() {
                 use crate::binder::pattern_lead_name;
                 for d in &v.declarators {
-                    let name = pattern_lead_name(&d.id);
+                    let name = pattern_lead_name(&d.id, &bind.interner).to_owned();
                     let scope = bind.scopes.get(bind.global_scope);
-                    let sym_id = match scope.lookup(name) {
+                    let sym_id = match bind
+                        .interner
+                        .get(&name)
+                        .and_then(|atom| scope.lookup(atom))
+                    {
                         Some(id) => id,
                         None => continue,
                     };

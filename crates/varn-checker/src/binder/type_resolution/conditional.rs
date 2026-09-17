@@ -17,12 +17,17 @@ pub(super) fn resolve_conditional(
     if let TypeKind::Union(members) = &check.0 {
         if matches!(&check_node.kind, TypeKind::Named(_, None)) {
             if let TypeKind::Named(var_name, None) = &check_node.kind {
+                let var_name_str = ctx
+                    .and_then(|c| c.interner())
+                    .and_then(|i| i.try_resolve(*var_name))
+                    .unwrap_or("")
+                    .to_owned();
                 let results: Vec<Type> = members
                     .iter()
                     .map(|m| {
                         let dist_ctx = AliasSubstitutionContext {
                             inner: ctx,
-                            params: vec![var_name.clone()],
+                            params: vec![var_name_str.clone()],
                             args: vec![m.clone()],
                         };
                         let mut infer_bindings = FxHashMap::default();
@@ -90,12 +95,18 @@ fn resolve_extends_with_infer(
 ) -> Type {
     match &node.kind {
         TypeKind::Infer(name) => {
-            bindings.insert(name.clone(), check.clone());
+            let name_str = ctx
+                .and_then(|c| c.interner())
+                .and_then(|i| i.try_resolve(*name))
+                .unwrap_or("")
+                .to_owned();
+            bindings.insert(name_str, check.clone());
             check.clone()
         }
         TypeKind::Generic(name, args, _) => {
+            let name_str = ctx.and_then(|c| c.interner()).and_then(|i| i.try_resolve(*name));
             if let TypeKind::Generic(check_name, check_args, _) = &check.0 {
-                if check_name.as_ref() == name && check_args.len() == args.len() {
+                if Some(check_name.as_ref()) == name_str && check_args.len() == args.len() {
                     for (arg_node, check_arg) in args.iter().zip(check_args.iter()) {
                         resolve_extends_with_infer(arg_node, ctx, bindings, check_arg);
                     }

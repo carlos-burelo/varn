@@ -39,4 +39,16 @@ pub trait TypeContext {
     fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
         None
     }
+
+    /// The per-parse `AtomInterner` backing the `Atom`s carried by the AST
+    /// nodes this context's callers walk (`ExprKind::Identifier`,
+    /// `Pattern::Identifier`, ...). `None` by default so existing
+    /// implementors that never see raw `Atom`s (the type-substitution
+    /// wrapper contexts in `type_resolution::contexts`, which only ever
+    /// forward `&str` text) don't have to provide one; `Binder` and
+    /// `BindView` — the two contexts callers actually reach `Atom`-bearing
+    /// AST through — override it.
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        None
+    }
 }

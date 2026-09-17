@@ -56,7 +56,7 @@ impl<'r> super::super::Binder<'r> {
                     if let ExprKind::Object { properties } = &init.kind {
                         let fields = self.collect_object_members(properties);
                         if !fields.is_empty() {
-                            self.type_members.objects.insert(name.clone(), fields);
+                            self.type_members.objects.insert(*name, fields);
                         }
                     }
                 }
@@ -75,13 +75,12 @@ impl<'r> super::super::Binder<'r> {
                     )
                 {
                     let scope = self.scopes.get(self.current);
-                    if let Some(sym_id) =
-                        scope.lookup(if let Pattern::Identifier { name, .. } = &d.id {
-                            name.as_ref()
-                        } else {
-                            ""
-                        })
-                    {
+                    let name_atom = if let Pattern::Identifier { name, .. } = &d.id {
+                        Some(*name)
+                    } else {
+                        None
+                    };
+                    if let Some(sym_id) = name_atom.and_then(|n| scope.lookup(n)) {
                         self.pending_enrich.push(PendingEnrich::Var {
                             sym_id,
                             init: init_expr as *const Expr,
@@ -98,8 +97,8 @@ impl<'r> super::super::Binder<'r> {
                     // file, and that is exactly what `bind_export` escapes.
                     if let Pattern::Identifier { name, .. } = &d.id {
                         let scope = self.scopes.get(self.current);
-                        if let Some(sym_id) = scope.lookup(name.as_ref()) {
-                            self.register_array_candidate(sym_id, name.clone());
+                        if let Some(sym_id) = scope.lookup(*name) {
+                            self.register_array_candidate(sym_id, *name);
                         }
                     }
                 }
@@ -114,7 +113,10 @@ impl<'r> super::super::Binder<'r> {
             .params
             .iter()
             .map(|p| {
-                let name = Some(Rc::from(crate::binder::pattern_lead_name(&p.pattern)));
+                let name = Some(Rc::from(crate::binder::pattern_lead_name(
+                    &p.pattern,
+                    &self.interner,
+                )));
                 let mut ty = p
                     .type_ann
                     .as_ref()
@@ -160,22 +162,18 @@ impl<'r> super::super::Binder<'r> {
             type_params: f
                 .type_params
                 .iter()
-                .map(|t| Rc::from(t.name.as_str()))
+                .map(|t| Rc::from(self.interner.resolve(t.name)))
                 .collect(),
         });
 
-        let mut sym = Symbol::new(SymbolKind::Function, f.id.clone(), line).with_type(fn_type);
+        let mut sym = Symbol::new(SymbolKind::Function, f.id, line).with_type(fn_type);
         sym.col = f.range.start.column + (f.id_offset - f.range.start.offset);
         sym.offset = f.id_offset;
         sym.has_explicit_type = f.return_type.is_some();
         sym.is_async = f.modifiers.is_async;
         sym.is_generator = f.modifiers.is_generator;
-        sym.doc = f.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        sym.type_params = f
-            .type_params
-            .iter()
-            .map(|t| Rc::from(t.name.as_str()))
-            .collect();
+        sym.doc = f.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.type_params = f.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = f
             .type_params
             .iter()
@@ -186,7 +184,7 @@ impl<'r> super::super::Binder<'r> {
             })
             .collect();
 
-        let sym_id = self.define(f.id.to_string(), sym);
+        let sym_id = self.define(f.id, sym);
 
         if f.return_type.is_none() && !f.modifiers.is_declare && !f.modifiers.is_generator {
             self.pending_enrich.push(PendingEnrich::Fn {
@@ -248,32 +246,25 @@ impl<'r> super::super::Binder<'r> {
             resolve_type_node(&t.alias, Some(self))
         };
         let mut sym =
-            Symbol::new(SymbolKind::TypeAlias, t.id.clone(), t.range.start.line).with_type(ty);
+            Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(ty);
         sym.offset = t.range.start.offset;
         sym.col = t.range.start.column;
-        sym.doc = t.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        sym.type_params = t
-            .type_params
-            .iter()
-            .map(|tp| Rc::from(tp.name.as_str()))
-            .collect();
+        sym.doc = t.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
         if has_type_params {
             sym.alias_node = Some(Box::new(t.alias.clone()));
         }
-        self.define(t.id.to_string(), sym);
+        self.define(t.id, sym);
     }
 
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
         let line = e.range.start.line;
-        let mut sym = Symbol::new(SymbolKind::Enum, e.id.clone(), line).with_type(
-            Type::named_with_origin(e.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+        let id_rc: Rc<str> = Rc::from(self.interner.resolve(e.id));
+        let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(
+            Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
         );
-        sym.doc = e.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        sym.type_params = e
-            .type_params
-            .iter()
-            .map(|t| Rc::from(t.name.as_str()))
-            .collect();
+        sym.doc = e.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.type_params = e.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = e
             .type_params
             .iter()
@@ -283,33 +274,30 @@ impl<'r> super::super::Binder<'r> {
                     .map(|con| resolve_type_node(con, Some(self)))
             })
             .collect();
-        self.define(e.id.to_string(), sym);
+        self.define(e.id, sym);
 
         let mut variants_info = Vec::new();
 
         for member in e.members.iter() {
+            let member_id_rc: Rc<str> = Rc::from(self.interner.resolve(member.id));
             let fields: Vec<(Rc<str>, Type)> = member
                 .payload_fields
                 .iter()
                 .map(|f| {
                     let ty = resolve_type_node(&f.ty, Some(self));
-                    (f.name.clone(), ty)
+                    (Rc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();
 
             self.sum_variant_parent
-                .insert(member.id.clone(), e.id.clone());
+                .insert(member_id_rc.clone(), id_rc.clone());
             self.sum_variant_fields
-                .insert(member.id.clone(), fields.clone());
+                .insert(member_id_rc.clone(), fields.clone());
 
             let variant_sym_id = if member.payload_fields.is_empty() {
-                let v_sym = Symbol::new(
-                    SymbolKind::EnumMember,
-                    member.id.clone(),
-                    member.range.start.line,
-                )
-                .with_type(Type::named(e.id.clone()));
-                self.define(member.id.to_string(), v_sym)
+                let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
+                    .with_type(Type::named(id_rc.clone()));
+                self.define(member.id, v_sym)
             } else {
                 let params: Vec<crate::types::FunctionParam> = fields
                     .iter()
@@ -323,23 +311,19 @@ impl<'r> super::super::Binder<'r> {
                 let fn_ty = Type::fn_(crate::types::FunctionType {
                     params,
                     return_type: Box::new(Type::named_with_origin(
-                        e.id.clone(),
+                        id_rc.clone(),
                         Some(Rc::from(self.source_file.as_ref())),
                     )),
                     is_arrow: false,
                     type_params: vec![],
                 });
-                let v_sym = Symbol::new(
-                    SymbolKind::EnumMember,
-                    member.id.clone(),
-                    member.range.start.line,
-                )
-                .with_type(fn_ty);
-                self.define(member.id.to_string(), v_sym)
+                let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
+                    .with_type(fn_ty);
+                self.define(member.id, v_sym)
             };
 
             variants_info.push(ClassMemberInfo {
-                name: member.id.clone(),
+                name: member_id_rc,
                 kind: ClassMemberKind::Property,
                 is_async: false,
                 is_generator: false,
@@ -348,7 +332,7 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named(e.id.clone()),
+                ty: Type::named(id_rc.clone()),
                 members: Vec::new(),
                 visibility: None,
                 is_abstract: false,
@@ -371,7 +355,7 @@ impl<'r> super::super::Binder<'r> {
         let mut members: Vec<ClassMemberInfo> = Vec::new();
 
         for member in &e.body {
-            self.collect_class_member(member, e.id.as_ref(), &mut methods, &mut members);
+            self.collect_class_member(member, id_rc.as_ref(), &mut methods, &mut members);
         }
 
         for member in &e.body {
@@ -394,11 +378,10 @@ impl<'r> super::super::Binder<'r> {
                     modifiers,
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     if return_type.is_none() && !modifiers.is_abstract {
                         self.pending_enrich.push(PendingEnrich::Method {
-                            class_name: e.id.clone(),
-                            key: key_rc,
+                            class_name: e.id,
+                            key: *key,
                             body: body as *const Stmt,
                             is_async: modifiers.is_async,
                         });
@@ -417,11 +400,10 @@ impl<'r> super::super::Binder<'r> {
                     body: Some(body),
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     if return_type.is_none() {
                         self.pending_enrich.push(PendingEnrich::Getter {
-                            class_name: e.id.clone(),
-                            key: key_rc,
+                            class_name: e.id,
+                            key: *key,
                             body: body as *const Stmt,
                         });
                     }
@@ -438,10 +420,9 @@ impl<'r> super::super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     self.pending_enrich.push(PendingEnrich::Setter {
-                        class_name: e.id.clone(),
-                        key: key_rc,
+                        class_name: e.id,
+                        key: *key,
                         body: body as *const Stmt,
                     });
                     self.escape_all_open_array_candidates();
@@ -464,7 +445,7 @@ impl<'r> super::super::Binder<'r> {
         }
 
         let class_info = ClassMemberInfo {
-            name: e.id.clone(),
+            name: id_rc.clone(),
             kind: ClassMemberKind::Class,
             is_async: false,
             is_generator: false,
@@ -473,7 +454,7 @@ impl<'r> super::super::Binder<'r> {
             line: e.range.start.line.saturating_sub(1),
             col: e.range.start.column,
             offset: e.range.start.offset,
-            ty: Type::named_with_origin(e.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+            ty: Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
             members: members.clone(),
             visibility: None,
             is_abstract: false,
@@ -483,11 +464,11 @@ impl<'r> super::super::Binder<'r> {
             ..Default::default()
         };
 
-        self.type_members.classes.insert(e.id.clone(), class_info);
+        self.type_members.classes.insert(id_rc.clone(), class_info);
 
         variants_info.extend(members);
         if !variants_info.is_empty() {
-            self.type_members.enums.insert(e.id.clone(), variants_info);
+            self.type_members.enums.insert(id_rc, variants_info);
         }
 
         self.current = saved;

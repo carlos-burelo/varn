@@ -9,12 +9,12 @@ use crate::types::Type;
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_namespace(&mut self, n: &NamespaceDecl) {
-        let mut sym =
-            Symbol::new(SymbolKind::Namespace, n.id.clone(), n.range.start.line).with_type(
-                Type::named_with_origin(n.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
-            );
-        sym.doc = n.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        self.define(n.id.to_string(), sym);
+        let id_rc: Rc<str> = Rc::from(self.interner.resolve(n.id));
+        let mut sym = Symbol::new(SymbolKind::Namespace, n.id, n.range.start.line).with_type(
+            Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
+        );
+        sym.doc = n.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        self.define(n.id, sym);
 
         let child = self.scopes.child(ScopeKind::Namespace, self.current);
         let saved = self.current;
@@ -26,7 +26,7 @@ impl<'r> super::super::Binder<'r> {
 
         let members = self.collect_namespace_members(&n.body);
         if !members.is_empty() {
-            self.type_members.namespaces.insert(n.id.clone(), members);
+            self.type_members.namespaces.insert(id_rc, members);
         }
 
         self.current = saved;
@@ -65,7 +65,7 @@ impl<'r> super::super::Binder<'r> {
                                 ty = Type::array(ty);
                             }
                             crate::types::FunctionParam {
-                                name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                                name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                                 ty,
                                 optional: p.is_optional || p.default.is_some(),
                                 is_rest: p.is_rest,
@@ -79,12 +79,12 @@ impl<'r> super::super::Binder<'r> {
                         type_params: f
                             .type_params
                             .iter()
-                            .map(|t| Rc::from(t.name.as_str()))
+                            .map(|t| Rc::from(self.interner.resolve(t.name)))
                             .collect(),
                     });
-                    let symbol_id = scope.resolve(&f.id, &self.scopes);
+                    let symbol_id = scope.resolve(f.id, &self.scopes);
                     members.push(ClassMemberInfo {
-                        name: f.id.clone(),
+                        name: Rc::from(self.interner.resolve(f.id)),
                         kind: ClassMemberKind::Function,
                         is_async: f.modifiers.is_async,
                         is_generator: f.modifiers.is_generator,
@@ -104,14 +104,17 @@ impl<'r> super::super::Binder<'r> {
                     });
                 }
                 Decl::Class(c) => {
-                    let name = c.id.clone().unwrap_or_else(|| Rc::from(""));
+                    let name: Rc<str> = c
+                        .id
+                        .map(|a| Rc::from(self.interner.resolve(a)))
+                        .unwrap_or_else(|| Rc::from(""));
                     let class_members = self
                         .type_members
                         .classes
                         .get(&name)
                         .map(|e| e.members.clone())
                         .unwrap_or_default();
-                    let symbol_id = scope.resolve(&name, &self.scopes);
+                    let symbol_id = c.id.and_then(|a| scope.resolve(a, &self.scopes));
                     members.push(ClassMemberInfo {
                         name: name.clone(),
                         kind: ClassMemberKind::Class,
@@ -137,7 +140,7 @@ impl<'r> super::super::Binder<'r> {
                 }
                 Decl::Variable(v) => {
                     for d in &v.declarators {
-                        let name = Rc::from(pattern_lead_name(&d.id));
+                        let name = Rc::from(pattern_lead_name(&d.id, &self.interner));
                         let ty = d
                             .type_ann
                             .as_ref()
@@ -149,7 +152,10 @@ impl<'r> super::super::Binder<'r> {
                                     .filter(|t| !t.is_dynamic())
                             })
                             .unwrap_or(Type::Dynamic);
-                        let symbol_id = scope.resolve(&name, &self.scopes);
+                        let symbol_id = self
+                            .interner
+                            .get(&name)
+                            .and_then(|a| scope.resolve(a, &self.scopes));
                         members.push(ClassMemberInfo {
                             name,
                             kind: ClassMemberKind::Variable,
@@ -173,9 +179,10 @@ impl<'r> super::super::Binder<'r> {
                 }
                 Decl::Namespace(n) => {
                     let inner_members = self.collect_namespace_members(&n.body);
-                    let symbol_id = scope.resolve(&n.id, &self.scopes);
+                    let symbol_id = scope.resolve(n.id, &self.scopes);
+                    let n_id_rc: Rc<str> = Rc::from(self.interner.resolve(n.id));
                     members.push(ClassMemberInfo {
-                        name: n.id.clone(),
+                        name: n_id_rc.clone(),
                         kind: ClassMemberKind::Namespace,
                         is_async: false,
                         is_generator: false,
@@ -184,7 +191,7 @@ impl<'r> super::super::Binder<'r> {
                         line: n.range.start.line.saturating_sub(1),
                         col: n.range.start.column,
                         offset: n.range.start.offset,
-                        ty: Type::named(n.id.clone()),
+                        ty: Type::named(n_id_rc),
                         members: inner_members,
                         visibility: None,
                         is_abstract: false,
@@ -195,9 +202,10 @@ impl<'r> super::super::Binder<'r> {
                     });
                 }
                 Decl::TypeAlias(t) => {
-                    let symbol_id = scope.resolve(&t.id, &self.scopes);
+                    let symbol_id = scope.resolve(t.id, &self.scopes);
+                    let t_id_rc: Rc<str> = Rc::from(self.interner.resolve(t.id));
                     members.push(ClassMemberInfo {
-                        name: t.id.clone(),
+                        name: t_id_rc.clone(),
                         kind: ClassMemberKind::Property,
                         is_async: false,
                         is_generator: false,
@@ -207,7 +215,7 @@ impl<'r> super::super::Binder<'r> {
                         col: t.range.start.column,
                         offset: t.range.start.offset,
                         ty: Type::named_with_origin(
-                            t.id.clone(),
+                            t_id_rc,
                             Some(Rc::from(self.source_file.as_ref())),
                         ),
                         members: Vec::new(),
@@ -220,15 +228,16 @@ impl<'r> super::super::Binder<'r> {
                     });
                 }
                 Decl::Enum(e) => {
+                    let e_id_rc: Rc<str> = Rc::from(self.interner.resolve(e.id));
                     let variants = self
                         .type_members
                         .enums
-                        .get(&e.id)
+                        .get(&e_id_rc)
                         .cloned()
                         .unwrap_or_default();
-                    let symbol_id = scope.resolve(&e.id, &self.scopes);
+                    let symbol_id = scope.resolve(e.id, &self.scopes);
                     members.push(ClassMemberInfo {
-                        name: e.id.clone(),
+                        name: e_id_rc.clone(),
                         kind: ClassMemberKind::Enum,
                         is_async: false,
                         is_generator: false,
@@ -237,7 +246,7 @@ impl<'r> super::super::Binder<'r> {
                         line: e.range.start.line.saturating_sub(1),
                         col: e.range.start.column,
                         offset: e.range.start.offset,
-                        ty: Type::named(e.id.clone()),
+                        ty: Type::named(e_id_rc),
                         members: variants,
                         visibility: None,
                         is_abstract: false,
@@ -254,9 +263,10 @@ impl<'r> super::super::Binder<'r> {
                         .get(&s.id)
                         .cloned()
                         .unwrap_or_default();
-                    let symbol_id = scope.resolve(&s.id, &self.scopes);
+                    let symbol_id = scope.resolve(s.id, &self.scopes);
+                    let s_id_rc: Rc<str> = Rc::from(self.interner.resolve(s.id));
                     members.push(ClassMemberInfo {
-                        name: s.id.clone(),
+                        name: s_id_rc.clone(),
                         kind: ClassMemberKind::Struct,
                         is_async: false,
                         is_generator: false,
@@ -265,7 +275,7 @@ impl<'r> super::super::Binder<'r> {
                         line: s.range.start.line.saturating_sub(1),
                         col: s.range.start.column,
                         offset: s.range.start.offset,
-                        ty: Type::named(s.id.clone()),
+                        ty: Type::named(s_id_rc),
                         members: struct_members,
                         visibility: None,
                         is_abstract: false,
@@ -276,15 +286,16 @@ impl<'r> super::super::Binder<'r> {
                     });
                 }
                 Decl::Interface(i) => {
+                    let i_id_rc: Rc<str> = Rc::from(self.interner.resolve(i.id));
                     let interface_members = self
                         .type_members
                         .interfaces
-                        .get(&i.id)
+                        .get(&i_id_rc)
                         .cloned()
                         .unwrap_or_default();
-                    let symbol_id = scope.resolve(&i.id, &self.scopes);
+                    let symbol_id = scope.resolve(i.id, &self.scopes);
                     members.push(ClassMemberInfo {
-                        name: i.id.clone(),
+                        name: i_id_rc.clone(),
                         kind: ClassMemberKind::Interface,
                         is_async: false,
                         is_generator: false,
@@ -293,7 +304,7 @@ impl<'r> super::super::Binder<'r> {
                         line: i.range.start.line.saturating_sub(1),
                         col: i.range.start.column,
                         offset: i.range.start.offset,
-                        ty: Type::named(i.id.clone()),
+                        ty: Type::named(i_id_rc),
                         members: interface_members,
                         visibility: None,
                         is_abstract: false,
@@ -318,29 +329,28 @@ impl<'r> super::super::Binder<'r> {
     }
 
     pub(crate) fn bind_struct(&mut self, s: &StructDecl) {
-        let mut sym = Symbol::new(SymbolKind::Struct, s.id.clone(), s.range.start.line).with_type(
-            Type::named_with_origin(s.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+        let id_rc: Rc<str> = Rc::from(self.interner.resolve(s.id));
+        let mut sym = Symbol::new(SymbolKind::Struct, s.id, s.range.start.line).with_type(
+            Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
         );
-        sym.doc = s.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        self.define(s.id.to_string(), sym);
+        sym.doc = s.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        self.define(s.id, sym);
 
         let mut members = Vec::new();
         for field in &s.fields {
             let ty = resolve_type_node(&field.type_ann, Some(self));
+            let field_name_rc: Rc<str> = Rc::from(self.interner.resolve(field.name));
 
-            let mut field_sym = Symbol::new(
-                SymbolKind::Property,
-                field.name.clone(),
-                field.range.start.line,
-            )
-            .with_type(ty.clone());
+            let mut field_sym =
+                Symbol::new(SymbolKind::Property, field.name, field.range.start.line)
+                    .with_type(ty.clone());
             field_sym.col = field.range.start.column;
             field_sym.offset = field.range.start.offset;
             field_sym.has_explicit_type = true;
             let symbol_id = self.arena.push(field_sym);
 
             members.push(ClassMemberInfo {
-                name: field.name.clone(),
+                name: field_name_rc,
                 kind: ClassMemberKind::Property,
                 is_async: false,
                 is_generator: false,
@@ -360,7 +370,7 @@ impl<'r> super::super::Binder<'r> {
             });
         }
         let struct_info = ClassMemberInfo {
-            name: s.id.clone(),
+            name: id_rc.clone(),
             kind: ClassMemberKind::Struct,
             is_async: false,
             is_generator: false,
@@ -369,7 +379,7 @@ impl<'r> super::super::Binder<'r> {
             line: s.range.start.line.saturating_sub(1),
             col: s.range.start.column,
             offset: s.range.start.offset,
-            ty: Type::named_with_origin(s.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+            ty: Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
             members,
             visibility: None,
             is_abstract: false,
@@ -378,6 +388,6 @@ impl<'r> super::super::Binder<'r> {
             symbol_id: None,
             ..Default::default()
         };
-        self.type_members.classes.insert(s.id.clone(), struct_info);
+        self.type_members.classes.insert(id_rc, struct_info);
     }
 }

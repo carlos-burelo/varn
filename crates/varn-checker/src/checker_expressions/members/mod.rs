@@ -346,7 +346,11 @@ fn collect_extension_members(
                 as_return: bool,
                 results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
                 seen: &mut rustc_hash::FxHashSet<Rc<str>>| {
-        let Some(sid) = scope.resolve(mangled, &bind.scopes) else {
+        let Some(sid) = bind
+            .interner
+            .get(mangled.as_ref())
+            .and_then(|atom| scope.resolve(atom, &bind.scopes))
+        else {
             return;
         };
         let sym = bind.arena.get(sid);

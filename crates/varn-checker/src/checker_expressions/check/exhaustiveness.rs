@@ -60,11 +60,13 @@ impl<'r> Checker<'r> {
                         }
                         match &c.pattern {
                             MatchPattern::Wildcard => true,
-                            MatchPattern::Identifier(name) => name.as_ref() == vname.as_ref(),
+                            MatchPattern::Identifier(name) => {
+                                bind.interner.resolve(*name) == vname.as_ref()
+                            }
                             MatchPattern::Record { fields, .. } => {
                                 fields.first().is_some_and(|(key, sub)| {
-                                    key.as_ref() == "__variant__"
-                                        && matches!(sub, Some(MatchPattern::Identifier(n)) if n.as_ref() == vname.as_ref())
+                                    bind.interner.resolve(*key) == "__variant__"
+                                        && matches!(sub, Some(MatchPattern::Identifier(n)) if bind.interner.resolve(*n) == vname.as_ref())
                                 })
                             }
                             _ => false,
@@ -106,22 +108,21 @@ impl<'r> Checker<'r> {
                         match &c.pattern {
                             MatchPattern::Wildcard => true,
                             MatchPattern::EnumVariant { variant_name, .. } => {
-                                let last_part = variant_name
-                                    .rsplit('.')
-                                    .next()
-                                    .unwrap_or(variant_name.as_ref());
+                                let variant_name_str = bind.interner.resolve(*variant_name);
+                                let last_part =
+                                    variant_name_str.rsplit('.').next().unwrap_or(variant_name_str);
                                 last_part == v.name.as_ref()
                             }
                             MatchPattern::Literal(e) => {
                                 use varn_core::ast::ExprKind;
                                 if let ExprKind::Member { property, .. } = &e.kind {
                                     if let ExprKind::Identifier { name } = &property.kind {
-                                        name.as_ref() == v.name.as_ref()
+                                        bind.interner.resolve(*name) == v.name.as_ref()
                                     } else {
                                         false
                                     }
                                 } else if let ExprKind::Identifier { name } = &e.kind {
-                                    name.as_ref() == v.name.as_ref()
+                                    bind.interner.resolve(*name) == v.name.as_ref()
                                 } else {
                                     false
                                 }

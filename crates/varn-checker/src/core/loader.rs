@@ -48,9 +48,13 @@ pub(crate) fn build_core_members(resolver: &dyn ImportResolver) -> CoreMembers {
             for (name, &sid) in &scope.bindings {
                 let sym = rb.arena.get(sid);
                 if !sym.type_params.is_empty() {
-                    members
-                        .class_type_params
-                        .insert(name.clone(), sym.type_params.clone());
+                    let name_rc: Rc<str> = Rc::from(rb.interner.resolve(*name));
+                    let tps: Vec<Rc<str>> = sym
+                        .type_params
+                        .iter()
+                        .map(|a| Rc::from(rb.interner.resolve(*a)))
+                        .collect();
+                    members.class_type_params.insert(name_rc, tps);
                 }
             }
 

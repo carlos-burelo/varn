@@ -69,10 +69,12 @@ impl<'r> Checker<'r> {
         if self.record_expr_types {
             if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
                 let callee_name = match &callee.kind {
-                    ExprKind::Identifier { name } => Some(std::rc::Rc::from(name.as_ref())),
+                    ExprKind::Identifier { name } => {
+                        Some(std::rc::Rc::from(bind.interner.resolve(*name)))
+                    }
                     ExprKind::Member { property, .. } => {
                         if let ExprKind::Identifier { name } = &property.kind {
-                            Some(std::rc::Rc::from(name.as_ref()))
+                            Some(std::rc::Rc::from(bind.interner.resolve(*name)))
                         } else {
                             None
                         }
@@ -146,7 +148,7 @@ impl<'r> Checker<'r> {
         let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) else {
             return;
         };
-        if let Some(mangled) = method_map.get(method_name.as_ref()) {
+        if let Some(mangled) = method_map.get(bind.interner.resolve(*method_name)) {
             self.extension_calls
                 .insert(range.start.offset, mangled.clone());
         }
@@ -434,8 +436,11 @@ impl<'r> Checker<'r> {
         let ExprKind::Identifier { name: fn_name } = &callee.kind else {
             return;
         };
-        let Some(fn_sym) = resolve_function_symbol(fn_name.as_ref(), self.current_scope, bind)
-        else {
+        let Some(fn_sym) = resolve_function_symbol(
+            bind.interner.resolve(*fn_name),
+            self.current_scope,
+            bind,
+        ) else {
             return;
         };
 
@@ -508,7 +513,11 @@ fn resolve_function_symbol<'a>(
     bind: &'a BindResult,
 ) -> Option<&'a crate::symbol::Symbol> {
     let current = bind.scopes.get(current_scope);
-    if let Some(id) = current.resolve(name, &bind.scopes) {
+    if let Some(id) = bind
+        .interner
+        .get(name)
+        .and_then(|atom| current.resolve(atom, &bind.scopes))
+    {
         let sym = bind.arena.get(id);
         if matches!(sym.kind, crate::symbol::SymbolKind::Function) {
             return Some(sym);
@@ -516,7 +525,11 @@ fn resolve_function_symbol<'a>(
     }
 
     let global = bind.scopes.get(bind.global_scope);
-    if let Some(id) = global.resolve(name, &bind.scopes) {
+    if let Some(id) = bind
+        .interner
+        .get(name)
+        .and_then(|atom| global.resolve(atom, &bind.scopes))
+    {
         let sym = bind.arena.get(id);
         if matches!(sym.kind, crate::symbol::SymbolKind::Function) {
             return Some(sym);

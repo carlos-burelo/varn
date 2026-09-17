@@ -22,8 +22,8 @@ impl<'r> super::super::Binder<'r> {
                 range,
                 ..
             } => {
-                let mut sym = Symbol::new(kind, name.clone(), line);
-                sym.doc = doc.map(Rc::from);
+                let mut sym = Symbol::new(kind, *name, line);
+                sym.doc = doc.map(|d| self.interner.intern(&d));
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();
@@ -32,7 +32,7 @@ impl<'r> super::super::Binder<'r> {
                 } else {
                     sym.ty = ty;
                 }
-                self.define(name.to_string(), sym);
+                self.define(*name, sym);
             }
             Pattern::Array { elements, rest, .. } => {
                 let elem_ty = ty.as_ref().and_then(|t| match &t.0 {
@@ -57,20 +57,21 @@ impl<'r> super::super::Binder<'r> {
             } => {
                 for prop in properties {
                     let mut prop_kind = kind;
+                    let key_str = self.interner.resolve(prop.key).to_string();
                     let prop_ty =
                         ty.as_ref().and_then(|t| match &t.0 {
                             varn_core::TypeKind::Object(members) => {
                                 members.iter().find_map(|m| match m {
                                     crate::types::ObjectTypeMember::Property {
                                         name, ty, ..
-                                    } if name.as_ref() == prop.key.as_ref() => Some(ty.clone()),
+                                    } if name.as_ref() == key_str => Some(ty.clone()),
                                     crate::types::ObjectTypeMember::Method {
                                         name,
                                         params,
                                         return_type,
                                         is_arrow,
                                         ..
-                                    } if name.as_ref() == prop.key.as_ref() => {
+                                    } if name.as_ref() == key_str => {
                                         Some(crate::types::Type::fn_(crate::types::FunctionType {
                                             params: params.clone(),
                                             return_type: return_type.clone(),
@@ -90,7 +91,7 @@ impl<'r> super::super::Binder<'r> {
                                 .and_then(|members| {
                                     members
                                         .iter()
-                                        .find(|m| m.name.as_ref() == prop.key.as_ref())
+                                        .find(|m| m.name.as_ref() == key_str)
                                         .map(|m| m.ty.clone())
                                 })
                                 .or_else(|| {
@@ -101,18 +102,18 @@ impl<'r> super::super::Binder<'r> {
                                     let mut visiting = vec![self.source_file.to_string()];
                                     let exports =
                                         self.resolver.module_exports(origin_path, &mut visiting);
-                                    if let Some(sym) = exports.get(prop.key.as_ref()) {
+                                    if let Some(sym) = exports.get(key_str.as_str()) {
                                         prop_kind = sym.kind;
                                         sym.ty.clone()
                                     } else {
                                         self.type_members
                                             .namespaces
-                                            .get(prop.key.as_ref())
+                                            .get(key_str.as_str())
                                             .and_then(|members| members.first())
                                             .map(|_| {
                                                 prop_kind = SymbolKind::Namespace;
                                                 Type::named_with_origin(
-                                                    prop.key.to_string(),
+                                                    key_str.clone(),
                                                     Some(origin_path.to_string()),
                                                 )
                                             })
@@ -146,44 +147,49 @@ impl<'r> super::super::Binder<'r> {
     }
 
     pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
-        let mut pe_sym =
-            Symbol::new(SymbolKind::TypeAlias, t.id.clone(), t.range.start.line).with_type(
-                Type::named_with_origin(t.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
-            );
+        let id_rc: Rc<str> = Rc::from(self.interner.resolve(t.id));
+        let mut pe_sym = Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(
+            Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
+        );
         // Expose the alias' generic parameters so consumers (e.g. match-variant
         // payload typing) can substitute them with concrete type arguments.
-        pe_sym.type_params = t
-            .type_params
-            .iter()
-            .map(|tp| Rc::from(tp.name.as_str()))
-            .collect();
-        self.define(t.id.to_string(), pe_sym);
+        pe_sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
+        self.define(t.id, pe_sym);
 
+        // `sum_type_variants`/`sum_variant_parent`/`sum_variant_fields` are
+        // consumed well outside this cluster (`emit::tables`,
+        // `checker_expressions::members::{member_exists,member_type}`,
+        // `checker_expressions::patterns`, `checker_expressions::check::exhaustiveness`)
+        // and stay `Rc<str>`-keyed; text is resolved from the `Atom` here at
+        // the point of insertion rather than migrating those consumers too.
         let mut variant_names = Vec::new();
 
         for v in &t.variants {
-            variant_names.push(v.name.clone());
+            let variant_rc: Rc<str> = Rc::from(self.interner.resolve(v.name));
+            variant_names.push(variant_rc.clone());
 
             let fields: Vec<(Rc<str>, Type)> = v
                 .fields
                 .iter()
                 .map(|f| {
                     let ty = resolve_type_node(&f.ty, Some(self));
-                    (f.name.clone(), ty)
+                    (Rc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();
 
-            self.sum_variant_parent.insert(v.name.clone(), t.id.clone());
+            self.sum_variant_parent
+                .insert(variant_rc.clone(), id_rc.clone());
             self.sum_variant_fields
-                .insert(v.name.clone(), fields.clone());
+                .insert(variant_rc.clone(), fields.clone());
 
             if v.fields.is_empty() {
-                let sym = Symbol::new(SymbolKind::Const, v.name.clone(), v.range.start.line)
-                    .with_type(Type::named_with_origin(
-                        t.id.clone(),
+                let sym = Symbol::new(SymbolKind::Const, v.name, v.range.start.line).with_type(
+                    Type::named_with_origin(
+                        id_rc.clone(),
                         Some(Rc::from(self.source_file.as_ref())),
-                    ));
-                self.define(v.name.to_string(), sym);
+                    ),
+                );
+                self.define(v.name, sym);
             } else {
                 let params: Vec<crate::types::FunctionParam> = fields
                     .iter()
@@ -197,22 +203,22 @@ impl<'r> super::super::Binder<'r> {
                 let fn_ty = Type::fn_(crate::types::FunctionType {
                     params,
                     return_type: Box::new(Type::named_with_origin(
-                        t.id.clone(),
+                        id_rc.clone(),
                         Some(Rc::from(self.source_file.as_ref())),
                     )),
                     is_arrow: false,
                     type_params: t
                         .type_params
                         .iter()
-                        .map(|tp| Rc::from(tp.name.as_str()))
+                        .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                         .collect(),
                 });
-                let sym = Symbol::new(SymbolKind::Function, v.name.clone(), v.range.start.line)
-                    .with_type(fn_ty);
-                self.define(v.name.to_string(), sym);
+                let sym =
+                    Symbol::new(SymbolKind::Function, v.name, v.range.start.line).with_type(fn_ty);
+                self.define(v.name, sym);
             }
         }
 
-        self.sum_type_variants.insert(t.id.clone(), variant_names);
+        self.sum_type_variants.insert(id_rc, variant_names);
     }
 }

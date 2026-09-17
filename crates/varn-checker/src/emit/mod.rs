@@ -78,10 +78,11 @@ pub fn emit_module(
         if !is_value_symbol(sym.kind) {
             continue;
         }
-        if !declared.contains(&sym.name) {
+        let sym_name: Rc<str> = Rc::from(interner.resolve(sym.name));
+        if !declared.contains(&sym_name) {
             continue;
         }
-        if global_slots.contains_key(&sym.name) {
+        if global_slots.contains_key(&sym_name) {
             continue;
         }
         let slot = globals.len() as u32;
@@ -91,7 +92,7 @@ pub fn emit_module(
                 .map(|t| lower_type(t, &mut types, &names))
                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
         );
-        global_slots.insert(sym.name.clone(), slot);
+        global_slots.insert(sym_name, slot);
     }
     // Nested namespaces (and their members) are not binder symbols, but they
     // still need a qualified global to hang the object off. Give every
@@ -1767,7 +1768,7 @@ fn emit_function(
     let fn_name_str = ctx.interner.resolve(f.id);
     let sym_ty = bind
         .global_symbols()
-        .find(|s| s.name.as_ref() == fn_name_str)
+        .find(|s| s.name == f.id)
         .and_then(|s| s.ty.clone());
 
     let arity = f.params.len();

@@ -202,7 +202,8 @@ impl BindResult {
     /// method form. Returns `None` for locals or non-intrinsic imports.
     pub fn intrinsic_import_wire(&self, name: &str) -> Option<u8> {
         let scope = self.scopes.get(self.global_scope);
-        let id = scope.resolve(name, &self.scopes)?;
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
         self.arena.get(id).intrinsic_wire
     }
 
@@ -212,11 +213,15 @@ impl BindResult {
     /// above: following an alias declared elsewhere needs a [`BindView`].
     pub fn get_alias_node_local(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
         let scope = self.scopes.get(self.global_scope);
-        let id = scope.resolve(name, &self.scopes)?;
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
         let sym = self.arena.get(id);
         let node = sym.alias_node.as_ref()?;
         Some((
-            sym.type_params.iter().map(|s| s.to_string()).collect(),
+            sym.type_params
+                .iter()
+                .map(|s| self.interner.resolve(*s).to_string())
+                .collect(),
             *node.clone(),
         ))
     }
@@ -276,6 +281,10 @@ impl<'r> BindView<'r> {
 }
 
 impl TypeContext for BindView<'_> {
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        Some(&self.bind.interner)
+    }
+
     fn get_interface_members(
         &self,
         name: &str,
@@ -314,7 +323,8 @@ impl TypeContext for BindView<'_> {
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         let scope = self.bind.scopes.get(self.bind.global_scope);
-        let id = scope.resolve(name, &self.bind.scopes)?;
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
         self.bind.arena.get(id).ty.clone()
     }
 
@@ -324,11 +334,15 @@ impl TypeContext for BindView<'_> {
 
     fn get_alias_node(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
         let scope = self.bind.scopes.get(self.bind.global_scope);
-        let id = scope.resolve(name, &self.bind.scopes)?;
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);
         let node = sym.alias_node.as_ref()?;
         Some((
-            sym.type_params.iter().map(|s| s.to_string()).collect(),
+            sym.type_params
+                .iter()
+                .map(|s| self.bind.interner.resolve(*s).to_string())
+                .collect(),
             *node.clone(),
         ))
     }
@@ -339,7 +353,8 @@ impl TypeContext for BindView<'_> {
             return foreign_view.resolve_type_alias(name, None);
         }
         let scope = self.bind.scopes.get(self.bind.global_scope);
-        let id = scope.resolve(name, &self.bind.scopes)?;
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);
         if sym.kind == crate::binder::SymbolKind::TypeAlias {
             return sym.ty.clone();

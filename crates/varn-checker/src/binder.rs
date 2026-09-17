@@ -56,6 +56,10 @@ impl TypeContext for Binder<'_> {
         Some(self.resolver)
     }
 
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        Some(&self.interner)
+    }
+
     fn get_interface_members(
         &self,
         name: &str,
@@ -129,7 +133,8 @@ impl TypeContext for Binder<'_> {
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         let scope = self.scopes.get(self.current);
-        let id = scope.resolve(name, &self.scopes)?;
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
         self.arena.get(id).ty.clone()
     }
 
@@ -139,11 +144,15 @@ impl TypeContext for Binder<'_> {
 
     fn get_alias_node(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
         let scope = self.scopes.get(self.current);
-        let id = scope.resolve(name, &self.scopes)?;
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
         let sym = self.arena.get(id);
         let node = sym.alias_node.as_ref()?;
         Some((
-            sym.type_params.iter().map(|s| s.to_string()).collect(),
+            sym.type_params
+                .iter()
+                .map(|s| self.interner.resolve(*s).to_string())
+                .collect(),
             *node.clone(),
         ))
     }
@@ -207,8 +216,9 @@ impl<'r> Binder<'r> {
         b.current = global;
 
         for (name, sym) in globals {
+            let name_atom = b.interner.intern(name.as_ref());
             let id = b.arena.push(sym);
-            b.scopes.get_mut(global).define(name, id);
+            b.scopes.get_mut(global).define(name_atom, id);
         }
 
         b.bind_stmts(&program.body);

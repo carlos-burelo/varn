@@ -127,7 +127,8 @@ impl CheckResult {
     ) -> Option<(SymbolId, crate::types::Type)> {
         let scope_id = self.scope_at_offset(cursor_offset);
         let scope = self.bind.scopes.get(scope_id);
-        let sym_id = scope.resolve(name, &self.bind.scopes)?;
+        let atom = self.bind.interner.get(name)?;
+        let sym_id = scope.resolve(atom, &self.bind.scopes)?;
         let ty = self
             .symbol_types
             .get(&sym_id)
@@ -671,13 +672,16 @@ impl<'r> Checker<'r> {
         }
 
         let resolved = if let Some(sid) = bind
-            .scopes
-            .get(bind.global_scope)
-            .resolve(name, &bind.scopes)
+            .interner
+            .get(name)
+            .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
         {
             let sym = bind.arena.get(sid);
             if sym.kind == kind {
-                sym.type_params.clone()
+                sym.type_params
+                    .iter()
+                    .map(|a| Rc::from(bind.interner.resolve(*a)))
+                    .collect()
             } else {
                 Vec::new()
             }
@@ -696,11 +700,16 @@ impl<'r> Checker<'r> {
         }
 
         let resolved = if let Some(sid) = bind
-            .scopes
-            .get(bind.global_scope)
-            .resolve(name, &bind.scopes)
+            .interner
+            .get(name)
+            .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
         {
-            bind.arena.get(sid).type_params.clone()
+            bind.arena
+                .get(sid)
+                .type_params
+                .iter()
+                .map(|a| Rc::from(bind.interner.resolve(*a)))
+                .collect()
         } else {
             bind.core
                 .as_ref()

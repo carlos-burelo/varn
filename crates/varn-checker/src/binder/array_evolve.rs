@@ -86,8 +86,7 @@
 //!    types produced are Int or Float, fixed after the whole block is
 //!    scanned and only when nothing disqualified the candidate).
 
-use std::rc::Rc;
-use varn_core::TypeKind;
+use varn_core::{Atom, TypeKind};
 
 use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
@@ -100,7 +99,7 @@ use super::Binder;
 /// finalized by `finalize_array_watch` when that scope exits.
 pub(crate) struct ArrayCandidate {
     sym_id: SymbolId,
-    name: Rc<str>,
+    name: Atom,
     owner_scope: ScopeId,
     elem_ty: Option<Type>,
     conflict: bool,
@@ -111,7 +110,7 @@ impl<'r> Binder<'r> {
     /// Registers a qualifying empty-array declarator. Called from
     /// `bind_variable` immediately after the symbol is bound, with
     /// `self.current` still the declaring block's scope.
-    pub(crate) fn register_array_candidate(&mut self, sym_id: SymbolId, name: Rc<str>) {
+    pub(crate) fn register_array_candidate(&mut self, sym_id: SymbolId, name: Atom) {
         self.array_watch.push(ArrayCandidate {
             sym_id,
             name,
@@ -126,29 +125,23 @@ impl<'r> Binder<'r> {
     /// innermost-first so a shadowing re-declaration of the same name in
     /// a nested scope naturally takes priority over an outer candidate
     /// still open further out.
-    pub(crate) fn array_candidate_active(&self, name: &str) -> bool {
+    pub(crate) fn array_candidate_active(&self, name: Atom) -> bool {
         !self.array_watch.is_empty() && self.find_candidate(name).is_some()
     }
 
-    fn find_candidate(&self, name: &str) -> Option<&ArrayCandidate> {
-        self.array_watch
-            .iter()
-            .rev()
-            .find(|c| c.name.as_ref() == name)
+    fn find_candidate(&self, name: Atom) -> Option<&ArrayCandidate> {
+        self.array_watch.iter().rev().find(|c| c.name == name)
     }
 
-    fn find_candidate_mut(&mut self, name: &str) -> Option<&mut ArrayCandidate> {
-        self.array_watch
-            .iter_mut()
-            .rev()
-            .find(|c| c.name.as_ref() == name)
+    fn find_candidate_mut(&mut self, name: Atom) -> Option<&mut ArrayCandidate> {
+        self.array_watch.iter_mut().rev().find(|c| c.name == name)
     }
 
     /// Records a `x.push(value)` / `x[i] = value` write against the
     /// innermost open candidate named `name` (a no-op if none is open).
     /// Rule 2's unification: Int/Float only, anything else is a
     /// conflict.
-    pub(crate) fn record_array_write(&mut self, name: &str, value_ty: &Type) {
+    pub(crate) fn record_array_write(&mut self, name: Atom, value_ty: &Type) {
         if self.array_watch.is_empty() {
             return;
         }
@@ -174,7 +167,7 @@ impl<'r> Binder<'r> {
 
     /// Marks the innermost open candidate named `name` as escaped (a
     /// no-op if none is open). Rule 3.
-    pub(crate) fn escape_array_candidate(&mut self, name: &str) {
+    pub(crate) fn escape_array_candidate(&mut self, name: Atom) {
         if self.array_watch.is_empty() {
             return;
         }

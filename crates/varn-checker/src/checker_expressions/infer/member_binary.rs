@@ -32,12 +32,13 @@ pub(super) fn infer_member_type(
         );
     };
 
+    let prop_name_str = bind.interner.resolve(*prop_name);
     match &obj_ty.0 {
         TypeKind::Array(_elem) => {
-            if prop_name.as_ref() == varn_core::MemberKey::Length.as_str() {
+            if prop_name_str == varn_core::MemberKey::Length.as_str() {
                 return Type::intrinsic(TypeTag::Int);
             }
-            if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
+            if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
                     return m_ty;
@@ -45,7 +46,7 @@ pub(super) fn infer_member_type(
             }
         }
         _ => {
-            if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
+            if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
                     return m_ty;

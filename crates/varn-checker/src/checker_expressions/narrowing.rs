@@ -49,7 +49,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Identifier { name } => {
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
+                if let Some(id) = scope.resolve(*name, &bind.scopes) {
                     let original_ty = self
                         .symbol_types
                         .get(&id)
@@ -97,7 +97,7 @@ impl<'r> Checker<'r> {
                     if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
                         if let ExprKind::Identifier { name } = &typeof_op.kind {
                             let scope = bind.scopes.get(self.current_scope);
-                            if let Some(id) = scope.resolve(name, &bind.scopes) {
+                            if let Some(id) = scope.resolve(*name, &bind.scopes) {
                                 let narrowed_ty = crate::binder::resolve_primitive(
                                     value,
                                     Some(&crate::binder::BindView::new(bind, self.resolver)),
@@ -118,7 +118,7 @@ impl<'r> Checker<'r> {
                 if is_null_check {
                     if let Some(name) = ident_name {
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(name, &bind.scopes) {
+                        if let Some(id) = scope.resolve(*name, &bind.scopes) {
                             if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
                                 let original_ty = self
                                     .symbol_types
@@ -131,8 +131,11 @@ impl<'r> Checker<'r> {
                                         narrowings.push((id, narrowed));
                                     }
                                 }
-                            } else if &**name != "_" && &**name != "__variant__" {
-                                narrowings.push((id, Type::Null));
+                            } else {
+                                let name_str = bind.interner.resolve(*name);
+                                if name_str != "_" && name_str != "__variant__" {
+                                    narrowings.push((id, Type::Null));
+                                }
                             }
                         }
                     }
@@ -158,8 +161,9 @@ impl<'r> Checker<'r> {
                                 _ => None,
                             };
                             if let Some(disc_ty) = disc_ty {
+                                let prop_name_str = bind.interner.resolve(*prop_name);
                                 let scope = bind.scopes.get(self.current_scope);
-                                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
+                                if let Some(id) = scope.resolve(*obj_name, &bind.scopes) {
                                     let original_ty = bind.arena.get(id).ty.clone();
                                     if let Some(Type(TypeKind::Union(members), _)) = &original_ty {
                                         let mut matched: Vec<Type> = Vec::new();
@@ -173,7 +177,7 @@ impl<'r> Checker<'r> {
                                                             ty,
                                                             ..
                                                         } => {
-                                                            name.as_ref() == prop_name.as_ref()
+                                                            name.as_ref() == prop_name_str
                                                                 && ty == &disc_ty
                                                         }
                                                         _ => false,
@@ -187,7 +191,7 @@ impl<'r> Checker<'r> {
                                                     })
                                                     .is_some_and(|ms| {
                                                         ms.iter().any(|cm| {
-                                                            cm.name.as_ref() == prop_name.as_ref()
+                                                            cm.name.as_ref() == prop_name_str
                                                                 && cm.ty == disc_ty
                                                         })
                                                     }),
@@ -234,12 +238,13 @@ impl<'r> Checker<'r> {
                     ) = (&left.kind, &right.kind)
                     {
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(name, &bind.scopes) {
+                        if let Some(id) = scope.resolve(*name, &bind.scopes) {
+                            let class_name_str = bind.interner.resolve(*class_name);
                             if is_true_branch {
-                                narrowings.push((id, Type::named(class_name.clone())));
+                                narrowings.push((id, Type::named(class_name_str)));
                             } else if let Some(ty) = &bind.arena.get(id).ty {
-                                let narrowed = ty.minus_named(class_name.as_ref());
-                                if &**name == "_" {
+                                let narrowed = ty.minus_named(class_name_str);
+                                if bind.interner.resolve(*name) == "_" {
                                     narrowings.push((id, narrowed));
                                 }
                             }
@@ -284,7 +289,7 @@ impl<'r> Checker<'r> {
             } => {
                 if let ExprKind::Identifier { name: arg_name } = &expression.kind {
                     let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
+                    if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
                         if is_true_branch {
                             let narrowed_ty = crate::binder::resolve_type_node(
                                 type_ann,
@@ -337,7 +342,7 @@ impl<'r> Checker<'r> {
                             arg_expr.map(|e| &e.kind)
                         {
                             let scope = bind.scopes.get(self.current_scope);
-                            if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
+                            if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
                                 let original_ty = self
                                     .symbol_types
                                     .get(&id)
@@ -407,7 +412,7 @@ impl<'r> Checker<'r> {
             ) = (&object.kind, &property.kind)
             {
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
+                if let Some(id) = scope.resolve(*obj_name, &bind.scopes) {
                     if let Some(Type(TypeKind::Union(members), _)) = &bind.arena.get(id).ty {
                         return Some((id, members.clone()));
                     }
@@ -437,11 +442,12 @@ impl<'r> Checker<'r> {
         let ExprKind::Identifier { name: prop_name } = &property.kind else {
             return false;
         };
+        let prop_name = bind.interner.resolve(*prop_name);
 
         match &m.0 {
             TypeKind::Object(fields) => fields.iter().any(|f| match f {
                 ObjectTypeMember::Property { name, ty, .. } => {
-                    name.as_ref() == prop_name.as_ref() && ty == disc_ty
+                    name.as_ref() == prop_name && ty == disc_ty
                 }
                 _ => false,
             }),
@@ -450,7 +456,7 @@ impl<'r> Checker<'r> {
                 .or_else(|| bind.get_class_entry(cn.as_ref()).map(|e| &e.members))
                 .is_some_and(|ms| {
                     ms.iter()
-                        .any(|cm| cm.name.as_ref() == prop_name.as_ref() && cm.ty == *disc_ty)
+                        .any(|cm| cm.name.as_ref() == prop_name && cm.ty == *disc_ty)
                 }),
             _ => false,
         }

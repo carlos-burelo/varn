@@ -84,7 +84,7 @@ impl<'r> Checker<'r> {
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let name = crate::binder::pattern_lead_name(&p.pattern);
+                let name = crate::binder::pattern_lead_name(&p.pattern, &bind.interner);
                 let mut ty = p
                     .type_ann
                     .as_ref()
@@ -129,11 +129,15 @@ impl<'r> Checker<'r> {
         if let Some(scope_id) = arrow_scope {
             self.current_scope = scope_id;
             for (p, fp) in params.iter().zip(ps.iter()) {
-                let name = crate::binder::pattern_lead_name(&p.pattern);
+                let name = crate::binder::pattern_lead_name(&p.pattern, &bind.interner);
                 if name.is_empty() || name == "_" {
                     continue;
                 }
-                if let Some(sym_id) = bind.scopes.get(scope_id).resolve(name, &bind.scopes) {
+                if let Some(sym_id) = bind
+                    .interner
+                    .get(name)
+                    .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
+                {
                     self.symbol_types.insert(sym_id, fp.ty.clone());
                 }
             }

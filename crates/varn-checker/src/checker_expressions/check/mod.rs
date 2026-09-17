@@ -55,7 +55,7 @@ impl<'r> Checker<'r> {
         let symbol_id = match (&expr.kind, self.record_expr_types) {
             (ExprKind::Identifier { name }, true) => {
                 let scope = bind.scopes.get(self.current_scope);
-                scope.resolve(name.as_ref(), &bind.scopes)
+                scope.resolve(*name, &bind.scopes)
             }
             _ => None,
         };
@@ -357,7 +357,7 @@ impl<'r> Checker<'r> {
                 let target_ty = if let ExprKind::Identifier { name } = &target.kind {
                     let scope = bind.scopes.get(self.current_scope);
                     scope
-                        .resolve(name.as_ref(), &bind.scopes)
+                        .resolve(*name, &bind.scopes)
                         .and_then(|id| {
                             self.symbol_types
                                 .get(&id)
@@ -393,13 +393,16 @@ impl<'r> Checker<'r> {
 
                 if let ExprKind::Identifier { name } = &target.kind {
                     let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(name.as_ref(), &bind.scopes) {
+                    if let Some(id) = scope.resolve(*name, &bind.scopes) {
                         let sym = bind.arena.get(id);
                         if sym.kind == crate::symbol::SymbolKind::Const {
                             self.emit(
                                 Diagnostic::error(
                                     ErrorCode::NotAssignable,
-                                    format!("cannot reassign to constant '{name}'"),
+                                    format!(
+                                        "cannot reassign to constant '{}'",
+                                        bind.interner.resolve(*name)
+                                    ),
                                 )
                                 .with_range(expr.range),
                             );
@@ -430,13 +433,13 @@ impl<'r> Checker<'r> {
             } => self.check_call_expr(callee, args, type_args, &expr.range, expr.id, bind),
             ExprKind::New { callee, args, .. } => {
                 let cls_name = match &callee.kind {
-                    ExprKind::Identifier { name } => Some(name.as_ref()),
+                    ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
                     ExprKind::Member {
                         property,
                         computed: false,
                         ..
                     } => match &property.kind {
-                        ExprKind::Identifier { name } => Some(name.as_ref()),
+                        ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
                         _ => None,
                     },
                     _ => None,
@@ -664,7 +667,8 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Identifier { name } => {
-                if name.as_ref() == "_" {
+                let name_str = bind.interner.resolve(*name);
+                if name_str == "_" {
                     if !self.is_assignment_target && !self.in_pipeline_rhs {
                         self.emit(
                             Diagnostic::error(
@@ -684,15 +688,15 @@ impl<'r> Checker<'r> {
                 }
 
                 let scope = bind.scopes.get(self.current_scope);
-                if scope.resolve(name.as_ref(), &bind.scopes).is_none()
-                    && !self.is_assignment_target
-                {
+                if scope.resolve(*name, &bind.scopes).is_none() && !self.is_assignment_target {
                     let mut diag = Diagnostic::error(
                         ErrorCode::UnknownSymbol,
-                        format!("undefined variable: {name}"),
+                        format!("undefined variable: {name_str}"),
                     )
                     .with_range(expr.range);
-                    if let Some(candidate) = closest_name(name.as_ref(), scope, &bind.scopes) {
+                    if let Some(candidate) =
+                        closest_name(name_str, scope, &bind.scopes, &bind.interner)
+                    {
                         diag =
                             diag.with_suggestion(Suggestion::did_you_mean(&candidate, expr.range));
                     }
@@ -703,6 +707,7 @@ impl<'r> Checker<'r> {
             // The backend stores a `bigint` literal in an `i128`; a wider one
             // has no representation yet.
             ExprKind::BigIntLiteral { raw } => {
+                let raw = bind.interner.resolve(*raw);
                 let s = raw.trim_end_matches('n').replace('_', "");
                 let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X"))
                 {
@@ -744,11 +749,17 @@ fn closest_name(
     name: &str,
     scope: &crate::scope::CheckerScope,
     arena: &crate::scope::ScopeArena,
+    interner: &varn_core::AtomInterner,
 ) -> Option<String> {
     let mut all: Vec<String> = Vec::new();
     let mut current = scope;
     loop {
-        all.extend(current.bindings.keys().map(|k| k.to_string()));
+        all.extend(
+            current
+                .bindings
+                .keys()
+                .map(|k| interner.resolve(*k).to_string()),
+        );
         match current.parent {
             Some(parent_id) => current = arena.get(parent_id),
             None => break,

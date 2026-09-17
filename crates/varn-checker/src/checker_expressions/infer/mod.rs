@@ -14,7 +14,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn infer_type_internal(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         if let ExprKind::Identifier { name } = &expr.kind {
             let scope = bind.scopes.get(self.current_scope);
-            if let Some(id) = scope.resolve(name, &bind.scopes) {
+            if let Some(id) = scope.resolve(*name, &bind.scopes) {
                 if let Some(stack) = self.narrowed_types.get(&id) {
                     if let Some(ty) = stack.last() {
                         return ty.clone();

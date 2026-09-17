@@ -9,25 +9,21 @@ use varn_core::TypeKind;
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
-        let name_rc: Rc<str> = Rc::from(i.id.as_ref());
+        let id_rc: Rc<str> = Rc::from(self.interner.resolve(i.id));
         let origin_rc: Option<Rc<str>> = if self.source_file.is_empty() {
             None
         } else {
             Some(Rc::from(self.source_file.as_ref()))
         };
-        let mut sym = Symbol::new(SymbolKind::Interface, i.id.clone(), i.range.start.line);
+        let mut sym = Symbol::new(SymbolKind::Interface, i.id, i.range.start.line);
         sym.ty = Some(crate::types::Type(
-            varn_core::TypeKind::Named(name_rc, origin_rc),
+            varn_core::TypeKind::Named(id_rc.clone(), origin_rc),
             false,
         ));
         sym.col = i.range.start.column;
         sym.offset = i.range.start.offset;
-        sym.doc = i.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        sym.type_params = i
-            .type_params
-            .iter()
-            .map(|t| Rc::from(t.name.as_str()))
-            .collect();
+        sym.doc = i.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.type_params = i.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = i
             .type_params
             .iter()
@@ -37,7 +33,7 @@ impl<'r> super::Binder<'r> {
                     .map(|con| resolve_type_node(con, Some(self)))
             })
             .collect();
-        self.define(i.id.to_string(), sym);
+        self.define(i.id, sym);
 
         let child = self
             .scopes
@@ -55,8 +51,8 @@ impl<'r> super::Binder<'r> {
         if !members.is_empty() {
             self.type_members
                 .interfaces
-                .insert(i.id.clone(), members.clone());
-            self.type_members.flattened.insert(i.id.clone(), members);
+                .insert(id_rc.clone(), members.clone());
+            self.type_members.flattened.insert(id_rc, members);
         }
 
         self.current = saved;
@@ -76,8 +72,9 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let ty = resolve_type_node(type_ann, Some(self));
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
 
-                let mut sym = Symbol::new(SymbolKind::Property, key.clone(), range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
@@ -85,7 +82,7 @@ impl<'r> super::Binder<'r> {
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
-                    name: key.clone(),
+                    name: key_rc,
                     kind: ClassMemberKind::Property,
                     is_async: false,
                     is_generator: false,
@@ -136,7 +133,7 @@ impl<'r> super::Binder<'r> {
                             ty = Type::array(ty);
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty,
                             optional: p.is_optional,
                             is_rest: p.is_rest,
@@ -146,7 +143,7 @@ impl<'r> super::Binder<'r> {
 
                 let fn_tps: Vec<Rc<str>> = type_params
                     .iter()
-                    .map(|tp| Rc::from(tp.name.as_str()))
+                    .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                     .collect();
 
                 let fn_type = Type::fn_(FunctionType {
@@ -156,7 +153,8 @@ impl<'r> super::Binder<'r> {
                     type_params: fn_tps,
                 });
 
-                let mut sym = Symbol::new(SymbolKind::Method, key.clone(), range.start.line)
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
                     .with_type(fn_type.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
@@ -164,7 +162,7 @@ impl<'r> super::Binder<'r> {
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
-                    name: key.clone(),
+                    name: key_rc,
                     kind: ClassMemberKind::Method,
                     is_async: *is_async,
                     is_generator: false,
@@ -190,7 +188,7 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let ret = resolve_type_node(return_type, Some(self));
-                let param_name = pattern_lead_name(&param.pattern);
+                let param_name = pattern_lead_name(&param.pattern, &self.interner);
                 let key_ty = param
                     .type_ann
                     .as_ref()
@@ -238,7 +236,7 @@ impl<'r> super::Binder<'r> {
                             ty = Type::array(ty);
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty,
                             optional: p.is_optional,
                             is_rest: p.is_rest,

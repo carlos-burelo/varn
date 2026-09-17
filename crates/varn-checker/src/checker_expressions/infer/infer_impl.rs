@@ -12,13 +12,14 @@ impl<'r> Checker<'r> {
     pub(super) fn infer_type_impl(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         match &expr.kind {
             ExprKind::Identifier { name } => {
+                let name_str = bind.interner.resolve(*name);
                 // Pipeline placeholder `_` stands for the piped value, so it
                 // carries that value's type (`x |> f(_, y)` ⇒ `_` has `x`'s type).
-                if name.as_ref() == "_" && self.in_pipeline_rhs {
+                if name_str == "_" && self.in_pipeline_rhs {
                     return self.pipeline_value_type.clone().unwrap_or(Type::Dynamic);
                 }
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(sid) = scope.resolve(name.as_ref(), &bind.scopes) {
+                if let Some(sid) = scope.resolve(*name, &bind.scopes) {
                     if let Some(ty) = self.symbol_types.get(&sid) {
                         return ty.clone();
                     }
@@ -27,7 +28,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 crate::binder::BindView::new(bind, self.resolver)
-                    .resolve_symbol(name.as_ref())
+                    .resolve_symbol(name_str)
                     .unwrap_or(Type::Dynamic)
             }
             ExprKind::This => self
@@ -84,16 +85,17 @@ impl<'r> Checker<'r> {
                     ),
                     _ => {
                         if let ExprKind::Identifier { name } = &callee.kind {
+                            let name_str = bind.interner.resolve(*name).to_string();
                             if !type_args.is_empty() {
                                 let args: Vec<Type> = type_args
                                     .iter()
                                     .map(|a| self.resolve_type_node_cached(a, bind))
                                     .collect();
-                                Type::generic(name.to_string(), args)
-                            } else if name.as_ref() == IntrinsicType::Map.as_str() {
-                                Type::generic(name.to_string(), vec![Type::Dynamic])
+                                Type::generic(name_str, args)
+                            } else if name_str == IntrinsicType::Map.as_str() {
+                                Type::generic(name_str, vec![Type::Dynamic])
                             } else {
-                                Type::named(name.to_string())
+                                Type::named(name_str)
                             }
                         } else {
                             Type::Dynamic
@@ -210,7 +212,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::MetaAccess { target, property } => {
                 let _target_ty = self.infer_type(target, bind);
-                match varn_core::MemberKey::from_str(property.as_ref()) {
+                match varn_core::MemberKey::from_str(bind.interner.resolve(*property)) {
                     Some(varn_core::MemberKey::Name) | Some(varn_core::MemberKey::Type) => {
                         Type::Str
                     }
@@ -658,7 +660,10 @@ impl<'r> Checker<'r> {
                     ty = Type::array(ty);
                 }
                 crate::types::FunctionParam {
-                    name: Some(Rc::from(crate::binder::pattern_lead_name(&p.pattern))),
+                    name: Some(Rc::from(crate::binder::pattern_lead_name(
+                        &p.pattern,
+                        &bind.interner,
+                    ))),
                     ty,
                     optional: p.is_optional || p.default.is_some(),
                     is_rest: p.is_rest,

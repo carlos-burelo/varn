@@ -18,8 +18,9 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
     let mut fn_type_params = FxHashMap::default();
 
     for sym in symbols.iter() {
+        let name_rc: Rc<str> = Rc::from(bind.interner.resolve(sym.name));
         if let Some(ty) = &sym.ty {
-            sym_map.insert(sym.name.clone(), ty.clone());
+            sym_map.insert(name_rc.clone(), ty.clone());
 
             if sym.kind == SymbolKind::Function {
                 if let Type(TypeKind::Fn(FunctionType { return_type, .. }), _) = ty {
@@ -27,14 +28,19 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
                     // it when it built the type.
                     let raw = return_type.as_ref().clone();
                     if !raw.is_dynamic() {
-                        fn_map.insert(sym.name.clone(), raw);
+                        fn_map.insert(name_rc.clone(), raw);
                     }
                 }
             }
         }
 
         if sym.kind == SymbolKind::Function && !sym.type_params.is_empty() {
-            fn_type_params.insert(sym.name.clone(), sym.type_params.clone());
+            let tps: Vec<Rc<str>> = sym
+                .type_params
+                .iter()
+                .map(|a| Rc::from(bind.interner.resolve(*a)))
+                .collect();
+            fn_type_params.insert(name_rc, tps);
         }
     }
 

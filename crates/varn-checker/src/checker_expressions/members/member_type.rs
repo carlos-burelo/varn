@@ -45,10 +45,17 @@ fn class_type_params(
 }
 
 fn params_in(name: &str, bind: &BindResult) -> Vec<Rc<str>> {
-    bind.scopes
-        .get(bind.global_scope)
-        .resolve(name, &bind.scopes)
-        .map(|sid| bind.arena.get(sid).type_params.clone())
+    bind.interner
+        .get(name)
+        .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
+        .map(|sid| {
+            bind.arena
+                .get(sid)
+                .type_params
+                .iter()
+                .map(|a| Rc::from(bind.interner.resolve(*a)))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -72,7 +79,8 @@ pub(crate) fn generic_mapping(
 
 fn resolve_extension_symbol_type(bind: &BindResult, mangled: &Rc<str>) -> Option<Type> {
     let scope = bind.scopes.get(bind.global_scope);
-    let sid = scope.resolve(mangled.as_ref(), &bind.scopes)?;
+    let atom = bind.interner.get(mangled.as_ref())?;
+    let sid = scope.resolve(atom, &bind.scopes)?;
     bind.arena.get(sid).ty.clone()
 }
 
@@ -180,7 +188,7 @@ impl<'r> Checker<'r> {
                             if let Some(sym) = exports.get(key) {
                                 let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
                                 if let Some(origin) = &sym.origin_module {
-                                    sym_ty = sym_ty.with_origin(origin.clone());
+                                    sym_ty = sym_ty.with_origin(Rc::from(bind.interner.resolve(*origin)));
                                 }
                                 return Some((sym_ty, None));
                             }
@@ -491,7 +499,7 @@ impl<'r> Checker<'r> {
                             if let Some(sym) = exports.get(key) {
                                 let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
                                 if let Some(origin) = &sym.origin_module {
-                                    sym_ty = sym_ty.with_origin(origin.clone());
+                                    sym_ty = sym_ty.with_origin(Rc::from(bind.interner.resolve(*origin)));
                                 }
                                 return Some(ObjectTypeMember::Property {
                                     name: Rc::from(key),

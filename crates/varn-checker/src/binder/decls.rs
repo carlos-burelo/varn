@@ -32,9 +32,9 @@ impl<'r> super::Binder<'r> {
         }
     }
 
-    pub(super) fn define(&mut self, name: String, sym: Symbol) -> SymbolId {
+    pub(super) fn define(&mut self, name: varn_core::Atom, sym: Symbol) -> SymbolId {
         let scope = self.scopes.get(self.current);
-        if let Some(existing_id) = scope.lookup(&name) {
+        if let Some(existing_id) = scope.lookup(name) {
             let existing_sym = self.arena.get(existing_id);
             let existing_from_extern = existing_sym.origin_module.is_some()
                 || (existing_sym.line == 0 && existing_sym.full_range.start.line == 0);
@@ -43,8 +43,7 @@ impl<'r> super::Binder<'r> {
                 || sym.kind == crate::symbol::SymbolKind::EnumMember
             {
                 let id = self.arena.push(sym);
-                let rc_name: Rc<str> = name.clone().into();
-                self.scopes.get_mut(self.current).define(rc_name, id);
+                self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
             // A prelude symbol (`core:global`, or anything reaching us from
@@ -54,8 +53,7 @@ impl<'r> super::Binder<'r> {
             // declares the `print` the prelude also exposes.
             if existing_from_extern && (new_is_import || sym.origin_module.is_none()) {
                 let id = self.arena.push(sym);
-                let rc_name: Rc<str> = name.clone().into();
-                self.scopes.get_mut(self.current).define(rc_name, id);
+                self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
             // Type space and value space are separate: `type TaskGroup<T> = …`
@@ -63,18 +61,17 @@ impl<'r> super::Binder<'r> {
             // two namespaces, not a redeclaration.
             if type_only(existing_sym.kind) != type_only(sym.kind) {
                 let id = self.arena.push(sym);
-                let rc_name: Rc<str> = name.clone().into();
-                self.scopes.get_mut(self.current).define(rc_name, id);
+                self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
             let existing_origin = existing_sym
                 .origin_module
                 .as_ref()
-                .map(|m| m.as_ref().to_owned())
+                .map(|m| self.interner.resolve(*m).to_owned())
                 .unwrap_or_else(|| self.source_file.to_string());
             let msg = format!(
                 "duplicate declaration of '{}' (already declared as {} in {})",
-                name,
+                self.interner.resolve(name),
                 existing_sym.kind.label().trim(),
                 existing_origin
             );
@@ -103,8 +100,7 @@ impl<'r> super::Binder<'r> {
         }
 
         let id = self.arena.push(sym);
-        let rc_name: Rc<str> = name.into();
-        self.scopes.get_mut(self.current).define(rc_name, id);
+        self.scopes.get_mut(self.current).define(name, id);
         id
     }
 
@@ -311,7 +307,7 @@ impl<'r> super::Binder<'r> {
                 // `bind_array_push_call` / `bind_array_index_write` /
                 // `bind_array_whitelisted_member`). Default-deny: escape
                 // it (array_evolve rule 3). A no-op for every other name.
-                self.escape_array_candidate(name);
+                self.escape_array_candidate(*name);
             }
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
@@ -349,7 +345,7 @@ impl<'r> super::Binder<'r> {
         let ExprKind::Identifier { name } = &object.kind else {
             return false;
         };
-        if !self.array_candidate_active(name) {
+        if !self.array_candidate_active(*name) {
             return false;
         }
         // A computed callee (`x["push"](e)`, `x[m](e)`) is a method call
@@ -358,7 +354,7 @@ impl<'r> super::Binder<'r> {
         // incompatible element, `unshift`, `splice`, ...), so escape rather
         // than mistake it for a safe `x[i]` read.
         if *computed {
-            self.escape_array_candidate(name);
+            self.escape_array_candidate(*name);
             self.bind_expr(property);
             self.bind_args(args);
             return true;
@@ -366,17 +362,17 @@ impl<'r> super::Binder<'r> {
         let ExprKind::Identifier { name: prop_name } = &property.kind else {
             return false;
         };
-        if prop_name.as_ref() != varn_core::MemberKey::Push.as_str() {
+        if self.interner.resolve(*prop_name) != varn_core::MemberKey::Push.as_str() {
             return false;
         }
         match args {
             [Arg::Positional(value)] => {
                 let value_ty = super::type_inference::infer_expr_type(value, Some(self));
-                self.record_array_write(name, &value_ty);
+                self.record_array_write(*name, &value_ty);
                 self.bind_expr(value);
             }
             _ => {
-                self.escape_array_candidate(name);
+                self.escape_array_candidate(*name);
                 self.bind_args(args);
             }
         }
@@ -413,7 +409,7 @@ impl<'r> super::Binder<'r> {
         let ExprKind::Identifier { name } = &object.kind else {
             return false;
         };
-        if !self.array_candidate_active(name) {
+        if !self.array_candidate_active(*name) {
             return false;
         }
         // A non-computed member write (`x.length = n`, a resize; or any
@@ -421,18 +417,18 @@ impl<'r> super::Binder<'r> {
         // not a whitelisted `x[i] = v` element write, and its effect on the
         // element type can't be unified — escape.
         if !*computed {
-            self.escape_array_candidate(name);
+            self.escape_array_candidate(*name);
             self.bind_expr(value);
             return true;
         }
         if op != AssignOp::Assign {
-            self.escape_array_candidate(name);
+            self.escape_array_candidate(*name);
             self.bind_expr(property);
             self.bind_expr(value);
             return true;
         }
         let value_ty = super::type_inference::infer_expr_type(value, Some(self));
-        self.record_array_write(name, &value_ty);
+        self.record_array_write(*name, &value_ty);
         self.bind_expr(property);
         self.bind_expr(value);
         true
@@ -457,7 +453,7 @@ impl<'r> super::Binder<'r> {
         let ExprKind::Identifier { name } = &object.kind else {
             return false;
         };
-        if !self.array_candidate_active(name) {
+        if !self.array_candidate_active(*name) {
             return false;
         }
         if computed {
@@ -469,14 +465,14 @@ impl<'r> super::Binder<'r> {
             // (`x[i]`) stay whitelisted — the element-type optimization
             // depends on them (matmul reads `a[row*n+k]` this way).
             if matches!(&property.kind, ExprKind::StrLiteral { .. }) {
-                self.escape_array_candidate(name);
+                self.escape_array_candidate(*name);
             }
             self.bind_expr(property);
         } else if !matches!(
             &property.kind,
-            ExprKind::Identifier { name: p } if p.as_ref() == varn_core::MemberKey::Length.as_str()
+            ExprKind::Identifier { name: p } if self.interner.resolve(*p) == varn_core::MemberKey::Length.as_str()
         ) {
-            self.escape_array_candidate(name);
+            self.escape_array_candidate(*name);
         }
         true
     }
@@ -571,11 +567,12 @@ impl<'r> super::Binder<'r> {
         use crate::types::Type;
 
         for tp in type_params {
-            let mut sym = Symbol::new(SymbolKind::TypeParameter, Rc::from(tp.name.as_str()), line)
-                .with_type(Type::named(Rc::from(tp.name.as_str())));
+            let name_rc: Rc<str> = Rc::from(self.interner.resolve(tp.name));
+            let mut sym = Symbol::new(SymbolKind::TypeParameter, tp.name, line)
+                .with_type(Type::named(name_rc));
             sym.col = tp.range.start.column;
             sym.offset = tp.range.start.offset;
-            self.define(tp.name.clone(), sym);
+            self.define(tp.name, sym);
         }
     }
 
@@ -599,38 +596,38 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
             bindings,
             ..
         } => {
-            let field_types = b.sum_variant_fields.get(variant_name).cloned();
+            let field_types = b
+                .sum_variant_fields
+                .get(b.interner.resolve(*variant_name))
+                .cloned();
             for (i, binding) in bindings.iter().enumerate() {
-                if binding.name.as_ref() != "_" {
+                if b.interner.resolve(binding.name) != "_" {
                     let ty = field_types
                         .as_ref()
                         .and_then(|fields| fields.get(i))
                         .map(|(_, t)| t.clone())
                         .unwrap_or(Type::Dynamic);
-                    let mut sym = Symbol::new(
-                        SymbolKind::Let,
-                        binding.name.clone(),
-                        binding.range.start.line,
-                    )
-                    .with_type(ty);
+                    let mut sym =
+                        Symbol::new(SymbolKind::Let, binding.name, binding.range.start.line)
+                            .with_type(ty);
                     sym.col = binding.range.start.column;
                     sym.offset = binding.range.start.offset;
-                    b.define(binding.name.to_string(), sym);
+                    b.define(binding.name, sym);
                 }
             }
         }
 
         MatchPattern::Identifier(name) => {
-            if name.as_ref() != "_" {
-                let sym = Symbol::new(SymbolKind::Let, name.clone(), 0).with_type(Type::Dynamic);
-                b.define(name.to_string(), sym);
+            if b.interner.resolve(*name) != "_" {
+                let sym = Symbol::new(SymbolKind::Let, *name, 0).with_type(Type::Dynamic);
+                b.define(*name, sym);
             }
         }
         MatchPattern::Record { fields, .. } => {
             let variant_name = fields.first().and_then(|(key, sub)| {
-                if key.as_ref() == varn_core::MemberKey::Variant.as_str() {
+                if b.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str() {
                     if let Some(MatchPattern::Identifier(n)) = sub {
-                        return Some(n.clone());
+                        return Some(*n);
                     }
                 }
                 None
@@ -639,26 +636,27 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
             if let Some(vname) = variant_name {
                 let field_types: Vec<(Rc<str>, Type)> = b
                     .sum_variant_fields
-                    .get(&vname)
+                    .get(b.interner.resolve(vname))
                     .cloned()
                     .unwrap_or_default();
 
                 for (field_key, sub_pat) in fields.iter().skip(1) {
                     let binding_name = match sub_pat {
-                        Some(MatchPattern::Identifier(n)) => n.clone(),
-                        _ => field_key.clone(),
+                        Some(MatchPattern::Identifier(n)) => *n,
+                        _ => *field_key,
                     };
-                    if binding_name.as_ref() == "_" {
+                    if b.interner.resolve(binding_name) == "_" {
                         continue;
                     }
 
+                    let field_key_str = b.interner.resolve(*field_key);
                     let ty = field_types
                         .iter()
-                        .find(|(fname, _)| fname.as_ref() == field_key.as_ref())
+                        .find(|(fname, _)| fname.as_ref() == field_key_str)
                         .map(|(_, t)| t.clone())
                         .unwrap_or(Type::Dynamic);
-                    let sym = Symbol::new(SymbolKind::Let, binding_name.clone(), 0).with_type(ty);
-                    b.define(binding_name.to_string(), sym);
+                    let sym = Symbol::new(SymbolKind::Let, binding_name, 0).with_type(ty);
+                    b.define(binding_name, sym);
 
                     if let Some(sub) = sub_pat {
                         if !matches!(sub, MatchPattern::Identifier(_)) {
@@ -669,13 +667,13 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
             } else {
                 for (field_name, sub_pat) in fields {
                     let binding_name = match sub_pat {
-                        Some(MatchPattern::Identifier(n)) => n.clone(),
-                        _ => field_name.clone(),
+                        Some(MatchPattern::Identifier(n)) => *n,
+                        _ => *field_name,
                     };
-                    if binding_name.as_ref() != "_" {
-                        let sym = Symbol::new(SymbolKind::Let, binding_name.clone(), 0)
+                    if b.interner.resolve(binding_name) != "_" {
+                        let sym = Symbol::new(SymbolKind::Let, binding_name, 0)
                             .with_type(Type::Dynamic);
-                        b.define(binding_name.to_string(), sym);
+                        b.define(binding_name, sym);
                     }
                     if let Some(sub) = sub_pat {
                         if !matches!(sub, MatchPattern::Identifier(_)) {

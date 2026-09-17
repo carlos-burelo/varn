@@ -3,9 +3,24 @@ use crate::module_resolver::cache::ExportMap;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use std::path::Path;
-use std::rc::Rc;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
 use varn_core::Atom;
+
+/// `Symbol::name`/`origin_module` are `Atom`s tied to the specific
+/// `AtomInterner` that minted them (see `binder::types::BindResult::interner`'s
+/// own doc comment: cross-module `Atom` resolution is a documented, pre-existing
+/// gap — "NOT YET WIRED", left for a later task). `collect_exports` only holds
+/// `bind: &BindResult` (shared, cached as `Rc<BindResult>`), so it cannot intern
+/// new text into `bind`'s interner for foreign strings that were never part of
+/// this module's own parse (an absolute file path, the synthetic `"default"`/
+/// namespace-alias names). `bind.interner.get` is the only non-mutating lookup
+/// available; when the text was never interned here, this falls back to
+/// `Atom::default()` (index 0) rather than panicking — a pre-existing
+/// misresolution risk this task inherits, not one it introduces or can close
+/// without threading a mutable interner through the resolver's export cache.
+fn atom_or_placeholder(bind: &BindResult, s: &str) -> Atom {
+    bind.interner.get(s).unwrap_or_default()
+}
 
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
@@ -40,7 +55,7 @@ pub(super) fn collect_exports(
                     let name_str = bind.interner.resolve(name);
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
-                        s.origin_module = Some(abs_path.to_owned().into());
+                        s.origin_module = Some(atom_or_placeholder(bind, abs_path));
                         out.insert(name_str.to_string(), s);
                     }
                 }
@@ -49,7 +64,7 @@ pub(super) fn collect_exports(
                         let variant_name = bind.interner.resolve(variant.name);
                         if let Some(sym) = lookup_global(bind, variant_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(abs_path.to_owned().into());
+                            s.origin_module = Some(atom_or_placeholder(bind, abs_path));
                             out.insert(variant_name.to_string(), s);
                         }
                     }
@@ -59,7 +74,7 @@ pub(super) fn collect_exports(
                         let member_name = bind.interner.resolve(member.id);
                         if let Some(sym) = lookup_global(bind, member_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(abs_path.to_owned().into());
+                            s.origin_module = Some(atom_or_placeholder(bind, abs_path));
                             out.insert(member_name.to_string(), s);
                         }
                     }
@@ -75,11 +90,11 @@ pub(super) fn collect_exports(
                     let exported_name = bind.interner.resolve(spec.exported);
                     if let Some(sym) = lookup_global(bind, local_name) {
                         let mut s = sym.clone();
-                        s.name = Rc::from(exported_name);
+                        s.name = spec.exported;
                         s.origin_module = s
                             .origin_module
                             .take()
-                            .or_else(|| Some(abs_path.to_owned().into()));
+                            .or_else(|| Some(atom_or_placeholder(bind, abs_path)));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -102,8 +117,8 @@ pub(super) fn collect_exports(
                     let exported_name = bind.interner.resolve(spec.exported);
                     if let Some(sym) = src_exports.get(local_name) {
                         let mut s = sym.clone();
-                        s.name = Rc::from(exported_name);
-                        s.re_export_path.push(abs_path.to_owned().into());
+                        s.name = spec.exported;
+                        s.re_export_path.push(atom_or_placeholder(bind, abs_path));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -124,7 +139,7 @@ pub(super) fn collect_exports(
                 for (name, sym) in src_exports.iter() {
                     out.entry(name.clone()).or_insert_with(|| {
                         let mut s = sym.clone();
-                        s.re_export_path.push(abs_path.to_owned().into());
+                        s.re_export_path.push(atom_or_placeholder(bind, abs_path));
                         s
                     });
                 }
@@ -148,12 +163,12 @@ pub(super) fn collect_exports(
                 } else {
                     resolver.module_exports(&src_abs, visiting)
                 };
-                let mut ns_sym = Symbol::new(SymbolKind::Namespace, Rc::from(ns_str), 0);
+                let mut ns_sym = Symbol::new(SymbolKind::Namespace, *ns, 0);
                 ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
-                ns_sym.origin_module = Some(src_abs.into());
+                ns_sym.origin_module = Some(atom_or_placeholder(bind, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();
-                    s.re_export_path.push(abs_path.to_owned().into());
+                    s.re_export_path.push(atom_or_placeholder(bind, abs_path));
                     out.insert(format!("{ns_str}.{sub_name}"), s);
                 }
                 out.insert(ns_str.to_string(), ns_sym);
@@ -163,7 +178,7 @@ pub(super) fn collect_exports(
                     let fn_name = bind.interner.resolve(f.id);
                     if let Some(sym) = lookup_global(bind, fn_name) {
                         let mut s = sym.clone();
-                        s.name = "default".into();
+                        s.name = atom_or_placeholder(bind, "default");
                         out.insert("default".into(), s);
                     }
                 }
@@ -172,14 +187,14 @@ pub(super) fn collect_exports(
                         let class_name = bind.interner.resolve(*id);
                         if let Some(sym) = lookup_global(bind, class_name) {
                             let mut s = sym.clone();
-                            s.name = "default".into();
+                            s.name = atom_or_placeholder(bind, "default");
                             out.insert("default".into(), s);
                         }
                     }
                 }
                 ExportDefaultDecl::Expr(_expr) => {
-                    let mut s = Symbol::new(SymbolKind::Let, "default".into(), 0);
-                    s.origin_module = Some(abs_path.to_owned().into());
+                    let mut s = Symbol::new(SymbolKind::Let, atom_or_placeholder(bind, "default"), 0);
+                    s.origin_module = Some(atom_or_placeholder(bind, abs_path));
                     out.insert("default".into(), s);
                 }
             },
@@ -207,5 +222,6 @@ fn decl_primary_name(decl: &Decl) -> Option<Atom> {
 
 pub(super) fn lookup_global<'a>(bind: &'a BindResult, name: &str) -> Option<&'a Symbol> {
     let scope = bind.scopes.get(bind.global_scope);
-    scope.bindings.get(name).map(|&id| bind.arena.get(id))
+    let atom = bind.interner.get(name)?;
+    scope.bindings.get(&atom).map(|&id| bind.arena.get(id))
 }

@@ -4,6 +4,7 @@ mod types;
 
 use crate::binder::{BindResult, BindView, PendingEnrich};
 use index::build_enrich_context;
+use std::rc::Rc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::{Expr, Stmt};
 
@@ -44,7 +45,8 @@ pub fn enrich_call_returns(
                     &bind.interner,
                 );
                 if let Some(t) = ty {
-                    let name = bind.arena.get(*sym_id).name.clone();
+                    let name_atom = bind.arena.get(*sym_id).name;
+                    let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
                     bind.arena.get_mut(*sym_id).ty = Some(t.clone());
                     sym_map.insert(name, t);
                 }

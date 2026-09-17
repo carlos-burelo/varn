@@ -72,7 +72,7 @@ impl<'r> super::super::Binder<'r> {
                         let fn_params: Vec<_> = params
                             .iter()
                             .map(|p| crate::types::FunctionParam {
-                                name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                                name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                                 ty: p
                                     .type_ann
                                     .as_ref()

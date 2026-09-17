@@ -13,6 +13,10 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.resolver())
     }
 
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        self.inner.and_then(|c| c.interner())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(ty) = self.bindings.get(name) {
             return Some(ty.clone());
@@ -88,6 +92,10 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.resolver())
     }
 
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        self.inner.and_then(|c| c.interner())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if name == self.key_var {
             return Some(self.key_value.clone());
@@ -135,6 +143,10 @@ pub(super) struct AliasSubstitutionContext<'a> {
 impl TypeContext for AliasSubstitutionContext<'_> {
     fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
+    }
+
+    fn interner(&self) -> Option<&varn_core::AtomInterner> {
+        self.inner.and_then(|c| c.interner())
     }
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {

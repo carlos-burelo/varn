@@ -9,9 +9,14 @@ pub(super) fn is_known_named(bind: &BindView, name: &str) -> bool {
     bind.bind.has_named_type(name)
         || bind
             .bind
-            .scopes
-            .get(bind.bind.global_scope)
-            .resolve(name, &bind.bind.scopes)
+            .interner
+            .get(name)
+            .and_then(|atom| {
+                bind.bind
+                    .scopes
+                    .get(bind.bind.global_scope)
+                    .resolve(atom, &bind.bind.scopes)
+            })
             .is_some()
 }
 

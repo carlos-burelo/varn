@@ -8,25 +8,24 @@ use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
-        let type_name = type_node_to_name(&e.target);
+        let type_name = type_node_to_name(&e.target, &self.interner);
 
         let receiver_ty = resolve_type_node(&e.target, Some(self));
 
-        if let Some(id) = &e.id {
-            let name = id.clone();
+        if let Some(id) = e.id {
             let line = e.range.start.line;
             let ext_type = receiver_ty.clone();
-            let mut sym =
-                Symbol::new(SymbolKind::Extension, name.clone(), line).with_type(ext_type);
+            let mut sym = Symbol::new(SymbolKind::Extension, id, line).with_type(ext_type);
             sym.col = e.range.start.column;
             sym.offset = e.range.start.offset;
-            self.define(name.to_string(), sym);
+            self.define(id, sym);
         }
 
         for member in &e.members {
             match member {
                 ExtensionMember::Method(method) => {
-                    let mangled = format!("__ext_{}_{}", type_name, method.id);
+                    let mangled =
+                        format!("__ext_{}_{}", type_name, self.interner.resolve(method.id));
                     let mut param_types: Vec<crate::types::FunctionParam> =
                         vec![crate::types::FunctionParam {
                             name: Some(Rc::from("this")),
@@ -49,7 +48,7 @@ impl<'r> super::super::Binder<'r> {
                         }
                         param_types.push(crate::types::FunctionParam {
                             name: Some(Rc::from(
-                                super::super::type_inference::pattern_to_string(&p.pattern)
+                                super::super::type_inference::pattern_to_string(&p.pattern, Some(&self.interner))
                                     .as_str(),
                             )),
                             ty,
@@ -72,24 +71,27 @@ impl<'r> super::super::Binder<'r> {
                         type_params: method
                             .type_params
                             .iter()
-                            .map(|t| Rc::from(t.name.as_str()))
+                            .map(|t| Rc::from(self.interner.resolve(t.name)))
                             .collect(),
                     });
                     let line = method.range.start.line;
-                    let mut sym =
-                        Symbol::new(SymbolKind::Function, Rc::from(mangled.as_str()), line)
-                            .with_type(fn_type);
+                    let mangled_atom = self.interner.intern(&mangled);
+                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, line)
+                        .with_type(fn_type);
                     sym.col = method.range.start.column;
                     sym.offset = method.range.start.offset;
                     sym.has_explicit_type = method.return_type.is_some();
                     sym.is_async = method.modifiers.is_async;
                     sym.is_generator = method.modifiers.is_generator;
-                    self.define(mangled.clone(), sym);
+                    self.define(mangled_atom, sym);
                     self.extensions
                         .methods
                         .entry(Rc::from(type_name.as_str()))
                         .or_default()
-                        .insert(method.id.clone(), Rc::from(mangled.as_str()));
+                        .insert(
+                            Rc::from(self.interner.resolve(method.id)),
+                            Rc::from(mangled.as_str()),
+                        );
                     self.bind_extension_function_scope(
                         line,
                         receiver_ty.clone(),
@@ -104,7 +106,8 @@ impl<'r> super::super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    let mangled = format!("__extget_{type_name}_{key}");
+                    let key_str = self.interner.resolve(*key).to_string();
+                    let mangled = format!("__extget_{type_name}_{}", key_str);
                     let ret_ty = return_type
                         .as_ref()
                         .map(|rt| resolve_type_node(rt, Some(self)))
@@ -120,21 +123,18 @@ impl<'r> super::super::Binder<'r> {
                         is_arrow: false,
                         type_params: vec![],
                     });
-                    let mut sym = Symbol::new(
-                        SymbolKind::Function,
-                        Rc::from(mangled.as_str()),
-                        range.start.line,
-                    )
-                    .with_type(fn_type);
+                    let mangled_atom = self.interner.intern(&mangled);
+                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
+                        .with_type(fn_type);
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
                     sym.has_explicit_type = return_type.is_some();
-                    self.define(mangled.clone(), sym);
+                    self.define(mangled_atom, sym);
                     self.extensions
                         .getters
                         .entry(Rc::from(type_name.as_str()))
                         .or_default()
-                        .insert(key.clone(), Rc::from(mangled.as_str()));
+                        .insert(Rc::from(key_str.as_str()), Rc::from(mangled.as_str()));
                     self.bind_extension_function_scope(
                         range.start.line,
                         receiver_ty.clone(),
@@ -149,7 +149,8 @@ impl<'r> super::super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    let mangled = format!("__extset_{type_name}_{key}");
+                    let key_str = self.interner.resolve(*key).to_string();
+                    let mangled = format!("__extset_{type_name}_{}", key_str);
                     let param_ty = param
                         .type_ann
                         .as_ref()
@@ -169,7 +170,7 @@ impl<'r> super::super::Binder<'r> {
                             },
                             crate::types::FunctionParam {
                                 name: Some(Rc::from(
-                                    super::super::type_inference::pattern_to_string(&param.pattern)
+                                    super::super::type_inference::pattern_to_string(&param.pattern, Some(&self.interner))
                                         .as_str(),
                                 )),
                                 ty: param_ty.clone(),
@@ -181,21 +182,18 @@ impl<'r> super::super::Binder<'r> {
                         is_arrow: false,
                         type_params: vec![],
                     });
-                    let mut sym = Symbol::new(
-                        SymbolKind::Function,
-                        Rc::from(mangled.as_str()),
-                        range.start.line,
-                    )
-                    .with_type(fn_type);
+                    let mangled_atom = self.interner.intern(&mangled);
+                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
+                        .with_type(fn_type);
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
                     sym.has_explicit_type = true;
-                    self.define(mangled.clone(), sym);
+                    self.define(mangled_atom, sym);
                     self.extensions
                         .setters
                         .entry(Rc::from(type_name.as_str()))
                         .or_default()
-                        .insert(key.clone(), Rc::from(mangled.as_str()));
+                        .insert(Rc::from(key_str.as_str()), Rc::from(mangled.as_str()));
                     self.bind_extension_function_scope(
                         range.start.line,
                         receiver_ty.clone(),
@@ -218,9 +216,9 @@ impl<'r> super::super::Binder<'r> {
         let saved = self.current;
         self.current = child;
 
-        let this_sym =
-            Symbol::new(SymbolKind::Parameter, Rc::from("this"), line).with_type(receiver_ty);
-        self.define("this".to_owned(), this_sym);
+        let this_atom = self.interner.intern("this");
+        let this_sym = Symbol::new(SymbolKind::Parameter, this_atom, line).with_type(receiver_ty);
+        self.define(this_atom, this_sym);
 
         for p in params {
             let mut ty = p

@@ -128,9 +128,7 @@ impl<'r> Checker<'r> {
                             Type::union(yields)
                         };
                         let scope = bind.scopes.get(saved_scope);
-                        if let Some(sym_id) =
-                            scope.resolve(bind.interner.resolve(f.id), &bind.scopes)
-                        {
+                        if let Some(sym_id) = scope.resolve(f.id, &bind.scopes) {
                             if let Some(mut fn_ty) = self
                                 .symbol_types
                                 .get(&sym_id)

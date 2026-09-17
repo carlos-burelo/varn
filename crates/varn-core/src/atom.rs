@@ -29,8 +29,26 @@ impl AtomInterner {
         Atom(id)
     }
 
+    /// Non-mutating lookup: the `Atom` for `s` if it was already interned,
+    /// `None` otherwise. Used by `&str`-keyed lookup APIs (e.g.
+    /// `BindResult`/`BindView` symbol resolution) that must not intern new
+    /// text on a read path — an unresolved name should report "not found",
+    /// not silently grow the table with a text that no declaration ever
+    /// produced.
+    pub fn get(&self, s: &str) -> Option<Atom> {
+        self.map.get(s).copied()
+    }
+
     pub fn resolve(&self, atom: Atom) -> &str {
         &self.strings[atom.0 as usize]
+    }
+
+    /// Bounds-checked `resolve`: `None` instead of panicking when `atom` was
+    /// interned by a *different* `AtomInterner` than `self` (e.g. a
+    /// `ctx`-less call site with only a placeholder interner on hand — see
+    /// `resolve_type_node`'s `default_interner` fallback).
+    pub fn try_resolve(&self, atom: Atom) -> Option<&str> {
+        self.strings.get(atom.0 as usize).map(|s| s.as_ref())
     }
 
     pub fn len(&self) -> usize {

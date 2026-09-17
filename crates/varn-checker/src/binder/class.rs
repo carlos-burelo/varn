@@ -20,15 +20,11 @@ impl<'r> super::Binder<'r> {
         let cls_type =
             Type::named_with_origin(name.clone(), Some(Rc::from(self.source_file.as_ref())));
         let mut sym =
-            Symbol::new(SymbolKind::Class, name.clone(), line).with_type(cls_type.clone());
+            Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
         sym.col = c.range.start.column;
         sym.offset = c.range.start.offset;
-        sym.doc = c.doc.as_ref().map(|s| Rc::from(s.as_str()));
-        sym.type_params = c
-            .type_params
-            .iter()
-            .map(|t| Rc::from(self.interner.resolve(t.name)))
-            .collect();
+        sym.doc = c.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.type_params = c.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = c
             .type_params
             .iter()
@@ -38,7 +34,7 @@ impl<'r> super::Binder<'r> {
                     .map(|con| resolve_type_node(con, Some(self)))
             })
             .collect();
-        self.define(name.to_string(), sym);
+        self.define(name_atom, sym);
 
         let child = self
             .scopes
@@ -68,7 +64,7 @@ impl<'r> super::Binder<'r> {
                         ty = Type::array(ty);
                     }
                     FunctionParam {
-                        name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                        name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                         ty,
                         optional: p.is_optional || p.default.is_some(),
                         is_rest: p.is_rest,
@@ -83,12 +79,9 @@ impl<'r> super::Binder<'r> {
                 type_params: vec![],
             });
 
-            let mut sym = Symbol::new(
-                SymbolKind::Method,
-                Rc::from("constructor"),
-                c.range.start.line,
-            )
-            .with_type(fn_ty.clone());
+            let ctor_atom = self.interner.intern("constructor");
+            let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line)
+                .with_type(fn_ty.clone());
             sym.col = c.range.start.column;
             sym.offset = c.range.start.offset;
             let symbol_id = self.arena.push(sym);
@@ -114,8 +107,9 @@ impl<'r> super::Binder<'r> {
             });
 
             for p in primary_params {
-                let name_str = pattern_lead_name(&p.pattern);
-                let key_rc: Rc<str> = Rc::from(name_str);
+                let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
+                let key_rc: Rc<str> = Rc::from(name_str.as_str());
+                let key_atom = self.interner.intern(&name_str);
                 let ty = p
                     .type_ann
                     .as_ref()
@@ -126,7 +120,7 @@ impl<'r> super::Binder<'r> {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
                     .with_type(ty.clone());
                 sym.col = p.range.start.column;
                 sym.offset = p.range.start.offset;
@@ -322,7 +316,7 @@ impl<'r> super::Binder<'r> {
                             ty = Type::array(ty);
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
@@ -337,12 +331,9 @@ impl<'r> super::Binder<'r> {
                     type_params: vec![],
                 });
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Method,
-                    Rc::from("constructor"),
-                    range.start.line,
-                )
-                .with_type(fn_ty.clone());
+                let ctor_atom = self.interner.intern("constructor");
+                let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, range.start.line)
+                    .with_type(fn_ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = true;
@@ -370,8 +361,9 @@ impl<'r> super::Binder<'r> {
 
                 for p in params {
                     if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
-                        let name_str = pattern_lead_name(&p.pattern);
-                        let key_rc: Rc<str> = Rc::from(name_str);
+                        let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
+                        let key_rc: Rc<str> = Rc::from(name_str.as_str());
+                        let key_atom = self.interner.intern(&name_str);
                         let ty = p
                             .type_ann
                             .as_ref()
@@ -383,7 +375,7 @@ impl<'r> super::Binder<'r> {
                             .unwrap_or(Type::Dynamic);
 
                         let mut sym =
-                            Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
+                            Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
                                 .with_type(ty.clone());
                         sym.col = p.range.start.column;
                         sym.offset = p.range.start.offset;
@@ -429,7 +421,7 @@ impl<'r> super::Binder<'r> {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
@@ -490,7 +482,7 @@ impl<'r> super::Binder<'r> {
                             ty = Type::array(ty);
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
@@ -510,7 +502,7 @@ impl<'r> super::Binder<'r> {
                     type_params: fn_tps,
                 });
 
-                let mut sym = Symbol::new(SymbolKind::Method, key_rc.clone(), range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
                     .with_type(fn_ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
@@ -552,7 +544,7 @@ impl<'r> super::Binder<'r> {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
@@ -603,7 +595,7 @@ impl<'r> super::Binder<'r> {
                         _ => false,
                     };
 
-                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;

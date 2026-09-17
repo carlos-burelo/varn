@@ -21,18 +21,19 @@ impl<'r> Checker<'r> {
         let ExprKind::Identifier { name: prop_name } = &property.kind else {
             return;
         };
+        let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(object, bind);
         if let Some(tn) = extension_type_name(&obj_ty.non_nullified()) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
-                if let Some(mangled) = setter_map.get(prop_name.as_ref()) {
+                if let Some(mangled) = setter_map.get(prop_name) {
                     self.extension_set_members
                         .insert(target.range.start.offset, mangled.clone());
                 }
             }
         }
         if let Some(ObjectTypeMember::Property { readonly: true, .. }) =
-            self.find_member(&obj_ty, prop_name.as_ref(), bind)
+            self.find_member(&obj_ty, prop_name, bind)
         {
             self.emit(
                 Diagnostic::error(
@@ -114,6 +115,7 @@ impl<'r> Checker<'r> {
             self.record_type(property.range.start.offset, prop_ty);
             return;
         };
+        let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(object, bind);
         if !optional && obj_ty.is_nullable() {
@@ -134,7 +136,7 @@ impl<'r> Checker<'r> {
 
         let check_ty = obj_ty.non_nullified();
 
-        if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name.as_ref(), bind) {
+        if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name, bind) {
             if let Some(sid) = maybe_sid {
                 self.record_member_type(property.range.start.offset, ty, sid);
             } else {
@@ -148,21 +150,21 @@ impl<'r> Checker<'r> {
 
         if let Some(tn) = extension_type_name(&check_ty) {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
-                if let Some(mangled) = getter_map.get(prop_name.as_ref()) {
+                if let Some(mangled) = getter_map.get(prop_name) {
                     self.extension_members
                         .insert(property.range.start.offset, mangled.clone());
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
-                if let Some(mangled) = method_map.get(prop_name.as_ref()) {
+                if let Some(mangled) = method_map.get(prop_name) {
                     self.extension_members
                         .insert(property.range.start.offset, mangled.clone());
                 }
             }
         }
 
-        if should_check && !self.member_exists_cached(&check_ty, prop_name.as_ref(), bind) {
+        if should_check && !self.member_exists_cached(&check_ty, prop_name, bind) {
             let candidates = self.collect_member_names(&check_ty, bind);
-            let suggestion = closest_in_list(prop_name.as_ref(), &candidates)
+            let suggestion = closest_in_list(prop_name, &candidates)
                 .map(|c| Suggestion::did_you_mean(c, *range));
             let mut diag = Diagnostic::error(
                 ErrorCode::MissingProperty,
@@ -177,14 +179,14 @@ impl<'r> Checker<'r> {
 
         if self.record_expr_types {
             let final_mem_ty = self
-                .find_member_info(&check_ty, prop_name.as_ref(), bind)
+                .find_member_info(&check_ty, prop_name, bind)
                 .map(|(t, _)| t)
                 .unwrap_or_else(|| self.infer_type(expr, bind));
 
             let is_static = if let ExprKind::Identifier { name } = &object.kind {
                 bind.scopes
                     .get(bind.global_scope)
-                    .resolve(name.as_ref(), &bind.scopes)
+                    .resolve(*name, &bind.scopes)
                     .map(|sid| {
                         matches!(
                             bind.arena.get(sid).kind,
@@ -202,9 +204,9 @@ impl<'r> Checker<'r> {
 
             let is_enum = matches!(&check_ty.0, TypeKind::EnumVariant { .. })
                 || if let TypeKind::Named(n, _) = &check_ty.0 {
-                    bind.scopes
-                        .get(bind.global_scope)
-                        .resolve(n.as_ref(), &bind.scopes)
+                    bind.interner
+                        .get(n.as_ref())
+                        .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
                         .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
                         .unwrap_or(false)
                 } else {
@@ -252,7 +254,7 @@ impl<'r> Checker<'r> {
                 property.range.start.offset,
                 crate::semantic_info::MemberResolution {
                     receiver_ty: check_ty.clone(),
-                    member_name: std::rc::Rc::from(prop_name.as_ref()),
+                    member_name: std::rc::Rc::from(prop_name),
                     member_kind,
                     member_ty: final_mem_ty,
                     origin_module,
@@ -267,7 +269,7 @@ impl<'r> Checker<'r> {
             _ => None,
         };
         if let Some(class_name) = class_name {
-            self.check_member_visibility(class_name, prop_name.as_ref(), range, bind);
+            self.check_member_visibility(class_name, prop_name, range, bind);
         }
     }
 

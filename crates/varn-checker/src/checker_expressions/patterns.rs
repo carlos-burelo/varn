@@ -18,11 +18,11 @@ impl<'r> Checker<'r> {
         use varn_core::ast::Pattern;
         match pattern {
             Pattern::Identifier { name, range, .. } => {
-                if name.as_ref() == "_" {
+                if bind.interner.resolve(*name) == "_" {
                     return;
                 }
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
+                if let Some(id) = scope.resolve(*name, &bind.scopes) {
                     self.record_type_with_symbol(range.start.offset, value_ty.clone(), id);
                 } else {
                     self.record_type(range.start.offset, value_ty.clone());
@@ -42,7 +42,7 @@ impl<'r> Checker<'r> {
             } => {
                 for prop in properties {
                     let prop_ty = self
-                        .find_member_info(value_ty, prop.key.as_ref(), bind)
+                        .find_member_info(value_ty, bind.interner.resolve(prop.key), bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     self.check_pattern(&prop.value, &prop_ty, bind);
@@ -67,11 +67,11 @@ impl<'r> Checker<'r> {
         use varn_core::ast::MatchPattern;
         match pattern {
             MatchPattern::Identifier(name) => {
-                if name.as_ref() == "_" {
+                if bind.interner.resolve(*name) == "_" {
                     return;
                 }
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
+                if let Some(id) = scope.resolve(*name, &bind.scopes) {
                     self.record_type_with_symbol(0, value_ty.clone(), id);
                 }
             }
@@ -80,13 +80,14 @@ impl<'r> Checker<'r> {
                 bindings,
                 ..
             } => {
+                let variant_name_str = bind.interner.resolve(*variant_name).to_string();
                 let Some((fields, mapping)) =
-                    self.variant_fields_with_subst(variant_name.as_ref(), value_ty, bind)
+                    self.variant_fields_with_subst(&variant_name_str, value_ty, bind)
                 else {
                     return;
                 };
                 for (i, binding) in bindings.iter().enumerate() {
-                    if binding.name.as_ref() == "_" {
+                    if bind.interner.resolve(binding.name) == "_" {
                         continue;
                     }
                     if let Some((_, field_ty)) = fields.get(i) {
@@ -96,7 +97,7 @@ impl<'r> Checker<'r> {
                             crate::checker_generics::map_generics_cached(self, field_ty, &mapping)
                         };
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(&binding.name, &bind.scopes) {
+                        if let Some(id) = scope.resolve(binding.name, &bind.scopes) {
                             self.record_type_with_symbol(binding.range.start.offset, resolved, id);
                         }
                     }
@@ -104,15 +105,16 @@ impl<'r> Checker<'r> {
             }
             MatchPattern::Record { fields, .. } => {
                 for (key, sub_pat) in fields {
+                    let key_str = bind.interner.resolve(*key);
                     let member_ty = self
-                        .find_member_info(value_ty, key.as_ref(), bind)
+                        .find_member_info(value_ty, key_str, bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     if let Some(sub) = sub_pat {
                         self.check_pattern_match(sub, &member_ty, bind);
-                    } else if key.as_ref() != "_" && key.as_ref() != "__variant__" {
+                    } else if key_str != "_" && key_str != "__variant__" {
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(key, &bind.scopes) {
+                        if let Some(id) = scope.resolve(*key, &bind.scopes) {
                             self.record_type_with_symbol(0, member_ty.clone(), id);
                         }
                     }
@@ -178,10 +180,17 @@ impl<'r> Checker<'r> {
                 if params.is_empty() {
                     if let Some(db) = &def_bind {
                         params = db
-                            .scopes
-                            .get(db.global_scope)
-                            .resolve(p.as_ref(), &db.scopes)
-                            .map(|sid| db.arena.get(sid).type_params.clone())
+                            .interner
+                            .get(p.as_ref())
+                            .and_then(|atom| db.scopes.get(db.global_scope).resolve(atom, &db.scopes))
+                            .map(|sid| {
+                                db.arena
+                                    .get(sid)
+                                    .type_params
+                                    .iter()
+                                    .map(|a| std::rc::Rc::from(db.interner.resolve(*a)))
+                                    .collect()
+                            })
                             .unwrap_or_default();
                     }
                 }

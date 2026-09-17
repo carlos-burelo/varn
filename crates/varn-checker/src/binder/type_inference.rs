@@ -99,7 +99,8 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             callee, type_args, ..
         } => infer_new(callee, type_args, ctx),
         ExprKind::Identifier { name } => ctx
-            .and_then(|c| c.resolve_symbol(name))
+            .and_then(|c| c.interner().map(|i| (c, i)))
+            .and_then(|(c, i)| c.resolve_symbol(i.resolve(*name)))
             .unwrap_or(Type::Dynamic),
         ExprKind::This => ctx
             .and_then(|c| c.resolve_symbol("this"))
@@ -192,33 +193,37 @@ fn infer_member(
             _ => Type::Dynamic,
         };
     }
-    let prop_name = match &property.kind {
-        ExprKind::Identifier { name } => name,
+    let prop_name_atom = match &property.kind {
+        ExprKind::Identifier { name } => *name,
         _ => return Type::Dynamic,
     };
 
     if let Some(ctx) = ctx {
+        let Some(interner) = ctx.interner() else {
+            return Type::Dynamic;
+        };
+        let prop_name = interner.resolve(prop_name_atom);
         match &obj_ty.0 {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
                 if let Some(variants) = ctx.get_enum_members(name.as_ref(), origin.as_deref()) {
-                    if prop_name.as_ref() == varn_core::MemberKey::RawValue.as_str()
-                        || prop_name.as_ref() == varn_core::MemberKey::Tag.as_str()
+                    if prop_name == varn_core::MemberKey::RawValue.as_str()
+                        || prop_name == varn_core::MemberKey::Tag.as_str()
                     {
                         return Type::Int;
                     }
-                    if prop_name.as_ref() == varn_core::MemberKey::Name.as_str()
-                        || prop_name.as_ref() == varn_core::MemberKey::VariantName.as_str()
+                    if prop_name == varn_core::MemberKey::Name.as_str()
+                        || prop_name == varn_core::MemberKey::VariantName.as_str()
                     {
                         return Type::Str;
                     }
                     let mut found_tys = Vec::new();
                     for v in &variants {
                         if let TypeKind::Fn(ft) = &v.ty.0 {
-                            if let Some(p) = ft.params.iter().find(|p| {
-                                p.name
-                                    .as_ref()
-                                    .is_some_and(|pn| pn.as_ref() == prop_name.as_ref())
-                            }) {
+                            if let Some(p) = ft
+                                .params
+                                .iter()
+                                .find(|p| p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name))
+                            {
                                 found_tys.push(p.ty.clone());
                             }
                         }
@@ -233,10 +238,7 @@ fn infer_member(
                     .or_else(|| ctx.get_namespace_members(name.as_ref(), origin.as_deref()))
                     .or_else(|| ctx.get_enum_members(name.as_ref(), origin.as_deref()))
                 {
-                    if let Some(m) = members
-                        .iter()
-                        .find(|m| m.name.as_ref() == prop_name.as_ref())
-                    {
+                    if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
                         return m.ty.clone();
                     }
                 }
@@ -249,10 +251,10 @@ fn infer_member(
                 }
             }
             TypeKind::Array(inner) => {
-                if prop_name.as_ref() == varn_core::MemberKey::Length.as_str() {
+                if prop_name == varn_core::MemberKey::Length.as_str() {
                     return Type::Int;
                 }
-                if prop_name.as_ref() == varn_core::MemberKey::Push.as_str() {
+                if prop_name == varn_core::MemberKey::Push.as_str() {
                     return Type::fn_(FunctionType {
                         params: vec![crate::types::FunctionParam {
                             name: Some(Rc::from("item")),
@@ -354,16 +356,20 @@ fn infer_new(
     ctx: Option<&dyn crate::types::TypeContext>,
 ) -> Type {
     if let ExprKind::Identifier { name } = &callee.kind {
+        let name_str = ctx
+            .and_then(|c| c.interner())
+            .map(|i| i.resolve(*name).to_owned())
+            .unwrap_or_default();
         if type_args.is_empty() {
-            if name.as_ref() == varn_core::IntrinsicType::Map.as_str() {
+            if name_str == varn_core::IntrinsicType::Map.as_str() {
                 return Type::generic_with_origin(
-                    name.to_string(),
+                    name_str,
                     vec![Type::Dynamic],
                     ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
                 );
             }
             return Type::named_with_origin(
-                name.to_string(),
+                name_str,
                 ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
             );
         }
@@ -372,7 +378,7 @@ fn infer_new(
             .map(|m| resolve_type_node(m, ctx))
             .collect();
         return Type::generic_with_origin(
-            name.to_string(),
+            name_str,
             args,
             ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
         );

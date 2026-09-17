@@ -128,7 +128,7 @@ fn infer_arrow_with_context(
             .map(|m| checker.resolve_type_node_cached(m, bind));
 
         actual_params.push(FunctionParam {
-            name: Some(Rc::from(pattern_lead_name(&ap.pattern))),
+            name: Some(Rc::from(pattern_lead_name(&ap.pattern, &bind.interner))),
             ty: explicit_ty.unwrap_or_else(|| ep.ty.clone()),
             optional: ap.is_optional,
             is_rest: ap.is_rest,
@@ -141,10 +141,14 @@ fn infer_arrow_with_context(
     if let Some(scope_id) = arrow_scope {
         checker.current_scope = scope_id;
         for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
-            let name = pattern_lead_name(&ap.pattern);
+            let name = pattern_lead_name(&ap.pattern, &bind.interner);
             if !name.is_empty() && name != "_" {
                 let scope = bind.scopes.get(scope_id);
-                if let Some(sym_id) = scope.resolve(name, &bind.scopes) {
+                if let Some(sym_id) = bind
+                    .interner
+                    .get(name)
+                    .and_then(|atom| scope.resolve(atom, &bind.scopes))
+                {
                     let explicit_ty = ap
                         .type_ann
                         .as_ref()
@@ -209,7 +213,7 @@ pub(crate) fn find_arrow_scope(
     }
     let param_names: Vec<&str> = params
         .iter()
-        .map(|p| pattern_lead_name(&p.pattern))
+        .map(|p| pattern_lead_name(&p.pattern, &bind.interner))
         .filter(|name| !name.is_empty() && *name != "_")
         .collect();
 
@@ -222,7 +226,11 @@ pub(crate) fn find_arrow_scope(
         let child_scope = bind.scopes.get(child_id);
         let mut matches = true;
         for name in &param_names {
-            if !child_scope.bindings.contains_key(*name) {
+            let found = bind
+                .interner
+                .get(name)
+                .is_some_and(|atom| child_scope.bindings.contains_key(&atom));
+            if !found {
                 matches = false;
                 break;
             }

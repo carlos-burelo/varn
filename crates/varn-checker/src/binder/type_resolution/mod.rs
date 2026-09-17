@@ -21,6 +21,16 @@ pub use aliases::resolve_primitive;
 
 pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type {
     use varn_core::TypeTag;
+    // `node.kind`'s name slots (`TypeKind::Named`/`Generic`/interface member
+    // keys) are `Atom` at the AST layer; resolving them to the `&str` this
+    // function's checker-`Type` output and the `TypeContext` lookups need
+    // goes through the context's interner. `None` only for a `ctx`-less call
+    // (no interner reachable) — those degrade to an empty name rather than
+    // panicking on an unresolved `Atom`.
+    let default_interner = varn_core::AtomInterner::new();
+    let interner = ctx.and_then(|c| c.interner()).unwrap_or(&default_interner);
+    let resolve_name =
+        |a: varn_core::Atom| -> Rc<str> { Rc::from(interner.try_resolve(a).unwrap_or("")) };
     match &node.kind {
         TypeKind::Intrinsic(TypeTag::Int) => Type::Int,
         TypeKind::Intrinsic(TypeTag::Float) => Type::Float,
@@ -41,9 +51,10 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             Type::union(members.iter().map(|m| resolve_type_node(m, ctx)).collect())
         }
         TypeKind::Generic(name, args, _origin) => {
+            let name_str = resolve_name(*name);
             let resolved_args: Vec<Type> = args.iter().map(|m| resolve_type_node(m, ctx)).collect();
 
-            if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(name.as_ref())) {
+            if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
                 if !params.is_empty() && params.len() == resolved_args.len() {
                     let alias_ctx = AliasSubstitutionContext {
                         inner: ctx,
@@ -54,7 +65,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                 }
             }
 
-            if let Some(ty) = try_stdlib_generic_alias(name.as_ref(), &resolved_args, ctx) {
+            if let Some(ty) = try_stdlib_generic_alias(&name_str, &resolved_args, ctx) {
                 return ty;
             }
 
@@ -71,7 +82,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             //
             // Placed after the user/stdlib alias lookups so an explicitly
             // declared `Array<T>` alias still wins.
-            if name.as_str() == varn_core::IntrinsicType::Array.as_str() {
+            if name_str.as_ref() == varn_core::IntrinsicType::Array.as_str() {
                 if let [el] = resolved_args.as_slice() {
                     return Type::array(el.clone());
                 }
@@ -83,27 +94,28 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             // declaring origin; fall back to the current file only for
             // locally-declared (or unresolvable) names.
             let origin = ctx
-                .and_then(|c| c.resolve_symbol(name.as_ref()))
+                .and_then(|c| c.resolve_symbol(&name_str))
                 .and_then(|t| match t.0 {
                     TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o,
                     _ => None,
                 })
                 .or_else(|| ctx.and_then(|c| c.source_file()).map(Rc::from));
-            Type::generic_with_origin(name.clone(), resolved_args, origin)
+            Type::generic_with_origin(name_str, resolved_args, origin)
         }
         TypeKind::Named(name, __origin) => {
-            let prim = resolve_primitive(name.as_ref(), ctx);
+            let name_str = resolve_name(*name);
+            let prim = resolve_primitive(&name_str, ctx);
             if !matches!(&prim.0, TypeKind::Named(_, _)) {
                 return prim;
             }
 
-            if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(name.as_ref())) {
+            if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
                 if params.is_empty() {
                     return resolve_type_node(&alias_node, ctx);
                 }
             }
 
-            if let Some(resolved) = ctx.and_then(|c| c.resolve_symbol(name.as_ref())) {
+            if let Some(resolved) = ctx.and_then(|c| c.resolve_symbol(&name_str)) {
                 return resolved;
             }
 
@@ -119,7 +131,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                         .map(|m| resolve_type_node(m, ctx))
                         .unwrap_or(Type::Dynamic);
                     crate::types::FunctionParam {
-                        name: Some(Rc::from(p.name.clone())),
+                        name: Some(resolve_name(p.name)),
                         ty,
                         optional: false,
                         is_rest: false,
@@ -144,7 +156,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                         readonly,
                         ..
                     } => ObjectTypeMember::Property {
-                        name: key.clone(),
+                        name: Rc::from(resolve_name(*key)),
                         ty: resolve_type_node(type_ann, ctx),
                         optional: *optional,
                         readonly: *readonly,
@@ -177,6 +189,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                                 crate::types::FunctionParam {
                                     name: Some(Rc::from(crate::binder::pattern_lead_name(
                                         &p.pattern,
+                                        interner,
                                     ))),
                                     ty,
                                     optional: p.is_optional || p.default.is_some(),
@@ -193,7 +206,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                             *is_async,
                         );
                         ObjectTypeMember::Method {
-                            name: key.clone(),
+                            name: Rc::from(resolve_name(*key)),
                             params: resolved_params,
                             return_type: Box::new(ret),
                             optional: *optional,
@@ -215,7 +228,10 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                             .map(|ann| resolve_type_node(ann, ctx))
                             .unwrap_or(Type::Str);
                         ObjectTypeMember::Index {
-                            param_name: Rc::from(crate::binder::pattern_lead_name(&param.pattern)),
+                            param_name: Rc::from(crate::binder::pattern_lead_name(
+                                &param.pattern,
+                                interner,
+                            )),
                             key_ty: Box::new(key_ty),
                             value_ty: Box::new(resolve_type_node(return_type, ctx)),
                         }
@@ -245,6 +261,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                                 crate::types::FunctionParam {
                                     name: Some(Rc::from(crate::binder::pattern_lead_name(
                                         &p.pattern,
+                                        interner,
                                     ))),
                                     ty,
                                     optional: p.is_optional || p.default.is_some(),
@@ -362,7 +379,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                 None
             };
             resolve_mapped(
-                key_var,
+                interner.try_resolve(*key_var).unwrap_or(""),
                 resolved_source,
                 value,
                 *optional,
@@ -391,7 +408,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             let target = resolve_type_node(target_type, ctx);
             Type(
                 TypeKind::TypePredicate {
-                    parameter_name: parameter_name.clone().into(),
+                    parameter_name: resolve_name(*parameter_name),
                     target_type: Box::new(target),
                 },
                 false,

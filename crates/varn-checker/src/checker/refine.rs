@@ -146,7 +146,8 @@ impl<'r> Checker<'r> {
             return None;
         }
         let scope = bind.scopes.get(self.current_scope);
-        let sym_id = scope.resolve(name, &bind.scopes)?;
+        let atom = bind.interner.get(name)?;
+        let sym_id = scope.resolve(atom, &bind.scopes)?;
         let offset = bind.arena.get(sym_id).offset;
         bind.evolved_array_types.get(&offset).cloned()
     }
