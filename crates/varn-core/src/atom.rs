@@ -7,7 +7,7 @@ pub struct Atom(u32);
 
 /// Tabla de interning por sesión de compilación. Una instancia vive por
 /// parseo (ver `AstArena`, que la contiene desde el Componente 2).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AtomInterner {
     map: FxHashMap<Box<str>, Atom>,
     strings: Vec<Box<str>>,

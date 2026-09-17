@@ -6,14 +6,16 @@ use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern, Stmt};
-use varn_core::TypeKind;
+use varn_core::{Atom, TypeKind};
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
-        let name: Rc<str> =
-            c.id.as_ref()
-                .map(|s| Rc::from(s.as_ref()))
-                .unwrap_or_else(|| Rc::from("<anon>"));
+        // `name_atom` forwards the class identifier's `Atom` for fields that
+        // stay `Atom`-keyed (`PendingEnrich`); `name` is the `Rc<str>` text
+        // resolved from it, needed everywhere this still feeds an unmigrated
+        // `Rc<str>`-typed API (`Symbol::new`, `ClassMemberInfo`, `Type`).
+        let name_atom: Atom = c.id.unwrap_or_else(|| self.interner.intern("<anon>"));
+        let name: Rc<str> = Rc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;
         let cls_type =
             Type::named_with_origin(name.clone(), Some(Rc::from(self.source_file.as_ref())));
@@ -25,7 +27,7 @@ impl<'r> super::Binder<'r> {
         sym.type_params = c
             .type_params
             .iter()
-            .map(|t| Rc::from(t.name.as_str()))
+            .map(|t| Rc::from(self.interner.resolve(t.name)))
             .collect();
         sym.type_param_constraints = c
             .type_params
@@ -181,11 +183,10 @@ impl<'r> super::Binder<'r> {
                     modifiers,
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     if return_type.is_none() && !modifiers.is_abstract {
                         self.pending_enrich.push(PendingEnrich::Method {
-                            class_name: name.clone(),
-                            key: key_rc,
+                            class_name: name_atom,
+                            key: *key,
                             body: body as *const Stmt,
                             is_async: modifiers.is_async,
                         });
@@ -204,11 +205,10 @@ impl<'r> super::Binder<'r> {
                     body: Some(body),
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     if return_type.is_none() {
                         self.pending_enrich.push(PendingEnrich::Getter {
-                            class_name: name.clone(),
-                            key: key_rc,
+                            class_name: name_atom,
+                            key: *key,
                             body: body as *const Stmt,
                         });
                     }
@@ -226,10 +226,9 @@ impl<'r> super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    let key_rc: Rc<str> = Rc::from(key.as_ref());
                     self.pending_enrich.push(PendingEnrich::Setter {
-                        class_name: name.clone(),
-                        key: key_rc,
+                        class_name: name_atom,
+                        key: *key,
                         body: body as *const Stmt,
                     });
                     self.escape_all_open_array_candidates();
@@ -424,7 +423,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(key.as_ref());
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ty = type_ann
                     .as_ref()
                     .map(|ann| resolve_type_node(ann, Some(self)))
@@ -466,7 +465,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(key.as_ref());
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ret = crate::types::async_fn_return(
                     return_type
                         .as_ref()
@@ -501,7 +500,7 @@ impl<'r> super::Binder<'r> {
 
                 let fn_tps: Vec<Rc<str>> = type_params
                     .iter()
-                    .map(|tp| Rc::from(tp.name.as_str()))
+                    .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                     .collect();
 
                 let fn_ty = Type::fn_(FunctionType {
@@ -547,7 +546,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(key.as_ref());
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ty = return_type
                     .as_ref()
                     .map(|ann| resolve_type_node(ann, Some(self)))
@@ -587,7 +586,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(key.as_ref());
+                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ty = param
                     .type_ann
                     .as_ref()

@@ -36,6 +36,10 @@ pub struct Binder<'r> {
     pub(crate) type_members: TypeMembers,
     pub(crate) class_parents: FxHashMap<Rc<str>, Rc<str>>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
+    /// Placeholder until a later task threads the real per-parse
+    /// `AtomInterner` through `Binder::bind`'s callers (see the doc comment
+    /// on `BindResult::interner`).
+    pub(crate) interner: varn_core::AtomInterner,
     pub(crate) source_file: Rc<str>,
     pub(crate) sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
     pub(crate) sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
@@ -182,6 +186,10 @@ impl<'r> Binder<'r> {
             type_members: TypeMembers::default(),
             class_parents: FxHashMap::default(),
             diagnostics: varn_core::DiagnosticBag::new(),
+            // TODO(later task): replace with the real interner threaded
+            // from `varn_parser::parse` once `Binder::bind`'s callers
+            // (outside this task's scope) are migrated to pass it in.
+            interner: varn_core::AtomInterner::new(),
             source_file: Rc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
             sum_variant_parent: FxHashMap::default(),
@@ -210,6 +218,7 @@ impl<'r> Binder<'r> {
             scopes: b.scopes,
             global_scope: global,
             diagnostics: b.diagnostics,
+            interner: b.interner,
             class_methods: b.class_methods,
             type_members: b.type_members,
             class_parents: b.class_parents,

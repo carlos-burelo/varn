@@ -5,6 +5,7 @@ use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{Expr, Stmt, TypeNode};
+use varn_core::Atom;
 
 pub use crate::types::TypeContext;
 
@@ -20,19 +21,22 @@ pub enum PendingEnrich {
         is_async: bool,
     },
     Method {
-        class_name: Rc<str>,
-        key: Rc<str>,
+        // `class_name`/`key` forward the class/member name `Atom`s the
+        // binder already resolved from the AST — no synthetic text here,
+        // so this stays a handle instead of re-wrapping into `Rc<str>`.
+        class_name: Atom,
+        key: Atom,
         body: *const Stmt,
         is_async: bool,
     },
     Getter {
-        class_name: Rc<str>,
-        key: Rc<str>,
+        class_name: Atom,
+        key: Atom,
         body: *const Stmt,
     },
     Setter {
-        class_name: Rc<str>,
-        key: Rc<str>,
+        class_name: Atom,
+        key: Atom,
         body: *const Stmt,
     },
 }
@@ -44,7 +48,16 @@ unsafe impl Sync for PendingEnrich {}
 pub struct TypeMembers {
     pub classes: FxHashMap<Rc<str>, ClassMemberInfo>,
     pub interfaces: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub objects: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
+    // Object-literal declarator names are looked up by `Atom` at every call
+    // site that still compiles (`Decl::Struct.id`, `Pattern::Identifier.name`),
+    // unlike the other maps here which are queried by `&str` through
+    // `TypeContext`/`BindResult` accessors — so this one forwards the AST's
+    // `Atom` directly instead of re-wrapping into `Rc<str>`. `Atom` does not
+    // (and should not) derive `serde::{Serialize, Deserialize}` — a bare
+    // interned index is meaningless without the matching `AtomInterner`, so
+    // this field, like the binder's other in-process-only data, is skipped.
+    #[serde(skip)]
+    pub objects: FxHashMap<Atom, Vec<ClassMemberInfo>>,
     pub enums: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
     pub namespaces: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
     pub flattened: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
@@ -66,6 +79,22 @@ pub struct BindResult {
     pub global_scope: ScopeId,
     #[serde(skip)]
     pub diagnostics: varn_core::DiagnosticBag,
+    /// Resolves the `Atom`s carried by this bind result (`PendingEnrich`,
+    /// `type_members.objects`, ...) back to text — diagnostics and any
+    /// comparison against externally-supplied text need it.
+    ///
+    /// NOT YET WIRED to the real per-parse interner `varn_parser::parse`
+    /// returns: threading it here would require changing the signature of
+    /// `Binder::bind`/`bind_with_global_refs`, whose callers
+    /// (`crate::checker::mod`, `crate::module_resolver::resolver`,
+    /// `varn-cli/src/debug_binder.rs`) are outside this task's 3-file scope
+    /// and are already broken pending their own migration tasks. Until a
+    /// later task threads the real interner through, this is a placeholder
+    /// `AtomInterner::new()` built in `Binder::bind_with_globals_iter` —
+    /// resolving an `Atom` interned by the *real* parser interner against
+    /// this placeholder will panic (empty table). See task-4-report.md.
+    #[serde(skip)]
+    pub interner: varn_core::AtomInterner,
     pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     pub type_members: TypeMembers,
     pub class_parents: FxHashMap<Rc<str>, Rc<str>>,
