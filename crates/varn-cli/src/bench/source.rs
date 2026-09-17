@@ -98,7 +98,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile, _interner) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
+    let (program, parse_profile, interner) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
         .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
@@ -114,7 +114,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let program_ref = &program;
     let check_samples = time_n(runs, || {
-        crate::pipeline::phase_check(program_ref, &source, &debug_flags, false)
+        crate::pipeline::phase_check(program_ref, interner.clone(), &source, &debug_flags, false)
             .map(|_| ())
             .map_err(|e| format!("{e}"))
     })?;
@@ -125,7 +125,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     // type table, which a real compile never builds. `profile` is filled by
     // every check, so nothing is lost by asking for the right one.
     let check_result = varn_pipeline::resolver::with_resolver(|r| {
-        Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
+        Checker::check_with(&program, interner, r, varn_checker::CheckOptions::compile())
     });
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
@@ -264,7 +264,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (program, _, _interner) =
+        let (program, _, interner) =
             varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
                 let msgs: Vec<String> = errs
                     .iter()
@@ -279,7 +279,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             })?;
 
         let check_result = varn_pipeline::resolver::with_resolver(|r| {
-            Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
+            Checker::check_with(&program, interner, r, varn_checker::CheckOptions::compile())
         });
 
         let proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))

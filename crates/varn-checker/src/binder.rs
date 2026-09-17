@@ -36,9 +36,8 @@ pub struct Binder<'r> {
     pub(crate) type_members: TypeMembers,
     pub(crate) class_parents: FxHashMap<Rc<str>, Rc<str>>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
-    /// Placeholder until a later task threads the real per-parse
-    /// `AtomInterner` through `Binder::bind`'s callers (see the doc comment
-    /// on `BindResult::interner`).
+    /// The real per-parse `AtomInterner`, threaded in from `Binder::bind`'s
+    /// caller (see the doc comment on `BindResult::interner`).
     pub(crate) interner: varn_core::AtomInterner,
     pub(crate) source_file: Rc<str>,
     pub(crate) sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
@@ -151,17 +150,23 @@ impl TypeContext for Binder<'_> {
 }
 
 impl<'r> Binder<'r> {
-    pub fn bind(program: &Program, resolver: &'r dyn ImportResolver) -> BindResult {
-        Self::bind_with_globals_iter(program, resolver, FxHashMap::default())
+    pub fn bind(
+        program: &Program,
+        interner: varn_core::AtomInterner,
+        resolver: &'r dyn ImportResolver,
+    ) -> BindResult {
+        Self::bind_with_globals_iter(program, interner, resolver, FxHashMap::default())
     }
 
     pub fn bind_with_global_refs(
         program: &Program,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
         globals: &FxHashMap<Rc<str>, Symbol>,
     ) -> BindResult {
         Self::bind_with_globals_iter(
             program,
+            interner,
             resolver,
             globals
                 .iter()
@@ -171,6 +176,7 @@ impl<'r> Binder<'r> {
 
     fn bind_with_globals_iter<I>(
         program: &Program,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
         globals: I,
     ) -> BindResult
@@ -186,10 +192,7 @@ impl<'r> Binder<'r> {
             type_members: TypeMembers::default(),
             class_parents: FxHashMap::default(),
             diagnostics: varn_core::DiagnosticBag::new(),
-            // TODO(later task): replace with the real interner threaded
-            // from `varn_parser::parse` once `Binder::bind`'s callers
-            // (outside this task's scope) are migrated to pass it in.
-            interner: varn_core::AtomInterner::new(),
+            interner,
             source_file: Rc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
             sum_variant_parent: FxHashMap::default(),

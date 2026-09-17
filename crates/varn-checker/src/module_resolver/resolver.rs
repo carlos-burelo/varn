@@ -176,17 +176,16 @@ impl DiskResolver {
         &self,
         source: &str,
         key: &str,
-    ) -> Option<(Rc<varn_core::ast::Program>, Vec<varn_core::Diagnostic>)> {
+    ) -> Option<(
+        Rc<varn_core::ast::Program>,
+        varn_core::AtomInterner,
+        Vec<varn_core::Diagnostic>,
+    )> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
-        // `BindResult` still keys names by `Rc<str>` (Task 4-8 migrates the
-        // checker to `Atom`), so there is nowhere to park this interner yet;
-        // dropping it here just re-opens the same gap Task 3c closes, but
-        // only for this module's own bound names, which the checker doesn't
-        // resolve through an `Atom` today.
-        let (program, _interner) = varn_parser::parse(tokens, lexeme_buf, key).ok()?;
+        let (program, interner) = varn_parser::parse(tokens, lexeme_buf, key).ok()?;
         let program = Rc::new(program);
         self.store_program(key.to_owned(), Rc::clone(&program));
-        Some((program, lex_errs))
+        Some((program, interner, lex_errs))
     }
 
     /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
@@ -197,11 +196,12 @@ impl DiskResolver {
     fn bind_and_cache(
         &self,
         program: &varn_core::ast::Program,
+        interner: varn_core::AtomInterner,
         lex_errs: Vec<varn_core::Diagnostic>,
         key: &str,
     ) -> Rc<BindResult> {
         self.in_flight.borrow_mut().insert(key.to_owned());
-        let mut bind = crate::binder::Binder::bind(program, self);
+        let mut bind = crate::binder::Binder::bind(program, interner, self);
         self.in_flight.borrow_mut().remove(key);
         for e in lex_errs {
             bind.diagnostics.emit(e);
@@ -247,12 +247,12 @@ impl DiskResolver {
         let Ok(source) = std::fs::read_to_string(abs_path) else {
             return ExportMap::default();
         };
-        let Some((program, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
+        let Some((program, interner, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
             return ExportMap::default();
         };
         let bind = self
             .cached_bind(abs_path)
-            .unwrap_or_else(|| self.bind_and_cache(&program, Vec::new(), abs_path));
+            .unwrap_or_else(|| self.bind_and_cache(&program, interner, Vec::new(), abs_path));
 
         self.collect(&program, bind.as_ref(), abs_path, base_dir, visiting)
     }
@@ -295,11 +295,11 @@ impl DiskResolver {
             return Rc::new(cached.exports);
         }
 
-        let Some((program, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
+        let Some((program, interner, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
             visiting.pop();
             return Rc::new(ExportMap::default());
         };
-        let bind = self.bind_and_cache(&program, Vec::new(), virtual_id);
+        let bind = self.bind_and_cache(&program, interner, Vec::new(), virtual_id);
         let exports = self.collect(
             &program,
             bind.as_ref(),
@@ -326,8 +326,8 @@ impl DiskResolver {
             );
             return Some(bind_rc);
         }
-        let (program, lex_errs) = self.parse_and_cache(source, virtual_id)?;
-        Some(self.bind_and_cache(&program, lex_errs, virtual_id))
+        let (program, interner, lex_errs) = self.parse_and_cache(source, virtual_id)?;
+        Some(self.bind_and_cache(&program, interner, lex_errs, virtual_id))
     }
 }
 
@@ -360,8 +360,8 @@ impl ImportResolver for DiskResolver {
             return Some(bind_rc);
         }
 
-        let (program, lex_errs) = self.parse_and_cache(&source, &canonical)?;
-        let bind = self.bind_and_cache(&program, lex_errs, &canonical);
+        let (program, interner, lex_errs) = self.parse_and_cache(&source, &canonical)?;
+        let bind = self.bind_and_cache(&program, interner, lex_errs, &canonical);
 
         let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
         let exports = self.collect(

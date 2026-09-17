@@ -56,6 +56,7 @@ pub fn report_diagnostics(
 
 pub fn check(
     program: &Program,
+    interner: varn_core::AtomInterner,
     source: &str,
     debug: &DebugFlags,
     strict: bool,
@@ -64,7 +65,8 @@ pub fn check(
     if strict {
         options = options.strict();
     }
-    let check_result = crate::resolver::with_resolver(|r| Checker::check_with(program, r, options));
+    let check_result =
+        crate::resolver::with_resolver(|r| Checker::check_with(program, interner, r, options));
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {

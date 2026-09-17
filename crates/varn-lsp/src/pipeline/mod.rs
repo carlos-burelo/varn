@@ -115,7 +115,18 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     }
 
     let result = crate::workspace::resolver::with_resolver(|r| {
-        varn_checker::Checker::check_with(&program, r, varn_checker::CheckOptions::tooling())
+        // `parse_partial` (unlike `varn_parser::parse`) does not yet expose the
+        // `AtomInterner` it builds internally -- migrating the LSP's error-
+        // tolerant parse path to surface it is follow-on work, not part of this
+        // task's scope (see the 4 external callers this task threads a real
+        // interner through). An empty interner here matches the placeholder
+        // behavior `BindResult.interner` had before this task connected it.
+        varn_checker::Checker::check_with(
+            &program,
+            varn_core::AtomInterner::new(),
+            r,
+            varn_checker::CheckOptions::tooling(),
+        )
     });
 
     for d in &result.diagnostics {

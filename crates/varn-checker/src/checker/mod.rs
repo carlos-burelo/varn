@@ -255,18 +255,21 @@ impl<'r> Checker<'r> {
     /// and nothing the checker consults can be invalidated behind its back.
     pub fn check(
         program: &Program,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
     ) -> CheckResult {
-        Self::check_with(program, resolver, CheckOptions::compile())
+        Self::check_with(program, interner, resolver, CheckOptions::compile())
     }
 
     pub fn check_with(
         program: &Program,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         options: CheckOptions,
     ) -> CheckResult {
         Self::check_internal(
             program,
+            interner,
             resolver,
             options.record_types,
             options.warn_implicit_dynamic,
@@ -275,6 +278,7 @@ impl<'r> Checker<'r> {
 
     fn check_internal(
         program: &Program,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
         warn_implicit_dynamic: bool,
@@ -293,8 +297,8 @@ impl<'r> Checker<'r> {
 
         let started = Instant::now();
         let mut bind = match globals_ref {
-            Some(globals) => Binder::bind_with_global_refs(program, resolver, &globals),
-            None => Binder::bind(program, resolver),
+            Some(globals) => Binder::bind_with_global_refs(program, interner, resolver, &globals),
+            None => Binder::bind(program, interner, resolver),
         };
         profile.bind = started.elapsed();
 

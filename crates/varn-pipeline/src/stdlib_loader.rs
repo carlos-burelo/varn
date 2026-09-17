@@ -197,8 +197,9 @@ fn compile_source_inner(
     path: &str,
     reject_type_errors: bool,
 ) -> Result<FunctionProto, String> {
-    let program = crate::quiet_parse::parse_module(source, path, "")?;
-    let check = crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, r));
+    let (program, interner) = crate::quiet_parse::parse_module(source, path, "")?;
+    let check =
+        crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, interner, r));
     if reject_type_errors && check.diagnostics.has_errors() {
         // The stdlib goes through the same checker as user code. Silently
         // dropping these diagnostics let `std/*.vn` carry types the backend

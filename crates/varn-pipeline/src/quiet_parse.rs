@@ -7,8 +7,20 @@
 
 use varn_core::ast::Program;
 
-pub(crate) fn parse_module(source: &str, path: &str, label: &str) -> Result<Program, String> {
-    parse_only(source, path, label)
+pub(crate) fn parse_module(
+    source: &str,
+    path: &str,
+    label: &str,
+) -> Result<(Program, varn_core::AtomInterner), String> {
+    let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(source, path);
+    varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
+        let msg = &errs[0].message;
+        if label.is_empty() {
+            msg.clone()
+        } else {
+            format!("{label}: {msg}")
+        }
+    })
 }
 
 /// Like [`parse_module`] but without assigning AST ids, for callers that only

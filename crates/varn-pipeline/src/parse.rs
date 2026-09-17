@@ -11,8 +11,8 @@ pub fn parse(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-) -> PipelineResult<varn_core::ast::Program> {
-    let (program, _interner) = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
+) -> PipelineResult<(varn_core::ast::Program, varn_core::AtomInterner)> {
+    let (program, interner) = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
             .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
@@ -43,5 +43,5 @@ pub fn parse(
         varn_debug::modules::debug_modules(&program);
     }
 
-    Ok(program)
+    Ok((program, interner))
 }

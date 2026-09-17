@@ -30,7 +30,8 @@ pub fn build_module_graph(
     let mut source_hashes: HashMap<String, u64> = HashMap::new();
     source_hashes.insert(canonical_entry.clone(), fnv1a64(entry_source.as_bytes()));
 
-    let mut node_sources: HashMap<String, (String, Program)> = HashMap::new();
+    let mut node_sources: HashMap<String, (String, Program, varn_core::AtomInterner)> =
+        HashMap::new();
     let mut package_nodes: HashMap<String, PackageNode> = HashMap::new();
 
     let entry_dir = Path::new(&canonical_entry)
@@ -68,7 +69,7 @@ pub fn build_module_graph(
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fnv1a64(source.as_bytes()));
 
-        let program = crate::quiet_parse::parse_module(
+        let (program, interner) = crate::quiet_parse::parse_module(
             &source,
             &module_path,
             &format!("parse error in '{module_path}'"),
@@ -92,7 +93,7 @@ pub fn build_module_graph(
         }
 
         graph.insert(module_path.clone(), deps);
-        node_sources.insert(module_path, (source, program));
+        node_sources.insert(module_path, (source, program, interner));
     }
 
     let mut in_degree: HashMap<&str, usize> = HashMap::new();
@@ -180,12 +181,17 @@ pub fn build_module_graph(
         if module_path == canonical_entry {
             continue;
         }
-        let Some((module_source, program)) = node_sources.get(&module_path) else {
+        let Some((module_source, program, interner)) = node_sources.get(&module_path) else {
             continue;
         };
 
         let check = crate::resolver::with_resolver(|r| {
-            varn_checker::Checker::check_with(program, r, varn_checker::CheckOptions::compile())
+            varn_checker::Checker::check_with(
+                program,
+                interner.clone(),
+                r,
+                varn_checker::CheckOptions::compile(),
+            )
         });
         // The source was already sitting here, bound to `_`, while the
         // diagnostics this produced went unread — which is what made a type

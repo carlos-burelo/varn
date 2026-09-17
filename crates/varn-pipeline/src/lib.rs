@@ -126,8 +126,8 @@ fn compile_source(
         .unwrap_or_else(|_| path.to_owned());
     let path = canonical_path.as_str();
     let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug)?;
-    let program = parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
-    let check_result = check::check(&program, source, debug, strict)?;
+    let (program, interner) = parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
+    let check_result = check::check(&program, interner, source, debug, strict)?;
     let compiled = compile::compile(&program, source, check_result, verbose, debug)?;
 
     Ok(compiled)
