@@ -2,12 +2,12 @@ use super::expr::Expr;
 use super::operators::Modifiers;
 use super::types::TypeNode;
 use crate::source::SourceRange;
-use std::rc::Rc;
+use crate::Atom;
 
 #[derive(Clone, Debug)]
 pub enum Pattern {
     Identifier {
-        name: Rc<str>,
+        name: Atom,
         type_ann: Option<TypeNode>,
         range: SourceRange,
     },
@@ -52,7 +52,7 @@ pub struct ArrayPatternEl {
 
 #[derive(Clone, Debug)]
 pub struct ObjPatternProp {
-    pub key: Rc<str>,
+    pub key: Atom,
     pub value: Pattern,
     pub shorthand: bool,
     pub range: SourceRange,
@@ -73,20 +73,20 @@ pub struct Param {
 pub enum MatchPattern {
     Wildcard,
     Literal(Expr),
-    Identifier(Rc<str>),
+    Identifier(Atom),
     Record {
-        fields: Vec<(Rc<str>, Option<MatchPattern>)>,
+        fields: Vec<(Atom, Option<MatchPattern>)>,
         rest: bool,
     },
     Sequence(Vec<MatchPattern>),
     Type {
-        type_name: Rc<str>,
-        binding: Option<Rc<str>>,
+        type_name: Atom,
+        binding: Option<Atom>,
     },
 
     EnumVariant {
-        enum_name: Rc<str>,
-        variant_name: Rc<str>,
+        enum_name: Atom,
+        variant_name: Atom,
 
         bindings: Vec<MatchBinding>,
     },
@@ -94,6 +94,6 @@ pub enum MatchPattern {
 
 #[derive(Clone, Debug)]
 pub struct MatchBinding {
-    pub name: Rc<str>,
+    pub name: Atom,
     pub range: SourceRange,
 }

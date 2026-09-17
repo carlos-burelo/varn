@@ -57,11 +57,11 @@ impl Decl {
     }
 }
 
-use std::rc::Rc;
+use crate::Atom;
 
 #[derive(Clone, Debug)]
 pub struct SumTypeDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub type_params: Vec<TypeParam>,
     pub variants: Vec<SumVariant>,
@@ -71,20 +71,20 @@ pub struct SumTypeDecl {
 
 #[derive(Clone, Debug)]
 pub struct SumVariant {
-    pub name: Rc<str>,
+    pub name: Atom,
     pub fields: Vec<SumField>,
     pub range: SourceRange,
 }
 
 #[derive(Clone, Debug)]
 pub struct SumField {
-    pub name: Rc<str>,
+    pub name: Atom,
     pub ty: TypeNode,
 }
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
 
     pub id_offset: u32,
@@ -100,7 +100,7 @@ pub struct FunctionDecl {
 
 #[derive(Clone, Debug)]
 pub struct ClassDecl {
-    pub id: Option<Rc<str>>,
+    pub id: Option<Atom>,
     pub ast_id: AstId,
 
     pub id_offset: u32,
@@ -128,7 +128,7 @@ pub enum ClassMember {
         range: SourceRange,
     },
     Method {
-        key: Rc<str>,
+        key: Atom,
         type_params: Vec<TypeParam>,
         params: Vec<Param>,
         return_type: Option<TypeNode>,
@@ -138,7 +138,7 @@ pub enum ClassMember {
         range: SourceRange,
     },
     Property {
-        key: Rc<str>,
+        key: Atom,
         type_ann: Option<TypeNode>,
         init: Option<Expr>,
         modifiers: Modifiers,
@@ -146,14 +146,14 @@ pub enum ClassMember {
         range: SourceRange,
     },
     Getter {
-        key: Rc<str>,
+        key: Atom,
         return_type: Option<TypeNode>,
         body: Option<Stmt>,
         modifiers: Modifiers,
         range: SourceRange,
     },
     Setter {
-        key: Rc<str>,
+        key: Atom,
         param: Param,
         body: Option<Stmt>,
         modifiers: Modifiers,
@@ -167,7 +167,7 @@ pub enum ClassMember {
 
 #[derive(Clone, Debug)]
 pub struct InterfaceDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub type_params: Vec<TypeParam>,
     pub extends: Vec<TypeNode>,
@@ -180,14 +180,14 @@ pub struct InterfaceDecl {
 #[allow(clippy::large_enum_variant)]
 pub enum InterfaceMember {
     Property {
-        key: Rc<str>,
+        key: Atom,
         type_ann: TypeNode,
         optional: bool,
         readonly: bool,
         range: SourceRange,
     },
     Method {
-        key: Rc<str>,
+        key: Atom,
         type_params: Vec<TypeParam>,
         params: Vec<Param>,
         return_type: Option<TypeNode>,
@@ -212,7 +212,7 @@ pub enum InterfaceMember {
 
 #[derive(Clone, Debug)]
 pub struct TypeAliasDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub type_params: Vec<TypeParam>,
     pub alias: TypeNode,
@@ -222,7 +222,7 @@ pub struct TypeAliasDecl {
 
 #[derive(Clone, Debug)]
 pub struct EnumDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub type_params: Vec<TypeParam>,
     pub implements: Vec<TypeNode>,
@@ -234,7 +234,7 @@ pub struct EnumDecl {
 
 #[derive(Clone, Debug)]
 pub struct EnumMember {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub init: Option<Expr>,
 
     pub payload_fields: Vec<EnumField>,
@@ -243,7 +243,7 @@ pub struct EnumMember {
 
 #[derive(Clone, Debug)]
 pub struct EnumField {
-    pub name: Rc<str>,
+    pub name: Atom,
     pub ty: TypeNode,
     pub init: Option<Expr>,
     pub range: SourceRange,
@@ -251,7 +251,7 @@ pub struct EnumField {
 
 #[derive(Clone, Debug)]
 pub struct NamespaceDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub body: Vec<Decl>,
     pub doc: Option<String>,
@@ -262,7 +262,7 @@ pub struct NamespaceDecl {
 pub struct ImportDecl {
     pub ast_id: AstId,
     pub specifiers: Vec<ImportSpecifier>,
-    pub source: Rc<str>,
+    pub source: Atom,
     pub is_type: bool,
     pub range: SourceRange,
 }
@@ -270,16 +270,16 @@ pub struct ImportDecl {
 #[derive(Clone, Debug)]
 pub enum ImportSpecifier {
     Named {
-        local: Rc<str>,
-        imported: Rc<str>,
+        local: Atom,
+        imported: Atom,
         range: SourceRange,
     },
     Default {
-        local: Rc<str>,
+        local: Atom,
         range: SourceRange,
     },
     Namespace {
-        local: Rc<str>,
+        local: Atom,
         range: SourceRange,
     },
 }
@@ -299,7 +299,7 @@ pub enum ExportDecl {
     Named {
         ast_id: AstId,
         specifiers: Vec<ExportSpecifier>,
-        source: Option<Rc<str>>,
+        source: Option<Atom>,
         range: SourceRange,
     },
     Default {
@@ -309,8 +309,8 @@ pub enum ExportDecl {
     },
     All {
         ast_id: AstId,
-        source: Rc<str>,
-        alias: Option<Rc<str>>,
+        source: Atom,
+        alias: Option<Atom>,
         range: SourceRange,
     },
     Decl {
@@ -342,8 +342,8 @@ impl ExportDecl {
 
 #[derive(Clone, Debug)]
 pub struct ExportSpecifier {
-    pub local: Rc<str>,
-    pub exported: Rc<str>,
+    pub local: Atom,
+    pub exported: Atom,
     pub range: SourceRange,
 }
 
@@ -356,7 +356,7 @@ pub enum ExportDefaultDecl {
 
 #[derive(Clone, Debug)]
 pub struct ExtensionDecl {
-    pub id: Option<Rc<str>>,
+    pub id: Option<Atom>,
     pub ast_id: AstId,
     pub target: TypeNode,
     pub members: Vec<ExtensionMember>,
@@ -367,14 +367,14 @@ pub struct ExtensionDecl {
 pub enum ExtensionMember {
     Method(FunctionDecl),
     Getter {
-        key: Rc<str>,
+        key: Atom,
         return_type: Option<TypeNode>,
         body: Stmt,
         modifiers: Modifiers,
         range: SourceRange,
     },
     Setter {
-        key: Rc<str>,
+        key: Atom,
         param: Param,
         body: Stmt,
         modifiers: Modifiers,
@@ -384,7 +384,7 @@ pub enum ExtensionMember {
 
 #[derive(Clone, Debug)]
 pub struct StructDecl {
-    pub id: Rc<str>,
+    pub id: Atom,
     pub ast_id: AstId,
     pub fields: Vec<StructField>,
     pub doc: Option<String>,
@@ -393,7 +393,7 @@ pub struct StructDecl {
 
 #[derive(Clone, Debug)]
 pub struct StructField {
-    pub name: Rc<str>,
+    pub name: Atom,
     pub type_ann: TypeNode,
     pub default: Option<Expr>,
     pub range: SourceRange,

@@ -4,7 +4,7 @@ use super::operators::VarKind;
 use super::pattern::Pattern;
 use super::types::TypeNode;
 use crate::source::SourceRange;
-use std::rc::Rc;
+use crate::Atom;
 
 #[derive(Clone, Debug)]
 pub struct VarDeclarator {
@@ -95,10 +95,10 @@ pub enum StmtKind {
         argument: Option<Box<Expr>>,
     },
     Break {
-        label: Option<Rc<str>>,
+        label: Option<Atom>,
     },
     Continue {
-        label: Option<Rc<str>>,
+        label: Option<Atom>,
     },
     Throw {
         argument: Box<Expr>,
@@ -113,7 +113,7 @@ pub enum StmtKind {
         is_await: bool,
     },
     Labeled {
-        label: Rc<str>,
+        label: Atom,
         body: Box<Stmt>,
     },
     Debugger,

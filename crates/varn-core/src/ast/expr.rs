@@ -1,6 +1,6 @@
 use super::stmt::Stmt;
 use crate::source::SourceRange;
-use std::rc::Rc;
+use crate::Atom;
 
 pub type AstId = u32;
 
@@ -15,17 +15,17 @@ pub struct Expr {
 pub enum ExprKind {
     IntLiteral {
         value: i64,
-        raw: Rc<str>,
+        raw: Atom,
     },
     FloatLiteral {
         value: f64,
-        raw: Rc<str>,
+        raw: Atom,
     },
     BigIntLiteral {
-        raw: Rc<str>,
+        raw: Atom,
     },
     DecimalLiteral {
-        raw: Rc<str>,
+        raw: Atom,
     },
     StrLiteral {
         value: String,
@@ -49,7 +49,7 @@ pub enum ExprKind {
         template: Box<Expr>,
     },
     Identifier {
-        name: Rc<str>,
+        name: Atom,
     },
     /// A hole where an expression was expected but the source did not supply
     /// one — `g.` with nothing after the dot, `const x = ` with no initializer.
@@ -124,7 +124,7 @@ pub enum ExprKind {
         args: Vec<Arg>,
     },
     Function {
-        fn_id: Option<Rc<str>>,
+        fn_id: Option<Atom>,
         params: Vec<super::pattern::Param>,
         return_type: Option<super::types::TypeNode>,
         body: Box<Stmt>,
@@ -196,7 +196,7 @@ pub enum ExprKind {
     },
     MetaAccess {
         target: Box<Expr>,
-        property: Rc<str>,
+        property: Atom,
     },
 }
 
