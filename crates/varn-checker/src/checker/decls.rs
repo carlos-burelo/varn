@@ -94,7 +94,7 @@ impl<'r> Checker<'r> {
                 }
                 let mut injected_tps = Vec::new();
                 for tp in &f.type_params {
-                    let tp_name: Rc<str> = Rc::from(tp.name.as_str());
+                    let tp_name: Rc<str> = Rc::from(bind.interner.resolve(tp.name));
                     self.active_type_params.insert(tp_name.clone());
                     injected_tps.push(tp_name);
                 }
@@ -128,7 +128,9 @@ impl<'r> Checker<'r> {
                             Type::union(yields)
                         };
                         let scope = bind.scopes.get(saved_scope);
-                        if let Some(sym_id) = scope.resolve(&f.id, &bind.scopes) {
+                        if let Some(sym_id) =
+                            scope.resolve(bind.interner.resolve(f.id), &bind.scopes)
+                        {
                             if let Some(mut fn_ty) = self
                                 .symbol_types
                                 .get(&sym_id)
@@ -159,10 +161,14 @@ impl<'r> Checker<'r> {
             Decl::Class(c) => {
                 if c.modifiers.is_abstract {
                     if let Some(id) = &c.id {
-                        self.abstract_classes.insert(id.clone());
+                        self.abstract_classes
+                            .insert(Rc::from(bind.interner.resolve(*id)));
                     }
                 }
-                let name = c.id.clone().unwrap_or_else(|| Rc::from("<anon>"));
+                let name = c
+                    .id
+                    .map(|id| Rc::from(bind.interner.resolve(id)))
+                    .unwrap_or_else(|| Rc::from("<anon>"));
                 let saved_class = self.current_class.replace(name);
                 let saved_scope = self.current_scope;
                 if let Some(cls_scope) = self.next_child_scope(bind) {
@@ -170,9 +176,10 @@ impl<'r> Checker<'r> {
                 }
 
                 let mut superclass_members = Vec::new();
-                let mut parent =
-                    c.id.as_ref()
-                        .and_then(|cls_id| bind.class_parents.get(cls_id));
+                let mut parent = c
+                    .id
+                    .as_ref()
+                    .and_then(|cls_id| bind.class_parents.get(bind.interner.resolve(*cls_id)));
                 while let Some(parent_name) = parent {
                     if let Some(m) = bind.get_class_entry(parent_name).map(|e| e.members.clone()) {
                         superclass_members.extend(m);
@@ -201,8 +208,9 @@ impl<'r> Checker<'r> {
                             ..
                         } => {
                             let is_override = modifiers.is_override;
+                            let key_str = bind.interner.resolve(*key);
                             let exists_in_superclass = superclass_members.iter().any(|m| {
-                                m.name.as_ref() == key.as_ref()
+                                m.name.as_ref() == key_str
                                     && m.kind != ClassMemberKind::Constructor
                             });
                             if exists_in_superclass {
@@ -210,7 +218,7 @@ impl<'r> Checker<'r> {
                                     self.emit(
                                         Diagnostic::error(
                                             ErrorCode::MissingOverride,
-                                            format!("member '{}' overrides a member in the superclass but is missing the 'override' modifier", key),
+                                            format!("member '{}' overrides a member in the superclass but is missing the 'override' modifier", key_str),
                                         )
                                         .with_range(*range),
                                     );
@@ -219,7 +227,7 @@ impl<'r> Checker<'r> {
                                 self.emit(
                                     Diagnostic::error(
                                         ErrorCode::SpuriousOverride,
-                                        format!("member '{}' is marked as override but does not override any member in the superclass", key),
+                                        format!("member '{}' is marked as override but does not override any member in the superclass", key_str),
                                     )
                                     .with_range(*range),
                                 );
@@ -241,6 +249,7 @@ impl<'r> Checker<'r> {
                             if let Some(init_expr) = init {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
+                                    let key_str = bind.interner.resolve(*key);
                                     self.with_expected(Some(prop_ty.clone()), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
@@ -248,7 +257,7 @@ impl<'r> Checker<'r> {
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
-                                                    key, prop_ty, init_ty
+                                                    key_str, prop_ty, init_ty
                                                 ))
                                                 .with_range(*range),
                                             );
@@ -366,7 +375,9 @@ impl<'r> Checker<'r> {
             }
 
             Decl::Enum(e) => {
-                let saved_class = self.current_class.replace(e.id.clone());
+                let saved_class = self
+                    .current_class
+                    .replace(Rc::from(bind.interner.resolve(e.id)));
                 let saved_scope = self.current_scope;
                 if let Some(enum_scope) = self.next_child_scope(bind) {
                     self.current_scope = enum_scope;
@@ -384,6 +395,7 @@ impl<'r> Checker<'r> {
                             if let Some(init_expr) = init {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
+                                    let key_str = bind.interner.resolve(*key);
                                     self.with_expected(Some(prop_ty.clone()), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
@@ -391,7 +403,7 @@ impl<'r> Checker<'r> {
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
-                                                    key, prop_ty, init_ty
+                                                    key_str, prop_ty, init_ty
                                                 ))
                                                 .with_range(*range),
                                             );
@@ -420,7 +432,8 @@ impl<'r> Checker<'r> {
                                     .map(|rt| self.resolve_type_node_cached(rt, bind));
 
                                 for tp in type_params {
-                                    self.active_type_params.insert(Rc::from(tp.name.as_str()));
+                                    self.active_type_params
+                                        .insert(Rc::from(bind.interner.resolve(tp.name)));
                                 }
 
                                 let saved_in_function = self.in_function;
@@ -431,7 +444,7 @@ impl<'r> Checker<'r> {
                                 self.in_function = saved_in_function;
 
                                 for tp in type_params {
-                                    self.active_type_params.remove(tp.name.as_str());
+                                    self.active_type_params.remove(bind.interner.resolve(tp.name));
                                 }
 
                                 self.expected_return_type = saved_expected;
@@ -493,9 +506,10 @@ impl<'r> Checker<'r> {
                                             .get_class_entry(class_name)
                                             .map(|e| e.members.clone())
                                         {
+                                            let key_str = bind.interner.resolve(*key);
                                             if let Some(m) = members
                                                 .iter()
-                                                .find(|m| m.name.as_ref() == key.as_ref())
+                                                .find(|m| m.name.as_ref() == key_str)
                                             {
                                                 param_ty = m.ty.clone();
                                             }

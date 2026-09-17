@@ -57,7 +57,9 @@ impl<'r> Checker<'r> {
     /// that removes guards on the strength of it.
     pub(crate) fn refine(&mut self, expr: &Expr, bind: &BindResult) -> Option<Type> {
         match &expr.kind {
-            ExprKind::Identifier { name } => self.evolved_array_of(name, bind),
+            ExprKind::Identifier { name } => {
+                self.evolved_array_of(bind.interner.resolve(*name), bind)
+            }
 
             ExprKind::Paren { expression } => self.refine(expression, bind),
 
@@ -85,7 +87,8 @@ impl<'r> Checker<'r> {
                     Some((**elem).clone())
                 } else if matches!(
                     &property.kind,
-                    ExprKind::Identifier { name } if name.as_ref() == varn_core::MemberKey::Length.as_str()
+                    ExprKind::Identifier { name }
+                        if bind.interner.resolve(*name) == varn_core::MemberKey::Length.as_str()
                 ) {
                     Some(Type::Int)
                 } else {

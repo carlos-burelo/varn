@@ -41,6 +41,7 @@ pub fn enrich_call_returns(
                     expr,
                     Some(&BindView::new(bind, resolver)),
                     None,
+                    &bind.interner,
                 );
                 if let Some(t) = ty {
                     let name = bind.arena.get(*sym_id).name.clone();

@@ -37,6 +37,7 @@ fn collect_returns_recursive(
                     arg,
                     Some(bind),
                     current_class,
+                    &bind.bind.interner,
                 ) {
                     results.push(ty);
                 }
@@ -144,6 +145,7 @@ fn enrich_vars_recursive(
                         init,
                         Some(&BindView::new(bind, resolver)),
                         current_class,
+                        &bind.interner,
                     );
                     if let Some(t) = ty {
                         bind.arena.get_mut(sym_id).ty = Some(t.clone());

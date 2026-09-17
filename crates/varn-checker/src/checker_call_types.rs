@@ -3,9 +3,11 @@ use crate::types::{Type, TypeContext};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{Expr, ExprKind};
+use varn_core::AtomInterner;
 use varn_core::IntrinsicType;
 use varn_core::TypeKind;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn infer_call_type(
     fn_map: &FxHashMap<Rc<str>, Type>,
     fn_type_params: &FxHashMap<Rc<str>, Vec<Rc<str>>>,
@@ -14,6 +16,7 @@ pub(crate) fn infer_call_type(
     expr: &Expr,
     ctx: Option<&dyn TypeContext>,
     current_class: Option<&str>,
+    interner: &AtomInterner,
 ) -> Option<Type> {
     match &expr.kind {
         ExprKind::IntLiteral { .. } => Some(Type::Int),
@@ -24,7 +27,7 @@ pub(crate) fn infer_call_type(
             let origin = ctx.and_then(|c| c.source_file());
             Type::named_with_origin(Rc::from(n), origin.map(Rc::from))
         }),
-        ExprKind::Identifier { name } => sym_map.get(name.as_ref()).cloned(),
+        ExprKind::Identifier { name } => sym_map.get(interner.resolve(*name)).cloned(),
 
         ExprKind::Member {
             object,
@@ -33,7 +36,7 @@ pub(crate) fn infer_call_type(
             ..
         } => {
             let prop_name = match &property.kind {
-                ExprKind::Identifier { name } => name.as_ref(),
+                ExprKind::Identifier { name } => interner.resolve(*name),
                 _ => return None,
             };
             let obj_ty = infer_call_type(
@@ -44,6 +47,7 @@ pub(crate) fn infer_call_type(
                 object,
                 ctx,
                 current_class,
+                interner,
             )?;
             let (class_name, origin): (&str, Option<&str>) = match &obj_ty.0 {
                 TypeKind::Named(n, origin) => (n.as_ref(), origin.as_deref()),
@@ -78,6 +82,7 @@ pub(crate) fn infer_call_type(
                 left,
                 ctx,
                 current_class,
+                interner,
             )?;
             let r = infer_call_type(
                 fn_map,
@@ -87,6 +92,7 @@ pub(crate) fn infer_call_type(
                 right,
                 ctx,
                 current_class,
+                interner,
             )?;
 
             use varn_core::ast::operators::BinaryOp;
@@ -120,8 +126,9 @@ pub(crate) fn infer_call_type(
             };
 
             if let Some(callee_name) = callee_name {
-                if let Some(ty) = fn_map.get(callee_name.as_ref() as &str) {
-                    if let Some(tps) = fn_type_params.get(callee_name.as_ref() as &str) {
+                let callee_name_str = interner.resolve(callee_name);
+                if let Some(ty) = fn_map.get(callee_name_str) {
+                    if let Some(tps) = fn_type_params.get(callee_name_str) {
                         let mut mapping = FxHashMap::default();
                         for (i, tp) in tps.iter().enumerate() {
                             if let Some(node) = type_args.get(i) {
@@ -142,6 +149,7 @@ pub(crate) fn infer_call_type(
                 callee,
                 ctx,
                 current_class,
+                interner,
             )?;
             match &callee_ty.0 {
                 TypeKind::Fn(ft) => Some((*ft.return_type).clone()),
@@ -153,17 +161,18 @@ pub(crate) fn infer_call_type(
             callee, type_args, ..
         } => {
             if let ExprKind::Identifier { name } = &callee.kind {
+                let name_str = interner.resolve(*name);
                 if !type_args.is_empty() {
                     let mut args = Vec::new();
                     for node in type_args {
                         args.push(resolve_type_node(node, ctx));
                     }
-                    return Some(Type::generic(name.clone(), args));
+                    return Some(Type::generic(Rc::from(name_str), args));
                 }
-                if name.as_ref() == IntrinsicType::Map.as_str() {
-                    return Some(Type::generic(name.clone(), vec![Type::Dynamic]));
+                if name_str == IntrinsicType::Map.as_str() {
+                    return Some(Type::generic(Rc::from(name_str), vec![Type::Dynamic]));
                 }
-                return Some(Type::named(name.clone()));
+                return Some(Type::named(Rc::from(name_str)));
             }
             None
         }
@@ -176,6 +185,7 @@ pub(crate) fn infer_call_type(
             expression,
             ctx,
             current_class,
+            interner,
         ),
 
         ExprKind::As { type_ann, .. } => Some(resolve_type_node(type_ann, ctx)),
@@ -189,6 +199,7 @@ pub(crate) fn infer_call_type(
                 argument,
                 ctx,
                 current_class,
+                interner,
             )?;
             match &ty.0 {
                 TypeKind::Generic(name, args, _)
@@ -215,6 +226,7 @@ pub(crate) fn infer_call_type(
                 consequent,
                 ctx,
                 current_class,
+                interner,
             )?;
             let f = infer_call_type(
                 fn_map,
@@ -224,6 +236,7 @@ pub(crate) fn infer_call_type(
                 alternate,
                 ctx,
                 current_class,
+                interner,
             )?;
             if t == f {
                 Some(t)
@@ -260,6 +273,7 @@ pub(crate) fn infer_call_type(
                     e,
                     ctx,
                     current_class,
+                    interner,
                 )
                 .unwrap_or(Type::Dynamic)
             } else {
@@ -287,6 +301,7 @@ pub(crate) fn infer_call_type(
                             e,
                             ctx,
                             current_class,
+                            interner,
                         ) {
                             tys.push(ty);
                         }
@@ -316,6 +331,7 @@ pub(crate) fn infer_call_type(
             right,
             ctx,
             current_class,
+            interner,
         ),
 
         _ => Some(Type::Dynamic),
