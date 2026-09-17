@@ -359,3 +359,21 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 - `cargo build --workspace`: limpio, sin `_ =>` comodín nuevos escondiendo un caso sin decidir (cada `match` exhaustivo roto por las 8 variantes se resolvió explícitamente).
 - Stress test dedicado (no permanente): 50 000 instancias con 7 campos angostos mezclados (`i8/i16/i32/u8/u16/u32/f32`), GC completo, íntegro; `debug -p bytecode` confirma `SetFixedField` tipado (no `SetProperty` por nombre) para los 7.
 - Plan completo en `docs/superpowers/plans/2026-09-16-narrow-numeric-types.md`.
+
+## Anexo K5 — `ArrayRepr` angosto: literales y lectura compactos (cierra K4)
+
+**Problema (K4, "Pendiente, fuera de alcance").** `ArrayRepr` solo tenía `{Boxed, I64, F64}`, elegido por los VALORES en runtime (`from_items`) — un mecanismo que no puede funcionar para anchos angostos, porque un `i8` y un `int` son el mismo `VmValue` (el ancho es un hecho solo-estático, vive en el mismo registro de 64 bits). Un `Array<i8>` pagaba `Boxed`: 16 bytes por elemento.
+
+**Cambio (4 capas, cada una probada por separado, plan completo en `docs/superpowers/plans/2026-09-16-narrow-array-repr.md`).**
+1. **Runtime**: 7 variantes nuevas en `ArrayRepr` (`I8..U32,F32`, discriminantes 3..9, aditivas) + `VmArray::new_i8/../new_f32`. `element_slotkind`/`get_vm`/`set_vm`/`push_vm`/`pop_vm`/`migrate_to_boxed` en `vm_value.rs` cubren las 7 explícitamente; CSV (siempre `Boxed`, `unreachable!` nombrado) y serialización JSON (arms reales, ensanchan a `i64`/`f64`) igual.
+2. **Checker**: `ExprKind::Array` tipa cada elemento contra el `Array<T>` esperado cuando `T` es angosto, reusando `literal_fits_type`/`expr_satisfies_target_type` (ya existían desde K4, nunca se habían activado para el contexto de un literal de array). `let bad: Array<i8> = [300]` es ahora error de compilación, no truncamiento silencioso en runtime.
+3. **Codegen**: `InstKind::BuildArray` gana `narrow_elem: Option<TypeTag>`, calculado en `from_tir/build.rs` desde `BackendTy::Array(elem_id)` vía `narrow_tag_of` (misma función de K4). Se hila hasta el byte ya libre del segundo operando de bytecode de `BuildArray` (antes siempre `0`; `TypeTag::Null == 0` es el centinela "no angosto, usar el camino de inferencia existente"). El dispatch de la VM llama a la nueva `alloc_array_vm_narrow` cuando ese byte no es cero, construyendo el `ArrayRepr` tipado directo — cero pasos de inferencia por valor.
+4. **Lectura**: `ArrayGetIndex`/JSON ya cubiertos en la capa 1. GC no requirió NINGÚN cambio: ya salta cualquier repr donde `as_boxed()` sea `None` (`crates/varn-vm/src/gc.rs`, `nursery.rs`), lo cual se cumple automáticamente para las 7 variantes nuevas por construcción — confirmado bajo GC real, no solo en principio (ver evidencia).
+
+**Deliberadamente fuera de alcance (documentado en el plan, no un descuido).** El camino de ESCRITURA hacia un array angosto — `arr[i] = v`, `.push(v)` — sigue usando el mecanismo existente de migración-a-`Boxed` en mismatch (`set_vm`/`push_vm`): correcto, no compacto. Activarlo compacto exige antes investigar si el checker siquiera verifica hoy la asignabilidad de `v` contra el tipo de elemento estático del array — pregunta abierta, no respondida por este plan.
+
+**Evidencia.**
+- Suite e2e: 1223/1223 (`tests/109-narrow-array-literals.vn` nuevo, importado a `main.vn`; "NARROW ARRAY LITERALS PASSED").
+- `cargo build --workspace`: limpio. Cada `match` exhaustivo roto por el nuevo campo `narrow_elem` (`ssa/dump.rs`, `ssa/emit/regs.rs`, `ssa/uses.rs` x2) y por las 7 variantes de `ArrayRepr` se resolvió explícitamente — sin `_ =>` nuevo escondiendo un caso sin decidir. Un sitio no enumerado por el plan (`varn-lsp/src/features/compiler_inspect.rs`) apareció durante el build y se corrigió igual.
+- Stress test dedicado (no permanente): `Array<i8>` de 5 elementos declarado antes de 200 000 asignaciones de basura (fuerza colecciones menores repetidas), íntegro tras 8 `minor gc` (`VARN_GC_TRACE=1`); valores en los extremos del rango (`-128`, `127`) sobreviven exactos.
+- `clif/arrays.rs`: doc de módulo actualizado — confirma que el módulo (hoy muerto, `FRAME_LAYOUT_V2_JIT_BAIL = true`) sigue siendo correcto para las 7 variantes nuevas sin cambio de código: el bloque `slow` ya despacha por los accesores totales de `VmArray`, no por un `match` de 3 vías fijo.

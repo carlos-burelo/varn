@@ -8,11 +8,20 @@
 //!
 //! # Unboxed element buffers
 //!
-//! An array's elements live in one of three reprs (`ArrayRepr`): `Boxed`
-//! (`Vec<VmValue>`), `I64` (`Vec<i64>`) or `F64` (`Vec<f64>`). All three put
-//! their data pointer and length at the same offsets, and all three use 8-byte
-//! elements, so the resolve, the length load and the address arithmetic are
-//! shared; only the element load/store differs.
+//! An array's elements live in one of ten reprs (`ArrayRepr`): `Boxed`
+//! (`Vec<VmValue>`), `I64`/`F64`, and seven narrow widths
+//! (`I8/I16/I32/U8/U16/U32/F32`, added for `Array<i8..f32>` literals — see
+//! `docs/AUDIT_RESPONSE.md` Anexo K5). Only `Boxed`/`I64`/`F64` are
+//! fast-pathed here; `Int`/`Float` registers reading/writing those three
+//! still get a bare 8-byte load/store with no write barrier, as before.
+//!
+//! The narrow seven are NOT fast-pathed in this file — this whole module is
+//! currently dead code (`FRAME_LAYOUT_V2_JIT_BAIL = true`, zero JIT
+//! compilation happens today), and correctness for them doesn't depend on
+//! it: the `slow` block below already dispatches through `VmArray`'s total
+//! `get_vm`/`set_vm` accessors rather than a hardcoded 3-way case, so a
+//! narrow-repr array falls through there unchanged and works, just not
+//! compactly, if this module is ever revived without further work.
 //!
 //! The reprs are what makes the typed pipeline pay off end to end: reading
 //! `Array<int>` into an `Int` register is a bare `i64` load — no NaN-box, no
@@ -24,7 +33,7 @@
 //! discriminant (`emit::array_disc`, re-read per access — see its docs on why
 //! it must not be folded into the cached resolve): the arm matching the
 //! register's representation loads raw, the `Boxed` arm converts, and anything
-//! else falls to the generic helper.
+//! else (including the narrow seven) falls to the generic helper.
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
