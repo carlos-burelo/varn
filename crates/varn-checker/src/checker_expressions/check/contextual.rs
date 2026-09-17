@@ -50,8 +50,12 @@ impl<'r> Checker<'r> {
                     self.with_expected(elem_expected.clone(), |c| c.check_expr(e, bind));
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(e, bind);
+                        // `value_assignable_to`, not `types_compatible`: a narrow
+                        // element type (`Array<i8>`) can only accept an `int`
+                        // literal by checking the literal's value, exactly like a
+                        // scalar `let x: i8 = 42` does.
                         if !actual.is_dynamic()
-                            && !self.types_compatible_cached(expected, &actual, Some(bind))
+                            && !self.value_assignable_to(expected, &actual, Some(e), Some(bind))
                         {
                             self.emit(
                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(

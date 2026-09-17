@@ -114,6 +114,71 @@ pub(crate) fn literal_fits_type(target: &Type, int_val: i64) -> bool {
     }
 }
 
+/// Folds the sign/parens a narrow literal is written with, so `-128` reaches
+/// the range check as `-128` and not as "some unary expression of type int".
+/// The parser keeps `-128` as `Unary(Minus, IntLiteral(128))`; without this the
+/// only narrow lower bounds expressible were the ones a `as i8` cast spelled out.
+fn const_int_value(expr: &varn_core::ast::Expr) -> Option<i64> {
+    use varn_core::ast::{ExprKind, UnaryOp};
+    match &expr.kind {
+        ExprKind::IntLiteral { value, .. } => Some(*value),
+        ExprKind::Paren { expression } => const_int_value(expression),
+        ExprKind::Unary {
+            op, prefix: true, operand, ..
+        } => match op {
+            UnaryOp::Minus => const_int_value(operand).and_then(|v| v.checked_neg()),
+            UnaryOp::Plus => const_int_value(operand),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn is_numeric_literal(expr: &varn_core::ast::Expr) -> bool {
+    use varn_core::ast::{ExprKind, UnaryOp};
+    match &expr.kind {
+        ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } => true,
+        ExprKind::Paren { expression } => is_numeric_literal(expression),
+        ExprKind::Unary {
+            op: UnaryOp::Minus | UnaryOp::Plus,
+            prefix: true,
+            operand,
+            ..
+        } => is_numeric_literal(operand),
+        _ => false,
+    }
+}
+
+fn array_element_type(ty: &Type) -> Option<&Type> {
+    match &ty.0 {
+        TypeKind::Array(inner) => Some(inner),
+        TypeKind::Generic(name, args, _)
+            if name.as_ref() == IntrinsicType::Array.as_str() && args.len() == 1 =>
+        {
+            Some(&args[0])
+        }
+        _ => None,
+    }
+}
+
+/// Assignability escape hatch for *literals* written at a narrow target type.
+///
+/// `types_compatible` is a pure type-to-type relation and a narrow type is
+/// deliberately not a supertype of `int` (`simple_types_compatible` answers
+/// `(I8, _) => false`), so `let x: i8 = 42` can only be accepted by looking at
+/// the literal's value rather than at its inferred type. That is what this
+/// function is for, and `value_assignable_to` is the single funnel that pairs
+/// the two.
+///
+/// Array literals need the same treatment one level down. `[1, 2, 3]` infers as
+/// `int[]`, and `Array<i8>` vs `int[]` bottoms out in the very same
+/// `simple_types_compatible(I8, Int) == false`, so before this the *valid*
+/// program `let a: Array<i8> = [1,2,3]` was a type error and there was no path
+/// on which an out-of-range element could ever be range-checked. Recursing into
+/// the literal's elements here — and pointing `check_array_with_context` at
+/// `value_assignable_to` instead of raw `types_compatible` — is what makes
+/// `[1,2,3]` legal and `[300]` a compile error rather than a later silent
+/// truncation into a compact `ArrayRepr`.
 pub(crate) fn expr_satisfies_target_type(
     target_ty: &Type,
     _init_ty: &Type,
@@ -122,15 +187,28 @@ pub(crate) fn expr_satisfies_target_type(
     let Some(expr) = expr else {
         return false;
     };
-    use varn_core::ast::ExprKind;
+    use varn_core::ast::{ArrayEl, ExprKind};
+    if let ExprKind::Paren { expression } = &expr.kind {
+        return expr_satisfies_target_type(target_ty, _init_ty, Some(expression));
+    }
     if target_ty.is_granular_int() {
-        if let ExprKind::IntLiteral { value, .. } = &expr.kind {
-            return literal_fits_type(target_ty, *value);
+        if let Some(value) = const_int_value(expr) {
+            return literal_fits_type(target_ty, value);
         }
     }
-    if matches!(target_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32)) {
-        if matches!(&expr.kind, ExprKind::FloatLiteral { .. } | ExprKind::IntLiteral { .. }) {
-            return true;
+    if matches!(target_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32)) && is_numeric_literal(expr)
+    {
+        return true;
+    }
+    if let (Some(elem_ty), ExprKind::Array { elements }) = (array_element_type(target_ty), &expr.kind)
+    {
+        let narrow_elem = elem_ty.is_granular_int()
+            || matches!(elem_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32));
+        if narrow_elem && !elements.is_empty() {
+            return elements.iter().all(|el| match el {
+                ArrayEl::Expr(e) => expr_satisfies_target_type(elem_ty, elem_ty, Some(e)),
+                _ => false,
+            });
         }
     }
     false
