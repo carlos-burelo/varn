@@ -115,7 +115,12 @@ impl<'r> Checker<'r> {
                     };
                     let is_type_param = matches!(&check_expected.0, TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
                     if !is_type_param
-                        && !self.types_compatible_cached(&check_expected, &actual, Some(bind))
+                        && !self.value_assignable_to(
+                            &check_expected,
+                            &actual,
+                            argument.as_deref(),
+                            Some(bind),
+                        )
                     {
                         self.emit(
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(

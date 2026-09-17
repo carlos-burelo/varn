@@ -134,19 +134,32 @@ fn const_int_value(expr: &varn_core::ast::Expr) -> Option<i64> {
     }
 }
 
-fn is_numeric_literal(expr: &varn_core::ast::Expr) -> bool {
+fn const_float_value(expr: &varn_core::ast::Expr) -> Option<f64> {
     use varn_core::ast::{ExprKind, UnaryOp};
     match &expr.kind {
-        ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } => true,
-        ExprKind::Paren { expression } => is_numeric_literal(expression),
+        ExprKind::FloatLiteral { value, .. } => Some(*value),
+        ExprKind::IntLiteral { value, .. } => Some(*value as f64),
+        ExprKind::Paren { expression } => const_float_value(expression),
         ExprKind::Unary {
-            op: UnaryOp::Minus | UnaryOp::Plus,
-            prefix: true,
-            operand,
-            ..
-        } => is_numeric_literal(operand),
-        _ => false,
+            op, prefix: true, operand, ..
+        } => match op {
+            UnaryOp::Minus => const_float_value(operand).map(|v| -v),
+            UnaryOp::Plus => const_float_value(operand),
+            _ => None,
+        },
+        _ => None,
     }
+}
+
+/// The `f32` bound cannot live in [`literal_fits_type`]: that function takes an
+/// `i64`, and every `i64` is inside `f32`'s exponent range, so it has no way to
+/// express the case that actually loses data. A float literal is parsed as
+/// `f64`, whose exponent range is far wider than `f32`'s — `1e300` narrows to
+/// `inf`. Rejecting that is the float analogue of `300` not fitting an `i8`, and
+/// it has to be rejected here rather than later: a compact `f32` array
+/// representation would turn the overflow into a silent `inf`.
+fn float_literal_fits_f32(value: f64) -> bool {
+    !value.is_finite() || (value as f32).is_finite()
 }
 
 fn array_element_type(ty: &Type) -> Option<&Type> {
@@ -196,20 +209,52 @@ pub(crate) fn expr_satisfies_target_type(
             return literal_fits_type(target_ty, value);
         }
     }
-    if matches!(target_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32)) && is_numeric_literal(expr)
-    {
-        return true;
+    if matches!(target_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32)) {
+        if let Some(value) = const_float_value(expr) {
+            return float_literal_fits_f32(value);
+        }
     }
     if let (Some(elem_ty), ExprKind::Array { elements }) = (array_element_type(target_ty), &expr.kind)
     {
+        // `Array<Array<i8>>` recurses: the gate asks whether the element type is
+        // narrow *or another array*, so nesting does not bail out one level in.
         let narrow_elem = elem_ty.is_granular_int()
-            || matches!(elem_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32));
+            || matches!(elem_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::F32))
+            || array_element_type(elem_ty).is_some();
         if narrow_elem && !elements.is_empty() {
             return elements.iter().all(|el| match el {
                 ArrayEl::Expr(e) => expr_satisfies_target_type(elem_ty, elem_ty, Some(e)),
                 _ => false,
             });
         }
+    }
+    // An inline object type carries its members inline, so `{ xs: [1, 2] }`
+    // against `{ xs: Array<i8> }` can recurse without a binder. A `Named`
+    // interface cannot — resolving its members needs a `BindView` this pure
+    // function has no access to — so that spelling still falls through.
+    if let (TypeKind::Object(members), ExprKind::Object { properties }) =
+        (&target_ty.0, &expr.kind)
+    {
+        if properties.is_empty() {
+            return false;
+        }
+        return properties.iter().all(|prop| match prop {
+            varn_core::ast::ObjectProp::Property { key, value, .. } => {
+                let key_str = match key {
+                    varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
+                        s.as_str()
+                    }
+                    _ => return false,
+                };
+                members.iter().any(|m| match m {
+                    ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {
+                        expr_satisfies_target_type(ty, ty, Some(value))
+                    }
+                    _ => false,
+                })
+            }
+            _ => false,
+        });
     }
     false
 }
@@ -682,4 +727,78 @@ pub(super) fn types_compatible_impl(
     in_progress.remove(&key);
     cache.insert(key, result);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use varn_core::TypeTag;
+
+    /// Parses `let probe = <src>` and hands back the initializer AST.
+    /// `expr_satisfies_target_type` is a pure function of (target type, expr),
+    /// so a real parse is all the fixture the value-level checks need — no
+    /// binder, no scopes.
+    fn init_of(src: &str) -> varn_core::ast::Expr {
+        let text = format!("let probe = {src}\n");
+        let (tokens, lexemes, _) = varn_lexer::scan(&text, "compat-test");
+        let program = varn_parser::parse(tokens, lexemes, "compat-test").expect("parses");
+        for stmt in &program.body {
+            if let varn_core::ast::StmtKind::Decl(decl) = &stmt.kind {
+                if let varn_core::ast::Decl::Variable(v) = &**decl {
+                    if let Some(init) = v.declarators[0].init.clone() {
+                        return init;
+                    }
+                }
+            }
+        }
+        panic!("no initializer parsed from `{src}`");
+    }
+
+    fn accepts(target: &Type, src: &str) -> bool {
+        expr_satisfies_target_type(target, &Type::Dynamic, Some(&init_of(src)))
+    }
+
+    fn array_of(tag: TypeTag) -> Type {
+        Type::array(Type::intrinsic(tag))
+    }
+
+    /// The safety property a later compact `ArrayRepr` depends on: an element
+    /// that does not fit the declared narrow width must never be accepted, or it
+    /// would be truncated silently at runtime instead.
+    #[test]
+    fn narrow_array_literal_rejects_out_of_range_element() {
+        assert!(!accepts(&array_of(TypeTag::I8), "[300]"));
+        assert!(!accepts(&array_of(TypeTag::I8), "[0, 1, -129]"));
+        assert!(!accepts(&array_of(TypeTag::U8), "[-1]"));
+        assert!(!accepts(&array_of(TypeTag::U32), "[4294967296]"));
+    }
+
+    #[test]
+    fn narrow_array_literal_accepts_in_range_elements() {
+        assert!(accepts(&array_of(TypeTag::I8), "[-128, 0, 127]"));
+        assert!(accepts(&array_of(TypeTag::U8), "[0, 255]"));
+        assert!(accepts(&array_of(TypeTag::U32), "[0, 4000000000]"));
+    }
+
+    #[test]
+    fn f32_literal_that_would_narrow_to_infinity_is_rejected() {
+        assert!(!accepts(&array_of(TypeTag::F32), "[1e300]"));
+        assert!(!accepts(&Type::intrinsic(TypeTag::F32), "1e300"));
+        assert!(accepts(&array_of(TypeTag::F32), "[1.5, -2.25, 3]"));
+        assert!(accepts(&Type::intrinsic(TypeTag::F32), "3.14"));
+    }
+
+    #[test]
+    fn nested_narrow_array_literals_recurse() {
+        let nested = Type::array(array_of(TypeTag::I8));
+        assert!(accepts(&nested, "[[1, 2], [3]]"));
+        assert!(!accepts(&nested, "[[1, 2], [300]]"));
+    }
+
+    /// A spread has no literal value to range-check, so it must fall through to
+    /// the conservative answer rather than wave the whole array through.
+    #[test]
+    fn spread_element_is_not_waved_through() {
+        assert!(!accepts(&array_of(TypeTag::I8), "[...other]"));
+    }
 }

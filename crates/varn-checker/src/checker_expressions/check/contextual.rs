@@ -152,7 +152,7 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(value, bind);
                         if !actual.is_dynamic()
-                            && !self.types_compatible_cached(expected, &actual, Some(bind))
+                            && !self.value_assignable_to(expected, &actual, Some(value), Some(bind))
                         {
                             self.emit(
                                 Diagnostic::error(

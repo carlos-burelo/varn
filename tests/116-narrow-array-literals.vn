@@ -36,4 +36,17 @@ let total = 0
 for (const v of i8s) { total = total + v }
 assert("i8: los elementos conservan su valor en runtime", total == -1)
 
+// Los otros contextos que aportan un tipo esperado pasan por el mismo embudo.
+function makeI8s(): Array<i8> { return [1, 2, 3] }
+assert("return: literal de array angosto en posicion de retorno", makeI8s()[2] == 3)
+
+class Palette { channels: Array<u8> = [0, 128, 255] }
+assert("campo de clase: literal de array angosto", new Palette().channels[2] == 255)
+
+let box: { xs: Array<i8> } = { xs: [-1, 1] }
+assert("propiedad de objeto: literal de array angosto", box.xs[1] == 1)
+
+let grid: Array<Array<i8>> = [[1, 2], [3, 4]]
+assert("anidado: Array<Array<i8>> acepta literales en rango", grid[1][1] == 4)
+
 print("NARROW ARRAY LITERALS PASSED")

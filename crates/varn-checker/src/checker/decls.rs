@@ -237,7 +237,7 @@ impl<'r> Checker<'r> {
                                     self.with_expected(Some(prop_ty.clone()), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
-                                        if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                        if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
@@ -380,7 +380,7 @@ impl<'r> Checker<'r> {
                                     self.with_expected(Some(prop_ty.clone()), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
-                                        if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                        if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
