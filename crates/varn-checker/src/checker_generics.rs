@@ -19,7 +19,7 @@ pub(crate) fn build_call_mapping(
     let fn_type_params: Vec<Rc<str>> = if !ft.type_params.is_empty() {
         ft.type_params.clone()
     } else if let ExprKind::Identifier { name } = &callee.kind {
-        checker.symbol_type_params(name.as_ref(), SymbolKind::Function, bind)
+        checker.symbol_type_params(bind.interner.resolve(*name), SymbolKind::Function, bind)
     } else {
         Vec::new()
     };

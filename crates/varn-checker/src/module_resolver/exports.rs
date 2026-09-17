@@ -5,6 +5,7 @@ use crate::types::Type;
 use std::path::Path;
 use std::rc::Rc;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
+use varn_core::Atom;
 
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
@@ -36,27 +37,30 @@ pub(super) fn collect_exports(
         match e {
             ExportDecl::Decl { declaration, .. } => {
                 if let Some(name) = decl_primary_name(declaration) {
-                    if let Some(sym) = lookup_global(bind, &name) {
+                    let name_str = bind.interner.resolve(name);
+                    if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
                         s.origin_module = Some(abs_path.to_owned().into());
-                        out.insert(name.to_string(), s);
+                        out.insert(name_str.to_string(), s);
                     }
                 }
                 if let Decl::SumType(st) = declaration.as_ref() {
                     for variant in &st.variants {
-                        if let Some(sym) = lookup_global(bind, &variant.name) {
+                        let variant_name = bind.interner.resolve(variant.name);
+                        if let Some(sym) = lookup_global(bind, variant_name) {
                             let mut s = sym.clone();
                             s.origin_module = Some(abs_path.to_owned().into());
-                            out.insert(variant.name.to_string(), s);
+                            out.insert(variant_name.to_string(), s);
                         }
                     }
                 }
                 if let Decl::Enum(e) = declaration.as_ref() {
                     for member in &e.members {
-                        if let Some(sym) = lookup_global(bind, &member.id) {
+                        let member_name = bind.interner.resolve(member.id);
+                        if let Some(sym) = lookup_global(bind, member_name) {
                             let mut s = sym.clone();
                             s.origin_module = Some(abs_path.to_owned().into());
-                            out.insert(member.id.to_string(), s);
+                            out.insert(member_name.to_string(), s);
                         }
                     }
                 }
@@ -67,14 +71,16 @@ pub(super) fn collect_exports(
                 ..
             } => {
                 for spec in specifiers {
-                    if let Some(sym) = lookup_global(bind, &spec.local) {
+                    let local_name = bind.interner.resolve(spec.local);
+                    let exported_name = bind.interner.resolve(spec.exported);
+                    if let Some(sym) = lookup_global(bind, local_name) {
                         let mut s = sym.clone();
-                        s.name = spec.exported.clone();
+                        s.name = Rc::from(exported_name);
                         s.origin_module = s
                             .origin_module
                             .take()
                             .or_else(|| Some(abs_path.to_owned().into()));
-                        out.insert(spec.exported.to_string(), s);
+                        out.insert(exported_name.to_string(), s);
                     }
                 }
             }
@@ -83,19 +89,22 @@ pub(super) fn collect_exports(
                 source: Some(src),
                 ..
             } => {
-                let src_exports = if super::paths::is_known_module(src) {
-                    resolver.stdlib_exports(src)
+                let src_str = bind.interner.resolve(*src);
+                let src_exports = if super::paths::is_known_module(src_str) {
+                    resolver.stdlib_exports(src_str)
                 } else {
-                    let src_abs = super::paths::resolve_relative(resolver, base_dir, src);
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, src_str);
                     resolver.record_dep(abs_path, &src_abs);
                     resolver.module_exports(&src_abs, visiting)
                 };
                 for spec in specifiers {
-                    if let Some(sym) = src_exports.get(&spec.local.to_string()) {
+                    let local_name = bind.interner.resolve(spec.local);
+                    let exported_name = bind.interner.resolve(spec.exported);
+                    if let Some(sym) = src_exports.get(local_name) {
                         let mut s = sym.clone();
-                        s.name = spec.exported.clone();
+                        s.name = Rc::from(exported_name);
                         s.re_export_path.push(abs_path.to_owned().into());
-                        out.insert(spec.exported.to_string(), s);
+                        out.insert(exported_name.to_string(), s);
                     }
                 }
             }
@@ -104,10 +113,11 @@ pub(super) fn collect_exports(
                 alias: None,
                 ..
             } => {
-                let src_exports = if super::paths::is_known_module(source) {
-                    resolver.stdlib_exports(source)
+                let source_str = bind.interner.resolve(*source);
+                let src_exports = if super::paths::is_known_module(source_str) {
+                    resolver.stdlib_exports(source_str)
                 } else {
-                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source);
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source_str);
                     resolver.record_dep(abs_path, &src_abs);
                     resolver.module_exports(&src_abs, visiting)
                 };
@@ -124,31 +134,34 @@ pub(super) fn collect_exports(
                 alias: Some(ns),
                 ..
             } => {
-                let src_abs = if super::paths::is_known_module(source) {
-                    source.to_string()
+                let source_str = bind.interner.resolve(*source);
+                let ns_str = bind.interner.resolve(*ns);
+                let src_abs = if super::paths::is_known_module(source_str) {
+                    source_str.to_string()
                 } else {
-                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source);
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source_str);
                     resolver.record_dep(abs_path, &src_abs);
                     src_abs
                 };
-                let src_exports = if super::paths::is_known_module(source) {
-                    resolver.stdlib_exports(source)
+                let src_exports = if super::paths::is_known_module(source_str) {
+                    resolver.stdlib_exports(source_str)
                 } else {
                     resolver.module_exports(&src_abs, visiting)
                 };
-                let mut ns_sym = Symbol::new(SymbolKind::Namespace, ns.clone(), 0);
+                let mut ns_sym = Symbol::new(SymbolKind::Namespace, Rc::from(ns_str), 0);
                 ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
                 ns_sym.origin_module = Some(src_abs.into());
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();
                     s.re_export_path.push(abs_path.to_owned().into());
-                    out.insert(format!("{ns}.{sub_name}"), s);
+                    out.insert(format!("{ns_str}.{sub_name}"), s);
                 }
-                out.insert(ns.to_string(), ns_sym);
+                out.insert(ns_str.to_string(), ns_sym);
             }
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => {
-                    if let Some(sym) = lookup_global(bind, &f.id) {
+                    let fn_name = bind.interner.resolve(f.id);
+                    if let Some(sym) = lookup_global(bind, fn_name) {
                         let mut s = sym.clone();
                         s.name = "default".into();
                         out.insert("default".into(), s);
@@ -156,7 +169,8 @@ pub(super) fn collect_exports(
                 }
                 ExportDefaultDecl::Class(c) => {
                     if let Some(id) = &c.id {
-                        if let Some(sym) = lookup_global(bind, id) {
+                        let class_name = bind.interner.resolve(*id);
+                        if let Some(sym) = lookup_global(bind, class_name) {
                             let mut s = sym.clone();
                             s.name = "default".into();
                             out.insert("default".into(), s);
@@ -173,20 +187,20 @@ pub(super) fn collect_exports(
     }
 }
 
-fn decl_primary_name(decl: &Decl) -> Option<Rc<str>> {
+fn decl_primary_name(decl: &Decl) -> Option<Atom> {
     match decl {
         Decl::Variable(v) => v.declarators.first().and_then(|d| match &d.id {
-            Pattern::Identifier { name, .. } => Some(name.clone()),
+            Pattern::Identifier { name, .. } => Some(*name),
             _ => None,
         }),
-        Decl::Function(f) => Some(f.id.clone()),
-        Decl::Class(c) => c.id.clone(),
-        Decl::Enum(e) => Some(e.id.clone()),
-        Decl::Interface(i) => Some(i.id.clone()),
-        Decl::TypeAlias(t) => Some(t.id.clone()),
-        Decl::Namespace(n) => Some(n.id.clone()),
-        Decl::Struct(s) => Some(s.id.clone()),
-        Decl::SumType(s) => Some(s.id.clone()),
+        Decl::Function(f) => Some(f.id),
+        Decl::Class(c) => c.id,
+        Decl::Enum(e) => Some(e.id),
+        Decl::Interface(i) => Some(i.id),
+        Decl::TypeAlias(t) => Some(t.id),
+        Decl::Namespace(n) => Some(n.id),
+        Decl::Struct(s) => Some(s.id),
+        Decl::SumType(s) => Some(s.id),
         _ => None,
     }
 }

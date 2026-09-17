@@ -80,29 +80,40 @@ pub fn enrich_call_returns(
                 body,
                 is_async,
             } => {
+                // `class_name`/`key` forward the AST `Atom`s recorded in
+                // `PendingEnrich` (Task 4); every map consulted here
+                // (`class_methods`, `type_members.classes`) is still
+                // `Rc<str>`-keyed (out of this task's scope). Resolved to an
+                // owned `String` (not a borrow of `bind.interner`) because
+                // several call sites below take `bind: &mut BindResult` as a
+                // whole, which a live borrow of `bind.interner` would block.
+                let class_name_str = bind.interner.resolve(*class_name).to_string();
+                let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: &Stmt = unsafe { &**body };
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
                     stmt,
                     &BindView::new(bind, resolver),
-                    Some(class_name.as_ref()),
+                    Some(&class_name_str),
                 );
                 let ret = types::join_types(inferred);
                 if !ret.is_dynamic() {
                     let final_ret = crate::types::async_fn_return(ret, *is_async);
-                    if let Some(ft_map) = bind.class_methods.get_mut(class_name) {
+                    if let Some(ft_map) = bind.class_methods.get_mut(class_name_str.as_str()) {
                         if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
-                            ft_map.get_mut(key)
+                            ft_map.get_mut(key_str.as_str())
                         {
                             *ft.return_type = final_ret.clone();
                         }
                     }
-                    if let Some(class_info) = bind.type_members.classes.get_mut(class_name) {
+                    if let Some(class_info) =
+                        bind.type_members.classes.get_mut(class_name_str.as_str())
+                    {
                         if let Some(m) = class_info
                             .members
                             .iter_mut()
-                            .find(|m| m.name.as_ref() == key.as_ref())
+                            .find(|m| m.name.as_ref() == key_str)
                         {
                             if let crate::types::Type(varn_core::TypeKind::Fn(ft), _) = &mut m.ty {
                                 *ft.return_type = final_ret.clone();
@@ -123,7 +134,7 @@ pub fn enrich_call_returns(
                     stmt,
                     bind,
                     resolver,
-                    Some(class_name.as_ref()),
+                    Some(&class_name_str),
                 );
             }
 
@@ -132,26 +143,34 @@ pub fn enrich_call_returns(
                 key,
                 body,
             } => {
+                let class_name_str = bind.interner.resolve(*class_name).to_string();
+                let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: &Stmt = unsafe { &**body };
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
                     stmt,
                     &BindView::new(bind, resolver),
-                    Some(class_name.as_ref()),
+                    Some(&class_name_str),
                 );
                 let ret = types::join_types(inferred);
                 if !ret.is_dynamic() {
-                    if let Some(ft_map) = bind.type_members.getters.get_mut(class_name) {
-                        if let Some(ty) = ft_map.get_mut(key) {
+                    if let Some(ft_map) = bind
+                        .type_members
+                        .getters
+                        .get_mut(class_name_str.as_str())
+                    {
+                        if let Some(ty) = ft_map.get_mut(key_str.as_str()) {
                             *ty = ret.clone();
                         }
                     }
-                    if let Some(class_info) = bind.type_members.classes.get_mut(class_name) {
+                    if let Some(class_info) =
+                        bind.type_members.classes.get_mut(class_name_str.as_str())
+                    {
                         if let Some(m) = class_info
                             .members
                             .iter_mut()
-                            .find(|m| m.name.as_ref() == key.as_ref())
+                            .find(|m| m.name.as_ref() == key_str)
                         {
                             m.ty = ret.clone();
                             if let Some(symbol_id) = m.symbol_id {
@@ -166,7 +185,7 @@ pub fn enrich_call_returns(
                     stmt,
                     bind,
                     resolver,
-                    Some(class_name.as_ref()),
+                    Some(&class_name_str),
                 );
             }
 
@@ -175,6 +194,7 @@ pub fn enrich_call_returns(
                 key: _,
                 body,
             } => {
+                let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let stmt: &Stmt = unsafe { &**body };
                 enrich_stmts_for_vars(
                     &ctx,
@@ -182,7 +202,7 @@ pub fn enrich_call_returns(
                     stmt,
                     bind,
                     resolver,
-                    Some(class_name.as_ref()),
+                    Some(&class_name_str),
                 );
             }
         }
