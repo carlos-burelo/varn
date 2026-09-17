@@ -67,6 +67,25 @@ pub enum BackendTy {
     Float,
     Bool,
     Char,
+    // Escalares de ancho angosto: viven en el MISMO registro de 64 bits que
+    // `Int`/`Float` (`HirType`/`SlotKind` no cambian — ver `from_tir/ty.rs`,
+    // que los vuelve a mapear a `HirType::Int`/`Float` sin colapsar más
+    // allá). El ancho solo importa para el chequeo de rango que sigue a cada
+    // aritmética/cast (`InstKind::NarrowRangeCheck`) y para el layout
+    // compacto de campos/arrays (`class_field_repr`, `InstanceData::
+    // read_field`/`write_field`, que ya saben empacar cada uno de estos
+    // ocho tags). `UInt64` NO está aquí a propósito: su aritmética necesita
+    // `u64::checked_*` sobre los mismos bits reinterpretados sin signo —
+    // reusar la aritmética con signo de `Int` da resultados incorrectos para
+    // valores por encima de `i64::MAX` (ver Anexo K4 en
+    // `docs/AUDIT_RESPONSE.md`). `U64` sigue lowereando a `Int` como hoy.
+    Int8,
+    Int16,
+    Int32,
+    UInt8,
+    UInt16,
+    UInt32,
+    Float32,
     // References with a known type.
     Str,
     Bytes,

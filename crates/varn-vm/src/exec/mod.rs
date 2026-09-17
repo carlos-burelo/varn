@@ -18,6 +18,7 @@ pub(crate) mod host;
 pub mod host_values;
 pub(crate) mod intrinsics;
 pub(crate) mod jit_helpers;
+pub(crate) mod narrow_range;
 pub(crate) mod modules;
 pub(crate) mod props;
 pub(crate) mod strings;

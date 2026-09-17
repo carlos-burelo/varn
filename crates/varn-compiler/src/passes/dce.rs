@@ -135,6 +135,11 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             true
         }
 
+        // Puede lanzar si el valor no cabe en el ancho declarado (mismo
+        // motivo que Div/Mod/Pow abajo: el panic ES el efecto observable,
+        // incluso con el resultado descartado).
+        NarrowRangeCheck { .. } => false,
+
         // Allocation with no observable effect.
         BuildArray { .. }
         | BuildTuple { .. }

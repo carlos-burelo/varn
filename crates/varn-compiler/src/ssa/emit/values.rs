@@ -234,6 +234,14 @@ pub(super) fn emit_value(
                 chunk.emit_rr(OpCode::Move, d, src, line);
             }
         }
+        InstKind::NarrowRangeCheck { operand, tag } => {
+            let src = reg[operand.0 as usize];
+            if d != src {
+                chunk.emit_rr(OpCode::Move, d, src, line);
+            }
+            chunk.emit(OpCode::CheckNarrowRange, line);
+            chunk.write(Chunk::pack(d, *tag as u8), line);
+        }
 
         InstKind::BuildArray { elements } => {
             for (i, e) in elements.iter().enumerate() {

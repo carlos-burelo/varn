@@ -100,6 +100,8 @@ import "./100-stdlib-http-enrichments.vn"
 import "./101-self-recursion-return-kind.vn"
 import "./102-int-overflow.vn"
 import "./103-boxed-int-range.vn"
+import "./107-narrow-numeric-types.vn"
+import "./108-granular-numerics.vn"
 import "./109-try-operator.vn"
 
 print("\n99 side-effect modules executed in suite")

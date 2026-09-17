@@ -328,3 +328,34 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 - A/B `debug -p bytecode --fn fmix` (función float con copias): con K2 `regs: 8` + 2 `Move` de join; sin K2 `regs: 9` (mismo código): frame 128B vs 144B. Los 2 `Move` restantes son joins no fusionables por interferencia (correcto).
 - `debug -p clif:kinds --fn fmix`: `[Unset, Float×5, Bool, Unset]` — clases intactas tras coalescer; `typeloss`: sin pérdidas.
 - Bench release `tests/main.vn`: execute ~589 ms, JIT 100% (220/220). Frente a ~709 ms pre-K2: **sin regresión; la diferencia entre corridas no se atribuye al cambio** (variación de máquina; el efecto esperado de K2 es local: menos `Move`s y frames menores en funciones float, no un salto global).
+
+## Anexo K3 — Layout compacto de instancias (paso 10 del plan de migración)
+
+**Problema.** `ClassLayout::from_fields` forzaba `(16, 8)` para TODO campo pase lo que pase (comentario propio: "Instances still address fields by whole `VmValue` slots"), aunque `TypeTag::field_repr` ya modelaba `(1,1),(2,2),(4,4),(8,8),(16,8)` desde antes. Un `int`/`float`/`class` de campo pagaba 16 bytes cuando le bastaban 8 o menos. `InstanceData::field_at`/`set_field_at` leían/escribían ciego con `slot*16`.
+
+**Cambio.** `class_field_repr` (nueva función en `class_layout.rs`, distinta de `field_repr` porque un campo de clase tiene una restricción que la tabla compartida no tiene: `str` puede ser `KIND_SSO` — inline, sin objeto heap — así que NO puede compactarse a un índice de 8 bytes; `char` necesita interning que `InstanceData` no puede hacer sin acceso al heap). `InstanceData::field_at`/`set_field_at` reescritos sobre `FieldLayout` real vía `ClassObj::find_by_id` (API externa intacta, cero cambios en los ~15 call-sites existentes). Un campo `Class?`/`Array?`/etc. nunca escrito lee `null` a través de un sentinel compacto (`u32::MAX`), simétrico con `REF_UNINIT` de `frame_store.rs`.
+
+**Bug encontrado en el camino.** El acceso por NOMBRE (`GetProperty`/`SetProperty`, usado cuando el campo no se resuelve en compilación — típicamente cross-módulo) tenía su PROPIA lectura/escritura ciega de 16 bytes, separada de `field_at` (`props.rs`, `host/mod.rs`, `collections.rs`). Sin corregirla, escribir un campo compacto por ese camino pisaba el campo siguiente en memoria — corrupción silenciosa de heap. Se descubrió porque `std/time/duration.vn`'s `Duration` (6 campos `int`, cross-módulo) lo ejercita.
+
+**Evidencia.**
+- Suite e2e: 1193/1193 (en ese momento).
+- Stress test dedicado (no permanente, ejecutado ad-hoc): 120 000 instancias con campos `int`+`Node?`+`str` mezclados, 5 minor GC + 1 major GC, íntegro.
+
+## Anexo K4 — Tipos numéricos angostos (i8/i16/i32/u8/u16/u32/f32)
+
+**Descubrimiento previo a implementar.** Buena parte de esto YA EXISTÍA, construido por trabajo anterior nunca activado: `crates/varn-checker/src/checker/compat/mod.rs`'s `simple_types_compatible`/`literal_fits_type`/`expr_satisfies_target_type` ya definían exactamente la asignabilidad correcta (`int→i8` exige cast, `i8→int` widening implícito seguro, un literal directo se infiere sin cast con su rango validado en compilación) — nunca se activaba porque `BackendTy` no distinguía el ancho.
+
+**Cambio.** 8 variantes nuevas en `BackendTy` (`Int8/Int16/Int32/UInt8/UInt16/UInt32/Float32` — `UInt64` deliberadamente fuera: ver abajo). `emit/ty.rs::lower_tag` deja de colapsarlas a `Int`/`Float`. `HirType`/`SlotKind` NO cambian: un ancho angosto vive en el mismo GPR/FPR de 64 bits que `int`/`float` — el ancho solo importa para `field_tag` (activa el layout compacto del Anexo K3 para estos tipos) y para un chequeo de rango nuevo (`InstKind::NarrowRangeCheck` / `OpCode::CheckNarrowRange`), insertado tras un cast explícito (`x as i32`) y tras `-x` unario (el único operador que preserva el ancho en el checker — la aritmética binaria SIEMPRE ensancha a `int`/`float` a propósito, ver bug abajo). Panica en runtime si no cabe, igual que `int` ya hace con su propio desbordamiento.
+
+**Bug encontrado en el camino.** `coerce_binary_operands` (`emit/body.rs`) unificaba operandos de ancho DIFERENTE (`i8 + i16`) casteando el derecho al ancho del IZQUIERDO en silencio, en vez de ensanchar ambos a `int` como el checker (`numeric_binary_type`) ya decidía — nunca se manifestaba porque antes ambos operandos YA ERAN `BackendTy::Int` (colapsados). Corregido ensanchando explícitamente cualquier ancho angosto a `Int`/`Float` antes de la unificación, coincidiendo con el checker.
+
+**Pendiente, fuera de alcance:**
+- `u64`: necesita aritmética sin signo dedicada (`u64::checked_*` sobre los bits reinterpretados) — reusar la aritmética con signo de `i64` da resultados incorrectos para valores por encima de `i64::MAX`. Aislado, no bloquea nada de lo anterior. `TypeTag::U64` sigue lowereando a `BackendTy::Int`.
+- `ArrayRepr` (`crates/varn-types/src/vm_value.rs`): sigue siendo `{Boxed, I64, F64}` sin distinguir ancho — un `i32[]` compacta a nivel de CAMPO si vive dentro de una clase (Anexo K3), pero el array en sí sigue boxeado elemento-por-elemento salvo que sea `int[]`/`float[]` puro. `VmArray` elige su repr por los VALORES en runtime, no por un tipo estático (ver el comentario de cabecera de `ArrayRepr`) — un array angosto necesita el mecanismo contrario.
+- JIT sigue en `FRAME_LAYOUT_V2_JIT_BAIL = true` (paso 9 del plan) — 0 funciones compiladas, todo interpretado.
+
+**Evidencia.**
+- Suite e2e: 1207/1207 (`tests/107-narrow-numeric-types.vn` nuevo + `tests/108-granular-numerics.vn`, preexistente y hasta ahora nunca importado a `main.vn`, ambos verdes).
+- `cargo build --workspace`: limpio, sin `_ =>` comodín nuevos escondiendo un caso sin decidir (cada `match` exhaustivo roto por las 8 variantes se resolvió explícitamente).
+- Stress test dedicado (no permanente): 50 000 instancias con 7 campos angostos mezclados (`i8/i16/i32/u8/u16/u32/f32`), GC completo, íntegro; `debug -p bytecode` confirma `SetFixedField` tipado (no `SetProperty` por nombre) para los 7.
+- Plan completo en `docs/superpowers/plans/2026-09-16-narrow-numeric-types.md`.

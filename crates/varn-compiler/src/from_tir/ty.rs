@@ -17,7 +17,21 @@ use varn_tir::{BackendTy, TirModule};
 pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
     match bt {
         BackendTy::Int => HirType::Int,
+        // Los anchos angostos viven en el MISMO registro físico que `Int`/
+        // `Float` (GPR de 64 bits / FPR): el ancho no es una clase de
+        // registro distinta, solo cambia dónde se valida el rango
+        // (`InstKind::NarrowRangeCheck`, insertado en `from_tir/build.rs`
+        // usando el `BackendTy` original, ANTES de perderlo aquí) y cómo se
+        // empaca en un campo/array (`class_field_repr`, que lee el
+        // `TypeTag` real vía `field_tag`, no este `HirType`).
+        BackendTy::Int8
+        | BackendTy::Int16
+        | BackendTy::Int32
+        | BackendTy::UInt8
+        | BackendTy::UInt16
+        | BackendTy::UInt32 => HirType::Int,
         BackendTy::Float => HirType::Float,
+        BackendTy::Float32 => HirType::Float,
         BackendTy::Bool => HirType::Bool,
         BackendTy::Str => HirType::Str,
         // `char` es `HeapObj::Char` internado: `Ref` es la

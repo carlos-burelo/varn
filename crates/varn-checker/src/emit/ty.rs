@@ -152,15 +152,24 @@ fn lower_kind(
 
 fn lower_tag(tag: TypeTag) -> BackendTy {
     match tag {
-        TypeTag::Int
-        | TypeTag::I8
-        | TypeTag::I16
-        | TypeTag::I32
-        | TypeTag::U8
-        | TypeTag::U16
-        | TypeTag::U32
-        | TypeTag::U64 => BackendTy::Int,
-        TypeTag::Float | TypeTag::F32 => BackendTy::Float,
+        // `U64` sigue aquí a propósito: necesita aritmética sin signo
+        // dedicada (`u64::checked_*` sobre los mismos bits reinterpretados)
+        // que reusar la de `Int` con signo no puede dar correctamente para
+        // valores por encima de `i64::MAX` — ver Anexo K4 en
+        // docs/AUDIT_RESPONSE.md. Las otras seis anchas SÍ preservan su
+        // ancho: colapsarlas aquí a `Int`/`Float` era precisamente lo que
+        // impedía que `class_field_repr`/`InstanceData::read_field` (que ya
+        // saben empacarlas a su tamaño real) o un chequeo de rango en
+        // aritmética las vieran alguna vez.
+        TypeTag::Int | TypeTag::U64 => BackendTy::Int,
+        TypeTag::I8 => BackendTy::Int8,
+        TypeTag::I16 => BackendTy::Int16,
+        TypeTag::I32 => BackendTy::Int32,
+        TypeTag::U8 => BackendTy::UInt8,
+        TypeTag::U16 => BackendTy::UInt16,
+        TypeTag::U32 => BackendTy::UInt32,
+        TypeTag::Float => BackendTy::Float,
+        TypeTag::F32 => BackendTy::Float32,
         TypeTag::Bool => BackendTy::Bool,
         TypeTag::Char => BackendTy::Char,
         TypeTag::Str => BackendTy::Str,
@@ -246,29 +255,34 @@ mod tests {
             lower_type(&prim(TypeTag::Decimal), &mut tt, &NoNames),
             BackendTy::Decimal
         );
+        // Anexo K4 (docs/AUDIT_RESPONSE.md): estos siete ya NO colapsan a
+        // `Int`/`Float` — preservan su ancho para el layout compacto
+        // (Anexo K3) y el chequeo de rango (`NarrowRangeCheck`). Solo `U64`
+        // sigue colapsando: necesita aritmética sin signo dedicada que
+        // reusar la de `Int` con signo no puede dar correctamente.
         assert_eq!(
             lower_type(&prim(TypeTag::I8), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::Int8
         );
         assert_eq!(
             lower_type(&prim(TypeTag::I16), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::Int16
         );
         assert_eq!(
             lower_type(&prim(TypeTag::I32), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::Int32
         );
         assert_eq!(
             lower_type(&prim(TypeTag::U8), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::UInt8
         );
         assert_eq!(
             lower_type(&prim(TypeTag::U16), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::UInt16
         );
         assert_eq!(
             lower_type(&prim(TypeTag::U32), &mut tt, &NoNames),
-            BackendTy::Int
+            BackendTy::UInt32
         );
         assert_eq!(
             lower_type(&prim(TypeTag::U64), &mut tt, &NoNames),
@@ -276,7 +290,7 @@ mod tests {
         );
         assert_eq!(
             lower_type(&prim(TypeTag::F32), &mut tt, &NoNames),
-            BackendTy::Float
+            BackendTy::Float32
         );
     }
 

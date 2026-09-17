@@ -259,6 +259,21 @@ pub enum InstKind {
         ty: HirType,
     },
 
+    /// Verifica que `operand` cabe en el rango de `tag` (`i8`, `u32`, `f32`,
+    /// …), pasándolo sin modificar si cabe. Emitido tras un cast explícito
+    /// (`x as i32`) hacia un ancho angosto y tras cualquier aritmética cuyo
+    /// tipo de resultado es angosto (`i8 + i8`) — nunca antes de la
+    /// operación normal, sobre ella: `AddInt`/`SubInt`/... siguen siendo la
+    /// aritmética real, esto solo valida que el resultado sigue cabiendo en
+    /// el ancho declarado. Panica en runtime si no cabe, igual que `int` ya
+    /// hace con su propio desbordamiento (`exec/arith.rs::overflow`).
+    /// `varn_core::TypeTag::U64` nunca aparece aquí — ver la nota de `u64`
+    /// en `varn_tir::BackendTy`.
+    NarrowRangeCheck {
+        operand: Value,
+        tag: varn_core::TypeTag,
+    },
+
     BuildArray {
         elements: Vec<Value>,
     },
