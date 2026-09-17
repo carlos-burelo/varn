@@ -1,4 +1,5 @@
 // Varn Core Architecture Crate (v2)
+pub mod atom;
 pub mod ast;
 pub mod cg_ty;
 pub mod diagnostics;
@@ -20,6 +21,7 @@ pub mod type_tag;
 pub mod typed_ir;
 pub mod well_known;
 
+pub use atom::{Atom, AtomInterner};
 pub use ast::AstId;
 pub use doc::DocComment;
 
