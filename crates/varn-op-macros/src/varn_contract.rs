@@ -8,7 +8,7 @@ use syn::{Ident, LitStr, Token};
 use varn_core::ast::{ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, Stmt, StmtKind};
 use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
-use varn_core::{IntrinsicType, TypeTag};
+use varn_core::{AtomInterner, IntrinsicType, TypeTag};
 
 pub(crate) struct ContractInput {
     module: String,
@@ -107,9 +107,9 @@ fn scalar_mapped(tag: TypeTag) -> Mapped {
     }
 }
 
-fn classify(t: &TypeNode) -> Mapped {
+fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     match &t.kind {
-        TypeKind::Named(n, _) => TypeTag::from_str(n.as_str())
+        TypeKind::Named(n, _) => TypeTag::from_str(interner.resolve(*n))
             .map(scalar_mapped)
             .unwrap_or(Mapped::Dynamic),
         TypeKind::Intrinsic(TypeTag::Void) => Mapped::Void,
@@ -117,9 +117,9 @@ fn classify(t: &TypeNode) -> Mapped {
         TypeKind::Array(_) => Mapped::Array,
         TypeKind::Union(members) if members.len() == 2 => {
             if matches!(members[1].kind, TypeKind::Intrinsic(TypeTag::Null)) {
-                Mapped::Opt(Box::new(classify(&members[0])))
+                Mapped::Opt(Box::new(classify(&members[0], interner)))
             } else if matches!(members[0].kind, TypeKind::Intrinsic(TypeTag::Null)) {
-                Mapped::Opt(Box::new(classify(&members[1])))
+                Mapped::Opt(Box::new(classify(&members[1], interner)))
             } else {
                 Mapped::Dynamic
             }
@@ -239,7 +239,7 @@ fn param_name_is_rest(p: &Param) -> bool {
     p.is_rest || matches!(p.pattern, Pattern::Rest { .. })
 }
 
-fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
+fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) -> Vec<Member> {
     let mut out = Vec::new();
     for m in &decl.body {
         match m {
@@ -256,10 +256,13 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                     Kind::Method
                 };
                 out.push(Member {
-                    symbol: key.to_string(),
+                    symbol: interner.resolve(*key).to_string(),
                     kind,
-                    params: map_params(params),
-                    ret: return_type.as_ref().map(classify).unwrap_or(Mapped::Void),
+                    params: map_params(params, interner),
+                    ret: return_type
+                        .as_ref()
+                        .map(|t| classify(t, interner))
+                        .unwrap_or(Mapped::Void),
                 });
             }
             ClassMember::Getter {
@@ -274,12 +277,12 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                     Kind::Getter
                 };
                 out.push(Member {
-                    symbol: key.to_string(),
+                    symbol: interner.resolve(*key).to_string(),
                     kind,
                     params: vec![],
                     ret: return_type
                         .as_ref()
-                        .map(classify)
+                        .map(|t| classify(t, interner))
                         .unwrap_or(Mapped::Dynamic),
                 });
             }
@@ -299,17 +302,20 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                     Kind::Property
                 };
                 out.push(Member {
-                    symbol: key.to_string(),
+                    symbol: interner.resolve(*key).to_string(),
                     kind,
                     params: vec![],
-                    ret: type_ann.as_ref().map(classify).unwrap_or(Mapped::Dynamic),
+                    ret: type_ann
+                        .as_ref()
+                        .map(|t| classify(t, interner))
+                        .unwrap_or(Mapped::Dynamic),
                 });
             }
             ClassMember::Constructor { params, .. } => {
                 out.push(Member {
                     symbol: "constructor".to_string(),
                     kind: Kind::Constructor,
-                    params: map_params(params),
+                    params: map_params(params, interner),
                     ret: Mapped::Dynamic,
                 });
             }
@@ -320,29 +326,35 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
     out
 }
 
-fn collect_functions(body: &[Stmt]) -> Vec<Member> {
-    fn from_decl(decl: &Decl, out: &mut Vec<Member>) {
+fn collect_functions(body: &[Stmt], interner: &AtomInterner) -> Vec<Member> {
+    fn from_decl(decl: &Decl, interner: &AtomInterner, out: &mut Vec<Member>) {
         match decl {
-            Decl::Function(f) => out.push(function_member(f)),
-            Decl::Export(ExportDecl::Decl { declaration, .. }) => from_decl(declaration, out),
+            Decl::Function(f) => out.push(function_member(f, interner)),
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                from_decl(declaration, interner, out)
+            }
             _ => {}
         }
     }
     let mut out = Vec::new();
     for stmt in body {
         if let StmtKind::Decl(decl) = &stmt.kind {
-            from_decl(decl, &mut out);
+            from_decl(decl, interner, &mut out);
         }
     }
     out
 }
 
-fn function_member(f: &FunctionDecl) -> Member {
+fn function_member(f: &FunctionDecl, interner: &AtomInterner) -> Member {
     Member {
-        symbol: f.id.to_string(),
+        symbol: interner.resolve(f.id).to_string(),
         kind: Kind::Function,
-        params: map_params(&f.params),
-        ret: f.return_type.as_ref().map(classify).unwrap_or(Mapped::Void),
+        params: map_params(&f.params, interner),
+        ret: f
+            .return_type
+            .as_ref()
+            .map(|t| classify(t, interner))
+            .unwrap_or(Mapped::Void),
     }
 }
 
@@ -359,12 +371,14 @@ fn param_type(p: &Param) -> Option<&TypeNode> {
     None
 }
 
-fn map_params(params: &[Param]) -> Vec<ParamInfo> {
+fn map_params(params: &[Param], interner: &AtomInterner) -> Vec<ParamInfo> {
     params
         .iter()
         .map(|p| {
             let is_rest = param_name_is_rest(p);
-            let base = param_type(p).map(classify).unwrap_or(Mapped::Dynamic);
+            let base = param_type(p)
+                .map(|t| classify(t, interner))
+                .unwrap_or(Mapped::Dynamic);
             let mapped = if p.is_optional && !is_rest {
                 Mapped::Opt(Box::new(base))
             } else {
@@ -396,14 +410,21 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     };
 
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(&source, &input.contract);
-    let program = match varn_parser::parse(tokens, lexeme_buf, &input.contract) {
+    // This proc-macro parses the contract itself, right here, in its own
+    // execution (a proc-macro body is ordinary Rust code that happens to run
+    // during another crate's build — not const-eval), so the `AtomInterner`
+    // `varn_parser::parse` now returns is a normal local value for the rest
+    // of `expand`, not a runtime value reaching across a compile-time
+    // boundary. No design gap here: propagating it from Part A resolves
+    // every `Atom`-to-text site below directly.
+    let (program, interner) = match varn_parser::parse(tokens, lexeme_buf, &input.contract) {
         Ok(p) => p,
         Err(_) => return err(format!("failed to parse contract `{}`", abs_path_str)),
     };
 
     let members = match &input.class {
-        Some(class) => match find_class(&program.body, class) {
-            Some(decl) => collect_members(class, &decl),
+        Some(class) => match find_class(&program.body, class, &interner) {
+            Some(decl) => collect_members(class, &decl, &interner),
             None => {
                 return err(format!(
                     "class `{class}` not found in contract `{abs_path_str}`"
@@ -411,7 +432,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         },
         None => {
-            let fns = collect_functions(&program.body);
+            let fns = collect_functions(&program.body, &interner);
             if fns.is_empty() {
                 return err(format!(
                     "no `declare function`s found in contract `{abs_path_str}`"
@@ -849,10 +870,10 @@ fn err(msg: String) -> TokenStream {
     TokenStream::from(quote! { compile_error!(#lit); })
 }
 
-fn find_class(body: &[Stmt], name: &str) -> Option<ClassDecl> {
+fn find_class(body: &[Stmt], name: &str, interner: &AtomInterner) -> Option<ClassDecl> {
     for stmt in body {
         if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Some(c) = class_from_decl(decl, name) {
+            if let Some(c) = class_from_decl(decl, name, interner) {
                 return Some(c);
             }
         }
@@ -860,16 +881,18 @@ fn find_class(body: &[Stmt], name: &str) -> Option<ClassDecl> {
     None
 }
 
-fn class_from_decl(decl: &Decl, name: &str) -> Option<ClassDecl> {
+fn class_from_decl(decl: &Decl, name: &str, interner: &AtomInterner) -> Option<ClassDecl> {
     match decl {
         Decl::Class(c) => {
-            if c.id.as_deref() == Some(name) {
+            if c.id.map(|id| interner.resolve(id)) == Some(name) {
                 Some(c.clone())
             } else {
                 None
             }
         }
-        Decl::Export(ExportDecl::Decl { declaration, .. }) => class_from_decl(declaration, name),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+            class_from_decl(declaration, name, interner)
+        }
         _ => None,
     }
 }

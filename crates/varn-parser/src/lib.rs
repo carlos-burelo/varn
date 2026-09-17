@@ -18,18 +18,20 @@ pub fn parse(
     tokens: Vec<Token>,
     lexeme_buf: Rc<[u8]>,
     filename: &str,
-) -> Result<Program, varn_core::DiagnosticBag> {
+) -> Result<(Program, varn_core::AtomInterner), varn_core::DiagnosticBag> {
     let mut parser = Parser::new(tokens, lexeme_buf, Rc::from(filename));
-    parser.parse_program()
+    let program = parser.parse_program()?;
+    Ok((program, parser.stream.interner))
 }
 
 pub fn parse_with_profile(
     tokens: Vec<Token>,
     lexeme_buf: Rc<[u8]>,
     filename: &str,
-) -> Result<(Program, ParseProfile), varn_core::DiagnosticBag> {
+) -> Result<(Program, ParseProfile, varn_core::AtomInterner), varn_core::DiagnosticBag> {
     let mut parser = Parser::new(tokens, lexeme_buf, Rc::from(filename));
-    parser.parse_program_with_profile()
+    let (program, profile) = parser.parse_program_with_profile()?;
+    Ok((program, profile, parser.stream.interner))
 }
 
 pub fn parse_partial(

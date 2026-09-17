@@ -98,7 +98,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
+    let (program, parse_profile, _interner) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
         .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
@@ -264,7 +264,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (program, _) =
+        let (program, _, _interner) =
             varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
                 let msgs: Vec<String> = errs
                     .iter()

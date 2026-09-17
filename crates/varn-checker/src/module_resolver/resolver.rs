@@ -178,7 +178,13 @@ impl DiskResolver {
         key: &str,
     ) -> Option<(Rc<varn_core::ast::Program>, Vec<varn_core::Diagnostic>)> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
-        let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, key).ok()?);
+        // `BindResult` still keys names by `Rc<str>` (Task 4-8 migrates the
+        // checker to `Atom`), so there is nowhere to park this interner yet;
+        // dropping it here just re-opens the same gap Task 3c closes, but
+        // only for this module's own bound names, which the checker doesn't
+        // resolve through an `Atom` today.
+        let (program, _interner) = varn_parser::parse(tokens, lexeme_buf, key).ok()?;
+        let program = Rc::new(program);
         self.store_program(key.to_owned(), Rc::clone(&program));
         Some((program, lex_errs))
     }

@@ -12,7 +12,7 @@ pub fn parse(
     verbose: bool,
     debug: &DebugFlags,
 ) -> PipelineResult<varn_core::ast::Program> {
-    let program = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
+    let (program, _interner) = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
             .map(|e| varn_core::diagnostics::format_diagnostic(e, source))

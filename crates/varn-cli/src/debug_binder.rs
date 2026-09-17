@@ -11,7 +11,7 @@ fn main() {
     let source = read_to_string(filename).expect("Cannot read test file");
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, filename);
     println!("Lex errors: {:?}", lex_errs);
-    let program = varn_parser::parse(tokens, lexeme_buf, filename).expect("Parse error");
+    let (program, _interner) = varn_parser::parse(tokens, lexeme_buf, filename).expect("Parse error");
 
     let bind = varn_checker::Binder::bind(&program);
     println!("Bind diagnostics count: {}", bind.diagnostics.len());
