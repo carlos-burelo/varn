@@ -7,7 +7,6 @@ pub fn parse_type(s: &mut TokenStream) -> Result<TypeNode, String> {
 
     if s.check(TokenKind::Identifier) && s.peek_kind(1) == TokenKind::Is {
         let param_name = s.consume_lexeme();
-        let param_name = s.interner.resolve(param_name).to_string();
         s.advance();
         let target_ty = parse_type(s)?;
         let full_range = s.span_from(start);
@@ -161,7 +160,6 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             if s.lexeme() == "infer" && s.peek_kind(1) == TokenKind::Identifier {
                 s.advance();
                 let name = s.consume_lexeme();
-                let name = s.interner.resolve(name).to_string();
                 let full_range = s.span_from(range);
                 return Ok(s.type_node(full_range, TypeKind::Infer(name)));
             }
@@ -179,7 +177,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     break;
                 }
             }
-            let name = name_buf.to_string();
+            let name = s.interner.intern(&name_buf);
 
             let type_args = if s.check(TokenKind::LAngle) {
                 parse_type_args(s)?
@@ -253,7 +251,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     .map(|ty| {
                         let ty_range = *ty.range();
                         TypeParam {
-                            name: "_".to_string(),
+                            name: s.interner.intern("_"),
                             constraint: Some(ty),
                             default: None,
                             range: ty_range,
@@ -268,11 +266,12 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 let ret = parse_type(s)?;
                 let full_range = s.span_from(range);
                 let first_range = *first.range();
+                let underscore = s.interner.intern("_");
                 return Ok(s.type_node(
                     full_range,
                     TypeKind::Fn((
                         vec![TypeParam {
-                            name: "_".to_string(),
+                            name: underscore,
                             constraint: Some(first),
                             default: None,
                             range: first_range,
@@ -316,7 +315,6 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 let mapped_readonly = s.eat(TokenKind::Readonly);
                 s.advance();
                 let key_var = s.consume_lexeme();
-                let key_var = s.interner.resolve(key_var).to_string();
                 s.advance();
                 let source = parse_type(s)?;
                 s.expect(TokenKind::RBracket)?;
@@ -386,7 +384,6 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
         | TokenKind::Constructor
         | TokenKind::Destructor => {
             let name = s.consume_lexeme();
-            let name = s.interner.resolve(name).to_string();
             Ok(s.type_node(range, TypeKind::Named(name, None)))
         }
 
@@ -445,7 +442,6 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> 
     while !s.check(TokenKind::RAngle) && !s.is_eof() {
         let range = s.range();
         let name = s.expect_id()?;
-        let name = s.interner.resolve(name).to_string();
         let constraint = if s.eat(TokenKind::Extends) {
             Some(parse_union_type(s)?)
         } else {
@@ -485,7 +481,6 @@ fn parse_fn_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> {
         } else {
             s.interner.intern("_")
         };
-        let name = s.interner.resolve(name).to_string();
         let ty = parse_type(s)?;
         let full_range = s.span_from(prange);
         params.push(TypeParam {

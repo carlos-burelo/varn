@@ -2,10 +2,11 @@ use super::decl::InterfaceMember;
 use super::expr::{AstId, Expr};
 use crate::kinds::TypeKind;
 use crate::source::SourceRange;
+use crate::Atom;
 
 pub type AstTypeKind = TypeKind<
     Box<TypeNode>,
-    String,
+    Atom,
     Vec<TypeNode>,
     (Vec<TypeParam>, Box<TypeNode>),
     Vec<InterfaceMember>,
@@ -31,7 +32,7 @@ impl TypeNode {
 
 #[derive(Clone, Debug)]
 pub struct TypeParam {
-    pub name: String,
+    pub name: Atom,
     pub constraint: Option<TypeNode>,
     pub default: Option<TypeNode>,
     pub range: SourceRange,
