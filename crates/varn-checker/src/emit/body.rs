@@ -4,6 +4,7 @@ use crate::emit::ty::{lower_type, NameResolver};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
+use varn_core::{Atom, AtomInterner};
 use varn_core::ast::pattern::{MatchBinding, MatchPattern};
 use varn_core::ast::{
     Arg, ArrayEl, AstId, Expr, ExprKind, MatchBody, MatchCase, ObjectProp, Pattern, PropKey, Stmt,
@@ -23,7 +24,7 @@ pub(super) struct ModuleCtx<'a> {
 
     pub globals: &'a FxHashMap<Rc<str>, u32>,
 
-    pub fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+    pub fns: &'a FxHashMap<Atom, (u32, u32)>,
 
     pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
 
@@ -35,7 +36,9 @@ pub(super) struct ModuleCtx<'a> {
 
     pub core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
 
-    pub math_intrinsics: &'a FxHashMap<Rc<str>, u8>,
+    pub math_intrinsics: &'a FxHashMap<Atom, u8>,
+
+    pub interner: &'a AtomInterner,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -155,9 +158,9 @@ fn splice_returns_only(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
     out
 }
 
-fn pattern_lead(p: &Pattern) -> Rc<str> {
+fn pattern_lead(p: &Pattern, interner: &AtomInterner) -> Rc<str> {
     match p {
-        Pattern::Identifier { name, .. } => name.clone(),
+        Pattern::Identifier { name, .. } => Rc::from(interner.resolve(*name)),
         _ => Rc::from("_"),
     }
 }
@@ -505,7 +508,7 @@ impl<'a> FnEmitter<'a> {
                     match &d.id {
                         Pattern::Identifier { name, .. } => {
                             let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
-                            let local = self.bind_local(name.clone(), ty);
+                            let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), ty);
                             out.extend(std::mem::take(&mut self.pending));
                             out.push(TirStmt::Let { local, ty, init });
                             if let Some(frame) = self.disposables.last_mut() {
@@ -540,7 +543,7 @@ impl<'a> FnEmitter<'a> {
     fn catch_type_names(&self, t: &varn_core::ast::TypeNode) -> Vec<Rc<str>> {
         use varn_core::TypeKind;
         match &t.kind {
-            TypeKind::Named(n, _) => vec![Rc::from(n.as_str())],
+            TypeKind::Named(n, _) => vec![Rc::from(self.m.interner.resolve(*n))],
             TypeKind::Union(items) | TypeKind::Intersection(items) => items
                 .iter()
                 .flat_map(|x| self.catch_type_names(x))
@@ -604,8 +607,8 @@ impl<'a> FnEmitter<'a> {
             this.scopes.push(FxHashMap::default());
             let mut out = Vec::new();
             if let Some(Pattern::Identifier { name, .. }) = &c.param {
-                if name.as_ref() != "<catch>" {
-                    let alias = this.bind_local(name.clone(), dyn_ty);
+                if this.m.interner.resolve(*name) != "<catch>" {
+                    let alias = this.bind_local(Rc::from(this.m.interner.resolve(*name)), dyn_ty);
                     out.push(TirStmt::Let {
                         local: alias,
                         ty: dyn_ty,
@@ -744,7 +747,7 @@ impl<'a> FnEmitter<'a> {
                             .as_ref()
                             .map(|e| e.ty)
                             .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                        let local = self.bind_local(name.clone(), ty);
+                        let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), ty);
                         out.extend(std::mem::take(&mut self.pending));
                         out.push(TirStmt::Let {
                             local,
@@ -870,7 +873,7 @@ impl<'a> FnEmitter<'a> {
         let Pattern::Identifier { name, .. } = left else {
             return self.lower_for_of_protocol(left, keys, out, body, false);
         };
-        let name = name.clone();
+        let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
         out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
         out
     }
@@ -892,7 +895,7 @@ impl<'a> FnEmitter<'a> {
                 Pattern::Identifier { name, .. },
             ) = (&right.kind, left)
             {
-                let name = name.clone();
+                let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
                 let lo = self.lower_expr(start);
                 let mut hi = self.lower_expr(end);
                 if *inclusive {
@@ -995,7 +998,8 @@ impl<'a> FnEmitter<'a> {
         };
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
-        out.extend(self.for_of_over_array(name, arr, elem_ty, body));
+        let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
+        out.extend(self.for_of_over_array(&name, arr, elem_ty, body));
         out
     }
 
@@ -1290,18 +1294,15 @@ impl<'a> FnEmitter<'a> {
         match pat {
             MatchPattern::Wildcard => (bool_lit(true), vec![]),
             MatchPattern::Identifier(name) => {
+                let name_str = self.m.interner.resolve(*name);
                 if let BackendTy::Enum(eid) = s.ty.non_nullable(self.tt) {
                     if let Some(info) = self.m.enums.get(eid.0 as usize) {
-                        if info
-                            .variants
-                            .iter()
-                            .any(|v| v.name.as_ref() == name.as_ref())
-                        {
-                            return self.match_enum_variant(s, name, name, &[]);
+                        if info.variants.iter().any(|v| v.name.as_ref() == name_str) {
+                            return self.match_enum_variant(s, name_str, name_str, &[]);
                         }
                     }
                 }
-                let local = self.bind_local(name.clone(), s.ty);
+                let local = self.bind_local(Rc::from(name_str), s.ty);
                 (
                     bool_lit(true),
                     vec![TirStmt::Let {
@@ -1326,7 +1327,7 @@ impl<'a> FnEmitter<'a> {
                 (cond, vec![])
             }
             MatchPattern::Type { type_name, binding } => {
-                let Some(cid) = self.m.names.class_id(type_name) else {
+                let Some(cid) = self.m.names.class_id(self.m.interner.resolve(*type_name)) else {
                     return (bool_lit(false), vec![]);
                 };
                 let cond = TirExpr {
@@ -1340,7 +1341,8 @@ impl<'a> FnEmitter<'a> {
                 };
                 let mut binds = vec![];
                 if let Some(name) = binding {
-                    let local = self.bind_local(name.clone(), BackendTy::Class(cid));
+                    let local =
+                        self.bind_local(Rc::from(self.m.interner.resolve(*name)), BackendTy::Class(cid));
                     binds.push(TirStmt::Let {
                         local,
                         ty: BackendTy::Class(cid),
@@ -1353,7 +1355,11 @@ impl<'a> FnEmitter<'a> {
                 enum_name,
                 variant_name,
                 bindings,
-            } => self.match_enum_variant(s, enum_name, variant_name, bindings),
+            } => {
+                let enum_name = self.m.interner.resolve(*enum_name);
+                let variant_name = self.m.interner.resolve(*variant_name);
+                self.match_enum_variant(s, enum_name, variant_name, bindings)
+            }
 
             _ => (bool_lit(false), vec![]),
         }
@@ -1431,7 +1437,7 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::EnumVariant { enum_id: eid, tag },
                 span: s.span,
             };
-            let local = self.bind_local(b.name.clone(), fty);
+            let local = self.bind_local(Rc::from(self.m.interner.resolve(b.name)), fty);
             binds.push(TirStmt::Let {
                 local,
                 ty: fty,
@@ -1479,7 +1485,7 @@ impl<'a> FnEmitter<'a> {
         let mut binds = Vec::new();
         for (i, b) in bindings.iter().enumerate() {
             let init = field(s.clone(), &format!("value{i}"), dyn_ty);
-            let local = self.bind_local(b.name.clone(), dyn_ty);
+            let local = self.bind_local(Rc::from(self.m.interner.resolve(b.name)), dyn_ty);
             binds.push(TirStmt::Let {
                 local,
                 ty: dyn_ty,
@@ -1498,7 +1504,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Decl::Function(f) = unwrapped {
             let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
-            let local = self.bind_local(f.id.clone(), dyn_ty);
+            let local = self.bind_local(Rc::from(self.m.interner.resolve(f.id)), dyn_ty);
             let closure = self.lower_closure(
                 &f.params,
                 ClosureBody::Stmt(&f.body),
@@ -1516,7 +1522,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Decl::Namespace(ns) = unwrapped {
             let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
-            let local = self.bind_local(ns.id.clone(), dyn_ty);
+            let local = self.bind_local(Rc::from(self.m.interner.resolve(ns.id)), dyn_ty);
             let mut entries: Vec<TirObjectEntry> = Vec::new();
             for m in &ns.body {
                 let Decl::Export(ExportDecl::Decl { declaration, .. }) = m else {
@@ -1532,7 +1538,7 @@ impl<'a> FnEmitter<'a> {
                         Span::EMPTY,
                     );
                     entries.push(TirObjectEntry::Field {
-                        name: f.id.clone(),
+                        name: Rc::from(self.m.interner.resolve(f.id)),
                         value: closure,
                     });
                 }
@@ -1561,6 +1567,7 @@ impl<'a> FnEmitter<'a> {
         for d in &v.declarators {
             match &d.id {
                 Pattern::Identifier { name, .. } => {
+                    let name_str = self.m.interner.resolve(*name);
                     if let Some(init) = &d.init {
                         if let ExprKind::Match { subject, cases } = &init.kind {
                             let ty = self
@@ -1571,7 +1578,7 @@ impl<'a> FnEmitter<'a> {
                                     lower_type(&e.ty, self.tt, names)
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                            let local = self.bind_local(name.clone(), ty);
+                            let local = self.bind_local(Rc::from(name_str), ty);
                             out.push(TirStmt::Let {
                                 local,
                                 ty,
@@ -1589,10 +1596,10 @@ impl<'a> FnEmitter<'a> {
                             Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
                         );
                         let is_global =
-                            self.top_level && self.m.globals.contains_key(name.as_ref());
+                            self.top_level && self.m.globals.contains_key(name_str);
                         if is_closure && !is_global {
                             Some(self.bind_local(
-                                name.clone(),
+                                Rc::from(name_str),
                                 BackendTy::Dynamic(DynReason::Unannotated),
                             ))
                         } else {
@@ -1615,7 +1622,7 @@ impl<'a> FnEmitter<'a> {
                     out.extend(std::mem::take(&mut self.pending));
 
                     if self.top_level && prebound.is_none() {
-                        if let Some(&slot) = self.m.globals.get(name.as_ref()) {
+                        if let Some(&slot) = self.m.globals.get(name_str) {
                             let value = init.unwrap_or_else(|| TirExpr {
                                 kind: TirExprKind::NullLit,
                                 ty,
@@ -1641,7 +1648,7 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
 
-                    let local = prebound.unwrap_or_else(|| self.bind_local(name.clone(), ty));
+                    let local = prebound.unwrap_or_else(|| self.bind_local(Rc::from(name_str), ty));
                     out.push(TirStmt::Let { local, ty, init });
                 }
 
@@ -1714,7 +1721,7 @@ impl<'a> FnEmitter<'a> {
     fn bind_pattern(&mut self, pat: &Pattern, src: TirExpr, out: &mut Vec<TirStmt>) {
         match pat {
             Pattern::Identifier { name, .. } => {
-                let local = self.bind_local(name.clone(), src.ty);
+                let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), src.ty);
                 out.push(TirStmt::Let {
                     local,
                     ty: src.ty,
@@ -1727,14 +1734,17 @@ impl<'a> FnEmitter<'a> {
                 for prop in properties {
                     let field = self.field_access(
                         src.clone(),
-                        prop.key.clone(),
+                        Rc::from(self.m.interner.resolve(prop.key)),
                         BackendTy::Dynamic(DynReason::Unannotated),
                         src.span,
                     );
                     self.bind_pattern(&prop.value, field, out);
                 }
                 if let Some(rest_pat) = rest {
-                    let skip: Vec<Rc<str>> = properties.iter().map(|p| p.key.clone()).collect();
+                    let skip: Vec<Rc<str>> = properties
+                        .iter()
+                        .map(|p| Rc::from(self.m.interner.resolve(p.key)))
+                        .collect();
                     let rest_obj = TirExpr {
                         kind: TirExprKind::ObjectRest {
                             object: Box::new(src.clone()),
@@ -1858,10 +1868,11 @@ impl<'a> FnEmitter<'a> {
             ExprKind::NullLiteral => Some(TirExprKind::NullLit),
 
             ExprKind::Identifier { name } => {
+                let name_str = self.m.interner.resolve(*name);
                 return TirExpr {
                     kind: TirExprKind::Var,
                     ty,
-                    res: self.resolve_name(name),
+                    res: self.resolve_name(name_str),
                     span,
                 }
             }
@@ -2125,11 +2136,12 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::Pipeline { left, right } => {
                 if let ExprKind::Call { callee, args, .. } = &right.kind {
+                    let interner = self.m.interner;
                     let has_placeholder = args.iter().any(|a| {
                         matches!(
                             a,
                             Arg::Positional(e) | Arg::Named { value: e, .. }
-                                if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_")
+                                if matches!(&e.kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_")
                         )
                     });
                     if has_placeholder {
@@ -2141,7 +2153,7 @@ impl<'a> FnEmitter<'a> {
                             .map(|a| match a {
                                 Arg::Positional(e)
                                 | Arg::Named { value: e, .. }
-                                    if matches!(&e.kind, ExprKind::Identifier { name } if name.as_ref() == "_") =>
+                                    if matches!(&e.kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_") =>
                                 {
                                     TirArg::Expr(piped.clone())
                                 }
@@ -2343,11 +2355,11 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::DecimalLiteral { raw } => {
-                let text: Rc<str> = Rc::from(raw.trim_end_matches('d'));
+                let text: Rc<str> = Rc::from(self.m.interner.resolve(*raw).trim_end_matches('d'));
                 Some(TirExprKind::DecimalLit(text))
             }
             ExprKind::BigIntLiteral { raw } => {
-                let s = raw.trim_end_matches('n').replace('_', "");
+                let s = self.m.interner.resolve(*raw).trim_end_matches('n').replace('_', "");
                 let n = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
                     i128::from_str_radix(r, 16)
                 } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
@@ -2401,7 +2413,7 @@ impl<'a> FnEmitter<'a> {
                 let bool_ty = BackendTy::Bool;
 
                 if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
-                    if let Some(class) = self.m.names.class_id(n) {
+                    if let Some(class) = self.m.names.class_id(self.m.interner.resolve(*n)) {
                         return TirExpr {
                             kind: TirExprKind::TypeTest {
                                 value: Box::new(v),
@@ -2417,7 +2429,7 @@ impl<'a> FnEmitter<'a> {
                 let tag_name: Option<&'static str> = match &type_ann.kind {
                     varn_core::TypeKind::Intrinsic(t) => Some(t.name()),
                     varn_core::TypeKind::Named(n, _) => {
-                        varn_core::TypeTag::from_str(n).map(|t| t.name())
+                        varn_core::TypeTag::from_str(self.m.interner.resolve(*n)).map(|t| t.name())
                     }
                     _ => None,
                 };
@@ -2454,7 +2466,7 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::MetaAccess { target, property } => {
                 let obj = self.lower_expr(target);
-                let key: Rc<str> = Rc::from(format!("::{property}"));
+                let key: Rc<str> = Rc::from(format!("::{}", self.m.interner.resolve(*property)));
                 return TirExpr {
                     kind: TirExprKind::Field {
                         object: Box::new(obj),
@@ -2525,7 +2537,7 @@ impl<'a> FnEmitter<'a> {
                     ..
                 } = &tag.kind
                 {
-                    if let Some(name) = Self::member_name(property) {
+                    if let Some(name) = Self::member_name(property, self.m.interner) {
                         let recv = self.lower_expr(object);
                         return TirExpr {
                             kind: TirExprKind::MethodCall {
@@ -2542,7 +2554,7 @@ impl<'a> FnEmitter<'a> {
                 let callee = self.lower_expr(tag);
                 let res = match &tag.kind {
                     ExprKind::Identifier { name } => Resolution::ByName {
-                        name: name.clone(),
+                        name: Rc::from(self.m.interner.resolve(*name)),
                         why: DynReason::Unannotated,
                     },
                     _ => Resolution::None,
@@ -2627,7 +2639,7 @@ impl<'a> FnEmitter<'a> {
         let Some(top) = bin_op(op) else {
             if op == BinaryOp::Instanceof {
                 if let ExprKind::Identifier { name } = &right.kind {
-                    if let Some(class) = self.m.names.class_id(name) {
+                    if let Some(class) = self.m.names.class_id(self.m.interner.resolve(*name)) {
                         return TirExpr {
                             kind: TirExprKind::TypeTest {
                                 value: Box::new(lhs),
@@ -2738,9 +2750,9 @@ impl<'a> FnEmitter<'a> {
         (lhs, rhs, ty)
     }
 
-    fn member_name(property: &Expr) -> Option<Rc<str>> {
+    fn member_name(property: &Expr, interner: &AtomInterner) -> Option<Rc<str>> {
         match &property.kind {
-            ExprKind::Identifier { name } => Some(name.clone()),
+            ExprKind::Identifier { name } => Some(Rc::from(interner.resolve(*name))),
             ExprKind::StrLiteral { value } => Some(Rc::from(value.as_str())),
             _ => None,
         }
@@ -2835,7 +2847,8 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         if optional && !computed {
-            let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
+            let name =
+                Self::member_name(property, self.m.interner).unwrap_or_else(|| Rc::from("<member>"));
             let mut recv = self.lower_expr(object);
             if !Self::is_pure(object) {
                 recv = self.hoist(recv);
@@ -2924,7 +2937,8 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        let name = Self::member_name(property).unwrap_or_else(|| Rc::from("<member>"));
+        let name =
+            Self::member_name(property, self.m.interner).unwrap_or_else(|| Rc::from("<member>"));
 
         if let Some(mangled) = self
             .m
@@ -3011,7 +3025,10 @@ impl<'a> FnEmitter<'a> {
         });
         let slot = self.out_closures.len() - 1;
 
-        let param_names: Vec<Rc<str>> = params.iter().map(|p| pattern_lead(&p.pattern)).collect();
+        let param_names: Vec<Rc<str>> = params
+            .iter()
+            .map(|p| pattern_lead(&p.pattern, self.m.interner))
+            .collect();
         let param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()];
 
         let mut outer_names = self.outer_names.clone();
@@ -3131,13 +3148,13 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let class = match &callee.kind {
-            ExprKind::Identifier { name } => self.m.names.class_id(name),
+            ExprKind::Identifier { name } => self.m.names.class_id(self.m.interner.resolve(*name)),
 
             ExprKind::Member {
                 property,
                 computed: false,
                 ..
-            } => Self::member_name(property).and_then(|n| self.m.names.class_id(&n)),
+            } => Self::member_name(property, self.m.interner).and_then(|n| self.m.names.class_id(&n)),
             _ => None,
         };
         let targs = self.lower_call_args(call_id, args);
@@ -3171,7 +3188,7 @@ impl<'a> FnEmitter<'a> {
         let ExprKind::Identifier { name } = &object.kind else {
             return None;
         };
-        let eid = self.m.names.enum_id(name)?;
+        let eid = self.m.names.enum_id(self.m.interner.resolve(*name))?;
         let info = self.m.enums.get(eid.0 as usize)?;
         let v = info.variants.iter().find(|v| v.name.as_ref() == variant)?;
         Some((eid, v.tag))
@@ -3237,7 +3254,7 @@ impl<'a> FnEmitter<'a> {
         } = &callee.kind
         {
             if matches!(object.kind, ExprKind::Super) {
-                if let Some(name) = Self::member_name(property) {
+                if let Some(name) = Self::member_name(property, self.m.interner) {
                     let targs = self.lower_call_args(call_id, args);
                     return TirExpr {
                         kind: TirExprKind::SuperMethodCall { name, args: targs },
@@ -3265,7 +3282,7 @@ impl<'a> FnEmitter<'a> {
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
                     _ => Resolution::ByName {
-                        name: name.clone(),
+                        name: Rc::from(self.m.interner.resolve(*name)),
                         why: DynReason::Unannotated,
                     },
                 },
@@ -3290,7 +3307,7 @@ impl<'a> FnEmitter<'a> {
             } => (object, property),
             _ => return self.by_name_call(call_id, callee, args, ty, span),
         };
-        let Some(name) = Self::member_name(property) else {
+        let Some(name) = Self::member_name(property, self.m.interner) else {
             return self.by_name_call(call_id, callee, args, ty, span);
         };
 

@@ -27,7 +27,7 @@ use std::rc::Rc;
 use varn_core::ast::{
     AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, Stmt, StmtKind,
 };
-use varn_core::TypeKind;
+use varn_core::{Atom, AtomInterner, TypeKind};
 use varn_tir::{
     BackendTy, DynReason, FnId, Resolution, SigId, Signature, Span, TirExpr, TirExprKind,
     TirFunction, TirModule, TirObjectEntry, TirStmt, TyTable,
@@ -45,6 +45,7 @@ pub fn emit_module(
     ext_members: &FxHashMap<u32, Rc<str>>,
     ext_set_members: &FxHashMap<u32, Rc<str>>,
 ) -> TirModule {
+    let interner = &bind.interner;
     let mut types = TyTable::default();
     ty::prime(&mut types);
 
@@ -62,14 +63,14 @@ pub fn emit_module(
     let mut declared: FxHashSet<Rc<str>> = FxHashSet::default();
     for stmt in &program.body {
         if let StmtKind::Decl(d) = &stmt.kind {
-            collect_decl_names(d, &mut declared);
+            collect_decl_names(d, &mut declared, interner);
         }
     }
     // `extension X on T { … }` members become mangled free functions
     // (`__ext_{label}_{name}`) stored as module globals and called by that name
     // (`InstKind::ExtensionCall`). Number them like any other module global so
     // the call site is `LoadGlobalIdx`, not a name lookup the JIT bails on.
-    collect_extension_names(program, &mut declared);
+    collect_extension_names(program, &mut declared, interner);
 
     let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
@@ -120,7 +121,7 @@ pub fn emit_module(
     // Guarded to non-static, non-async, non-generator `Method` members so the
     // emitted op-id is guaranteed to resolve.
     let core_ops = core_method_ops(bind);
-    let math_intrinsics = math_intrinsic_imports(program);
+    let math_intrinsics = math_intrinsic_imports(program, interner);
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
@@ -157,7 +158,7 @@ pub fn emit_module(
             ns_member_fns(ns, &mut free_fns);
         }
     }
-    let mut fn_index: FxHashMap<Rc<str>, (u32, u32)> = FxHashMap::default();
+    let mut fn_index: FxHashMap<Atom, (u32, u32)> = FxHashMap::default();
     for (i, f) in free_fns.iter().enumerate() {
         fn_index
             .entry(f.id.clone())
@@ -176,6 +177,7 @@ pub fn emit_module(
         ext_set_members,
         core_ops: &core_ops,
         math_intrinsics: &math_intrinsics,
+        interner,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -234,7 +236,14 @@ pub fn emit_module(
                         top_body.push(TirStmt::BuildClass(class_ord));
                         class_ord += 1;
                     }
-                    emit_namespace_object(ns, &fn_index, &global_slots, &mut top, &mut top_body);
+                    emit_namespace_object(
+                        ns,
+                        &fn_index,
+                        &global_slots,
+                        interner,
+                        &mut top,
+                        &mut top_body,
+                    );
                 }
                 // `let X = class { … }` — build the class here, then let the
                 // `let` bind `X` to it (the initializer lowers to a load of the
@@ -320,8 +329,8 @@ pub fn emit_module(
         &mut functions,
     );
 
-    let imports = collect_imports(program);
-    let exports = collect_exports(program);
+    let imports = collect_imports(program, interner);
+    let exports = collect_exports(program, interner);
 
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
@@ -346,13 +355,14 @@ struct MCtx<'a> {
     classes: &'a [varn_tir::ClassInfo],
     enums: &'a [varn_tir::EnumInfo],
     globals: &'a FxHashMap<Rc<str>, u32>,
-    fns: &'a FxHashMap<Rc<str>, (u32, u32)>,
+    fns: &'a FxHashMap<Atom, (u32, u32)>,
     call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
     ext_calls: &'a FxHashMap<u32, Rc<str>>,
     ext_members: &'a FxHashMap<u32, Rc<str>>,
     ext_set_members: &'a FxHashMap<u32, Rc<str>>,
     core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
-    math_intrinsics: &'a FxHashMap<Rc<str>, u8>,
+    math_intrinsics: &'a FxHashMap<Atom, u8>,
+    interner: &'a AtomInterner,
 }
 
 impl<'a> MCtx<'a> {
@@ -369,6 +379,7 @@ impl<'a> MCtx<'a> {
             ext_set_members: self.ext_set_members,
             core_ops: self.core_ops,
             math_intrinsics: self.math_intrinsics,
+            interner: self.interner,
         }
     }
 }
@@ -445,8 +456,9 @@ fn ns_nested_types(ns: &varn_core::ast::NamespaceDecl) -> Vec<&Decl> {
 /// global, a `const` / `let` at its lowered initializer.
 fn emit_namespace_object(
     ns: &varn_core::ast::NamespaceDecl,
-    fn_index: &FxHashMap<Rc<str>, (u32, u32)>,
+    fn_index: &FxHashMap<Atom, (u32, u32)>,
     global_slots: &FxHashMap<Rc<str>, u32>,
+    interner: &AtomInterner,
     top: &mut FnEmitter,
     top_body: &mut Vec<TirStmt>,
 ) {
@@ -465,11 +477,11 @@ fn emit_namespace_object(
             other => other,
         };
         if let Decl::Namespace(inner_ns) = inner {
-            emit_namespace_object(inner_ns, fn_index, global_slots, top, top_body);
+            emit_namespace_object(inner_ns, fn_index, global_slots, interner, top, top_body);
         }
     }
 
-    let Some(&slot) = global_slots.get(ns.id.as_ref()) else {
+    let Some(&slot) = global_slots.get(interner.resolve(ns.id)) else {
         return;
     };
     let mut entries: Vec<TirObjectEntry> = Vec::new();
@@ -483,7 +495,7 @@ fn emit_namespace_object(
             Decl::Function(f) => {
                 if let Some(&(fnid, _)) = fn_index.get(&f.id) {
                     entries.push(TirObjectEntry::Field {
-                        name: f.id.clone(),
+                        name: Rc::from(interner.resolve(f.id)),
                         value: TirExpr {
                             kind: TirExprKind::Var,
                             ty: dyno(),
@@ -495,15 +507,15 @@ fn emit_namespace_object(
             }
             Decl::Class(_) | Decl::Enum(_) | Decl::Namespace(_) => {
                 let mname = match inner {
-                    Decl::Class(c) => c.id.clone(),
-                    Decl::Enum(e) => Some(e.id.clone()),
-                    Decl::Namespace(n) => Some(n.id.clone()),
+                    Decl::Class(c) => c.id,
+                    Decl::Enum(e) => Some(e.id),
+                    Decl::Namespace(n) => Some(n.id),
                     _ => None,
                 };
                 if let Some(mname) = mname {
-                    if let Some(&mslot) = global_slots.get(mname.as_ref()) {
+                    if let Some(&mslot) = global_slots.get(interner.resolve(mname)) {
                         entries.push(TirObjectEntry::Field {
-                            name: mname.clone(),
+                            name: Rc::from(interner.resolve(mname)),
                             value: global_ref(mslot),
                         });
                     }
@@ -514,7 +526,7 @@ fn emit_namespace_object(
                     if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, &decl.init) {
                         let value = top.lower_expression(init);
                         entries.push(TirObjectEntry::Field {
-                            name: name.clone(),
+                            name: Rc::from(interner.resolve(*name)),
                             value,
                         });
                     }
@@ -591,50 +603,50 @@ fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
 /// Top-level binding names this declaration introduces — functions, classes,
 /// enums, `let`/`const` (including destructured), namespaces, and import
 /// locals. The set the module qualifies its globals by.
-fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
+fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
     use varn_core::ast::{ImportSpecifier, Pattern as P};
-    fn pat_names(p: &P, out: &mut FxHashSet<Rc<str>>) {
+    fn pat_names(p: &P, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
         match p {
             P::Identifier { name, .. } => {
-                out.insert(name.clone());
+                out.insert(Rc::from(interner.resolve(*name)));
             }
             P::Array { elements, rest, .. } => {
                 for e in elements.iter().flatten() {
-                    pat_names(&e.pattern, out);
+                    pat_names(&e.pattern, out, interner);
                 }
                 if let Some(r) = rest {
-                    pat_names(r, out);
+                    pat_names(r, out, interner);
                 }
             }
             P::Object {
                 properties, rest, ..
             } => {
                 for prop in properties {
-                    pat_names(&prop.value, out);
+                    pat_names(&prop.value, out, interner);
                 }
                 if let Some(r) = rest {
-                    pat_names(r, out);
+                    pat_names(r, out, interner);
                 }
             }
-            P::Assignment { left, .. } => pat_names(left, out),
-            P::Rest { argument, .. } => pat_names(argument, out),
+            P::Assignment { left, .. } => pat_names(left, out, interner),
+            P::Rest { argument, .. } => pat_names(argument, out, interner),
         }
     }
     match decl {
         Decl::Function(f) => {
-            out.insert(f.id.clone());
+            out.insert(Rc::from(interner.resolve(f.id)));
         }
         Decl::Class(c) => {
             if let Some(id) = &c.id {
-                out.insert(id.clone());
+                out.insert(Rc::from(interner.resolve(*id)));
             }
         }
         Decl::Enum(e) => {
-            out.insert(e.id.clone());
+            out.insert(Rc::from(interner.resolve(e.id)));
         }
         Decl::Variable(v) => {
             for d in &v.declarators {
-                pat_names(&d.id, out);
+                pat_names(&d.id, out, interner);
                 if matches!(
                     d.init.as_ref().map(|e| &e.kind),
                     Some(varn_core::ast::ExprKind::ClassExpr { .. })
@@ -644,11 +656,11 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
             }
         }
         Decl::Namespace(ns) => {
-            out.insert(ns.id.clone());
+            out.insert(Rc::from(interner.resolve(ns.id)));
             // A namespace member is a module binding too: a sibling reads it by
             // bare name and its qualified global backs the namespace object.
             for m in &ns.body {
-                collect_decl_names(m, out);
+                collect_decl_names(m, out, interner);
             }
         }
         Decl::Import(i) => {
@@ -656,10 +668,12 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
                 let (ImportSpecifier::Default { local, .. }
                 | ImportSpecifier::Named { local, .. }
                 | ImportSpecifier::Namespace { local, .. }) = spec;
-                out.insert(local.clone());
+                out.insert(Rc::from(interner.resolve(*local)));
             }
         }
-        Decl::Export(ExportDecl::Decl { declaration, .. }) => collect_decl_names(declaration, out),
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+            collect_decl_names(declaration, out, interner)
+        }
         _ => {}
     }
 }
@@ -668,7 +682,7 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>) {
 /// `f` the JIT can lower to a single ISA instruction. Empty when nothing
 /// intrinsic-able is imported. The import binding is what makes it safe: a
 /// user `let abs = …` shadows the name and never reaches here.
-fn math_intrinsic_imports(program: &Program) -> FxHashMap<Rc<str>, u8> {
+fn math_intrinsic_imports(program: &Program, interner: &AtomInterner) -> FxHashMap<Atom, u8> {
     use varn_core::ast::ImportSpecifier;
     let mut out = FxHashMap::default();
     for stmt in &program.body {
@@ -678,7 +692,7 @@ fn math_intrinsic_imports(program: &Program) -> FxHashMap<Rc<str>, u8> {
         let Decl::Import(imp) = d.as_ref() else {
             continue;
         };
-        if imp.source.as_ref() != "std:math" {
+        if interner.resolve(imp.source) != "std:math" {
             continue;
         }
         for spec in &imp.specifiers {
@@ -688,10 +702,11 @@ fn math_intrinsic_imports(program: &Program) -> FxHashMap<Rc<str>, u8> {
             else {
                 continue;
             };
-            if let Some(wire) =
-                varn_core::intrinsic_ops::intrinsic_lookup(&format!("std:math/{imported}"))
-            {
-                out.insert(local.clone(), wire);
+            if let Some(wire) = varn_core::intrinsic_ops::intrinsic_lookup(&format!(
+                "std:math/{}",
+                interner.resolve(*imported)
+            )) {
+                out.insert(*local, wire);
             }
         }
     }
@@ -700,7 +715,7 @@ fn math_intrinsic_imports(program: &Program) -> FxHashMap<Rc<str>, u8> {
 
 /// The mangled global names of every `extension` member — same strings
 /// `emit_extensions` produces, so they get numbered as module globals.
-fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>) {
+fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
     use varn_core::ast::ExtensionMember;
     for stmt in &program.body {
         let StmtKind::Decl(d) = &stmt.kind else {
@@ -709,14 +724,20 @@ fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>) {
         let Decl::Extension(ext) = d.as_ref() else {
             continue;
         };
-        let Some(label) = extension_target_label(&ext.target) else {
+        let Some(label) = extension_target_label(&ext.target, interner) else {
             continue;
         };
         for member in &ext.members {
             let name: Rc<str> = match member {
-                ExtensionMember::Method(f) => Rc::from(format!("__ext_{label}_{}", f.id)),
-                ExtensionMember::Getter { key, .. } => Rc::from(format!("__extget_{label}_{key}")),
-                ExtensionMember::Setter { key, .. } => Rc::from(format!("__extset_{label}_{key}")),
+                ExtensionMember::Method(f) => {
+                    Rc::from(format!("__ext_{label}_{}", interner.resolve(f.id)))
+                }
+                ExtensionMember::Getter { key, .. } => {
+                    Rc::from(format!("__extget_{label}_{}", interner.resolve(*key)))
+                }
+                ExtensionMember::Setter { key, .. } => {
+                    Rc::from(format!("__extset_{label}_{}", interner.resolve(*key)))
+                }
             };
             out.insert(name);
         }
@@ -725,11 +746,14 @@ fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>) {
 
 /// The type label an `extension X on T` targets — matches the binder's
 /// mangling (`__ext_{label}_{name}`).
-fn extension_target_label(t: &varn_core::ast::types::TypeNode) -> Option<Rc<str>> {
+fn extension_target_label(
+    t: &varn_core::ast::types::TypeNode,
+    interner: &AtomInterner,
+) -> Option<Rc<str>> {
     use varn_core::TypeKind;
     match &t.kind {
-        TypeKind::Named(n, _) => Some(Rc::from(n.as_str())),
-        TypeKind::Generic(n, _, _) => Some(Rc::from(n.as_str())),
+        TypeKind::Named(n, _) => Some(Rc::from(interner.resolve(*n))),
+        TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(*n))),
         TypeKind::Intrinsic(tag) => Some(Rc::from(varn_core::IntrinsicType::from(*tag).as_str())),
         TypeKind::Array(_) => Some(Rc::from("Array")),
         _ => None,
@@ -752,7 +776,7 @@ fn emit_extensions(
         let Decl::Extension(ext) = d.as_ref() else {
             continue;
         };
-        let Some(label) = extension_target_label(&ext.target) else {
+        let Some(label) = extension_target_label(&ext.target, ctx.interner) else {
             continue;
         };
         let recv_ty = match label.as_ref() {
@@ -774,18 +798,29 @@ fn emit_extensions(
         for member in &ext.members {
             let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, &Stmt) = match member {
                 ExtensionMember::Method(f) => (
-                    Rc::from(format!("__ext_{label}_{}", f.id)),
-                    f.params.iter().map(param_name).collect(),
+                    Rc::from(format!("__ext_{label}_{}", ctx.interner.resolve(f.id))),
+                    f.params
+                        .iter()
+                        .map(|p| param_name(p, ctx.interner))
+                        .collect(),
                     &f.body,
                 ),
-                ExtensionMember::Getter { key, body, .. } => {
-                    (Rc::from(format!("__extget_{label}_{key}")), vec![], body)
-                }
+                ExtensionMember::Getter { key, body, .. } => (
+                    Rc::from(format!(
+                        "__extget_{label}_{}",
+                        ctx.interner.resolve(*key)
+                    )),
+                    vec![],
+                    body,
+                ),
                 ExtensionMember::Setter {
                     key, param, body, ..
                 } => (
-                    Rc::from(format!("__extset_{label}_{key}")),
-                    vec![param_name(param)],
+                    Rc::from(format!(
+                        "__extset_{label}_{}",
+                        ctx.interner.resolve(*key)
+                    )),
+                    vec![param_name(param, ctx.interner)],
                     body,
                 ),
             };
@@ -871,7 +906,7 @@ fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
     })
 }
 
-fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
+fn collect_exports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
     let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
         out.push(varn_tir::TirExport {
@@ -888,7 +923,7 @@ fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
         match d.as_ref() {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => {
                 let mut names = FxHashSet::default();
-                collect_decl_names(declaration, &mut names);
+                collect_decl_names(declaration, &mut names, interner);
                 for n in names {
                     push(n.clone(), n, None, false);
                 }
@@ -897,7 +932,12 @@ fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
                 specifiers, source, ..
             }) => {
                 for sp in specifiers {
-                    push(sp.exported.clone(), sp.local.clone(), source.clone(), false);
+                    push(
+                        Rc::from(interner.resolve(sp.exported)),
+                        Rc::from(interner.resolve(sp.local)),
+                        source.map(|s| Rc::from(interner.resolve(s))),
+                        false,
+                    );
                 }
             }
             Decl::Export(ExportDecl::All {
@@ -905,7 +945,13 @@ fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
                 alias: Some(alias),
                 ..
             }) => {
-                push(alias.clone(), alias.clone(), Some(source.clone()), true);
+                let alias: Rc<str> = Rc::from(interner.resolve(*alias));
+                push(
+                    alias.clone(),
+                    alias,
+                    Some(Rc::from(interner.resolve(*source))),
+                    true,
+                );
             }
             Decl::Export(ExportDecl::Default { .. }) => {
                 push(Rc::from("default"), Rc::from("default"), None, false);
@@ -916,7 +962,7 @@ fn collect_exports(program: &Program) -> Vec<varn_tir::TirExport> {
     out
 }
 
-fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
+fn collect_imports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::TirImport> {
     use varn_core::ast::ImportSpecifier as IS;
     let mut out = Vec::new();
     for stmt in &program.body {
@@ -931,22 +977,26 @@ fn collect_imports(program: &Program) -> Vec<varn_tir::TirImport> {
             .iter()
             .map(|s| {
                 let (local, kind) = match s {
-                    IS::Default { local, .. } => (local.clone(), varn_tir::TirImportKind::Default),
-                    IS::Namespace { local, .. } => {
-                        (local.clone(), varn_tir::TirImportKind::Namespace)
-                    }
+                    IS::Default { local, .. } => (
+                        Rc::from(interner.resolve(*local)),
+                        varn_tir::TirImportKind::Default,
+                    ),
+                    IS::Namespace { local, .. } => (
+                        Rc::from(interner.resolve(*local)),
+                        varn_tir::TirImportKind::Namespace,
+                    ),
                     IS::Named {
                         local, imported, ..
                     } => (
-                        local.clone(),
-                        varn_tir::TirImportKind::Named(imported.clone()),
+                        Rc::from(interner.resolve(*local)),
+                        varn_tir::TirImportKind::Named(Rc::from(interner.resolve(*imported))),
                     ),
                 };
                 varn_tir::TirImportSpec { local, kind }
             })
             .collect();
         out.push(varn_tir::TirImport {
-            source: imp.source.clone(),
+            source: Rc::from(interner.resolve(imp.source)),
             is_type_only: imp.is_type,
             specs,
         });
@@ -985,7 +1035,7 @@ fn emit_member_fn(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::FnId {
     let sig_snapshot = signatures[sig.0 as usize].clone();
-    let param_names: Vec<Rc<str>> = params.iter().map(param_name).collect();
+    let param_names: Vec<Rc<str>> = params.iter().map(|p| param_name(p, ctx.interner)).collect();
     let fn_id = varn_tir::FnId(out.len() as u32);
     // Reserve this slot; the member's own closures follow it.
     let base = out.len() as u32 + 1;
@@ -1012,7 +1062,10 @@ fn emit_member_fn(
         for (i, p) in params.iter().enumerate() {
             if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                 if let Pattern::Identifier { name, .. } = &p.pattern {
-                    b.push(param_field_assign(name.clone(), i as u32));
+                    b.push(param_field_assign(
+                        Rc::from(ctx.interner.resolve(*name)),
+                        i as u32,
+                    ));
                 }
             }
         }
@@ -1083,7 +1136,10 @@ fn emit_class(
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
     // An anonymous `class { … }` is bound by the binder under `<anon>`.
-    let class_name = class.id.clone().unwrap_or_else(|| Rc::from("<anon>"));
+    let class_name: Rc<str> = class
+        .id
+        .map(|a| Rc::from(ctx.interner.resolve(a)))
+        .unwrap_or_else(|| Rc::from("<anon>"));
     let class_id = ctx.names.class_id(&class_name);
 
     let mut def = varn_tir::TirClassDef {
@@ -1094,7 +1150,7 @@ fn emit_class(
 
     if let Some(sup) = &class.super_class {
         if let varn_core::ast::ExprKind::Identifier { name } = &sup.kind {
-            def.parent = ctx.names.class_id(name);
+            def.parent = ctx.names.class_id(ctx.interner.resolve(*name));
         }
         let (pre, x) = lower_outer(
             sup,
@@ -1166,7 +1222,10 @@ fn emit_class(
                 }
                 let value = em.lower_expression(init);
                 stmts.append(&mut em.take_pending());
-                stmts.push(this_field_assign(key.clone(), value));
+                stmts.push(this_field_assign(
+                    Rc::from(ctx.interner.resolve(*key)),
+                    value,
+                ));
             }
         }
         drop(em);
@@ -1209,9 +1268,10 @@ fn emit_class(
                 decorators,
                 ..
             } => {
-                let sig = info_sig(key, params.len(), signatures);
+                let key_str = ctx.interner.resolve(*key);
+                let sig = info_sig(key_str, params.len(), signatures);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.{key}")),
+                    Rc::from(format!("{class_name}.{key_str}")),
                     params,
                     body,
                     modifiers.is_async,
@@ -1243,7 +1303,7 @@ fn emit_class(
                     })
                     .collect();
                 def.methods.push(varn_tir::TirClassMember {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_static: modifiers.is_static,
                     is_private: matches!(
@@ -1259,9 +1319,10 @@ fn emit_class(
                 modifiers,
                 ..
             } => {
+                let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.get {key}")),
+                    Rc::from(format!("{class_name}.get {key_str}")),
                     &[],
                     body,
                     false,
@@ -1276,7 +1337,7 @@ fn emit_class(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
@@ -1289,10 +1350,11 @@ fn emit_class(
                 modifiers,
                 ..
             } => {
+                let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 1);
                 let ps = std::slice::from_ref(param);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.set {key}")),
+                    Rc::from(format!("{class_name}.set {key_str}")),
                     ps,
                     body,
                     false,
@@ -1307,7 +1369,7 @@ fn emit_class(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
@@ -1333,7 +1395,7 @@ fn emit_class(
                     def.prelude.extend(pre);
                     x
                 });
-                def.statics.push((key.clone(), init_x));
+                def.statics.push((Rc::from(ctx.interner.resolve(*key)), init_x));
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);
@@ -1425,7 +1487,10 @@ fn emit_class(
                         continue;
                     }
                     if let Pattern::Identifier { name, .. } = &p.pattern {
-                        body.push(param_field_assign(name.clone(), i as u32));
+                        body.push(param_field_assign(
+                            Rc::from(ctx.interner.resolve(*name)),
+                            i as u32,
+                        ));
                     }
                 }
                 let mut new = field_defaults;
@@ -1454,7 +1519,7 @@ fn emit_enum(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
-    let name = en.id.clone();
+    let name: Rc<str> = Rc::from(ctx.interner.resolve(en.id));
     let enum_id = ctx.names.enum_id(&name);
     let mut def = varn_tir::TirClassDef {
         name: name.clone(),
@@ -1469,16 +1534,17 @@ fn emit_enum(
                 tag = *value;
             }
         }
+        let member_name = ctx.interner.resolve(m.id);
         let fields_str = m
             .payload_fields
             .iter()
-            .map(|f| f.name.as_ref())
+            .map(|f| ctx.interner.resolve(f.name))
             .collect::<Vec<&str>>()
             .join(",");
         let meta = if fields_str.is_empty() {
-            format!("{name}.{}", m.id)
+            format!("{name}.{member_name}")
         } else {
-            format!("{name}.{}:{fields_str}", m.id)
+            format!("{name}.{member_name}:{fields_str}")
         };
         let mut const_args = Vec::new();
         for f in &m.payload_fields {
@@ -1498,7 +1564,7 @@ fn emit_enum(
             }
         }
         def.variants.push(varn_tir::TirVariantDef {
-            name: m.id.clone(),
+            name: Rc::from(member_name),
             tag,
             meta: Rc::from(meta.as_str()),
             const_args,
@@ -1518,9 +1584,10 @@ fn emit_enum(
                 modifiers,
                 ..
             } => {
+                let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.{key}")),
+                    Rc::from(format!("{name}.{key_str}")),
                     params,
                     body,
                     modifiers.is_async,
@@ -1535,7 +1602,7 @@ fn emit_enum(
                     out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_static: modifiers.is_static,
                     is_private: false,
@@ -1573,9 +1640,10 @@ fn emit_enum(
                 modifiers,
                 ..
             } => {
+                let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.get {key}")),
+                    Rc::from(format!("{name}.get {key_str}")),
                     &[],
                     body,
                     false,
@@ -1590,7 +1658,7 @@ fn emit_enum(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
@@ -1603,9 +1671,10 @@ fn emit_enum(
                 modifiers,
                 ..
             } => {
+                let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 1);
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.set {key}")),
+                    Rc::from(format!("{name}.set {key_str}")),
                     std::slice::from_ref(param),
                     body,
                     false,
@@ -1620,7 +1689,7 @@ fn emit_enum(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: key.clone(),
+                    key: Rc::from(key_str),
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
@@ -1647,7 +1716,7 @@ fn emit_enum(
                     def.prelude.extend(pre);
                     x
                 });
-                def.statics.push((key.clone(), init_x));
+                def.statics.push((Rc::from(ctx.interner.resolve(*key)), init_x));
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);
@@ -1674,9 +1743,9 @@ fn emit_enum(
     def
 }
 
-fn param_name(p: &Param) -> Rc<str> {
+fn param_name(p: &Param, interner: &AtomInterner) -> Rc<str> {
     match &p.pattern {
-        Pattern::Identifier { name, .. } => name.clone(),
+        Pattern::Identifier { name, .. } => Rc::from(interner.resolve(*name)),
         _ => Rc::from("_"),
     }
 }
@@ -1695,9 +1764,10 @@ fn emit_function(
     // The function's signature is on its global symbol as a `Fn` type. Its
     // arity is forced to the AST parameter count so the verifier's arity
     // check on a DirectFn call site agrees with `fn_index`.
+    let fn_name_str = ctx.interner.resolve(f.id);
     let sym_ty = bind
         .global_symbols()
-        .find(|s| s.name == f.id)
+        .find(|s| s.name.as_ref() == fn_name_str)
         .and_then(|s| s.ty.clone());
 
     let arity = f.params.len();
@@ -1716,7 +1786,7 @@ fn emit_function(
         return_ty,
     });
 
-    let param_names: Vec<Rc<str>> = f.params.iter().map(param_name).collect();
+    let param_names: Vec<Rc<str>> = f.params.iter().map(|p| param_name(p, ctx.interner)).collect();
     let (body, locals) = {
         let mut em = FnEmitter::new(
             expr_table,
@@ -1736,7 +1806,7 @@ fn emit_function(
     };
 
     TirFunction {
-        name: f.id.clone(),
+        name: Rc::from(fn_name_str),
         sig,
         params: param_tys,
         return_ty,
