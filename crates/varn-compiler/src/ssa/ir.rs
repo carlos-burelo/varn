@@ -276,6 +276,11 @@ pub enum InstKind {
 
     BuildArray {
         elements: Vec<Value>,
+        /// `Some(tag)` cuando el elemento declarado es un ancho angosto
+        /// (`i8..u32/f32`): el runtime construye un `ArrayRepr` tipado en
+        /// vez de inferir la representación por valores. `None` preserva
+        /// el camino existente (`Boxed`/`I64`/`F64` por `from_items`).
+        narrow_elem: Option<varn_core::TypeTag>,
     },
 
     BuildTuple {

@@ -243,13 +243,14 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack(d, *tag as u8), line);
         }
 
-        InstKind::BuildArray { elements } => {
+        InstKind::BuildArray { elements, narrow_elem } => {
             for (i, e) in elements.iter().enumerate() {
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], line);
             }
             chunk.emit(OpCode::BuildArray, line);
             chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(elements.len() as u8, 0), line);
+            let tag_byte = narrow_elem.map_or(0u8, |t| t as u8);
+            chunk.write(Chunk::pack(elements.len() as u8, tag_byte), line);
         }
 
         InstKind::BuildTuple { elements } => {

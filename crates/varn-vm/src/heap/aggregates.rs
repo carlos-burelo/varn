@@ -13,6 +13,30 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
     }
 
+    /// Construye un `ArrayRepr` tipado directamente desde el `TypeTag`
+    /// angosto declarado (Task 3 del plan narrow-array-repr), en vez de
+    /// inferir la representación por los valores como `alloc_array_vm`
+    /// hace. `tag` nunca es `TypeTag::Null` (el llamador solo entra aquí
+    /// cuando el byte de la instrucción es distinto de 0).
+    pub(crate) fn alloc_array_vm_narrow(
+        &mut self,
+        items: Vec<VmValue>,
+        tag: varn_core::TypeTag,
+    ) -> VmValue {
+        use varn_core::TypeTag as T;
+        let va = match tag {
+            T::I8 => VmArray::new_i8(items.iter().map(|v| v.as_int() as i8).collect()),
+            T::I16 => VmArray::new_i16(items.iter().map(|v| v.as_int() as i16).collect()),
+            T::I32 => VmArray::new_i32(items.iter().map(|v| v.as_int() as i32).collect()),
+            T::U8 => VmArray::new_u8(items.iter().map(|v| v.as_int() as u8).collect()),
+            T::U16 => VmArray::new_u16(items.iter().map(|v| v.as_int() as u16).collect()),
+            T::U32 => VmArray::new_u32(items.iter().map(|v| v.as_int() as u32).collect()),
+            T::F32 => VmArray::new_f32(items.iter().map(|v| v.as_f64() as f32).collect()),
+            _ => return self.alloc_array_vm(items),
+        };
+        VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
+    }
+
     pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))

@@ -1015,7 +1015,13 @@ impl<'m> Builder<'m> {
                             varn_tir::TirArrayEl::Spread(_) => unreachable!(),
                         }
                     }
-                    Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
+                    let narrow_elem = match e.ty {
+                        BackendTy::Array(elem_id) => {
+                            narrow_tag_of(self.tir.types.get(elem_id))
+                        }
+                        _ => None,
+                    };
+                    Ok(self.emit(InstKind::BuildArray { elements: vals, narrow_elem }, ty))
                 }
             }
             TirExprKind::TupleLit(xs) => {

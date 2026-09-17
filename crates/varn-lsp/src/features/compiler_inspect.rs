@@ -309,7 +309,7 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
             format!("v{}.{}({})", recv.0, name, args_str)
         }
         IsNull { operand } => format!("v{} == null", operand.0),
-        BuildArray { elements } => {
+        BuildArray { elements, .. } => {
             let elems = elements
                 .iter()
                 .map(|e| format!("v{}", e.0))
