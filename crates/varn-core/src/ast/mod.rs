@@ -1,3 +1,4 @@
+pub mod arena;
 pub mod decl;
 pub mod expr;
 pub mod operators;
@@ -6,6 +7,7 @@ pub mod program;
 pub mod stmt;
 pub mod types;
 
+pub use arena::{AstArena, ExprId, StmtId};
 pub use program::Program;
 
 pub use decl::{
