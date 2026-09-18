@@ -12,6 +12,7 @@ mod cpu_freq;
 mod doctor_impl;
 mod error;
 mod formatter;
+#[cfg(feature = "lsp")]
 mod inspect_lsp;
 mod pipeline;
 mod tester;
@@ -100,7 +101,12 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
+        #[cfg(feature = "lsp")]
         Commands::Lsp(args) => commands::lsp::execute(args),
+        #[cfg(not(feature = "lsp"))]
+        Commands::Lsp(_) => Err(error::CliError::fatal(
+            "vn was built without the \"lsp\" feature (disabled during the Fase 1 compiler refactor)".into(),
+        )),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
     }

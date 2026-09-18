@@ -12,6 +12,7 @@ pub mod fmt;
 pub mod init;
 
 pub mod install;
+#[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod pkg;
 pub mod remove;

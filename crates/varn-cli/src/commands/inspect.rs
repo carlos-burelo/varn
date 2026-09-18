@@ -14,6 +14,7 @@ pub fn execute(args: InspectArgs) -> Result<(), CliError> {
         }
     };
 
+    #[cfg(feature = "lsp")]
     crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
 
     pipeline::run(&RunOpts {

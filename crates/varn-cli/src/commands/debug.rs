@@ -20,6 +20,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
         }
     };
 
+    #[cfg(feature = "lsp")]
     crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
 
     // Every phase but `gc` reads the compiled program without running it.
