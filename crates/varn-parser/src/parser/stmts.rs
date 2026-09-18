@@ -2,10 +2,10 @@ use crate::stream::TokenStream;
 #[cfg(feature = "profiling")]
 use std::time::Instant;
 use varn_core::ast::operators::VarKind;
-use varn_core::ast::{CatchClause, ForInit, Stmt, StmtKind, SwitchCase, VarDeclarator};
+use varn_core::ast::{CatchClause, ForInit, StmtId, StmtKind, SwitchCase, VarDeclarator};
 use varn_core::TokenKind;
 
-pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
+pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
     while s.check(TokenKind::DocComment) {
         // Doc comments are prose, not names — they don't belong in the atom
         // table, so they bypass `consume_lexeme` and keep the plain `Rc<str>`
@@ -59,13 +59,7 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
             s.advance();
             let body = parse_stmt_or_decl_inner(s)?;
             let range = s.span_from(start_range);
-            Ok(s.stmt(
-                range,
-                StmtKind::Labeled {
-                    label,
-                    body: Box::new(body),
-                },
-            ))
+            Ok(s.stmt(range, StmtKind::Labeled { label, body }))
         }
 
         _ => {
@@ -73,17 +67,12 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
             let expr = crate::expressions::parse_seq_expr(s)?;
             s.eat_semicolon();
             let range = s.span_from(start_range);
-            Ok(s.stmt(
-                range,
-                StmtKind::Expr {
-                    expression: Box::new(expr),
-                },
-            ))
+            Ok(s.stmt(range, StmtKind::Expr { expression: expr }))
         }
     }
 }
 
-pub fn parse_block(s: &mut TokenStream) -> Result<Stmt, String> {
+pub fn parse_block(s: &mut TokenStream) -> Result<StmtId, String> {
     #[cfg(feature = "profiling")]
     let started = Instant::now();
     let start_range = s.range();
@@ -133,7 +122,7 @@ pub fn parse_block(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(range, StmtKind::Block { stmts }))
 }
 
-fn parse_if_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
@@ -141,7 +130,7 @@ fn parse_if_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     s.expect(TokenKind::RParen)?;
     let consequent = parse_stmt_or_decl_inner(s)?;
     let alternate = if s.eat(TokenKind::Else) {
-        Some(Box::new(parse_stmt_or_decl_inner(s)?))
+        Some(parse_stmt_or_decl_inner(s)?)
     } else {
         None
     };
@@ -149,14 +138,14 @@ fn parse_if_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(
         range,
         StmtKind::If {
-            test: Box::new(test),
-            consequent: Box::new(consequent),
+            test,
+            consequent,
             alternate,
         },
     ))
 }
 
-fn parse_while_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
@@ -164,16 +153,10 @@ fn parse_while_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     s.expect(TokenKind::RParen)?;
     let body = parse_stmt_or_decl_inner(s)?;
     let range = s.span_from(start_range);
-    Ok(s.stmt(
-        range,
-        StmtKind::While {
-            test: Box::new(test),
-            body: Box::new(body),
-        },
-    ))
+    Ok(s.stmt(range, StmtKind::While { test, body }))
 }
 
-fn parse_do_while_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_do_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let body = parse_stmt_or_decl_inner(s)?;
@@ -183,16 +166,10 @@ fn parse_do_while_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     s.expect(TokenKind::RParen)?;
     s.eat_semicolon();
     let range = s.span_from(start_range);
-    Ok(s.stmt(
-        range,
-        StmtKind::DoWhile {
-            body: Box::new(body),
-            test: Box::new(test),
-        },
-    ))
+    Ok(s.stmt(range, StmtKind::DoWhile { body, test }))
 }
 
-fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let is_await = s.eat(TokenKind::Await);
@@ -229,8 +206,8 @@ fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
                 StmtKind::ForIn {
                     kind,
                     left: pat,
-                    right: Box::new(right),
-                    body: Box::new(body),
+                    right,
+                    body,
                 },
             ));
         }
@@ -244,8 +221,8 @@ fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
                 StmtKind::ForOf {
                     kind,
                     left: pat,
-                    right: Box::new(right),
-                    body: Box::new(body),
+                    right,
+                    body,
                     is_await,
                 },
             ));
@@ -268,13 +245,13 @@ fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     let test = if s.check(TokenKind::Semicolon) {
         None
     } else {
-        Some(Box::new(crate::expressions::parse_seq_expr(s)?))
+        Some(crate::expressions::parse_seq_expr(s)?)
     };
     s.expect(TokenKind::Semicolon)?;
     let update = if s.check(TokenKind::RParen) {
         None
     } else {
-        Some(Box::new(crate::expressions::parse_seq_expr(s)?))
+        Some(crate::expressions::parse_seq_expr(s)?)
     };
     s.expect(TokenKind::RParen)?;
     let body = parse_stmt_or_decl_inner(s)?;
@@ -286,12 +263,12 @@ fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
             init,
             test,
             update,
-            body: Box::new(body),
+            body,
         },
     ))
 }
 
-fn parse_switch_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_switch_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
@@ -329,13 +306,13 @@ fn parse_switch_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(
         range,
         StmtKind::Switch {
-            discriminant: Box::new(discriminant),
+            discriminant,
             cases,
         },
     ))
 }
 
-fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<Stmt, String> {
+fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<StmtId, String> {
     let start_range = s.range();
     if is_await {
         s.expect(TokenKind::Await)?;
@@ -378,11 +355,11 @@ fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<Stmt, String>
     ))
 }
 
-fn parse_return_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_return_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let argument = if !s.check(TokenKind::Semicolon) && !s.check(TokenKind::RBrace) && !s.is_eof() {
-        Some(Box::new(crate::expressions::parse_seq_expr(s)?))
+        Some(crate::expressions::parse_seq_expr(s)?)
     } else {
         None
     };
@@ -391,7 +368,7 @@ fn parse_return_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(range, StmtKind::Return { argument }))
 }
 
-fn parse_break_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_break_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
 
@@ -408,7 +385,7 @@ fn parse_break_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(range, StmtKind::Break { label }))
 }
 
-fn parse_continue_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_continue_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
 
@@ -425,21 +402,16 @@ fn parse_continue_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(range, StmtKind::Continue { label }))
 }
 
-fn parse_throw_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_throw_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let argument = crate::expressions::parse_seq_expr(s)?;
     s.eat_semicolon();
     let range = s.span_from(start_range);
-    Ok(s.stmt(
-        range,
-        StmtKind::Throw {
-            argument: Box::new(argument),
-        },
-    ))
+    Ok(s.stmt(range, StmtKind::Throw { argument }))
 }
 
-fn parse_try_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
+fn parse_try_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let block = parse_block(s)?;
@@ -471,13 +443,13 @@ fn parse_try_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
         catches.push(CatchClause {
             param,
             type_ann,
-            body: Box::new(body),
+            body,
             range: catch_range,
         });
     }
 
     let finally = if s.eat(TokenKind::Finally) {
-        Some(Box::new(parse_block(s)?))
+        Some(parse_block(s)?)
     } else {
         None
     };
@@ -490,7 +462,7 @@ fn parse_try_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     Ok(s.stmt(
         range,
         StmtKind::Try {
-            block: Box::new(block),
+            block,
             catches,
             finally,
         },

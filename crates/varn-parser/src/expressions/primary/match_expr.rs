@@ -1,9 +1,9 @@
 use crate::stream::TokenStream;
 use varn_core::ast::expr::MatchCase;
-use varn_core::ast::{Expr, MatchBody, MatchPattern};
+use varn_core::ast::{ExprId, MatchBody, MatchPattern};
 use varn_core::TokenKind;
 
-pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<Expr, String> {
+pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let range = s.range();
     s.advance();
 
@@ -24,10 +24,7 @@ pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let full_range = s.span_from(range);
     Ok(s.expr(
         full_range,
-        varn_core::ast::ExprKind::Match {
-            subject: Box::new(subject),
-            cases,
-        },
+        varn_core::ast::ExprKind::Match { subject, cases },
     ))
 }
 
@@ -101,8 +98,8 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
         let expr = s.expr(
             id_range.to(prop_range),
             varn_core::ast::ExprKind::Member {
-                object: Box::new(id_expr),
-                property: Box::new(prop_expr),
+                object: id_expr,
+                property: prop_expr,
                 computed: false,
                 optional: false,
             },

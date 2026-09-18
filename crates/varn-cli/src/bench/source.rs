@@ -98,7 +98,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile, interner) = varn_parser::parse_with_profile(
+    // TODO(fase1-componente2): varn-cli's bench path still expects
+    // `Vec<Stmt>`; the arena migration for this crate lands in a later task.
+    let (program, parse_profile, interner, _arena) = varn_parser::parse_with_profile(
         tokens,
         lexeme_buf,
         path,
@@ -274,7 +276,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (program, _, interner) = varn_parser::parse_with_profile(
+        // TODO(fase1-componente2): see the other `parse_with_profile` call
+        // above — same deferred arena.
+        let (program, _, interner, _arena) = varn_parser::parse_with_profile(
             tokens,
             lexeme_buf,
             path,

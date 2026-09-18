@@ -174,7 +174,7 @@ pub fn parse_class_member(
                 return Err("declare constructor cannot have a body".to_owned());
             }
             s.eat_semicolon();
-            varn_core::ast::Stmt::new_with_range(s.range(), varn_core::ast::StmtKind::Empty)
+            s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
         } else {
             super::super::stmts::parse_block(s)?
         };
@@ -192,7 +192,7 @@ pub fn parse_class_member(
                 return Err("declare destructor cannot have a body".to_owned());
             }
             s.eat_semicolon();
-            varn_core::ast::Stmt::new_with_range(s.range(), varn_core::ast::StmtKind::Empty)
+            s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
         } else {
             super::super::stmts::parse_block(s)?
         };

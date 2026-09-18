@@ -1,8 +1,8 @@
 use crate::expressions::helpers::unescape_string;
 use crate::stream::TokenStream;
-use varn_core::ast::{Expr, TemplatePart};
+use varn_core::ast::{ExprId, TemplatePart};
 
-pub(crate) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
+pub(crate) fn parse_template(s: &mut TokenStream) -> Result<ExprId, String> {
     let range = s.range();
     let mut parts = vec![];
 

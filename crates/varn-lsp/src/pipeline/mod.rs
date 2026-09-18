@@ -99,7 +99,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         })
         .collect();
 
-    let (program, parse_errs) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
+    // TODO(fase1-componente2): the LSP pipeline still expects `Vec<Stmt>`;
+    // arena wiring for varn-lsp lands in a later task.
+    let (program, parse_errs, _arena) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,

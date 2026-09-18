@@ -2,7 +2,7 @@ use super::parse_assign_expr;
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::expr::ArrowBody;
-use varn_core::ast::{Expr, ExprKind, Param, Pattern};
+use varn_core::ast::{ExprId, ExprKind, Param, Pattern};
 use varn_core::TokenKind;
 
 pub(super) fn could_be_arrow(s: &TokenStream) -> bool {
@@ -69,7 +69,7 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
     }
 }
 
-pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<Expr>, String> {
+pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<ExprId>, String> {
     let save = s.save();
     match parse_arrow_attempt(s) {
         Ok(expr) => Ok(Some(expr)),
@@ -80,7 +80,7 @@ pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<Expr>, Strin
     }
 }
 
-fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
+fn parse_arrow_attempt(s: &mut TokenStream) -> Result<ExprId, String> {
     let start_range = s.range();
     let is_async = s.eat(TokenKind::Async);
 
@@ -131,12 +131,12 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
     ))
 }
 
-pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<Expr, String> {
+pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let start_range = s.range();
     s.advance();
     let delegate = s.eat(TokenKind::Star);
     let argument = if !s.check(TokenKind::Semicolon) && !s.check(TokenKind::RBrace) && !s.is_eof() {
-        Some(Box::new(parse_assign_expr(s)?))
+        Some(parse_assign_expr(s)?)
     } else {
         None
     };

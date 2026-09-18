@@ -2,7 +2,7 @@ use crate::expressions::{parse_call_args_pub, parse_expr};
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::operators::{Modifiers, Visibility};
-use varn_core::ast::{ArrayPatternEl, Decorator, Expr, ExprKind, ObjPatternProp, Param, Pattern};
+use varn_core::ast::{ArrayPatternEl, Decorator, ExprId, ExprKind, ObjPatternProp, Param, Pattern};
 use varn_core::TokenKind;
 
 pub fn parse_params(s: &mut TokenStream) -> Result<Vec<Param>, String> {
@@ -57,7 +57,7 @@ fn parse_param(s: &mut TokenStream) -> Result<Param, String> {
         None
     };
     let default = if s.eat(TokenKind::Eq) {
-        Some(Box::new(parse_expr(s)?))
+        Some(parse_expr(s)?)
     } else {
         None
     };
@@ -147,7 +147,7 @@ fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             let assign_range = s.span_from(*pat.range());
             pat = Pattern::Assignment {
                 left: Box::new(pat),
-                right: Box::new(default),
+                right: default,
                 range: assign_range,
             };
         }
@@ -206,7 +206,7 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             let assign_range = s.span_from(prop_range);
             Pattern::Assignment {
                 left: Box::new(value),
-                right: Box::new(default),
+                right: default,
                 range: assign_range,
             }
         } else {
@@ -245,7 +245,7 @@ pub fn parse_decorator_list(s: &mut TokenStream) -> Result<Vec<Decorator>, Strin
     Ok(decorators)
 }
 
-fn parse_decorator_expr(s: &mut TokenStream) -> Result<Expr, String> {
+fn parse_decorator_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let range = s.range();
     let name = s.expect_id()?;
     let mut expr = s.expr(range, ExprKind::Identifier { name });
@@ -253,13 +253,13 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<Expr, String> {
     while s.eat(TokenKind::Dot) {
         let prop_range = s.range();
         let prop = s.consume_lexeme();
-        let start_range = *expr.range();
+        let start_range = s.expr_range(expr);
         let prop_expr = s.expr(prop_range, ExprKind::Identifier { name: prop });
         expr = s.expr(
             start_range.to(prop_range),
             ExprKind::Member {
-                object: Box::new(expr),
-                property: Box::new(prop_expr),
+                object: expr,
+                property: prop_expr,
                 computed: false,
                 optional: false,
             },
@@ -268,11 +268,11 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
     if s.check(TokenKind::LParen) {
         let (type_args, args, call_range) = parse_call_args_pub(s)?;
-        let start_range = *expr.range();
+        let start_range = s.expr_range(expr);
         expr = s.expr(
             start_range.to(call_range),
             ExprKind::Call {
-                callee: Box::new(expr),
+                callee: expr,
                 type_args,
                 args,
                 optional: false,

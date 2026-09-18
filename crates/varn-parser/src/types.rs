@@ -202,7 +202,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             s.advance();
             let expr = crate::expressions::parse_unary_expr(s)?;
             let full_range = s.span_from(range);
-            Ok(s.type_node(full_range, TypeKind::Typeof(Box::new(expr))))
+            Ok(s.type_node(full_range, TypeKind::Typeof(expr)))
         }
 
         TokenKind::LParen => {

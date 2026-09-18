@@ -386,7 +386,7 @@ pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String
             break;
         }
         let stmt = super::super::stmts::parse_stmt_or_decl_inner(s)?;
-        if let StmtKind::Decl(d) = stmt.kind {
+        if let StmtKind::Decl(d) = s.arena.stmt(stmt).kind.clone() {
             body.push(*d);
         }
     }

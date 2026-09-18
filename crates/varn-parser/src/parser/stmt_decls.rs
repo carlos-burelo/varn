@@ -1,5 +1,5 @@
 use crate::stream::TokenStream;
-use varn_core::ast::{Decl, Stmt, StmtKind};
+use varn_core::ast::{Decl, StmtId, StmtKind};
 use varn_core::TokenKind;
 
 pub(super) fn try_parse_decl_stmt(
@@ -7,7 +7,7 @@ pub(super) fn try_parse_decl_stmt(
     kind: TokenKind,
     next_kind: TokenKind,
     decorators: Vec<varn_core::ast::Decorator>,
-) -> Option<Result<Stmt, String>> {
+) -> Option<Result<StmtId, String>> {
     if kind == TokenKind::Declare {
         s.advance();
         return try_parse_decl_stmt_mode(s, s.kind(), s.peek_kind(1), decorators, true);
@@ -22,7 +22,7 @@ pub(super) fn try_parse_decl_stmt_mode(
     next_kind: TokenKind,
     decorators: Vec<varn_core::ast::Decorator>,
     is_declare: bool,
-) -> Option<Result<Stmt, String>> {
+) -> Option<Result<StmtId, String>> {
     let result = match kind {
         TokenKind::Function => {
             let mut decl = match super::decls::parse_function_decl(s, decorators, false, is_declare)

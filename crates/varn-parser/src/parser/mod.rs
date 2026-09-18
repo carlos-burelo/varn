@@ -189,7 +189,7 @@ impl Parser {
         self.stream.span_from(start)
     }
 
-    fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::Stmt, String> {
+    fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::StmtId, String> {
         #[cfg(feature = "profiling")]
         let started = Instant::now();
         let s = &mut self.stream;

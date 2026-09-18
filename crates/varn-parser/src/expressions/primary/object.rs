@@ -1,10 +1,10 @@
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::expr::PropKey;
-use varn_core::ast::{Expr, ObjectProp};
+use varn_core::ast::{ExprId, ObjectProp};
 use varn_core::TokenKind;
 
-pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
+pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let range = s.range();
     s.advance();
     let properties = parse_object_body(s)?;
@@ -56,7 +56,7 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Getter {
                 key,
-                body: Box::new(body),
+                body,
                 return_type,
                 range: full_prop_range,
             });
@@ -75,7 +75,7 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             properties.push(ObjectProp::Setter {
                 key,
                 param,
-                body: Box::new(body),
+                body,
                 range: full_prop_range,
             });
             s.eat(TokenKind::Comma);
@@ -105,7 +105,7 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             properties.push(ObjectProp::Method {
                 key,
                 params,
-                body: Box::new(body),
+                body,
                 return_type,
                 is_async,
                 is_generator,

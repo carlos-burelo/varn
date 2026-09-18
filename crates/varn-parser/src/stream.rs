@@ -1,6 +1,6 @@
 use crate::ParseProfile;
 use std::rc::Rc;
-use varn_core::ast::{AstId, AstTypeKind, Expr, ExprKind, Stmt, StmtKind, TypeNode};
+use varn_core::ast::{AstArena, AstId, AstTypeKind, ExprId, ExprKind, StmtId, StmtKind, TypeNode};
 use varn_core::{ErrorCode, ParsedNumber, SourceRange, Token, TokenKind};
 
 pub struct TokenStream {
@@ -24,6 +24,12 @@ pub struct TokenStream {
     /// exactly why `errors` and `pending_doc` live here too. `Parser`
     /// derefs to `TokenStream`, so `parser.interner` still resolves.
     pub interner: varn_core::AtomInterner,
+
+    /// Owns every `Expr`/`Stmt` node this parse allocates. Lives here for the
+    /// same reason `interner` does: the parser is a tree of free functions
+    /// threaded with `&mut TokenStream`. Unlike `interner`, this is never
+    /// shared across files — each parse gets a fresh arena, created below.
+    pub arena: AstArena,
 }
 
 impl TokenStream {
@@ -50,6 +56,7 @@ impl TokenStream {
             split_count: 0,
             next_ast_id: 1,
             interner,
+            arena: AstArena::new(),
         }
     }
 
@@ -61,13 +68,23 @@ impl TokenStream {
     }
 
     #[inline(always)]
-    pub fn expr(&mut self, range: SourceRange, kind: ExprKind) -> Expr {
-        Expr::new(self.next_ast_id(), range, kind)
+    pub fn expr(&mut self, range: SourceRange, kind: ExprKind) -> ExprId {
+        self.arena.alloc_expr(kind, range)
     }
 
     #[inline(always)]
-    pub fn stmt(&mut self, range: SourceRange, kind: StmtKind) -> Stmt {
-        Stmt::new(self.next_ast_id(), range, kind)
+    pub fn stmt(&mut self, range: SourceRange, kind: StmtKind) -> StmtId {
+        self.arena.alloc_stmt(kind, range)
+    }
+
+    #[inline(always)]
+    pub fn expr_range(&self, id: ExprId) -> SourceRange {
+        self.arena.expr(id).range
+    }
+
+    #[inline(always)]
+    pub fn stmt_range(&self, id: StmtId) -> SourceRange {
+        self.arena.stmt(id).range
     }
 
     #[inline(always)]

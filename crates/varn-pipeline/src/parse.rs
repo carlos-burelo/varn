@@ -20,7 +20,11 @@ pub fn parse(
     // resolver's shared table instead, and publish the grown result back, so
     // the root file and everything it imports share one `Atom` space.
     let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
-    let (program, interner) = varn_parser::parse(tokens, lexeme_buf, path, interner).map_err(|errs| {
+    // TODO(fase1-componente2): varn-pipeline's own `parse` still returns
+    // `(Program, AtomInterner)`; threading `AstArena` through its public
+    // signature (and every caller of *this* function) is later-task scope.
+    let (program, interner, _arena) = varn_parser::parse(tokens, lexeme_buf, path, interner)
+        .map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
             .map(|e| varn_core::diagnostics::format_diagnostic(e, source))

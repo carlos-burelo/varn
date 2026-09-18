@@ -243,7 +243,11 @@ impl DiskResolver {
         // the resolver's own table is untouched, so a module that fails to
         // parse never rolls back atoms other modules already minted.
         let interner = self.interner_snapshot();
-        let (program, interner) = varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
+        // TODO(fase1-componente2): `program.body` is now `Vec<StmtId>` and this
+        // resolver's callers still expect `Vec<Stmt>` — varn-checker migrates
+        // to the arena in a later task. `_arena` is dropped here for now.
+        let (program, interner, _arena) =
+            varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
         self.set_interner(interner);
         let program = Rc::new(program);
         self.store_program(key.to_owned(), Rc::clone(&program));

@@ -6,7 +6,7 @@ use super::helpers::{parse_int_radix, split_regex, unescape_string};
 use super::{parse_call_args, parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
-use varn_core::ast::{ArrayEl, Expr, ExprKind};
+use varn_core::ast::{ArrayEl, ExprId, ExprKind};
 use varn_core::ParsedNumber;
 use varn_core::TokenKind;
 
@@ -15,7 +15,7 @@ pub(crate) use self::object::parse_object_body;
 use self::object::parse_object_expr;
 pub(crate) use self::template::parse_template;
 
-pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
+pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let range = s.range();
 
     match s.kind() {
@@ -121,12 +121,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let expr = parse_seq_expr(s)?;
             s.expect(TokenKind::RParen)?;
             let full_range = s.span_from(start_range);
-            Ok(s.expr(
-                full_range,
-                ExprKind::Paren {
-                    expression: Box::new(expr),
-                },
-            ))
+            Ok(s.expr(full_range, ExprKind::Paren { expression: expr }))
         }
 
         TokenKind::New => parse_new_expr(s, range),
@@ -164,7 +159,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 s.advance();
                 let obj = parse_object_expr(s)?;
                 let full_range = s.span_from(start_range);
-                let ExprKind::Object { properties } = obj.kind else {
+                let ExprKind::Object { properties } = s.arena.expr(obj).kind.clone() else {
                     unreachable!()
                 };
                 Ok(s.expr(full_range, ExprKind::Record { properties }))
@@ -191,7 +186,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
     }
 }
 
-fn parse_array_expr(s: &mut TokenStream) -> Result<Expr, String> {
+fn parse_array_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let start_range = s.range();
     s.advance();
     let mut elements = vec![];
@@ -216,7 +211,7 @@ fn parse_array_expr(s: &mut TokenStream) -> Result<Expr, String> {
     Ok(s.expr(full_range, ExprKind::Array { elements }))
 }
 
-fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<Expr, String> {
+fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<ExprId, String> {
     s.advance();
     let callee = super::parse_new_callee_expr(s)?;
     let mut type_args = vec![];
@@ -241,14 +236,14 @@ fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<
     Ok(s.expr(
         full_range,
         ExprKind::New {
-            callee: Box::new(callee),
+            callee,
             type_args,
             args,
         },
     ))
 }
 
-fn parse_function_expr(s: &mut TokenStream) -> Result<Expr, String> {
+fn parse_function_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let start_range = s.range();
     s.advance();
     parse_function_expr_inner_with_start(s, false, start_range)
@@ -258,7 +253,7 @@ fn parse_function_expr_inner_with_start(
     s: &mut TokenStream,
     is_async: bool,
     start_range: varn_core::SourceRange,
-) -> Result<Expr, String> {
+) -> Result<ExprId, String> {
     let is_generator = s.eat(TokenKind::Star);
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())
@@ -279,14 +274,14 @@ fn parse_function_expr_inner_with_start(
             fn_id: id,
             params,
             return_type,
-            body: Box::new(body),
+            body,
             is_async,
             is_generator,
         },
     ))
 }
 
-fn parse_class_expr(s: &mut TokenStream) -> Result<Expr, String> {
+fn parse_class_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let decl = crate::parser::parse_class_decl(s, vec![], false)?;
     let full_range = decl.range;
     Ok(s.expr(

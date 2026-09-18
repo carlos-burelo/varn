@@ -237,7 +237,7 @@ pub fn parse_export_decl(
             None => super::super::stmts::parse_stmt_or_decl_inner(s)?,
         }
     };
-    if let StmtKind::Decl(d) = decl.kind {
+    if let StmtKind::Decl(d) = s.arena.stmt(decl).kind.clone() {
         let full_range = s.span_from(range);
         return Ok(ExportDecl::Decl {
             ast_id: s.next_ast_id(),
