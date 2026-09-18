@@ -17,6 +17,16 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.interner())
     }
 
+    // The `TypeNode`s this wrapper's callers walk (e.g. a `typeof` inside the
+    // bound type it wraps) are always local to the module being checked —
+    // this context only ever narrows/extends bindings within that one
+    // module's type resolution, it never reaches into another module's AST.
+    // So forwarding the inner `ast_arena()` is safe, unlike
+    // `AliasSubstitutionContext` below.
+    fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
+        self.inner.and_then(|c| c.ast_arena())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(ty) = self.bindings.get(name) {
             return Some(ty.clone());
@@ -96,6 +106,12 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.interner())
     }
 
+    // Same reasoning as `InferBindingContext`: a mapped type's `TypeNode`s
+    // are always the local module's, so forwarding is safe.
+    fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
+        self.inner.and_then(|c| c.ast_arena())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if name == self.key_var {
             return Some(self.key_value.clone());
@@ -147,6 +163,22 @@ impl TypeContext for AliasSubstitutionContext<'_> {
 
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         self.inner.and_then(|c| c.interner())
+    }
+
+    // Deliberately NOT forwarded, unlike `InferBindingContext`/`MappedContext`
+    // above. `alias_node` (see `try_stdlib_generic_alias`) is loaded from
+    // `core:types` — a *different* module than the one being checked — so
+    // `self.inner.ast_arena()` would be the checked module's arena, not
+    // `core:types`'s. Forwarding it would resolve the alias's `ExprId`s
+    // (e.g. a `typeof` inside the aliased type) against the wrong arena:
+    // the same cross-module mixup `AstTypeKind`'s doc comment warns about,
+    // just at the arena level instead of the interner level. Staying `None`
+    // means `typeof` inside an imported generic alias still resolves to
+    // `Type::Dynamic` — not a new regression, that was already the case
+    // before this wrapper existed; only `InferBindingContext`/`MappedContext`
+    // (whose `TypeNode`s are always local) had ast_arena() wired up.
+    fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
+        None
     }
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {

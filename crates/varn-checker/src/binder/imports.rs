@@ -151,6 +151,15 @@ impl<'r> super::Binder<'r> {
                             // resolver's current shared snapshot, which by now
                             // holds everything the exporting bind published.
                             let foreign = self.resolver.interner_snapshot();
+                            // `alias_node` is lost here too, same as the
+                            // disk-cache round trip `to_cacheable` documents
+                            // (this is that same round trip, just in-memory).
+                            // An imported type alias's `typeof`/mapped-type
+                            // expansion doesn't go through this `Symbol` at
+                            // all — it goes through the foreign-module path
+                            // in `resolve_type_alias` (`binder/types.rs`),
+                            // which reaches the origin module's own bind
+                            // instead of this locally-rehydrated copy.
                             let mut s = Symbol::from_cacheable(
                                 resolved.to_cacheable(&foreign),
                                 &mut self.interner,

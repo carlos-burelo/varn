@@ -164,6 +164,22 @@ impl DiskResolver {
     pub fn set_interner(&self, interner: varn_core::AtomInterner) {
         let mut live = self.interner.borrow_mut();
         if interner.len() >= live.len() {
+            // `interner` is assumed to be a superset-by-prefix of `live`:
+            // every `Atom` already minted against `live` must still resolve
+            // to the same text in `interner`, or every `Symbol`/`Type` that
+            // captured one of those `Atom`s silently starts pointing at the
+            // wrong string the moment we swap the table below. This check is
+            // debug-only (real prefix corruption is a deeper invariant this
+            // function alone can't fix — see its module doc) but turns a
+            // silent divergence into a loud, local panic instead of a
+            // mysterious wrong-name diagnostic three calls later.
+            debug_assert!(
+                live.iter_strings().eq(interner.iter_strings().take(live.len())),
+                "set_interner: incoming interner's first {} entries diverge from the live \
+                 interner's — every Atom already minted against `live` would silently resolve \
+                 to different text after this swap",
+                live.len()
+            );
             *live = interner;
         }
     }

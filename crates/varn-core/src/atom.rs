@@ -5,8 +5,11 @@ use rustc_hash::FxHashMap;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Atom(u32);
 
-/// Tabla de interning por sesión de compilación. Una instancia vive por
-/// parseo (ver `AstArena`, que la contiene desde el Componente 2).
+/// Tabla de interning por sesión de compilación completa (no por parseo
+/// individual): un módulo importa símbolos de otro, así que sus `Atom`s
+/// deben ser comparables entre sí, y por eso viven todos en la misma tabla
+/// compartida. `AstArena` NO la contiene -- son dos estructuras separadas,
+/// pasadas juntas a quien las necesite.
 #[derive(Debug, Default, Clone)]
 pub struct AtomInterner {
     map: FxHashMap<Box<str>, Atom>,
@@ -57,6 +60,15 @@ impl AtomInterner {
 
     pub fn is_empty(&self) -> bool {
         self.strings.is_empty()
+    }
+
+    /// Interned strings in insertion order, i.e. `Atom(0), Atom(1), ...`.
+    /// `Atom`'s inner index is private (it is not meant to be reconstructed
+    /// by callers), so this is the sanctioned way for a debug-only invariant
+    /// check (e.g. `ModuleResolver::set_interner`) to compare two
+    /// interners' entries by text without minting `Atom`s of its own.
+    pub fn iter_strings(&self) -> impl Iterator<Item = &str> {
+        self.strings.iter().map(|s| s.as_ref())
     }
 }
 
