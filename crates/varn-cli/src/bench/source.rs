@@ -98,8 +98,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile, interner) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
-        .map_err(|errs| {
+    let (program, parse_profile, interner) = varn_parser::parse_with_profile(
+        tokens,
+        lexeme_buf,
+        path,
+        varn_core::AtomInterner::new(),
+    )
+    .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
                 .map(|e| {
@@ -264,8 +269,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (program, _, interner) =
-            varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
+        let (program, _, interner) = varn_parser::parse_with_profile(
+            tokens,
+            lexeme_buf,
+            path,
+            varn_core::AtomInterner::new(),
+        )
+        .map_err(|errs| {
                 let msgs: Vec<String> = errs
                     .iter()
                     .map(|e| {

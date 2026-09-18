@@ -12,7 +12,15 @@ pub fn parse(
     verbose: bool,
     debug: &DebugFlags,
 ) -> PipelineResult<(varn_core::ast::Program, varn_core::AtomInterner)> {
-    let (program, interner) = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
+    // The entry file used to parse through its own throwaway `AtomInterner`,
+    // a genuinely separate path from `module_resolver`/`with_resolver` below
+    // it (imports go through `DiskResolver::parse_and_cache`, this file did
+    // not). Two tables meant the entry file's `Atom`s and an imported
+    // module's `Atom`s were never comparable — seed this parse from the
+    // resolver's shared table instead, and publish the grown result back, so
+    // the root file and everything it imports share one `Atom` space.
+    let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
+    let (program, interner) = varn_parser::parse(tokens, lexeme_buf, path, interner).map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
             .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
@@ -27,6 +35,11 @@ pub fn parse(
         );
         PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer))
     })?;
+    // Publish the entry file's own atoms into the shared table before any
+    // import gets resolved: an import that reaches back into this file's
+    // exports (a re-export cycle) must see these atoms, not a stale
+    // pre-entry-file snapshot.
+    crate::resolver::with_resolver(|r| r.set_interner(interner.clone()));
 
     if verbose {
         varn_core::term::terminal::tagged(

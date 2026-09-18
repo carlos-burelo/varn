@@ -417,7 +417,12 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     // of `expand`, not a runtime value reaching across a compile-time
     // boundary. No design gap here: propagating it from Part A resolves
     // every `Atom`-to-text site below directly.
-    let (program, interner) = match varn_parser::parse(tokens, lexeme_buf, &input.contract) {
+    let (program, interner) = match varn_parser::parse(
+        tokens,
+        lexeme_buf,
+        &input.contract,
+        varn_core::AtomInterner::new(),
+    ) {
         Ok(p) => p,
         Err(_) => return err(format!("failed to parse contract `{}`", abs_path_str)),
     };

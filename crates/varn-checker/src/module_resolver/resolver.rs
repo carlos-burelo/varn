@@ -101,11 +101,38 @@ pub struct DiskResolver {
     /// bundle) would otherwise keep answering from the first one it ever saw.
     core_exports: RefCell<Option<Rc<CoreExportsMap>>>,
     core_members: RefCell<Option<Rc<crate::core::loader::CoreMembers>>>,
+    /// The single `Atom` table for this compilation. Every `varn_parser::parse`
+    /// this resolver drives (the entry file included, via
+    /// `interner_snapshot`/`set_interner`) reads from and grows this same
+    /// table, so an `Atom` minted while parsing one module compares equal to
+    /// the same text minted while parsing another — see `Symbol::origin_module`.
+    /// A resolver-per-file `AtomInterner` was the bug: two parses never shared
+    /// one, so their `Atom` indices meant nothing to each other.
+    interner: RefCell<varn_core::AtomInterner>,
 }
 
 impl DiskResolver {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A clone of the compilation's `Atom` table as of now. Cheap relative to
+    /// a parse, and the only way to hand modules-so-far's interned text to a
+    /// caller without exposing the `RefCell` itself: `AtomInterner::clone`
+    /// copies the dedup map and string vec, but every `Atom` it already
+    /// contains keeps the same index, so an atom resolved through this clone
+    /// resolves identically through the resolver's live table or through any
+    /// other snapshot taken later.
+    pub fn interner_snapshot(&self) -> varn_core::AtomInterner {
+        self.interner.borrow().clone()
+    }
+
+    /// Publish `interner` as the compilation's table, replacing what was
+    /// there. Callers pass back the `AtomInterner` a `varn_parser::parse` call
+    /// returned after seeding it from `interner_snapshot` — the grown clone
+    /// becomes the new shared table so the next module sees this one's atoms.
+    pub fn set_interner(&self, interner: varn_core::AtomInterner) {
+        *self.interner.borrow_mut() = interner;
     }
 
     /// Evict `id` and everything that transitively imports it.
@@ -176,16 +203,18 @@ impl DiskResolver {
         &self,
         source: &str,
         key: &str,
-    ) -> Option<(
-        Rc<varn_core::ast::Program>,
-        varn_core::AtomInterner,
-        Vec<varn_core::Diagnostic>,
-    )> {
+    ) -> Option<(Rc<varn_core::ast::Program>, Vec<varn_core::Diagnostic>)> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
-        let (program, interner) = varn_parser::parse(tokens, lexeme_buf, key).ok()?;
+        // Seed this parse from a clone of the shared table rather than handing
+        // it out by value: on a parse error the clone is simply dropped and
+        // the resolver's own table is untouched, so a module that fails to
+        // parse never rolls back atoms other modules already minted.
+        let interner = self.interner_snapshot();
+        let (program, interner) = varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
+        self.set_interner(interner);
         let program = Rc::new(program);
         self.store_program(key.to_owned(), Rc::clone(&program));
-        Some((program, interner, lex_errs))
+        Some((program, lex_errs))
     }
 
     /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
@@ -247,12 +276,12 @@ impl DiskResolver {
         let Ok(source) = std::fs::read_to_string(abs_path) else {
             return ExportMap::default();
         };
-        let Some((program, interner, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
+        let Some((program, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
             return ExportMap::default();
         };
-        let bind = self
-            .cached_bind(abs_path)
-            .unwrap_or_else(|| self.bind_and_cache(&program, interner, Vec::new(), abs_path));
+        let bind = self.cached_bind(abs_path).unwrap_or_else(|| {
+            self.bind_and_cache(&program, self.interner_snapshot(), Vec::new(), abs_path)
+        });
 
         self.collect(&program, bind.as_ref(), abs_path, base_dir, visiting)
     }
@@ -295,11 +324,11 @@ impl DiskResolver {
             return Rc::new(cached.exports);
         }
 
-        let Some((program, interner, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
+        let Some((program, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
             visiting.pop();
             return Rc::new(ExportMap::default());
         };
-        let bind = self.bind_and_cache(&program, interner, Vec::new(), virtual_id);
+        let bind = self.bind_and_cache(&program, self.interner_snapshot(), Vec::new(), virtual_id);
         let exports = self.collect(
             &program,
             bind.as_ref(),
@@ -326,8 +355,8 @@ impl DiskResolver {
             );
             return Some(bind_rc);
         }
-        let (program, interner, lex_errs) = self.parse_and_cache(source, virtual_id)?;
-        Some(self.bind_and_cache(&program, interner, lex_errs, virtual_id))
+        let (program, lex_errs) = self.parse_and_cache(source, virtual_id)?;
+        Some(self.bind_and_cache(&program, self.interner_snapshot(), lex_errs, virtual_id))
     }
 }
 
@@ -360,8 +389,8 @@ impl ImportResolver for DiskResolver {
             return Some(bind_rc);
         }
 
-        let (program, interner, lex_errs) = self.parse_and_cache(&source, &canonical)?;
-        let bind = self.bind_and_cache(&program, interner, lex_errs, &canonical);
+        let (program, lex_errs) = self.parse_and_cache(&source, &canonical)?;
+        let bind = self.bind_and_cache(&program, self.interner_snapshot(), lex_errs, &canonical);
 
         let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
         let exports = self.collect(

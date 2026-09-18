@@ -13,7 +13,7 @@ pub(crate) fn parse_module(
     label: &str,
 ) -> Result<(Program, varn_core::AtomInterner), String> {
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(source, path);
-    varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
+    varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new()).map_err(|errs| {
         let msg = &errs[0].message;
         if label.is_empty() {
             msg.clone()
@@ -27,7 +27,7 @@ pub(crate) fn parse_module(
 /// walk the syntax (import collection) and never lower it.
 pub(crate) fn parse_only(source: &str, path: &str, label: &str) -> Result<Program, String> {
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(source, path);
-    varn_parser::parse(tokens, lexeme_buf, path)
+    varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
         .map(|(program, _interner)| program)
         .map_err(|errs| {
             let msg = &errs[0].message;

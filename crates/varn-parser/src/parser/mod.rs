@@ -40,9 +40,14 @@ impl std::ops::DerefMut for Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<varn_core::Token>, lexeme_buf: Rc<[u8]>, filename: Rc<str>) -> Self {
+    pub fn new(
+        tokens: Vec<varn_core::Token>,
+        lexeme_buf: Rc<[u8]>,
+        filename: Rc<str>,
+        interner: varn_core::AtomInterner,
+    ) -> Self {
         Parser {
-            stream: TokenStream::new(tokens, lexeme_buf, filename),
+            stream: TokenStream::new(tokens, lexeme_buf, filename, interner),
             diagnostics: varn_core::DiagnosticBag::new(),
         }
     }

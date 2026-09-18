@@ -27,7 +27,18 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
-    pub fn new(tokens: Vec<Token>, lexeme_buf: Rc<[u8]>, filename: Rc<str>) -> Self {
+    /// `interner` is owned by the caller: a fresh `AtomInterner::new()` for a
+    /// self-contained parse (benchmarks, macros, isolated tests), or a clone
+    /// of a compilation-wide table when this parse's `Atom`s must compare
+    /// equal to another module's (see `varn_core::AtomInterner` and
+    /// `DiskResolver::interner_snapshot`). Either way `TokenStream` never
+    /// mints its own — doing that per file is exactly the bug this replaced.
+    pub fn new(
+        tokens: Vec<Token>,
+        lexeme_buf: Rc<[u8]>,
+        filename: Rc<str>,
+        interner: varn_core::AtomInterner,
+    ) -> Self {
         TokenStream {
             tokens,
             lexeme_buf,
@@ -38,7 +49,7 @@ impl TokenStream {
             profile: ParseProfile::default(),
             split_count: 0,
             next_ast_id: 1,
-            interner: varn_core::AtomInterner::new(),
+            interner,
         }
     }
 

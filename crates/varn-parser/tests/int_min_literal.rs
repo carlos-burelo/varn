@@ -11,7 +11,7 @@ fn parses(src: &str) -> bool {
     if !lex_diags.is_empty() {
         return false;
     }
-    varn_parser::parse(tokens, buf, "test.vn").is_ok()
+    varn_parser::parse(tokens, buf, "test.vn", varn_core::AtomInterner::new()).is_ok()
 }
 
 /// The lower bound of `int` parses.
