@@ -1,20 +1,23 @@
 use std::collections::HashSet;
 use varn_core::ast::*;
+use varn_core::AtomInterner;
 
-pub fn collect_imports(program: &Program) -> HashSet<String> {
-    let mut collector = ImportCollector::new();
+pub fn collect_imports(program: &Program, interner: &AtomInterner) -> HashSet<String> {
+    let mut collector = ImportCollector::new(interner);
     collector.visit_program(program);
     collector.imports
 }
 
-struct ImportCollector {
+struct ImportCollector<'a> {
     imports: HashSet<String>,
+    interner: &'a AtomInterner,
 }
 
-impl ImportCollector {
-    fn new() -> Self {
+impl<'a> ImportCollector<'a> {
+    fn new(interner: &'a AtomInterner) -> Self {
         Self {
             imports: HashSet::new(),
+            interner,
         }
     }
 
@@ -33,17 +36,19 @@ impl ImportCollector {
     fn visit_decl(&mut self, decl: &Decl) {
         match decl {
             Decl::Import(import) => {
-                self.imports.insert(import.source.to_string());
+                self.imports
+                    .insert(self.interner.resolve(import.source).to_owned());
             }
             Decl::Export(export) => match export {
                 ExportDecl::Named {
                     source: Some(src), ..
                 } => {
-                    self.imports.insert(src.to_string());
+                    self.imports.insert(self.interner.resolve(*src).to_owned());
                 }
                 ExportDecl::Named { .. } => {}
                 ExportDecl::All { source, .. } => {
-                    self.imports.insert(source.to_string());
+                    self.imports
+                        .insert(self.interner.resolve(*source).to_owned());
                 }
                 _ => {}
             },

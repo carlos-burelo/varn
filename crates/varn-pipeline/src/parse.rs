@@ -49,7 +49,7 @@ pub fn parse(
     }
 
     if debug.ast {
-        varn_debug::ast::debug_ast(&program);
+        varn_debug::ast::debug_ast(&program, &interner);
     }
 
     if debug.modules {

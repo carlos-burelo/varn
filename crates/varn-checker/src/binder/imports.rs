@@ -132,11 +132,34 @@ impl<'r> super::Binder<'r> {
                 } else {
                     match exports.get(&imported) {
                         Some(resolved) => {
-                            let mut s = resolved.clone();
+                            // `resolved` was bound in whatever module declares
+                            // it, against that compilation's view of the
+                            // shared `Atom` table at the time — not
+                            // necessarily this binder's own `self.interner`,
+                            // which can be behind (or, after a nested import
+                            // resolution, differently numbered) if this
+                            // module's own atoms and the exporter's diverged
+                            // before either got published. A raw `.clone()`
+                            // would carry its `doc`/`type_params`/
+                            // `origin_module`/`re_export_path` `Atom`s
+                            // straight through, silently pointing at whatever
+                            // text happens to sit at that index in
+                            // `self.interner` instead. Round-trip through text
+                            // — the same crossing `Symbol::to_cacheable`/
+                            // `from_cacheable` exist for when a module
+                            // interface goes to disk — decoding against the
+                            // resolver's current shared snapshot, which by now
+                            // holds everything the exporting bind published.
+                            let foreign = self.resolver.interner_snapshot();
+                            let mut s = Symbol::from_cacheable(
+                                resolved.to_cacheable(&foreign),
+                                &mut self.interner,
+                            );
+                            s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;
                             s.original_name = Some(self.interner.intern(&imported));
-                            s.origin_module = resolved.origin_module.or(module_path_atom);
+                            s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
                             {
                                 let origin_rc: Rc<str> = Rc::from(self.interner.resolve(*origin));

@@ -50,6 +50,16 @@ pub trait ImportResolver {
     /// property of which stdlib you resolve against.
     fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>>;
 
+    /// A clone of this resolver's single, whole-compilation `Atom` table.
+    ///
+    /// `core_exports`'s `Symbol`s carry `Atom`s minted while binding the core
+    /// stdlib modules against this same table — a caller that binds a program
+    /// against a `Checker::check`-supplied `AtomInterner` captured *before*
+    /// `core_exports()` ran must re-fetch this snapshot afterward, or those
+    /// `Symbol`s' `Atom`s (now real, published indices) resolve out of bounds
+    /// against the caller's now-stale, smaller table.
+    fn interner_snapshot(&self) -> varn_core::AtomInterner;
+
     /// The prelude's member tables.
     fn core_members(&self) -> Rc<crate::core::loader::CoreMembers>;
 
@@ -131,8 +141,20 @@ impl DiskResolver {
     /// there. Callers pass back the `AtomInterner` a `varn_parser::parse` call
     /// returned after seeding it from `interner_snapshot` — the grown clone
     /// becomes the new shared table so the next module sees this one's atoms.
+    ///
+    /// Refuses to shrink the live table: a bind that recurses into another
+    /// module's import (e.g. `bind_and_cache`, re-entered while an *outer*
+    /// bind is still in flight) snapshots, grows, and publishes on its own
+    /// schedule, so the outer bind's own snapshot — taken before that nested
+    /// growth happened — is stale by the time the outer bind finishes and
+    /// tries to publish its own (smaller) table. Overwriting a live table
+    /// with fewer entries always regresses a real publish, since `intern`
+    /// never removes; keeping the larger one is never wrong.
     pub fn set_interner(&self, interner: varn_core::AtomInterner) {
-        *self.interner.borrow_mut() = interner;
+        let mut live = self.interner.borrow_mut();
+        if interner.len() >= live.len() {
+            *live = interner;
+        }
     }
 
     /// Evict `id` and everything that transitively imports it.
@@ -235,6 +257,12 @@ impl DiskResolver {
         for e in lex_errs {
             bind.diagnostics.emit(e);
         }
+        // Binding itself coins new atoms (doc comments, "constructor", "this",
+        // mangled extension names, ...) on top of whatever parsing produced.
+        // Without publishing them back, a later `interner_snapshot()` (e.g.
+        // `save_to_cache`) resolves against a table that never saw them and
+        // panics out of bounds — same fix as `parse_and_cache`.
+        self.set_interner(bind.interner.clone());
         let bind = Rc::new(bind);
         self.store_bind(key.to_owned(), Rc::clone(&bind));
         bind
@@ -364,6 +392,10 @@ impl DiskResolver {
 }
 
 impl ImportResolver for DiskResolver {
+    fn interner_snapshot(&self) -> varn_core::AtomInterner {
+        self.interner.borrow().clone()
+    }
+
     fn module_bind(&self, abs_path: &str) -> Option<Rc<BindResult>> {
         if let Some(cached) = self.cached_bind(abs_path) {
             return Some(cached);

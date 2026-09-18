@@ -31,7 +31,7 @@ pub fn debug_symbols(
             sym.full_range.start.column
         );
         let kind_str = sym.kind.label().trim();
-        let name = &sym.name;
+        let name = check_result.bind.interner.resolve(sym.name);
         let ty = check_result
             .symbol_types
             .get(&id)
@@ -39,7 +39,10 @@ pub fn debug_symbols(
             .map(|t| t.to_string())
             .unwrap_or_else(|| "dynamic".to_string());
 
-        let origin = sym.origin_module.as_deref().unwrap_or("");
+        let origin = sym
+            .origin_module
+            .map(|a| check_result.bind.interner.resolve(a))
+            .unwrap_or("");
 
         let is_core = origin.starts_with("core:")
             || origin.starts_with("builtin:")

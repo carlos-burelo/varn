@@ -23,6 +23,7 @@ pub fn build_module_graph(
     entry_source: &str,
     entry_path: &str,
     entry_proto: &FunctionProto,
+    entry_interner: &varn_core::AtomInterner,
 ) -> Result<ModuleGraphBuild, String> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
@@ -39,7 +40,7 @@ pub fn build_module_graph(
         .unwrap_or_else(|| Path::new("."));
 
     let mut entry_deps = Vec::new();
-    for spec in crate::import_collector::collect_imports(entry_program) {
+    for spec in crate::import_collector::collect_imports(entry_program, entry_interner) {
         if let Some(dep_path) = resolve_import_specifier(&spec, entry_dir, &mut package_nodes)
             .map_err(|e| format!("{e}\n  imported from: {entry_path}"))?
         {
@@ -80,7 +81,7 @@ pub fn build_module_graph(
             .unwrap_or_else(|| Path::new("."));
 
         let mut deps = Vec::new();
-        for child_spec in crate::import_collector::collect_imports(&program) {
+        for child_spec in crate::import_collector::collect_imports(&program, &interner) {
             if let Some(child_path) =
                 resolve_import_specifier(&child_spec, module_dir, &mut package_nodes)
                     .map_err(|e| format!("{e}\n  imported from: {module_path}"))?

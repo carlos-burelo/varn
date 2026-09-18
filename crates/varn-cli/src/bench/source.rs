@@ -163,9 +163,14 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
-    let graph_build =
-        varn_pipeline::module_precompile::build_module_graph(&program, &source, path, &proto)
-            .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
+    let graph_build = varn_pipeline::module_precompile::build_module_graph(
+        &program,
+        &source,
+        path,
+        &proto,
+        &check_result.bind.interner,
+    )
+    .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
     let precompile_dur = precompile_start.elapsed();
     let precompiled = Rc::new(
         graph_build

@@ -112,9 +112,14 @@ pub fn compile(
     if verbose {
         varn_core::term::terminal::tagged("Varn", "resolving module graph...");
     }
-    let graph_build =
-        crate::module_precompile::build_module_graph(program, source, &program.filename, &proto)
-            .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
+    let graph_build = crate::module_precompile::build_module_graph(
+        program,
+        source,
+        &program.filename,
+        &proto,
+        &check_result.checker_result.bind.interner,
+    )
+    .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
 
     if debug.graph {
         print_module_graph(&graph_build);

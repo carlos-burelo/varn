@@ -243,8 +243,8 @@ fn compile_source_inner(
 /// same import collector the pipeline uses for cache invalidation. Avoids the
 /// false positives/negatives of matching import syntax inside string literals.
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
-    let program = crate::quiet_parse::parse_only(source, id, "")?;
-    for spec in crate::import_collector::collect_imports(&program) {
+    let (program, interner) = crate::quiet_parse::parse_only(source, id, "")?;
+    for spec in crate::import_collector::collect_imports(&program, &interner) {
         if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics")
         {
             return Err(format!(
@@ -347,8 +347,13 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
                 return Err(format!("cannot bind {}: {}", m.id, err_msg));
             }
         };
-        let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
-            .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
+        let shared_interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
+        let interface = varn_checker::module_resolver::serialize_module_interface(
+            &exports,
+            &bind,
+            &shared_interner,
+        )
+        .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
         let proto = match compile_source_checked(&source, &m.id) {
             Ok(p) => p,

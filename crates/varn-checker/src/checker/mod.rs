@@ -296,6 +296,22 @@ impl<'r> Checker<'r> {
             None
         };
 
+        // `core_exports()` may have just bound the core stdlib modules for the
+        // first time, minting `Atom`s into the resolver's shared table that
+        // `interner` (captured by the caller before this call) never saw. Its
+        // `Symbol`s carry those new `Atom`s, so binding against the stale
+        // `interner` leaves them unresolvable. This compilation's whole
+        // parse/publish discipline (`interner_snapshot`/`set_interner`)
+        // already guarantees `interner`'s own entries are a prefix of the
+        // resolver's current table, so replacing it here is lossless — every
+        // downstream user of `bind.interner`, this file's own atoms included,
+        // still resolves correctly.
+        let interner = if globals_ref.is_some() {
+            resolver.interner_snapshot()
+        } else {
+            interner
+        };
+
         let started = Instant::now();
         let mut bind = match globals_ref {
             Some(globals) => Binder::bind_with_global_refs(program, interner, resolver, &globals),
