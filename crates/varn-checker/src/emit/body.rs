@@ -7,8 +7,8 @@ use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
 use varn_core::{Atom, AtomInterner};
 use varn_core::ast::pattern::{MatchBinding, MatchPattern};
 use varn_core::ast::{
-    Arg, ArrayEl, AstId, Expr, ExprKind, MatchBody, MatchCase, ObjectProp, Pattern, PropKey, Stmt,
-    StmtKind,
+    Arg, ArrayEl, AstArena, AstId, ExprId, ExprKind, MatchBody, MatchCase, ObjectProp, Pattern,
+    PropKey, StmtId, StmtKind,
 };
 use varn_tir::{
     BackendTy, ClassId, ClassInfo, DynReason, EnumId, EnumInfo, LocalId, Resolution, SigId,
@@ -42,6 +42,7 @@ pub(super) struct ModuleCtx<'a> {
 }
 
 pub(super) struct FnEmitter<'a> {
+    pub ast_arena: &'a AstArena,
     pub expr_table: &'a FxHashMap<AstId, TypeEntry>,
     pub tt: &'a mut TyTable,
     m: ModuleCtx<'a>,
@@ -67,9 +68,9 @@ pub(super) struct FnEmitter<'a> {
     disposables: Vec<Vec<TirExpr>>,
 }
 
-enum ClosureBody<'a> {
-    Expr(&'a Expr),
-    Stmt(&'a Stmt),
+enum ClosureBody {
+    Expr(ExprId),
+    Stmt(StmtId),
 }
 
 fn splice_finally_before_exits(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
@@ -172,10 +173,11 @@ enum MatchDest {
     Assign(LocalId),
 }
 
-fn span_of(e: &Expr) -> Span {
+fn span_of(ast_arena: &AstArena, e: ExprId) -> Span {
+    let range = ast_arena.expr(e).range;
     Span {
-        start: e.range.start.offset,
-        end: e.range.end.offset,
+        start: range.start.offset,
+        end: range.end.offset,
     }
 }
 
@@ -190,6 +192,7 @@ fn placeholder(reason: DynReason) -> TirExpr {
 
 impl<'a> FnEmitter<'a> {
     pub fn new(
+        ast_arena: &'a AstArena,
         expr_table: &'a FxHashMap<AstId, TypeEntry>,
         tt: &'a mut TyTable,
         m: ModuleCtx<'a>,
@@ -199,6 +202,7 @@ impl<'a> FnEmitter<'a> {
         params: Vec<Rc<str>>,
     ) -> Self {
         FnEmitter {
+            ast_arena,
             expr_table,
             tt,
             m,
@@ -256,12 +260,12 @@ impl<'a> FnEmitter<'a> {
         self
     }
 
-    pub fn lower_outer_expr(&mut self, e: &Expr) -> (Vec<TirStmt>, TirExpr) {
+    pub fn lower_outer_expr(&mut self, e: ExprId) -> (Vec<TirStmt>, TirExpr) {
         let x = self.lower_expr(e);
         (std::mem::take(&mut self.pending), x)
     }
 
-    pub fn lower_expression(&mut self, e: &Expr) -> TirExpr {
+    pub fn lower_expression(&mut self, e: ExprId) -> TirExpr {
         self.lower_expr(e)
     }
 
@@ -294,9 +298,9 @@ impl<'a> FnEmitter<'a> {
         varn_core::op_id::core_class_name(tag)
     }
 
-    fn expr_ty(&mut self, e: &Expr) -> BackendTy {
+    fn expr_ty(&mut self, e: ExprId) -> BackendTy {
         let names = self.m.names;
-        match self.expr_table.get(&e.id) {
+        match self.expr_table.get(&e.index()) {
             Some(entry) => lower_type(&entry.ty, self.tt, names),
             None => BackendTy::Dynamic(DynReason::Unannotated),
         }
@@ -342,11 +346,11 @@ impl<'a> FnEmitter<'a> {
         id
     }
 
-    pub fn lower_block(&mut self, stmts: &[Stmt]) -> Vec<TirStmt> {
+    pub fn lower_block(&mut self, stmts: &[StmtId]) -> Vec<TirStmt> {
         self.scopes.push(FxHashMap::default());
         self.disposables.push(Vec::new());
         let mut out = Vec::new();
-        for s in stmts {
+        for &s in stmts {
             out.extend(self.lower_stmt(s));
         }
 
@@ -369,24 +373,29 @@ impl<'a> FnEmitter<'a> {
         out
     }
 
-    pub fn lower_stmt_as_block(&mut self, s: &Stmt) -> Vec<TirStmt> {
-        match &s.kind {
-            StmtKind::Block { stmts } => self.lower_block(stmts),
+    pub fn lower_stmt_as_block(&mut self, s: StmtId) -> Vec<TirStmt> {
+        match &self.ast_arena.stmt(s).kind {
+            StmtKind::Block { stmts } => {
+                let stmts = stmts.clone();
+                self.lower_block(&stmts)
+            }
             _ => self.lower_stmt(s),
         }
     }
 
-    fn lower_stmt(&mut self, s: &Stmt) -> Vec<TirStmt> {
+    fn lower_stmt(&mut self, s: StmtId) -> Vec<TirStmt> {
         let one = |s: TirStmt| vec![s];
         let drained = |em: &mut Self, built: Vec<TirStmt>| {
             let mut out = std::mem::take(&mut em.pending);
             out.extend(built);
             out
         };
-        match &s.kind {
+        match &self.ast_arena.stmt(s).kind {
             StmtKind::Block { stmts } => self.lower_block(stmts),
             StmtKind::Expr { expression } => {
-                if let ExprKind::Match { subject, cases } = &expression.kind {
+                let expression = *expression;
+                if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(expression).kind {
+                    let (subject, cases) = (*subject, cases);
                     return self.lower_match_stmt(subject, cases);
                 }
                 let e = self.lower_expr(expression);
@@ -400,16 +409,18 @@ impl<'a> FnEmitter<'a> {
             }
 
             StmtKind::Return { argument } => {
+                let argument = *argument;
                 if let Some(arg) = argument {
-                    if let ExprKind::Match { subject, cases } = &arg.kind {
+                    if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(arg).kind {
+                        let (subject, cases) = (*subject, cases);
                         return self.lower_match(subject, cases, MatchDest::Return);
                     }
                 }
-                let a = argument.as_ref().map(|a| self.lower_expr(a));
+                let a = argument.map(|a| self.lower_expr(a));
                 drained(self, one(TirStmt::Return(a)))
             }
             StmtKind::Throw { argument } => {
-                let a = self.lower_expr(argument);
+                let a = self.lower_expr(*argument);
                 drained(self, one(TirStmt::Throw(a)))
             }
             StmtKind::Break { .. } => one(TirStmt::Break),
@@ -420,11 +431,11 @@ impl<'a> FnEmitter<'a> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 let cond = self.lower_cond(test);
                 let mut out = std::mem::take(&mut self.pending);
                 let then_body = self.lower_stmt_as_block(consequent);
                 let else_body = alternate
-                    .as_ref()
                     .map(|a| self.lower_stmt_as_block(a))
                     .unwrap_or_default();
                 out.push(TirStmt::If {
@@ -436,6 +447,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             StmtKind::While { test, body } => {
+                let (test, body) = (*test, *body);
                 let cond = self.lower_cond(test);
                 let cond_pending = std::mem::take(&mut self.pending);
                 let body = self.lower_stmt_as_block(body);
@@ -461,9 +473,13 @@ impl<'a> FnEmitter<'a> {
                 test,
                 update,
                 body,
-            } => self.lower_for(init.as_deref(), test.as_deref(), update.as_deref(), body),
+            } => {
+                let (test, update, body) = (*test, *update, *body);
+                self.lower_for(init.as_deref(), test, update, body)
+            }
 
             StmtKind::DoWhile { body, test } => {
+                let (body, test) = (*body, *test);
                 let mut loop_body = self.lower_stmt_as_block(body);
                 let cond = self.lower_cond(test);
                 loop_body.extend(std::mem::take(&mut self.pending));
@@ -484,27 +500,27 @@ impl<'a> FnEmitter<'a> {
                 body,
                 is_await,
                 ..
-            } => self.lower_for_of(left, right, body, *is_await),
+            } => self.lower_for_of(left, *right, *body, *is_await),
             StmtKind::ForIn {
                 left, right, body, ..
-            } => self.lower_for_in(left, right, body),
+            } => self.lower_for_in(left, *right, *body),
 
             StmtKind::Try {
                 block,
                 catches,
                 finally,
-            } => self.lower_try(block, catches, finally.as_deref()),
+            } => self.lower_try(*block, catches, *finally),
 
             StmtKind::Switch {
                 discriminant,
                 cases,
-            } => self.lower_switch(discriminant, cases),
+            } => self.lower_switch(*discriminant, cases),
 
             StmtKind::Using { declarations, .. } => {
                 let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
                 let mut out = Vec::new();
                 for d in declarations {
-                    let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                    let init = d.init.map(|e| self.lower_expr(e));
                     match &d.id {
                         Pattern::Identifier { name, .. } => {
                             let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
@@ -536,7 +552,7 @@ impl<'a> FnEmitter<'a> {
                 out
             }
 
-            StmtKind::Labeled { body, .. } => self.lower_stmt_as_block(body),
+            StmtKind::Labeled { body, .. } => self.lower_stmt_as_block(*body),
         }
     }
 
@@ -588,9 +604,9 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_try(
         &mut self,
-        block: &Stmt,
+        block: StmtId,
         catches: &[varn_core::ast::CatchClause],
-        finally: Option<&Stmt>,
+        finally: Option<StmtId>,
     ) -> Vec<TirStmt> {
         let body = self.lower_stmt_as_block(block);
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
@@ -616,7 +632,7 @@ impl<'a> FnEmitter<'a> {
                     });
                 }
             }
-            out.extend(this.lower_stmt_as_block(&c.body));
+            out.extend(this.lower_stmt_as_block(c.body));
             this.scopes.pop();
             out
         };
@@ -675,7 +691,7 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_switch(
         &mut self,
-        discriminant: &Expr,
+        discriminant: ExprId,
         cases: &[varn_core::ast::SwitchCase],
     ) -> Vec<TirStmt> {
         let d = self.lower_expr(discriminant);
@@ -696,10 +712,10 @@ impl<'a> FnEmitter<'a> {
             return vec![];
         };
         self.scopes.push(FxHashMap::default());
-        let body: Vec<TirStmt> = case.body.iter().flat_map(|s| self.lower_stmt(s)).collect();
+        let body: Vec<TirStmt> = case.body.iter().flat_map(|&s| self.lower_stmt(s)).collect();
         self.scopes.pop();
         let rest = self.switch_cases(d, cases, i + 1);
-        match &case.test {
+        match case.test {
             None => {
                 let mut v = body;
                 v.extend(rest);
@@ -731,9 +747,9 @@ impl<'a> FnEmitter<'a> {
     fn lower_for(
         &mut self,
         init: Option<&varn_core::ast::ForInit>,
-        test: Option<&Expr>,
-        update: Option<&Expr>,
-        body: &Stmt,
+        test: Option<ExprId>,
+        update: Option<ExprId>,
+        body: StmtId,
     ) -> Vec<TirStmt> {
         use varn_core::ast::ForInit;
         let mut out = Vec::new();
@@ -742,7 +758,7 @@ impl<'a> FnEmitter<'a> {
             Some(ForInit::Var { declarators, .. }) => {
                 for d in declarators {
                     if let Pattern::Identifier { name, .. } = &d.id {
-                        let iexpr = d.init.as_ref().map(|e| self.lower_expr(e));
+                        let iexpr = d.init.map(|e| self.lower_expr(e));
                         let ty = iexpr
                             .as_ref()
                             .map(|e| e.ty)
@@ -758,14 +774,14 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Some(ForInit::Expr(e)) => {
-                let e = self.lower_expr(e);
+                let e = self.lower_expr(*e);
                 out.extend(std::mem::take(&mut self.pending));
                 out.push(TirStmt::Expr(e));
             }
             None => {}
         }
 
-        if !has_continue(body) {
+        if !has_continue(self.ast_arena, body) {
             let cond = test.map(|t| self.lower_cond(t)).unwrap_or_else(|| bool_lit(true));
             let cond_pending = std::mem::take(&mut self.pending);
             let has_cond_pending = !cond_pending.is_empty();
@@ -855,7 +871,7 @@ impl<'a> FnEmitter<'a> {
         out
     }
 
-    fn lower_for_in(&mut self, left: &Pattern, right: &Expr, body: &Stmt) -> Vec<TirStmt> {
+    fn lower_for_in(&mut self, left: &Pattern, right: ExprId, body: StmtId) -> Vec<TirStmt> {
         let obj = self.lower_expr(right);
         let mut out = std::mem::take(&mut self.pending);
         let s = self.tt.intern(BackendTy::Str);
@@ -881,8 +897,8 @@ impl<'a> FnEmitter<'a> {
     fn lower_for_of(
         &mut self,
         left: &Pattern,
-        right: &Expr,
-        body: &Stmt,
+        right: ExprId,
+        body: StmtId,
         is_await: bool,
     ) -> Vec<TirStmt> {
         if !is_await {
@@ -893,12 +909,13 @@ impl<'a> FnEmitter<'a> {
                     inclusive,
                 },
                 Pattern::Identifier { name, .. },
-            ) = (&right.kind, left)
+            ) = (&self.ast_arena.expr(right).kind, left)
             {
+                let (start, end, inclusive) = (*start, *end, *inclusive);
                 let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
                 let lo = self.lower_expr(start);
                 let mut hi = self.lower_expr(end);
-                if *inclusive {
+                if inclusive {
                     hi = TirExpr {
                         kind: TirExprKind::Binary {
                             op: TirBinOp::Add,
@@ -1008,7 +1025,7 @@ impl<'a> FnEmitter<'a> {
         name: &Rc<str>,
         arr: TirExpr,
         elem_ty: BackendTy,
-        body: &Stmt,
+        body: StmtId,
     ) -> Vec<TirStmt> {
         let mut out = Vec::new();
         let idx = self.fresh_local(BackendTy::Int);
@@ -1093,7 +1110,7 @@ impl<'a> FnEmitter<'a> {
         left: &Pattern,
         src: TirExpr,
         mut out: Vec<TirStmt>,
-        body: &Stmt,
+        body: StmtId,
         is_await: bool,
     ) -> Vec<TirStmt> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
@@ -1191,7 +1208,7 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_match(
         &mut self,
-        subject: &Expr,
+        subject: ExprId,
         cases: &[MatchCase],
         dest: MatchDest,
     ) -> Vec<TirStmt> {
@@ -1204,7 +1221,7 @@ impl<'a> FnEmitter<'a> {
         out
     }
 
-    fn lower_match_stmt(&mut self, subject: &Expr, cases: &[MatchCase]) -> Vec<TirStmt> {
+    fn lower_match_stmt(&mut self, subject: ExprId, cases: &[MatchCase]) -> Vec<TirStmt> {
         self.lower_match(subject, cases, MatchDest::Statement)
     }
 
@@ -1222,7 +1239,7 @@ impl<'a> FnEmitter<'a> {
         self.scopes.push(FxHashMap::default());
         let (cond, bindings) = self.match_pattern(s, &case.pattern);
 
-        let guard = case.guard.as_ref().map(|g| {
+        let guard = case.guard.map(|g| {
             let gexpr = self.lower_expr(g);
             let pending = std::mem::take(&mut self.pending);
             (pending, gexpr)
@@ -1230,9 +1247,9 @@ impl<'a> FnEmitter<'a> {
         let mut then_body: Vec<TirStmt> = Vec::new();
 
         let value = match &case.body {
-            MatchBody::Expr(e) => self.lower_expr(e),
+            MatchBody::Expr(e) => self.lower_expr(*e),
             MatchBody::Block(stmt) => {
-                then_body.extend(self.lower_stmt_as_block(stmt));
+                then_body.extend(self.lower_stmt_as_block(*stmt));
                 TirExpr {
                     kind: TirExprKind::NullLit,
                     ty: BackendTy::Dynamic(DynReason::Unannotated),
@@ -1313,7 +1330,7 @@ impl<'a> FnEmitter<'a> {
                 )
             }
             MatchPattern::Literal(lit) => {
-                let l = self.lower_expr(lit);
+                let l = self.lower_expr(*lit);
                 let cond = TirExpr {
                     kind: TirExprKind::Binary {
                         op: TirBinOp::Eq,
@@ -1507,7 +1524,7 @@ impl<'a> FnEmitter<'a> {
             let local = self.bind_local(Rc::from(self.m.interner.resolve(f.id)), dyn_ty);
             let closure = self.lower_closure(
                 &f.params,
-                ClosureBody::Stmt(&f.body),
+                ClosureBody::Stmt(f.body),
                 f.modifiers.is_async,
                 f.modifiers.is_generator,
                 dyn_ty,
@@ -1531,7 +1548,7 @@ impl<'a> FnEmitter<'a> {
                 if let Decl::Function(f) = declaration.as_ref() {
                     let closure = self.lower_closure(
                         &f.params,
-                        ClosureBody::Stmt(&f.body),
+                        ClosureBody::Stmt(f.body),
                         f.modifiers.is_async,
                         f.modifiers.is_generator,
                         dyn_ty,
@@ -1568,11 +1585,12 @@ impl<'a> FnEmitter<'a> {
             match &d.id {
                 Pattern::Identifier { name, .. } => {
                     let name_str = self.m.interner.resolve(*name);
-                    if let Some(init) = &d.init {
-                        if let ExprKind::Match { subject, cases } = &init.kind {
+                    if let Some(init) = d.init {
+                        if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(init).kind {
+                            let (subject, cases) = (*subject, cases);
                             let ty = self
                                 .expr_table
-                                .get(&init.id)
+                                .get(&init.index())
                                 .map(|e| {
                                     let names = self.m.names;
                                     lower_type(&e.ty, self.tt, names)
@@ -1591,10 +1609,12 @@ impl<'a> FnEmitter<'a> {
                     }
 
                     let prebound = {
-                        let is_closure = matches!(
-                            d.init.as_ref().map(|e| &e.kind),
-                            Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
-                        );
+                        let is_closure = d.init.is_some_and(|e| {
+                            matches!(
+                                self.ast_arena.expr(e).kind,
+                                ExprKind::Arrow { .. } | ExprKind::Function { .. }
+                            )
+                        });
                         let is_global =
                             self.top_level && self.m.globals.contains_key(name_str);
                         if is_closure && !is_global {
@@ -1607,7 +1627,7 @@ impl<'a> FnEmitter<'a> {
                         }
                     };
 
-                    let init = d.init.as_ref().map(|e| self.lower_expr(e));
+                    let init = d.init.map(|e| self.lower_expr(e));
 
                     let ty = d
                         .type_ann
@@ -1653,7 +1673,7 @@ impl<'a> FnEmitter<'a> {
                 }
 
                 pat => {
-                    let src = match &d.init {
+                    let src = match d.init {
                         Some(init) => self.lower_expr(init),
                         None => placeholder(DynReason::Unannotated),
                     };
@@ -1670,7 +1690,7 @@ impl<'a> FnEmitter<'a> {
     pub fn destructure_params(&mut self, params: &[varn_core::ast::Param]) -> Vec<TirStmt> {
         let mut out = Vec::new();
         for (i, p) in params.iter().enumerate() {
-            if let Some(def) = &p.default {
+            if let Some(def) = p.default {
                 let pvar = || TirExpr {
                     kind: TirExprKind::Var,
                     ty: BackendTy::Dynamic(DynReason::Unannotated),
@@ -1800,7 +1820,7 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Pattern::Assignment { left, right, .. } => {
-                let def = self.lower_expr(right);
+                let def = self.lower_expr(*right);
                 out.extend(std::mem::take(&mut self.pending));
                 let value = if def.ty == src.ty || matches!(src.ty, BackendTy::Dynamic(_)) {
                     let is_null = TirExpr {
@@ -1832,7 +1852,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn lower_cond(&mut self, e: &Expr) -> TirExpr {
+    fn lower_cond(&mut self, e: ExprId) -> TirExpr {
         let lowered = self.lower_expr(e);
         match lowered.ty {
             BackendTy::Bool | BackendTy::Dynamic(_) => lowered,
@@ -1855,11 +1875,11 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn lower_expr(&mut self, e: &Expr) -> TirExpr {
+    fn lower_expr(&mut self, e: ExprId) -> TirExpr {
         let ty = self.expr_ty(e);
-        let span = span_of(e);
+        let span = span_of(self.ast_arena, e);
 
-        let kind = match &e.kind {
+        let kind = match &self.ast_arena.expr(e).kind {
             ExprKind::IntLiteral { value, .. } => Some(TirExprKind::IntLit(*value)),
             ExprKind::FloatLiteral { value, .. } => Some(TirExprKind::FloatLit(*value)),
             ExprKind::BoolLiteral { value } => Some(TirExprKind::BoolLit(*value)),
@@ -1877,16 +1897,16 @@ impl<'a> FnEmitter<'a> {
                 }
             }
 
-            ExprKind::Paren { expression } => return self.lower_expr(expression),
+            ExprKind::Paren { expression } => return self.lower_expr(*expression),
 
             ExprKind::Binary { op, left, right } => {
-                return self.lower_binary(*op, left, right, ty, span)
+                return self.lower_binary(*op, *left, *right, ty, span)
             }
             ExprKind::Unary {
                 op,
                 operand,
                 prefix: _,
-            } => return self.lower_unary(*op, operand, ty, span),
+            } => return self.lower_unary(*op, *operand, ty, span),
 
             ExprKind::This => {
                 let this_ty = self
@@ -1907,15 +1927,16 @@ impl<'a> FnEmitter<'a> {
                 property,
                 computed,
                 optional,
-            } => return self.lower_member(object, property, *computed, *optional, ty, span),
+            } => return self.lower_member(*object, *property, *computed, *optional, ty, span),
 
             ExprKind::Logical { op, left, right } => {
-                return self.lower_logical(*op, left, right, ty, span)
+                return self.lower_logical(*op, *left, *right, ty, span)
             }
 
             ExprKind::Template { parts } => return self.lower_template(parts, span),
 
             ExprKind::Match { subject, cases } => {
+                let subject = *subject;
                 let result = self.fresh_local(ty);
                 self.pending.push(TirStmt::Let {
                     local: result,
@@ -1941,7 +1962,7 @@ impl<'a> FnEmitter<'a> {
             } => {
                 return self.lower_closure(
                     params,
-                    ClosureBody::Stmt(body),
+                    ClosureBody::Stmt(*body),
                     *is_async,
                     *is_generator,
                     ty,
@@ -1955,14 +1976,14 @@ impl<'a> FnEmitter<'a> {
                 ..
             } => {
                 let cb = match body.as_ref() {
-                    varn_core::ast::ArrowBody::Expr(e) => ClosureBody::Expr(e),
-                    varn_core::ast::ArrowBody::Block(s) => ClosureBody::Stmt(s),
+                    varn_core::ast::ArrowBody::Expr(e) => ClosureBody::Expr(*e),
+                    varn_core::ast::ArrowBody::Block(s) => ClosureBody::Stmt(*s),
                 };
                 return self.lower_closure(params, cb, *is_async, false, ty, span);
             }
 
             ExprKind::Await { argument } => {
-                let fut = self.lower_expr(argument);
+                let fut = self.lower_expr(*argument);
                 return TirExpr {
                     kind: TirExprKind::Await {
                         future: Box::new(fut),
@@ -1973,7 +1994,7 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             ExprKind::Yield { argument, delegate } => {
-                let value = argument.as_ref().map(|a| Box::new(self.lower_expr(a)));
+                let value = argument.map(|a| Box::new(self.lower_expr(a)));
                 return TirExpr {
                     kind: TirExprKind::Yield {
                         value,
@@ -1991,14 +2012,17 @@ impl<'a> FnEmitter<'a> {
                 args,
                 optional: _,
                 type_args: _,
-            } => return self.lower_call(e.id, callee, args, ty, span),
+            } => {
+                let callee = *callee;
+                return self.lower_call(e.index(), callee, args, ty, span);
+            }
 
             ExprKind::Array { elements } => {
                 let els = elements
                     .iter()
                     .map(|el| match el {
-                        ArrayEl::Expr(e) => TirArrayEl::Expr(self.lower_expr(e)),
-                        ArrayEl::Spread(e) => TirArrayEl::Spread(self.lower_expr(e)),
+                        ArrayEl::Expr(e) => TirArrayEl::Expr(self.lower_expr(*e)),
+                        ArrayEl::Spread(e) => TirArrayEl::Spread(self.lower_expr(*e)),
                         ArrayEl::Hole => TirArrayEl::Hole,
                     })
                     .collect();
@@ -2010,7 +2034,7 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             ExprKind::Tuple { elements } => {
-                let xs = elements.iter().map(|e| self.lower_expr(e)).collect();
+                let xs = elements.iter().map(|&e| self.lower_expr(e)).collect();
                 return TirExpr {
                     kind: TirExprKind::TupleLit(xs),
                     ty,
@@ -2023,7 +2047,7 @@ impl<'a> FnEmitter<'a> {
                     .iter()
                     .filter_map(|p| match p {
                         ObjectProp::Property { key, value, .. } => {
-                            Some((prop_key_name(key)?, self.lower_expr(value)))
+                            Some((prop_key_name(key)?, self.lower_expr(*value)))
                         }
                         _ => None,
                     })
@@ -2043,12 +2067,12 @@ impl<'a> FnEmitter<'a> {
                             if let Some(name) = prop_key_name(key) {
                                 entries.push(TirObjectEntry::Field {
                                     name,
-                                    value: self.lower_expr(value),
+                                    value: self.lower_expr(*value),
                                 });
                             }
                         }
                         ObjectProp::Spread { argument, .. } => {
-                            entries.push(TirObjectEntry::Spread(self.lower_expr(argument)));
+                            entries.push(TirObjectEntry::Spread(self.lower_expr(*argument)));
                         }
 
                         ObjectProp::Method {
@@ -2062,7 +2086,7 @@ impl<'a> FnEmitter<'a> {
                             if let Some(name) = prop_key_name(key) {
                                 let closure = self.lower_closure(
                                     params,
-                                    ClosureBody::Stmt(body),
+                                    ClosureBody::Stmt(*body),
                                     *is_async,
                                     *is_generator,
                                     BackendTy::Dynamic(DynReason::Unannotated),
@@ -2086,11 +2110,12 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             ExprKind::New { callee, args, .. } => {
-                return self.lower_new(e.id, callee, args, ty, span)
+                let callee = *callee;
+                return self.lower_new(e.index(), callee, args, ty, span);
             }
 
             ExprKind::NonNull { expression } => {
-                let inner = self.lower_expr(expression);
+                let inner = self.lower_expr(*expression);
                 let nn = inner.ty.non_nullable(self.tt);
                 if inner.ty == nn {
                     return inner;
@@ -2106,7 +2131,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::As { expression, .. } => {
-                let inner = self.lower_expr(expression);
+                let inner = self.lower_expr(*expression);
                 return TirExpr {
                     kind: TirExprKind::Cast {
                         operand: Box::new(inner),
@@ -2116,10 +2141,10 @@ impl<'a> FnEmitter<'a> {
                     span,
                 };
             }
-            ExprKind::Satisfies { expression, .. } => return self.lower_expr(expression),
+            ExprKind::Satisfies { expression, .. } => return self.lower_expr(*expression),
 
             ExprKind::Sequence { expressions } => {
-                let Some((last, lead)) = expressions.split_last() else {
+                let Some((&last, lead)) = expressions.split_last() else {
                     return TirExpr {
                         kind: TirExprKind::NullLit,
                         ty: BackendTy::Void,
@@ -2127,7 +2152,7 @@ impl<'a> FnEmitter<'a> {
                         span,
                     };
                 };
-                for e in lead {
+                for &e in lead {
                     let te = self.lower_expr(e);
                     self.pending.push(TirStmt::Expr(te));
                 }
@@ -2135,13 +2160,15 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Pipeline { left, right } => {
-                if let ExprKind::Call { callee, args, .. } = &right.kind {
+                let (left, right) = (*left, *right);
+                if let ExprKind::Call { callee, args, .. } = &self.ast_arena.expr(right).kind {
+                    let (callee, args) = (*callee, args);
                     let interner = self.m.interner;
                     let has_placeholder = args.iter().any(|a| {
                         matches!(
                             a,
                             Arg::Positional(e) | Arg::Named { value: e, .. }
-                                if matches!(&e.kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_")
+                                if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_")
                         )
                     });
                     if has_placeholder {
@@ -2153,7 +2180,7 @@ impl<'a> FnEmitter<'a> {
                             .map(|a| match a {
                                 Arg::Positional(e)
                                 | Arg::Named { value: e, .. }
-                                    if matches!(&e.kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_") =>
+                                    if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_") =>
                                 {
                                     TirArg::Expr(piped.clone())
                                 }
@@ -2191,13 +2218,14 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::With { object, properties } => {
+                let object = *object;
                 let mut entries = vec![TirObjectEntry::Spread(self.lower_expr(object))];
                 for p in properties {
                     if let ObjectProp::Property { key, value, .. } = p {
                         if let Some(name) = prop_key_name(key) {
                             entries.push(TirObjectEntry::Field {
                                 name,
-                                value: self.lower_expr(value),
+                                value: self.lower_expr(*value),
                             });
                         }
                     }
@@ -2212,16 +2240,19 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::Assign { op, target, value }
                 if matches!(assign_bin_op(*op), Ok(None))
-                    && matches!(&target.kind, ExprKind::Member { .. })
+                    && matches!(&self.ast_arena.expr(*target).kind, ExprKind::Member { .. })
                     && self
                         .m
                         .ext_set_members
-                        .contains_key(&target.range.start.offset) =>
+                        .contains_key(&self.ast_arena.expr(*target).range.start.offset) =>
             {
-                let ExprKind::Member { object, .. } = &target.kind else {
+                let (target, value) = (*target, *value);
+                let ExprKind::Member { object, .. } = &self.ast_arena.expr(target).kind else {
                     unreachable!()
                 };
-                let mangled = self.m.ext_set_members[&target.range.start.offset].clone();
+                let object = *object;
+                let mangled = self.m.ext_set_members[&self.ast_arena.expr(target).range.start.offset]
+                    .clone();
                 let recv = self.lower_expr(object);
                 let v = self.lower_expr(value);
                 return TirExpr {
@@ -2237,10 +2268,11 @@ impl<'a> FnEmitter<'a> {
             }
             ExprKind::Assign { op, target, value }
                 if matches!(
-                    target.kind,
+                    self.ast_arena.expr(*target).kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
-                ) && Self::is_pure(target) =>
+                ) && Self::is_pure(self.ast_arena, *target) =>
             {
+                let (target, value) = (*target, *value);
                 let t = self.lower_expr(target);
                 let v = self.lower_expr(value);
                 let rhs = match assign_bin_op(*op) {
@@ -2305,11 +2337,12 @@ impl<'a> FnEmitter<'a> {
                 operand,
                 prefix,
             } if matches!(
-                operand.kind,
+                self.ast_arena.expr(*operand).kind,
                 ExprKind::Identifier { .. } | ExprKind::Member { .. }
-            ) && Self::is_pure(operand) =>
+            ) && Self::is_pure(self.ast_arena, *operand) =>
             {
                 use varn_core::ast::operators::UpdateOp;
+                let operand = *operand;
                 let t = self.lower_expr(operand);
                 let bop = match op {
                     UpdateOp::Increment => TirBinOp::Add,
@@ -2383,7 +2416,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Spawn { argument } => {
-                let inner = self.lower_expr(argument);
+                let inner = self.lower_expr(*argument);
                 return self.cast_to(inner, ty);
             }
             ExprKind::Range {
@@ -2391,8 +2424,8 @@ impl<'a> FnEmitter<'a> {
                 end,
                 inclusive,
             } => {
-                let s = self.lower_expr(start);
-                let en = self.lower_expr(end);
+                let s = self.lower_expr(*start);
+                let en = self.lower_expr(*end);
                 return TirExpr {
                     kind: TirExprKind::RangeLit {
                         start: Box::new(s),
@@ -2409,7 +2442,7 @@ impl<'a> FnEmitter<'a> {
                 expression,
                 type_ann,
             } => {
-                let v = self.lower_expr(expression);
+                let v = self.lower_expr(*expression);
                 let bool_ty = BackendTy::Bool;
 
                 if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
@@ -2465,7 +2498,7 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::MetaAccess { target, property } => {
-                let obj = self.lower_expr(target);
+                let obj = self.lower_expr(*target);
                 let key: Rc<str> = Rc::from(format!("::{}", self.m.interner.resolve(*property)));
                 return TirExpr {
                     kind: TirExprKind::Field {
@@ -2494,8 +2527,9 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             ExprKind::TaggedTemplate { tag, template } => {
+                let (tag, template) = (*tag, *template);
                 use varn_core::ast::TemplatePart;
-                let ExprKind::Template { parts } = &template.kind else {
+                let ExprKind::Template { parts } = &self.ast_arena.expr(template).kind else {
                     return self.lower_expr(template);
                 };
 
@@ -2514,7 +2548,7 @@ impl<'a> FnEmitter<'a> {
                         TemplatePart::Interpolation(e) => {
                             strings.push(TirArrayEl::Expr(str_lit(&cur)));
                             cur.clear();
-                            let v = self.lower_expr(e);
+                            let v = self.lower_expr(*e);
                             values.push(TirArg::Expr(v));
                         }
                     }
@@ -2535,9 +2569,10 @@ impl<'a> FnEmitter<'a> {
                     property,
                     computed: false,
                     ..
-                } = &tag.kind
+                } = &self.ast_arena.expr(tag).kind
                 {
-                    if let Some(name) = Self::member_name(property, self.m.interner) {
+                    let (object, property) = (*object, *property);
+                    if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
                         let recv = self.lower_expr(object);
                         return TirExpr {
                             kind: TirExprKind::MethodCall {
@@ -2552,7 +2587,7 @@ impl<'a> FnEmitter<'a> {
                     }
                 }
                 let callee = self.lower_expr(tag);
-                let res = match &tag.kind {
+                let res = match &self.ast_arena.expr(tag).kind {
                     ExprKind::Identifier { name } => Resolution::ByName {
                         name: Rc::from(self.m.interner.resolve(*name)),
                         why: DynReason::Unannotated,
@@ -2575,6 +2610,7 @@ impl<'a> FnEmitter<'a> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 let cond = self.lower_expr(test);
                 let cond = self.cast_to(cond, BackendTy::Bool);
                 let then_val = self.lower_expr(consequent);
@@ -2628,8 +2664,8 @@ impl<'a> FnEmitter<'a> {
     fn lower_binary(
         &mut self,
         op: BinaryOp,
-        left: &Expr,
-        right: &Expr,
+        left: ExprId,
+        right: ExprId,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
@@ -2638,7 +2674,7 @@ impl<'a> FnEmitter<'a> {
 
         let Some(top) = bin_op(op) else {
             if op == BinaryOp::Instanceof {
-                if let ExprKind::Identifier { name } = &right.kind {
+                if let ExprKind::Identifier { name } = &self.ast_arena.expr(right).kind {
                     if let Some(class) = self.m.names.class_id(self.m.interner.resolve(*name)) {
                         return TirExpr {
                             kind: TirExprKind::TypeTest {
@@ -2750,16 +2786,16 @@ impl<'a> FnEmitter<'a> {
         (lhs, rhs, ty)
     }
 
-    fn member_name(property: &Expr, interner: &AtomInterner) -> Option<Rc<str>> {
-        match &property.kind {
+    fn member_name(ast_arena: &AstArena, property: ExprId, interner: &AtomInterner) -> Option<Rc<str>> {
+        match &ast_arena.expr(property).kind {
             ExprKind::Identifier { name } => Some(Rc::from(interner.resolve(*name))),
             ExprKind::StrLiteral { value } => Some(Rc::from(value.as_str())),
             _ => None,
         }
     }
 
-    fn is_pure(e: &Expr) -> bool {
-        match &e.kind {
+    fn is_pure(ast_arena: &AstArena, e: ExprId) -> bool {
+        match &ast_arena.expr(e).kind {
             ExprKind::Identifier { .. }
             | ExprKind::This
             | ExprKind::IntLiteral { .. }
@@ -2768,15 +2804,20 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::StrLiteral { .. }
             | ExprKind::CharLiteral { .. }
             | ExprKind::NullLiteral => true,
-            ExprKind::Paren { expression } => Self::is_pure(expression),
+            ExprKind::Paren { expression } => Self::is_pure(ast_arena, *expression),
             ExprKind::Member {
                 object,
                 property,
                 computed,
                 ..
-            } => Self::is_pure(object) && (!computed || Self::is_pure(property)),
-            ExprKind::Binary { left, right, .. } => Self::is_pure(left) && Self::is_pure(right),
-            ExprKind::Unary { operand, .. } => Self::is_pure(operand),
+            } => {
+                Self::is_pure(ast_arena, *object)
+                    && (!computed || Self::is_pure(ast_arena, *property))
+            }
+            ExprKind::Binary { left, right, .. } => {
+                Self::is_pure(ast_arena, *left) && Self::is_pure(ast_arena, *right)
+            }
+            ExprKind::Unary { operand, .. } => Self::is_pure(ast_arena, *operand),
             _ => false,
         }
     }
@@ -2784,8 +2825,8 @@ impl<'a> FnEmitter<'a> {
     fn lower_logical(
         &mut self,
         op: LogicalOp,
-        left: &Expr,
-        right: &Expr,
+        left: ExprId,
+        right: ExprId,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
@@ -2802,7 +2843,7 @@ impl<'a> FnEmitter<'a> {
             }
             LogicalOp::Nullish => {
                 let mut l = self.lower_expr(left);
-                if !Self::is_pure(left) {
+                if !Self::is_pure(self.ast_arena, left) {
                     l = self.hoist(l);
                 }
                 let r = self.lower_expr(right);
@@ -2839,18 +2880,18 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_member(
         &mut self,
-        object: &Expr,
-        property: &Expr,
+        object: ExprId,
+        property: ExprId,
         computed: bool,
         optional: bool,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
         if optional && !computed {
-            let name =
-                Self::member_name(property, self.m.interner).unwrap_or_else(|| Rc::from("<member>"));
+            let name = Self::member_name(self.ast_arena, property, self.m.interner)
+                .unwrap_or_else(|| Rc::from("<member>"));
             let mut recv = self.lower_expr(object);
-            if !Self::is_pure(object) {
+            if !Self::is_pure(self.ast_arena, object) {
                 recv = self.hoist(recv);
             }
             let is_null = TirExpr {
@@ -2889,11 +2930,12 @@ impl<'a> FnEmitter<'a> {
                 start,
                 end,
                 inclusive,
-            } = &property.kind
+            } = &self.ast_arena.expr(property).kind
             {
+                let (start, end, inclusive) = (*start, *end, *inclusive);
                 let s = self.lower_expr(start);
                 let mut e = self.lower_expr(end);
-                if *inclusive {
+                if inclusive {
                     e = TirExpr {
                         kind: TirExprKind::Binary {
                             op: TirBinOp::Add,
@@ -2937,13 +2979,13 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        let name =
-            Self::member_name(property, self.m.interner).unwrap_or_else(|| Rc::from("<member>"));
+        let name = Self::member_name(self.ast_arena, property, self.m.interner)
+            .unwrap_or_else(|| Rc::from("<member>"));
 
         if let Some(mangled) = self
             .m
             .ext_members
-            .get(&property.range.start.offset)
+            .get(&self.ast_arena.expr(property).range.start.offset)
             .cloned()
         {
             return TirExpr {
@@ -3038,6 +3080,7 @@ impl<'a> FnEmitter<'a> {
         outer_names.extend(self.params.iter().cloned());
 
         let mut sub = FnEmitter::new(
+            self.ast_arena,
             self.expr_table,
             &mut *self.tt,
             self.m,
@@ -3111,7 +3154,7 @@ impl<'a> FnEmitter<'a> {
                     str_expr(TirExprKind::StrLit(Rc::from(s.as_str())), span)
                 }
                 TemplatePart::Interpolation(e) => {
-                    let le = self.lower_expr(e);
+                    let le = self.lower_expr(*e);
                     if le.ty == BackendTy::Str {
                         le
                     } else {
@@ -3142,19 +3185,20 @@ impl<'a> FnEmitter<'a> {
     fn lower_new(
         &mut self,
         call_id: AstId,
-        callee: &Expr,
+        callee: ExprId,
         args: &[Arg],
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        let class = match &callee.kind {
+        let class = match &self.ast_arena.expr(callee).kind {
             ExprKind::Identifier { name } => self.m.names.class_id(self.m.interner.resolve(*name)),
 
             ExprKind::Member {
                 property,
                 computed: false,
                 ..
-            } => Self::member_name(property, self.m.interner).and_then(|n| self.m.names.class_id(&n)),
+            } => Self::member_name(self.ast_arena, *property, self.m.interner)
+                .and_then(|n| self.m.names.class_id(&n)),
             _ => None,
         };
         let targs = self.lower_call_args(call_id, args);
@@ -3184,8 +3228,8 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn enum_variant(&self, object: &Expr, variant: &str) -> Option<(varn_tir::EnumId, u16)> {
-        let ExprKind::Identifier { name } = &object.kind else {
+    fn enum_variant(&self, object: ExprId, variant: &str) -> Option<(varn_tir::EnumId, u16)> {
+        let ExprKind::Identifier { name } = &self.ast_arena.expr(object).kind else {
             return None;
         };
         let eid = self.m.names.enum_id(self.m.interner.resolve(*name))?;
@@ -3196,11 +3240,11 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_arg(&mut self, a: &Arg) -> TirArg {
         match a {
-            Arg::Positional(e) => TirArg::Expr(self.lower_expr(e)),
-            Arg::Spread(e) => TirArg::Spread(self.lower_expr(e)),
+            Arg::Positional(e) => TirArg::Expr(self.lower_expr(*e)),
+            Arg::Spread(e) => TirArg::Spread(self.lower_expr(*e)),
             Arg::Named { label, value } => TirArg::Named {
                 label: Rc::from(label.as_str()),
-                value: self.lower_expr(value),
+                value: self.lower_expr(*value),
             },
         }
     }
@@ -3212,9 +3256,9 @@ impl<'a> FnEmitter<'a> {
                 .map(|opt| match opt {
                     Some(i) => match &args[*i] {
                         Arg::Positional(e) | Arg::Named { value: e, .. } => {
-                            TirArg::Expr(self.lower_expr(e))
+                            TirArg::Expr(self.lower_expr(*e))
                         }
-                        Arg::Spread(e) => TirArg::Spread(self.lower_expr(e)),
+                        Arg::Spread(e) => TirArg::Spread(self.lower_expr(*e)),
                     },
                     None => TirArg::Expr(TirExpr {
                         kind: TirExprKind::NullLit,
@@ -3231,12 +3275,12 @@ impl<'a> FnEmitter<'a> {
     fn lower_call(
         &mut self,
         call_id: AstId,
-        callee: &Expr,
+        callee: ExprId,
         args: &[Arg],
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        if matches!(callee.kind, ExprKind::Super) {
+        if matches!(self.ast_arena.expr(callee).kind, ExprKind::Super) {
             let targs = self.lower_call_args(call_id, args);
             return TirExpr {
                 kind: TirExprKind::SuperCall { args: targs },
@@ -3251,10 +3295,11 @@ impl<'a> FnEmitter<'a> {
             property,
             computed: false,
             ..
-        } = &callee.kind
+        } = &self.ast_arena.expr(callee).kind
         {
-            if matches!(object.kind, ExprKind::Super) {
-                if let Some(name) = Self::member_name(property, self.m.interner) {
+            let (object, property) = (*object, *property);
+            if matches!(self.ast_arena.expr(object).kind, ExprKind::Super) {
+                if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
                     let targs = self.lower_call_args(call_id, args);
                     return TirExpr {
                         kind: TirExprKind::SuperMethodCall { name, args: targs },
@@ -3266,7 +3311,7 @@ impl<'a> FnEmitter<'a> {
             }
         }
 
-        if let ExprKind::Identifier { name } = &callee.kind {
+        if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
             let c = self.lower_expr(callee);
             let targs = self.lower_call_args(call_id, args);
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
@@ -3298,16 +3343,16 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        let (object, property) = match &callee.kind {
+        let (object, property) = match &self.ast_arena.expr(callee).kind {
             ExprKind::Member {
                 object,
                 property,
                 computed: false,
                 ..
-            } => (object, property),
+            } => (*object, *property),
             _ => return self.by_name_call(call_id, callee, args, ty, span),
         };
-        let Some(name) = Self::member_name(property, self.m.interner) else {
+        let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) else {
             return self.by_name_call(call_id, callee, args, ty, span);
         };
 
@@ -3389,7 +3434,7 @@ impl<'a> FnEmitter<'a> {
     fn by_name_call(
         &mut self,
         call_id: AstId,
-        callee: &Expr,
+        callee: ExprId,
         args: &[Arg],
         ty: BackendTy,
         span: Span,
@@ -3410,7 +3455,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn lower_unary(&mut self, op: UnaryOp, operand: &Expr, ty: BackendTy, span: Span) -> TirExpr {
+    fn lower_unary(&mut self, op: UnaryOp, operand: ExprId, ty: BackendTy, span: Span) -> TirExpr {
         let top = match op {
             UnaryOp::Minus => TirUnOp::Neg,
             UnaryOp::Not => TirUnOp::Not,
@@ -3515,9 +3560,9 @@ fn bin_op(op: BinaryOp) -> Option<TirBinOp> {
     })
 }
 
-fn has_continue(stmt: &Stmt) -> bool {
-    fn check(stmt: &Stmt, in_nested_loop: bool) -> bool {
-        match &stmt.kind {
+fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
+    fn check(ast_arena: &AstArena, stmt: StmtId, in_nested_loop: bool) -> bool {
+        match &ast_arena.stmt(stmt).kind {
             StmtKind::Continue { label } => {
                 if in_nested_loop {
                     label.is_some()
@@ -3525,35 +3570,35 @@ fn has_continue(stmt: &Stmt) -> bool {
                     true
                 }
             }
-            StmtKind::Block { stmts } => stmts.iter().any(|s| check(s, in_nested_loop)),
+            StmtKind::Block { stmts } => stmts.iter().any(|&s| check(ast_arena, s, in_nested_loop)),
             StmtKind::If {
                 consequent,
                 alternate,
                 ..
             } => {
-                check(consequent, in_nested_loop)
-                    || alternate.as_ref().map_or(false, |a| check(a, in_nested_loop))
+                check(ast_arena, *consequent, in_nested_loop)
+                    || alternate.map_or(false, |a| check(ast_arena, a, in_nested_loop))
             }
-            StmtKind::Switch { cases, .. } => {
-                cases.iter().any(|c| c.body.iter().any(|s| check(s, in_nested_loop)))
-            }
+            StmtKind::Switch { cases, .. } => cases
+                .iter()
+                .any(|c| c.body.iter().any(|&s| check(ast_arena, s, in_nested_loop))),
             StmtKind::Try {
                 block,
                 catches,
                 finally,
             } => {
-                check(block, in_nested_loop)
-                    || catches.iter().any(|c| check(&c.body, in_nested_loop))
-                    || finally.as_ref().map_or(false, |f| check(f, in_nested_loop))
+                check(ast_arena, *block, in_nested_loop)
+                    || catches.iter().any(|c| check(ast_arena, c.body, in_nested_loop))
+                    || finally.map_or(false, |f| check(ast_arena, f, in_nested_loop))
             }
-            StmtKind::Labeled { body, .. } => check(body, in_nested_loop),
+            StmtKind::Labeled { body, .. } => check(ast_arena, *body, in_nested_loop),
             StmtKind::While { body, .. }
             | StmtKind::DoWhile { body, .. }
             | StmtKind::For { body, .. }
             | StmtKind::ForIn { body, .. }
-            | StmtKind::ForOf { body, .. } => check(body, true),
+            | StmtKind::ForOf { body, .. } => check(ast_arena, *body, true),
             _ => false,
         }
     }
-    check(stmt, false)
+    check(ast_arena, stmt, false)
 }

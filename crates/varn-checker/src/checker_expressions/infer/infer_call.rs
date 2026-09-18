@@ -37,7 +37,7 @@ impl<'r> Checker<'r> {
             return Type::Dynamic;
         };
 
-        let mapping = build_call_mapping(arena.expr(callee), &type_args, &args, ft, self, bind);
+        let mapping = build_call_mapping(callee, &type_args, &args, ft, self, bind);
         let ret = map_generics_cached(self, &ft.return_type, &mapping);
 
         let ret = if matches!(ret.0, TypeKind::This) {

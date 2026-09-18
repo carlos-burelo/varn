@@ -342,7 +342,7 @@ impl<'r> Checker<'r> {
         profile.merge_core_members = started.elapsed();
 
         let started = Instant::now();
-        enrich_call_returns(&mut bind, resolver);
+        enrich_call_returns(&mut bind, ast_arena, resolver);
         profile.enrich_call_returns = started.elapsed();
 
         let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());

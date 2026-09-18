@@ -3,7 +3,7 @@ use crate::module_resolver::cache::ExportMap;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use std::path::Path;
-use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
+use varn_core::ast::{AstArena, Decl, ExportDecl, ExportDefaultDecl, Pattern, StmtId, StmtKind};
 use varn_core::Atom;
 
 /// `Symbol::origin_module` must name the module that DECLARES the export —
@@ -36,15 +36,16 @@ pub(super) fn assign_slots(exports: &mut ExportMap) {
 
 pub(super) fn collect_exports(
     resolver: &dyn super::ImportResolver,
-    stmts: &[Stmt],
+    stmts: &[StmtId],
+    ast_arena: &AstArena,
     bind: &BindResult,
     abs_path: &str,
     base_dir: &Path,
     visiting: &mut Vec<String>,
     out: &mut ExportMap,
 ) {
-    for stmt in stmts {
-        let StmtKind::Decl(decl) = &stmt.kind else {
+    for &stmt_id in stmts {
+        let StmtKind::Decl(decl) = &ast_arena.stmt(stmt_id).kind else {
             continue;
         };
         let Decl::Export(e) = decl.as_ref() else {

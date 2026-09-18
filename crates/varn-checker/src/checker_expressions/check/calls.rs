@@ -43,7 +43,7 @@ impl<'r> Checker<'r> {
         }
 
         let effective_callee_ty = if let TypeKind::Fn(ft) = &callee_ty.0 {
-            let mapping = build_call_mapping(arena.expr(callee), type_args, args, ft, self, bind);
+            let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
             map_generics_cached(self, &callee_ty, &mapping)
         } else {
             callee_ty.clone()

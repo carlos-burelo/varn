@@ -6,12 +6,13 @@ use crate::binder::{BindResult, BindView, PendingEnrich};
 use index::build_enrich_context;
 use std::rc::Rc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
-use varn_core::ast::{Expr, Stmt};
+use varn_core::ast::AstArena;
 
 /// `resolver` is threaded in rather than reached for ambiently: enrichment
 /// infers call return types, which means resolving imported signatures.
 pub fn enrich_call_returns(
     bind: &mut BindResult,
+    ast_arena: &AstArena,
     resolver: &dyn crate::module_resolver::ImportResolver,
 ) {
     if bind.pending_enrich.is_empty() {
@@ -33,13 +34,13 @@ pub fn enrich_call_returns(
                 {
                     continue;
                 }
-                let expr: &Expr = unsafe { &**init };
                 let ty = crate::checker_call_types::infer_call_type(
                     &ctx.fn_map,
                     &ctx.fn_type_params,
                     &ctx.class_methods,
                     &sym_map,
-                    expr,
+                    *init,
+                    ast_arena,
                     Some(&BindView::new(bind, resolver)),
                     None,
                     &bind.interner,
@@ -57,11 +58,12 @@ pub fn enrich_call_returns(
                 body,
                 is_async,
             } => {
-                let stmt: &Stmt = unsafe { &**body };
+                let stmt: varn_core::ast::StmtId = *body;
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
                     stmt,
+                    ast_arena,
                     &BindView::new(bind, resolver),
                     None,
                 );
@@ -73,7 +75,7 @@ pub fn enrich_call_returns(
                         *ft.return_type = final_ret;
                     }
                 }
-                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, resolver, None);
+                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, ast_arena, bind, resolver, None);
             }
 
             PendingEnrich::Method {
@@ -91,11 +93,12 @@ pub fn enrich_call_returns(
                 // whole, which a live borrow of `bind.interner` would block.
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
-                let stmt: &Stmt = unsafe { &**body };
+                let stmt: varn_core::ast::StmtId = *body;
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
                     stmt,
+                    ast_arena,
                     &BindView::new(bind, resolver),
                     Some(&class_name_str),
                 );
@@ -134,6 +137,7 @@ pub fn enrich_call_returns(
                     &ctx,
                     &mut sym_map,
                     stmt,
+                    ast_arena,
                     bind,
                     resolver,
                     Some(&class_name_str),
@@ -147,11 +151,12 @@ pub fn enrich_call_returns(
             } => {
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
-                let stmt: &Stmt = unsafe { &**body };
+                let stmt: varn_core::ast::StmtId = *body;
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
                     stmt,
+                    ast_arena,
                     &BindView::new(bind, resolver),
                     Some(&class_name_str),
                 );
@@ -185,6 +190,7 @@ pub fn enrich_call_returns(
                     &ctx,
                     &mut sym_map,
                     stmt,
+                    ast_arena,
                     bind,
                     resolver,
                     Some(&class_name_str),
@@ -197,11 +203,12 @@ pub fn enrich_call_returns(
                 body,
             } => {
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
-                let stmt: &Stmt = unsafe { &**body };
+                let stmt: varn_core::ast::StmtId = *body;
                 enrich_stmts_for_vars(
                     &ctx,
                     &mut sym_map,
                     stmt,
+                    ast_arena,
                     bind,
                     resolver,
                     Some(&class_name_str),

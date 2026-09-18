@@ -4,12 +4,12 @@ use crate::symbol::SymbolKind;
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{Arg, ArrowBody, Expr, ExprKind, Param, Stmt, StmtKind, TypeNode};
+use varn_core::ast::{Arg, ArrowBody, ExprId, ExprKind, Param, StmtId, StmtKind, TypeNode};
 use varn_core::TypeKind;
 
 
 pub(crate) fn build_call_mapping(
-    callee: &Expr,
+    callee: ExprId,
     type_args: &[TypeNode],
     args: &[Arg],
     ft: &FunctionType,
@@ -18,7 +18,7 @@ pub(crate) fn build_call_mapping(
 ) -> FxHashMap<Rc<str>, Type> {
     let fn_type_params: Vec<Rc<str>> = if !ft.type_params.is_empty() {
         ft.type_params.clone()
-    } else if let ExprKind::Identifier { name } = &callee.kind {
+    } else if let ExprKind::Identifier { name } = &checker.ast_arena.expr(callee).kind {
         checker.symbol_type_params(bind.interner.resolve(*name), SymbolKind::Function, bind)
     } else {
         Vec::new()
@@ -60,16 +60,18 @@ pub(crate) fn infer_mapping_from_args(
 
     for (param, arg) in param_types.iter().zip(args.iter()) {
         let is_arrow = match arg {
-            Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
-            Arg::Named { value, .. } => matches!(value.kind, ExprKind::Arrow { .. }),
+            Arg::Positional(e) => matches!(checker.ast_arena.expr(*e).kind, ExprKind::Arrow { .. }),
+            Arg::Named { value, .. } => {
+                matches!(checker.ast_arena.expr(*value).kind, ExprKind::Arrow { .. })
+            }
             _ => false,
         };
         if is_arrow {
             continue;
         }
         let arg_ty = match arg {
-            Arg::Positional(e) => checker.infer_type(e, bind),
-            Arg::Named { value, .. } => checker.infer_type(value, bind),
+            Arg::Positional(e) => checker.infer_type(*e, bind),
+            Arg::Named { value, .. } => checker.infer_type(*value, bind),
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
@@ -77,8 +79,10 @@ pub(crate) fn infer_mapping_from_args(
 
     for (param, arg) in param_types.iter().zip(args.iter()) {
         let is_arrow = match arg {
-            Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
-            Arg::Named { value, .. } => matches!(value.kind, ExprKind::Arrow { .. }),
+            Arg::Positional(e) => matches!(checker.ast_arena.expr(*e).kind, ExprKind::Arrow { .. }),
+            Arg::Named { value, .. } => {
+                matches!(checker.ast_arena.expr(*value).kind, ExprKind::Arrow { .. })
+            }
             _ => false,
         };
         if !is_arrow {
@@ -89,15 +93,15 @@ pub(crate) fn infer_mapping_from_args(
         let arg_ty = match arg {
             Arg::Positional(e) => {
                 if let TypeKind::Fn(expected_fn) = &mapped_param_ty.0 {
-                    if let Some(concrete) = infer_arrow_with_context(e, expected_fn, checker, bind)
+                    if let Some(concrete) = infer_arrow_with_context(*e, expected_fn, checker, bind)
                     {
                         collect_type_inferences(&param.ty, &concrete, type_params, &mut mapping);
                         continue;
                     }
                 }
-                checker.infer_type(e, bind)
+                checker.infer_type(*e, bind)
             }
-            Arg::Named { value, .. } => checker.infer_type(value, bind),
+            Arg::Named { value, .. } => checker.infer_type(*value, bind),
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
@@ -107,12 +111,12 @@ pub(crate) fn infer_mapping_from_args(
 }
 
 fn infer_arrow_with_context(
-    expr: &Expr,
+    expr: ExprId,
     expected_fn: &FunctionType,
     checker: &mut Checker,
     bind: &BindResult,
 ) -> Option<Type> {
-    let ExprKind::Arrow { params, body, .. } = &expr.kind else {
+    let ExprKind::Arrow { params, body, .. } = &checker.ast_arena.expr(expr).kind else {
         return None;
     };
 
@@ -169,6 +173,7 @@ fn infer_arrow_with_context(
 
     let ret_ty = match body.as_ref() {
         ArrowBody::Expr(e) => {
+            let e = *e;
             let saved_pipeline = checker.in_pipeline_rhs;
             let saved_pipe_ty = checker.pipeline_value_type.clone();
             checker.in_pipeline_rhs = false;
@@ -179,6 +184,7 @@ fn infer_arrow_with_context(
             t
         }
         ArrowBody::Block(s) => {
+            let s = *s;
             let mut returns = Vec::new();
             collect_returns(s, &mut returns, checker, bind);
             if returns.is_empty() {
@@ -242,15 +248,16 @@ pub(crate) fn find_arrow_scope(
     None
 }
 
-fn collect_returns(stmt: &Stmt, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {
-    match &stmt.kind {
+fn collect_returns(stmt: StmtId, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {
+    match &checker.ast_arena.stmt(stmt).kind {
         StmtKind::Block { stmts } => {
-            for s in stmts {
+            for &s in stmts {
                 collect_returns(s, out, checker, bind);
             }
         }
         StmtKind::Return { argument } => {
             if let Some(val_expr) = argument {
+                let val_expr = *val_expr;
                 out.push(checker.infer_type(val_expr, bind));
             } else {
                 out.push(Type::Void);
@@ -261,6 +268,7 @@ fn collect_returns(stmt: &Stmt, out: &mut Vec<Type>, checker: &mut Checker, bind
             alternate,
             ..
         } => {
+            let (consequent, alternate) = (*consequent, *alternate);
             collect_returns(consequent, out, checker, bind);
             if let Some(alt) = alternate {
                 collect_returns(alt, out, checker, bind);

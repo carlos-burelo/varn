@@ -25,7 +25,8 @@ use body::FnEmitter;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use varn_core::ast::{
-    AstId, Decl, ExportDecl, FunctionDecl, Param, Pattern, Program, Stmt, StmtKind,
+    AstArena, AstId, Decl, ExportDecl, ExprId, FunctionDecl, Param, Pattern, Program, StmtId,
+    StmtKind,
 };
 use varn_core::{Atom, AtomInterner, TypeKind};
 use varn_tir::{
@@ -38,6 +39,7 @@ use varn_tir::{
 /// not expose here is a gap in the checker, to be closed there.
 pub fn emit_module(
     program: &Program,
+    ast_arena: &AstArena,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
@@ -61,16 +63,16 @@ pub fn emit_module(
     // become a module-qualified global. A builtin (`print`) or a name reaching
     // us from the prelude is NOT one of these; it resolves by bare name.
     let mut declared: FxHashSet<Rc<str>> = FxHashSet::default();
-    for stmt in &program.body {
-        if let StmtKind::Decl(d) = &stmt.kind {
-            collect_decl_names(d, &mut declared, interner);
+    for &stmt in &program.body {
+        if let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind {
+            collect_decl_names(d, ast_arena, &mut declared, interner);
         }
     }
     // `extension X on T { … }` members become mangled free functions
     // (`__ext_{label}_{name}`) stored as module globals and called by that name
     // (`InstKind::ExtensionCall`). Number them like any other module global so
     // the call site is `LoadGlobalIdx`, not a name lookup the JIT bails on.
-    collect_extension_names(program, &mut declared, interner);
+    collect_extension_names(program, ast_arena, &mut declared, interner);
 
     let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
@@ -122,7 +124,7 @@ pub fn emit_module(
     // Guarded to non-static, non-async, non-generator `Method` members so the
     // emitted op-id is guaranteed to resolve.
     let core_ops = core_method_ops(bind);
-    let math_intrinsics = math_intrinsic_imports(program, interner);
+    let math_intrinsics = math_intrinsic_imports(program, ast_arena, interner);
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
@@ -130,7 +132,7 @@ pub fn emit_module(
     let mut free_fns: Vec<&FunctionDecl> = program
         .body
         .iter()
-        .filter_map(|s| match &s.kind {
+        .filter_map(|&s| match &ast_arena.stmt(s).kind {
             StmtKind::Decl(d) => free_function(d),
             _ => None,
         })
@@ -151,8 +153,8 @@ pub fn emit_module(
             }
         }
     }
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         if let Some(ns) = namespace_decl(d) {
@@ -194,6 +196,7 @@ pub fn emit_module(
     for f in &free_fns {
         let tf = emit_function(
             f,
+            ast_arena,
             bind,
             expr_table,
             &mut types,
@@ -210,6 +213,7 @@ pub fn emit_module(
     let mut top_body = Vec::new();
     let top_locals = {
         let mut top = FnEmitter::new(
+            ast_arena,
             expr_table,
             &mut types,
             ctx.as_module_ctx(),
@@ -220,8 +224,8 @@ pub fn emit_module(
         )
         .as_top_level();
         let mut class_ord: u32 = 0;
-        for stmt in &program.body {
-            match &stmt.kind {
+        for &stmt in &program.body {
+            match &ast_arena.stmt(stmt).kind {
                 // A class / enum declaration: a `BuildClass` at this position,
                 // in the same order `class_defs` is filled below.
                 StmtKind::Decl(d) if class_decl(d).is_some() || enum_decl(d).is_some() => {
@@ -249,7 +253,7 @@ pub fn emit_module(
                 // `let X = class { … }` — build the class here, then let the
                 // `let` bind `X` to it (the initializer lowers to a load of the
                 // `<anon>` global).
-                StmtKind::Decl(d) if anon_class_of(d).is_some() => {
+                StmtKind::Decl(d) if anon_class_of(d, ast_arena).is_some() => {
                     top_body.push(TirStmt::BuildClass(class_ord));
                     class_ord += 1;
                     top_body.extend(top.lower_stmt_as_block(stmt));
@@ -285,21 +289,23 @@ pub fn emit_module(
                      functions: &mut Vec<TirFunction>,
                      types: &mut TyTable,
                      signatures: &mut Vec<Signature>| {
-        if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl)) {
+        if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl, ast_arena)) {
             class_defs.push(emit_class(
-                class, &ctx, expr_table, types, signatures, functions,
+                class, ast_arena, &ctx, expr_table, types, signatures, functions,
             ));
         } else if let Some(en) = enum_decl(decl) {
             class_defs.push(emit_enum(
-                en, &ctx, expr_table, types, signatures, functions,
+                en, ast_arena, &ctx, expr_table, types, signatures, functions,
             ));
         }
     };
-    for stmt in &program.body {
-        let StmtKind::Decl(decl) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(decl) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
-        if class_decl(decl).is_some() || enum_decl(decl).is_some() || anon_class_of(decl).is_some()
+        if class_decl(decl).is_some()
+            || enum_decl(decl).is_some()
+            || anon_class_of(decl, ast_arena).is_some()
         {
             emit_type(
                 decl,
@@ -323,6 +329,7 @@ pub fn emit_module(
 
     emit_extensions(
         program,
+        ast_arena,
         &ctx,
         expr_table,
         &mut types,
@@ -330,8 +337,8 @@ pub fn emit_module(
         &mut functions,
     );
 
-    let imports = collect_imports(program, interner);
-    let exports = collect_exports(program, interner);
+    let imports = collect_imports(program, ast_arena, interner);
+    let exports = collect_exports(program, ast_arena, interner);
 
     TirModule {
         source_file: Rc::from(program.filename.as_ref()),
@@ -524,7 +531,7 @@ fn emit_namespace_object(
             }
             Decl::Variable(v) => {
                 for decl in &v.declarators {
-                    if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, &decl.init) {
+                    if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) {
                         let value = top.lower_expression(init);
                         entries.push(TirObjectEntry::Field {
                             name: Rc::from(interner.resolve(*name)),
@@ -556,11 +563,11 @@ fn emit_namespace_object(
 
 /// `let X = class { … }` — the class body of an anonymous class expression,
 /// so it is built like a named class (under `<anon>`).
-fn anon_class_of(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
+fn anon_class_of<'a>(decl: &'a Decl, ast_arena: &'a AstArena) -> Option<&'a varn_core::ast::ClassDecl> {
     let v = variable_decl(decl)?;
     for d in &v.declarators {
-        if let Some(init) = &d.init {
-            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &init.kind {
+        if let Some(init) = d.init {
+            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &ast_arena.expr(init).kind {
                 return Some(declaration);
             }
         }
@@ -604,7 +611,12 @@ fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
 /// Top-level binding names this declaration introduces — functions, classes,
 /// enums, `let`/`const` (including destructured), namespaces, and import
 /// locals. The set the module qualifies its globals by.
-fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
+fn collect_decl_names(
+    decl: &Decl,
+    ast_arena: &AstArena,
+    out: &mut FxHashSet<Rc<str>>,
+    interner: &AtomInterner,
+) {
     use varn_core::ast::{ImportSpecifier, Pattern as P};
     fn pat_names(p: &P, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
         match p {
@@ -648,10 +660,12 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &Atom
         Decl::Variable(v) => {
             for d in &v.declarators {
                 pat_names(&d.id, out, interner);
-                if matches!(
-                    d.init.as_ref().map(|e| &e.kind),
-                    Some(varn_core::ast::ExprKind::ClassExpr { .. })
-                ) {
+                if d.init.is_some_and(|e| {
+                    matches!(
+                        ast_arena.expr(e).kind,
+                        varn_core::ast::ExprKind::ClassExpr { .. }
+                    )
+                }) {
                     out.insert(Rc::from("<anon>"));
                 }
             }
@@ -661,7 +675,7 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &Atom
             // A namespace member is a module binding too: a sibling reads it by
             // bare name and its qualified global backs the namespace object.
             for m in &ns.body {
-                collect_decl_names(m, out, interner);
+                collect_decl_names(m, ast_arena, out, interner);
             }
         }
         Decl::Import(i) => {
@@ -673,7 +687,7 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &Atom
             }
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => {
-            collect_decl_names(declaration, out, interner)
+            collect_decl_names(declaration, ast_arena, out, interner)
         }
         _ => {}
     }
@@ -683,11 +697,15 @@ fn collect_decl_names(decl: &Decl, out: &mut FxHashSet<Rc<str>>, interner: &Atom
 /// `f` the JIT can lower to a single ISA instruction. Empty when nothing
 /// intrinsic-able is imported. The import binding is what makes it safe: a
 /// user `let abs = …` shadows the name and never reaches here.
-fn math_intrinsic_imports(program: &Program, interner: &AtomInterner) -> FxHashMap<Atom, u8> {
+fn math_intrinsic_imports(
+    program: &Program,
+    ast_arena: &AstArena,
+    interner: &AtomInterner,
+) -> FxHashMap<Atom, u8> {
     use varn_core::ast::ImportSpecifier;
     let mut out = FxHashMap::default();
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         let Decl::Import(imp) = d.as_ref() else {
@@ -716,10 +734,15 @@ fn math_intrinsic_imports(program: &Program, interner: &AtomInterner) -> FxHashM
 
 /// The mangled global names of every `extension` member — same strings
 /// `emit_extensions` produces, so they get numbered as module globals.
-fn collect_extension_names(program: &Program, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
+fn collect_extension_names(
+    program: &Program,
+    ast_arena: &AstArena,
+    out: &mut FxHashSet<Rc<str>>,
+    interner: &AtomInterner,
+) {
     use varn_core::ast::ExtensionMember;
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         let Decl::Extension(ext) = d.as_ref() else {
@@ -763,6 +786,7 @@ fn extension_target_label(
 
 fn emit_extensions(
     program: &Program,
+    ast_arena: &AstArena,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -770,8 +794,8 @@ fn emit_extensions(
     out: &mut Vec<TirFunction>,
 ) {
     use varn_core::ast::ExtensionMember;
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         let Decl::Extension(ext) = d.as_ref() else {
@@ -797,14 +821,14 @@ fn emit_extensions(
             _ => None,
         };
         for member in &ext.members {
-            let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, &Stmt) = match member {
+            let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, StmtId) = match member {
                 ExtensionMember::Method(f) => (
                     Rc::from(format!("__ext_{label}_{}", ctx.interner.resolve(f.id))),
                     f.params
                         .iter()
                         .map(|p| param_name(p, ctx.interner))
                         .collect(),
-                    &f.body,
+                    f.body,
                 ),
                 ExtensionMember::Getter { key, body, .. } => (
                     Rc::from(format!(
@@ -812,7 +836,7 @@ fn emit_extensions(
                         ctx.interner.resolve(*key)
                     )),
                     vec![],
-                    body,
+                    *body,
                 ),
                 ExtensionMember::Setter {
                     key, param, body, ..
@@ -822,7 +846,7 @@ fn emit_extensions(
                         ctx.interner.resolve(*key)
                     )),
                     vec![param_name(param, ctx.interner)],
-                    body,
+                    *body,
                 ),
             };
             let arity = params.len();
@@ -831,6 +855,7 @@ fn emit_extensions(
             let mut mcls: Vec<TirFunction> = Vec::new();
             let (body_stmts, locals) = {
                 let mut em = FnEmitter::new(
+                    ast_arena,
                     expr_table,
                     types,
                     ctx.as_module_ctx(),
@@ -842,9 +867,9 @@ fn emit_extensions(
                 if let Some(cid) = this_cid {
                     em = em.with_this(cid);
                 }
-                let b = match &body.kind {
+                let b = match &ast_arena.stmt(body).kind {
                     StmtKind::Block { stmts } => em.lower_block(stmts),
-                    _ => em.lower_block(std::slice::from_ref(body)),
+                    _ => em.lower_block(std::slice::from_ref(&body)),
                 };
                 (b, std::mem::take(&mut em.locals))
             };
@@ -907,7 +932,11 @@ fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
     })
 }
 
-fn collect_exports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::TirExport> {
+fn collect_exports(
+    program: &Program,
+    ast_arena: &AstArena,
+    interner: &AtomInterner,
+) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
     let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
         out.push(varn_tir::TirExport {
@@ -917,14 +946,14 @@ fn collect_exports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::
             namespace: ns,
         });
     };
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         match d.as_ref() {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => {
                 let mut names = FxHashSet::default();
-                collect_decl_names(declaration, &mut names, interner);
+                collect_decl_names(declaration, ast_arena, &mut names, interner);
                 for n in names {
                     push(n.clone(), n, None, false);
                 }
@@ -963,11 +992,15 @@ fn collect_exports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::
     out
 }
 
-fn collect_imports(program: &Program, interner: &AtomInterner) -> Vec<varn_tir::TirImport> {
+fn collect_imports(
+    program: &Program,
+    ast_arena: &AstArena,
+    interner: &AtomInterner,
+) -> Vec<varn_tir::TirImport> {
     use varn_core::ast::ImportSpecifier as IS;
     let mut out = Vec::new();
-    for stmt in &program.body {
-        let StmtKind::Decl(d) = &stmt.kind else {
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
             continue;
         };
         let Decl::Import(imp) = d.as_ref() else {
@@ -1023,7 +1056,8 @@ fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
 fn emit_member_fn(
     display_name: Rc<str>,
     params: &[Param],
-    body: &Stmt,
+    body: Option<StmtId>,
+    ast_arena: &AstArena,
     is_async: bool,
     is_generator: bool,
     this_class: Option<varn_tir::ClassId>,
@@ -1043,6 +1077,7 @@ fn emit_member_fn(
     let mut mcls: Vec<TirFunction> = Vec::new();
     let (body_stmts, locals) = {
         let mut em = FnEmitter::new(
+            ast_arena,
             expr_table,
             types,
             ctx.as_module_ctx(),
@@ -1070,9 +1105,12 @@ fn emit_member_fn(
                 }
             }
         }
-        b.extend(match &body.kind {
-            StmtKind::Block { stmts } => em.lower_block(stmts),
-            _ => em.lower_block(std::slice::from_ref(body)),
+        b.extend(match body {
+            Some(id) => match &ast_arena.stmt(id).kind {
+                StmtKind::Block { stmts } => em.lower_block(stmts),
+                _ => em.lower_block(std::slice::from_ref(&id)),
+            },
+            None => em.lower_block(&[]),
         });
         (b, std::mem::take(&mut em.locals))
     };
@@ -1103,7 +1141,8 @@ fn fresh_sig(signatures: &mut Vec<Signature>, arity: usize) -> SigId {
 }
 
 fn lower_outer(
-    e: &varn_core::ast::Expr,
+    e: ExprId,
+    ast_arena: &AstArena,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -1113,6 +1152,7 @@ fn lower_outer(
     this_class: Option<varn_tir::ClassId>,
 ) -> (Vec<TirStmt>, TirExpr) {
     let mut em = FnEmitter::new(
+        ast_arena,
         expr_table,
         types,
         ctx.as_module_ctx(),
@@ -1129,6 +1169,7 @@ fn lower_outer(
 
 fn emit_class(
     class: &varn_core::ast::ClassDecl,
+    ast_arena: &AstArena,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -1149,12 +1190,13 @@ fn emit_class(
         ..Default::default()
     };
 
-    if let Some(sup) = &class.super_class {
-        if let varn_core::ast::ExprKind::Identifier { name } = &sup.kind {
+    if let Some(sup) = class.super_class {
+        if let varn_core::ast::ExprKind::Identifier { name } = &ast_arena.expr(sup).kind {
             def.parent = ctx.names.class_id(ctx.interner.resolve(*name));
         }
         let (pre, x) = lower_outer(
             sup,
+            ast_arena,
             ctx,
             expr_table,
             types,
@@ -1168,7 +1210,8 @@ fn emit_class(
     }
     for deco in &class.decorators {
         let (pre, x) = lower_outer(
-            &deco.expression,
+            deco.expression,
+            ast_arena,
             ctx,
             expr_table,
             types,
@@ -1199,6 +1242,7 @@ fn emit_class(
         let base = out.len() as u32;
         let mut cls: Vec<TirFunction> = Vec::new();
         let mut em = FnEmitter::new(
+            ast_arena,
             expr_table,
             types,
             ctx.as_module_ctx(),
@@ -1221,7 +1265,7 @@ fn emit_class(
                 if modifiers.is_static {
                     continue;
                 }
-                let value = em.lower_expression(init);
+                let value = em.lower_expression(*init);
                 stmts.append(&mut em.take_pending());
                 stmts.push(this_field_assign(
                     Rc::from(ctx.interner.resolve(*key)),
@@ -1241,7 +1285,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.constructor")),
                     params,
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     class_id,
@@ -1274,7 +1319,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.{key_str}")),
                     params,
-                    body,
+                    Some(*body),
+                    ast_arena,
                     modifiers.is_async,
                     modifiers.is_generator,
                     (!modifiers.is_static).then_some(()).and(class_id),
@@ -1290,7 +1336,8 @@ fn emit_class(
                     .iter()
                     .map(|d| {
                         let (pre, x) = lower_outer(
-                            &d.expression,
+                            d.expression,
+                            ast_arena,
                             ctx,
                             expr_table,
                             types,
@@ -1325,7 +1372,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.get {key_str}")),
                     &[],
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     (!modifiers.is_static).then_some(()).and(class_id),
@@ -1357,7 +1405,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.set {key_str}")),
                     ps,
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     (!modifiers.is_static).then_some(()).and(class_id),
@@ -1382,9 +1431,10 @@ fn emit_class(
                 modifiers,
                 ..
             } if modifiers.is_static => {
-                let init_x = init.as_ref().map(|e| {
+                let init_x = init.map(|e| {
                     let (pre, x) = lower_outer(
                         e,
+                        ast_arena,
                         ctx,
                         expr_table,
                         types,
@@ -1403,7 +1453,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.<static>")),
                     &[],
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     class_id,
@@ -1440,11 +1491,6 @@ fn emit_class(
                 // A synthetic constructor: primary params (with their defaults,
                 // via `destructure_params`), then the field defaults, then
                 // `this.<p> = p` for every primary param.
-                let empty_body = Stmt {
-                    id: class.ast_id,
-                    range: class.range.clone(),
-                    kind: StmtKind::Block { stmts: vec![] },
-                };
                 let sig = fresh_sig(signatures, primary.len());
                 {
                     let tys: Vec<BackendTy> = primary
@@ -1467,7 +1513,8 @@ fn emit_class(
                 let id = emit_member_fn(
                     Rc::from(format!("{class_name}.constructor")),
                     primary,
-                    &empty_body,
+                    None,
+                    ast_arena,
                     false,
                     false,
                     class_id,
@@ -1513,6 +1560,7 @@ fn emit_class(
 
 fn emit_enum(
     en: &varn_core::ast::EnumDecl,
+    ast_arena: &AstArena,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -1530,8 +1578,8 @@ fn emit_enum(
 
     let mut tag = 0i64;
     for m in &en.members {
-        if let Some(init) = &m.init {
-            if let varn_core::ast::ExprKind::IntLiteral { value, .. } = &init.kind {
+        if let Some(init) = m.init {
+            if let varn_core::ast::ExprKind::IntLiteral { value, .. } = &ast_arena.expr(init).kind {
                 tag = *value;
             }
         }
@@ -1549,9 +1597,10 @@ fn emit_enum(
         };
         let mut const_args = Vec::new();
         for f in &m.payload_fields {
-            if let Some(init) = &f.init {
+            if let Some(init) = f.init {
                 let (pre, x) = lower_outer(
                     init,
+                    ast_arena,
                     ctx,
                     expr_table,
                     types,
@@ -1590,7 +1639,8 @@ fn emit_enum(
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.{key_str}")),
                     params,
-                    body,
+                    Some(*body),
+                    ast_arena,
                     modifiers.is_async,
                     modifiers.is_generator,
                     (!modifiers.is_static).then_some(()).and(this_cid),
@@ -1615,7 +1665,8 @@ fn emit_enum(
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.constructor")),
                     params,
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     this_cid,
@@ -1646,7 +1697,8 @@ fn emit_enum(
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.get {key_str}")),
                     &[],
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
@@ -1677,7 +1729,8 @@ fn emit_enum(
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.set {key_str}")),
                     std::slice::from_ref(param),
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     (!modifiers.is_static).then_some(()).and(this_cid),
@@ -1703,9 +1756,10 @@ fn emit_enum(
                 modifiers,
                 ..
             } if modifiers.is_static => {
-                let init_x = init.as_ref().map(|e| {
+                let init_x = init.map(|e| {
                     let (pre, x) = lower_outer(
                         e,
+                        ast_arena,
                         ctx,
                         expr_table,
                         types,
@@ -1724,7 +1778,8 @@ fn emit_enum(
                 let id = emit_member_fn(
                     Rc::from(format!("{name}.<static>")),
                     &[],
-                    body,
+                    Some(*body),
+                    ast_arena,
                     false,
                     false,
                     None,
@@ -1754,6 +1809,7 @@ fn param_name(p: &Param, interner: &AtomInterner) -> Rc<str> {
 #[allow(clippy::too_many_arguments)]
 fn emit_function(
     f: &FunctionDecl,
+    ast_arena: &AstArena,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -1790,6 +1846,7 @@ fn emit_function(
     let param_names: Vec<Rc<str>> = f.params.iter().map(|p| param_name(p, ctx.interner)).collect();
     let (body, locals) = {
         let mut em = FnEmitter::new(
+            ast_arena,
             expr_table,
             types,
             ctx.as_module_ctx(),
@@ -1799,7 +1856,7 @@ fn emit_function(
             param_names,
         );
         let mut b = em.destructure_params(&f.params);
-        b.extend(match &f.body.kind {
+        b.extend(match &ast_arena.stmt(f.body).kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
             _ => em.lower_block(std::slice::from_ref(&f.body)),
         });
