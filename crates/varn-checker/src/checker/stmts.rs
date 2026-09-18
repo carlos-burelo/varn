@@ -2,33 +2,36 @@ use super::Checker;
 use crate::binder::BindResult;
 use crate::symbol::SymbolId;
 use crate::types::Type;
-use varn_core::ast::{ForInit, Stmt, StmtKind};
+use varn_core::ast::{AstArena, ExprId, ForInit, StmtId, StmtKind};
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeTag};
 
 impl<'r> Checker<'r> {
-    pub(crate) fn check_stmts(&mut self, stmts: &[Stmt], bind: &BindResult) {
+    pub(crate) fn check_stmts(&mut self, stmts: &[StmtId], bind: &BindResult) {
         self.check_stmts_with_guards(stmts, bind);
     }
 
-    fn check_stmts_with_guards(&mut self, stmts: &[Stmt], bind: &BindResult) {
+    fn check_stmts_with_guards(&mut self, stmts: &[StmtId], bind: &BindResult) {
+        let arena = self.ast_arena;
         let mut i = 0;
         while i < stmts.len() {
-            let stmt = &stmts[i];
+            let stmt_id = stmts[i];
+            let stmt = arena.stmt(stmt_id);
 
             if matches!(&stmt.kind, StmtKind::Throw { .. } | StmtKind::Return { .. }) {
-                self.check_stmt(stmt, bind);
+                self.check_stmt(stmt_id, bind);
 
-                for stmt in &stmts[i + 1..] {
+                for &later_id in &stmts[i + 1..] {
+                    let later = arena.stmt(later_id);
                     self.emit(
                         Diagnostic::warning(ErrorCode::UnreachableCode, "unreachable code")
-                            .with_range(stmt.range),
+                            .with_range(later.range),
                     );
                 }
                 return;
             }
 
-            if let Some(guard_narrowings) = self.extract_guard_narrowings(stmt, bind) {
-                self.check_stmt(stmt, bind);
+            if let Some(guard_narrowings) = self.extract_guard_narrowings(stmt_id, bind) {
+                self.check_stmt(stmt_id, bind);
 
                 self.push_narrowings(&guard_narrowings);
                 self.check_stmts_with_guards(&stmts[i + 1..], bind);
@@ -36,28 +39,28 @@ impl<'r> Checker<'r> {
                 return;
             }
 
-            self.check_stmt(stmt, bind);
+            self.check_stmt(stmt_id, bind);
             i += 1;
         }
     }
 
     fn extract_guard_narrowings(
         &mut self,
-        stmt: &Stmt,
+        stmt: StmtId,
         bind: &BindResult,
     ) -> Option<Vec<(SymbolId, Type)>> {
-        let StmtKind::If {
-            test,
-            consequent,
-            alternate,
-        } = &stmt.kind
-        else {
-            return None;
+        let (test, consequent, alternate) = match &self.ast_arena.stmt(stmt).kind {
+            StmtKind::If {
+                test,
+                consequent,
+                alternate,
+            } => (*test, *consequent, *alternate),
+            _ => return None,
         };
         if alternate.is_some() {
             return None;
         }
-        if !stmt_terminates(consequent) {
+        if !stmt_terminates(consequent, self.ast_arena) {
             return None;
         }
         if !self.can_extract_narrowings(test) {
@@ -71,31 +74,39 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(crate) fn check_stmt(&mut self, stmt: &Stmt, bind: &BindResult) {
-        match &stmt.kind {
-            StmtKind::Decl(decl) => self.check_decl(decl, bind),
+    pub(crate) fn check_stmt(&mut self, stmt: StmtId, bind: &BindResult) {
+        let arena = self.ast_arena;
+        let range = arena.stmt(stmt).range;
+        match &arena.stmt(stmt).kind {
+            StmtKind::Decl(decl) => {
+                let decl = decl.clone();
+                self.check_decl(&decl, bind);
+            }
 
             StmtKind::Block { stmts } => {
+                let stmts = stmts.clone();
                 self.with_next_child_scope_span(
                     bind,
-                    stmt.range.start.offset,
-                    stmt.range.end.offset,
-                    |checker| checker.check_stmts(stmts, bind),
+                    range.start.offset,
+                    range.end.offset,
+                    |checker| checker.check_stmts(&stmts, bind),
                 );
             }
 
             StmtKind::Expr { expression } => {
+                let expression = *expression;
                 self.check_expr(expression, bind);
             }
 
             StmtKind::Return { argument } => {
+                let argument = *argument;
                 if !self.in_function {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::ReturnOutsideFunction,
                             "a 'return' statement can only be used within a function body",
                         )
-                        .with_range(stmt.range),
+                        .with_range(range),
                     );
                 }
 
@@ -121,7 +132,7 @@ impl<'r> Checker<'r> {
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                 "type mismatch: function is declared to return '{expected}', but returns '{actual}'"
                             ))
-                            .with_range(stmt.range),
+                            .with_range(range),
                         );
                     }
                 }
@@ -134,7 +145,7 @@ impl<'r> Checker<'r> {
                             ErrorCode::InvalidBreakTarget,
                             "a 'break' statement can only be used within an enclosing iteration or switch statement",
                         )
-                        .with_range(stmt.range),
+                        .with_range(range),
                     );
                 }
             }
@@ -146,7 +157,7 @@ impl<'r> Checker<'r> {
                             ErrorCode::InvalidContinueTarget,
                             "a 'continue' statement can only be used within an enclosing iteration statement",
                         )
-                        .with_range(stmt.range),
+                        .with_range(range),
                     );
                 }
             }
@@ -156,6 +167,7 @@ impl<'r> Checker<'r> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 self.check_expr(test, bind);
                 if self.can_extract_narrowings(test) {
                     let narrow_true = self.extract_narrowings(test, bind, true);
@@ -178,6 +190,7 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::While { test, body } | StmtKind::DoWhile { test, body } => {
+                let (test, body) = (*test, *body);
                 self.check_expr(test, bind);
                 self.loop_depth += 1;
                 if self.can_extract_narrowings(test) {
@@ -195,35 +208,33 @@ impl<'r> Checker<'r> {
                 update,
                 body,
             } => {
+                let init = init.clone();
+                let (test, update, body) = (*test, *update, *body);
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(
-                    bind,
-                    stmt.range.start.offset,
-                    stmt.range.end.offset,
-                    |checker| {
-                        if let Some(i) = init {
-                            match i.as_ref() {
-                                ForInit::Var { declarators, .. } => {
-                                    checker.check_for_var_init(declarators, bind)
-                                }
-                                ForInit::Expr(e) => checker.check_expr(e, bind),
+                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+                    if let Some(i) = &init {
+                        match i.as_ref() {
+                            ForInit::Var { declarators, .. } => {
+                                checker.check_for_var_init(declarators, bind)
                             }
+                            ForInit::Expr(e) => checker.check_expr(*e, bind),
                         }
-                        if let Some(t) = test {
-                            checker.check_expr(t, bind);
-                        }
-                        if let Some(u) = update {
-                            checker.check_expr(u, bind);
-                        }
-                        checker.check_stmt(body, bind);
-                    },
-                );
+                    }
+                    if let Some(t) = test {
+                        checker.check_expr(t, bind);
+                    }
+                    if let Some(u) = update {
+                        checker.check_expr(u, bind);
+                    }
+                    checker.check_stmt(body, bind);
+                });
                 self.loop_depth -= 1;
             }
 
             StmtKind::ForOf {
                 left, right, body, ..
             } => {
+                let (left, right, body) = (left.clone(), *right, *body);
                 self.check_expr(right, bind);
                 let right_ty = self.infer_type(right, bind);
                 let elem_ty = match &right_ty.0 {
@@ -248,32 +259,23 @@ impl<'r> Checker<'r> {
                     _ => Type::Dynamic,
                 };
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(
-                    bind,
-                    stmt.range.start.offset,
-                    stmt.range.end.offset,
-                    |checker| {
-                        checker.check_pattern(left, &elem_ty, bind);
-                        checker.check_stmt(body, bind);
-                    },
-                );
+                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+                    checker.check_pattern(&left, &elem_ty, bind);
+                    checker.check_stmt(body, bind);
+                });
                 self.loop_depth -= 1;
             }
 
             StmtKind::ForIn {
                 left, right, body, ..
             } => {
+                let (left, right, body) = (left.clone(), *right, *body);
                 self.check_expr(right, bind);
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(
-                    bind,
-                    stmt.range.start.offset,
-                    stmt.range.end.offset,
-                    |checker| {
-                        checker.check_pattern(left, &Type::Str, bind);
-                        checker.check_stmt(body, bind);
-                    },
-                );
+                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+                    checker.check_pattern(&left, &Type::Str, bind);
+                    checker.check_stmt(body, bind);
+                });
                 self.loop_depth -= 1;
             }
 
@@ -281,20 +283,21 @@ impl<'r> Checker<'r> {
                 discriminant,
                 cases,
             } => {
+                let (discriminant, cases) = (*discriminant, cases.clone());
                 self.check_expr(discriminant, bind);
                 self.switch_depth += 1;
                 let mut seen_cases = rustc_hash::FxHashSet::default();
-                for case in cases {
-                    if let Some(t) = &case.test {
+                for case in &cases {
+                    if let Some(t) = case.test {
                         self.check_expr(t, bind);
-                        if let Some(lit_val) = get_literal_value_key(t) {
+                        if let Some(lit_val) = get_literal_value_key(t, self.ast_arena) {
                             if !seen_cases.insert(lit_val.clone()) {
                                 self.emit(
                                     Diagnostic::error(
                                         ErrorCode::DuplicateCaseLabel,
                                         format!("duplicate case label '{}'", lit_val),
                                     )
-                                    .with_range(t.range),
+                                    .with_range(self.ast_arena.expr(t).range),
                                 );
                             }
                         }
@@ -309,19 +312,24 @@ impl<'r> Checker<'r> {
                 catches,
                 finally,
             } => {
+                let (block, catches, finally) = (*block, catches.clone(), *finally);
                 self.check_stmt(block, bind);
-                for clause in catches {
-                    self.with_next_child_scope(bind, clause.body.range.start.offset, |checker| {
-                        if let Some(param) = &clause.param {
-                            let catch_ty = if let Some(ann) = &clause.type_ann {
-                                checker.resolve_type_node_cached(ann, bind)
-                            } else {
-                                Type::named("Error")
-                            };
-                            checker.check_pattern(param, &catch_ty, bind);
-                        }
-                        checker.check_stmt(&clause.body, bind);
-                    });
+                for clause in &catches {
+                    self.with_next_child_scope(
+                        bind,
+                        self.ast_arena.stmt(clause.body).range.start.offset,
+                        |checker| {
+                            if let Some(param) = &clause.param {
+                                let catch_ty = if let Some(ann) = &clause.type_ann {
+                                    checker.resolve_type_node_cached(ann, bind)
+                                } else {
+                                    Type::named("Error")
+                                };
+                                checker.check_pattern(param, &catch_ty, bind);
+                            }
+                            checker.check_stmt(clause.body, bind);
+                        },
+                    );
                 }
                 if let Some(fin) = finally {
                     self.check_stmt(fin, bind);
@@ -329,6 +337,7 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::Throw { argument } => {
+                let argument = *argument;
                 self.check_expr(argument, bind);
                 let thrown = self.infer_type(argument, bind);
                 if !self.is_throwable(&thrown, bind) {
@@ -339,12 +348,13 @@ impl<'r> Checker<'r> {
                                 "cannot throw a value of type `{thrown}`: thrown values must be `Error` or a subclass"
                             ),
                         )
-                        .with_range(argument.range),
+                        .with_range(self.ast_arena.expr(argument).range),
                     );
                 }
             }
 
             StmtKind::Labeled { body, .. } => {
+                let body = *body;
                 self.check_stmt(body, bind);
             }
 
@@ -353,13 +363,15 @@ impl<'r> Checker<'r> {
                 is_await,
                 ..
             } => {
-                let dispose_method = if *is_await { "disposeAsync" } else { "dispose" };
-                let interface_name = if *is_await {
+                let declarations = declarations.clone();
+                let is_await = *is_await;
+                let dispose_method = if is_await { "disposeAsync" } else { "dispose" };
+                let interface_name = if is_await {
                     varn_core::well_known::ASYNC_DISPOSABLE
                 } else {
                     varn_core::well_known::DISPOSABLE
                 };
-                for d in declarations {
+                for d in &declarations {
                     if d.init.is_none() {
                         self.emit(
                             Diagnostic::error(
@@ -376,7 +388,7 @@ impl<'r> Checker<'r> {
                     });
                     let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
-                    let init = d.init.as_ref().unwrap();
+                    let init = d.init.unwrap();
                     self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init, bind));
                     let init_ty = self.infer_type(init, bind);
 
@@ -423,13 +435,13 @@ impl<'r> Checker<'r> {
             });
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
-            if let Some(init_expr) = &declarator.init {
+            if let Some(init_expr) = declarator.init {
                 self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init_expr, bind));
 
                 if let Some(ann_ty) = &ann_ty_opt {
                     let init_ty = self.infer_type(init_expr, bind);
                     let is_empty_array = init_ty.is_dynamic()
-                        && matches!(&init_expr.kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
+                        && matches!(&self.ast_arena.expr(init_expr).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
                     if !is_empty_array
                         && !self.types_compatible_cached(ann_ty, &init_ty, Some(bind))
                     {
@@ -481,16 +493,16 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn stmt_terminates(stmt: &Stmt) -> bool {
-    match &stmt.kind {
+fn stmt_terminates(stmt: StmtId, arena: &AstArena) -> bool {
+    match &arena.stmt(stmt).kind {
         StmtKind::Return { .. } | StmtKind::Throw { .. } => true,
-        StmtKind::Block { stmts } => stmts.last().is_some_and(stmt_terminates),
+        StmtKind::Block { stmts } => stmts.last().is_some_and(|&s| stmt_terminates(s, arena)),
         _ => false,
     }
 }
 
-fn get_literal_value_key(expr: &varn_core::ast::Expr) -> Option<String> {
-    match &expr.kind {
+fn get_literal_value_key(expr: ExprId, arena: &AstArena) -> Option<String> {
+    match &arena.expr(expr).kind {
         varn_core::ast::ExprKind::IntLiteral { value, .. } => Some(value.to_string()),
         varn_core::ast::ExprKind::FloatLiteral { value, .. } => Some(value.to_string()),
         varn_core::ast::ExprKind::StrLiteral { value } => Some(format!("\"{}\"", value)),

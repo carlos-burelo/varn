@@ -23,16 +23,16 @@ impl<'r> Checker<'r> {
                     });
                     let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
-                    if let Some(init_expr) = &d.init {
+                    if let Some(init_expr) = d.init {
                         self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init_expr, bind));
 
                         if let Some(ann_ty) = &ann_ty_opt {
                             let init_ty = self.infer_type(init_expr, bind);
                             let is_empty_array = init_ty.is_dynamic()
-                                && matches!(&init_expr.kind, ExprKind::Array { elements } if elements.is_empty());
+                                && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
                             let mut is_compatible = self.types_compatible_cached(ann_ty, &init_ty, Some(bind));
                             if is_compatible && ann_ty.is_granular_int() {
-                                if let ExprKind::IntLiteral { value, .. } = &init_expr.kind {
+                                if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(init_expr).kind {
                                     if !crate::checker::compat::literal_fits_type(ann_ty, *value) {
                                         is_compatible = false;
                                     }
@@ -113,7 +113,7 @@ impl<'r> Checker<'r> {
                 self.loop_depth = 0;
                 self.switch_depth = 0;
 
-                self.check_stmt(&f.body, bind);
+                self.check_stmt(f.body, bind);
 
                 self.in_function = saved_in_function;
                 self.loop_depth = saved_loop_depth;
@@ -244,7 +244,7 @@ impl<'r> Checker<'r> {
                             range,
                             ..
                         } => {
-                            if let Some(init_expr) = init {
+                            if let Some(init_expr) = *init {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
                                     let key_str = bind.interner.resolve(*key);
@@ -265,14 +265,16 @@ impl<'r> Checker<'r> {
                             }
                         }
                         ClassMember::Constructor { body, .. } => {
+                            let body = *body;
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
+                            let body_range = self.ast_arena.stmt(body).range;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
                                 self.record_scope_span(
-                                    body.range.start.offset,
-                                    body.range.end.offset,
+                                    body_range.start.offset,
+                                    body_range.end.offset,
                                     ctor_scope,
                                 );
                             }
@@ -286,6 +288,7 @@ impl<'r> Checker<'r> {
                             modifiers,
                             ..
                         } => {
+                            let body = *body;
                             let saved_expected = self.expected_return_type.take();
                             self.expected_return_type = return_type
                                 .as_ref()
@@ -301,11 +304,12 @@ impl<'r> Checker<'r> {
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
+                            let body_range = self.ast_arena.stmt(body).range;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
                                 self.record_scope_span(
-                                    body.range.start.offset,
-                                    body.range.end.offset,
+                                    body_range.start.offset,
+                                    body_range.end.offset,
                                     m_scope,
                                 );
                             }
@@ -321,6 +325,7 @@ impl<'r> Checker<'r> {
                             body: Some(body),
                             ..
                         } => {
+                            let body = *body;
                             let saved_expected = self.expected_return_type.take();
                             self.expected_return_type = return_type
                                 .as_ref()
@@ -329,11 +334,12 @@ impl<'r> Checker<'r> {
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
+                            let body_range = self.ast_arena.stmt(body).range;
                             if let Some(g_scope) = self.next_child_scope(bind) {
                                 self.current_scope = g_scope;
                                 self.record_scope_span(
-                                    body.range.start.offset,
-                                    body.range.end.offset,
+                                    body_range.start.offset,
+                                    body_range.end.offset,
                                     g_scope,
                                 );
                             }
@@ -347,14 +353,16 @@ impl<'r> Checker<'r> {
                         ClassMember::Setter {
                             body: Some(body), ..
                         } => {
+                            let body = *body;
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
+                            let body_range = self.ast_arena.stmt(body).range;
                             if let Some(s_scope) = self.next_child_scope(bind) {
                                 self.current_scope = s_scope;
                                 self.record_scope_span(
-                                    body.range.start.offset,
-                                    body.range.end.offset,
+                                    body_range.start.offset,
+                                    body_range.end.offset,
                                     s_scope,
                                 );
                             }
@@ -390,7 +398,7 @@ impl<'r> Checker<'r> {
                             range,
                             ..
                         } => {
-                            if let Some(init_expr) = init {
+                            if let Some(init_expr) = *init {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
                                     let key_str = bind.interner.resolve(*key);
@@ -417,7 +425,7 @@ impl<'r> Checker<'r> {
                             range,
                             ..
                         } => {
-                            if let Some(body_stmt) = body {
+                            if let Some(body_stmt) = *body {
                                 let saved_method_scope = self.current_scope;
                                 if let Some(m_scope) = self.next_child_scope(bind) {
                                     self.current_scope = m_scope;
@@ -455,7 +463,7 @@ impl<'r> Checker<'r> {
                             range,
                             ..
                         } => {
-                            if let Some(body_stmt) = body {
+                            if let Some(body_stmt) = *body {
                                 let saved_getter_scope = self.current_scope;
                                 if let Some(g_scope) = self.next_child_scope(bind) {
                                     self.current_scope = g_scope;
@@ -485,7 +493,7 @@ impl<'r> Checker<'r> {
                             range,
                             ..
                         } => {
-                            if let Some(body_stmt) = body {
+                            if let Some(body_stmt) = *body {
                                 let saved_setter_scope = self.current_scope;
                                 if let Some(s_scope) = self.next_child_scope(bind) {
                                     self.current_scope = s_scope;
@@ -528,18 +536,20 @@ impl<'r> Checker<'r> {
                             }
                         }
                         ClassMember::Constructor { body, .. } => {
+                            let body = *body;
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
                             self.in_function = saved_in_function;
                         }
                         ClassMember::StaticBlock { body, range } => {
+                            let body = *body;
                             let saved_block_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
@@ -596,15 +606,16 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope(method.body.range.start.offset);
+                                self.record_scope(self.ast_arena.stmt(method.body).range.start.offset);
                             }
-                            self.check_stmt(&method.body, bind);
+                            self.check_stmt(method.body, bind);
                             self.current_scope = saved_scope;
                             self.in_function = saved_in_function;
                         }
                         ExtensionMember::Getter {
                             return_type, body, ..
                         } => {
+                            let body = *body;
                             self.expected_return_type = return_type
                                 .as_ref()
                                 .map(|rt| self.resolve_type_node_cached(rt, bind));
@@ -613,20 +624,21 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
                             self.in_function = saved_in_function;
                         }
                         ExtensionMember::Setter { body, .. } => {
+                            let body = *body;
                             self.expected_return_type = Some(Type::Void);
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
@@ -670,7 +682,7 @@ impl<'r> Checker<'r> {
                     self.check_decl(&varn_core::ast::Decl::Class(c.clone()), bind);
                 }
                 varn_core::ast::ExportDefaultDecl::Expr(expr) => {
-                    self.check_expr(expr, bind);
+                    self.check_expr(*expr, bind);
                 }
             },
             _ => {}

@@ -2,7 +2,7 @@ use crate::binder::resolve_type_node;
 use crate::types::{Type, TypeContext};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
 use varn_core::IntrinsicType;
 use varn_core::TypeKind;
@@ -13,12 +13,13 @@ pub(crate) fn infer_call_type(
     fn_type_params: &FxHashMap<Rc<str>, Vec<Rc<str>>>,
     class_methods: &FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     sym_map: &FxHashMap<Rc<str>, Type>,
-    expr: &Expr,
+    expr: ExprId,
+    ast_arena: &AstArena,
     ctx: Option<&dyn TypeContext>,
     current_class: Option<&str>,
     interner: &AtomInterner,
 ) -> Option<Type> {
-    match &expr.kind {
+    match &ast_arena.expr(expr).kind {
         ExprKind::IntLiteral { .. } => Some(Type::Int),
         ExprKind::FloatLiteral { .. } => Some(Type::Float),
         ExprKind::StrLiteral { .. } => Some(Type::Str),
@@ -35,7 +36,8 @@ pub(crate) fn infer_call_type(
             computed: false,
             ..
         } => {
-            let prop_name = match &property.kind {
+            let (object, property) = (*object, *property);
+            let prop_name = match &ast_arena.expr(property).kind {
                 ExprKind::Identifier { name } => interner.resolve(*name),
                 _ => return None,
             };
@@ -45,6 +47,7 @@ pub(crate) fn infer_call_type(
                 class_methods,
                 sym_map,
                 object,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -74,12 +77,14 @@ pub(crate) fn infer_call_type(
         }
 
         ExprKind::Binary { left, right, op } => {
+            let (left, right, op) = (*left, *right, *op);
             let l = infer_call_type(
                 fn_map,
                 fn_type_params,
                 class_methods,
                 sym_map,
                 left,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -90,6 +95,7 @@ pub(crate) fn infer_call_type(
                 class_methods,
                 sym_map,
                 right,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -112,14 +118,15 @@ pub(crate) fn infer_call_type(
         ExprKind::Call {
             callee, type_args, ..
         } => {
-            let callee_name = match &callee.kind {
-                ExprKind::Identifier { name } => Some(name.clone()),
+            let callee = *callee;
+            let callee_name = match &ast_arena.expr(callee).kind {
+                ExprKind::Identifier { name } => Some(*name),
                 ExprKind::Member {
                     property,
                     computed: false,
                     ..
-                } => match &property.kind {
-                    ExprKind::Identifier { name } => Some(name.clone()),
+                } => match &ast_arena.expr(*property).kind {
+                    ExprKind::Identifier { name } => Some(*name),
                     _ => None,
                 },
                 _ => None,
@@ -147,6 +154,7 @@ pub(crate) fn infer_call_type(
                 class_methods,
                 sym_map,
                 callee,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -160,7 +168,7 @@ pub(crate) fn infer_call_type(
         ExprKind::New {
             callee, type_args, ..
         } => {
-            if let ExprKind::Identifier { name } = &callee.kind {
+            if let ExprKind::Identifier { name } = &ast_arena.expr(*callee).kind {
                 let name_str = interner.resolve(*name);
                 if !type_args.is_empty() {
                     let mut args = Vec::new();
@@ -182,7 +190,8 @@ pub(crate) fn infer_call_type(
             fn_type_params,
             class_methods,
             sym_map,
-            expression,
+            *expression,
+            ast_arena,
             ctx,
             current_class,
             interner,
@@ -196,7 +205,8 @@ pub(crate) fn infer_call_type(
                 fn_type_params,
                 class_methods,
                 sym_map,
-                argument,
+                *argument,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -218,12 +228,14 @@ pub(crate) fn infer_call_type(
             alternate,
             ..
         } => {
+            let (consequent, alternate) = (*consequent, *alternate);
             let t = infer_call_type(
                 fn_map,
                 fn_type_params,
                 class_methods,
                 sym_map,
                 consequent,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -234,6 +246,7 @@ pub(crate) fn infer_call_type(
                 class_methods,
                 sym_map,
                 alternate,
+                ast_arena,
                 ctx,
                 current_class,
                 interner,
@@ -270,7 +283,8 @@ pub(crate) fn infer_call_type(
                     fn_type_params,
                     class_methods,
                     sym_map,
-                    e,
+                    *e,
+                    ast_arena,
                     ctx,
                     current_class,
                     interner,
@@ -298,7 +312,8 @@ pub(crate) fn infer_call_type(
                             fn_type_params,
                             class_methods,
                             sym_map,
-                            e,
+                            *e,
+                            ast_arena,
                             ctx,
                             current_class,
                             interner,
@@ -328,7 +343,8 @@ pub(crate) fn infer_call_type(
             fn_type_params,
             class_methods,
             sym_map,
-            right,
+            *right,
+            ast_arena,
             ctx,
             current_class,
             interner,

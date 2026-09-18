@@ -40,7 +40,7 @@
 //! *more* is a miscompile, not an optimisation.
 
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 
 use crate::binder::BindResult;
@@ -55,13 +55,14 @@ impl<'r> Checker<'r> {
     /// `array_evolve` proves things about. Anything else answers `None`
     /// rather than guessing, because a guess here is trusted by a backend
     /// that removes guards on the strength of it.
-    pub(crate) fn refine(&mut self, expr: &Expr, bind: &BindResult) -> Option<Type> {
-        match &expr.kind {
+    pub(crate) fn refine(&mut self, expr: ExprId, bind: &BindResult) -> Option<Type> {
+        let arena = self.ast_arena;
+        match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
                 self.evolved_array_of(bind.interner.resolve(*name), bind)
             }
 
-            ExprKind::Paren { expression } => self.refine(expression, bind),
+            ExprKind::Paren { expression } => self.refine(*expression, bind),
 
             // Sign and negation preserve the numeric type; `!` does not
             // produce a refinement worth carrying (its type is already known).
@@ -69,7 +70,7 @@ impl<'r> Checker<'r> {
                 op: UnaryOp::Minus | UnaryOp::Plus,
                 operand,
                 ..
-            } => self.refine(operand, bind),
+            } => self.refine(*operand, bind),
             ExprKind::Unary { .. } => None,
 
             ExprKind::Member {
@@ -78,15 +79,16 @@ impl<'r> Checker<'r> {
                 computed,
                 ..
             } => {
+                let (object, property, computed) = (*object, *property, *computed);
                 let obj = self.refine(object, bind)?;
                 let TypeKind::Array(elem) = &obj.0 else {
                     return None;
                 };
-                if *computed {
+                if computed {
                     // `x[i]` on a proved `Array<T>` is a `T`.
                     Some((**elem).clone())
                 } else if matches!(
-                    &property.kind,
+                    &arena.expr(property).kind,
                     ExprKind::Identifier { name }
                         if bind.interner.resolve(*name) == varn_core::MemberKey::Length.as_str()
                 ) {
@@ -103,6 +105,7 @@ impl<'r> Checker<'r> {
             // local guess — `varn_core::binary_result_kind` is the same
             // function the checker uses.
             ExprKind::Binary { op, left, right } => {
+                let (op, left, right) = (*op, *left, *right);
                 if !matches!(
                     op,
                     BinaryOp::Add
@@ -121,7 +124,7 @@ impl<'r> Checker<'r> {
                 }
                 let l = l_ref.unwrap_or_else(|| self.checked_ty(left));
                 let r = r_ref.unwrap_or_else(|| self.checked_ty(right));
-                numeric_result(op, &l, &r)
+                numeric_result(&op, &l, &r)
             }
 
             _ => None,
@@ -131,9 +134,9 @@ impl<'r> Checker<'r> {
     /// The checked type already recorded for `expr`, or `Dynamic` when the
     /// checker has not reached it yet (operands are checked before their
     /// parent, so in practice it is there).
-    fn checked_ty(&self, expr: &Expr) -> Type {
+    fn checked_ty(&self, expr: ExprId) -> Type {
         self.expr_table
-            .get(&expr.id)
+            .get(&expr.index())
             .map(|e| e.ty.clone())
             .unwrap_or(Type::Dynamic)
     }

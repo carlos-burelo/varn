@@ -10,7 +10,7 @@ use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use varn_core::ast::Expr;
+use varn_core::ast::{AstArena, ExprId};
 use varn_core::ast::Program;
 use varn_core::Diagnostic;
 
@@ -159,6 +159,12 @@ pub struct Checker<'r> {
     /// check, so the checker owns no module cache and nothing it holds can go
     /// stale behind another thread's invalidation.
     pub(crate) resolver: &'r dyn crate::module_resolver::ImportResolver,
+    /// The parsed program's expression/statement nodes (fase1-componente2:
+    /// `Expr`/`Stmt` are no longer owned trees). Same field name and same
+    /// reused lifetime `'r` as `Binder<'r>::ast_arena` — the checker is a
+    /// second, later borrower of the identical arena the binder already
+    /// walked, not a distinct mechanism.
+    pub(crate) ast_arena: &'r AstArena,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) source_file: std::rc::Rc<str>,
     pub(crate) current_scope: crate::scope::ScopeId,
@@ -168,7 +174,7 @@ pub struct Checker<'r> {
         FxHashMap<(u32, bool, crate::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,
     pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
-    pub(crate) infer_cache: FxHashMap<(u32, ScopeId, u32), Type>,
+    pub(crate) infer_cache: FxHashMap<(ExprId, ScopeId, u32), Type>,
     pub(crate) infer_env_rev: u32,
     pub(crate) compat_cache: FxHashMap<(Type, Type, usize), bool>,
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
@@ -256,20 +262,29 @@ impl<'r> Checker<'r> {
     /// and nothing the checker consults can be invalidated behind its back.
     pub fn check(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
     ) -> CheckResult {
-        Self::check_with(program, interner, resolver, CheckOptions::compile())
+        Self::check_with(
+            program,
+            ast_arena,
+            interner,
+            resolver,
+            CheckOptions::compile(),
+        )
     }
 
     pub fn check_with(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         options: CheckOptions,
     ) -> CheckResult {
         Self::check_internal(
             program,
+            ast_arena,
             interner,
             resolver,
             options.record_types,
@@ -279,6 +294,7 @@ impl<'r> Checker<'r> {
 
     fn check_internal(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
@@ -314,8 +330,10 @@ impl<'r> Checker<'r> {
 
         let started = Instant::now();
         let mut bind = match globals_ref {
-            Some(globals) => Binder::bind_with_global_refs(program, interner, resolver, &globals),
-            None => Binder::bind(program, interner, resolver),
+            Some(globals) => {
+                Binder::bind_with_global_refs(program, ast_arena, interner, resolver, &globals)
+            }
+            None => Binder::bind(program, ast_arena, interner, resolver),
         };
         profile.bind = started.elapsed();
 
@@ -332,6 +350,7 @@ impl<'r> Checker<'r> {
         let started = Instant::now();
         let mut checker = Checker {
             resolver,
+            ast_arena,
             current_scope: bind.global_scope,
             diagnostics: varn_core::DiagnosticBag::new(),
             source_file: source_file.clone(),
@@ -600,8 +619,8 @@ impl<'r> Checker<'r> {
         result
     }
 
-    pub(crate) fn infer_type(&mut self, expr: &Expr, bind: &BindResult) -> Type {
-        let key = (expr.id(), self.current_scope, self.infer_env_rev);
+    pub(crate) fn infer_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+        let key = (expr, self.current_scope, self.infer_env_rev);
         if let Some(ty) = self.infer_cache.get(&key) {
             return ty.clone();
         }

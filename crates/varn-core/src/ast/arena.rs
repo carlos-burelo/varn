@@ -8,6 +8,23 @@ pub struct ExprId(u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct StmtId(u32);
 
+impl ExprId {
+    /// The node's position in the arena. Doubles as its `AstId` (the checker
+    /// keys `CheckResult::expr_table` by this raw index, not by a separate
+    /// stable id): every expression is minted once, from `alloc_expr`, so the
+    /// arena position already IS a per-node identity.
+    pub fn index(&self) -> u32 {
+        self.0
+    }
+}
+
+impl StmtId {
+    /// See [`ExprId::index`].
+    pub fn index(&self) -> u32 {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ExprNode {
     pub range: SourceRange,

@@ -10,7 +10,7 @@
 use super::Checker;
 use crate::binder::BindResult;
 use rustc_hash::FxHashSet;
-use varn_core::ast::{ArrowBody, Decl, Expr, ExprKind, MatchBody, Program, Stmt, StmtKind};
+use varn_core::ast::{ArrowBody, AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind};
 use varn_core::{Atom, Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]
@@ -49,9 +49,9 @@ impl<'r> Checker<'r> {
         self.da_block(&program.body, &mut flow, bind);
     }
 
-    fn da_block(&mut self, stmts: &[Stmt], flow: &mut Flow, bind: &BindResult) {
+    fn da_block(&mut self, stmts: &[StmtId], flow: &mut Flow, bind: &BindResult) {
         let outer_pending: FxHashSet<Atom> = flow.pending.clone();
-        for s in stmts {
+        for &s in stmts {
             if flow.diverged {
                 break;
             }
@@ -61,15 +61,20 @@ impl<'r> Checker<'r> {
         flow.pending.retain(|n| outer_pending.contains(n));
     }
 
-    fn da_stmt(&mut self, stmt: &Stmt, flow: &mut Flow, bind: &BindResult) {
-        match &stmt.kind {
-            StmtKind::Block { stmts } => self.da_block(stmts, flow, bind),
-            StmtKind::Expr { expression } => self.da_expr(expression, flow, bind),
+    fn da_stmt(&mut self, stmt: StmtId, flow: &mut Flow, bind: &BindResult) {
+        let arena = self.ast_arena;
+        match &arena.stmt(stmt).kind {
+            StmtKind::Block { stmts } => {
+                let stmts = stmts.clone();
+                self.da_block(&stmts, flow, bind);
+            }
+            StmtKind::Expr { expression } => self.da_expr(*expression, flow, bind),
 
             StmtKind::Decl(decl) => {
+                let decl = decl.clone();
                 if let Decl::Variable(v) = decl.as_ref() {
                     for d in &v.declarators {
-                        if let Some(init) = &d.init {
+                        if let Some(init) = d.init {
                             self.da_expr(init, flow, bind);
                         }
                         for name in pattern_names(&d.id) {
@@ -84,16 +89,18 @@ impl<'r> Checker<'r> {
                     }
                 }
                 // Function / class / enum declarations: analysed on their own.
-                self.da_nested_decl(decl, bind);
+                self.da_nested_decl(&decl, bind);
             }
 
             StmtKind::Return { argument } => {
+                let argument = *argument;
                 if let Some(a) = argument {
                     self.da_expr(a, flow, bind);
                 }
                 flow.diverged = true;
             }
             StmtKind::Throw { argument } => {
+                let argument = *argument;
                 self.da_expr(argument, flow, bind);
                 flow.diverged = true;
             }
@@ -104,6 +111,7 @@ impl<'r> Checker<'r> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 self.da_expr(test, flow, bind);
                 let mut a = flow.clone();
                 self.da_stmt(consequent, &mut a, bind);
@@ -115,6 +123,7 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::While { test, body } | StmtKind::DoWhile { body, test } => {
+                let (test, body) = (*test, *body);
                 self.da_expr(test, flow, bind);
                 let mut inner = flow.clone();
                 inner.diverged = false;
@@ -126,12 +135,14 @@ impl<'r> Checker<'r> {
                 update,
                 body,
             } => {
-                if let Some(fi) = init {
+                let init = init.clone();
+                let (test, update, body) = (*test, *update, *body);
+                if let Some(fi) = &init {
                     match fi.as_ref() {
-                        varn_core::ast::ForInit::Expr(e) => self.da_expr(e, flow, bind),
+                        varn_core::ast::ForInit::Expr(e) => self.da_expr(*e, flow, bind),
                         varn_core::ast::ForInit::Var { declarators, .. } => {
                             for d in declarators {
-                                if let Some(e) = &d.init {
+                                if let Some(e) = d.init {
                                     self.da_expr(e, flow, bind);
                                 }
                                 for n in pattern_names(&d.id) {
@@ -157,10 +168,11 @@ impl<'r> Checker<'r> {
             | StmtKind::ForOf {
                 right, body, left, ..
             } => {
+                let (right, body, left) = (*right, *body, left.clone());
                 self.da_expr(right, flow, bind);
                 let mut inner = flow.clone();
                 inner.diverged = false;
-                for n in pattern_names(left) {
+                for n in pattern_names(&left) {
                     inner.assigned.insert(n);
                 }
                 self.da_stmt(body, &mut inner, bind);
@@ -170,17 +182,18 @@ impl<'r> Checker<'r> {
                 discriminant,
                 cases,
             } => {
+                let (discriminant, cases) = (*discriminant, cases.clone());
                 self.da_expr(discriminant, flow, bind);
                 let mut acc: Option<Flow> = None;
                 let mut has_default = false;
-                for c in cases {
-                    if let Some(t) = &c.test {
+                for c in &cases {
+                    if let Some(t) = c.test {
                         self.da_expr(t, flow, bind);
                     } else {
                         has_default = true;
                     }
                     let mut arm = flow.clone();
-                    for s in &c.body {
+                    for &s in &c.body {
                         if arm.diverged {
                             break;
                         }
@@ -207,11 +220,12 @@ impl<'r> Checker<'r> {
                 catches,
                 finally,
             } => {
+                let (block, catches, finally) = (*block, catches.clone(), *finally);
                 let mut t = flow.clone();
                 self.da_stmt(block, &mut t, bind);
                 let mut c = flow.clone();
                 if let Some(clause) = catches.first() {
-                    self.da_stmt(&clause.body, &mut c, bind);
+                    self.da_stmt(clause.body, &mut c, bind);
                 }
                 flow.merge(t, c);
                 if let Some(f) = finally {
@@ -220,8 +234,9 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::Using { declarations, .. } => {
-                for d in declarations {
-                    if let Some(e) = &d.init {
+                let declarations = declarations.clone();
+                for d in &declarations {
+                    if let Some(e) = d.init {
                         self.da_expr(e, flow, bind);
                     }
                     for n in pattern_names(&d.id) {
@@ -229,34 +244,40 @@ impl<'r> Checker<'r> {
                     }
                 }
             }
-            StmtKind::Labeled { body, .. } => self.da_stmt(body, flow, bind),
+            StmtKind::Labeled { body, .. } => {
+                let body = *body;
+                self.da_stmt(body, flow, bind);
+            }
 
             StmtKind::Empty | StmtKind::Debugger | StmtKind::Error => {}
         }
     }
 
-    fn da_expr(&mut self, e: &Expr, flow: &mut Flow, bind: &BindResult) {
-        match &e.kind {
+    fn da_expr(&mut self, e: ExprId, flow: &mut Flow, bind: &BindResult) {
+        let arena = self.ast_arena;
+        match &arena.expr(e).kind {
             ExprKind::Identifier { name } => {
-                if flow.pending.contains(name) && !flow.assigned.contains(name) {
-                    let name_str = bind.interner.resolve(*name);
+                let name = *name;
+                if flow.pending.contains(&name) && !flow.assigned.contains(&name) {
+                    let name_str = bind.interner.resolve(name);
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::UseBeforeAssignment,
                             format!("'{name_str}' is used before it is assigned a value"),
                         )
-                        .with_range(*e.range()),
+                        .with_range(arena.expr(e).range),
                     );
                     // Report once per binding.
-                    flow.assigned.insert(*name);
+                    flow.assigned.insert(name);
                 }
             }
 
             // An assignment to a bare identifier makes it assigned; the value
             // is analysed first.
             ExprKind::Assign { target, value, .. } => {
+                let (target, value) = (*target, *value);
                 self.da_expr(value, flow, bind);
-                if let ExprKind::Identifier { name } = &target.kind {
+                if let ExprKind::Identifier { name } = &arena.expr(target).kind {
                     flow.assign(name);
                 } else {
                     self.da_expr(target, flow, bind);
@@ -266,7 +287,7 @@ impl<'r> Checker<'r> {
             // Nested functions have their own flow; do not walk into them here.
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {}
 
-            _ => walk_expr_children(e, &mut |c| self.da_expr(c, flow, bind)),
+            _ => walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind)),
         }
     }
 
@@ -274,7 +295,7 @@ impl<'r> Checker<'r> {
         match decl {
             Decl::Function(f) => {
                 let mut flow = Flow::default();
-                self.da_stmt(&f.body, &mut flow, bind);
+                self.da_stmt(f.body, &mut flow, bind);
             }
             Decl::Class(c) => {
                 for m in &c.body {
@@ -282,9 +303,9 @@ impl<'r> Checker<'r> {
                     let body = match m {
                         ClassMember::Method { body: Some(b), .. }
                         | ClassMember::Getter { body: Some(b), .. }
-                        | ClassMember::Setter { body: Some(b), .. } => Some(b),
+                        | ClassMember::Setter { body: Some(b), .. } => Some(*b),
                         ClassMember::Constructor { body, .. }
-                        | ClassMember::StaticBlock { body, .. } => Some(body),
+                        | ClassMember::StaticBlock { body, .. } => Some(*body),
                         _ => None,
                     };
                     if let Some(b) = body {
@@ -333,26 +354,27 @@ fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
     out
 }
 
-/// Apply `f` to every direct sub-expression of `e`. Deliberately structural —
-/// it does not need to know what each node means, only where the children are.
-fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
+/// Apply `f` to every direct sub-expression id of `e`. Deliberately
+/// structural — it does not need to know what each node means, only where
+/// the children are.
+fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
     use varn_core::ast::{Arg, ArrayEl, ObjectProp, TemplatePart};
-    match &e.kind {
+    match &arena.expr(e).kind {
         ExprKind::Template { parts } => {
             for p in parts {
                 if let TemplatePart::Interpolation(x) = p {
-                    f(x);
+                    f(*x);
                 }
             }
         }
         ExprKind::TaggedTemplate { tag, template } => {
-            f(tag);
-            f(template);
+            f(*tag);
+            f(*template);
         }
         ExprKind::Array { elements } => {
             for el in elements {
                 match el {
-                    ArrayEl::Expr(x) | ArrayEl::Spread(x) => f(x),
+                    ArrayEl::Expr(x) | ArrayEl::Spread(x) => f(*x),
                     ArrayEl::Hole => {}
                 }
             }
@@ -360,13 +382,13 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
         ExprKind::Object { properties } | ExprKind::Record { properties } => {
             for p in properties {
                 match p {
-                    ObjectProp::Property { value, .. } => f(value),
-                    ObjectProp::Spread { argument, .. } => f(argument),
+                    ObjectProp::Property { value, .. } => f(*value),
+                    ObjectProp::Spread { argument, .. } => f(*argument),
                     _ => {}
                 }
             }
         }
-        ExprKind::Tuple { elements } => elements.iter().for_each(&mut *f),
+        ExprKind::Tuple { elements } => elements.iter().for_each(|x| f(*x)),
         ExprKind::Unary { operand, .. }
         | ExprKind::Update { operand, .. }
         | ExprKind::Paren {
@@ -391,10 +413,10 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
         | ExprKind::Is {
             expression: operand,
             ..
-        } => f(operand),
+        } => f(*operand),
         ExprKind::Yield { argument, .. } => {
             if let Some(x) = argument {
-                f(x);
+                f(*x);
             }
         }
         ExprKind::Binary { left, right, .. }
@@ -405,50 +427,50 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
             end: right,
             ..
         } => {
-            f(left);
-            f(right);
+            f(*left);
+            f(*right);
         }
         ExprKind::Conditional {
             test,
             consequent,
             alternate,
         } => {
-            f(test);
-            f(consequent);
-            f(alternate);
+            f(*test);
+            f(*consequent);
+            f(*alternate);
         }
         ExprKind::Member {
             object, property, ..
         } => {
-            f(object);
-            f(property);
+            f(*object);
+            f(*property);
         }
         ExprKind::Call { callee, args, .. } | ExprKind::New { callee, args, .. } => {
-            f(callee);
+            f(*callee);
             for a in args {
                 match a {
-                    Arg::Positional(x) | Arg::Spread(x) | Arg::Named { value: x, .. } => f(x),
+                    Arg::Positional(x) | Arg::Spread(x) | Arg::Named { value: x, .. } => f(*x),
                 }
             }
         }
-        ExprKind::Sequence { expressions } => expressions.iter().for_each(&mut *f),
-        ExprKind::MetaAccess { target, .. } => f(target),
+        ExprKind::Sequence { expressions } => expressions.iter().for_each(|x| f(*x)),
+        ExprKind::MetaAccess { target, .. } => f(*target),
         ExprKind::With { object, properties } => {
-            f(object);
+            f(*object);
             for p in properties {
                 if let ObjectProp::Property { value, .. } = p {
-                    f(value);
+                    f(*value);
                 }
             }
         }
         ExprKind::Match { subject, cases } => {
-            f(subject);
+            f(*subject);
             for c in cases {
-                if let Some(g) = &c.guard {
+                if let Some(g) = c.guard {
                     f(g);
                 }
                 match &c.body {
-                    MatchBody::Expr(x) => f(x),
+                    MatchBody::Expr(x) => f(*x),
                     MatchBody::Block(_) => {}
                 }
             }
@@ -459,9 +481,9 @@ fn walk_expr_children(e: &Expr, f: &mut dyn FnMut(&Expr)) {
 
 /// For an arrow body used as an expression source.
 #[allow(dead_code)]
-fn arrow_body_expr(b: &ArrowBody) -> Option<&Expr> {
+fn arrow_body_expr(b: &ArrowBody) -> Option<ExprId> {
     match b {
-        ArrowBody::Expr(e) => Some(e),
+        ArrowBody::Expr(e) => Some(*e),
         ArrowBody::Block(_) => None,
     }
 }
