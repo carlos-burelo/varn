@@ -1,5 +1,5 @@
 use varn_checker::Checker;
-use varn_core::ast::Program;
+use varn_core::ast::{AstArena, Program};
 
 use crate::PipelineError;
 use varn_core::term::chalk::chalk;
@@ -56,6 +56,7 @@ pub fn report_diagnostics(
 
 pub fn check(
     program: &Program,
+    ast_arena: &AstArena,
     interner: varn_core::AtomInterner,
     source: &str,
     debug: &DebugFlags,
@@ -65,8 +66,9 @@ pub fn check(
     if strict {
         options = options.strict();
     }
-    let check_result =
-        crate::resolver::with_resolver(|r| Checker::check_with(program, interner, r, options));
+    let check_result = crate::resolver::with_resolver(|r| {
+        Checker::check_with(program, ast_arena, interner, r, options)
+    });
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {

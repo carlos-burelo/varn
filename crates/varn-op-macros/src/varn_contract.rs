@@ -5,7 +5,9 @@ use std::path::Path;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token};
 
-use varn_core::ast::{ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, Stmt, StmtKind};
+use varn_core::ast::{
+    AstArena, ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, StmtId, StmtKind,
+};
 use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
 use varn_core::{AtomInterner, IntrinsicType, TypeTag};
@@ -326,7 +328,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
     out
 }
 
-fn collect_functions(body: &[Stmt], interner: &AtomInterner) -> Vec<Member> {
+fn collect_functions(body: &[StmtId], arena: &AstArena, interner: &AtomInterner) -> Vec<Member> {
     fn from_decl(decl: &Decl, interner: &AtomInterner, out: &mut Vec<Member>) {
         match decl {
             Decl::Function(f) => out.push(function_member(f, interner)),
@@ -337,8 +339,8 @@ fn collect_functions(body: &[Stmt], interner: &AtomInterner) -> Vec<Member> {
         }
     }
     let mut out = Vec::new();
-    for stmt in body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
+    for &stmt_id in body {
+        if let StmtKind::Decl(decl) = &arena.stmt(stmt_id).kind {
             from_decl(decl, interner, &mut out);
         }
     }
@@ -417,9 +419,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     // of `expand`, not a runtime value reaching across a compile-time
     // boundary. No design gap here: propagating it from Part A resolves
     // every `Atom`-to-text site below directly.
-    // TODO(fase1-componente2): this proc-macro still expects `Vec<Stmt>`;
-    // arena wiring for varn-op-macros lands in a later task.
-    let (program, interner, _arena) = match varn_parser::parse(
+    let (program, interner, arena) = match varn_parser::parse(
         tokens,
         lexeme_buf,
         &input.contract,
@@ -430,7 +430,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     };
 
     let members = match &input.class {
-        Some(class) => match find_class(&program.body, class, &interner) {
+        Some(class) => match find_class(&program.body, &arena, class, &interner) {
             Some(decl) => collect_members(class, &decl, &interner),
             None => {
                 return err(format!(
@@ -439,7 +439,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         },
         None => {
-            let fns = collect_functions(&program.body, &interner);
+            let fns = collect_functions(&program.body, &arena, &interner);
             if fns.is_empty() {
                 return err(format!(
                     "no `declare function`s found in contract `{abs_path_str}`"
@@ -877,9 +877,14 @@ fn err(msg: String) -> TokenStream {
     TokenStream::from(quote! { compile_error!(#lit); })
 }
 
-fn find_class(body: &[Stmt], name: &str, interner: &AtomInterner) -> Option<ClassDecl> {
-    for stmt in body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
+fn find_class(
+    body: &[StmtId],
+    arena: &AstArena,
+    name: &str,
+    interner: &AtomInterner,
+) -> Option<ClassDecl> {
+    for &stmt_id in body {
+        if let StmtKind::Decl(decl) = &arena.stmt(stmt_id).kind {
             if let Some(c) = class_from_decl(decl, name, interner) {
                 return Some(c);
             }

@@ -11,7 +11,11 @@ pub fn parse(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-) -> PipelineResult<(varn_core::ast::Program, varn_core::AtomInterner)> {
+) -> PipelineResult<(
+    varn_core::ast::Program,
+    varn_core::ast::AstArena,
+    varn_core::AtomInterner,
+)> {
     // The entry file used to parse through its own throwaway `AtomInterner`,
     // a genuinely separate path from `module_resolver`/`with_resolver` below
     // it (imports go through `DiskResolver::parse_and_cache`, this file did
@@ -20,10 +24,7 @@ pub fn parse(
     // resolver's shared table instead, and publish the grown result back, so
     // the root file and everything it imports share one `Atom` space.
     let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
-    // TODO(fase1-componente2): varn-pipeline's own `parse` still returns
-    // `(Program, AtomInterner)`; threading `AstArena` through its public
-    // signature (and every caller of *this* function) is later-task scope.
-    let (program, interner, _arena) = varn_parser::parse(tokens, lexeme_buf, path, interner)
+    let (program, interner, arena) = varn_parser::parse(tokens, lexeme_buf, path, interner)
         .map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
@@ -53,12 +54,12 @@ pub fn parse(
     }
 
     if debug.ast {
-        varn_debug::ast::debug_ast(&program, &interner);
+        varn_debug::ast::debug_ast(&program, &arena, &interner);
     }
 
     if debug.modules {
-        varn_debug::modules::debug_modules(&program);
+        varn_debug::modules::debug_modules(&program, &arena);
     }
 
-    Ok((program, interner))
+    Ok((program, arena, interner))
 }

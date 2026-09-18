@@ -51,9 +51,9 @@ impl<'r> Checker<'r> {
         for el in elements {
             match el {
                 ArrayEl::Expr(e) => {
-                    self.with_expected(elem_expected.clone(), |c| c.check_expr(e, bind));
+                    self.with_expected(elem_expected.clone(), |c| c.check_expr(*e, bind));
                     if let Some(expected) = &elem_expected {
-                        let actual = self.infer_type(e, bind);
+                        let actual = self.infer_type(*e, bind);
                         if !actual.is_dynamic()
                             && !self.types_compatible_cached(expected, &actual, Some(bind))
                         {
@@ -61,12 +61,12 @@ impl<'r> Checker<'r> {
                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                     "type mismatch: array element is '{actual}', expected '{expected}'"
                                 ))
-                                .with_range(*e.range()),
+                                .with_range(self.ast_arena.expr(*e).range),
                             );
                         }
                     }
                 }
-                ArrayEl::Spread(e) => self.check_expr(e, bind),
+                ArrayEl::Spread(e) => self.check_expr(*e, bind),
                 ArrayEl::Hole => {}
             }
         }
@@ -148,9 +148,9 @@ impl<'r> Checker<'r> {
                             _ => None,
                         })
                     });
-                    self.with_expected(prop_expected.clone(), |c| c.check_expr(value, bind));
+                    self.with_expected(prop_expected.clone(), |c| c.check_expr(*value, bind));
                     if let Some(expected) = &prop_expected {
-                        let actual = self.infer_type(value, bind);
+                        let actual = self.infer_type(*value, bind);
                         if !actual.is_dynamic()
                             && !self.types_compatible_cached(expected, &actual, Some(bind))
                         {
@@ -164,7 +164,7 @@ impl<'r> Checker<'r> {
                                         expected
                                     ),
                                 )
-                                .with_range(*value.range()),
+                                .with_range(self.ast_arena.expr(*value).range),
                             );
                         }
                     }
@@ -191,7 +191,7 @@ impl<'r> Checker<'r> {
                     if let Some(fn_scope) = self.next_child_scope(bind) {
                         self.current_scope = fn_scope;
                     }
-                    self.in_function_body(|c| c.check_stmt(body, bind));
+                    self.in_function_body(|c| c.check_stmt(*body, bind));
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
@@ -210,10 +210,10 @@ impl<'r> Checker<'r> {
                         .with_range(*range),
                     );
                     let saved_expected = self.expected_return_type.take();
-                    self.in_function_body(|c| c.check_stmt(body, bind));
+                    self.in_function_body(|c| c.check_stmt(*body, bind));
                     self.expected_return_type = saved_expected;
                 }
-                ObjectProp::Spread { argument, .. } => self.check_expr(argument, bind),
+                ObjectProp::Spread { argument, .. } => self.check_expr(*argument, bind),
             }
         }
     }

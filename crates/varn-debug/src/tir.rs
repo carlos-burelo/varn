@@ -8,10 +8,11 @@
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
 use varn_checker::{BindResult, TypeEntry};
-use varn_core::ast::{AstId, Program};
+use varn_core::ast::{AstArena, AstId, Program};
 
 pub fn debug_tir(
     program: &Program,
+    ast_arena: &AstArena,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
@@ -19,6 +20,7 @@ pub fn debug_tir(
 ) {
     let module = varn_checker::emit::emit_module(
         program,
+        ast_arena,
         bind,
         expr_table,
         call_mappings,

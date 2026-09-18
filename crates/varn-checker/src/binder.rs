@@ -66,6 +66,10 @@ impl TypeContext for Binder<'_> {
         Some(&self.interner)
     }
 
+    fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
+        Some(self.ast_arena)
+    }
+
     fn get_interface_members(
         &self,
         name: &str,

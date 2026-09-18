@@ -127,7 +127,7 @@ impl<'r> Checker<'r> {
                 }
             }
             MatchPattern::Literal(expr) => {
-                self.check_expr(expr, bind);
+                self.check_expr(*expr, bind);
             }
             _ => {}
         }

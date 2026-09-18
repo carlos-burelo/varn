@@ -96,7 +96,7 @@ impl<'r> super::super::Binder<'r> {
                         line,
                         receiver_ty.clone(),
                         &method.params,
-                        &method.body,
+                        method.body,
                     );
                 }
                 ExtensionMember::Getter {
@@ -139,7 +139,7 @@ impl<'r> super::super::Binder<'r> {
                         range.start.line,
                         receiver_ty.clone(),
                         &[],
-                        body,
+                        *body,
                     );
                 }
                 ExtensionMember::Setter {
@@ -198,7 +198,7 @@ impl<'r> super::super::Binder<'r> {
                         range.start.line,
                         receiver_ty.clone(),
                         std::slice::from_ref(param),
-                        body,
+                        *body,
                     );
                 }
             }
@@ -210,7 +210,7 @@ impl<'r> super::super::Binder<'r> {
         line: u32,
         receiver_ty: Type,
         params: &[varn_core::ast::Param],
-        body: &varn_core::ast::Stmt,
+        body: varn_core::ast::StmtId,
     ) {
         let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
@@ -234,7 +234,7 @@ impl<'r> super::super::Binder<'r> {
                 ty = Type::array(ty);
             }
             self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));
-            if let Some(def) = &p.default {
+            if let Some(def) = p.default {
                 self.bind_expr(def);
             }
         }

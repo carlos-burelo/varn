@@ -28,6 +28,10 @@ pub struct ModuleGraph {
     binds: FxHashMap<String, Rc<BindResult>>,
     exports: FxHashMap<String, Rc<ExportMap>>,
     programs: FxHashMap<String, Rc<varn_core::ast::Program>>,
+    /// The `AstArena` each cached `program` was parsed into — same key, same
+    /// lifetime, stored alongside it since an `ExprId`/`StmtId` in `program`
+    /// resolves only against the arena it was allocated from.
+    arenas: FxHashMap<String, Rc<varn_core::ast::AstArena>>,
     /// `(base_dir, specifier)` → resolved absolute path.
     resolved_paths: FxHashMap<(String, String), String>,
     /// imported module → modules that import it. Drives transitive eviction.
@@ -71,6 +75,16 @@ impl ModuleGraph {
 
     pub fn insert_program(&mut self, key: String, program: Rc<varn_core::ast::Program>) {
         self.programs.entry(key).or_insert(program);
+    }
+
+    // ── AST arenas ───────────────────────────────────────────────────────
+
+    pub fn arena(&self, key: &str) -> Option<Rc<varn_core::ast::AstArena>> {
+        self.arenas.get(key).map(Rc::clone)
+    }
+
+    pub fn insert_arena(&mut self, key: String, arena: Rc<varn_core::ast::AstArena>) {
+        self.arenas.entry(key).or_insert(arena);
     }
 
     // ── specifier resolution ─────────────────────────────────────────────
@@ -126,6 +140,7 @@ impl ModuleGraph {
             self.binds.remove(k);
             self.exports.remove(k);
             self.programs.remove(k);
+            self.arenas.remove(k);
         }
         self.resolved_paths.retain(|_, v| !to_clear.contains(v));
     }
@@ -136,6 +151,7 @@ impl ModuleGraph {
         self.binds.clear();
         self.exports.clear();
         self.programs.clear();
+        self.arenas.clear();
         self.resolved_paths.clear();
         self.reverse_deps.clear();
     }

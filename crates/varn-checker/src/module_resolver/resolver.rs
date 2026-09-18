@@ -220,6 +220,14 @@ impl DiskResolver {
         self.graph.borrow_mut().insert_program(key, program);
     }
 
+    pub(super) fn cached_arena(&self, key: &str) -> Option<Rc<varn_core::ast::AstArena>> {
+        self.graph.borrow().arena(key)
+    }
+
+    pub(super) fn store_arena(&self, key: String, arena: Rc<varn_core::ast::AstArena>) {
+        self.graph.borrow_mut().insert_arena(key, arena);
+    }
+
     pub(super) fn cached_path(&self, base_dir: &str, specifier: &str) -> Option<String> {
         self.graph.borrow().resolved_path(base_dir, specifier)
     }
@@ -236,22 +244,25 @@ impl DiskResolver {
         &self,
         source: &str,
         key: &str,
-    ) -> Option<(Rc<varn_core::ast::Program>, Vec<varn_core::Diagnostic>)> {
+    ) -> Option<(
+        Rc<varn_core::ast::Program>,
+        Rc<varn_core::ast::AstArena>,
+        Vec<varn_core::Diagnostic>,
+    )> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
         // Seed this parse from a clone of the shared table rather than handing
         // it out by value: on a parse error the clone is simply dropped and
         // the resolver's own table is untouched, so a module that fails to
         // parse never rolls back atoms other modules already minted.
         let interner = self.interner_snapshot();
-        // TODO(fase1-componente2): `program.body` is now `Vec<StmtId>` and this
-        // resolver's callers still expect `Vec<Stmt>` — varn-checker migrates
-        // to the arena in a later task. `_arena` is dropped here for now.
-        let (program, interner, _arena) =
+        let (program, interner, arena) =
             varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
         self.set_interner(interner);
         let program = Rc::new(program);
+        let arena = Rc::new(arena);
         self.store_program(key.to_owned(), Rc::clone(&program));
-        Some((program, lex_errs))
+        self.store_arena(key.to_owned(), Rc::clone(&arena));
+        Some((program, arena, lex_errs))
     }
 
     /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
@@ -262,12 +273,13 @@ impl DiskResolver {
     fn bind_and_cache(
         &self,
         program: &varn_core::ast::Program,
+        ast_arena: &varn_core::ast::AstArena,
         interner: varn_core::AtomInterner,
         lex_errs: Vec<varn_core::Diagnostic>,
         key: &str,
     ) -> Rc<BindResult> {
         self.in_flight.borrow_mut().insert(key.to_owned());
-        let mut bind = crate::binder::Binder::bind(program, interner, self);
+        let mut bind = crate::binder::Binder::bind(program, ast_arena, interner, self);
         self.in_flight.borrow_mut().remove(key);
         for e in lex_errs {
             bind.diagnostics.emit(e);
@@ -287,6 +299,7 @@ impl DiskResolver {
     fn collect(
         &self,
         program: &varn_core::ast::Program,
+        ast_arena: &varn_core::ast::AstArena,
         bind: &BindResult,
         key: &str,
         base_dir: &Path,
@@ -296,6 +309,7 @@ impl DiskResolver {
         super::exports::collect_exports(
             self,
             &program.body,
+            ast_arena,
             bind,
             key,
             base_dir,
@@ -310,23 +324,46 @@ impl DiskResolver {
     fn module_exports_uncached(&self, abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
         let base_dir = Path::new(abs_path).parent().unwrap_or(Path::new("."));
 
-        if let (Some(bind), Some(program)) =
-            (self.cached_bind(abs_path), self.cached_program(abs_path))
-        {
-            return self.collect(&program, bind.as_ref(), abs_path, base_dir, visiting);
+        if let (Some(bind), Some(program), Some(ast_arena)) = (
+            self.cached_bind(abs_path),
+            self.cached_program(abs_path),
+            self.cached_arena(abs_path),
+        ) {
+            return self.collect(
+                &program,
+                ast_arena.as_ref(),
+                bind.as_ref(),
+                abs_path,
+                base_dir,
+                visiting,
+            );
         }
 
         let Ok(source) = std::fs::read_to_string(abs_path) else {
             return ExportMap::default();
         };
-        let Some((program, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
+        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(&source, abs_path)
+        else {
             return ExportMap::default();
         };
         let bind = self.cached_bind(abs_path).unwrap_or_else(|| {
-            self.bind_and_cache(&program, self.interner_snapshot(), Vec::new(), abs_path)
+            self.bind_and_cache(
+                &program,
+                ast_arena.as_ref(),
+                self.interner_snapshot(),
+                Vec::new(),
+                abs_path,
+            )
         });
 
-        self.collect(&program, bind.as_ref(), abs_path, base_dir, visiting)
+        self.collect(
+            &program,
+            ast_arena.as_ref(),
+            bind.as_ref(),
+            abs_path,
+            base_dir,
+            visiting,
+        )
     }
 
     // ── stdlib carriers ──────────────────────────────────────────────────
@@ -370,13 +407,21 @@ impl DiskResolver {
             return Rc::new(cached.exports);
         }
 
-        let Some((program, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
+        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(source, virtual_id)
+        else {
             visiting.pop();
             return Rc::new(ExportMap::default());
         };
-        let bind = self.bind_and_cache(&program, self.interner_snapshot(), Vec::new(), virtual_id);
+        let bind = self.bind_and_cache(
+            &program,
+            ast_arena.as_ref(),
+            self.interner_snapshot(),
+            Vec::new(),
+            virtual_id,
+        );
         let exports = self.collect(
             &program,
+            ast_arena.as_ref(),
             bind.as_ref(),
             virtual_id,
             Path::new("."),
@@ -401,8 +446,14 @@ impl DiskResolver {
             );
             return Some(bind_rc);
         }
-        let (program, lex_errs) = self.parse_and_cache(source, virtual_id)?;
-        Some(self.bind_and_cache(&program, self.interner_snapshot(), lex_errs, virtual_id))
+        let (program, ast_arena, lex_errs) = self.parse_and_cache(source, virtual_id)?;
+        Some(self.bind_and_cache(
+            &program,
+            ast_arena.as_ref(),
+            self.interner_snapshot(),
+            lex_errs,
+            virtual_id,
+        ))
     }
 }
 
@@ -443,12 +494,19 @@ impl ImportResolver for DiskResolver {
             return Some(bind_rc);
         }
 
-        let (program, lex_errs) = self.parse_and_cache(&source, &canonical)?;
-        let bind = self.bind_and_cache(&program, self.interner_snapshot(), lex_errs, &canonical);
+        let (program, ast_arena, lex_errs) = self.parse_and_cache(&source, &canonical)?;
+        let bind = self.bind_and_cache(
+            &program,
+            ast_arena.as_ref(),
+            self.interner_snapshot(),
+            lex_errs,
+            &canonical,
+        );
 
         let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
         let exports = self.collect(
             &program,
+            ast_arena.as_ref(),
             bind.as_ref(),
             &canonical,
             base_dir,

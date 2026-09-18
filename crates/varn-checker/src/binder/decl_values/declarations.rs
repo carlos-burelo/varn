@@ -6,8 +6,7 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionType, Type};
 use std::rc::Rc;
 use varn_core::ast::{
-    ClassMember, EnumDecl, ExprId, ExprKind, FunctionDecl, Pattern, StmtId, TypeAliasDecl,
-    VarKind, VariableDecl,
+    ClassMember, EnumDecl, ExprKind, FunctionDecl, Pattern, TypeAliasDecl, VarKind, VariableDecl,
 };
 
 impl<'r> super::super::Binder<'r> {

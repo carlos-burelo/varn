@@ -30,11 +30,13 @@ use crate::error::CliError;
 /// Compile through the TIR path — the same route the pipeline takes.
 fn compile_via_tir(
     program: &varn_core::ast::Program,
+    ast_arena: &varn_core::ast::AstArena,
     check: &varn_checker::CheckResult,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, String> {
     let tir = varn_checker::emit::emit_module(
         program,
+        ast_arena,
         &check.bind,
         &check.expr_table,
         &check.call_mappings,
@@ -98,9 +100,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    // TODO(fase1-componente2): varn-cli's bench path still expects
-    // `Vec<Stmt>`; the arena migration for this crate lands in a later task.
-    let (program, parse_profile, interner, _arena) = varn_parser::parse_with_profile(
+    let (program, parse_profile, interner, arena) = varn_parser::parse_with_profile(
         tokens,
         lexeme_buf,
         path,
@@ -120,10 +120,18 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         })?;
 
     let program_ref = &program;
+    let arena_ref = &arena;
     let check_samples = time_n(runs, || {
-        crate::pipeline::phase_check(program_ref, interner.clone(), &source, &debug_flags, false)
-            .map(|_| ())
-            .map_err(|e| format!("{e}"))
+        crate::pipeline::phase_check(
+            program_ref,
+            arena_ref,
+            interner.clone(),
+            &source,
+            &debug_flags,
+            false,
+        )
+        .map(|_| ())
+        .map_err(|e| format!("{e}"))
     })?;
 
     // The COMPILE configuration, deliberately. This used to call
@@ -132,7 +140,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     // type table, which a real compile never builds. `profile` is filled by
     // every check, so nothing is lost by asking for the right one.
     let check_result = varn_pipeline::resolver::with_resolver(|r| {
-        Checker::check_with(&program, interner, r, varn_checker::CheckOptions::compile())
+        Checker::check_with(
+            &program,
+            &arena,
+            interner,
+            r,
+            varn_checker::CheckOptions::compile(),
+        )
     });
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
@@ -142,6 +156,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
         let res = compile_via_tir(
             program_ref,
+            arena_ref,
             &check_result,
             export_names_of(&program_ref.filename),
         );
@@ -161,12 +176,18 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
-        .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
+    let proto = compile_via_tir(
+        &program,
+        &arena,
+        &check_result,
+        export_names_of(&program.filename),
+    )
+    .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
     let graph_build = varn_pipeline::module_precompile::build_module_graph(
         &program,
+        &arena,
         &source,
         path,
         &proto,
@@ -276,9 +297,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        // TODO(fase1-componente2): see the other `parse_with_profile` call
-        // above — same deferred arena.
-        let (program, _, interner, _arena) = varn_parser::parse_with_profile(
+        let (program, _, interner, arena) = varn_parser::parse_with_profile(
             tokens,
             lexeme_buf,
             path,
@@ -298,11 +317,22 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             })?;
 
         let check_result = varn_pipeline::resolver::with_resolver(|r| {
-            Checker::check_with(&program, interner, r, varn_checker::CheckOptions::compile())
+            Checker::check_with(
+                &program,
+                &arena,
+                interner,
+                r,
+                varn_checker::CheckOptions::compile(),
+            )
         });
 
-        let proto = compile_via_tir(&program, &check_result, export_names_of(&program.filename))
-            .map_err(|e| format!("compile failed: {}", e))?;
+        let proto = compile_via_tir(
+            &program,
+            &arena,
+            &check_result,
+            export_names_of(&program.filename),
+        )
+        .map_err(|e| format!("compile failed: {}", e))?;
 
         varn_builtins::reset_testing_counters();
 

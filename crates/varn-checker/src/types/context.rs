@@ -51,4 +51,12 @@ pub trait TypeContext {
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         None
     }
+
+    /// The [`varn_core::ast::AstArena`] backing the `ExprId`/`StmtId`
+    /// handles carried by the AST nodes this context's callers walk.
+    /// `None` by default for the same reason as [`Self::interner`]: only
+    /// `Binder`/`BindView` reach `ExprId`-bearing AST directly.
+    fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
+        None
+    }
 }

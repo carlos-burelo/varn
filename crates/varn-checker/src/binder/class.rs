@@ -5,7 +5,7 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{ClassDecl, ClassMember, Pattern, Stmt};
+use varn_core::ast::{ClassDecl, ClassMember, Pattern};
 use varn_core::{Atom, TypeKind};
 
 impl<'r> super::Binder<'r> {
@@ -165,7 +165,7 @@ impl<'r> super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    self.bind_inline_function(&[], params, None, body, range);
+                    self.bind_inline_function(&[], params, None, *body, range);
                 }
                 ClassMember::Method {
                     key,
@@ -181,7 +181,7 @@ impl<'r> super::Binder<'r> {
                         self.pending_enrich.push(PendingEnrich::Method {
                             class_name: name_atom,
                             key: *key,
-                            body: body as *const Stmt,
+                            body: *body,
                             is_async: modifiers.is_async,
                         });
                     }
@@ -189,7 +189,7 @@ impl<'r> super::Binder<'r> {
                         type_params,
                         params,
                         return_type.as_ref(),
-                        body,
+                        *body,
                         range,
                     );
                 }
@@ -203,7 +203,7 @@ impl<'r> super::Binder<'r> {
                         self.pending_enrich.push(PendingEnrich::Getter {
                             class_name: name_atom,
                             key: *key,
-                            body: body as *const Stmt,
+                            body: *body,
                         });
                     }
                     // Getters/setters don't route through
@@ -211,7 +211,7 @@ impl<'r> super::Binder<'r> {
                     // so the closure escape (array_evolve rule 3) is
                     // applied explicitly here too.
                     self.escape_all_open_array_candidates();
-                    self.bind_stmt(body);
+                    self.bind_stmt(*body);
                 }
                 ClassMember::Setter {
                     key,
@@ -223,10 +223,10 @@ impl<'r> super::Binder<'r> {
                     self.pending_enrich.push(PendingEnrich::Setter {
                         class_name: name_atom,
                         key: *key,
-                        body: body as *const Stmt,
+                        body: *body,
                     });
                     self.escape_all_open_array_candidates();
-                    self.bind_stmt(body);
+                    self.bind_stmt(*body);
                     self.bind_pattern(
                         &param.pattern,
                         SymbolKind::Parameter,
@@ -238,14 +238,15 @@ impl<'r> super::Binder<'r> {
                 ClassMember::Property {
                     init: Some(init), ..
                 } => {
-                    self.bind_expr(init);
+                    self.bind_expr(*init);
                 }
                 _ => {}
             }
         }
 
+        let ast_arena = self.ast_arena;
         let extends = c.super_class.as_ref().and_then(|e| {
-            match super::type_inference::infer_expr_type(e, Some(self)).0 {
+            match super::type_inference::infer_expr_type(*e, ast_arena, Some(self)).0 {
                 TypeKind::Named(n, o) => Some((n, o)),
                 TypeKind::Generic(n, _, o) => Some((n, o)),
                 _ => None,

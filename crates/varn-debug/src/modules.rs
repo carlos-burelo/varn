@@ -1,9 +1,9 @@
-use varn_core::ast::{Decl, Program, StmtKind};
+use varn_core::ast::{AstArena, Decl, Program, StmtKind};
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::Section;
 
-pub fn debug_modules(program: &Program) {
+pub fn debug_modules(program: &Program, arena: &AstArena) {
     Section::new("module linkage")
         .subtitle(&program.filename)
         .color(|c| c.cyan())
@@ -12,8 +12,8 @@ pub fn debug_modules(program: &Program) {
     let mut imports = 0;
     let mut exports = 0;
 
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
+    for &stmt in &program.body {
+        if let StmtKind::Decl(decl) = &arena.stmt(stmt).kind {
             match &**decl {
                 Decl::Import(i) => {
                     terminal::log(format!(

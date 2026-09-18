@@ -281,7 +281,10 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
         }
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx),
 
-        TypeKind::Typeof(expr) => crate::binder::infer_expr_type(expr, ctx),
+        TypeKind::Typeof(expr) => match ctx.and_then(|c| c.ast_arena()) {
+            Some(arena) => crate::binder::infer_expr_type(*expr, arena, ctx),
+            None => Type::Dynamic,
+        },
 
         TypeKind::Intersection(members) => {
             let resolved: Vec<Type> = members.iter().map(|m| resolve_type_node(m, ctx)).collect();

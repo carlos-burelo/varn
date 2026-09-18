@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_checker::module_resolver::ImportResolver;
 use varn_compiler::FunctionProto;
-use varn_core::ast::Program;
+use varn_core::ast::{AstArena, Program};
 use varn_debug::flags::DebugFlags;
 use varn_types::ModuleGraphArtifact;
 
@@ -18,6 +18,7 @@ pub struct CompileOutput {
 
 pub fn compile(
     program: &Program,
+    ast_arena: &AstArena,
     source: &str,
     check_result: CheckResult,
     verbose: bool,
@@ -37,6 +38,7 @@ pub fn compile(
 
     let tir = varn_checker::emit::emit_module(
         program,
+        ast_arena,
         &check_result.checker_result.bind,
         &check_result.checker_result.expr_table,
         &check_result.checker_result.call_mappings,
@@ -86,6 +88,7 @@ pub fn compile(
     if debug.tir || debug.tir_check {
         varn_debug::tir::debug_tir(
             program,
+            ast_arena,
             &check_result.checker_result.bind,
             &check_result.checker_result.expr_table,
             &check_result.checker_result.call_mappings,
@@ -114,6 +117,7 @@ pub fn compile(
     }
     let graph_build = crate::module_precompile::build_module_graph(
         program,
+        ast_arena,
         source,
         &program.filename,
         &proto,

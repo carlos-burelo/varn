@@ -197,9 +197,10 @@ fn compile_source_inner(
     path: &str,
     reject_type_errors: bool,
 ) -> Result<FunctionProto, String> {
-    let (program, interner) = crate::quiet_parse::parse_module(source, path, "")?;
-    let check =
-        crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, interner, r));
+    let (program, arena, interner) = crate::quiet_parse::parse_module(source, path, "")?;
+    let check = crate::resolver::with_resolver(|r| {
+        varn_checker::Checker::check(&program, &arena, interner, r)
+    });
     if reject_type_errors && check.diagnostics.has_errors() {
         // The stdlib goes through the same checker as user code. Silently
         // dropping these diagnostics let `std/*.vn` carry types the backend
@@ -227,6 +228,7 @@ fn compile_source_inner(
     export_names.sort();
     let tir = varn_checker::emit::emit_module(
         &program,
+        &arena,
         &check.bind,
         &check.expr_table,
         &check.call_mappings,
@@ -243,8 +245,8 @@ fn compile_source_inner(
 /// same import collector the pipeline uses for cache invalidation. Avoids the
 /// false positives/negatives of matching import syntax inside string literals.
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
-    let (program, interner) = crate::quiet_parse::parse_only(source, id, "")?;
-    for spec in crate::import_collector::collect_imports(&program, &interner) {
+    let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
+    for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
         if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics")
         {
             return Err(format!(

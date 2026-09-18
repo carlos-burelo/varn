@@ -2,33 +2,39 @@ use std::collections::HashSet;
 use varn_core::ast::*;
 use varn_core::AtomInterner;
 
-pub fn collect_imports(program: &Program, interner: &AtomInterner) -> HashSet<String> {
-    let mut collector = ImportCollector::new(interner);
+pub fn collect_imports(
+    program: &Program,
+    ast_arena: &AstArena,
+    interner: &AtomInterner,
+) -> HashSet<String> {
+    let mut collector = ImportCollector::new(ast_arena, interner);
     collector.visit_program(program);
     collector.imports
 }
 
 struct ImportCollector<'a> {
     imports: HashSet<String>,
+    ast_arena: &'a AstArena,
     interner: &'a AtomInterner,
 }
 
 impl<'a> ImportCollector<'a> {
-    fn new(interner: &'a AtomInterner) -> Self {
+    fn new(ast_arena: &'a AstArena, interner: &'a AtomInterner) -> Self {
         Self {
             imports: HashSet::new(),
+            ast_arena,
             interner,
         }
     }
 
     fn visit_program(&mut self, program: &Program) {
-        for stmt in &program.body {
+        for &stmt in &program.body {
             self.visit_stmt(stmt);
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let StmtKind::Decl(decl) = &stmt.kind {
+    fn visit_stmt(&mut self, stmt: StmtId) {
+        if let StmtKind::Decl(decl) = &self.ast_arena.stmt(stmt).kind {
             self.visit_decl(decl)
         }
     }

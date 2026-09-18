@@ -141,6 +141,7 @@ impl<'r> super::super::Binder<'r> {
                 Decl::Variable(v) => {
                     for d in &v.declarators {
                         let name = Rc::from(pattern_lead_name(&d.id, &self.interner));
+                        let ast_arena = self.ast_arena;
                         let ty = d
                             .type_ann
                             .as_ref()
@@ -148,7 +149,7 @@ impl<'r> super::super::Binder<'r> {
                             .or_else(|| {
                                 d.init
                                     .as_ref()
-                                    .map(|e| infer_expr_type(e, Some(self)))
+                                    .map(|e| infer_expr_type(*e, ast_arena, Some(self)))
                                     .filter(|t| !t.is_dynamic())
                             })
                             .unwrap_or(Type::Dynamic);
