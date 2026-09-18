@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
-use varn_core::ast::{ArrayEl, ArrowBody, Expr, ExprKind, MatchBody, ObjectProp, PropKey};
+use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, ObjectProp, PropKey};
 
 use super::inference_utils::{build_fn_type, build_method_params, infer_object_member_type};
 pub use super::inference_utils::{pattern_lead_name, pattern_to_string, widen_literal};
@@ -8,8 +8,12 @@ use super::type_resolution::resolve_type_node;
 use crate::types::{FunctionType, ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
-pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>) -> Type {
-    match &expr.kind {
+pub fn infer_expr_type(
+    id: ExprId,
+    arena: &AstArena,
+    ctx: Option<&dyn crate::types::TypeContext>,
+) -> Type {
+    match &arena.expr(id).kind {
         ExprKind::IntLiteral { .. } => Type::Int,
         ExprKind::FloatLiteral { .. } => Type::Float,
         ExprKind::DecimalLiteral { .. } => Type::Decimal,
@@ -19,12 +23,12 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         ExprKind::BoolLiteral { .. } => Type::Bool,
         ExprKind::NullLiteral => Type::Null,
         ExprKind::Template { .. } => Type::Str,
-        ExprKind::Paren { expression } => infer_expr_type(expression, ctx),
+        ExprKind::Paren { expression } => infer_expr_type(*expression, arena, ctx),
         ExprKind::As { type_ann, .. } => resolve_type_node(type_ann, ctx),
         ExprKind::Is { .. } => Type::Bool,
-        ExprKind::Satisfies { expression, .. } => infer_expr_type(expression, ctx),
+        ExprKind::Satisfies { expression, .. } => infer_expr_type(*expression, arena, ctx),
         ExprKind::Await { argument } => {
-            let inner = infer_expr_type(argument, ctx);
+            let inner = infer_expr_type(*argument, arena, ctx);
             match &inner.0 {
                 TypeKind::Generic(name, args, _)
                     if name.as_ref() == varn_core::IntrinsicType::Task.as_str()
@@ -35,20 +39,20 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
                 _ => inner,
             }
         }
-        ExprKind::NonNull { expression } => infer_expr_type(expression, ctx),
+        ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx),
         ExprKind::Logical {
             op, left, right, ..
         } => match op {
             LogicalOp::Nullish => {
-                let rhs = infer_expr_type(right, ctx);
+                let rhs = infer_expr_type(*right, arena, ctx);
                 if !rhs.is_dynamic() {
                     return rhs;
                 }
-                infer_expr_type(left, ctx)
+                infer_expr_type(*left, arena, ctx)
             }
             LogicalOp::And | LogicalOp::Or => {
-                let l = infer_expr_type(left, ctx);
-                let r = infer_expr_type(right, ctx);
+                let l = infer_expr_type(*left, arena, ctx);
+                let r = infer_expr_type(*right, arena, ctx);
                 if l.0 == r.0 {
                     l
                 } else {
@@ -61,9 +65,9 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             property,
             computed,
             ..
-        } => infer_member(object, property, *computed, ctx),
+        } => infer_member(*object, *property, *computed, arena, ctx),
         ExprKind::Unary { op, operand, .. } => {
-            let inner = infer_expr_type(operand, ctx);
+            let inner = infer_expr_type(*operand, arena, ctx);
             match op {
                 UnaryOp::Minus | UnaryOp::Plus => inner,
                 UnaryOp::Not => Type::Bool,
@@ -76,11 +80,11 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         }
         ExprKind::Binary {
             op, left, right, ..
-        } => infer_binary(op, left, right, ctx),
+        } => infer_binary(op, *left, *right, arena, ctx),
         ExprKind::Array { elements } => {
             for el in elements {
                 if let ArrayEl::Expr(first) = el {
-                    let elem_ty = infer_expr_type(first, ctx);
+                    let elem_ty = infer_expr_type(*first, arena, ctx);
                     if !elem_ty.is_dynamic() {
                         return Type::array(widen_literal(elem_ty));
                     }
@@ -89,7 +93,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             Type::Dynamic
         }
         ExprKind::Call { callee, .. } => {
-            let callee_ty = infer_expr_type(callee, ctx);
+            let callee_ty = infer_expr_type(*callee, arena, ctx);
             if let TypeKind::Fn(ft) = &callee_ty.0 {
                 return *ft.return_type.clone();
             }
@@ -97,7 +101,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         }
         ExprKind::New {
             callee, type_args, ..
-        } => infer_new(callee, type_args, ctx),
+        } => infer_new(*callee, type_args, arena, ctx),
         ExprKind::Identifier { name } => ctx
             .and_then(|c| c.interner().map(|i| (c, i)))
             .and_then(|(c, i)| c.resolve_symbol(i.resolve(*name)))
@@ -113,7 +117,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         } => {
             let mut inferred_ret = Type::Dynamic;
             if let ArrowBody::Expr(e) = body.as_ref() {
-                inferred_ret = infer_expr_type(e, ctx);
+                inferred_ret = infer_expr_type(*e, arena, ctx);
             }
             build_fn_type(params, return_type, true, ctx, inferred_ret)
         }
@@ -138,7 +142,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             for case in cases {
                 match &case.body {
                     MatchBody::Expr(e) => {
-                        let ty = infer_expr_type(e, ctx);
+                        let ty = infer_expr_type(*e, arena, ctx);
                         if !ty.is_dynamic() && !ty.is_never() {
                             expr_arm_ty = Some(ty);
                             break;
@@ -149,20 +153,21 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             }
             expr_arm_ty.unwrap_or(Type::Dynamic)
         }
-        ExprKind::Object { properties } => infer_object(properties, ctx),
+        ExprKind::Object { properties } => infer_object(properties, arena, ctx),
         ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
-        ExprKind::Pipeline { right, .. } => infer_expr_type(right, ctx),
+        ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx),
         _ => Type::Dynamic,
     }
 }
 
 fn infer_member(
-    object: &Expr,
-    property: &Expr,
+    object: ExprId,
+    property: ExprId,
     computed: bool,
+    arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
 ) -> Type {
-    let obj_ty = infer_expr_type(object, ctx);
+    let obj_ty = infer_expr_type(object, arena, ctx);
     if computed {
         return match &obj_ty.0 {
             TypeKind::Array(inner) => (**inner).clone(),
@@ -193,7 +198,7 @@ fn infer_member(
             _ => Type::Dynamic,
         };
     }
-    let prop_name_atom = match &property.kind {
+    let prop_name_atom = match &arena.expr(property).kind {
         ExprKind::Identifier { name } => *name,
         _ => return Type::Dynamic,
     };
@@ -304,14 +309,15 @@ pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type) -> Option<Ty
 
 fn infer_binary(
     op: &BinaryOp,
-    left: &Expr,
-    right: &Expr,
+    left: ExprId,
+    right: ExprId,
+    arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
 ) -> Type {
     match op {
         BinaryOp::Add => {
-            let l = infer_expr_type(left, ctx);
-            let r = infer_expr_type(right, ctx);
+            let l = infer_expr_type(left, arena, ctx);
+            let r = infer_expr_type(right, arena, ctx);
             match (&l.0, &r.0) {
                 (&TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
                 | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
@@ -319,8 +325,8 @@ fn infer_binary(
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-            let l = infer_expr_type(left, ctx);
-            let r = infer_expr_type(right, ctx);
+            let l = infer_expr_type(left, arena, ctx);
+            let r = infer_expr_type(right, arena, ctx);
             numeric_binary_type(*op, &l, &r).unwrap_or(Type::Dynamic)
         }
         BinaryOp::Eq
@@ -337,8 +343,8 @@ fn infer_binary(
         | BinaryOp::Shl
         | BinaryOp::Shr
         | BinaryOp::UShr => {
-            let l = infer_expr_type(left, ctx);
-            let r = infer_expr_type(right, ctx);
+            let l = infer_expr_type(left, arena, ctx);
+            let r = infer_expr_type(right, arena, ctx);
             match (&l.0, &r.0) {
                 (
                     &TypeKind::Intrinsic(varn_core::TypeTag::Int),
@@ -351,11 +357,12 @@ fn infer_binary(
 }
 
 fn infer_new(
-    callee: &Expr,
+    callee: ExprId,
     type_args: &[varn_core::ast::TypeNode],
+    arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
 ) -> Type {
-    if let ExprKind::Identifier { name } = &callee.kind {
+    if let ExprKind::Identifier { name } = &arena.expr(callee).kind {
         let name_str = ctx
             .and_then(|c| c.interner())
             .map(|i| i.resolve(*name).to_owned())
@@ -383,8 +390,8 @@ fn infer_new(
             ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
         );
     }
-    if let ExprKind::Member { .. } = &callee.kind {
-        let callee_ty = infer_expr_type(callee, ctx);
+    if let ExprKind::Member { .. } = &arena.expr(callee).kind {
+        let callee_ty = infer_expr_type(callee, arena, ctx);
         match &callee_ty.0 {
             TypeKind::Named(name, origin) => {
                 return Type::named_with_origin(
@@ -405,13 +412,18 @@ fn infer_new(
     Type::Dynamic
 }
 
-fn infer_object(properties: &[ObjectProp], ctx: Option<&dyn crate::types::TypeContext>) -> Type {
+fn infer_object(
+    properties: &[ObjectProp],
+    arena: &AstArena,
+    ctx: Option<&dyn crate::types::TypeContext>,
+) -> Type {
     let mut members = Vec::new();
     for p in properties {
         match p {
             ObjectProp::Property { key, value, .. } => {
+                let value = *value;
                 if matches!(key, PropKey::Computed(_)) {
-                    let val_ty = infer_expr_type(value, ctx);
+                    let val_ty = infer_expr_type(value, arena, ctx);
                     members.push(ObjectTypeMember::Index {
                         param_name: Rc::from("_key"),
                         key_ty: Box::new(Type::Str),
@@ -423,7 +435,7 @@ fn infer_object(properties: &[ObjectProp], ctx: Option<&dyn crate::types::TypeCo
                     PropKey::Identifier(n) | PropKey::Str(n) => Rc::from(n.as_str()),
                     _ => continue,
                 };
-                let ty = infer_expr_type(value, ctx);
+                let ty = infer_expr_type(value, arena, ctx);
                 if let TypeKind::Fn(ft) = &ty.0 {
                     members.push(ObjectTypeMember::Method {
                         name,
@@ -465,7 +477,7 @@ fn infer_object(properties: &[ObjectProp], ctx: Option<&dyn crate::types::TypeCo
                 });
             }
             ObjectProp::Spread { argument, .. } => {
-                let spread_ty = infer_expr_type(argument, ctx);
+                let spread_ty = infer_expr_type(*argument, arena, ctx);
                 if let TypeKind::Object(spread_members) = spread_ty.0 {
                     members.extend(spread_members);
                 }

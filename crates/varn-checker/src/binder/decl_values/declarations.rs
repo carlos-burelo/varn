@@ -6,8 +6,8 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionType, Type};
 use std::rc::Rc;
 use varn_core::ast::{
-    ClassMember, EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind,
-    VariableDecl,
+    ClassMember, EnumDecl, ExprId, ExprKind, FunctionDecl, Pattern, StmtId, TypeAliasDecl,
+    VarKind, VariableDecl,
 };
 
 impl<'r> super::super::Binder<'r> {
@@ -36,8 +36,7 @@ impl<'r> super::super::Binder<'r> {
                 .map(|ann| resolve_type_node(ann, Some(self)))
                 .or_else(|| {
                     d.init
-                        .as_ref()
-                        .map(|e| infer_expr_type(e, Some(self)))
+                        .map(|e| infer_expr_type(e, self.ast_arena, Some(self)))
                         .map(|t| {
                             if sym_kind == SymbolKind::Let && !has_explicit_ann {
                                 widen_literal(t)
@@ -52,8 +51,8 @@ impl<'r> super::super::Binder<'r> {
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
 
             if let Pattern::Identifier { name, .. } = &d.id {
-                if let Some(init) = &d.init {
-                    if let ExprKind::Object { properties } = &init.kind {
+                if let Some(init) = d.init {
+                    if let ExprKind::Object { properties } = &self.ast_arena.expr(init).kind {
                         let fields = self.collect_object_members(properties);
                         if !fields.is_empty() {
                             self.type_members.objects.insert(*name, fields);
@@ -62,10 +61,10 @@ impl<'r> super::super::Binder<'r> {
                 }
             }
 
-            if let Some(init_expr) = &d.init {
+            if let Some(init_expr) = d.init {
                 if needs_enrich
                     && matches!(
-                        &init_expr.kind,
+                        &self.ast_arena.expr(init_expr).kind,
                         ExprKind::Call { .. }
                             | ExprKind::Await { .. }
                             | ExprKind::Member { .. }
@@ -83,11 +82,11 @@ impl<'r> super::super::Binder<'r> {
                     if let Some(sym_id) = name_atom.and_then(|n| scope.lookup(n)) {
                         self.pending_enrich.push(PendingEnrich::Var {
                             sym_id,
-                            init: init_expr as *const Expr,
+                            init: init_expr,
                         });
                     }
                 } else if !has_explicit_ann
-                    && matches!(&init_expr.kind, ExprKind::Array { elements } if elements.is_empty())
+                    && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty())
                 {
                     // Task A0.3': `let`/`const x = []` (empty literal, no
                     // annotation) — register as a candidate for evolving
@@ -127,8 +126,7 @@ impl<'r> super::super::Binder<'r> {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .or_else(|| {
                         p.default
-                            .as_ref()
-                            .map(|e| widen_literal(infer_expr_type(e, Some(self))))
+                            .map(|e| widen_literal(infer_expr_type(e, self.ast_arena, Some(self))))
                     })
                     .unwrap_or(Type::Dynamic);
 
@@ -189,7 +187,7 @@ impl<'r> super::super::Binder<'r> {
         if f.return_type.is_none() && !f.modifiers.is_declare && !f.modifiers.is_generator {
             self.pending_enrich.push(PendingEnrich::Fn {
                 sym_id,
-                body: &f.body as *const Stmt,
+                body: f.body,
                 is_async: f.modifiers.is_async,
             });
         }
@@ -211,8 +209,7 @@ impl<'r> super::super::Binder<'r> {
                 .map(|ann| resolve_type_node(ann, Some(self)))
                 .or_else(|| {
                     p.default
-                        .as_ref()
-                        .map(|e| widen_literal(infer_expr_type(e, Some(self))))
+                        .map(|e| widen_literal(infer_expr_type(e, self.ast_arena, Some(self))))
                 })
                 .unwrap_or(Type::Dynamic);
 
@@ -230,7 +227,7 @@ impl<'r> super::super::Binder<'r> {
         }
 
         if !f.modifiers.is_declare {
-            self.bind_stmt(&f.body);
+            self.bind_stmt(f.body);
         }
         self.current = saved;
 
@@ -366,7 +363,7 @@ impl<'r> super::super::Binder<'r> {
                     range,
                     ..
                 } => {
-                    self.bind_inline_function(&[], params, None, body, range);
+                    self.bind_inline_function(&[], params, None, *body, range);
                 }
                 ClassMember::Method {
                     key,
@@ -378,11 +375,12 @@ impl<'r> super::super::Binder<'r> {
                     modifiers,
                     ..
                 } => {
+                    let body = *body;
                     if return_type.is_none() && !modifiers.is_abstract {
                         self.pending_enrich.push(PendingEnrich::Method {
                             class_name: e.id,
                             key: *key,
-                            body: body as *const Stmt,
+                            body,
                             is_async: modifiers.is_async,
                         });
                     }
@@ -400,11 +398,12 @@ impl<'r> super::super::Binder<'r> {
                     body: Some(body),
                     ..
                 } => {
+                    let body = *body;
                     if return_type.is_none() {
                         self.pending_enrich.push(PendingEnrich::Getter {
                             class_name: e.id,
                             key: *key,
-                            body: body as *const Stmt,
+                            body,
                         });
                     }
                     // See array_evolve rule 3: getters/setters are closures
@@ -420,10 +419,11 @@ impl<'r> super::super::Binder<'r> {
                     range,
                     ..
                 } => {
+                    let body = *body;
                     self.pending_enrich.push(PendingEnrich::Setter {
                         class_name: e.id,
                         key: *key,
-                        body: body as *const Stmt,
+                        body,
                     });
                     self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
@@ -438,7 +438,7 @@ impl<'r> super::super::Binder<'r> {
                 ClassMember::Property {
                     init: Some(init), ..
                 } => {
-                    self.bind_expr(init);
+                    self.bind_expr(*init);
                 }
                 _ => {}
             }

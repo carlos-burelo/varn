@@ -3,7 +3,7 @@ use crate::symbol::{Symbol, SymbolArena, SymbolKind};
 use crate::types::Type;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{ExprKind, ForInit, Program, Stmt, StmtKind, VarDeclarator};
+use varn_core::ast::{AstArena, ExprKind, ForInit, Program, StmtId, StmtKind, VarDeclarator};
 
 mod array_evolve;
 mod class;
@@ -29,6 +29,12 @@ pub struct Binder<'r> {
     /// resolver constructs binders while binding a module's imports, so an
     /// owning handle would make the ownership circular.
     pub(crate) resolver: &'r dyn ImportResolver,
+    /// The parsed program's expression/statement nodes (fase1-componente2:
+    /// `Expr`/`Stmt` are no longer owned trees — every AST node the binder
+    /// visits is an `ExprId`/`StmtId` resolved against this arena). Named
+    /// `ast_arena` (not `arena`) to avoid colliding with the symbol arena
+    /// below, which every binder method already calls `self.arena`.
+    pub(crate) ast_arena: &'r AstArena,
     pub(crate) arena: SymbolArena,
     pub(crate) scopes: ScopeArena,
     pub(crate) current: ScopeId,
@@ -161,20 +167,23 @@ impl TypeContext for Binder<'_> {
 impl<'r> Binder<'r> {
     pub fn bind(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
     ) -> BindResult {
-        Self::bind_with_globals_iter(program, interner, resolver, FxHashMap::default())
+        Self::bind_with_globals_iter(program, ast_arena, interner, resolver, FxHashMap::default())
     }
 
     pub fn bind_with_global_refs(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
         globals: &FxHashMap<Rc<str>, Symbol>,
     ) -> BindResult {
         Self::bind_with_globals_iter(
             program,
+            ast_arena,
             interner,
             resolver,
             globals
@@ -185,6 +194,7 @@ impl<'r> Binder<'r> {
 
     fn bind_with_globals_iter<I>(
         program: &Program,
+        ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
         globals: I,
@@ -194,6 +204,7 @@ impl<'r> Binder<'r> {
     {
         let mut b = Binder {
             resolver,
+            ast_arena,
             arena: SymbolArena::default(),
             scopes: ScopeArena::default(),
             current: 0,
@@ -246,8 +257,8 @@ impl<'r> Binder<'r> {
         }
     }
 
-    pub(crate) fn bind_stmts(&mut self, stmts: &[Stmt]) {
-        for stmt in stmts {
+    pub(crate) fn bind_stmts(&mut self, stmts: &[StmtId]) {
+        for &stmt in stmts {
             self.bind_stmt(stmt);
         }
     }
@@ -276,8 +287,7 @@ impl<'r> Binder<'r> {
                 .or_else(|| {
                     declarator
                         .init
-                        .as_ref()
-                        .map(|expr| infer_expr_type(expr, Some(self)))
+                        .map(|expr| infer_expr_type(expr, self.ast_arena, Some(self)))
                         .filter(|ty| !ty.is_dynamic())
                 });
 
@@ -290,8 +300,9 @@ impl<'r> Binder<'r> {
             );
 
             if let Pattern::Identifier { name, .. } = &declarator.id {
-                if let Some(init_expr) = &declarator.init {
-                    if let ExprKind::Object { properties, .. } = &init_expr.kind {
+                if let Some(init_expr) = declarator.init {
+                    if let ExprKind::Object { properties, .. } = &self.ast_arena.expr(init_expr).kind
+                    {
                         let fields = self.collect_object_members(properties);
                         if !fields.is_empty() {
                             self.type_members.objects.insert(name.clone(), fields);
@@ -300,14 +311,15 @@ impl<'r> Binder<'r> {
                 }
             }
 
-            if let Some(init_expr) = &declarator.init {
+            if let Some(init_expr) = declarator.init {
                 self.bind_expr(init_expr);
             }
         }
     }
 
-    pub(crate) fn bind_stmt(&mut self, stmt: &Stmt) {
-        match &stmt.kind {
+    pub(crate) fn bind_stmt(&mut self, stmt: StmtId) {
+        let arena = self.ast_arena;
+        match &arena.stmt(stmt).kind {
             StmtKind::Decl(decl) => self.bind_decl(decl),
             StmtKind::Block { stmts } => {
                 let child = self.scopes.child(ScopeKind::Block, self.current);
@@ -322,6 +334,7 @@ impl<'r> Binder<'r> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 self.bind_expr(test);
                 self.bind_stmt(consequent);
                 if let Some(alt) = alternate {
@@ -329,6 +342,7 @@ impl<'r> Binder<'r> {
                 }
             }
             StmtKind::While { test, body } | StmtKind::DoWhile { test, body } => {
+                let (test, body) = (*test, *body);
                 self.bind_expr(test);
                 self.bind_stmt(body);
             }
@@ -338,6 +352,7 @@ impl<'r> Binder<'r> {
                 update,
                 body,
             } => {
+                let body = *body;
                 let child = self.scopes.child(ScopeKind::Block, self.current);
                 let saved = self.current;
                 self.current = child;
@@ -347,15 +362,15 @@ impl<'r> Binder<'r> {
                             self.bind_var_declarators(declarators, *kind, None);
                         }
                         ForInit::Expr(e) => {
-                            self.bind_expr(e);
+                            self.bind_expr(*e);
                         }
                     }
                 }
                 if let Some(t) = test {
-                    self.bind_expr(t);
+                    self.bind_expr(*t);
                 }
                 if let Some(u) = update {
-                    self.bind_expr(u);
+                    self.bind_expr(*u);
                 }
                 self.bind_stmt(body);
                 self.finalize_array_watch(child);
@@ -367,10 +382,12 @@ impl<'r> Binder<'r> {
             | StmtKind::ForOf {
                 left, right, body, ..
             } => {
+                let (right, body) = (*right, *body);
                 let child = self.scopes.child(ScopeKind::Block, self.current);
                 let saved = self.current;
                 self.current = child;
-                self.bind_pattern(left, SymbolKind::Let, right.range.start.line, None, None);
+                let line = arena.expr(right).range.start.line;
+                self.bind_pattern(left, SymbolKind::Let, line, None, None);
                 self.bind_expr(right);
                 self.bind_stmt(body);
                 self.finalize_array_watch(child);
@@ -380,10 +397,11 @@ impl<'r> Binder<'r> {
                 discriminant,
                 cases,
             } => {
+                let discriminant = *discriminant;
                 self.bind_expr(discriminant);
                 for case in cases {
                     if let Some(t) = &case.test {
-                        self.bind_expr(t);
+                        self.bind_expr(*t);
                     }
                     self.bind_stmts(&case.body);
                 }
@@ -393,6 +411,7 @@ impl<'r> Binder<'r> {
                 catches,
                 finally,
             } => {
+                let (block, finally) = (*block, *finally);
                 self.bind_stmt(block);
                 for clause in catches {
                     let child = self.scopes.child(ScopeKind::Block, self.current);
@@ -403,9 +422,10 @@ impl<'r> Binder<'r> {
                             .type_ann
                             .as_ref()
                             .map(|ann| type_resolution::resolve_type_node(ann, Some(self)));
-                        self.bind_pattern(p, SymbolKind::Let, block.range.start.line, None, ty);
+                        let block_line = arena.stmt(block).range.start.line;
+                        self.bind_pattern(p, SymbolKind::Let, block_line, None, ty);
                     }
-                    self.bind_stmt(&clause.body);
+                    self.bind_stmt(clause.body);
                     self.finalize_array_watch(child);
                     self.current = saved;
                 }
@@ -414,18 +434,18 @@ impl<'r> Binder<'r> {
                 }
             }
             StmtKind::Labeled { body, .. } => {
-                self.bind_stmt(body);
+                self.bind_stmt(*body);
             }
             StmtKind::Expr { expression } => {
-                self.bind_expr(expression);
+                self.bind_expr(*expression);
             }
             StmtKind::Return { argument } => {
                 if let Some(arg) = argument {
-                    self.bind_expr(arg);
+                    self.bind_expr(*arg);
                 }
             }
             StmtKind::Throw { argument } => {
-                self.bind_expr(argument);
+                self.bind_expr(*argument);
             }
             StmtKind::Using { declarations, .. } => {
                 self.bind_var_declarators(declarations, VarKind::Const, None);

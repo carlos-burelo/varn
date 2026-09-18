@@ -17,16 +17,19 @@ impl<'r> super::super::Binder<'r> {
                 let range = prop.range();
                 match prop {
                     ObjectProp::Property { key, value, .. } => {
+                        let value = *value;
                         let name = match key {
                             PropKey::Identifier(s) | PropKey::Str(s) => Rc::from(s.as_str()),
                             _ => return None,
                         };
-                        let ty = infer_expr_type(value, Some(self));
-                        let nested_members = if let ExprKind::Object { properties } = &value.kind {
-                            self.collect_object_members(properties)
-                        } else {
-                            Vec::new()
-                        };
+                        let ty = infer_expr_type(value, self.ast_arena, Some(self));
+                        let nested_members =
+                            if let ExprKind::Object { properties } = &self.ast_arena.expr(value).kind
+                            {
+                                self.collect_object_members(properties)
+                            } else {
+                                Vec::new()
+                            };
 
                         let kind = if matches!(&ty.0, TypeKind::Fn(_)) {
                             ClassMemberKind::Method

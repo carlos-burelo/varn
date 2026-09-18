@@ -4,20 +4,25 @@ use crate::symbol::{Symbol, SymbolArena, SymbolId};
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{Expr, Stmt, TypeNode};
+use varn_core::ast::{ExprId, StmtId, TypeNode};
 use varn_core::Atom;
 
 pub use crate::types::TypeContext;
 
+// Node identity used to be a raw pointer into a heap-allocated `Expr`/`Stmt`
+// (fragile: the pointee's address was only valid while that `Box` lived).
+// Now that expressions/statements live in an `AstArena` addressed by id
+// (fase1-componente2), the natural — and inherently `Send`/`Sync` — handle
+// is the id itself; no `unsafe impl` needed anymore.
 #[derive(Clone)]
 pub enum PendingEnrich {
     Var {
         sym_id: SymbolId,
-        init: *const Expr,
+        init: ExprId,
     },
     Fn {
         sym_id: SymbolId,
-        body: *const Stmt,
+        body: StmtId,
         is_async: bool,
     },
     Method {
@@ -26,23 +31,20 @@ pub enum PendingEnrich {
         // so this stays a handle instead of re-wrapping into `Rc<str>`.
         class_name: Atom,
         key: Atom,
-        body: *const Stmt,
+        body: StmtId,
         is_async: bool,
     },
     Getter {
         class_name: Atom,
         key: Atom,
-        body: *const Stmt,
+        body: StmtId,
     },
     Setter {
         class_name: Atom,
         key: Atom,
-        body: *const Stmt,
+        body: StmtId,
     },
 }
-
-unsafe impl Send for PendingEnrich {}
-unsafe impl Sync for PendingEnrich {}
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TypeMembers {

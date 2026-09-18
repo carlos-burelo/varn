@@ -3,7 +3,8 @@ use crate::types::Type;
 use std::rc::Rc;
 use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{
-    Arg, ArrayEl, ArrowBody, Decl, Expr, ExprKind, MatchBody, ObjectProp, Param, TemplatePart,
+    Arg, ArrayEl, ArrowBody, Decl, ExprId, ExprKind, MatchBody, ObjectProp, Param, StmtId,
+    TemplatePart,
 };
 use varn_core::{Diagnostic, ErrorCode};
 
@@ -104,8 +105,9 @@ impl<'r> super::Binder<'r> {
         id
     }
 
-    pub(super) fn bind_expr(&mut self, expr: &Expr) {
-        match &expr.kind {
+    pub(super) fn bind_expr(&mut self, id: ExprId) {
+        let arena = self.ast_arena;
+        match &arena.expr(id).kind {
             // A hole binds nothing, but its parent still binds normally — that
             // is the whole point of keeping the node instead of dropping the
             // statement that contains it.
@@ -115,52 +117,61 @@ impl<'r> super::Binder<'r> {
                 return_type,
                 body,
                 ..
-            } => match body.as_ref() {
-                ArrowBody::Block(stmt) => {
-                    self.bind_inline_function(&[], params, return_type.as_ref(), stmt, &expr.range);
+            } => {
+                let range = arena.expr(id).range;
+                match body.as_ref() {
+                    ArrowBody::Block(stmt) => {
+                        self.bind_inline_function(&[], params, return_type.as_ref(), *stmt, &range);
+                    }
+                    ArrowBody::Expr(e) => {
+                        self.bind_inline_function_expr(params, *e, &range);
+                    }
                 }
-                ArrowBody::Expr(e) => {
-                    self.bind_inline_function_expr(params, e, &expr.range);
-                }
-            },
+            }
             ExprKind::Function {
                 params,
                 return_type,
                 body,
                 ..
             } => {
-                self.bind_inline_function(&[], params, return_type.as_ref(), body, &expr.range);
+                let range = arena.expr(id).range;
+                self.bind_inline_function(&[], params, return_type.as_ref(), *body, &range);
             }
             ExprKind::As { expression, .. }
             | ExprKind::Is { expression, .. }
-            | ExprKind::Satisfies { expression, .. } => self.bind_expr(expression),
-            ExprKind::MetaAccess { target, .. } => self.bind_expr(target),
-            ExprKind::Await { argument } | ExprKind::Spawn { argument } => self.bind_expr(argument),
-            ExprKind::Try { expression } => self.bind_expr(expression),
+            | ExprKind::Satisfies { expression, .. } => self.bind_expr(*expression),
+            ExprKind::MetaAccess { target, .. } => self.bind_expr(*target),
+            ExprKind::Await { argument } | ExprKind::Spawn { argument } => {
+                self.bind_expr(*argument)
+            }
+            ExprKind::Try { expression } => self.bind_expr(*expression),
             ExprKind::Yield { argument, .. } => {
                 if let Some(arg) = argument {
-                    self.bind_expr(arg);
+                    self.bind_expr(*arg);
                 }
             }
-            ExprKind::Unary { operand, .. } => self.bind_expr(operand),
+            ExprKind::Unary { operand, .. } => self.bind_expr(*operand),
             ExprKind::Binary { left, right, .. } | ExprKind::Logical { left, right, .. } => {
+                let (left, right) = (*left, *right);
                 self.bind_expr(left);
                 self.bind_expr(right);
             }
             ExprKind::Assign { op, target, value } => {
-                if !self.bind_array_index_write(*op, target, value) {
+                let (op, target, value) = (*op, *target, *value);
+                if !self.bind_array_index_write(op, target, value) {
                     self.bind_expr(target);
                     self.bind_expr(value);
                 }
             }
             ExprKind::Call { callee, args, .. } => {
+                let callee = *callee;
                 if !self.bind_array_push_call(callee, args) {
                     self.bind_expr(callee);
                     self.bind_args(args);
                 }
             }
             ExprKind::New { callee, args, .. } => {
-                self.bind_expr(callee);
+                self.bind_expr(*callee);
                 self.bind_args(args);
             }
             ExprKind::Conditional {
@@ -168,6 +179,7 @@ impl<'r> super::Binder<'r> {
                 consequent,
                 alternate,
             } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 self.bind_expr(test);
                 self.bind_expr(consequent);
                 self.bind_expr(alternate);
@@ -178,33 +190,34 @@ impl<'r> super::Binder<'r> {
                 computed,
                 ..
             } => {
-                if !self.bind_array_whitelisted_member(object, property, *computed) {
+                let (object, property, computed) = (*object, *property, *computed);
+                if !self.bind_array_whitelisted_member(object, property, computed) {
                     self.bind_expr(object);
-                    if *computed {
+                    if computed {
                         self.bind_expr(property);
                     }
                 }
             }
-            ExprKind::Paren { expression } => self.bind_expr(expression),
-            ExprKind::NonNull { expression } => self.bind_expr(expression),
+            ExprKind::Paren { expression } => self.bind_expr(*expression),
+            ExprKind::NonNull { expression } => self.bind_expr(*expression),
             ExprKind::Array { elements } => {
                 for el in elements {
                     match el {
-                        ArrayEl::Expr(e) => self.bind_expr(e),
-                        ArrayEl::Spread(e) => self.bind_expr(e),
+                        ArrayEl::Expr(e) => self.bind_expr(*e),
+                        ArrayEl::Spread(e) => self.bind_expr(*e),
                         ArrayEl::Hole => {}
                     }
                 }
             }
             ExprKind::Tuple { elements } => {
-                for e in elements {
+                for &e in elements {
                     self.bind_expr(e);
                 }
             }
             ExprKind::Object { properties } | ExprKind::Record { properties } => {
                 for prop in properties {
                     match prop {
-                        ObjectProp::Property { value, .. } => self.bind_expr(value),
+                        ObjectProp::Property { value, .. } => self.bind_expr(*value),
                         ObjectProp::Method {
                             params,
                             return_type,
@@ -216,7 +229,7 @@ impl<'r> super::Binder<'r> {
                                 &[],
                                 params,
                                 return_type.as_ref(),
-                                body,
+                                *body,
                                 range,
                             );
                         }
@@ -226,22 +239,22 @@ impl<'r> super::Binder<'r> {
                             // scope is created for them), so the closure
                             // escape has to be applied here explicitly too.
                             self.escape_all_open_array_candidates();
-                            self.bind_stmt(body);
+                            self.bind_stmt(*body);
                         }
                         ObjectProp::Setter { body, .. } => {
                             self.escape_all_open_array_candidates();
-                            self.bind_stmt(body);
+                            self.bind_stmt(*body);
                         }
-                        ObjectProp::Spread { argument, .. } => self.bind_expr(argument),
+                        ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
                     }
                 }
             }
             ExprKind::With { object, properties } => {
-                self.bind_expr(object);
+                self.bind_expr(*object);
                 for prop in properties {
                     match prop {
-                        ObjectProp::Property { value, .. } => self.bind_expr(value),
-                        ObjectProp::Spread { argument, .. } => self.bind_expr(argument),
+                        ObjectProp::Property { value, .. } => self.bind_expr(*value),
+                        ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
                         _ => {}
                     }
                 }
@@ -249,12 +262,12 @@ impl<'r> super::Binder<'r> {
             ExprKind::Template { parts } => {
                 for p in parts {
                     if let TemplatePart::Interpolation(e) = p {
-                        self.bind_expr(e);
+                        self.bind_expr(*e);
                     }
                 }
             }
             ExprKind::Sequence { expressions } => {
-                for e in expressions {
+                for &e in expressions {
                     self.bind_expr(e);
                 }
             }
@@ -262,6 +275,7 @@ impl<'r> super::Binder<'r> {
                 self.bind_class(declaration);
             }
             ExprKind::Match { subject, cases } => {
+                let subject = *subject;
                 self.bind_expr(subject);
                 for case in cases {
                     use crate::scope::ScopeKind;
@@ -272,28 +286,31 @@ impl<'r> super::Binder<'r> {
 
                     bind_match_pattern_vars(self, &case.pattern);
 
-                    if let Some(g) = &case.guard {
+                    if let Some(g) = case.guard {
                         self.bind_expr(g);
                     }
                     match &case.body {
-                        MatchBody::Expr(e) => self.bind_expr(e),
-                        MatchBody::Block(stmt) => self.bind_stmt(stmt),
+                        MatchBody::Expr(e) => self.bind_expr(*e),
+                        MatchBody::Block(stmt) => self.bind_stmt(*stmt),
                     }
                     self.finalize_array_watch(child);
                     self.current = saved;
                 }
             }
-            ExprKind::Update { operand, .. } => self.bind_expr(operand),
-            ExprKind::Spread { argument } => self.bind_expr(argument),
+            ExprKind::Update { operand, .. } => self.bind_expr(*operand),
+            ExprKind::Spread { argument } => self.bind_expr(*argument),
             ExprKind::Pipeline { left, right } => {
+                let (left, right) = (*left, *right);
                 self.bind_expr(left);
                 self.bind_expr(right);
             }
             ExprKind::Range { start, end, .. } => {
+                let (start, end) = (*start, *end);
                 self.bind_expr(start);
                 self.bind_expr(end);
             }
             ExprKind::TaggedTemplate { tag, template, .. } => {
+                let (tag, template) = (*tag, *template);
                 self.bind_expr(tag);
                 self.bind_expr(template);
             }
@@ -332,20 +349,23 @@ impl<'r> super::Binder<'r> {
     /// on a watched candidate is treated as an escape rather than guessed
     /// at. Returns `false` when this isn't a push call on a watched
     /// candidate at all, so the caller falls back to normal traversal.
-    fn bind_array_push_call(&mut self, callee: &Expr, args: &[Arg]) -> bool {
+    fn bind_array_push_call(&mut self, callee: ExprId, args: &[Arg]) -> bool {
+        let arena = self.ast_arena;
         let ExprKind::Member {
             object,
             property,
             computed,
             ..
-        } = &callee.kind
+        } = &arena.expr(callee).kind
         else {
             return false;
         };
-        let ExprKind::Identifier { name } = &object.kind else {
+        let (object, property, computed) = (*object, *property, *computed);
+        let ExprKind::Identifier { name } = &arena.expr(object).kind else {
             return false;
         };
-        if !self.array_candidate_active(*name) {
+        let name = *name;
+        if !self.array_candidate_active(name) {
             return false;
         }
         // A computed callee (`x["push"](e)`, `x[m](e)`) is a method call
@@ -353,26 +373,28 @@ impl<'r> super::Binder<'r> {
         // We can't tell which method it resolves to (it could push an
         // incompatible element, `unshift`, `splice`, ...), so escape rather
         // than mistake it for a safe `x[i]` read.
-        if *computed {
-            self.escape_array_candidate(*name);
+        if computed {
+            self.escape_array_candidate(name);
             self.bind_expr(property);
             self.bind_args(args);
             return true;
         }
-        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+        let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
             return false;
         };
-        if self.interner.resolve(*prop_name) != varn_core::MemberKey::Push.as_str() {
+        let prop_name = *prop_name;
+        if self.interner.resolve(prop_name) != varn_core::MemberKey::Push.as_str() {
             return false;
         }
         match args {
             [Arg::Positional(value)] => {
-                let value_ty = super::type_inference::infer_expr_type(value, Some(self));
-                self.record_array_write(*name, &value_ty);
+                let value = *value;
+                let value_ty = super::type_inference::infer_expr_type(value, arena, Some(self));
+                self.record_array_write(name, &value_ty);
                 self.bind_expr(value);
             }
             _ => {
-                self.escape_array_candidate(*name);
+                self.escape_array_candidate(name);
                 self.bind_args(args);
             }
         }
@@ -392,43 +414,46 @@ impl<'r> super::Binder<'r> {
     fn bind_array_index_write(
         &mut self,
         op: varn_core::ast::operators::AssignOp,
-        target: &Expr,
-        value: &Expr,
+        target: ExprId,
+        value: ExprId,
     ) -> bool {
         use varn_core::ast::operators::AssignOp;
 
+        let arena = self.ast_arena;
         let ExprKind::Member {
             object,
             property,
             computed,
             ..
-        } = &target.kind
+        } = &arena.expr(target).kind
         else {
             return false;
         };
-        let ExprKind::Identifier { name } = &object.kind else {
+        let (object, property, computed) = (*object, *property, *computed);
+        let ExprKind::Identifier { name } = &arena.expr(object).kind else {
             return false;
         };
-        if !self.array_candidate_active(*name) {
+        let name = *name;
+        if !self.array_candidate_active(name) {
             return false;
         }
         // A non-computed member write (`x.length = n`, a resize; or any
         // other `x.<name> = v`) mutates the array through a named member,
         // not a whitelisted `x[i] = v` element write, and its effect on the
         // element type can't be unified — escape.
-        if !*computed {
-            self.escape_array_candidate(*name);
+        if !computed {
+            self.escape_array_candidate(name);
             self.bind_expr(value);
             return true;
         }
         if op != AssignOp::Assign {
-            self.escape_array_candidate(*name);
+            self.escape_array_candidate(name);
             self.bind_expr(property);
             self.bind_expr(value);
             return true;
         }
-        let value_ty = super::type_inference::infer_expr_type(value, Some(self));
-        self.record_array_write(*name, &value_ty);
+        let value_ty = super::type_inference::infer_expr_type(value, arena, Some(self));
+        self.record_array_write(name, &value_ty);
         self.bind_expr(property);
         self.bind_expr(value);
         true
@@ -446,14 +471,16 @@ impl<'r> super::Binder<'r> {
     /// so the caller falls back to normal traversal.
     fn bind_array_whitelisted_member(
         &mut self,
-        object: &Expr,
-        property: &Expr,
+        object: ExprId,
+        property: ExprId,
         computed: bool,
     ) -> bool {
-        let ExprKind::Identifier { name } = &object.kind else {
+        let arena = self.ast_arena;
+        let ExprKind::Identifier { name } = &arena.expr(object).kind else {
             return false;
         };
-        if !self.array_candidate_active(*name) {
+        let name = *name;
+        if !self.array_candidate_active(name) {
             return false;
         }
         if computed {
@@ -464,15 +491,15 @@ impl<'r> super::Binder<'r> {
             // past the scan, so escape. Genuine integer/dynamic index reads
             // (`x[i]`) stay whitelisted — the element-type optimization
             // depends on them (matmul reads `a[row*n+k]` this way).
-            if matches!(&property.kind, ExprKind::StrLiteral { .. }) {
-                self.escape_array_candidate(*name);
+            if matches!(&arena.expr(property).kind, ExprKind::StrLiteral { .. }) {
+                self.escape_array_candidate(name);
             }
             self.bind_expr(property);
         } else if !matches!(
-            &property.kind,
+            &arena.expr(property).kind,
             ExprKind::Identifier { name: p } if self.interner.resolve(*p) == varn_core::MemberKey::Length.as_str()
         ) {
-            self.escape_array_candidate(*name);
+            self.escape_array_candidate(name);
         }
         true
     }
@@ -482,7 +509,7 @@ impl<'r> super::Binder<'r> {
         type_params: &[varn_core::ast::TypeParam],
         params: &[varn_core::ast::Param],
         _return_type: Option<&varn_core::ast::TypeNode>,
-        body: &varn_core::ast::Stmt,
+        body: StmtId,
         range: &varn_core::SourceRange,
     ) {
         use crate::scope::ScopeKind;
@@ -511,7 +538,7 @@ impl<'r> super::Binder<'r> {
     fn bind_inline_function_expr(
         &mut self,
         params: &[Param],
-        body: &Expr,
+        body: ExprId,
         range: &varn_core::SourceRange,
     ) {
         use crate::scope::ScopeKind;
@@ -544,15 +571,14 @@ impl<'r> super::Binder<'r> {
                 .map(|m| resolve_type_node(m, Some(self)))
                 .or_else(|| {
                     p.default
-                        .as_ref()
-                        .map(|e| infer_expr_type(e, Some(self)))
+                        .map(|e| infer_expr_type(e, self.ast_arena, Some(self)))
                         .filter(|t| !t.is_dynamic())
                 })
                 .unwrap_or(Type::Dynamic);
 
             self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));
 
-            if let Some(default_value) = &p.default {
+            if let Some(default_value) = p.default {
                 self.bind_expr(default_value);
             }
         }
@@ -579,8 +605,8 @@ impl<'r> super::Binder<'r> {
     fn bind_args(&mut self, args: &[Arg]) {
         for arg in args {
             match arg {
-                Arg::Positional(expr) | Arg::Spread(expr) => self.bind_expr(expr),
-                Arg::Named { value, .. } => self.bind_expr(value),
+                Arg::Positional(expr) | Arg::Spread(expr) => self.bind_expr(*expr),
+                Arg::Named { value, .. } => self.bind_expr(*value),
             }
         }
     }
@@ -590,7 +616,7 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
     use crate::symbol::SymbolKind;
     match pattern {
         MatchPattern::Wildcard | MatchPattern::Type { .. } => {}
-        MatchPattern::Literal(expr) => b.bind_expr(expr),
+        MatchPattern::Literal(expr) => b.bind_expr(*expr),
         MatchPattern::EnumVariant {
             variant_name,
             bindings,
