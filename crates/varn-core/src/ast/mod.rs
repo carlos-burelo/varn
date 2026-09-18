@@ -25,25 +25,3 @@ pub use operators::{
 pub use pattern::{ArrayPatternEl, MatchBinding, MatchPattern, ObjPatternProp, Param, Pattern};
 pub use stmt::{CatchClause, ForInit, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
 pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};
-
-use crate::source::SourceRange;
-use rustc_hash::FxHashMap;
-
-#[derive(Default, Clone, Debug)]
-pub struct AstMetadata {
-    pub ranges: FxHashMap<AstId, SourceRange>,
-}
-
-impl AstMetadata {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn add(&mut self, id: AstId, range: SourceRange) {
-        self.ranges.insert(id, range);
-    }
-
-    pub fn get(&self, id: AstId) -> Option<SourceRange> {
-        self.ranges.get(&id).copied()
-    }
-}

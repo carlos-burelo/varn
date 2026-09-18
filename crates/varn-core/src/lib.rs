@@ -39,9 +39,6 @@ pub use numeric::{
     add_int, binary_operand_kind, binary_result_kind, checked_int, mul_int, neg_int, pow_int,
     sub_int, NumericOperand, INT_MAX, INT_MIN,
 };
-use rustc_hash::FxHashMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
@@ -54,24 +51,11 @@ pub use typed_ir::{AnnKey, ExprAnnotation, NumericKind, TypeAnnotations};
 /// with a clear module error (spec §3).
 pub const HOST_API_VERSION: u32 = 3;
 
-thread_local! {
-    static INTERNER: RefCell<FxHashMap<Box<str>, Rc<str>>> = RefCell::new(FxHashMap::default());
-}
-
-pub fn intern_string(s: &str) -> Rc<str> {
-    INTERNER.with(|interner| {
-        let mut interner = interner.borrow_mut();
-        if let Some(rc) = interner.get(s) {
-            return rc.clone();
-        }
-        let rc: Rc<str> = Rc::from(s);
-        interner.insert(Box::from(s), rc.clone());
-        rc
-    })
-}
-
-pub fn clear_interner() {
-    INTERNER.with(|interner| {
-        interner.borrow_mut().clear();
-    });
-}
+/// No-op kept for API compatibility: `varn-lsp`/`varn-pipeline` call this on
+/// every module invalidation. It used to clear a `thread_local` `Rc<str>`
+/// interner (`intern_string`, now removed -- it had no remaining callers);
+/// the real per-session interning now lives in `AtomInterner`
+/// (`atom.rs`), which is owned data, not global state, and clears with
+/// whatever owns it. Safe to remove entirely once those two call sites are
+/// updated to stop calling it.
+pub fn clear_interner() {}

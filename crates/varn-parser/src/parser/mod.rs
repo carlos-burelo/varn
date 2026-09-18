@@ -124,7 +124,6 @@ impl Parser {
             filename: self.stream.filename.clone(),
             body,
             range,
-            metadata: Default::default(),
         };
         (prog, errors, profile)
     }

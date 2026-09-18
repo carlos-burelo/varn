@@ -20,7 +20,7 @@ use varn_core::Atom;
 /// `resolver` is always the live, shared `AtomInterner` every module's bind
 /// publishes into (see `ImportResolver::intern`), so interning `s` there
 /// mints (or reuses) a real, resolvable `Atom` instead of guessing.
-fn atom_or_placeholder(resolver: &dyn super::ImportResolver, s: &str) -> Atom {
+fn intern_origin(resolver: &dyn super::ImportResolver, s: &str) -> Atom {
     resolver.intern(s)
 }
 
@@ -58,7 +58,7 @@ pub(super) fn collect_exports(
                     let name_str = bind.interner.resolve(name);
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
-                        s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
+                        s.origin_module = Some(intern_origin(resolver, abs_path));
                         out.insert(name_str.to_string(), s);
                     }
                 }
@@ -67,7 +67,7 @@ pub(super) fn collect_exports(
                         let variant_name = bind.interner.resolve(variant.name);
                         if let Some(sym) = lookup_global(bind, variant_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
+                            s.origin_module = Some(intern_origin(resolver, abs_path));
                             out.insert(variant_name.to_string(), s);
                         }
                     }
@@ -77,7 +77,7 @@ pub(super) fn collect_exports(
                         let member_name = bind.interner.resolve(member.id);
                         if let Some(sym) = lookup_global(bind, member_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
+                            s.origin_module = Some(intern_origin(resolver, abs_path));
                             out.insert(member_name.to_string(), s);
                         }
                     }
@@ -97,7 +97,7 @@ pub(super) fn collect_exports(
                         s.origin_module = s
                             .origin_module
                             .take()
-                            .or_else(|| Some(atom_or_placeholder(resolver, abs_path)));
+                            .or_else(|| Some(intern_origin(resolver, abs_path)));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -121,7 +121,7 @@ pub(super) fn collect_exports(
                     if let Some(sym) = src_exports.get(local_name) {
                         let mut s = sym.clone();
                         s.name = spec.exported;
-                        s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
+                        s.re_export_path.push(intern_origin(resolver, abs_path));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -142,7 +142,7 @@ pub(super) fn collect_exports(
                 for (name, sym) in src_exports.iter() {
                     out.entry(name.clone()).or_insert_with(|| {
                         let mut s = sym.clone();
-                        s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
+                        s.re_export_path.push(intern_origin(resolver, abs_path));
                         s
                     });
                 }
@@ -168,10 +168,10 @@ pub(super) fn collect_exports(
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, *ns, 0);
                 ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
-                ns_sym.origin_module = Some(atom_or_placeholder(resolver, &src_abs));
+                ns_sym.origin_module = Some(intern_origin(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();
-                    s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
+                    s.re_export_path.push(intern_origin(resolver, abs_path));
                     out.insert(format!("{ns_str}.{sub_name}"), s);
                 }
                 out.insert(ns_str.to_string(), ns_sym);
@@ -181,7 +181,7 @@ pub(super) fn collect_exports(
                     let fn_name = bind.interner.resolve(f.id);
                     if let Some(sym) = lookup_global(bind, fn_name) {
                         let mut s = sym.clone();
-                        s.name = atom_or_placeholder(resolver, "default");
+                        s.name = intern_origin(resolver, "default");
                         out.insert("default".into(), s);
                     }
                 }
@@ -190,14 +190,14 @@ pub(super) fn collect_exports(
                         let class_name = bind.interner.resolve(*id);
                         if let Some(sym) = lookup_global(bind, class_name) {
                             let mut s = sym.clone();
-                            s.name = atom_or_placeholder(resolver, "default");
+                            s.name = intern_origin(resolver, "default");
                             out.insert("default".into(), s);
                         }
                     }
                 }
                 ExportDefaultDecl::Expr(_expr) => {
-                    let mut s = Symbol::new(SymbolKind::Let, atom_or_placeholder(resolver, "default"), 0);
-                    s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
+                    let mut s = Symbol::new(SymbolKind::Let, intern_origin(resolver, "default"), 0);
+                    s.origin_module = Some(intern_origin(resolver, abs_path));
                     out.insert("default".into(), s);
                 }
             },

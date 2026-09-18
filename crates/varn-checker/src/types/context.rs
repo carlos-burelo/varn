@@ -55,7 +55,16 @@ pub trait TypeContext {
     /// The [`varn_core::ast::AstArena`] backing the `ExprId`/`StmtId`
     /// handles carried by the AST nodes this context's callers walk.
     /// `None` by default for the same reason as [`Self::interner`]: only
-    /// `Binder`/`BindView` reach `ExprId`-bearing AST directly.
+    /// `Binder` overrides it — it borrows the arena of the module it is
+    /// currently binding. `BindView` does NOT override it: `BindResult` (what
+    /// `BindView` wraps) is cached/serialized data with no borrowed arena to
+    /// hand back, by the same design that keeps it free of a `resolver`
+    /// (see `BindView`'s doc comment). The type-substitution wrapper
+    /// contexts in `type_resolution::contexts` are a mixed case: some
+    /// forward their inner context's `ast_arena()` (safe — their `TypeNode`s
+    /// are always local to the module being checked), one deliberately does
+    /// not (see `AliasSubstitutionContext::ast_arena`, whose `TypeNode` can
+    /// come from a different module).
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         None
     }
