@@ -295,7 +295,10 @@ impl DiskResolver {
     ) -> Option<(Rc<ExportMap>, Rc<BindResult>)> {
         let provider = varn_modules::provider::get()?;
         let blob = provider.interface_blob(specifier)?;
-        match super::cache::deserialize_module_interface(blob) {
+        let mut interner = self.interner_snapshot();
+        let result = super::cache::deserialize_module_interface(blob, &mut interner);
+        self.set_interner(interner);
+        match result {
             Ok((exports, bind)) => {
                 let exports = Rc::new(exports);
                 let bind = Rc::new(bind);
