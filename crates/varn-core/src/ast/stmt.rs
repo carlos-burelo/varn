@@ -1,5 +1,6 @@
+use super::arena::{ExprId, StmtId};
 use super::decl::Decl;
-use super::expr::{AstId, Expr};
+use super::expr::AstId;
 use super::operators::VarKind;
 use super::pattern::Pattern;
 use super::types::TypeNode;
@@ -10,7 +11,7 @@ use crate::Atom;
 pub struct VarDeclarator {
     pub id: Pattern,
     pub type_ann: Option<TypeNode>,
-    pub init: Option<Expr>,
+    pub init: Option<ExprId>,
     pub range: SourceRange,
 }
 
@@ -25,20 +26,13 @@ pub struct VariableDecl {
 }
 
 #[derive(Clone, Debug)]
-pub struct Stmt {
-    pub id: AstId,
-    pub range: SourceRange,
-    pub kind: StmtKind,
-}
-
-#[derive(Clone, Debug)]
 pub enum StmtKind {
     Block {
-        stmts: Vec<Stmt>,
+        stmts: Vec<StmtId>,
     },
     Empty,
     Expr {
-        expression: Box<Expr>,
+        expression: ExprId,
     },
     Decl(Box<Decl>),
 
@@ -55,44 +49,44 @@ pub enum StmtKind {
     Error,
 
     If {
-        test: Box<Expr>,
-        consequent: Box<Stmt>,
-        alternate: Option<Box<Stmt>>,
+        test: ExprId,
+        consequent: StmtId,
+        alternate: Option<StmtId>,
     },
     While {
-        test: Box<Expr>,
-        body: Box<Stmt>,
+        test: ExprId,
+        body: StmtId,
     },
     DoWhile {
-        body: Box<Stmt>,
-        test: Box<Expr>,
+        body: StmtId,
+        test: ExprId,
     },
     For {
         init: Option<Box<ForInit>>,
-        test: Option<Box<Expr>>,
-        update: Option<Box<Expr>>,
-        body: Box<Stmt>,
+        test: Option<ExprId>,
+        update: Option<ExprId>,
+        body: StmtId,
     },
     ForIn {
         kind: VarKind,
         left: Pattern,
-        right: Box<Expr>,
-        body: Box<Stmt>,
+        right: ExprId,
+        body: StmtId,
     },
     ForOf {
         kind: VarKind,
         left: Pattern,
-        right: Box<Expr>,
-        body: Box<Stmt>,
+        right: ExprId,
+        body: StmtId,
         is_await: bool,
     },
     Switch {
-        discriminant: Box<Expr>,
+        discriminant: ExprId,
         cases: Vec<SwitchCase>,
     },
 
     Return {
-        argument: Option<Box<Expr>>,
+        argument: Option<ExprId>,
     },
     Break {
         label: Option<Atom>,
@@ -101,12 +95,12 @@ pub enum StmtKind {
         label: Option<Atom>,
     },
     Throw {
-        argument: Box<Expr>,
+        argument: ExprId,
     },
     Try {
-        block: Box<Stmt>,
+        block: StmtId,
         catches: Vec<CatchClause>,
-        finally: Option<Box<Stmt>>,
+        finally: Option<StmtId>,
     },
     Using {
         declarations: Vec<VarDeclarator>,
@@ -114,33 +108,9 @@ pub enum StmtKind {
     },
     Labeled {
         label: Atom,
-        body: Box<Stmt>,
+        body: StmtId,
     },
     Debugger,
-}
-
-impl Stmt {
-    pub fn new(id: AstId, range: SourceRange, kind: StmtKind) -> Self {
-        Self { id, range, kind }
-    }
-
-    pub fn new_with_range(range: SourceRange, kind: StmtKind) -> Self {
-        Self { id: 0, range, kind }
-    }
-
-    pub fn id(&self) -> AstId {
-        match &self.kind {
-            StmtKind::Decl(d) => d.id(),
-            _ => self.id,
-        }
-    }
-
-    pub fn range(&self) -> &SourceRange {
-        match &self.kind {
-            StmtKind::Decl(d) => d.range(),
-            _ => &self.range,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -149,13 +119,13 @@ pub enum ForInit {
         kind: VarKind,
         declarators: Vec<VarDeclarator>,
     },
-    Expr(Expr),
+    Expr(ExprId),
 }
 
 #[derive(Clone, Debug)]
 pub struct SwitchCase {
-    pub test: Option<Expr>,
-    pub body: Vec<Stmt>,
+    pub test: Option<ExprId>,
+    pub body: Vec<StmtId>,
     pub range: SourceRange,
 }
 
@@ -163,6 +133,6 @@ pub struct SwitchCase {
 pub struct CatchClause {
     pub param: Option<Pattern>,
     pub type_ann: Option<TypeNode>,
-    pub body: Box<Stmt>,
+    pub body: StmtId,
     pub range: SourceRange,
 }

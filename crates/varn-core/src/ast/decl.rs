@@ -1,7 +1,8 @@
-use super::expr::{AstId, Expr};
+use super::arena::{ExprId, StmtId};
+use super::expr::AstId;
 use super::operators::Modifiers;
 use super::pattern::Param;
-use super::stmt::{Stmt, VariableDecl};
+use super::stmt::VariableDecl;
 use super::types::{Decorator, TypeNode, TypeParam};
 use crate::source::SourceRange;
 
@@ -91,7 +92,7 @@ pub struct FunctionDecl {
     pub type_params: Vec<TypeParam>,
     pub params: Vec<Param>,
     pub return_type: Option<TypeNode>,
-    pub body: Stmt,
+    pub body: StmtId,
     pub modifiers: Modifiers,
     pub decorators: Vec<Decorator>,
     pub doc: Option<String>,
@@ -106,7 +107,7 @@ pub struct ClassDecl {
     pub id_offset: u32,
     pub type_params: Vec<TypeParam>,
     pub primary_params: Option<Vec<Param>>,
-    pub super_class: Option<Expr>,
+    pub super_class: Option<ExprId>,
     pub super_type_args: Vec<TypeNode>,
     pub implements: Vec<TypeNode>,
     pub body: Vec<ClassMember>,
@@ -120,11 +121,11 @@ pub struct ClassDecl {
 pub enum ClassMember {
     Constructor {
         params: Vec<Param>,
-        body: Stmt,
+        body: StmtId,
         range: SourceRange,
     },
     Destructor {
-        body: Stmt,
+        body: StmtId,
         range: SourceRange,
     },
     Method {
@@ -132,7 +133,7 @@ pub enum ClassMember {
         type_params: Vec<TypeParam>,
         params: Vec<Param>,
         return_type: Option<TypeNode>,
-        body: Option<Stmt>,
+        body: Option<StmtId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
         range: SourceRange,
@@ -140,7 +141,7 @@ pub enum ClassMember {
     Property {
         key: Atom,
         type_ann: Option<TypeNode>,
-        init: Option<Expr>,
+        init: Option<ExprId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
         range: SourceRange,
@@ -148,19 +149,19 @@ pub enum ClassMember {
     Getter {
         key: Atom,
         return_type: Option<TypeNode>,
-        body: Option<Stmt>,
+        body: Option<StmtId>,
         modifiers: Modifiers,
         range: SourceRange,
     },
     Setter {
         key: Atom,
         param: Param,
-        body: Option<Stmt>,
+        body: Option<StmtId>,
         modifiers: Modifiers,
         range: SourceRange,
     },
     StaticBlock {
-        body: Stmt,
+        body: StmtId,
         range: SourceRange,
     },
 }
@@ -235,7 +236,7 @@ pub struct EnumDecl {
 #[derive(Clone, Debug)]
 pub struct EnumMember {
     pub id: Atom,
-    pub init: Option<Expr>,
+    pub init: Option<ExprId>,
 
     pub payload_fields: Vec<EnumField>,
     pub range: SourceRange,
@@ -245,7 +246,7 @@ pub struct EnumMember {
 pub struct EnumField {
     pub name: Atom,
     pub ty: TypeNode,
-    pub init: Option<Expr>,
+    pub init: Option<ExprId>,
     pub range: SourceRange,
 }
 
@@ -351,7 +352,7 @@ pub struct ExportSpecifier {
 pub enum ExportDefaultDecl {
     Function(FunctionDecl),
     Class(ClassDecl),
-    Expr(Expr),
+    Expr(ExprId),
 }
 
 #[derive(Clone, Debug)]
@@ -369,14 +370,14 @@ pub enum ExtensionMember {
     Getter {
         key: Atom,
         return_type: Option<TypeNode>,
-        body: Stmt,
+        body: StmtId,
         modifiers: Modifiers,
         range: SourceRange,
     },
     Setter {
         key: Atom,
         param: Param,
-        body: Stmt,
+        body: StmtId,
         modifiers: Modifiers,
         range: SourceRange,
     },
@@ -395,6 +396,6 @@ pub struct StructDecl {
 pub struct StructField {
     pub name: Atom,
     pub type_ann: TypeNode,
-    pub default: Option<Expr>,
+    pub default: Option<ExprId>,
     pub range: SourceRange,
 }

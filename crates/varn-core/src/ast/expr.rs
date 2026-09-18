@@ -1,15 +1,8 @@
-use super::stmt::Stmt;
+use super::arena::{ExprId, StmtId};
 use crate::source::SourceRange;
 use crate::Atom;
 
 pub type AstId = u32;
-
-#[derive(Clone, Debug)]
-pub struct Expr {
-    pub id: AstId,
-    pub range: SourceRange,
-    pub kind: ExprKind,
-}
 
 #[derive(Clone, Debug)]
 pub enum ExprKind {
@@ -45,8 +38,8 @@ pub enum ExprKind {
         parts: Vec<TemplatePart>,
     },
     TaggedTemplate {
-        tag: Box<Expr>,
-        template: Box<Expr>,
+        tag: ExprId,
+        template: ExprId,
     },
     Identifier {
         name: Atom,
@@ -71,7 +64,7 @@ pub enum ExprKind {
         properties: Vec<ObjectProp>,
     },
     Tuple {
-        elements: Vec<Expr>,
+        elements: Vec<ExprId>,
     },
     Record {
         properties: Vec<ObjectProp>,
@@ -79,47 +72,47 @@ pub enum ExprKind {
     Unary {
         op: super::operators::UnaryOp,
         prefix: bool,
-        operand: Box<Expr>,
+        operand: ExprId,
     },
     Update {
         op: super::operators::UpdateOp,
         prefix: bool,
-        operand: Box<Expr>,
+        operand: ExprId,
     },
     Binary {
         op: super::operators::BinaryOp,
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: ExprId,
+        right: ExprId,
     },
     Logical {
         op: super::operators::LogicalOp,
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: ExprId,
+        right: ExprId,
     },
     Assign {
         op: super::operators::AssignOp,
-        target: Box<Expr>,
-        value: Box<Expr>,
+        target: ExprId,
+        value: ExprId,
     },
     Conditional {
-        test: Box<Expr>,
-        consequent: Box<Expr>,
-        alternate: Box<Expr>,
+        test: ExprId,
+        consequent: ExprId,
+        alternate: ExprId,
     },
     Member {
-        object: Box<Expr>,
-        property: Box<Expr>,
+        object: ExprId,
+        property: ExprId,
         computed: bool,
         optional: bool,
     },
     Call {
-        callee: Box<Expr>,
+        callee: ExprId,
         type_args: Vec<super::types::TypeNode>,
         args: Vec<Arg>,
         optional: bool,
     },
     New {
-        callee: Box<Expr>,
+        callee: ExprId,
         type_args: Vec<super::types::TypeNode>,
         args: Vec<Arg>,
     },
@@ -127,7 +120,7 @@ pub enum ExprKind {
         fn_id: Option<Atom>,
         params: Vec<super::pattern::Param>,
         return_type: Option<super::types::TypeNode>,
-        body: Box<Stmt>,
+        body: StmtId,
         is_async: bool,
         is_generator: bool,
     },
@@ -138,72 +131,72 @@ pub enum ExprKind {
         return_type: Option<super::types::TypeNode>,
     },
     Sequence {
-        expressions: Vec<Expr>,
+        expressions: Vec<ExprId>,
     },
     Paren {
-        expression: Box<Expr>,
+        expression: ExprId,
     },
     Await {
-        argument: Box<Expr>,
+        argument: ExprId,
     },
     Spawn {
-        argument: Box<Expr>,
+        argument: ExprId,
     },
     Yield {
-        argument: Option<Box<Expr>>,
+        argument: Option<ExprId>,
         delegate: bool,
     },
     Spread {
-        argument: Box<Expr>,
+        argument: ExprId,
     },
     Pipeline {
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: ExprId,
+        right: ExprId,
     },
     Range {
-        start: Box<Expr>,
-        end: Box<Expr>,
+        start: ExprId,
+        end: ExprId,
         inclusive: bool,
     },
     NonNull {
-        expression: Box<Expr>,
+        expression: ExprId,
     },
     Try {
-        expression: Box<Expr>,
+        expression: ExprId,
     },
     As {
-        expression: Box<Expr>,
+        expression: ExprId,
         type_ann: super::types::TypeNode,
     },
     Satisfies {
-        expression: Box<Expr>,
+        expression: ExprId,
         type_ann: super::types::TypeNode,
     },
     ClassExpr {
         declaration: Box<super::decl::ClassDecl>,
     },
     Match {
-        subject: Box<Expr>,
+        subject: ExprId,
         cases: Vec<MatchCase>,
     },
     Is {
-        expression: Box<Expr>,
+        expression: ExprId,
         type_ann: super::types::TypeNode,
     },
     With {
-        object: Box<Expr>,
+        object: ExprId,
         properties: Vec<ObjectProp>,
     },
     MetaAccess {
-        target: Box<Expr>,
+        target: ExprId,
         property: Atom,
     },
 }
 
 #[derive(Clone, Debug)]
 pub enum ArrayEl {
-    Expr(Expr),
-    Spread(Expr),
+    Expr(ExprId),
+    Spread(ExprId),
     Hole,
 }
 
@@ -211,7 +204,7 @@ pub enum ArrayEl {
 pub enum ObjectProp {
     Property {
         key: PropKey,
-        value: Expr,
+        value: ExprId,
         shorthand: bool,
         computed: bool,
         range: SourceRange,
@@ -219,7 +212,7 @@ pub enum ObjectProp {
     Method {
         key: PropKey,
         params: Vec<super::pattern::Param>,
-        body: Box<Stmt>,
+        body: StmtId,
         return_type: Option<super::types::TypeNode>,
         is_async: bool,
         is_generator: bool,
@@ -227,18 +220,18 @@ pub enum ObjectProp {
     },
     Getter {
         key: PropKey,
-        body: Box<Stmt>,
+        body: StmtId,
         return_type: Option<super::types::TypeNode>,
         range: SourceRange,
     },
     Setter {
         key: PropKey,
         param: super::pattern::Param,
-        body: Box<Stmt>,
+        body: StmtId,
         range: SourceRange,
     },
     Spread {
-        argument: Expr,
+        argument: ExprId,
         range: SourceRange,
     },
 }
@@ -260,52 +253,38 @@ pub enum PropKey {
     Identifier(String),
     Str(String),
     Int(i64),
-    Computed(Expr),
+    Computed(ExprId),
 }
 
 #[derive(Clone, Debug)]
 pub enum TemplatePart {
     Literal(String),
-    Interpolation(Expr),
+    Interpolation(ExprId),
 }
 
 #[derive(Clone, Debug)]
 pub enum ArrowBody {
-    Expr(Expr),
-    Block(Stmt),
+    Expr(ExprId),
+    Block(StmtId),
 }
 
 #[derive(Clone, Debug)]
 pub enum Arg {
-    Positional(Expr),
-    Spread(Expr),
-    Named { label: String, value: Expr },
+    Positional(ExprId),
+    Spread(ExprId),
+    Named { label: String, value: ExprId },
 }
 
 #[derive(Clone, Debug)]
 pub struct MatchCase {
     pub pattern: super::pattern::MatchPattern,
-    pub guard: Option<Expr>,
+    pub guard: Option<ExprId>,
     pub body: MatchBody,
     pub range: SourceRange,
 }
 
 #[derive(Clone, Debug)]
 pub enum MatchBody {
-    Block(Stmt),
-    Expr(Expr),
-}
-
-impl Expr {
-    pub fn new(id: AstId, range: SourceRange, kind: ExprKind) -> Self {
-        Self { id, range, kind }
-    }
-
-    pub fn id(&self) -> AstId {
-        self.id
-    }
-
-    pub fn range(&self) -> &SourceRange {
-        &self.range
-    }
+    Block(StmtId),
+    Expr(ExprId),
 }

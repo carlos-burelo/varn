@@ -16,14 +16,14 @@ pub use decl::{
     InterfaceMember, NamespaceDecl, StructDecl, SumField, SumTypeDecl, SumVariant, TypeAliasDecl,
 };
 pub use expr::{
-    Arg, ArrayEl, ArrowBody, AstId, Expr, ExprKind, MatchBody, MatchCase, ObjectProp, PropKey,
+    Arg, ArrayEl, ArrowBody, AstId, ExprKind, MatchBody, MatchCase, ObjectProp, PropKey,
     TemplatePart,
 };
 pub use operators::{
     AssignOp, BinaryOp, LogicalOp, Modifiers, UnaryOp, UpdateOp, VarKind, Visibility,
 };
 pub use pattern::{ArrayPatternEl, MatchBinding, MatchPattern, ObjPatternProp, Param, Pattern};
-pub use stmt::{CatchClause, ForInit, Stmt, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
+pub use stmt::{CatchClause, ForInit, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
 pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};
 
 use crate::source::SourceRange;

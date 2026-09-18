@@ -1,5 +1,6 @@
+use super::arena::ExprId;
 use super::decl::InterfaceMember;
-use super::expr::{AstId, Expr};
+use super::expr::AstId;
 use crate::kinds::TypeKind;
 use crate::source::SourceRange;
 use crate::Atom;
@@ -10,7 +11,7 @@ pub type AstTypeKind = TypeKind<
     Vec<TypeNode>,
     (Vec<TypeParam>, Box<TypeNode>),
     Vec<InterfaceMember>,
-    Box<Expr>,
+    ExprId,
 >;
 
 #[derive(Clone, Debug)]
@@ -40,6 +41,6 @@ pub struct TypeParam {
 
 #[derive(Clone, Debug)]
 pub struct Decorator {
-    pub expression: Expr,
+    pub expression: ExprId,
     pub range: SourceRange,
 }

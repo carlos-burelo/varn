@@ -1,4 +1,4 @@
-use super::expr::Expr;
+use super::arena::ExprId;
 use super::operators::Modifiers;
 use super::types::TypeNode;
 use crate::source::SourceRange;
@@ -24,7 +24,7 @@ pub enum Pattern {
 
     Assignment {
         left: Box<Pattern>,
-        right: Box<Expr>,
+        right: ExprId,
         range: SourceRange,
     },
     Rest {
@@ -62,7 +62,7 @@ pub struct ObjPatternProp {
 pub struct Param {
     pub pattern: Pattern,
     pub type_ann: Option<TypeNode>,
-    pub default: Option<Box<Expr>>,
+    pub default: Option<ExprId>,
     pub is_rest: bool,
     pub is_optional: bool,
     pub modifiers: Modifiers,
@@ -72,7 +72,7 @@ pub struct Param {
 #[derive(Clone, Debug)]
 pub enum MatchPattern {
     Wildcard,
-    Literal(Expr),
+    Literal(ExprId),
     Identifier(Atom),
     Record {
         fields: Vec<(Atom, Option<MatchPattern>)>,
