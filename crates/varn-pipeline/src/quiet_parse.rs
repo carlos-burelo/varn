@@ -13,14 +13,23 @@ pub(crate) fn parse_module(
     label: &str,
 ) -> Result<(Program, varn_core::AtomInterner), String> {
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(source, path);
-    varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new()).map_err(|errs| {
+    // Same fix as `parse::parse`: a fresh `AtomInterner::new()` per module made
+    // this module's `Atom`s incomparable with the resolver's shared table, so
+    // an imported symbol's `origin_module` (set from another module's atoms in
+    // `binder/imports.rs`) could never resolve back to this module's own
+    // atoms. Seed from the shared snapshot, publish back only on success so a
+    // failed parse of this module doesn't lose atoms already coined elsewhere.
+    let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
+    let result = varn_parser::parse(tokens, lexeme_buf, path, interner).map_err(|errs| {
         let msg = &errs[0].message;
         if label.is_empty() {
             msg.clone()
         } else {
             format!("{label}: {msg}")
         }
-    })
+    })?;
+    crate::resolver::with_resolver(|r| r.set_interner(result.1.clone()));
+    Ok(result)
 }
 
 /// Like [`parse_module`] but without assigning AST ids, for callers that only
