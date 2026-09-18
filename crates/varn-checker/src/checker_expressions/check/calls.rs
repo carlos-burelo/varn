@@ -4,7 +4,7 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::checker_generics::{build_call_mapping, map_generics_cached};
 use crate::types::{FunctionParam, Type};
-use varn_core::ast::{Arg, Expr, ExprKind, TypeNode};
+use varn_core::ast::{Arg, ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -13,13 +13,14 @@ use super::members::extension_type_name;
 impl<'r> Checker<'r> {
     pub(super) fn check_call_expr(
         &mut self,
-        callee: &Expr,
+        callee: ExprId,
         args: &[Arg],
         type_args: &[TypeNode],
         range: &SourceRange,
         call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) {
+        let arena = self.ast_arena;
         self.check_expr(callee, bind);
         self.record_extension_call(callee, range, bind);
 
@@ -42,16 +43,23 @@ impl<'r> Checker<'r> {
         }
 
         let effective_callee_ty = if let TypeKind::Fn(ft) = &callee_ty.0 {
-            let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
+            let mapping = build_call_mapping(arena.expr(callee), type_args, args, ft, self, bind);
             map_generics_cached(self, &callee_ty, &mapping)
         } else {
             callee_ty.clone()
         };
 
-        if let ExprKind::Member { property, .. } = &callee.kind {
-            self.record_type(property.range.start.offset, effective_callee_ty.clone());
+        if let ExprKind::Member { property, .. } = &arena.expr(callee).kind {
+            let property = *property;
+            self.record_type(
+                arena.expr(property).range.start.offset,
+                effective_callee_ty.clone(),
+            );
         } else {
-            self.record_type(callee.range.start.offset, effective_callee_ty.clone());
+            self.record_type(
+                arena.expr(callee).range.start.offset,
+                effective_callee_ty.clone(),
+            );
         }
 
         let params_for_context: Vec<FunctionParam> =
@@ -68,12 +76,12 @@ impl<'r> Checker<'r> {
 
         if self.record_expr_types {
             if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
-                let callee_name = match &callee.kind {
+                let callee_name = match &arena.expr(callee).kind {
                     ExprKind::Identifier { name } => {
                         Some(std::rc::Rc::from(bind.interner.resolve(*name)))
                     }
                     ExprKind::Member { property, .. } => {
-                        if let ExprKind::Identifier { name } = &property.kind {
+                        if let ExprKind::Identifier { name } = &arena.expr(*property).kind {
                             Some(std::rc::Rc::from(bind.interner.resolve(*name)))
                         } else {
                             None
@@ -121,24 +129,26 @@ impl<'r> Checker<'r> {
                 self.call_resolutions
                     .insert(range.start.offset, call_res.clone());
                 self.call_resolutions
-                    .insert(callee.range.start.offset, call_res);
+                    .insert(arena.expr(callee).range.start.offset, call_res);
             }
         }
 
         self.check_type_arg_constraints(callee, type_args, range, bind);
     }
 
-    fn record_extension_call(&mut self, callee: &Expr, range: &SourceRange, bind: &BindResult) {
+    fn record_extension_call(&mut self, callee: ExprId, range: &SourceRange, bind: &BindResult) {
+        let arena = self.ast_arena;
         let ExprKind::Member {
             object,
             property,
             computed: false,
             ..
-        } = &callee.kind
+        } = &arena.expr(callee).kind
         else {
             return;
         };
-        let ExprKind::Identifier { name: method_name } = &property.kind else {
+        let (object, property) = (*object, *property);
+        let ExprKind::Identifier { name: method_name } = &arena.expr(property).kind else {
             return;
         };
         let obj_ty = self.infer_type(object, bind).non_nullified();
@@ -181,9 +191,10 @@ impl<'r> Checker<'r> {
             });
             match arg {
                 Arg::Positional(e) | Arg::Spread(e) => {
+                    let e = *e;
                     self.with_expected(expected, |c| c.check_expr(e, bind));
                 }
-                Arg::Named { value, .. } => self.check_expr(value, bind),
+                Arg::Named { value, .. } => self.check_expr(*value, bind),
             }
         }
     }
@@ -261,10 +272,12 @@ impl<'r> Checker<'r> {
 
         for arg in args {
             let (label_opt, arg_ty) = match arg {
-                Arg::Named { label, value } => (Some(label.as_str()), self.infer_type(value, bind)),
-                Arg::Positional(e) => (None, self.infer_type(e, bind)),
+                Arg::Named { label, value } => {
+                    (Some(label.as_str()), self.infer_type(*value, bind))
+                }
+                Arg::Positional(e) => (None, self.infer_type(*e, bind)),
                 Arg::Spread(e) => {
-                    let arg_ty = self.infer_type(e, bind);
+                    let arg_ty = self.infer_type(*e, bind);
                     if !arg_ty.is_dynamic() && !matches!(arg_ty.0, TypeKind::Array(_)) {
                         self.emit(
                             Diagnostic::error(
@@ -373,10 +386,13 @@ impl<'r> Checker<'r> {
 
                 let param_accepts_array = matches!(param_ty.0, TypeKind::Array(_))
                     || matches!(&param_ty.0, TypeKind::Union(ms) if ms.iter().any(|m| matches!(m.0, TypeKind::Array(_))));
+                let arena = self.ast_arena;
                 let is_empty_array_arg = effective_arg_ty.is_dynamic()
                     && matches!(
                         match arg {
-                            Arg::Positional(e) | Arg::Named { value: e, .. } | Arg::Spread(e) => &e.kind,
+                            Arg::Positional(e) | Arg::Named { value: e, .. } | Arg::Spread(e) => {
+                                &arena.expr(*e).kind
+                            }
                         },
                         ExprKind::Array { elements } if elements.is_empty()
                     )
@@ -406,10 +422,10 @@ impl<'r> Checker<'r> {
     ) -> Result<(Type, Option<Type>), Type> {
         match arg {
             Arg::Positional(expr) | Arg::Named { value: expr, .. } => {
-                Ok((self.infer_type(expr, bind), None))
+                Ok((self.infer_type(*expr, bind), None))
             }
             Arg::Spread(expr) => {
-                let arg_ty = self.infer_type(expr, bind);
+                let arg_ty = self.infer_type(*expr, bind);
                 let spread_inner = match &arg_ty.0 {
                     TypeKind::Array(inner) => Some(inner.as_ref().clone()),
                     _ => None,
@@ -425,7 +441,7 @@ impl<'r> Checker<'r> {
 
     fn check_type_arg_constraints(
         &mut self,
-        callee: &Expr,
+        callee: ExprId,
         type_args: &[TypeNode],
         range: &SourceRange,
         bind: &BindResult,
@@ -433,7 +449,7 @@ impl<'r> Checker<'r> {
         if type_args.is_empty() {
             return;
         }
-        let ExprKind::Identifier { name: fn_name } = &callee.kind else {
+        let ExprKind::Identifier { name: fn_name } = &self.ast_arena.expr(callee).kind else {
             return;
         };
         let Some(fn_sym) = resolve_function_symbol(

@@ -1,7 +1,7 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 use varn_core::TypeTag;
 
@@ -9,11 +9,12 @@ use super::super::helpers::base_type;
 
 pub(super) fn infer_member_type(
     checker: &mut Checker<'_>,
-    expr: &Expr,
-    object: &Expr,
-    property: &Expr,
+    expr: ExprId,
+    object: ExprId,
+    property: ExprId,
     bind: &BindResult,
 ) -> Type {
+    let arena = checker.ast_arena;
     let obj_ty_raw = checker.infer_type(object, bind);
     let obj_ty = obj_ty_raw.non_nullified();
     let obj_ty = if matches!(
@@ -25,9 +26,10 @@ pub(super) fn infer_member_type(
         obj_ty
     };
 
-    let ExprKind::Identifier { name: prop_name } = &property.kind else {
+    let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
         return crate::binder::infer_expr_type(
             expr,
+            arena,
             Some(&crate::binder::BindView::new(bind, checker.resolver)),
         );
     };
@@ -57,6 +59,7 @@ pub(super) fn infer_member_type(
 
     crate::binder::infer_expr_type(
         expr,
+        arena,
         Some(&crate::binder::BindView::new(bind, checker.resolver)),
     )
 }
@@ -77,9 +80,9 @@ pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
 
 pub(super) fn infer_binary_type(
     checker: &mut Checker<'_>,
-    op: &varn_core::ast::operators::BinaryOp,
-    left: &Expr,
-    right: &Expr,
+    op: varn_core::ast::operators::BinaryOp,
+    left: ExprId,
+    right: ExprId,
     bind: &BindResult,
 ) -> Type {
     use varn_core::ast::operators::BinaryOp;
@@ -106,11 +109,11 @@ pub(super) fn infer_binary_type(
                     {
                         return Type::Str;
                     }
-                    crate::binder::type_inference::numeric_binary_type(*op, &l, &r)
+                    crate::binder::type_inference::numeric_binary_type(op, &l, &r)
                         .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    crate::binder::type_inference::numeric_binary_type(*op, &l, &r)
+                    crate::binder::type_inference::numeric_binary_type(op, &l, &r)
                         .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::BitAnd

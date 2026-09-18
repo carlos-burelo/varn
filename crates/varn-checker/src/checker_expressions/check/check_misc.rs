@@ -4,15 +4,15 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 impl<'r> Checker<'r> {
     pub(super) fn check_binary_expr(
         &mut self,
-        left: &Expr,
-        right: &Expr,
+        left: ExprId,
+        right: ExprId,
         op: &BinaryOp,
         range: &SourceRange,
         bind: &BindResult,
@@ -30,7 +30,7 @@ impl<'r> Checker<'r> {
         if l_base.is_dynamic() || r_base.is_dynamic() {
             return;
         }
-        
+
         let is_type_param = |t: &Type| matches!(&t.0, TypeKind::Named(n, _) if self.active_type_params.contains(n));
         if is_type_param(l_base) || is_type_param(r_base) {
             return;
@@ -80,11 +80,12 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_assign_expr(
         &mut self,
-        target: &Expr,
-        value: &Expr,
+        target: ExprId,
+        value: ExprId,
         range: &SourceRange,
         bind: &BindResult,
     ) {
+        let arena = self.ast_arena;
         let prev = self.is_assignment_target;
         self.is_assignment_target = true;
         self.check_expr(target, bind);
@@ -93,10 +94,12 @@ impl<'r> Checker<'r> {
 
         self.check_extension_assignment(target, bind);
 
-        if let ExprKind::Identifier { name } = &target.kind {
+        if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+            let name = *name;
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(name, &bind.scopes) {
                 let sym = bind.arena.get(id);
+                let name = bind.interner.resolve(name);
                 match sym.kind {
                     crate::symbol::SymbolKind::Const => {
                         self.emit(
@@ -139,7 +142,8 @@ impl<'r> Checker<'r> {
             }
         }
 
-        let target_ty = if let ExprKind::Identifier { name } = &target.kind {
+        let target_ty = if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+            let name = *name;
             let scope = bind.scopes.get(self.current_scope);
             scope
                 .resolve(name, &bind.scopes)
@@ -155,10 +159,10 @@ impl<'r> Checker<'r> {
         };
         let value_ty = self.infer_type(value, bind);
         let is_empty_array_val = value_ty.is_dynamic()
-            && matches!(&value.kind, ExprKind::Array { elements } if elements.is_empty());
+            && matches!(&arena.expr(value).kind, ExprKind::Array { elements } if elements.is_empty());
         let mut is_compatible = self.types_compatible_cached(&target_ty, &value_ty, Some(bind));
         if is_compatible && target_ty.is_granular_int() {
-            if let ExprKind::IntLiteral { value: int_val, .. } = &value.kind {
+            if let ExprKind::IntLiteral { value: int_val, .. } = &arena.expr(value).kind {
                 if !crate::checker::compat::literal_fits_type(&target_ty, *int_val) {
                     is_compatible = false;
                 }
@@ -174,11 +178,12 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_match_expr(
         &mut self,
-        subject: &Expr,
+        subject: ExprId,
         cases: &[varn_core::ast::MatchCase],
         range: &SourceRange,
         bind: &BindResult,
     ) {
+        let arena = self.ast_arena;
         self.check_expr(subject, bind);
         let disc_narrowings = self.collect_match_disc_narrowings(subject, bind);
         for case in cases {
@@ -188,13 +193,14 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(g) = &case.guard {
-                self.check_expr(g, bind);
+                self.check_expr(*g, bind);
             }
 
             let arm_disc_ty = match &case.pattern {
                 varn_core::ast::MatchPattern::Literal(e) => {
+                    let e = *e;
                     self.check_expr(e, bind);
-                    match &e.kind {
+                    match &arena.expr(e).kind {
                         ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
                         ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
                         _ => None,
@@ -211,7 +217,7 @@ impl<'r> Checker<'r> {
                             self.union_member_matches_disc(
                                 m,
                                 disc_narrowings.as_ref().map(|(_, _)| &disc_ty),
-                                disc_narrowings.as_ref().map(|(_, _)| subject.as_ref()),
+                                disc_narrowings.as_ref().map(|(_, _)| subject),
                                 bind,
                             )
                         })
@@ -234,8 +240,8 @@ impl<'r> Checker<'r> {
 
             self.with_narrowings(&narrowing_vec, |checker| {
                 match &case.body {
-                    varn_core::ast::MatchBody::Expr(e) => checker.check_expr(e, bind),
-                    varn_core::ast::MatchBody::Block(stmt) => checker.check_stmt(stmt, bind),
+                    varn_core::ast::MatchBody::Expr(e) => checker.check_expr(*e, bind),
+                    varn_core::ast::MatchBody::Block(stmt) => checker.check_stmt(*stmt, bind),
                 }
             });
             self.current_scope = saved_scope;
@@ -244,13 +250,3 @@ impl<'r> Checker<'r> {
         self.check_match_exhaustiveness(&subject_ty, cases, range, bind);
     }
 }
-
-
-
-
-
-
-
-
-
-

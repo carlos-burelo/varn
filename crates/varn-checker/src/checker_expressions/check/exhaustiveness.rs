@@ -115,13 +115,17 @@ impl<'r> Checker<'r> {
                             }
                             MatchPattern::Literal(e) => {
                                 use varn_core::ast::ExprKind;
-                                if let ExprKind::Member { property, .. } = &e.kind {
-                                    if let ExprKind::Identifier { name } = &property.kind {
+                                let arena = self.ast_arena;
+                                if let ExprKind::Member { property, .. } = &arena.expr(*e).kind {
+                                    if let ExprKind::Identifier { name } =
+                                        &arena.expr(*property).kind
+                                    {
                                         bind.interner.resolve(*name) == v.name.as_ref()
                                     } else {
                                         false
                                     }
-                                } else if let ExprKind::Identifier { name } = &e.kind {
+                                } else if let ExprKind::Identifier { name } = &arena.expr(*e).kind
+                                {
                                     bind.interner.resolve(*name) == v.name.as_ref()
                                 } else {
                                     false

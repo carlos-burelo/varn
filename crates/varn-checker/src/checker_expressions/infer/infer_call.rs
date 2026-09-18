@@ -3,20 +3,21 @@ use crate::checker::Checker;
 use crate::checker_generics::{build_call_mapping, map_generics_cached};
 use crate::types::{FunctionParam, FunctionType, Type};
 use std::rc::Rc;
-use varn_core::ast::{Expr, ExprKind, Param};
+use varn_core::ast::{ExprId, ExprKind, Param};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use super::collect_checked_return_types;
 
 impl<'r> Checker<'r> {
-    pub(super) fn infer_call_type(&mut self, expr: &Expr, bind: &BindResult) -> Type {
-        let (callee, type_args, args) = match &expr.kind {
+    pub(super) fn infer_call_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+        let arena = self.ast_arena;
+        let (callee, type_args, args) = match &arena.expr(expr).kind {
             ExprKind::Call {
                 callee,
                 type_args,
                 args,
                 ..
-            } => (callee, type_args, args),
+            } => (*callee, type_args.clone(), args.clone()),
             _ => return Type::Dynamic,
         };
 
@@ -36,12 +37,12 @@ impl<'r> Checker<'r> {
             return Type::Dynamic;
         };
 
-        let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
+        let mapping = build_call_mapping(arena.expr(callee), &type_args, &args, ft, self, bind);
         let ret = map_generics_cached(self, &ft.return_type, &mapping);
 
         let ret = if matches!(ret.0, TypeKind::This) {
-            if let ExprKind::Member { object, .. } = &callee.kind {
-                let receiver_ty = self.infer_type(object, bind);
+            if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
+                let receiver_ty = self.infer_type(*object, bind);
                 if !receiver_ty.is_dynamic() {
                     receiver_ty
                 } else {
@@ -61,10 +62,10 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_arrow_type(
         &mut self,
-        _expr: &Expr,
+        _expr: ExprId,
         params: &[Param],
         return_type: &Option<varn_core::ast::TypeNode>,
-        body: &varn_core::ast::ArrowBody,
+        body: varn_core::ast::ArrowBody,
         is_async: bool,
         bind: &BindResult,
     ) -> Type {

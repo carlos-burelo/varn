@@ -3,22 +3,25 @@ use crate::checker::Checker;
 use crate::checker_expressions::helpers::closest_in_list;
 use crate::types::{ObjectTypeMember, Type};
 use varn_core::ast::operators::Visibility;
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, Suggestion, TypeKind};
 
 impl<'r> Checker<'r> {
-    pub(super) fn check_extension_assignment(&mut self, target: &Expr, bind: &BindResult) {
+    pub(super) fn check_extension_assignment(&mut self, target: ExprId, bind: &BindResult) {
+        let arena = self.ast_arena;
+        let target_range = arena.expr(target).range;
         let ExprKind::Member {
             object,
             property,
             computed: false,
             ..
-        } = &target.kind
+        } = &arena.expr(target).kind
         else {
             return;
         };
-        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+        let (object, property) = (*object, *property);
+        let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
             return;
         };
         let prop_name = bind.interner.resolve(*prop_name);
@@ -28,7 +31,7 @@ impl<'r> Checker<'r> {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
                     self.extension_set_members
-                        .insert(target.range.start.offset, mangled.clone());
+                        .insert(target_range.start.offset, mangled.clone());
                 }
             }
         }
@@ -40,7 +43,7 @@ impl<'r> Checker<'r> {
                     ErrorCode::NotAssignable,
                     format!("cannot assign to readonly property '{prop_name}'"),
                 )
-                .with_range(target.range),
+                .with_range(target_range),
             );
         }
     }
@@ -48,17 +51,19 @@ impl<'r> Checker<'r> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn check_member_expr(
         &mut self,
-        expr: &Expr,
-        object: &Expr,
-        property: &Expr,
+        expr: ExprId,
+        object: ExprId,
+        property: ExprId,
         computed: bool,
         optional: bool,
         range: &SourceRange,
         bind: &BindResult,
     ) {
+        let arena = self.ast_arena;
+        let property_range = arena.expr(property).range;
         self.check_expr(object, bind);
         if computed {
-            if matches!(property.kind, ExprKind::Range { .. }) {
+            if matches!(arena.expr(property).kind, ExprKind::Range { .. }) {
                 self.check_expr(property, bind);
                 return;
             }
@@ -101,7 +106,7 @@ impl<'r> Checker<'r> {
                                 "type mismatch: index key is '{actual_k}', expected '{expected_k}'"
                             ),
                         )
-                        .with_range(*property.range()),
+                        .with_range(property_range),
                     );
                 }
             } else {
@@ -110,9 +115,9 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+        let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
             let prop_ty = self.infer_type(expr, bind);
-            self.record_type(property.range.start.offset, prop_ty);
+            self.record_type(property_range.start.offset, prop_ty);
             return;
         };
         let prop_name = bind.interner.resolve(*prop_name);
@@ -138,13 +143,13 @@ impl<'r> Checker<'r> {
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name, bind) {
             if let Some(sid) = maybe_sid {
-                self.record_member_type(property.range.start.offset, ty, sid);
+                self.record_member_type(property_range.start.offset, ty, sid);
             } else {
-                self.record_type(property.range.start.offset, ty);
+                self.record_type(property_range.start.offset, ty);
             }
         } else {
             let prop_ty = self.infer_type(expr, bind);
-            self.record_type(property.range.start.offset, prop_ty);
+            self.record_type(property_range.start.offset, prop_ty);
         }
         let should_check = !matches!(check_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::Never));
 
@@ -152,12 +157,12 @@ impl<'r> Checker<'r> {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name) {
                     self.extension_members
-                        .insert(property.range.start.offset, mangled.clone());
+                        .insert(property_range.start.offset, mangled.clone());
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
                 if let Some(mangled) = method_map.get(prop_name) {
                     self.extension_members
-                        .insert(property.range.start.offset, mangled.clone());
+                        .insert(property_range.start.offset, mangled.clone());
                 }
             }
         }
@@ -183,7 +188,7 @@ impl<'r> Checker<'r> {
                 .map(|(t, _)| t)
                 .unwrap_or_else(|| self.infer_type(expr, bind));
 
-            let is_static = if let ExprKind::Identifier { name } = &object.kind {
+            let is_static = if let ExprKind::Identifier { name } = &arena.expr(object).kind {
                 bind.scopes
                     .get(bind.global_scope)
                     .resolve(*name, &bind.scopes)
@@ -217,7 +222,7 @@ impl<'r> Checker<'r> {
                 crate::semantic_info::ResolvedMemberKind::EnumMember
             } else if self
                 .extension_members
-                .contains_key(&property.range.start.offset)
+                .contains_key(&property_range.start.offset)
             {
                 if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
                     crate::semantic_info::ResolvedMemberKind::ExtensionMethod
@@ -251,7 +256,7 @@ impl<'r> Checker<'r> {
             };
 
             self.member_resolutions.insert(
-                property.range.start.offset,
+                property_range.start.offset,
                 crate::semantic_info::MemberResolution {
                     receiver_ty: check_ty.clone(),
                     member_name: std::rc::Rc::from(prop_name),

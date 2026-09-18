@@ -3,14 +3,15 @@ use crate::checker::Checker;
 use crate::types::TypeContext;
 use crate::types::{ObjectTypeMember, Type};
 use std::rc::Rc;
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind, TypeTag};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
 
 impl<'r> Checker<'r> {
-    pub(super) fn infer_type_impl(&mut self, expr: &Expr, bind: &BindResult) -> Type {
-        match &expr.kind {
+    pub(super) fn infer_type_impl(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+        let arena = self.ast_arena;
+        match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
                 let name_str = bind.interner.resolve(*name);
                 // Pipeline placeholder `_` stands for the piped value, so it
@@ -49,6 +50,7 @@ impl<'r> Checker<'r> {
             ExprKind::New {
                 callee, type_args, ..
             } => {
+                let callee = *callee;
                 let callee_ty = self.infer_type(callee, bind);
                 if callee_ty.is_dynamic() {
                     return Type::Dynamic;
@@ -84,7 +86,7 @@ impl<'r> Checker<'r> {
                         origin.as_ref().map(|s| s.to_string()),
                     ),
                     _ => {
-                        if let ExprKind::Identifier { name } = &callee.kind {
+                        if let ExprKind::Identifier { name } = &arena.expr(callee).kind {
                             let name_str = bind.interner.resolve(*name).to_string();
                             if !type_args.is_empty() {
                                 let args: Vec<Type> = type_args
@@ -105,19 +107,20 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Call { .. } => self.infer_call_type(expr, bind),
             ExprKind::TaggedTemplate { tag, .. } => {
-                let tag_ty = self.infer_type(tag, bind).non_nullified();
+                let tag_ty = self.infer_type(*tag, bind).non_nullified();
                 if let TypeKind::Fn(ft) = &tag_ty.0 {
                     ft.return_type.as_ref().clone()
                 } else {
                     Type::Dynamic
                 }
             }
-            ExprKind::With { object, .. } => self.infer_type(object, bind),
+            ExprKind::With { object, .. } => self.infer_type(*object, bind),
             ExprKind::Conditional {
                 consequent,
                 alternate,
                 ..
             } => {
+                let (consequent, alternate) = (*consequent, *alternate);
                 let t_ty = self.infer_type(consequent, bind);
                 let f_ty = self.infer_type(alternate, bind);
                 if self.source_file.as_ref() != bind.source_file.as_ref() {
@@ -136,7 +139,8 @@ impl<'r> Checker<'r> {
                 computed,
                 ..
             } => {
-                if !*computed {
+                let (object, property, computed) = (*object, *property, *computed);
+                if !computed {
                     infer_member_type(self, expr, object, property, bind)
                 } else {
                     self.infer_computed_member(object, property, expr, bind)
@@ -147,7 +151,11 @@ impl<'r> Checker<'r> {
                 return_type,
                 body,
                 is_async,
-            } => self.infer_arrow_type(expr, params, return_type, body, *is_async, bind),
+            } => {
+                let (params, return_type, body, is_async) =
+                    (params.clone(), return_type.clone(), (**body).clone(), *is_async);
+                self.infer_arrow_type(expr, &params, &return_type, body, is_async, bind)
+            }
             ExprKind::Function {
                 params,
                 return_type,
@@ -155,18 +163,24 @@ impl<'r> Checker<'r> {
                 is_generator,
                 ..
             } => self.infer_function_expr_type(params, return_type, *is_async, *is_generator, bind),
-            ExprKind::Object { properties } => self.infer_object_type(properties, bind, expr),
+            ExprKind::Object { properties } => {
+                let properties = properties.clone();
+                self.infer_object_type(&properties, bind, expr)
+            }
             ExprKind::Tuple { elements } => {
-                let elem_tys: Vec<Type> =
-                    elements.iter().map(|e| self.infer_type(e, bind)).collect();
+                let elements = elements.clone();
+                let elem_tys: Vec<Type> = elements
+                    .iter()
+                    .map(|e| self.infer_type(*e, bind))
+                    .collect();
                 Type(TypeKind::Tuple(elem_tys), false)
             }
             ExprKind::Record { properties } => {
                 let mut members = Vec::new();
-                for prop in properties {
+                for prop in properties.clone() {
                     if let varn_core::ast::ObjectProp::Property { key, value, .. } = prop {
                         let ty = self.infer_type(value, bind);
-                        let name: std::rc::Rc<str> = match key {
+                        let name: std::rc::Rc<str> = match &key {
                             varn_core::ast::PropKey::Identifier(s)
                             | varn_core::ast::PropKey::Str(s) => std::rc::Rc::from(s.as_str()),
                             varn_core::ast::PropKey::Int(n) => {
@@ -189,30 +203,34 @@ impl<'r> Checker<'r> {
                 type_ann,
                 ..
             } => {
+                let (expression, type_ann) = (*expression, type_ann.clone());
                 self.check_expr(expression, bind);
-                self.resolve_type_node_cached(type_ann, bind)
+                self.resolve_type_node_cached(&type_ann, bind)
             }
             ExprKind::Satisfies {
                 expression,
                 type_ann,
                 ..
             } => {
+                let (expression, type_ann) = (*expression, type_ann.clone());
                 let ty = self.infer_type(expression, bind);
-                let target = self.resolve_type_node_cached(type_ann, bind);
+                let target = self.resolve_type_node_cached(&type_ann, bind);
                 if !self.types_compatible_cached(&target, &ty, Some(bind)) {
+                    let range = arena.expr(expression).range;
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::InvalidSatisfies,
                             format!("type '{ty}' does not satisfy '{target}'"),
                         )
-                        .with_range(expression.range),
+                        .with_range(range),
                     );
                 }
                 ty
             }
             ExprKind::MetaAccess { target, property } => {
+                let (target, property) = (*target, *property);
                 let _target_ty = self.infer_type(target, bind);
-                match varn_core::MemberKey::from_str(bind.interner.resolve(*property)) {
+                match varn_core::MemberKey::from_str(bind.interner.resolve(property)) {
                     Some(varn_core::MemberKey::Name) | Some(varn_core::MemberKey::Type) => {
                         Type::Str
                     }
@@ -256,11 +274,11 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Await { argument } => {
-                let inner = self.infer_type(argument, bind);
+                let inner = self.infer_type(*argument, bind);
                 crate::types::awaited(&inner)
             }
             ExprKind::NonNull { expression } => {
-                let ty = self.infer_type(expression, bind);
+                let ty = self.infer_type(*expression, bind);
                 if let TypeKind::Union(members) = &ty.0 {
                     let filtered: Vec<Type> = members
                         .iter()
@@ -281,6 +299,7 @@ impl<'r> Checker<'r> {
                 ty
             }
             ExprKind::Logical { op, left, right } => {
+                let (op, left, right) = (*op, *left, *right);
                 let l_ty = self.infer_type(left, bind);
                 let r_ty = self.infer_type(right, bind);
                 match op {
@@ -308,35 +327,42 @@ impl<'r> Checker<'r> {
                     }
                 }
             }
-            ExprKind::Binary { op, left, right } => infer_binary_type(self, op, left, right, bind),
-            ExprKind::Unary { op, operand, .. } => match op {
-                varn_core::ast::operators::UnaryOp::Not => Type::Bool,
-                varn_core::ast::operators::UnaryOp::Minus
-                | varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
-                varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
-                varn_core::ast::operators::UnaryOp::BitNot => {
-                    let inner = self.infer_type(operand, bind);
-                    if inner.is_int() {
-                        Type::intrinsic(TypeTag::Int)
-                    } else {
-                        Type::Dynamic
+            ExprKind::Binary { op, left, right } => {
+                let (op, left, right) = (*op, *left, *right);
+                infer_binary_type(self, op, left, right, bind)
+            }
+            ExprKind::Unary { op, operand, .. } => {
+                let (op, operand) = (*op, *operand);
+                match op {
+                    varn_core::ast::operators::UnaryOp::Not => Type::Bool,
+                    varn_core::ast::operators::UnaryOp::Minus
+                    | varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
+                    varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
+                    varn_core::ast::operators::UnaryOp::BitNot => {
+                        let inner = self.infer_type(operand, bind);
+                        if inner.is_int() {
+                            Type::intrinsic(TypeTag::Int)
+                        } else {
+                            Type::Dynamic
+                        }
                     }
                 }
-            },
-            ExprKind::Update { operand, .. } => self.infer_type(operand, bind),
-            ExprKind::Assign { value, .. } => self.infer_type(value, bind),
+            }
+            ExprKind::Update { operand, .. } => self.infer_type(*operand, bind),
+            ExprKind::Assign { value, .. } => self.infer_type(*value, bind),
             ExprKind::Array { elements } => {
+                let elements = elements.clone();
                 let mut elem_tys = Vec::new();
-                for el in elements {
+                for el in &elements {
                     match el {
                         varn_core::ast::ArrayEl::Expr(e) => {
-                            let ty = self.infer_type(e, bind);
+                            let ty = self.infer_type(*e, bind);
                             if !ty.is_dynamic() {
                                 elem_tys.push(ty);
                             }
                         }
                         varn_core::ast::ArrayEl::Spread(e) => {
-                            let ty = self.infer_type(e, bind);
+                            let ty = self.infer_type(*e, bind);
                             if let TypeKind::Array(inner) = &ty.0 {
                                 elem_tys.push((**inner).clone());
                             }
@@ -364,7 +390,7 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Template { .. } => Type::Str,
-            ExprKind::Paren { expression } => self.infer_type(expression, bind),
+            ExprKind::Paren { expression } => self.infer_type(*expression, bind),
             ExprKind::IntLiteral { .. } => Type::Int,
             ExprKind::FloatLiteral { .. } => Type::Float,
             ExprKind::DecimalLiteral { .. } => Type::Decimal,
@@ -375,15 +401,16 @@ impl<'r> Checker<'r> {
             ExprKind::NullLiteral => Type::Null,
             ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
             ExprKind::Match { cases, .. } => {
+                let cases = cases.clone();
                 let mut tys = Vec::new();
-                for case in cases {
+                for case in &cases {
                     match &case.body {
                         varn_core::ast::MatchBody::Expr(e) => {
-                            let ty = self.infer_type(e, bind);
+                            let ty = self.infer_type(*e, bind);
                             tys.push(ty);
                         }
                         varn_core::ast::MatchBody::Block(stmt) => {
-                            if stmt_terminates(stmt) {
+                            if stmt_terminates(*stmt, arena) {
                                 tys.push(Type::Never);
                             } else {
                                 tys.push(Type::Void);
@@ -405,6 +432,7 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Pipeline { left, right } => {
+                let (left, right) = (*left, *right);
                 let lhs_ty = self.infer_type(left, bind);
                 let saved_pipeline = self.in_pipeline_rhs;
                 let saved_pipe_ty = self.pipeline_value_type.replace(lhs_ty);
@@ -427,31 +455,29 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn infer_computed_member(
         &mut self,
-        object: &Expr,
-        property: &Expr,
-        _expr: &Expr,
+        object: ExprId,
+        property: ExprId,
+        _expr: ExprId,
         bind: &BindResult,
     ) -> Type {
+        let arena = self.ast_arena;
         let obj_ty = self.infer_type(object, bind);
-        if matches!(property.kind, varn_core::ast::ExprKind::Range { .. }) {
+        if matches!(
+            arena.expr(property).kind,
+            varn_core::ast::ExprKind::Range { .. }
+        ) {
             return obj_ty;
         }
         let prop_ty = self.infer_type(property, bind);
         match &obj_ty.0 {
-            TypeKind::Array(inner) if prop_ty.is_int() => {
-                (**inner).clone()
-            }
-            TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => {
-                Type::Str
-            }
+            TypeKind::Array(inner) if prop_ty.is_int() => (**inner).clone(),
+            TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => Type::Str,
             TypeKind::Named(name, _)
                 if name.as_ref() == IntrinsicType::Str.as_str() && prop_ty.is_int() =>
             {
                 Type::Str
             }
-            TypeKind::Generic(name, args, _)
-                if name.as_ref() == IntrinsicType::Map.as_str() =>
-            {
+            TypeKind::Generic(name, args, _) if name.as_ref() == IntrinsicType::Map.as_str() => {
                 if args.len() == 2 {
                     args[1].clone()
                 } else if args.len() == 1 {
@@ -461,15 +487,13 @@ impl<'r> Checker<'r> {
                 }
             }
             TypeKind::Intrinsic(TypeTag::Map) => Type::Dynamic,
-            TypeKind::Object(members) => {
-                members
-                    .iter()
-                    .find_map(|m| match m {
-                        ObjectTypeMember::Index { value_ty, .. } => Some((**value_ty).clone()),
-                        _ => None,
-                    })
-                    .unwrap_or(Type::Dynamic)
-            }
+            TypeKind::Object(members) => members
+                .iter()
+                .find_map(|m| match m {
+                    ObjectTypeMember::Index { value_ty, .. } => Some((**value_ty).clone()),
+                    _ => None,
+                })
+                .unwrap_or(Type::Dynamic),
             _ => Type::Dynamic,
         }
     }
@@ -478,7 +502,7 @@ impl<'r> Checker<'r> {
         &mut self,
         properties: &[varn_core::ast::ObjectProp],
         bind: &BindResult,
-        _expr: &Expr,
+        _expr: ExprId,
     ) -> Type {
         let has_methods = properties.iter().any(|p| {
             matches!(
@@ -505,7 +529,7 @@ impl<'r> Checker<'r> {
                 if is_map {
                     for prop in properties {
                         if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
-                            self.infer_type(value, bind);
+                            self.infer_type(*value, bind);
                         }
                     }
                     if let TypeKind::Object(members) = &exp.0 {
@@ -535,7 +559,7 @@ impl<'r> Checker<'r> {
                     let Some(name) = prop_key_name(key) else {
                         continue;
                     };
-                    let ty = self.infer_type(value, bind);
+                    let ty = self.infer_type(*value, bind);
                     members.push(ObjectTypeMember::Property {
                         name,
                         ty,
@@ -576,7 +600,7 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ObjectProp::Getter { .. }
                 | varn_core::ast::ObjectProp::Setter { .. } => {}
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
-                    let spread_ty = self.infer_type(argument, bind);
+                    let spread_ty = self.infer_type(*argument, bind);
                     if let varn_core::TypeKind::Object(spread_members) = &spread_ty.0 {
                         for m in spread_members {
                             members.push(m.clone());
@@ -688,10 +712,12 @@ fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Rc<str>> {
     }
 }
 
-fn stmt_terminates(stmt: &varn_core::ast::Stmt) -> bool {
-    match &stmt.kind {
+fn stmt_terminates(stmt: varn_core::ast::StmtId, arena: &AstArena) -> bool {
+    match &arena.stmt(stmt).kind {
         varn_core::ast::StmtKind::Return { .. } | varn_core::ast::StmtKind::Throw { .. } => true,
-        varn_core::ast::StmtKind::Block { stmts } => stmts.last().is_some_and(stmt_terminates),
+        varn_core::ast::StmtKind::Block { stmts } => {
+            stmts.last().is_some_and(|s| stmt_terminates(*s, arena))
+        }
         _ => false,
     }
 }

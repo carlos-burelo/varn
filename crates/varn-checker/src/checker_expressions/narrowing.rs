@@ -4,13 +4,13 @@ use crate::symbol::SymbolId;
 use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::FxHashMap;
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
-use varn_core::ast::{Expr, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn can_extract_narrowings(&self, expr: &Expr) -> bool {
+    pub(crate) fn can_extract_narrowings(&self, expr: ExprId) -> bool {
         matches!(
-            &expr.kind,
+            &self.ast_arena.expr(expr).kind,
             ExprKind::Binary {
                 op: BinaryOp::Eq | BinaryOp::NotEq | BinaryOp::Instanceof,
                 ..
@@ -27,23 +27,25 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn extract_narrowings(
         &mut self,
-        expr: &Expr,
+        expr: ExprId,
         bind: &BindResult,
         is_true_branch: bool,
     ) -> Vec<(crate::symbol::SymbolId, Type)> {
-        let cache_key = (expr.id, is_true_branch, self.current_scope);
+        let arena = self.ast_arena;
+        let cache_key = (expr.index(), is_true_branch, self.current_scope);
         if let Some(cached) = self.narrowings_cache.get(&cache_key) {
             return cached.clone();
         }
 
         let mut narrowings = Vec::new();
 
-        match &expr.kind {
+        match &arena.expr(expr).kind {
             ExprKind::Unary {
                 op: UnaryOp::Not,
                 operand,
                 ..
             } => {
+                let operand = *operand;
                 narrowings.extend(self.extract_narrowings(operand, bind, !is_true_branch));
             }
 
@@ -69,11 +71,12 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Binary { left, right, op } => {
-                let is_eq = *op == BinaryOp::Eq;
-                let is_neq = *op == BinaryOp::NotEq;
+                let (left, right, op) = (*left, *right, *op);
+                let is_eq = op == BinaryOp::Eq;
+                let is_neq = op == BinaryOp::NotEq;
 
                 // 1. typeof x === "str" / "int" / "float" / "bool" / etc.
-                let typeof_check = match (&left.kind, &right.kind) {
+                let typeof_check = match (&arena.expr(left).kind, &arena.expr(right).kind) {
                     (
                         ExprKind::Unary {
                             op: UnaryOp::Typeof,
@@ -81,7 +84,7 @@ impl<'r> Checker<'r> {
                             ..
                         },
                         ExprKind::StrLiteral { value },
-                    ) => Some((typeof_op, value.as_ref())),
+                    ) => Some((*typeof_op, value.clone())),
                     (
                         ExprKind::StrLiteral { value },
                         ExprKind::Unary {
@@ -89,17 +92,17 @@ impl<'r> Checker<'r> {
                             operand: typeof_op,
                             ..
                         },
-                    ) => Some((typeof_op, value.as_ref())),
+                    ) => Some((*typeof_op, value.clone())),
                     _ => None,
                 };
 
                 if let Some((typeof_op, value)) = typeof_check {
                     if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
-                        if let ExprKind::Identifier { name } = &typeof_op.kind {
+                        if let ExprKind::Identifier { name } = &arena.expr(typeof_op).kind {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(*name, &bind.scopes) {
                                 let narrowed_ty = crate::binder::resolve_primitive(
-                                    value,
+                                    &value,
                                     Some(&crate::binder::BindView::new(bind, self.resolver)),
                                 );
                                 narrowings.push((id, narrowed_ty));
@@ -109,16 +112,21 @@ impl<'r> Checker<'r> {
                 }
 
                 // 2. x !== null / null !== x / x === null / null === x
-                let (ident_name, is_null_check) = match (&left.kind, &right.kind) {
-                    (ExprKind::Identifier { name }, ExprKind::NullLiteral) => (Some(name), true),
-                    (ExprKind::NullLiteral, ExprKind::Identifier { name }) => (Some(name), true),
-                    _ => (None, false),
-                };
+                let (ident_name, is_null_check) =
+                    match (&arena.expr(left).kind, &arena.expr(right).kind) {
+                        (ExprKind::Identifier { name }, ExprKind::NullLiteral) => {
+                            (Some(*name), true)
+                        }
+                        (ExprKind::NullLiteral, ExprKind::Identifier { name }) => {
+                            (Some(*name), true)
+                        }
+                        _ => (None, false),
+                    };
 
                 if is_null_check {
                     if let Some(name) = ident_name {
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(*name, &bind.scopes) {
+                        if let Some(id) = scope.resolve(name, &bind.scopes) {
                             if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
                                 let original_ty = self
                                     .symbol_types
@@ -132,7 +140,7 @@ impl<'r> Checker<'r> {
                                     }
                                 }
                             } else {
-                                let name_str = bind.interner.resolve(*name);
+                                let name_str = bind.interner.resolve(name);
                                 if name_str != "_" && name_str != "__variant__" {
                                     narrowings.push((id, Type::Null));
                                 }
@@ -148,22 +156,24 @@ impl<'r> Checker<'r> {
                         property,
                         computed: false,
                         ..
-                    } = &left.kind
+                    } = &arena.expr(left).kind
                     {
+                        let (object, property) = (*object, *property);
                         if let (
                             ExprKind::Identifier { name: obj_name },
                             ExprKind::Identifier { name: prop_name },
-                        ) = (&object.kind, &property.kind)
+                        ) = (&arena.expr(object).kind, &arena.expr(property).kind)
                         {
-                            let disc_ty: Option<Type> = match &right.kind {
+                            let (obj_name, prop_name) = (*obj_name, *prop_name);
+                            let disc_ty: Option<Type> = match &arena.expr(right).kind {
                                 ExprKind::StrLiteral { .. } => Some(Type::Str),
                                 ExprKind::IntLiteral { .. } => Some(Type::Int),
                                 _ => None,
                             };
                             if let Some(disc_ty) = disc_ty {
-                                let prop_name_str = bind.interner.resolve(*prop_name);
+                                let prop_name_str = bind.interner.resolve(prop_name);
                                 let scope = bind.scopes.get(self.current_scope);
-                                if let Some(id) = scope.resolve(*obj_name, &bind.scopes) {
+                                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
                                     let original_ty = bind.arena.get(id).ty.clone();
                                     if let Some(Type(TypeKind::Union(members), _)) = &original_ty {
                                         let mut matched: Vec<Type> = Vec::new();
@@ -231,20 +241,21 @@ impl<'r> Checker<'r> {
                 }
 
                 // 4. Instanceof narrowing: x instanceof User
-                if *op == BinaryOp::Instanceof {
+                if op == BinaryOp::Instanceof {
                     if let (
                         ExprKind::Identifier { name },
                         ExprKind::Identifier { name: class_name },
-                    ) = (&left.kind, &right.kind)
+                    ) = (&arena.expr(left).kind, &arena.expr(right).kind)
                     {
+                        let (name, class_name) = (*name, *class_name);
                         let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                            let class_name_str = bind.interner.resolve(*class_name);
+                        if let Some(id) = scope.resolve(name, &bind.scopes) {
+                            let class_name_str = bind.interner.resolve(class_name);
                             if is_true_branch {
                                 narrowings.push((id, Type::named(class_name_str)));
                             } else if let Some(ty) = &bind.arena.get(id).ty {
                                 let narrowed = ty.minus_named(class_name_str);
-                                if bind.interner.resolve(*name) == "_" {
+                                if bind.interner.resolve(name) == "_" {
                                     narrowings.push((id, narrowed));
                                 }
                             }
@@ -258,6 +269,7 @@ impl<'r> Checker<'r> {
                 right,
                 op: varn_core::ast::operators::LogicalOp::And,
             } => {
+                let (left, right) = (*left, *right);
                 if is_true_branch {
                     narrowings.extend(self.extract_narrowings(left, bind, true));
                     narrowings.extend(self.extract_narrowings(right, bind, true));
@@ -273,6 +285,7 @@ impl<'r> Checker<'r> {
                 right,
                 op: varn_core::ast::operators::LogicalOp::Or,
             } => {
+                let (left, right) = (*left, *right);
                 if is_true_branch {
                     let left_n = self.extract_narrowings(left, bind, true);
                     let right_n = self.extract_narrowings(right, bind, true);
@@ -287,19 +300,21 @@ impl<'r> Checker<'r> {
                 expression,
                 type_ann,
             } => {
-                if let ExprKind::Identifier { name: arg_name } = &expression.kind {
+                let (expression, type_ann) = (*expression, type_ann.clone());
+                if let ExprKind::Identifier { name: arg_name } = &arena.expr(expression).kind {
+                    let arg_name = *arg_name;
                     let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
+                    if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                         if is_true_branch {
                             let narrowed_ty = crate::binder::resolve_type_node(
-                                type_ann,
+                                &type_ann,
                                 Some(&crate::binder::BindView::new(bind, self.resolver)),
                             );
                             narrowings.push((id, narrowed_ty));
                         } else {
                             if let Some(original_ty) = &bind.arena.get(id).ty {
                                 let target_ty = crate::binder::resolve_type_node(
-                                    type_ann,
+                                    &type_ann,
                                     Some(&crate::binder::BindView::new(bind, self.resolver)),
                                 );
                                 let narrowed = original_ty.minus(&target_ty);
@@ -313,6 +328,7 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Call { callee, args, .. } => {
+                let (callee, args) = (*callee, args.clone());
                 let callee_ty = self.infer_type(callee, bind).non_nullified();
                 if let TypeKind::Fn(ft) = &callee_ty.0 {
                     if let TypeKind::TypePredicate {
@@ -326,12 +342,12 @@ impl<'r> Checker<'r> {
                             .position(|p| p.name.as_deref() == Some(parameter_name.as_ref()))
                         {
                             args.get(pos).and_then(|a| match a {
-                                varn_core::ast::Arg::Positional(e) => Some(e),
+                                varn_core::ast::Arg::Positional(e) => Some(*e),
                                 _ => None,
                             })
                         } else if args.len() == 1 {
                             match &args[0] {
-                                varn_core::ast::Arg::Positional(e) => Some(e),
+                                varn_core::ast::Arg::Positional(e) => Some(*e),
                                 _ => None,
                             }
                         } else {
@@ -339,7 +355,7 @@ impl<'r> Checker<'r> {
                         };
 
                         if let Some(ExprKind::Identifier { name: arg_name }) =
-                            arg_expr.map(|e| &e.kind)
+                            arg_expr.map(|e| &arena.expr(e).kind)
                         {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
@@ -396,23 +412,26 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn collect_match_disc_narrowings(
         &self,
-        subject: &Expr,
+        subject: ExprId,
         bind: &BindResult,
     ) -> Option<(SymbolId, Vec<Type>)> {
+        let arena = self.ast_arena;
         if let ExprKind::Member {
             object,
             property,
             computed: false,
             ..
-        } = &subject.kind
+        } = &arena.expr(subject).kind
         {
+            let (object, property) = (*object, *property);
             if let (
                 ExprKind::Identifier { name: obj_name },
                 ExprKind::Identifier { name: _prop_name },
-            ) = (&object.kind, &property.kind)
+            ) = (&arena.expr(object).kind, &arena.expr(property).kind)
             {
+                let obj_name = *obj_name;
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(*obj_name, &bind.scopes) {
+                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
                     if let Some(Type(TypeKind::Union(members), _)) = &bind.arena.get(id).ty {
                         return Some((id, members.clone()));
                     }
@@ -426,20 +445,22 @@ impl<'r> Checker<'r> {
         &self,
         m: &Type,
         disc_ty: Option<&Type>,
-        subject: Option<&Expr>,
+        subject: Option<ExprId>,
         bind: &BindResult,
     ) -> bool {
+        let arena = self.ast_arena;
         let Some(disc_ty) = disc_ty else { return false };
         let Some(subject) = subject else { return false };
         let ExprKind::Member {
             property,
             computed: false,
             ..
-        } = &subject.kind
+        } = &arena.expr(subject).kind
         else {
             return false;
         };
-        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+        let property = *property;
+        let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
             return false;
         };
         let prop_name = bind.interner.resolve(*prop_name);

@@ -10,7 +10,7 @@ use crate::checker::Checker;
 use crate::types::{Type, TypeContext};
 use std::rc::Rc;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, TemplatePart};
+use varn_core::ast::{ArrowBody, ExprId, ExprKind, MatchBody, MatchPattern, TemplatePart};
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind};
 
 impl<'r> Checker<'r> {
@@ -19,7 +19,8 @@ impl<'r> Checker<'r> {
     /// Callers gate on the operands NOT overflowing themselves, so a nested
     /// overflow is named once at its innermost expression instead of again at
     /// every enclosing one.
-    fn report_int_overflow(&mut self, expr: &Expr) {
+    fn report_int_overflow(&mut self, expr: ExprId) {
+        let range = self.ast_arena.expr(expr).range;
         self.diagnostics.push(
             Diagnostic::error(
                 ErrorCode::IntegerOverflow,
@@ -30,14 +31,16 @@ impl<'r> Checker<'r> {
                 ),
             )
             .with_file(self.source_file.clone())
-            .with_range(expr.range),
+            .with_range(range),
         );
     }
 
-    pub(crate) fn check_expr(&mut self, expr: &Expr, bind: &BindResult) {
+    pub(crate) fn check_expr(&mut self, expr: ExprId, bind: &BindResult) {
+        let arena = self.ast_arena;
         self.check_expr_no_record(expr, bind);
-        let start = expr.range.start.offset;
-        let end = expr.range.end.offset.saturating_sub(1);
+        let range = arena.expr(expr).range;
+        let start = range.start.offset;
+        let end = range.end.offset.saturating_sub(1);
         // By BYTE OFFSET, like the 18 `record_scope` sites, and only when a
         // caller asked for the table. This line used to key by `expr.id` —
         // mixing AST ids into a map whose only consumers (`scope_at_offset`
@@ -52,7 +55,7 @@ impl<'r> Checker<'r> {
 
         // Resolving the identifier's symbol costs a scope walk and only tooling
         // reads it, so it is not paid for on a compile.
-        let symbol_id = match (&expr.kind, self.record_expr_types) {
+        let symbol_id = match (&arena.expr(expr).kind, self.record_expr_types) {
             (ExprKind::Identifier { name }, true) => {
                 let scope = bind.scopes.get(self.current_scope);
                 scope.resolve(*name, &bind.scopes)
@@ -74,8 +77,13 @@ impl<'r> Checker<'r> {
 
         let seq = self.expr_seq;
         self.expr_seq += 1;
+        // `expr_table` is keyed by `ExprId::index()` — the arena position of
+        // an EXPRESSION node. `ExprId` and `StmtId` are separate counters,
+        // each starting at 0 in its own arena `Vec`, so a `StmtId::index()`
+        // of the same value would collide here undetected. This is the only
+        // insertion site: never key this table with a `StmtId`.
         self.expr_table.insert(
-            expr.id,
+            expr.index(),
             crate::checker::TypeEntry {
                 ty,
                 refined,
@@ -87,8 +95,10 @@ impl<'r> Checker<'r> {
         );
     }
 
-    fn check_expr_no_record(&mut self, expr: &Expr, bind: &BindResult) {
-        match &expr.kind {
+    fn check_expr_no_record(&mut self, expr: ExprId, bind: &BindResult) {
+        let arena = self.ast_arena;
+        let range = arena.expr(expr).range;
+        match &arena.expr(expr).kind {
             // Nothing to check: the parser already reported the syntax error.
             // Emitting a second diagnostic here would paint the file red for
             // code the user is still in the middle of typing.
@@ -100,13 +110,15 @@ impl<'r> Checker<'r> {
                 is_async,
                 ..
             } => {
+                let (params, return_type, body, is_async) =
+                    (params.clone(), return_type.clone(), (**body).clone(), *is_async);
                 let saved_expected = self.expected_return_type.take();
 
                 let resolved_ret = return_type
                     .as_ref()
                     .map(|rt| self.resolve_type_node_cached(rt, bind))
                     .or_else(|| self.expected_return_from_fn_type());
-                self.expected_return_type = if *is_async {
+                self.expected_return_type = if is_async {
                     resolved_ret.map(|t| crate::types::awaited(&t))
                 } else {
                     resolved_ret
@@ -115,11 +127,7 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope_span(
-                        expr.range.start.offset,
-                        expr.range.end.offset,
-                        fn_scope,
-                    );
+                    self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
                 }
 
                 let mut injected_type_params: Vec<Rc<str>> = vec![];
@@ -139,7 +147,7 @@ impl<'r> Checker<'r> {
                     for tp in &injected_type_params {
                         self.active_type_params.insert(tp.clone());
                     }
-                    self.apply_contextual_arrow_params(params, &expected_fn, bind);
+                    self.apply_contextual_arrow_params(&params, &expected_fn, bind);
                 }
 
                 let saved_in_function = self.in_function;
@@ -149,7 +157,7 @@ impl<'r> Checker<'r> {
                 self.loop_depth = 0;
                 self.switch_depth = 0;
 
-                match body.as_ref() {
+                match body {
                     ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
                     ArrowBody::Expr(e) => {
                         let expected_ret = self.expected_return_type.clone();
@@ -169,7 +177,7 @@ impl<'r> Checker<'r> {
                                     Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                         "type mismatch: arrow function is declared to return '{expected}', but returns '{actual}'"
                                     ))
-                                    .with_range(expr.range),
+                                    .with_range(range),
                                 );
                             }
                         }
@@ -192,12 +200,13 @@ impl<'r> Checker<'r> {
                 is_async,
                 ..
             } => {
+                let (return_type, body, is_async) = (return_type.clone(), *body, *is_async);
                 let saved_expected = self.expected_return_type.take();
                 self.expected_return_type = return_type
                     .as_ref()
                     .map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
-                        if *is_async {
+                        if is_async {
                             crate::types::awaited(&ty)
                         } else {
                             ty
@@ -207,11 +216,7 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope_span(
-                        expr.range.start.offset,
-                        expr.range.end.offset,
-                        fn_scope,
-                    );
+                    self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
                 }
 
                 self.in_function_body(|c| c.check_stmt(body, bind));
@@ -219,14 +224,15 @@ impl<'r> Checker<'r> {
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;
             }
-            ExprKind::As { expression, .. } => self.check_expr(expression, bind),
-            ExprKind::Is { expression, .. } => self.check_expr(expression, bind),
+            ExprKind::As { expression, .. } => self.check_expr(*expression, bind),
+            ExprKind::Is { expression, .. } => self.check_expr(*expression, bind),
             ExprKind::Satisfies {
                 expression,
                 type_ann,
             } => {
+                let (expression, type_ann) = (*expression, type_ann.clone());
                 self.check_expr(expression, bind);
-                let declared_ty = self.resolve_type_node_cached(type_ann, bind);
+                let declared_ty = self.resolve_type_node_cached(&type_ann, bind);
                 let inferred_ty = self.infer_type(expression, bind);
                 if !self.types_compatible_cached(&declared_ty, &inferred_ty, Some(bind)) {
                     self.emit(
@@ -236,11 +242,12 @@ impl<'r> Checker<'r> {
                                 "expression does not satisfy '{declared_ty}': got '{inferred_ty}'"
                             ),
                         )
-                        .with_range(expr.range),
+                        .with_range(range),
                     );
                 }
             }
             ExprKind::Await { argument } => {
+                let argument = *argument;
                 self.check_expr(argument, bind);
                 let arg_ty = self.infer_type(argument, bind);
                 if !arg_ty.is_dynamic() && !crate::types::is_awaitable(&arg_ty) {
@@ -249,13 +256,14 @@ impl<'r> Checker<'r> {
                             ErrorCode::TypeMismatch,
                             format!("'await' applied to non-Future type '{arg_ty}' has no effect"),
                         )
-                        .with_range(expr.range),
+                        .with_range(range),
                     );
                 }
             }
-            ExprKind::Spawn { argument } => self.check_expr(argument, bind),
-            ExprKind::Try { expression } => self.check_expr(expression, bind),
+            ExprKind::Spawn { argument } => self.check_expr(*argument, bind),
+            ExprKind::Try { expression } => self.check_expr(*expression, bind),
             ExprKind::Yield { argument, .. } => {
+                let argument = *argument;
                 let ty = if let Some(arg) = argument {
                     self.check_expr(arg, bind);
                     self.infer_type(arg, bind)
@@ -267,12 +275,14 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Unary { operand, .. } => {
+                let operand = *operand;
                 self.check_expr(operand, bind);
-                if overflows_int_literal(expr) && !overflows_int_literal(operand) {
+                if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
                     self.report_int_overflow(expr);
                 }
             }
             ExprKind::Binary { left, right, op } => {
+                let (left, right, op) = (*left, *right, *op);
                 self.check_expr(left, bind);
                 self.check_expr(right, bind);
 
@@ -281,9 +291,9 @@ impl<'r> Checker<'r> {
                 // waiting for the run-time raise. Reported only when neither
                 // operand already overflows on its own, so a nested overflow
                 // names its innermost expression once.
-                if overflows_int_literal(expr)
-                    && !overflows_int_literal(left)
-                    && !overflows_int_literal(right)
+                if overflows_int_literal(expr, arena)
+                    && !overflows_int_literal(left, arena)
+                    && !overflows_int_literal(right, arena)
                 {
                     self.report_int_overflow(expr);
                 }
@@ -334,30 +344,32 @@ impl<'r> Checker<'r> {
                                 ErrorCode::InvalidTypeOperator,
                                 format!(
                                     "invalid binary operation '{}' between '{}' and '{}'",
-                                    op_str(op),
+                                    op_str(&op),
                                     l_ty,
                                     r_ty
                                 ),
                             )
-                            .with_range(expr.range),
+                            .with_range(range),
                         );
                     }
                 }
             }
             ExprKind::Logical { left, right, .. } => {
-                self.check_expr(left, bind);
-                self.check_expr(right, bind);
+                self.check_expr(*left, bind);
+                self.check_expr(*right, bind);
             }
             ExprKind::Assign { target, value, .. } => {
+                let (target, value) = (*target, *value);
                 let prev = self.is_assignment_target;
                 self.is_assignment_target = true;
                 self.check_expr(target, bind);
                 self.is_assignment_target = prev;
 
-                let target_ty = if let ExprKind::Identifier { name } = &target.kind {
+                let target_ty = if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+                    let name = *name;
                     let scope = bind.scopes.get(self.current_scope);
                     scope
-                        .resolve(*name, &bind.scopes)
+                        .resolve(name, &bind.scopes)
                         .and_then(|id| {
                             self.symbol_types
                                 .get(&id)
@@ -379,7 +391,7 @@ impl<'r> Checker<'r> {
                 self.check_extension_assignment(target, bind);
 
                 if !matches!(
-                    &target.kind,
+                    &arena.expr(target).kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
                 ) {
                     self.emit(
@@ -387,13 +399,14 @@ impl<'r> Checker<'r> {
                             ErrorCode::NotAssignable,
                             "invalid left-hand side in assignment",
                         )
-                        .with_range(target.range),
+                        .with_range(arena.expr(target).range),
                     );
                 }
 
-                if let ExprKind::Identifier { name } = &target.kind {
+                if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+                    let name = *name;
                     let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(*name, &bind.scopes) {
+                    if let Some(id) = scope.resolve(name, &bind.scopes) {
                         let sym = bind.arena.get(id);
                         if sym.kind == crate::symbol::SymbolKind::Const {
                             self.emit(
@@ -401,10 +414,10 @@ impl<'r> Checker<'r> {
                                     ErrorCode::NotAssignable,
                                     format!(
                                         "cannot reassign to constant '{}'",
-                                        bind.interner.resolve(*name)
+                                        bind.interner.resolve(name)
                                     ),
                                 )
-                                .with_range(expr.range),
+                                .with_range(range),
                             );
                         }
                     }
@@ -412,7 +425,7 @@ impl<'r> Checker<'r> {
 
                 let value_ty = self.infer_type(value, bind);
                 let is_empty_array_val = value_ty.is_dynamic()
-                    && matches!(&value.kind, ExprKind::Array { elements } if elements.is_empty());
+                    && matches!(&arena.expr(value).kind, ExprKind::Array { elements } if elements.is_empty());
                 if !is_empty_array_val
                     && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind))
                 {
@@ -421,7 +434,7 @@ impl<'r> Checker<'r> {
                             ErrorCode::TypeMismatch,
                             format!("type mismatch: cannot assign '{value_ty}' to '{target_ty}'"),
                         )
-                        .with_range(expr.range),
+                        .with_range(range),
                     );
                 }
             }
@@ -430,15 +443,19 @@ impl<'r> Checker<'r> {
                 args,
                 type_args,
                 ..
-            } => self.check_call_expr(callee, args, type_args, &expr.range, expr.id, bind),
+            } => {
+                let (callee, args, type_args) = (*callee, args.clone(), type_args.clone());
+                self.check_call_expr(callee, &args, &type_args, &range, expr.index(), bind)
+            }
             ExprKind::New { callee, args, .. } => {
-                let cls_name = match &callee.kind {
+                let (callee, args) = (*callee, args.clone());
+                let cls_name = match &arena.expr(callee).kind {
                     ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
                     ExprKind::Member {
                         property,
                         computed: false,
                         ..
-                    } => match &property.kind {
+                    } => match &arena.expr(*property).kind {
                         ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
                         _ => None,
                     },
@@ -451,7 +468,7 @@ impl<'r> Checker<'r> {
                                 ErrorCode::AbstractMethodNotImplemented,
                                 format!("cannot instantiate abstract class '{name}'"),
                             )
-                            .with_range(expr.range),
+                            .with_range(range),
                         );
                     }
                 }
@@ -471,7 +488,7 @@ impl<'r> Checker<'r> {
                         })
                     })
                     .unwrap_or_default();
-                self.check_call_args_with_context(args, &ctor_params, bind);
+                self.check_call_args_with_context(&args, &ctor_params, bind);
             }
 
             ExprKind::Conditional {
@@ -479,9 +496,9 @@ impl<'r> Checker<'r> {
                 consequent,
                 alternate,
             } => {
-                self.check_expr(test, bind);
-                self.check_expr(consequent, bind);
-                self.check_expr(alternate, bind);
+                self.check_expr(*test, bind);
+                self.check_expr(*consequent, bind);
+                self.check_expr(*alternate, bind);
             }
 
             ExprKind::Member {
@@ -489,32 +506,37 @@ impl<'r> Checker<'r> {
                 property,
                 computed,
                 optional,
-            } => self.check_member_expr(
-                expr,
-                object,
-                property,
-                *computed,
-                *optional,
-                &expr.range,
-                bind,
-            ),
+            } => {
+                let (object, property, computed, optional) =
+                    (*object, *property, *computed, *optional);
+                self.check_member_expr(expr, object, property, computed, optional, &range, bind)
+            }
 
-            ExprKind::Paren { expression } => self.check_expr(expression, bind),
-            ExprKind::NonNull { expression } => self.check_expr(expression, bind),
+            ExprKind::Paren { expression } => self.check_expr(*expression, bind),
+            ExprKind::NonNull { expression } => self.check_expr(*expression, bind),
 
-            ExprKind::Array { elements } => self.check_array_with_context(elements, bind),
+            ExprKind::Array { elements } => {
+                let elements = elements.clone();
+                self.check_array_with_context(&elements, bind)
+            }
 
             ExprKind::Tuple { elements } => {
-                for e in elements {
+                for e in elements.clone() {
                     self.check_expr(e, bind);
                 }
             }
 
-            ExprKind::Object { properties } => self.check_object_with_context(properties, bind),
-            ExprKind::Record { properties } => self.check_object_with_context(properties, bind),
+            ExprKind::Object { properties } => {
+                let properties = properties.clone();
+                self.check_object_with_context(&properties, bind)
+            }
+            ExprKind::Record { properties } => {
+                let properties = properties.clone();
+                self.check_object_with_context(&properties, bind)
+            }
 
             ExprKind::Template { parts } => {
-                for p in parts {
+                for p in parts.clone() {
                     if let TemplatePart::Interpolation(e) = p {
                         self.check_expr(e, bind);
                     }
@@ -522,30 +544,32 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Sequence { expressions } => {
-                for e in expressions {
+                for e in expressions.clone() {
                     self.check_expr(e, bind);
                 }
             }
 
             ExprKind::ClassExpr { declaration } => {
-                self.check_decl(&varn_core::ast::Decl::Class((**declaration).clone()), bind);
+                let declaration = declaration.clone();
+                self.check_decl(&varn_core::ast::Decl::Class((*declaration).clone()), bind);
             }
 
             ExprKind::Match { subject, cases } => {
+                let (subject, cases) = (*subject, cases.clone());
                 self.check_expr(subject, bind);
                 let disc_narrowings = self.collect_match_disc_narrowings(subject, bind);
-                for case in cases {
+                for case in &cases {
                     let saved_scope = self.current_scope;
                     if let Some(arm_scope) = self.next_child_scope(bind) {
                         self.current_scope = arm_scope;
                     }
 
                     if let Some(g) = &case.guard {
-                        self.check_expr(g, bind);
+                        self.check_expr(*g, bind);
                     }
 
                     let arm_disc_ty = match &case.pattern {
-                        MatchPattern::Literal(e) => match &e.kind {
+                        MatchPattern::Literal(e) => match &arena.expr(*e).kind {
                             ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
                             ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
                             _ => None,
@@ -561,7 +585,7 @@ impl<'r> Checker<'r> {
                                     self.union_member_matches_disc(
                                         m,
                                         disc_narrowings.as_ref().map(|(_, _)| &disc_ty),
-                                        disc_narrowings.as_ref().map(|(_, _)| subject.as_ref()),
+                                        disc_narrowings.as_ref().map(|(_, _)| subject),
                                         bind,
                                     )
                                 })
@@ -584,27 +608,28 @@ impl<'r> Checker<'r> {
 
                     self.with_narrowings(&narrowing_vec, |checker| {
                         if let Some(g) = &case.guard {
-                            checker.check_expr(g, bind);
+                            checker.check_expr(*g, bind);
                         }
 
                         let subject_ty = checker.infer_type(subject, bind);
                         checker.check_pattern_match(&case.pattern, &subject_ty, bind);
 
                         match &case.body {
-                            MatchBody::Expr(e) => checker.check_expr(e, bind),
-                            MatchBody::Block(stmt) => checker.check_stmt(stmt, bind),
+                            MatchBody::Expr(e) => checker.check_expr(*e, bind),
+                            MatchBody::Block(stmt) => checker.check_stmt(*stmt, bind),
                         }
                     });
                     self.current_scope = saved_scope;
                 }
                 let subject_ty = self.infer_type(subject, bind);
-                self.check_match_exhaustiveness(&subject_ty, cases, &expr.range, bind);
+                self.check_match_exhaustiveness(&subject_ty, &cases, &range, bind);
             }
 
             ExprKind::Update { operand, .. } => {
+                let operand = *operand;
                 self.check_expr(operand, bind);
                 if !matches!(
-                    &operand.kind,
+                    &arena.expr(operand).kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
                 ) {
                     self.emit(
@@ -612,13 +637,14 @@ impl<'r> Checker<'r> {
                             ErrorCode::NotAssignable,
                             "invalid left-hand side in update expression",
                         )
-                        .with_range(operand.range),
+                        .with_range(arena.expr(operand).range),
                     );
                 }
             }
-            ExprKind::Spread { argument } => self.check_expr(argument, bind),
+            ExprKind::Spread { argument } => self.check_expr(*argument, bind),
 
             ExprKind::Pipeline { left, right } => {
+                let (left, right) = (*left, *right);
                 self.check_expr(left, bind);
                 let lhs_ty = self.infer_type(left, bind);
                 let saved_pipeline = self.in_pipeline_rhs;
@@ -630,44 +656,48 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Range { start, end, .. } => {
-                self.check_expr(start, bind);
-                self.check_expr(end, bind);
+                self.check_expr(*start, bind);
+                self.check_expr(*end, bind);
             }
 
             ExprKind::TaggedTemplate { tag, template, .. } => {
+                let (tag, template) = (*tag, *template);
                 self.check_expr(tag, bind);
                 self.check_expr(template, bind);
                 let tag_ty = self.infer_type(tag, bind).non_nullified();
                 if let TypeKind::Fn(ft) = &tag_ty.0 {
-                    self.record_type(expr.range.start.offset, ft.return_type.as_ref().clone());
+                    self.record_type(range.start.offset, ft.return_type.as_ref().clone());
                 }
             }
 
             ExprKind::With { object, properties } => {
+                let (object, properties) = (*object, properties.clone());
                 self.check_expr(object, bind);
-                for prop in properties {
+                for prop in &properties {
                     match prop {
                         varn_core::ast::ObjectProp::Property { value, .. } => {
-                            self.check_expr(value, bind);
+                            self.check_expr(*value, bind);
                         }
                         varn_core::ast::ObjectProp::Spread { argument, .. } => {
-                            self.check_expr(argument, bind);
+                            self.check_expr(*argument, bind);
                         }
                         _ => {}
                     }
                 }
                 let obj_ty = self.infer_type(object, bind);
-                self.record_type(expr.range.start.offset, obj_ty);
+                self.record_type(range.start.offset, obj_ty);
             }
 
             ExprKind::MetaAccess { target, .. } => {
+                let target = *target;
                 self.check_expr(target, bind);
                 let ty = self.infer_type(expr, bind);
-                self.record_type(expr.range.start.offset, ty);
+                self.record_type(range.start.offset, ty);
             }
 
             ExprKind::Identifier { name } => {
-                let name_str = bind.interner.resolve(*name);
+                let name = *name;
+                let name_str = bind.interner.resolve(name);
                 if name_str == "_" {
                     if !self.is_assignment_target && !self.in_pipeline_rhs {
                         self.emit(
@@ -675,30 +705,29 @@ impl<'r> Checker<'r> {
                                 ErrorCode::UnknownSymbol,
                                 "cannot use '_' as a value; '_' is the discard placeholder",
                             )
-                            .with_range(expr.range),
+                            .with_range(range),
                         );
                     } else if self.in_pipeline_rhs {
                         // `_` stands for the piped value; record its concrete type so
                         // downstream consumers (compiler, LSP) don't see `dynamic`.
                         if let Some(ty) = self.pipeline_value_type.clone() {
-                            self.record_type(expr.range.start.offset, ty);
+                            self.record_type(range.start.offset, ty);
                         }
                     }
                     return;
                 }
 
                 let scope = bind.scopes.get(self.current_scope);
-                if scope.resolve(*name, &bind.scopes).is_none() && !self.is_assignment_target {
+                if scope.resolve(name, &bind.scopes).is_none() && !self.is_assignment_target {
                     let mut diag = Diagnostic::error(
                         ErrorCode::UnknownSymbol,
                         format!("undefined variable: {name_str}"),
                     )
-                    .with_range(expr.range);
+                    .with_range(range);
                     if let Some(candidate) =
                         closest_name(name_str, scope, &bind.scopes, &bind.interner)
                     {
-                        diag =
-                            diag.with_suggestion(Suggestion::did_you_mean(&candidate, expr.range));
+                        diag = diag.with_suggestion(Suggestion::did_you_mean(&candidate, range));
                     }
                     self.emit(diag);
                 }
@@ -726,7 +755,7 @@ impl<'r> Checker<'r> {
                             "this `bigint` literal does not fit in 128 bits".to_string(),
                         )
                         .with_file(self.source_file.clone())
-                        .with_range(expr.range),
+                        .with_range(range),
                     );
                 }
             }
@@ -792,17 +821,17 @@ enum ConstInt {
 /// NOT follow `const` bindings or fold across statements — that is constant
 /// propagation, which the SSA pipeline already owns. The point is to catch the
 /// expression a person can read and see is out of range, where they wrote it.
-fn const_int_expr(e: &Expr) -> ConstInt {
+fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> ConstInt {
     use ConstInt::*;
     let lift = |o: Option<i64>| o.map_or(Overflow, Value);
-    match &e.kind {
+    match &arena.expr(e).kind {
         // Every `i64` is a valid `int`, so a literal the parser produced is
         // always in range; a number too large to be an `i64` never reaches
         // here as an `IntLiteral`.
         ExprKind::IntLiteral { value, .. } => Value(*value),
         ExprKind::Unary { op, operand, .. } => {
             use varn_core::ast::operators::UnaryOp;
-            let v = match const_int_expr(operand) {
+            let v = match const_int_expr(*operand, arena) {
                 Value(v) => v,
                 other => return other,
             };
@@ -814,13 +843,13 @@ fn const_int_expr(e: &Expr) -> ConstInt {
         }
         // Parentheses are a node, not just syntax; without this `(1 << 47)`
         // and `-(-x)` read as NotConst.
-        ExprKind::Paren { expression } => const_int_expr(expression),
+        ExprKind::Paren { expression } => const_int_expr(*expression, arena),
         ExprKind::Binary { left, right, op } => {
-            let a = match const_int_expr(left) {
+            let a = match const_int_expr(*left, arena) {
                 Value(v) => v,
                 other => return other,
             };
-            let b = match const_int_expr(right) {
+            let b = match const_int_expr(*right, arena) {
                 Value(v) => v,
                 other => return other,
             };
@@ -849,6 +878,6 @@ fn const_int_expr(e: &Expr) -> ConstInt {
 /// not reach this evaluator. It is caught at run time instead (see
 /// `tests/errors/int-overflow-negate.vn`), which is the arm that matters for
 /// safety; this diagnostic is an earlier warning, not the guarantee.
-fn overflows_int_literal(e: &Expr) -> bool {
-    const_int_expr(e) == ConstInt::Overflow
+fn overflows_int_literal(e: ExprId, arena: &varn_core::ast::AstArena) -> bool {
+    const_int_expr(e, arena) == ConstInt::Overflow
 }

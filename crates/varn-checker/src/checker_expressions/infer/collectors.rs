@@ -1,9 +1,9 @@
 use crate::checker::Checker;
 use crate::types::Type;
-use varn_core::ast::{Stmt, StmtKind};
+use varn_core::ast::{StmtId, StmtKind};
 
 pub(crate) fn collect_checked_return_types(
-    stmt: &Stmt,
+    stmt: StmtId,
     checker: &mut Checker,
     bind: &crate::binder::BindResult,
 ) -> Vec<Type> {
@@ -13,21 +13,22 @@ pub(crate) fn collect_checked_return_types(
 }
 
 fn collect_returns(
-    stmt: &Stmt,
+    stmt: StmtId,
     checker: &mut Checker,
     bind: &crate::binder::BindResult,
     out: &mut Vec<Type>,
 ) {
-    match &stmt.kind {
+    let arena = checker.ast_arena;
+    match &arena.stmt(stmt).kind {
         StmtKind::Block { stmts, .. } => {
-            for s in stmts {
+            for s in stmts.clone() {
                 collect_returns(s, checker, bind, out);
             }
         }
         StmtKind::Return {
             argument: Some(e), ..
         } => {
-            let ty = checker.infer_type(e, bind);
+            let ty = checker.infer_type(*e, bind);
             if !ty.is_dynamic() {
                 out.push(ty);
             }
@@ -37,18 +38,19 @@ fn collect_returns(
             alternate,
             ..
         } => {
+            let (consequent, alternate) = (*consequent, *alternate);
             collect_returns(consequent, checker, bind, out);
             if let Some(alt) = alternate {
                 collect_returns(alt, checker, bind, out);
             }
         }
         StmtKind::While { body, .. } | StmtKind::DoWhile { body, .. } => {
-            collect_returns(body, checker, bind, out);
+            collect_returns(*body, checker, bind, out);
         }
         StmtKind::For { body, .. }
         | StmtKind::ForIn { body, .. }
         | StmtKind::ForOf { body, .. } => {
-            collect_returns(body, checker, bind, out);
+            collect_returns(*body, checker, bind, out);
         }
         StmtKind::Try {
             block,
@@ -56,19 +58,20 @@ fn collect_returns(
             finally,
             ..
         } => {
+            let (block, catches, finally) = (*block, catches.clone(), *finally);
             collect_returns(block, checker, bind, out);
-            for c in catches {
-                collect_returns(c.body.as_ref(), checker, bind, out);
+            for c in &catches {
+                collect_returns(c.body, checker, bind, out);
             }
             if let Some(f) = finally {
                 collect_returns(f, checker, bind, out);
             }
         }
-        StmtKind::Labeled { body, .. } => collect_returns(body, checker, bind, out),
+        StmtKind::Labeled { body, .. } => collect_returns(*body, checker, bind, out),
         StmtKind::Switch { cases, .. } => {
-            for case in cases {
+            for case in cases.clone() {
                 for s in &case.body {
-                    collect_returns(s, checker, bind, out);
+                    collect_returns(*s, checker, bind, out);
                 }
             }
         }
