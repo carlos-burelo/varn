@@ -105,7 +105,8 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Lsp(args) => commands::lsp::execute(args),
         #[cfg(not(feature = "lsp"))]
         Commands::Lsp(_) => Err(error::CliError::fatal(
-            "vn was built without the \"lsp\" feature (disabled during the Fase 1 compiler refactor)".into(),
+            "vn was built without the \"lsp\" feature (disabled during the Fase 1 compiler refactor)"
+                .to_string(),
         )),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),

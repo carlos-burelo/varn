@@ -60,6 +60,17 @@ pub trait ImportResolver {
     /// against the caller's now-stale, smaller table.
     fn interner_snapshot(&self) -> varn_core::AtomInterner;
 
+    /// Intern `s` into this resolver's shared `Atom` table, publishing the
+    /// result immediately (unlike `interner_snapshot`, which only reads).
+    ///
+    /// Exists for callers that hold no mutable interner of their own but must
+    /// mint an `Atom` for text that is not part of any module's own source —
+    /// an absolute file path or `std:`-style specifier used as an export's
+    /// `origin_module`. Interning here (the live, shared table) rather than
+    /// into a throwaway copy is what makes the returned `Atom` resolve
+    /// correctly through every later `interner_snapshot()`.
+    fn intern(&self, s: &str) -> varn_core::Atom;
+
     /// The prelude's member tables.
     fn core_members(&self) -> Rc<crate::core::loader::CoreMembers>;
 
@@ -394,6 +405,10 @@ impl DiskResolver {
 impl ImportResolver for DiskResolver {
     fn interner_snapshot(&self) -> varn_core::AtomInterner {
         self.interner.borrow().clone()
+    }
+
+    fn intern(&self, s: &str) -> varn_core::Atom {
+        self.interner.borrow_mut().intern(s)
     }
 
     fn module_bind(&self, abs_path: &str) -> Option<Rc<BindResult>> {

@@ -6,20 +6,22 @@ use std::path::Path;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
 use varn_core::Atom;
 
-/// `Symbol::name`/`origin_module` are `Atom`s tied to the specific
-/// `AtomInterner` that minted them (see `binder::types::BindResult::interner`'s
-/// own doc comment: cross-module `Atom` resolution is a documented, pre-existing
-/// gap — "NOT YET WIRED", left for a later task). `collect_exports` only holds
-/// `bind: &BindResult` (shared, cached as `Rc<BindResult>`), so it cannot intern
-/// new text into `bind`'s interner for foreign strings that were never part of
-/// this module's own parse (an absolute file path, the synthetic `"default"`/
-/// namespace-alias names). `bind.interner.get` is the only non-mutating lookup
-/// available; when the text was never interned here, this falls back to
-/// `Atom::default()` (index 0) rather than panicking — a pre-existing
-/// misresolution risk this task inherits, not one it introduces or can close
-/// without threading a mutable interner through the resolver's export cache.
-fn atom_or_placeholder(bind: &BindResult, s: &str) -> Atom {
-    bind.interner.get(s).unwrap_or_default()
+/// `Symbol::origin_module` must name the module that DECLARES the export —
+/// almost never a string `bind`'s own parse ever interned (an absolute file
+/// path or `std:`-style specifier is compiler-internal bookkeeping, not
+/// source text). `bind.interner` is an owned snapshot with no mutable access
+/// here, so it cannot mint the atom itself: a `.get`-only lookup against it
+/// silently fell back to `Atom::default()` (index 0) on the near-guaranteed
+/// miss, handing every export an `origin_module` that resolved to whatever
+/// text happened to occupy slot 0 of whichever interner later decoded it —
+/// the cross-module "property does not exist" regression across the whole
+/// stdlib (`Color`, `Pointer`, `MarkdownNode`, ... all imported types).
+///
+/// `resolver` is always the live, shared `AtomInterner` every module's bind
+/// publishes into (see `ImportResolver::intern`), so interning `s` there
+/// mints (or reuses) a real, resolvable `Atom` instead of guessing.
+fn atom_or_placeholder(resolver: &dyn super::ImportResolver, s: &str) -> Atom {
+    resolver.intern(s)
 }
 
 pub(super) fn assign_slots(exports: &mut ExportMap) {
@@ -55,7 +57,7 @@ pub(super) fn collect_exports(
                     let name_str = bind.interner.resolve(name);
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
-                        s.origin_module = Some(atom_or_placeholder(bind, abs_path));
+                        s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
                         out.insert(name_str.to_string(), s);
                     }
                 }
@@ -64,7 +66,7 @@ pub(super) fn collect_exports(
                         let variant_name = bind.interner.resolve(variant.name);
                         if let Some(sym) = lookup_global(bind, variant_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(atom_or_placeholder(bind, abs_path));
+                            s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
                             out.insert(variant_name.to_string(), s);
                         }
                     }
@@ -74,7 +76,7 @@ pub(super) fn collect_exports(
                         let member_name = bind.interner.resolve(member.id);
                         if let Some(sym) = lookup_global(bind, member_name) {
                             let mut s = sym.clone();
-                            s.origin_module = Some(atom_or_placeholder(bind, abs_path));
+                            s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
                             out.insert(member_name.to_string(), s);
                         }
                     }
@@ -94,7 +96,7 @@ pub(super) fn collect_exports(
                         s.origin_module = s
                             .origin_module
                             .take()
-                            .or_else(|| Some(atom_or_placeholder(bind, abs_path)));
+                            .or_else(|| Some(atom_or_placeholder(resolver, abs_path)));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -118,7 +120,7 @@ pub(super) fn collect_exports(
                     if let Some(sym) = src_exports.get(local_name) {
                         let mut s = sym.clone();
                         s.name = spec.exported;
-                        s.re_export_path.push(atom_or_placeholder(bind, abs_path));
+                        s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
                         out.insert(exported_name.to_string(), s);
                     }
                 }
@@ -139,7 +141,7 @@ pub(super) fn collect_exports(
                 for (name, sym) in src_exports.iter() {
                     out.entry(name.clone()).or_insert_with(|| {
                         let mut s = sym.clone();
-                        s.re_export_path.push(atom_or_placeholder(bind, abs_path));
+                        s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
                         s
                     });
                 }
@@ -165,10 +167,10 @@ pub(super) fn collect_exports(
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, *ns, 0);
                 ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
-                ns_sym.origin_module = Some(atom_or_placeholder(bind, &src_abs));
+                ns_sym.origin_module = Some(atom_or_placeholder(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();
-                    s.re_export_path.push(atom_or_placeholder(bind, abs_path));
+                    s.re_export_path.push(atom_or_placeholder(resolver, abs_path));
                     out.insert(format!("{ns_str}.{sub_name}"), s);
                 }
                 out.insert(ns_str.to_string(), ns_sym);
@@ -178,7 +180,7 @@ pub(super) fn collect_exports(
                     let fn_name = bind.interner.resolve(f.id);
                     if let Some(sym) = lookup_global(bind, fn_name) {
                         let mut s = sym.clone();
-                        s.name = atom_or_placeholder(bind, "default");
+                        s.name = atom_or_placeholder(resolver, "default");
                         out.insert("default".into(), s);
                     }
                 }
@@ -187,14 +189,14 @@ pub(super) fn collect_exports(
                         let class_name = bind.interner.resolve(*id);
                         if let Some(sym) = lookup_global(bind, class_name) {
                             let mut s = sym.clone();
-                            s.name = atom_or_placeholder(bind, "default");
+                            s.name = atom_or_placeholder(resolver, "default");
                             out.insert("default".into(), s);
                         }
                     }
                 }
                 ExportDefaultDecl::Expr(_expr) => {
-                    let mut s = Symbol::new(SymbolKind::Let, atom_or_placeholder(bind, "default"), 0);
-                    s.origin_module = Some(atom_or_placeholder(bind, abs_path));
+                    let mut s = Symbol::new(SymbolKind::Let, atom_or_placeholder(resolver, "default"), 0);
+                    s.origin_module = Some(atom_or_placeholder(resolver, abs_path));
                     out.insert("default".into(), s);
                 }
             },
