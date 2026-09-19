@@ -33,15 +33,17 @@ impl<'r> Checker<'r> {
                             let mut is_compatible = self.types_compatible_cached(ann_ty, &init_ty, Some(bind));
                             if is_compatible && ann_ty.is_granular_int() {
                                 if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(init_expr).kind {
-                                    if !crate::checker::compat::literal_fits_type(ann_ty, *value) {
+                                    if !crate::checker::compat::literal_fits_type(ann_ty, *value, &self.ty_table) {
                                         is_compatible = false;
                                     }
                                 }
                             }
                             if !is_empty_array && !is_compatible {
+                                let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
+                                let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                                 self.emit(
                                     Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                        "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"
+                                        "type mismatch: declared as '{ann_ty_s}' but initialised with '{init_ty_s}'"
                                     ))
                                     .with_range(*decl.range()),
                                 );
@@ -80,7 +82,7 @@ impl<'r> Checker<'r> {
                     .map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if f.modifiers.is_async {
-                            crate::types::awaited(&ty)
+                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
                         } else {
                             ty
                         }
@@ -125,24 +127,29 @@ impl<'r> Checker<'r> {
                         let inferred_yield = if yields.is_empty() {
                             Type::Void
                         } else {
-                            Type::union(yields)
+                            Type::union(yields, &mut self.ty_table)
                         };
                         let scope = bind.scopes.get(saved_scope);
                         if let Some(sym_id) = scope.resolve(f.id, &bind.scopes) {
-                            if let Some(mut fn_ty) = self
+                            if let Some(fn_ty) = self
                                 .symbol_types
                                 .get(&sym_id)
                                 .cloned()
-                                .or_else(|| bind.arena.get(sym_id).ty.clone())
+                                .or_else(|| bind.arena.get(sym_id).ty)
                             {
-                                if let TypeKind::Fn(ref mut ft) = fn_ty.0 {
-                                    *ft.return_type = crate::types::generator_of(
+                                if let TypeKind::Fn(fid) = *self.ty_table.get(fn_ty.0) {
+                                    let new_ret = crate::types::generator_of(
                                         inferred_yield,
                                         f.modifiers.is_async,
+                                        &mut self.ty_table,
+                                        Some(self.resolver),
                                     );
+                                    let mut ft = self.ty_table.get_function(fid).clone();
+                                    ft.return_type = new_ret.0;
+                                    let new_fn_ty = Type::fn_(ft, &mut self.ty_table);
+                                    self.symbol_types.insert(sym_id, new_fn_ty);
+                                    self.record_type_with_symbol(f.id_offset, new_fn_ty, sym_id);
                                 }
-                                self.symbol_types.insert(sym_id, fn_ty.clone());
-                                self.record_type_with_symbol(f.id_offset, fn_ty, sym_id);
                             }
                         }
                     }
@@ -248,14 +255,16 @@ impl<'r> Checker<'r> {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
                                     let key_str = bind.interner.resolve(*key);
-                                    self.with_expected(Some(prop_ty.clone()), |checker| {
+                                    self.with_expected(Some(prop_ty), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
                                         if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                            let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
+                                            let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
-                                                    key_str, prop_ty, init_ty
+                                                    key_str, prop_ty_s, init_ty_s
                                                 ))
                                                 .with_range(*range),
                                             );
@@ -295,7 +304,7 @@ impl<'r> Checker<'r> {
                                 .map(|rt| {
                                     let ty = self.resolve_type_node_cached(rt, bind);
                                     if modifiers.is_async {
-                                        crate::types::awaited(&ty)
+                                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
                                     } else {
                                         ty
                                     }
@@ -402,14 +411,16 @@ impl<'r> Checker<'r> {
                                 if let Some(ann) = type_ann {
                                     let prop_ty = self.resolve_type_node_cached(ann, bind);
                                     let key_str = bind.interner.resolve(*key);
-                                    self.with_expected(Some(prop_ty.clone()), |checker| {
+                                    self.with_expected(Some(prop_ty), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
                                         if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                            let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
+                                            let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
                                             checker.emit(
                                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                                     "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
-                                                    key_str, prop_ty, init_ty
+                                                    key_str, prop_ty_s, init_ty_s
                                                 ))
                                                 .with_range(*range),
                                             );
@@ -572,13 +583,15 @@ impl<'r> Checker<'r> {
 
             Decl::Extension(ext) => {
                 let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
-                let ext_class_name = match &ext_self_ty.0 {
-                    TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
+                let ext_class_name = match *self.ty_table.get(ext_self_ty.0) {
+                    TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
+                        Some(Rc::from(bind.interner.resolve(n)))
+                    }
 
                     TypeKind::Intrinsic(tag)
-                        if varn_core::IntrinsicType(*tag).is_scalar_primitive() =>
+                        if varn_core::IntrinsicType(tag).is_scalar_primitive() =>
                     {
-                        Some(varn_core::IntrinsicType(*tag).as_str().into())
+                        Some(varn_core::IntrinsicType(tag).as_str().into())
                     }
                     _ => None,
                 };
@@ -596,7 +609,7 @@ impl<'r> Checker<'r> {
                                 .map(|rt| {
                                     let ty = self.resolve_type_node_cached(rt, bind);
                                     if method.modifiers.is_async {
-                                        crate::types::awaited(&ty)
+                                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
                                     } else {
                                         ty
                                     }
