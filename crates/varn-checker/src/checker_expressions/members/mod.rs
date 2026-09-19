@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{ObjectTypeMember, Type};
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
 /// Is `name` an enum, as `bind` sees it?
@@ -91,6 +91,7 @@ pub fn get_members_of_type(
     resolver: &dyn crate::module_resolver::ImportResolver,
     ty: &Type,
     bind: &BindResult,
+    table: &mut CheckerTyTable,
 ) -> Vec<crate::semantic_info::ResolvedMemberSummary> {
     let mut results: Vec<crate::semantic_info::ResolvedMemberSummary> = Vec::new();
     let mut seen = rustc_hash::FxHashSet::default();
@@ -146,9 +147,10 @@ pub fn get_members_of_type(
         }
     }
 
-    match &ty.0 {
-        TypeKind::Object(members) => {
-            for m in members {
+    let ty_kind = *table.get(ty.0);
+    match ty_kind {
+        TypeKind::Object(mid) => {
+            for m in table.get_object_members(mid).to_vec() {
                 match m {
                     ObjectTypeMember::Property {
                         name,
@@ -160,11 +162,11 @@ pub fn get_members_of_type(
                             &mut results,
                             &mut seen,
                             name.clone(),
-                            ty.clone(),
+                            Type(ty, false),
                             crate::semantic_info::ResolvedMemberKind::Property,
                             false,
-                            *optional,
-                            *readonly,
+                            optional,
+                            readonly,
                         );
                     }
                     ObjectTypeMember::Method {
@@ -174,12 +176,15 @@ pub fn get_members_of_type(
                         is_arrow,
                         ..
                     } => {
-                        let fn_ty = Type::fn_(crate::types::FunctionType {
-                            params: params.clone(),
-                            return_type: return_type.clone(),
-                            is_arrow: *is_arrow,
-                            type_params: vec![],
-                        });
+                        let fn_ty = Type::fn_(
+                            crate::types::FunctionType {
+                                params: params.clone(),
+                                return_type,
+                                is_arrow,
+                                type_params: vec![],
+                            },
+                            table,
+                        );
                         add_member(
                             &mut results,
                             &mut seen,
@@ -195,13 +200,14 @@ pub fn get_members_of_type(
                 }
             }
         }
-        TypeKind::Tuple(elems) => {
+        TypeKind::Tuple(list) => {
+            let elems = table.get_list(list).to_vec();
             for (idx, elem) in elems.iter().enumerate() {
                 add_member(
                     &mut results,
                     &mut seen,
                     Rc::from(idx.to_string()),
-                    elem.clone(),
+                    Type(*elem, false),
                     crate::semantic_info::ResolvedMemberKind::Property,
                     false,
                     false,
@@ -220,38 +226,45 @@ pub fn get_members_of_type(
             );
         }
         TypeKind::Array(inner) => {
-            let array_ty = Type::generic(
-                varn_core::IntrinsicType::Array.as_str().to_owned(),
-                vec![*inner.clone()],
-            );
-            return get_members_of_type(resolver, &array_ty, bind);
+            let atom = resolver.intern(varn_core::IntrinsicType::Array.as_str());
+            let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
+            return get_members_of_type(resolver, &array_ty, bind, table);
         }
-        TypeKind::Named(cn, origin) | TypeKind::Generic(cn, _, origin) => {
-            let mapping = if let TypeKind::Generic(_, args, _) = &ty.0 {
-                member_type::generic_mapping(resolver, cn.as_ref(), args, origin.as_ref(), bind)
+        TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
+            let cn: Rc<str> = Rc::from(bind.interner.resolve(cn_atom));
+            let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
+            let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
+                let args: Vec<Type> = table
+                    .get_list(args_list)
+                    .iter()
+                    .map(|id| Type(*id, false))
+                    .collect();
+                member_type::generic_mapping(resolver, cn.as_ref(), &args, origin.as_ref(), bind)
             } else {
                 rustc_hash::FxHashMap::default()
             };
 
-            let map_ty = |t: &Type| {
+            let mut map_ty = |t: &Type, table: &mut CheckerTyTable| {
                 if mapping.is_empty() {
-                    t.clone()
+                    *t
                 } else {
-                    t.map_generics(&mapping)
+                    t.map_generics(&mapping, table)
                 }
             };
 
             // 1. Check local type_members
-            if let Some(entry) = bind.type_members.classes.get(cn) {
+            if let Some(entry) = bind.type_members.classes.get(&cn) {
                 for m in &entry.members {
                     let kind = map_class_member_kind(m.kind);
-                    add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
+                    let mapped = map_ty(&m.ty, table);
+                    add_declared(&mut results, &mut seen, m, mapped, kind);
                 }
             }
-            if let Some(entry) = bind.type_members.interfaces.get(cn) {
+            if let Some(entry) = bind.type_members.interfaces.get(&cn) {
                 for m in entry {
                     let kind = map_class_member_kind(m.kind);
-                    add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
+                    let mapped = map_ty(&m.ty, table);
+                    add_declared(&mut results, &mut seen, m, mapped, kind);
                 }
             }
 
@@ -260,24 +273,27 @@ pub fn get_members_of_type(
                 if let Some(entry) = b.class_members.get(cn.as_ref()) {
                     for m in &entry.members {
                         let kind = map_class_member_kind(m.kind);
-                        add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
+                        let mapped = map_ty(&m.ty, table);
+                        add_declared(&mut results, &mut seen, m, mapped, kind);
                     }
                 }
                 if let Some(members) = b.flattened_members.get(cn.as_ref()) {
                     for m in members {
                         let kind = map_class_member_kind(m.kind);
-                        add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
+                        let mapped = map_ty(&m.ty, table);
+                        add_declared(&mut results, &mut seen, m, mapped, kind);
                     }
                 }
             }
 
             // 3. Check external / stdlib module binds
             let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-            if let Some(ext_bind) = resolver.find_bind_for_type(cn, &origin_modules) {
-                if let Some(entry) = ext_bind.type_members.classes.get(cn) {
+            if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules) {
+                if let Some(entry) = ext_bind.type_members.classes.get(&cn) {
                     for m in &entry.members {
                         let kind = map_class_member_kind(m.kind);
-                        add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
+                        let mapped = map_ty(&m.ty, table);
+                        add_declared(&mut results, &mut seen, m, mapped, kind);
                     }
                 }
             }
@@ -293,17 +309,17 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned());
-            return get_members_of_type(resolver, &str_ty, bind);
+            let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned(), resolver, table);
+            return get_members_of_type(resolver, &str_ty, bind, table);
         }
         TypeKind::Intrinsic(tag) => {
-            let named_ty = Type::named(tag.name().to_owned());
-            return get_members_of_type(resolver, &named_ty, bind);
+            let named_ty = Type::named(tag.name().to_owned(), resolver, table);
+            return get_members_of_type(resolver, &named_ty, bind, table);
         }
         _ => {}
     }
 
-    collect_extension_members(&mut results, &mut seen, ty, bind);
+    collect_extension_members(&mut results, &mut seen, ty, bind, table);
     results
 }
 
@@ -319,8 +335,9 @@ fn collect_extension_members(
     seen: &mut rustc_hash::FxHashSet<Rc<str>>,
     ty: &Type,
     bind: &BindResult,
+    table: &mut CheckerTyTable,
 ) {
-    let Some(type_name) = extension_key(ty) else {
+    let Some(type_name) = extension_key(ty, table, &bind.interner) else {
         return;
     };
     let scope = bind.scopes.get(bind.global_scope);
@@ -334,18 +351,19 @@ fn collect_extension_members(
         }
         crate::types::FunctionType {
             params,
-            return_type: ft.return_type.clone(),
+            return_type: ft.return_type,
             is_arrow: ft.is_arrow,
             type_params: ft.type_params.clone(),
         }
     };
 
-    let push = |name: &Rc<str>,
+    let mut push = |name: &Rc<str>,
                 mangled: &Rc<str>,
                 kind: crate::semantic_info::ResolvedMemberKind,
                 as_return: bool,
                 results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-                seen: &mut rustc_hash::FxHashSet<Rc<str>>| {
+                seen: &mut rustc_hash::FxHashSet<Rc<str>>,
+                table: &mut CheckerTyTable| {
         let Some(sid) = bind
             .interner
             .get(mangled.as_ref())
@@ -354,14 +372,18 @@ fn collect_extension_members(
             return;
         };
         let sym = bind.arena.get(sid);
-        let Some(Type(TypeKind::Fn(ft), _)) = &sym.ty else {
+        let Some(sym_ty) = &sym.ty else {
             return;
         };
+        let TypeKind::Fn(fid) = table.get(sym_ty.0) else {
+            return;
+        };
+        let ft = table.get_function(*fid).clone();
         // A getter reads as its return type; a method reads as its signature.
         let member_ty = if as_return {
-            ft.return_type.as_ref().clone()
+            Type(ft.return_type, false)
         } else {
-            Type(TypeKind::Fn(strip_this(ft)), false)
+            Type::fn_(strip_this(&ft), table)
         };
         if seen.insert(name.clone()) {
             results.push(crate::semantic_info::ResolvedMemberSummary {
@@ -382,25 +404,29 @@ fn collect_extension_members(
     use crate::semantic_info::ResolvedMemberKind as K;
     if let Some(methods) = bind.extensions.methods.get(type_name.as_ref()) {
         for (name, mangled) in methods {
-            push(name, mangled, K::ExtensionMethod, false, results, seen);
+            push(name, mangled, K::ExtensionMethod, false, results, seen, table);
         }
     }
     if let Some(getters) = bind.extensions.getters.get(type_name.as_ref()) {
         for (name, mangled) in getters {
-            push(name, mangled, K::ExtensionProperty, true, results, seen);
+            push(name, mangled, K::ExtensionProperty, true, results, seen, table);
         }
     }
     if let Some(setters) = bind.extensions.setters.get(type_name.as_ref()) {
         for (name, mangled) in setters {
-            push(name, mangled, K::ExtensionProperty, true, results, seen);
+            push(name, mangled, K::ExtensionProperty, true, results, seen, table);
         }
     }
 }
 
 /// The name `extension` blocks are keyed by for `ty`.
-fn extension_key(ty: &Type) -> Option<Rc<str>> {
-    match &ty.0 {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
+fn extension_key(
+    ty: &Type,
+    table: &CheckerTyTable,
+    interner: &varn_core::AtomInterner,
+) -> Option<Rc<str>> {
+    match table.get(ty.0) {
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(*n))),
         TypeKind::Intrinsic(tag) => Some(Rc::from(tag.name())),
         TypeKind::Array(_) => Some(Rc::from(varn_core::IntrinsicType::Array.as_str())),
         _ => None,
@@ -409,8 +435,11 @@ fn extension_key(ty: &Type) -> Option<Rc<str>> {
 
 impl<'r> Checker<'r> {
     pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Rc<str>> {
-        match &ty.0 {
-            TypeKind::Object(members) => members
+        let ty_kind = *self.ty_table.get(ty.0);
+        match ty_kind {
+            TypeKind::Object(mid) => self
+                .ty_table
+                .get_object_members(mid)
                 .iter()
                 .filter_map(|m| match m {
                     ObjectTypeMember::Property { name, .. }
@@ -418,15 +447,18 @@ impl<'r> Checker<'r> {
                     _ => None,
                 })
                 .collect(),
-            TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => bind
-                .get_class_entry(cn.as_ref())
-                .map(|entry| entry.members.iter().map(|m| m.name.clone()).collect())
-                .unwrap_or_default(),
-            TypeKind::Union(members) => {
+            TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => {
+                let cn_str = bind.interner.resolve(cn);
+                bind.get_class_entry(cn_str)
+                    .map(|entry| entry.members.iter().map(|m| m.name.clone()).collect())
+                    .unwrap_or_default()
+            }
+            TypeKind::Union(list) => {
                 let mut names: Vec<Rc<str>> = Vec::new();
-                for m in members {
-                    if !m.is_nullable() {
-                        names.extend(self.collect_member_names(m, bind));
+                for id in self.ty_table.get_list(list).to_vec() {
+                    let m = Type(id, false);
+                    if !m.is_nullable(&self.ty_table) {
+                        names.extend(self.collect_member_names(&m, bind));
                     }
                 }
                 names.sort_unstable();

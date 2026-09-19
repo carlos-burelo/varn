@@ -60,7 +60,7 @@ fn check_origin_module(
 
 impl<'r> Checker<'r> {
     pub(crate) fn member_exists_cached(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
-        let ty_key = (ty.clone(), Rc::from(key));
+        let ty_key = (*ty, Rc::from(key));
         if let Some(exists) = self.member_exists_cache.get(&ty_key) {
             return *exists;
         }
@@ -70,8 +70,9 @@ impl<'r> Checker<'r> {
         exists
     }
 
-    pub(crate) fn member_exists(&self, ty: &Type, key: &str, bind: &BindResult) -> bool {
-        let res = match &ty.0 {
+    pub(crate) fn member_exists(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
+        let ty_kind = *self.ty_table.get(ty.0);
+        let res = match ty_kind {
             TypeKind::Intrinsic(varn_core::TypeTag::Dynamic) => true,
             TypeKind::Intrinsic(varn_core::TypeTag::Never) => false,
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
@@ -90,7 +91,7 @@ impl<'r> Checker<'r> {
                 false
             }
             TypeKind::Intrinsic(_) => {
-                let name = ty.to_string();
+                let name = ty.display(&self.ty_table, &bind.interner).to_string();
                 if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_str()) {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
@@ -113,14 +114,18 @@ impl<'r> Checker<'r> {
                 {
                     return true;
                 }
-                if self.member_exists(payload_ty, key, bind) {
+                if self.member_exists(&Type(payload_ty, false), key, bind) {
                     return true;
                 }
-                self.member_exists(&Type::named(enum_name.clone()), key, bind)
+                let enum_name_str = bind.interner.resolve(enum_name).to_string();
+                let named = Type::named(enum_name_str, self.resolver, &mut self.ty_table);
+                self.member_exists(&named, key, bind)
             }
-            TypeKind::Named(name, origin) => {
+            TypeKind::Named(name_atom, origin_atom) => {
+                let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
+                let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
                 if name.as_ref() == "*" {
-                    if let Some(origin_path) = origin {
+                    if let Some(origin_path) = &origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
                             Some(self.resolver.stdlib_exports(origin_path))
                         } else {
@@ -142,7 +147,7 @@ impl<'r> Checker<'r> {
                 }
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-                let is_enum = super::is_enum_type(self.resolver, bind, name, &origin_modules);
+                let is_enum = super::is_enum_type(self.resolver, bind, &name, &origin_modules);
 
                 if is_enum {
                     if key == varn_core::MemberKey::RawValue.as_str()
@@ -157,7 +162,7 @@ impl<'r> Checker<'r> {
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
-                    if let Some(ext_bind) = self.resolver.find_bind_for_type(name, &origin_modules)
+                    if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -173,7 +178,7 @@ impl<'r> Checker<'r> {
                             }
                         }
                         if let Some(ext_bind) =
-                            self.resolver.find_bind_for_type(name, &origin_modules)
+                            self.resolver.find_bind_for_type(&name, &origin_modules)
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if fields.iter().any(|(fname, _)| fname.as_ref() == key) {
@@ -184,22 +189,22 @@ impl<'r> Checker<'r> {
                     }
                 }
 
-                if let Some(members) = bind.type_members.classes.get(name) {
+                if let Some(members) = bind.type_members.classes.get(&name) {
                     if members.members.iter().any(|m| m.name.as_ref() == key) {
                         return true;
                     }
                 }
-                if let Some(members) = bind.type_members.interfaces.get(name) {
+                if let Some(members) = bind.type_members.interfaces.get(&name) {
                     if members.iter().any(|m| m.name.as_ref() == key) {
                         return true;
                     }
                 }
-                if let Some(members) = bind.type_members.enums.get(name) {
+                if let Some(members) = bind.type_members.enums.get(&name) {
                     if members.iter().any(|m| m.name.as_ref() == key) {
                         return true;
                     }
                 }
-                if let Some(members) = bind.type_members.namespaces.get(name) {
+                if let Some(members) = bind.type_members.namespaces.get(&name) {
                     if members.iter().any(|m| m.name.as_ref() == key) {
                         return true;
                     }
@@ -223,20 +228,28 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                if let Some(parent) = bind.class_parents.get(name) {
-                    return self.member_exists(&Type::named(parent.clone()), key, bind);
+                if let Some(parent) = bind.class_parents.get(&name) {
+                    let parent = parent.clone();
+                    let named = Type::named(parent, self.resolver, &mut self.ty_table);
+                    return self.member_exists(&named, key, bind);
                 }
 
-                if check_origin_module(self.resolver, name, origin, key) {
+                if check_origin_module(self.resolver, &name, &origin, key) {
                     return true;
                 }
                 false
             }
-            TypeKind::Generic(name, _, origin) => {
-                let ty = Type(TypeKind::Named(name.clone(), origin.clone()), false);
+            TypeKind::Generic(name_atom, _, origin_atom) => {
+                let name = bind.interner.resolve(name_atom).to_string();
+                let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
+                let ty = Type::named_with_origin(name, origin, self.resolver, &mut self.ty_table);
                 self.member_exists(&ty, key, bind)
             }
-            TypeKind::Object(members) => members.iter().any(|m| m.name() == key),
+            TypeKind::Object(mid) => self
+                .ty_table
+                .get_object_members(mid)
+                .iter()
+                .any(|m| m.name() == key),
             // Mirrors the `TypeKind::Tuple` arm of `find_member_info_uncached`.
             //
             // Having to say it twice is the defect, not the answer: "which
@@ -258,14 +271,22 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
-            TypeKind::Union(members) => members.iter().all(|m| self.member_exists(m, key, bind)),
-            TypeKind::Intersection(members) => {
-                members.iter().any(|m| self.member_exists(m, key, bind))
+            TypeKind::Union(list) => {
+                let ids = self.ty_table.get_list(list).to_vec();
+                ids.iter().all(|id| self.member_exists(&Type(*id, false), key, bind))
+            }
+            TypeKind::Intersection(list) => {
+                let ids = self.ty_table.get_list(list).to_vec();
+                ids.iter().any(|id| self.member_exists(&Type(*id, false), key, bind))
             }
             _ => false,
         };
         if !res {
-            if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(ty) {
+            if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+                ty,
+                &self.ty_table,
+                &bind.interner,
+            ) {
                 if bind
                     .extensions
                     .methods

@@ -55,12 +55,6 @@ pub struct TypeEntry {
     pub symbol_id: Option<SymbolId>,
 }
 
-impl std::fmt::Display for ExprInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.ty)
-    }
-}
-
 #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ScopeSpan {
     pub start: u32,
@@ -496,8 +490,11 @@ impl<'r> Checker<'r> {
                 None => true,
                 Some(t) => {
                     t.is_dynamic()
-                        || match &t.0 {
-                            varn_core::TypeKind::Fn(ft) => ft.return_type.is_dynamic(),
+                        || match checker.ty_table.get(t.0) {
+                            varn_core::TypeKind::Fn(fid) => {
+                                Type(checker.ty_table.get_function(*fid).return_type, false)
+                                    .is_dynamic()
+                            }
                             _ => false,
                         }
                 }

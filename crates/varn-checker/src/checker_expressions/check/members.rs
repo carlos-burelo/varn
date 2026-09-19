@@ -27,7 +27,8 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(object, bind);
-        if let Some(tn) = extension_type_name(&obj_ty.non_nullified()) {
+        let non_null = obj_ty.non_nullified(&mut self.ty_table);
+        if let Some(tn) = extension_type_name(&non_null, &self.ty_table, &bind.interner) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
                     self.extension_set_members
@@ -68,33 +69,40 @@ impl<'r> Checker<'r> {
                 return;
             }
             let obj_ty = self.infer_type(object, bind);
-            let check_ty = obj_ty.non_nullified();
-            let key_expected = match &check_ty.0 {
+            let check_ty = obj_ty.non_nullified(&mut self.ty_table);
+            let check_kind = *self.ty_table.get(check_ty.0);
+            let key_expected = match check_kind {
                 TypeKind::Generic(name, args, _)
-                    if name.as_ref() == varn_core::IntrinsicType::Map.as_str() =>
+                    if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str() =>
                 {
-                    if args.len() == 2 {
-                        Some(args[0].clone())
-                    } else if args.len() == 1 {
+                    let arg_ids = self.ty_table.get_list(args).to_vec();
+                    if arg_ids.len() == 2 {
+                        Some(Type(arg_ids[0], false))
+                    } else if arg_ids.len() == 1 {
                         Some(Type::Str)
                     } else {
                         None
                     }
                 }
-                TypeKind::Object(members) => members.iter().find_map(|m| match m {
-                    ObjectTypeMember::Index { key_ty, .. } => Some((**key_ty).clone()),
-                    _ => None,
-                }),
+                TypeKind::Object(mid) => {
+                    self.ty_table.get_object_members(mid).iter().find_map(|m| match m {
+                        ObjectTypeMember::Index { key_ty, .. } => Some(Type(*key_ty, false)),
+                        _ => None,
+                    })
+                }
                 TypeKind::Array(_) => Some(Type::Int),
                 _ => None,
             };
             if let Some(expected_k) = key_expected {
-                self.with_expected(Some(expected_k.clone()), |c| c.check_expr(property, bind));
+                self.with_expected(Some(expected_k), |c| c.check_expr(property, bind));
                 let actual_k = self.infer_type(property, bind);
                 let is_range_slice = matches!(
-                    check_ty.0,
+                    check_kind,
                     TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str)
-                ) && matches!(actual_k.0, TypeKind::Intrinsic(varn_core::TypeTag::Range));
+                ) && matches!(
+                    self.ty_table.get(actual_k.0),
+                    TypeKind::Intrinsic(varn_core::TypeTag::Range)
+                );
                 if !actual_k.is_dynamic()
                     && !is_range_slice
                     && !self.types_compatible_cached(&expected_k, &actual_k, Some(bind))
@@ -103,7 +111,9 @@ impl<'r> Checker<'r> {
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
                             format!(
-                                "type mismatch: index key is '{actual_k}', expected '{expected_k}'"
+                                "type mismatch: index key is '{}', expected '{}'",
+                                actual_k.display(&self.ty_table, &bind.interner),
+                                expected_k.display(&self.ty_table, &bind.interner)
                             ),
                         )
                         .with_range(property_range),
@@ -123,13 +133,14 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(object, bind);
-        if !optional && obj_ty.is_nullable() {
+        if !optional && obj_ty.is_nullable(&self.ty_table) {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::PossibleNullDereference,
                     format!(
                         "object is possibly null: cannot access property '{}' on nullable type '{}'",
-                        prop_name, obj_ty
+                        prop_name,
+                        obj_ty.display(&self.ty_table, &bind.interner)
                     ),
                 )
                 .with_suggestion(Suggestion::new(
@@ -139,7 +150,7 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let check_ty = obj_ty.non_nullified();
+        let check_ty = obj_ty.non_nullified(&mut self.ty_table);
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name, bind) {
             if let Some(sid) = maybe_sid {
@@ -151,9 +162,12 @@ impl<'r> Checker<'r> {
             let prop_ty = self.infer_type(expr, bind);
             self.record_type(property_range.start.offset, prop_ty);
         }
-        let should_check = !matches!(check_ty.0, TypeKind::Intrinsic(varn_core::TypeTag::Never));
+        let should_check = !matches!(
+            self.ty_table.get(check_ty.0),
+            TypeKind::Intrinsic(varn_core::TypeTag::Never)
+        );
 
-        if let Some(tn) = extension_type_name(&check_ty) {
+        if let Some(tn) = extension_type_name(&check_ty, &self.ty_table, &bind.interner) {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name) {
                     self.extension_members
@@ -173,7 +187,10 @@ impl<'r> Checker<'r> {
                 .map(|c| Suggestion::did_you_mean(c, *range));
             let mut diag = Diagnostic::error(
                 ErrorCode::MissingProperty,
-                format!("property '{prop_name}' does not exist on type '{check_ty}'"),
+                format!(
+                    "property '{prop_name}' does not exist on type '{}'",
+                    check_ty.display(&self.ty_table, &bind.interner)
+                ),
             )
             .with_range(*range);
             if let Some(s) = suggestion {
@@ -207,10 +224,12 @@ impl<'r> Checker<'r> {
                 false
             };
 
-            let is_enum = matches!(&check_ty.0, TypeKind::EnumVariant { .. })
-                || if let TypeKind::Named(n, _) = &check_ty.0 {
+            let check_kind = *self.ty_table.get(check_ty.0);
+            let is_enum = matches!(check_kind, TypeKind::EnumVariant { .. })
+                || if let TypeKind::Named(n, _) = check_kind {
+                    let n_str = bind.interner.resolve(n);
                     bind.interner
-                        .get(n.as_ref())
+                        .get(n_str)
                         .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
                         .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
                         .unwrap_or(false)
@@ -218,31 +237,34 @@ impl<'r> Checker<'r> {
                     false
                 };
 
+            let final_mem_kind = *self.ty_table.get(final_mem_ty.0);
             let member_kind = if is_enum {
                 crate::semantic_info::ResolvedMemberKind::EnumMember
             } else if self
                 .extension_members
                 .contains_key(&property_range.start.offset)
             {
-                if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+                if matches!(final_mem_kind, TypeKind::Fn(_)) {
                     crate::semantic_info::ResolvedMemberKind::ExtensionMethod
                 } else {
                     crate::semantic_info::ResolvedMemberKind::ExtensionProperty
                 }
             } else if is_static {
-                if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+                if matches!(final_mem_kind, TypeKind::Fn(_)) {
                     crate::semantic_info::ResolvedMemberKind::StaticMethod
                 } else {
                     crate::semantic_info::ResolvedMemberKind::StaticProperty
                 }
-            } else if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+            } else if matches!(final_mem_kind, TypeKind::Fn(_)) {
                 crate::semantic_info::ResolvedMemberKind::Method
             } else {
                 crate::semantic_info::ResolvedMemberKind::Property
             };
 
-            let origin_module = match &check_ty.0 {
-                TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => orig.clone(),
+            let origin_module = match check_kind {
+                TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
+                    orig.map(|o| std::rc::Rc::from(bind.interner.resolve(o)))
+                }
                 TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(match tag {
                     varn_core::TypeTag::Map => "core:map",
                     varn_core::TypeTag::Set => "core:set",
@@ -258,7 +280,7 @@ impl<'r> Checker<'r> {
             self.member_resolutions.insert(
                 property_range.start.offset,
                 crate::semantic_info::MemberResolution {
-                    receiver_ty: check_ty.clone(),
+                    receiver_ty: check_ty,
                     member_name: std::rc::Rc::from(prop_name),
                     member_kind,
                     member_ty: final_mem_ty,
@@ -269,12 +291,15 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let class_name = match &obj_ty.0 {
-            TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => Some(n.as_ref()),
+        let obj_kind = *self.ty_table.get(obj_ty.0);
+        let class_name = match obj_kind {
+            TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
+                Some(bind.interner.resolve(n).to_string())
+            }
             _ => None,
         };
         if let Some(class_name) = class_name {
-            self.check_member_visibility(class_name, prop_name, range, bind);
+            self.check_member_visibility(&class_name, prop_name, range, bind);
         }
     }
 
@@ -326,9 +351,13 @@ impl<'r> Checker<'r> {
     }
 }
 
-pub(crate) fn extension_type_name(ty: &Type) -> Option<std::rc::Rc<str>> {
-    match &ty.0 {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
+pub(crate) fn extension_type_name(
+    ty: &Type,
+    table: &crate::types::CheckerTyTable,
+    interner: &varn_core::AtomInterner,
+) -> Option<std::rc::Rc<str>> {
+    match table.get(ty.0) {
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(std::rc::Rc::from(interner.resolve(*n))),
         TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(tag.name())),
         _ => None,
     }
