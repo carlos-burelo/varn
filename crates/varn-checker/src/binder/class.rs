@@ -1,5 +1,4 @@
 use super::type_inference::pattern_lead_name;
-use super::type_resolution::resolve_type_node;
 use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
@@ -17,8 +16,12 @@ impl<'r> super::Binder<'r> {
         let name_atom: Atom = c.id.unwrap_or_else(|| self.interner.intern("<anon>"));
         let name: Rc<str> = Rc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;
-        let cls_type =
-            Type::named_with_origin(name.clone(), Some(Rc::from(self.source_file.as_ref())));
+        let cls_type = Type::named_with_origin(
+            name.clone(),
+            Some(Rc::from(self.source_file.as_ref())),
+            self.resolver,
+            &mut self.ty_table,
+        );
         let mut sym =
             Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
         sym.col = c.range.start.column;
@@ -60,24 +63,30 @@ impl<'r> super::Binder<'r> {
                         })
                         .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Dynamic);
-                    if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                        ty = Type::array(ty);
+                    if p.is_rest {
+                        let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
+                        if !is_array {
+                            ty = Type::array(ty, &mut self.ty_table);
+                        }
                     }
                     FunctionParam {
                         name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                        ty,
+                        ty: ty.0,
                         optional: p.is_optional || p.default.is_some(),
                         is_rest: p.is_rest,
                     }
                 })
                 .collect();
 
-            let fn_ty = Type::fn_(FunctionType {
-                params: ps,
-                return_type: Box::new(Type::Void),
-                is_arrow: false,
-                type_params: vec![],
-            });
+            let fn_ty = Type::fn_(
+                FunctionType {
+                    params: ps,
+                    return_type: Type::Void.0,
+                    is_arrow: false,
+                    type_params: vec![],
+                },
+                &mut self.ty_table,
+            );
 
             let ctor_atom = self.interner.intern("constructor");
             let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line)
@@ -244,13 +253,19 @@ impl<'r> super::Binder<'r> {
             }
         }
 
-        let ast_arena = self.ast_arena;
         let extends = c.super_class.as_ref().and_then(|e| {
-            match self.infer_expr_type_self(*e).0 {
+            let super_ty = self.infer_expr_type_self(*e);
+            match *self.ty_table.get(super_ty.0) {
                 TypeKind::Named(n, o) => Some((n, o)),
                 TypeKind::Generic(n, _, o) => Some((n, o)),
                 _ => None,
             }
+        });
+        let extends = extends.map(|(n, o)| {
+            (
+                Rc::<str>::from(self.interner.resolve(n)),
+                o.map(|o| Rc::<str>::from(self.interner.resolve(o))),
+            )
         });
 
         let mut final_members = members.clone();
@@ -313,24 +328,30 @@ impl<'r> super::Binder<'r> {
                             })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
-                        if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                            ty = Type::array(ty);
+                        if p.is_rest {
+                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
+                            if !is_array {
+                                ty = Type::array(ty, &mut self.ty_table);
+                            }
                         }
                         FunctionParam {
                             name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty,
+                            ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
                         }
                     })
                     .collect();
 
-                let fn_ty = Type::fn_(FunctionType {
-                    params: ps,
-                    return_type: Box::new(Type::Void),
-                    is_arrow: false,
-                    type_params: vec![],
-                });
+                let fn_ty = Type::fn_(
+                    FunctionType {
+                        params: ps,
+                        return_type: Type::Void.0,
+                        is_arrow: false,
+                        type_params: vec![],
+                    },
+                    &mut self.ty_table,
+                );
 
                 let ctor_atom = self.interner.intern("constructor");
                 let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, range.start.line)
@@ -459,12 +480,16 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let declared_ret = return_type
+                    .as_ref()
+                    .map(|ann| self.resolve_type(ann))
+                    .unwrap_or(Type::Void);
                 let ret = crate::types::async_fn_return(
-                    return_type
-                        .as_ref()
-                        .map(|ann| self.resolve_type(ann))
-                        .unwrap_or(Type::Void),
+                    declared_ret,
                     modifiers.is_async,
+                    &mut self.ty_table,
+                    &self.interner,
+                    Some(self.resolver),
                 );
 
                 let ps: Vec<FunctionParam> = params
@@ -479,12 +504,15 @@ impl<'r> super::Binder<'r> {
                             })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
-                        if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                            ty = Type::array(ty);
+                        if p.is_rest {
+                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
+                            if !is_array {
+                                ty = Type::array(ty, &mut self.ty_table);
+                            }
                         }
                         FunctionParam {
                             name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty,
+                            ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
                         }
@@ -496,12 +524,15 @@ impl<'r> super::Binder<'r> {
                     .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                     .collect();
 
-                let fn_ty = Type::fn_(FunctionType {
-                    params: ps,
-                    return_type: Box::new(ret),
-                    is_arrow: false,
-                    type_params: fn_tps,
-                });
+                let fn_ty = Type::fn_(
+                    FunctionType {
+                        params: ps,
+                        return_type: ret.0,
+                        is_arrow: false,
+                        type_params: fn_tps,
+                    },
+                    &mut self.ty_table,
+                );
 
                 let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
                     .with_type(fn_ty.clone());
