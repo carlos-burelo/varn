@@ -13,7 +13,7 @@ impl<'r> super::Binder<'r> {
         // stay `Atom`-keyed (`PendingEnrich`); `name` is the `Rc<str>` text
         // resolved from it, needed everywhere this still feeds an unmigrated
         // `Rc<str>`-typed API (`Symbol::new`, `ClassMemberInfo`, `Type`).
-        let name_atom: Atom = c.id.unwrap_or_else(|| self.interner.intern("<anon>"));
+        let name_atom: Atom = c.id.unwrap_or_else(|| self.intern_local("<anon>"));
         let name: Rc<str> = Rc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;
         let cls_type = Type::named_with_origin(
@@ -26,7 +26,7 @@ impl<'r> super::Binder<'r> {
             Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
         sym.col = c.range.start.column;
         sym.offset = c.range.start.offset;
-        sym.doc = c.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = c.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = c.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = c
             .type_params
@@ -88,7 +88,7 @@ impl<'r> super::Binder<'r> {
                 &mut self.ty_table,
             );
 
-            let ctor_atom = self.interner.intern("constructor");
+            let ctor_atom = self.intern_local("constructor");
             let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line)
                 .with_type(fn_ty.clone());
             sym.col = c.range.start.column;
@@ -118,7 +118,7 @@ impl<'r> super::Binder<'r> {
             for p in primary_params {
                 let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
                 let key_rc: Rc<str> = Rc::from(name_str.as_str());
-                let key_atom = self.interner.intern(&name_str);
+                let key_atom = self.intern_local(&name_str);
                 let ty = p
                     .type_ann
                     .as_ref()
@@ -353,7 +353,7 @@ impl<'r> super::Binder<'r> {
                     &mut self.ty_table,
                 );
 
-                let ctor_atom = self.interner.intern("constructor");
+                let ctor_atom = self.intern_local("constructor");
                 let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, range.start.line)
                     .with_type(fn_ty.clone());
                 sym.col = range.start.column;
@@ -385,7 +385,7 @@ impl<'r> super::Binder<'r> {
                     if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                         let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
                         let key_rc: Rc<str> = Rc::from(name_str.as_str());
-                        let key_atom = self.interner.intern(&name_str);
+                        let key_atom = self.intern_local(&name_str);
                         let ty = p
                             .type_ann
                             .as_ref()

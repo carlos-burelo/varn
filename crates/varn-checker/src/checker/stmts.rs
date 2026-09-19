@@ -246,12 +246,14 @@ impl<'r> Checker<'r> {
                     TypeKind::Array(inner) => Type(inner, false),
                     TypeKind::Intrinsic(TypeTag::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
                     TypeKind::Named(name, _)
-                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Str.as_str() =>
+                        if bind.interner.get(varn_core::IntrinsicType::Str.as_str())
+                            == Some(name) =>
                     {
                         Type::Char
                     }
                     TypeKind::Generic(name, args, _)
-                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str()
+                        if bind.interner.get(varn_core::IntrinsicType::Map.as_str())
+                            == Some(name)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();

@@ -73,7 +73,7 @@ impl<'r> Checker<'r> {
             let check_kind = *self.ty_table.get(check_ty.0);
             let key_expected = match check_kind {
                 TypeKind::Generic(name, args, _)
-                    if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str() =>
+                    if bind.interner.get(varn_core::IntrinsicType::Map.as_str()) == Some(name) =>
                 {
                     let arg_ids = self.ty_table.get_list(args).to_vec();
                     if arg_ids.len() == 2 {

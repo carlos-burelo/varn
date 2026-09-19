@@ -82,6 +82,37 @@ impl CheckerTyId {
     pub const U64: CheckerTyId = CheckerTyId(18);
     pub const F32: CheckerTyId = CheckerTyId(19);
     pub const THIS: CheckerTyId = CheckerTyId(20);
+
+    /// The highest id `CheckerTyTable::new()`'s fixed seeding ever assigns —
+    /// everything `<= THIS.0` names the same intrinsic shape in *any* table,
+    /// since seeding order is fixed and `debug_assert!`-enforced. Anything
+    /// past it is table-relative and portable only within the table that
+    /// interned it.
+    const MAX_PORTABLE: u32 = Self::THIS.0;
+
+    /// `true` for exactly the ~21 fixed intrinsic ids every `CheckerTyTable`
+    /// seeds identically — the only `CheckerTyId`s that mean the same thing
+    /// in a table other than the one that produced them.
+    pub fn is_portable(self) -> bool {
+        self.0 <= Self::MAX_PORTABLE
+    }
+
+    /// `self` if it's one of the ~21 ids valid in any table, else
+    /// [`Self::DYNAMIC`] — the honest degradation for a `CheckerTyId` that
+    /// crossed into a table it wasn't interned in (the on-disk module cache,
+    /// `module_resolver::cache.rs`, is the one place this happens today: see
+    /// its own doc for why a non-intrinsic cached type can't be reconstructed
+    /// without a portable encoding this crate doesn't have yet). Matches the
+    /// rest of the checker's own philosophy for a type it genuinely doesn't
+    /// know (`BackendTy::Dynamic(DynReason::Unannotated)` in `emit/ty.rs`) —
+    /// wrong-but-plausible would be worse than honestly unknown.
+    pub fn sanitize_foreign(self) -> CheckerTyId {
+        if self.is_portable() {
+            self
+        } else {
+            Self::DYNAMIC
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

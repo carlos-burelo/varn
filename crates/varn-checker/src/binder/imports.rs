@@ -115,7 +115,7 @@ impl<'r> super::Binder<'r> {
                     }
                 })
                 .map(Rc::from);
-            let module_path_atom = module_path.as_ref().map(|s| self.interner.intern(s));
+            let module_path_atom = module_path.as_ref().map(|s| self.intern_local(s));
 
             let exports_ref: Option<&module_resolver::ExportMap> =
                 relative_exports.as_deref().or(stdlib_exports.as_deref());
@@ -162,6 +162,14 @@ impl<'r> super::Binder<'r> {
                             // in `resolve_type_alias` (`binder/types.rs`),
                             // which reaches the origin module's own bind
                             // instead of this locally-rehydrated copy.
+                            // `from_cacheable` mints several new atoms
+                            // (name/doc/type_params/...) into `self.interner`
+                            // in one batch — resync it to the live table
+                            // first, or those atoms number from a stale base
+                            // and can collide with whatever a nested import
+                            // above just published (see `resync_interner`'s
+                            // doc).
+                            self.resync_interner();
                             let mut s = Symbol::from_cacheable(
                                 resolved.to_cacheable(&foreign),
                                 &mut self.interner,
@@ -210,7 +218,7 @@ impl<'r> super::Binder<'r> {
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;
-                            s.original_name = Some(self.interner.intern(&imported));
+                            s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
                             {
@@ -242,7 +250,7 @@ impl<'r> super::Binder<'r> {
                                 .with_range(range),
                             );
                             let mut s = Symbol::new(SymbolKind::Let, local, line);
-                            s.original_name = Some(self.interner.intern(&imported));
+                            s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = module_path_atom;
                             s
                         }

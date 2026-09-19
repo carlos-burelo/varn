@@ -275,7 +275,7 @@ impl<'r> Checker<'r> {
                             } else if let Some(ty) = bind.arena.get(id).ty {
                                 let class_name_atom = self.resolver.intern(&class_name_str);
                                 let narrowed = ty.minus_named(class_name_atom, &mut self.ty_table);
-                                if bind.interner.resolve(name) == "_" {
+                                if bind.interner.get("_") == Some(name) {
                                     narrowings.push((id, narrowed));
                                 }
                             }

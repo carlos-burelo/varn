@@ -536,12 +536,12 @@ impl<'r> Checker<'r> {
             TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => Type::Str,
             TypeKind::Named(name, _)
                 if prop_ty.is_int()
-                    && bind.interner.resolve(name) == IntrinsicType::Str.as_str() =>
+                    && bind.interner.get(IntrinsicType::Str.as_str()) == Some(name) =>
             {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
-                if bind.interner.resolve(name) == IntrinsicType::Map.as_str() =>
+                if bind.interner.get(IntrinsicType::Map.as_str()) == Some(name) =>
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
@@ -586,7 +586,7 @@ impl<'r> Checker<'r> {
                 let exp_kind = *self.ty_table.get(exp.0);
                 let is_map = match exp_kind {
                     TypeKind::Generic(name, args, _) => {
-                        bind.interner.resolve(name) == IntrinsicType::Map.as_str()
+                        bind.interner.get(IntrinsicType::Map.as_str()) == Some(name)
                             && {
                                 let n = self.ty_table.get_list(args).len();
                                 n == 1 || n == 2

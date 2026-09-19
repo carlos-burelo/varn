@@ -84,6 +84,13 @@ pub trait ImportResolver {
     /// correctly through every later `interner_snapshot()`.
     fn intern(&self, s: &str) -> varn_core::Atom;
 
+    /// Length of this resolver's live `Atom` table, without cloning it (unlike
+    /// [`Self::interner_snapshot`]). Lets a caller cheaply check "has the live
+    /// table grown past what I have locally" before paying for a snapshot —
+    /// see `Binder::intern_local`'s doc for why that check has to happen
+    /// before every locally-minted `Atom`, not just at construction.
+    fn interner_len(&self) -> usize;
+
     /// The prelude's member tables.
     fn core_members(&self) -> Rc<crate::core::loader::CoreMembers>;
 
@@ -189,13 +196,20 @@ impl DiskResolver {
             // function alone can't fix — see its module doc) but turns a
             // silent divergence into a loud, local panic instead of a
             // mysterious wrong-name diagnostic three calls later.
-            debug_assert!(
-                live.iter_strings().eq(interner.iter_strings().take(live.len())),
-                "set_interner: incoming interner's first {} entries diverge from the live \
-                 interner's — every Atom already minted against `live` would silently resolve \
-                 to different text after this swap",
-                live.len()
-            );
+            #[cfg(debug_assertions)]
+            if let Some((idx, (a, b))) = live
+                .iter_strings()
+                .zip(interner.iter_strings())
+                .enumerate()
+                .find(|(_, (a, b))| a != b)
+            {
+                panic!(
+                    "set_interner: incoming interner diverges from the live interner at index \
+                     {idx} — live has {a:?}, incoming has {b:?} (live.len()={}, incoming.len()={})",
+                    live.len(),
+                    interner.len()
+                );
+            }
             *live = interner;
         }
     }
@@ -504,6 +518,10 @@ impl ImportResolver for DiskResolver {
         if table.len() >= live.len() {
             *live = table;
         }
+    }
+
+    fn interner_len(&self) -> usize {
+        self.interner.borrow().len()
     }
 
     fn intern(&self, s: &str) -> varn_core::Atom {

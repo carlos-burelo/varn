@@ -23,7 +23,7 @@ impl<'r> super::Binder<'r> {
         ));
         sym.col = i.range.start.column;
         sym.offset = i.range.start.offset;
-        sym.doc = i.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = i.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = i.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = i
             .type_params

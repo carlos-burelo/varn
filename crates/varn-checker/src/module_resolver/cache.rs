@@ -155,9 +155,79 @@ pub fn deserialize_module_interface(
     interner: &mut AtomInterner,
 ) -> Result<(ExportMap, BindResult), String> {
     let cached: CacheableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
-    let (mut exports, bind) = cached.into_live(interner);
+    let (mut exports, mut bind) = cached.into_live(interner);
+    for s in exports.values_mut() {
+        sanitize_symbol_types(s);
+    }
+    for s in bind.arena.all_mut() {
+        sanitize_symbol_types(s);
+    }
+    for t in bind.class_methods.values_mut().flat_map(|m| m.values_mut()) {
+        *t = t.sanitize_foreign();
+    }
+    sanitize_type_members(&mut bind.type_members);
+    for fields in bind.sum_variant_fields.values_mut() {
+        for (_, t) in fields.iter_mut() {
+            *t = t.sanitize_foreign();
+        }
+    }
     super::exports::assign_slots(&mut exports);
     Ok((exports, bind))
+}
+
+/// A cached `Type` is only trustworthy against `bind.ty_table`
+/// (`CacheableModule::into_live` seeds it to `CheckerTyTable::default()`,
+/// i.e. only the fixed intrinsic ids — see that function's own doc) — every
+/// non-intrinsic `CheckerTyId` a cache file carries came from a *different*
+/// `CheckerTyTable` (whatever session wrote it) and is meaningless here.
+/// `sanitize_foreign` degrades it to `Type::Dynamic` instead of either
+/// panicking (an out-of-range index) or silently resolving to whatever shape
+/// happens to sit at that index in the fresh table — honest-unknown beats
+/// wrong-but-plausible, same call the rest of the checker already makes for
+/// a type it can't determine (see `CheckerTyId::sanitize_foreign`'s doc).
+/// Re-run whenever a cache-loaded `Symbol`/`ClassMemberInfo` reaches a
+/// call site: NOT needed once the on-disk format carries a portable
+/// encoding, at which point this whole pass — and its performance cost on
+/// every cache hit — goes away.
+fn sanitize_symbol_types(s: &mut Symbol) {
+    if let Some(t) = s.ty.as_mut() {
+        *t = t.sanitize_foreign();
+    }
+    for t in s.type_param_constraints.iter_mut().flatten() {
+        *t = t.sanitize_foreign();
+    }
+}
+
+fn sanitize_class_member_info(m: &mut crate::types::ClassMemberInfo) {
+    m.ty = m.ty.sanitize_foreign();
+    for child in &mut m.members {
+        sanitize_class_member_info(child);
+    }
+}
+
+fn sanitize_type_members(tm: &mut TypeMembers) {
+    for v in tm.classes.values_mut() {
+        sanitize_class_member_info(v);
+    }
+    for list in tm
+        .interfaces
+        .values_mut()
+        .chain(tm.enums.values_mut())
+        .chain(tm.namespaces.values_mut())
+        .chain(tm.flattened.values_mut())
+    {
+        for v in list {
+            sanitize_class_member_info(v);
+        }
+    }
+    for t in tm
+        .getters
+        .values_mut()
+        .chain(tm.setters.values_mut())
+        .flat_map(|m| m.values_mut())
+    {
+        *t = t.sanitize_foreign();
+    }
 }
 
 pub(super) fn compute_source_hash(source: &str) -> u64 {
@@ -175,32 +245,51 @@ pub(super) fn try_load_cache(
     virtual_id: &str,
     source: &str,
 ) -> Option<CachedModule> {
-    // TEMPORARILY DISABLED (Fase 1, Componente 3): every `Type` reachable
-    // from a cached module's `exports`/`bind` (`CacheableSymbol.ty`,
-    // `type_param_constraints`, `TypeMembers.{classes,interfaces,enums,...}`'s
-    // `ClassMemberInfo.ty`/`.members`, `class_methods`, `sum_variant_fields`)
-    // still round-trips its `CheckerTyId` as a bare, table-relative integer —
-    // `CacheableModule::into_live` even seeds a *fresh* `CheckerTyTable` for
-    // `bind.ty_table` (see its own doc comment: "a bare `CheckerTyId`
-    // round-trips a number, not a type"), so every non-intrinsic cached type
-    // was ALREADY silently wrong before this change; it only started
-    // panicking (instead of quietly resolving to the wrong shape) once real
-    // code started dereferencing those ids (`CheckerTyTable::reintern`,
-    // wired for the in-memory cross-module import case this same task
-    // fixed). Disabling cache *reads* trades away reuse for correctness: every
-    // module binds fresh this run, sharing the one real, live `CheckerTyTable`
-    // lineage (`DiskResolver::ty_table`) the in-memory path already handles
-    // correctly. The proper fix is the same shape as `Symbol`'s `Atom` fields
-    // getting a `String`-based `CacheableSymbol` (this file's own pattern,
-    // and see `CheckerTyTable::reintern`'s doc) applied to `Type`: a portable,
-    // interner-independent encoding of `InternedTypeKind` (walk it via
-    // `CheckerTyTable::get`, resolve every `Atom` to text, recurse) written
-    // alongside the cache and re-interned through `AtomInterner::intern` +
-    // `CheckerTyTable::intern` on load — not yet built. Re-enable this
-    // function (and the corresponding write in `save_to_cache`) only once
-    // that lands.
-    let _ = (resolver, virtual_id, source);
-    None
+    if virtual_id == "core:types" {
+        return None;
+    }
+    let hash = compute_source_hash(source);
+    let name = if virtual_id.contains(':') {
+        virtual_id.replace(':', "_")
+    } else {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        virtual_id.hash(&mut hasher);
+        format!("file_{:x}", hasher.finish())
+    };
+
+    let cache_dir = get_cache_dir(resolver);
+    let cache_file = cache_dir.join(format!(
+        "{}.{:x}.{:08x}.vnm",
+        name,
+        hash,
+        varn_modules::artifact::cache_key()
+    ));
+    if !cache_file.exists() {
+        return None;
+    }
+    let bytes = std::fs::read(&cache_file).ok()?;
+    let payload = match varn_modules::artifact::read_artifact(
+        varn_modules::artifact::ArtifactKind::CheckerInterface,
+        &bytes,
+    ) {
+        Ok(p) => p,
+        Err(_) => return None,
+    };
+    // Re-intern against this compilation's own interner (not whatever
+    // process wrote this cache file, possibly a session ago and always a
+    // different `AtomInterner`) and publish the grown table back, same
+    // pattern as `parse_and_cache`. `deserialize_module_interface` also
+    // sanitizes every `Type` this cache carries down to the ~21 ids that
+    // are valid in any `CheckerTyTable` (see its own doc) — `bind.ty_table`
+    // itself stays the fresh, intrinsics-only table `into_live` seeds; a
+    // non-intrinsic cached type is `Dynamic`, not a dangling id.
+    let mut interner = resolver.interner_snapshot();
+    let result = deserialize_module_interface(payload, &mut interner);
+    resolver.set_interner(interner);
+    match result {
+        Ok((exports, bind)) => Some(CachedModule { exports, bind }),
+        Err(_) => None,
+    }
 }
 
 pub(super) fn save_to_cache(
@@ -210,11 +299,34 @@ pub(super) fn save_to_cache(
     exports: &ExportMap,
     bind: &BindResult,
 ) {
-    // Disabled alongside `try_load_cache` (see its doc comment) — writing a
-    // cache nothing reads back is just wasted I/O, and leaving stale `.vnm`
-    // files with wrong `CheckerTyId`s on disk (from a build before this
-    // module existed) invites a future re-enable to trust them without a
-    // cache-format version bump. Re-enable together once `Type` gets a
-    // portable, interner-independent on-disk encoding.
-    let _ = (resolver, virtual_id, source, exports, bind);
+    if virtual_id == "core:types" {
+        return;
+    }
+    let hash = compute_source_hash(source);
+    let cache_dir = get_cache_dir(resolver);
+    let _ = std::fs::create_dir_all(&cache_dir);
+    let name = if virtual_id.contains(':') {
+        virtual_id.replace(':', "_")
+    } else {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        virtual_id.hash(&mut hasher);
+        format!("file_{:x}", hasher.finish())
+    };
+
+    let cache_file = cache_dir.join(format!(
+        "{}.{:x}.{:08x}.vnm",
+        name,
+        hash,
+        varn_modules::artifact::cache_key()
+    ));
+    let interner = resolver.interner_snapshot();
+    if let Ok(payload) = serialize_module_interface(exports, bind, &interner) {
+        let bytes = varn_modules::artifact::write_artifact(
+            varn_modules::artifact::ArtifactKind::CheckerInterface,
+            varn_modules::artifact::ArtifactClass::Cache,
+            &payload,
+        );
+        let _ = varn_modules::artifact::write_artifact_file(&cache_file, &bytes);
+        varn_modules::artifact::prune_superseded(&cache_file);
+    }
 }

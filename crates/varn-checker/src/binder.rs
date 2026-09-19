@@ -181,6 +181,53 @@ impl TypeContext for Binder<'_> {
 }
 
 impl<'r> Binder<'r> {
+    /// Mint a *new* `Atom` for text that isn't already in `self.interner`
+    /// (a synthetic name like `"constructor"`, a symbol's `doc`, ...),
+    /// keeping `self.interner` and the resolver's live, shared table from
+    /// diverging.
+    ///
+    /// Why divergence is possible without this: binding an import can
+    /// recurse into `bind_and_cache` for another module, which grows and
+    /// *publishes* the live table (`DiskResolver::set_interner`) before
+    /// returning — but `self.interner` is this `Binder`'s own snapshot,
+    /// taken once at construction, and nothing about processing that import
+    /// statement refreshes it. If this binder then locally mints an atom
+    /// (`self.interner.intern(text)`) for the first time *after* that nested
+    /// growth, it numbers the new atom starting from its own stale length —
+    /// which can collide with whatever the nested bind already published at
+    /// that same index. `DiskResolver::set_interner`'s prefix check is built
+    /// to catch exactly this (a real bind observed it: two `Binder`s, one
+    /// module importing another, both landed a different string on index 60)
+    /// rather than let a `Symbol` silently resolve to someone else's text.
+    ///
+    /// The fix: before minting, adopt the live table if it has grown past
+    /// what `self.interner` has (cheap to check via `interner_len`, only
+    /// clones when actually behind) — safe because their shared prefix is
+    /// never disputed, only what comes after it, so adopting a longer table
+    /// is index-compatible; then also publish the *new* atom to the live
+    /// table (`self.resolver.intern`), so a sibling `Binder`/nested bind
+    /// still in flight sees it too. Both interns are deterministic
+    /// dedup-then-append over the same prefix, so they agree on the index.
+    pub(crate) fn intern_local(&mut self, text: &str) -> varn_core::Atom {
+        self.resync_interner();
+        let atom = self.interner.intern(text);
+        self.resolver.intern(text);
+        atom
+    }
+
+    /// The "adopt live if it's grown past us" half of [`Self::intern_local`],
+    /// exposed on its own for a caller that's about to mint several atoms at
+    /// once through code that doesn't go through `intern_local` itself (e.g.
+    /// `Symbol::from_cacheable`'s several `interner.intern(text)` calls when
+    /// rehydrating an imported symbol, `binder/imports.rs`) — one resync
+    /// before the batch is enough, since nothing publishes to the live table
+    /// *during* that batch (no resolver calls inside `from_cacheable`).
+    pub(crate) fn resync_interner(&mut self) {
+        if self.resolver.interner_len() > self.interner.len() {
+            self.interner = self.resolver.interner_snapshot();
+        }
+    }
+
     pub fn bind(
         program: &Program,
         ast_arena: &'r AstArena,

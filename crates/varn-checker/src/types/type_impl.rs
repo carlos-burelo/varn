@@ -39,6 +39,12 @@ impl Type {
         Type(table.intern(TypeKind::Intrinsic(tag)), false)
     }
 
+    /// See `CheckerTyId::sanitize_foreign` — same degrade-to-`Dynamic` rule,
+    /// applied to the wrapper.
+    pub fn sanitize_foreign(self) -> Type {
+        Type(self.0.sanitize_foreign(), self.1)
+    }
+
     // ── Constructors that build a new shape (need `&mut CheckerTyTable`) ──
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {

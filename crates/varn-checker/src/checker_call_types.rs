@@ -242,8 +242,8 @@ pub(crate) fn infer_call_type(
             )?;
             match *table.get(ty.0) {
                 TypeKind::Generic(name, args, _)
-                    if (interner.resolve(name) == IntrinsicType::Task.as_str()
-                        || interner.resolve(name) == IntrinsicType::TaskHandle.as_str())
+                    if (interner.get(IntrinsicType::Task.as_str()) == Some(name)
+                        || interner.get(IntrinsicType::TaskHandle.as_str()) == Some(name))
                         && table.get_list(args).len() == 1 =>
                 {
                     Some(Type(table.get_list(args)[0], false))

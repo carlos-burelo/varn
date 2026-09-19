@@ -42,7 +42,7 @@ impl<'r> Checker<'r> {
         let elem_expected = self.expected_type.and_then(|t| match *self.ty_table.get(t.0) {
             TypeKind::Array(inner) => Some(Type(inner, false)),
             TypeKind::Generic(name, args, _)
-                if bind.interner.resolve(name) == varn_core::IntrinsicType::Array.as_str()
+                if bind.interner.get(varn_core::IntrinsicType::Array.as_str()) == Some(name)
                     && self.ty_table.get_list(args).len() == 1 =>
             {
                 Some(Type(self.ty_table.get_list(args)[0], false))
@@ -90,7 +90,8 @@ impl<'r> Checker<'r> {
                 let resolved = match ty_kind {
                     TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
                     TypeKind::Generic(name, args, _)
-                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str()
+                        if bind.interner.get(varn_core::IntrinsicType::Map.as_str())
+                            == Some(name)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();
@@ -102,9 +103,24 @@ impl<'r> Checker<'r> {
                     }
                     TypeKind::Named(name_atom, origin_atom)
                     | TypeKind::Generic(name_atom, _, origin_atom) => {
-                        let name = bind.interner.resolve(name_atom).to_string();
-                        let origin: Option<String> =
-                            origin_atom.map(|o| bind.interner.resolve(o).to_string());
+                        // `bind.interner` is a snapshot from when *this*
+                        // module started checking — `name_atom`/`origin_atom`
+                        // can come from a `Type` a cross-module lookup built
+                        // from a sibling module's (possibly later, bigger)
+                        // table. `try_resolve` degrades to a fresh live
+                        // snapshot instead of indexing out of bounds; the
+                        // live table is guaranteed to have anything ever
+                        // actually minted this compilation.
+                        let resolve_atom = |a: varn_core::Atom| -> String {
+                            bind.interner
+                                .try_resolve(a)
+                                .map(str::to_string)
+                                .unwrap_or_else(|| {
+                                    self.resolver.interner_snapshot().resolve(a).to_string()
+                                })
+                        };
+                        let name = resolve_atom(name_atom);
+                        let origin: Option<String> = origin_atom.map(resolve_atom);
                         let view = crate::binder::BindView::new(bind, self.resolver);
                         let members = view
                             .get_class_members(&name, origin.as_deref())

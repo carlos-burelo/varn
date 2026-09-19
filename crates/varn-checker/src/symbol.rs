@@ -249,6 +249,10 @@ impl SymbolArena {
         &self.symbols
     }
 
+    pub fn all_mut(&mut self) -> &mut [Symbol] {
+        &mut self.symbols
+    }
+
     pub fn len(&self) -> usize {
         self.symbols.len()
     }

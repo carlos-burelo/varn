@@ -321,11 +321,17 @@ impl<'r> Checker<'r> {
         // resolver's current table, so replacing it here is lossless — every
         // downstream user of `bind.interner`, this file's own atoms included,
         // still resolves correctly.
-        let interner = if globals_ref.is_some() {
-            resolver.interner_snapshot()
-        } else {
-            interner
-        };
+        //
+        // Unconditional, not just `if globals_ref.is_some()`: a core/stdlib
+        // module (`is_builtin`, `globals_ref: None`) skips `core_exports()`
+        // but can still be checked *after* a sibling core module earlier in
+        // the same `compile_stdlib_bundle` loop already grew and published
+        // the live table (e.g. a `Generic<T>`-typed symbol whose class-name
+        // `Atom` that sibling minted) — this caller's own `interner`, taken
+        // before that publish, is exactly as stale either way. Always
+        // starting from the live snapshot is never wrong (same prefix
+        // guarantee) and is the only branch that actually covers this case.
+        let interner = resolver.interner_snapshot();
 
         let started = Instant::now();
         let mut bind = match globals_ref {
@@ -345,6 +351,19 @@ impl<'r> Checker<'r> {
         profile.enrich_call_returns = started.elapsed();
 
         let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());
+
+        // Same reasoning as the unconditional `interner` refresh above,
+        // mirrored for `CheckerTyId`: a sibling core/stdlib module bound
+        // earlier in the same `compile_stdlib_bundle` loop can have grown
+        // and published a bigger live `CheckerTyTable` than what `bind`
+        // carries (its own snapshot is only as fresh as when *this*
+        // module's `Binder::bind` started). Adopting the live one when it's
+        // ahead is lossless (`CheckerTyTable::intern` never renumbers), and
+        // is what `Checker.ty_table`'s field doc already promises.
+        let live_ty_table = resolver.ty_table_snapshot();
+        if live_ty_table.len() > bind.ty_table.len() {
+            bind.ty_table = live_ty_table;
+        }
 
         let started = Instant::now();
         let mut checker = Checker {
