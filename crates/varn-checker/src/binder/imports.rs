@@ -123,9 +123,11 @@ impl<'r> super::Binder<'r> {
             let sym = if let Some(exports) = exports_ref {
                 if imported == "*" {
                     let mut s = Symbol::new(SymbolKind::Namespace, local, line);
-                    s.ty = Some(crate::types::Type(
-                        TypeKind::Named(Rc::from("*"), module_path.clone()),
-                        false,
+                    s.ty = Some(crate::types::Type::named_with_origin(
+                        Rc::from("*"),
+                        module_path.clone(),
+                        self.resolver,
+                        &mut self.ty_table,
                     ));
                     s.origin_module = module_path_atom;
                     s
@@ -172,7 +174,8 @@ impl<'r> super::Binder<'r> {
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
                             {
                                 let origin_rc: Rc<str> = Rc::from(self.interner.resolve(*origin));
-                                *ty = ty.clone().with_origin(origin_rc);
+                                let origin_atom = self.resolver.intern(&origin_rc);
+                                *ty = ty.with_origin(origin_atom, &mut self.ty_table);
                             }
                             // Free-function intrinsic import (e.g. `abs` from
                             // `std:math`): stamp the wire byte now, while the

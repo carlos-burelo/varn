@@ -145,7 +145,7 @@ impl<'r> Binder<'r> {
         if self.array_watch.is_empty() {
             return;
         }
-        let normalized = match &value_ty.0 {
+        let normalized = match self.ty_table.get(value_ty.0) {
             TypeKind::Intrinsic(varn_core::TypeTag::Int) => Some(Type::Int),
             TypeKind::Intrinsic(varn_core::TypeTag::Float) => Some(Type::Float),
             _ => None,
@@ -214,7 +214,8 @@ impl<'r> Binder<'r> {
                 if !c.escaped && !c.conflict {
                     if let Some(elem) = c.elem_ty {
                         let offset = self.arena.get(c.sym_id).offset;
-                        self.evolved_array_types.insert(offset, Type::array(elem));
+                        let array_ty = Type::array(elem, &mut self.ty_table);
+                        self.evolved_array_types.insert(offset, array_ty);
                     }
                 }
             } else {

@@ -97,6 +97,16 @@ impl CacheableModule {
             global_scope: self.global_scope,
             diagnostics: varn_core::DiagnosticBag::default(),
             interner: interner.clone(),
+            // KNOWN CAVEAT (see `CheckerTyId`'s serde derive doc in
+            // `types/interned.rs`): a bare `CheckerTyId` round-trips a
+            // number, not a type, without the table that produced it, and
+            // this cache format carries no such table. A fresh empty table
+            // is the honest placeholder — no `Type` reached through this
+            // `BindResult`'s cached fields (`class_methods`, `type_members`,
+            // `sum_variant_fields`, ...) should be treated as resolvable
+            // against it. Fixing this for real is out of this task's scope,
+            // same as when this caveat was first documented.
+            ty_table: crate::types::CheckerTyTable::default(),
             class_methods: self.class_methods,
             type_members: self.type_members,
             class_parents: self.class_parents,

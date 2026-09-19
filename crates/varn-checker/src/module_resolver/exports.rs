@@ -3,6 +3,7 @@ use crate::module_resolver::cache::ExportMap;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use std::path::Path;
+use std::rc::Rc;
 use varn_core::ast::{AstArena, Decl, ExportDecl, ExportDefaultDecl, Pattern, StmtId, StmtKind};
 use varn_core::Atom;
 
@@ -167,7 +168,14 @@ pub(super) fn collect_exports(
                     resolver.module_exports(&src_abs, visiting)
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, *ns, 0);
-                ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
+                let mut table = resolver.ty_table_snapshot();
+                ns_sym.ty = Some(Type::named_with_origin(
+                    "*",
+                    Some(Rc::from(src_abs.as_str())),
+                    resolver,
+                    &mut table,
+                ));
+                resolver.set_ty_table(table);
                 ns_sym.origin_module = Some(intern_origin(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();

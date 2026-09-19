@@ -594,8 +594,9 @@ impl<'r> super::Binder<'r> {
 
         for tp in type_params {
             let name_rc: Rc<str> = Rc::from(self.interner.resolve(tp.name));
-            let mut sym = Symbol::new(SymbolKind::TypeParameter, tp.name, line)
-                .with_type(Type::named(name_rc));
+            let tp_ty = Type::named(name_rc, self.resolver, &mut self.ty_table);
+            let mut sym =
+                Symbol::new(SymbolKind::TypeParameter, tp.name, line).with_type(tp_ty);
             sym.col = tp.range.start.column;
             sym.offset = tp.range.start.offset;
             self.define(tp.name, sym);

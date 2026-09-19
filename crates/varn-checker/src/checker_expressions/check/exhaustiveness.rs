@@ -21,7 +21,13 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        if let TypeKind::Union(members) = &subject_ty.0 {
+        if let TypeKind::Union(list) = *self.ty_table.get(subject_ty.0) {
+            let members: Vec<Type> = self
+                .ty_table
+                .get_list(list)
+                .iter()
+                .map(|id| Type(*id, false))
+                .collect();
             let uncovered: Vec<String> = members
                 .iter()
                 .filter(|m| {
@@ -29,7 +35,7 @@ impl<'r> Checker<'r> {
                         .iter()
                         .any(|c| c.guard.is_none() && pattern_covers_type(&c.pattern, m))
                 })
-                .map(|m| m.to_string())
+                .map(|m| m.display(&self.ty_table, &bind.interner).to_string())
                 .collect();
             if !uncovered.is_empty() {
                 self.emit(
@@ -46,9 +52,10 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        let TypeKind::Named(type_name, _) = &subject_ty.0 else {
+        let TypeKind::Named(type_name_atom, _) = *self.ty_table.get(subject_ty.0) else {
             return;
         };
+        let type_name: std::rc::Rc<str> = std::rc::Rc::from(bind.interner.resolve(type_name_atom));
 
         if let Some(variants) = bind.sum_type_variants.get(type_name.as_ref()) {
             let uncovered: Vec<String> = variants
