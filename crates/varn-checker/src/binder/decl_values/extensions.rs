@@ -1,4 +1,3 @@
-use super::super::type_resolution::resolve_type_node;
 use super::type_node_to_name;
 use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
@@ -29,7 +28,7 @@ impl<'r> super::super::Binder<'r> {
                     let mut param_types: Vec<crate::types::FunctionParam> =
                         vec![crate::types::FunctionParam {
                             name: Some(Rc::from("this")),
-                            ty: receiver_ty.clone(),
+                            ty: receiver_ty.0,
                             optional: false,
                             is_rest: false,
                         }];
@@ -43,37 +42,47 @@ impl<'r> super::super::Binder<'r> {
                             })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
-                        if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
-                            ty = Type::array(ty);
+                        if p.is_rest {
+                            let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                            if !is_array {
+                                ty = Type::array(ty, &mut self.ty_table);
+                            }
                         }
                         param_types.push(crate::types::FunctionParam {
                             name: Some(Rc::from(
                                 super::super::type_inference::pattern_to_string(&p.pattern, Some(&self.interner))
                                     .as_str(),
                             )),
-                            ty,
+                            ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
                         });
                     }
+                    let declared_ret = method
+                        .return_type
+                        .as_ref()
+                        .map(|rt| self.resolve_type(rt))
+                        .unwrap_or(Type::Void);
                     let ret_ty = crate::types::async_fn_return(
-                        method
-                            .return_type
-                            .as_ref()
-                            .map(|rt| self.resolve_type(rt))
-                            .unwrap_or(Type::Void),
+                        declared_ret,
                         method.modifiers.is_async,
+                        &mut self.ty_table,
+                        &self.interner,
+                        Some(self.resolver),
                     );
-                    let fn_type = Type::fn_(crate::types::FunctionType {
-                        params: param_types,
-                        return_type: Box::new(ret_ty),
-                        is_arrow: false,
-                        type_params: method
-                            .type_params
-                            .iter()
-                            .map(|t| Rc::from(self.interner.resolve(t.name)))
-                            .collect(),
-                    });
+                    let fn_type = Type::fn_(
+                        crate::types::FunctionType {
+                            params: param_types,
+                            return_type: ret_ty.0,
+                            is_arrow: false,
+                            type_params: method
+                                .type_params
+                                .iter()
+                                .map(|t| Rc::from(self.interner.resolve(t.name)))
+                                .collect(),
+                        },
+                        &mut self.ty_table,
+                    );
                     let line = method.range.start.line;
                     let mangled_atom = self.interner.intern(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, line)
@@ -112,17 +121,20 @@ impl<'r> super::super::Binder<'r> {
                         .as_ref()
                         .map(|rt| self.resolve_type(rt))
                         .unwrap_or(Type::Dynamic);
-                    let fn_type = Type::fn_(crate::types::FunctionType {
-                        params: vec![crate::types::FunctionParam {
-                            name: Some(Rc::from("this")),
-                            ty: receiver_ty.clone(),
-                            optional: false,
-                            is_rest: false,
-                        }],
-                        return_type: Box::new(ret_ty),
-                        is_arrow: false,
-                        type_params: vec![],
-                    });
+                    let fn_type = Type::fn_(
+                        crate::types::FunctionType {
+                            params: vec![crate::types::FunctionParam {
+                                name: Some(Rc::from("this")),
+                                ty: receiver_ty.0,
+                                optional: false,
+                                is_rest: false,
+                            }],
+                            return_type: ret_ty.0,
+                            is_arrow: false,
+                            type_params: vec![],
+                        },
+                        &mut self.ty_table,
+                    );
                     let mangled_atom = self.interner.intern(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
                         .with_type(fn_type);
@@ -160,28 +172,31 @@ impl<'r> super::super::Binder<'r> {
                         })
                         .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Dynamic);
-                    let fn_type = Type::fn_(crate::types::FunctionType {
-                        params: vec![
-                            crate::types::FunctionParam {
-                                name: Some(Rc::from("this")),
-                                ty: receiver_ty.clone(),
-                                optional: false,
-                                is_rest: false,
-                            },
-                            crate::types::FunctionParam {
-                                name: Some(Rc::from(
-                                    super::super::type_inference::pattern_to_string(&param.pattern, Some(&self.interner))
-                                        .as_str(),
-                                )),
-                                ty: param_ty.clone(),
-                                optional: param.is_optional,
-                                is_rest: param.is_rest,
-                            },
-                        ],
-                        return_type: Box::new(Type::Void),
-                        is_arrow: false,
-                        type_params: vec![],
-                    });
+                    let fn_type = Type::fn_(
+                        crate::types::FunctionType {
+                            params: vec![
+                                crate::types::FunctionParam {
+                                    name: Some(Rc::from("this")),
+                                    ty: receiver_ty.0,
+                                    optional: false,
+                                    is_rest: false,
+                                },
+                                crate::types::FunctionParam {
+                                    name: Some(Rc::from(
+                                        super::super::type_inference::pattern_to_string(&param.pattern, Some(&self.interner))
+                                            .as_str(),
+                                    )),
+                                    ty: param_ty.0,
+                                    optional: param.is_optional,
+                                    is_rest: param.is_rest,
+                                },
+                            ],
+                            return_type: Type::Void.0,
+                            is_arrow: false,
+                            type_params: vec![],
+                        },
+                        &mut self.ty_table,
+                    );
                     let mangled_atom = self.interner.intern(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
                         .with_type(fn_type);
@@ -230,8 +245,11 @@ impl<'r> super::super::Binder<'r> {
                 })
                 .map(|ann| self.resolve_type(ann))
                 .unwrap_or(Type::Dynamic);
-            if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
-                ty = Type::array(ty);
+            if p.is_rest {
+                let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                if !is_array {
+                    ty = Type::array(ty, &mut self.ty_table);
+                }
             }
             self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));
             if let Some(def) = p.default {
