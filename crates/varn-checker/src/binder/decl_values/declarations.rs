@@ -1,5 +1,4 @@
-use super::super::type_inference::{infer_expr_type, widen_literal};
-use super::super::type_resolution::resolve_type_node;
+use super::super::type_inference::widen_literal;
 use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
 use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
@@ -129,13 +128,16 @@ impl<'r> super::super::Binder<'r> {
                     })
                     .unwrap_or(Type::Dynamic);
 
-                if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
-                    ty = Type::array(ty);
+                if p.is_rest {
+                    let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                    if !is_array {
+                        ty = Type::array(ty, &mut self.ty_table);
+                    }
                 }
 
                 crate::types::FunctionParam {
                     name,
-                    ty,
+                    ty: ty.0,
                     optional: p.is_optional || p.default.is_some(),
                     is_rest: p.is_rest,
                 }
@@ -148,20 +150,34 @@ impl<'r> super::super::Binder<'r> {
             .map(|ann| self.resolve_type(ann));
 
         let ret = if f.modifiers.is_generator {
-            crate::types::generator_of(declared_ret.unwrap_or(Type::Dynamic), f.modifiers.is_async)
+            crate::types::generator_of(
+                declared_ret.unwrap_or(Type::Dynamic),
+                f.modifiers.is_async,
+                &mut self.ty_table,
+                Some(self.resolver),
+            )
         } else {
-            crate::types::async_fn_return(declared_ret.unwrap_or(Type::Void), f.modifiers.is_async)
+            crate::types::async_fn_return(
+                declared_ret.unwrap_or(Type::Void),
+                f.modifiers.is_async,
+                &mut self.ty_table,
+                &self.interner,
+                Some(self.resolver),
+            )
         };
-        let fn_type = Type::fn_(FunctionType {
-            params: params.clone(),
-            return_type: Box::new(ret),
-            is_arrow: false,
-            type_params: f
-                .type_params
-                .iter()
-                .map(|t| Rc::from(self.interner.resolve(t.name)))
-                .collect(),
-        });
+        let fn_type = Type::fn_(
+            FunctionType {
+                params: params.clone(),
+                return_type: ret.0,
+                is_arrow: false,
+                type_params: f
+                    .type_params
+                    .iter()
+                    .map(|t| Rc::from(self.interner.resolve(t.name)))
+                    .collect(),
+            },
+            &mut self.ty_table,
+        );
 
         let mut sym = Symbol::new(SymbolKind::Function, f.id, line).with_type(fn_type);
         sym.col = f.range.start.column + (f.id_offset - f.range.start.offset);
@@ -212,8 +228,11 @@ impl<'r> super::super::Binder<'r> {
                 })
                 .unwrap_or(Type::Dynamic);
 
-            if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
-                ty = Type::array(ty);
+            if p.is_rest {
+                let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                if !is_array {
+                    ty = Type::array(ty, &mut self.ty_table);
+                }
             }
 
             self.bind_pattern(
@@ -256,9 +275,12 @@ impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
         let line = e.range.start.line;
         let id_rc: Rc<str> = Rc::from(self.interner.resolve(e.id));
-        let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(
-            Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
-        );
+        let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(Type::named_with_origin(
+            id_rc.clone(),
+            Some(Rc::from(self.source_file.as_ref())),
+            self.resolver,
+            &mut self.ty_table,
+        ));
         sym.doc = e.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
         sym.type_params = e.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = e
@@ -291,28 +313,35 @@ impl<'r> super::super::Binder<'r> {
                 .insert(member_id_rc.clone(), fields.clone());
 
             let variant_sym_id = if member.payload_fields.is_empty() {
+                let variant_ty = Type::named(id_rc.clone(), self.resolver, &mut self.ty_table);
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
-                    .with_type(Type::named(id_rc.clone()));
+                    .with_type(variant_ty);
                 self.define(member.id, v_sym)
             } else {
                 let params: Vec<crate::types::FunctionParam> = fields
                     .iter()
                     .map(|(fname, fty)| crate::types::FunctionParam {
                         name: Some(fname.clone()),
-                        ty: fty.clone(),
+                        ty: fty.0,
                         optional: false,
                         is_rest: false,
                     })
                     .collect();
-                let fn_ty = Type::fn_(crate::types::FunctionType {
-                    params,
-                    return_type: Box::new(Type::named_with_origin(
-                        id_rc.clone(),
-                        Some(Rc::from(self.source_file.as_ref())),
-                    )),
-                    is_arrow: false,
-                    type_params: vec![],
-                });
+                let ret_ty = Type::named_with_origin(
+                    id_rc.clone(),
+                    Some(Rc::from(self.source_file.as_ref())),
+                    self.resolver,
+                    &mut self.ty_table,
+                );
+                let fn_ty = Type::fn_(
+                    crate::types::FunctionType {
+                        params,
+                        return_type: ret_ty.0,
+                        is_arrow: false,
+                        type_params: vec![],
+                    },
+                    &mut self.ty_table,
+                );
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(fn_ty);
                 self.define(member.id, v_sym)
@@ -328,7 +357,7 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named(id_rc.clone()),
+                ty: Type::named(id_rc.clone(), self.resolver, &mut self.ty_table),
                 members: Vec::new(),
                 visibility: None,
                 is_abstract: false,
@@ -453,7 +482,12 @@ impl<'r> super::super::Binder<'r> {
             line: e.range.start.line.saturating_sub(1),
             col: e.range.start.column,
             offset: e.range.start.offset,
-            ty: Type::named_with_origin(id_rc.clone(), Some(Rc::from(self.source_file.as_ref()))),
+            ty: Type::named_with_origin(
+                id_rc.clone(),
+                Some(Rc::from(self.source_file.as_ref())),
+                self.resolver,
+                &mut self.ty_table,
+            ),
             members: members.clone(),
             visibility: None,
             is_abstract: false,
