@@ -31,7 +31,7 @@ impl<'r> super::Binder<'r> {
             .map(|t| {
                 t.constraint
                     .as_ref()
-                    .map(|con| resolve_type_node(con, Some(self)))
+                    .map(|con| self.resolve_type(con))
             })
             .collect();
         self.define(name_atom, sym);
@@ -58,7 +58,7 @@ impl<'r> super::Binder<'r> {
                             Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                             _ => None,
                         })
-                        .map(|ann| resolve_type_node(ann, Some(self)))
+                        .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Dynamic);
                     if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
                         ty = Type::array(ty);
@@ -117,7 +117,7 @@ impl<'r> super::Binder<'r> {
                         Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                         _ => None,
                     })
-                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
                 let mut sym = Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
@@ -246,7 +246,7 @@ impl<'r> super::Binder<'r> {
 
         let ast_arena = self.ast_arena;
         let extends = c.super_class.as_ref().and_then(|e| {
-            match super::type_inference::infer_expr_type(*e, ast_arena, Some(self)).0 {
+            match self.infer_expr_type_self(*e).0 {
                 TypeKind::Named(n, o) => Some((n, o)),
                 TypeKind::Generic(n, _, o) => Some((n, o)),
                 _ => None,
@@ -311,7 +311,7 @@ impl<'r> super::Binder<'r> {
                                 Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                                 _ => None,
                             })
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
                             ty = Type::array(ty);
@@ -372,7 +372,7 @@ impl<'r> super::Binder<'r> {
                                 Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                                 _ => None,
                             })
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
 
                         let mut sym =
@@ -419,7 +419,7 @@ impl<'r> super::Binder<'r> {
                 let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ty = type_ann
                     .as_ref()
-                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
                 let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
@@ -462,7 +462,7 @@ impl<'r> super::Binder<'r> {
                 let ret = crate::types::async_fn_return(
                     return_type
                         .as_ref()
-                        .map(|ann| resolve_type_node(ann, Some(self)))
+                        .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Void),
                     modifiers.is_async,
                 );
@@ -477,7 +477,7 @@ impl<'r> super::Binder<'r> {
                                 Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                                 _ => None,
                             })
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
                             ty = Type::array(ty);
@@ -542,7 +542,7 @@ impl<'r> super::Binder<'r> {
                 let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let ty = return_type
                     .as_ref()
-                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
                 let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
@@ -587,7 +587,7 @@ impl<'r> super::Binder<'r> {
                         varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                         _ => None,
                     })
-                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
                 let has_explicit = param.type_ann.is_some()

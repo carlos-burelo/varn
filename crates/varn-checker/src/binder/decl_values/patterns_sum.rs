@@ -28,7 +28,7 @@ impl<'r> super::super::Binder<'r> {
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();
                 if let Some(ann) = type_ann {
-                    sym.ty = Some(resolve_type_node(ann, Some(self)));
+                    sym.ty = Some(self.resolve_type(ann));
                 } else {
                     sym.ty = ty;
                 }
@@ -129,7 +129,7 @@ impl<'r> super::super::Binder<'r> {
             }
             Pattern::Assignment { left, right, .. } => {
                 let resolved_ty = if ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()) {
-                    let inferred = infer_expr_type(*right, self.ast_arena, Some(self));
+                    let inferred = self.infer_expr_type_self(*right);
                     if inferred.is_dynamic() {
                         ty
                     } else {
@@ -172,7 +172,7 @@ impl<'r> super::super::Binder<'r> {
                 .fields
                 .iter()
                 .map(|f| {
-                    let ty = resolve_type_node(&f.ty, Some(self));
+                    let ty = self.resolve_type(&f.ty);
                     (Rc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();

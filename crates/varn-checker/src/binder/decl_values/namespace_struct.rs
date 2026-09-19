@@ -42,7 +42,7 @@ impl<'r> super::super::Binder<'r> {
                     let ret = crate::types::async_fn_return(
                         f.return_type
                             .as_ref()
-                            .map(|m| resolve_type_node(m, Some(self)))
+                            .map(|m| self.resolve_type(m))
                             .unwrap_or(Type::Void),
                         f.modifiers.is_async,
                     );
@@ -59,7 +59,7 @@ impl<'r> super::super::Binder<'r> {
                                     }
                                     _ => None,
                                 })
-                                .map(|ann| resolve_type_node(ann, Some(self)))
+                                .map(|ann| self.resolve_type(ann))
                                 .unwrap_or(Type::Dynamic);
                             if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
                                 ty = Type::array(ty);
@@ -145,11 +145,11 @@ impl<'r> super::super::Binder<'r> {
                         let ty = d
                             .type_ann
                             .as_ref()
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .or_else(|| {
                                 d.init
                                     .as_ref()
-                                    .map(|e| infer_expr_type(*e, ast_arena, Some(self)))
+                                    .map(|e| self.infer_expr_type_self(*e))
                                     .filter(|t| !t.is_dynamic())
                             })
                             .unwrap_or(Type::Dynamic);
@@ -339,7 +339,7 @@ impl<'r> super::super::Binder<'r> {
 
         let mut members = Vec::new();
         for field in &s.fields {
-            let ty = resolve_type_node(&field.type_ann, Some(self));
+            let ty = self.resolve_type(&field.type_ann);
             let field_name_rc: Rc<str> = Rc::from(self.interner.resolve(field.name));
 
             let mut field_sym =

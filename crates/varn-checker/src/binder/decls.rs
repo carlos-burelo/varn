@@ -389,7 +389,7 @@ impl<'r> super::Binder<'r> {
         match args {
             [Arg::Positional(value)] => {
                 let value = *value;
-                let value_ty = super::type_inference::infer_expr_type(value, arena, Some(self));
+                let value_ty = self.infer_expr_type_self(value);
                 self.record_array_write(name, &value_ty);
                 self.bind_expr(value);
             }
@@ -452,7 +452,7 @@ impl<'r> super::Binder<'r> {
             self.bind_expr(value);
             return true;
         }
-        let value_ty = super::type_inference::infer_expr_type(value, arena, Some(self));
+        let value_ty = self.infer_expr_type_self(value);
         self.record_array_write(name, &value_ty);
         self.bind_expr(property);
         self.bind_expr(value);
@@ -568,10 +568,10 @@ impl<'r> super::Binder<'r> {
                     varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|m| resolve_type_node(m, Some(self)))
+                .map(|m| self.resolve_type(m))
                 .or_else(|| {
                     p.default
-                        .map(|e| infer_expr_type(e, self.ast_arena, Some(self)))
+                        .map(|e| self.infer_expr_type_self(e))
                         .filter(|t| !t.is_dynamic())
                 })
                 .unwrap_or(Type::Dynamic);

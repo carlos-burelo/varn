@@ -32,10 +32,10 @@ impl<'r> super::super::Binder<'r> {
                     Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|ann| resolve_type_node(ann, Some(self)))
+                .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     d.init
-                        .map(|e| infer_expr_type(e, self.ast_arena, Some(self)))
+                        .map(|e| self.infer_expr_type_self(e))
                         .map(|t| {
                             if sym_kind == SymbolKind::Let && !has_explicit_ann {
                                 widen_literal(t)
@@ -122,10 +122,10 @@ impl<'r> super::super::Binder<'r> {
                         Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                         _ => None,
                     })
-                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .map(|ann| self.resolve_type(ann))
                     .or_else(|| {
                         p.default
-                            .map(|e| widen_literal(infer_expr_type(e, self.ast_arena, Some(self))))
+                            .map(|e| widen_literal(self.infer_expr_type_self(e)))
                     })
                     .unwrap_or(Type::Dynamic);
 
@@ -145,7 +145,7 @@ impl<'r> super::super::Binder<'r> {
         let declared_ret = f
             .return_type
             .as_ref()
-            .map(|ann| resolve_type_node(ann, Some(self)));
+            .map(|ann| self.resolve_type(ann));
 
         let ret = if f.modifiers.is_generator {
             crate::types::generator_of(declared_ret.unwrap_or(Type::Dynamic), f.modifiers.is_async)
@@ -177,7 +177,7 @@ impl<'r> super::super::Binder<'r> {
             .map(|t| {
                 t.constraint
                     .as_ref()
-                    .map(|c| resolve_type_node(c, Some(self)))
+                    .map(|c| self.resolve_type(c))
             })
             .collect();
 
@@ -205,10 +205,10 @@ impl<'r> super::super::Binder<'r> {
                     Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|ann| resolve_type_node(ann, Some(self)))
+                .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     p.default
-                        .map(|e| widen_literal(infer_expr_type(e, self.ast_arena, Some(self))))
+                        .map(|e| widen_literal(self.infer_expr_type_self(e)))
                 })
                 .unwrap_or(Type::Dynamic);
 
@@ -239,7 +239,7 @@ impl<'r> super::super::Binder<'r> {
         let ty = if has_type_params {
             crate::types::Type::Dynamic
         } else {
-            resolve_type_node(&t.alias, Some(self))
+            self.resolve_type(&t.alias)
         };
         let mut sym =
             Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(ty);
@@ -267,7 +267,7 @@ impl<'r> super::super::Binder<'r> {
             .map(|t| {
                 t.constraint
                     .as_ref()
-                    .map(|con| resolve_type_node(con, Some(self)))
+                    .map(|con| self.resolve_type(con))
             })
             .collect();
         self.define(e.id, sym);
@@ -280,7 +280,7 @@ impl<'r> super::super::Binder<'r> {
                 .payload_fields
                 .iter()
                 .map(|f| {
-                    let ty = resolve_type_node(&f.ty, Some(self));
+                    let ty = self.resolve_type(&f.ty);
                     (Rc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();

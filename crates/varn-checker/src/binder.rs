@@ -281,6 +281,32 @@ impl<'r> Binder<'r> {
         }
     }
 
+    /// `resolve_type_node(node, Some(self), &mut self.ty_table)` doesn't
+    /// borrow-check: `Some(self)` takes `&Binder` (the whole struct, through
+    /// the `dyn TypeContext` object) while `&mut self.ty_table` needs a
+    /// disjoint mutable borrow of one field, and a trait object erases the
+    /// field-level information NLL would otherwise use to see they don't
+    /// overlap. `resolve_type_node` only ever reads `table` through the
+    /// explicit parameter (never through `ctx.ty_table()` — that accessor
+    /// exists for callers with no such parameter to thread, like the
+    /// checker's `compat` module), so swapping `self.ty_table` out for the
+    /// call's duration is sound: nothing observes the gap.
+    pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
+        let mut table = std::mem::take(&mut self.ty_table);
+        let result = resolve_type_node(node, Some(self), &mut table);
+        self.ty_table = table;
+        result
+    }
+
+    /// Same rationale as [`Self::resolve_type`], for `infer_expr_type`.
+    pub(crate) fn infer_expr_type_self(&mut self, expr: varn_core::ast::ExprId) -> Type {
+        let mut table = std::mem::take(&mut self.ty_table);
+        let arena = self.ast_arena;
+        let result = infer_expr_type(expr, arena, Some(self), &mut table);
+        self.ty_table = table;
+        result
+    }
+
     fn bind_var_declarators(
         &mut self,
         declarators: &[VarDeclarator],
@@ -301,11 +327,11 @@ impl<'r> Binder<'r> {
                     Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|ann| resolve_type_node(ann, Some(self)))
+                .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     declarator
                         .init
-                        .map(|expr| infer_expr_type(expr, self.ast_arena, Some(self)))
+                        .map(|expr| self.infer_expr_type_self(expr))
                         .filter(|ty| !ty.is_dynamic())
                 });
 
@@ -439,7 +465,7 @@ impl<'r> Binder<'r> {
                         let ty = clause
                             .type_ann
                             .as_ref()
-                            .map(|ann| type_resolution::resolve_type_node(ann, Some(self)));
+                            .map(|ann| self.resolve_type(ann));
                         let block_line = arena.stmt(block).range.start.line;
                         self.bind_pattern(p, SymbolKind::Let, block_line, None, ty);
                     }

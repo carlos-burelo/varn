@@ -10,7 +10,7 @@ impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
         let type_name = type_node_to_name(&e.target, &self.interner);
 
-        let receiver_ty = resolve_type_node(&e.target, Some(self));
+        let receiver_ty = self.resolve_type(&e.target);
 
         if let Some(id) = e.id {
             let line = e.range.start.line;
@@ -41,7 +41,7 @@ impl<'r> super::super::Binder<'r> {
                                 Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                                 _ => None,
                             })
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
                             ty = Type::array(ty);
@@ -60,7 +60,7 @@ impl<'r> super::super::Binder<'r> {
                         method
                             .return_type
                             .as_ref()
-                            .map(|rt| resolve_type_node(rt, Some(self)))
+                            .map(|rt| self.resolve_type(rt))
                             .unwrap_or(Type::Void),
                         method.modifiers.is_async,
                     );
@@ -110,7 +110,7 @@ impl<'r> super::super::Binder<'r> {
                     let mangled = format!("__extget_{type_name}_{}", key_str);
                     let ret_ty = return_type
                         .as_ref()
-                        .map(|rt| resolve_type_node(rt, Some(self)))
+                        .map(|rt| self.resolve_type(rt))
                         .unwrap_or(Type::Dynamic);
                     let fn_type = Type::fn_(crate::types::FunctionType {
                         params: vec![crate::types::FunctionParam {
@@ -158,7 +158,7 @@ impl<'r> super::super::Binder<'r> {
                             Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                             _ => None,
                         })
-                        .map(|ann| resolve_type_node(ann, Some(self)))
+                        .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Dynamic);
                     let fn_type = Type::fn_(crate::types::FunctionType {
                         params: vec![
@@ -228,7 +228,7 @@ impl<'r> super::super::Binder<'r> {
                     Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|ann| resolve_type_node(ann, Some(self)))
+                .map(|ann| self.resolve_type(ann))
                 .unwrap_or(Type::Dynamic);
             if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
                 ty = Type::array(ty);

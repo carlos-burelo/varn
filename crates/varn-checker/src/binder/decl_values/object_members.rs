@@ -22,7 +22,7 @@ impl<'r> super::super::Binder<'r> {
                             PropKey::Identifier(s) | PropKey::Str(s) => Rc::from(s.as_str()),
                             _ => return None,
                         };
-                        let ty = infer_expr_type(value, self.ast_arena, Some(self));
+                        let ty = self.infer_expr_type_self(value);
                         let nested_members =
                             if let ExprKind::Object { properties } = &self.ast_arena.expr(value).kind
                             {
@@ -69,7 +69,7 @@ impl<'r> super::super::Binder<'r> {
                         };
                         let ret_ty = ret_ann
                             .as_ref()
-                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
 
                         let fn_params: Vec<_> = params
@@ -79,7 +79,7 @@ impl<'r> super::super::Binder<'r> {
                                 ty: p
                                     .type_ann
                                     .as_ref()
-                                    .map(|ann| resolve_type_node(ann, Some(self)))
+                                    .map(|ann| self.resolve_type(ann))
                                     .unwrap_or(Type::Dynamic),
                                 optional: p.is_optional || p.default.is_some(),
                                 is_rest: p.is_rest,
