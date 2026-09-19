@@ -166,6 +166,47 @@ impl<'r> super::Binder<'r> {
                                 resolved.to_cacheable(&foreign),
                                 &mut self.interner,
                             );
+                            // Same crossing as `foreign`/`self.interner` above,
+                            // for `CheckerTyId` instead of `Atom`: `s.ty` (and
+                            // any `type_param_constraints`) came from
+                            // `resolved`'s own bind, interned against whatever
+                            // `CheckerTyTable` that module's binder/checker
+                            // grew — not necessarily `self.ty_table`, which is
+                            // this binder's own, still-growing-locally table
+                            // and can be missing entries the exporter minted
+                            // (see `CheckerTyTable::reintern`'s doc for why a
+                            // raw id can't just be copied across). Decode
+                            // against a fresh snapshot of the resolver's
+                            // shared table (which, since the exporting module
+                            // fully bound-and-published before this import
+                            // could resolve, is guaranteed to contain
+                            // everything `resolved.ty` references) and
+                            // re-intern into `self.ty_table`.
+                            let foreign_ty_table = self.resolver.ty_table_snapshot();
+                            let mut ty_cache = rustc_hash::FxHashMap::default();
+                            s.ty = s.ty.map(|t| {
+                                crate::types::Type(
+                                    self.ty_table
+                                        .reintern(&foreign_ty_table, t.0, &mut ty_cache),
+                                    t.1,
+                                )
+                            });
+                            s.type_param_constraints = s
+                                .type_param_constraints
+                                .into_iter()
+                                .map(|c| {
+                                    c.map(|t| {
+                                        crate::types::Type(
+                                            self.ty_table.reintern(
+                                                &foreign_ty_table,
+                                                t.0,
+                                                &mut ty_cache,
+                                            ),
+                                            t.1,
+                                        )
+                                    })
+                                })
+                                .collect();
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;

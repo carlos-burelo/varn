@@ -36,7 +36,10 @@ pub fn debug_symbols(
             .symbol_types
             .get(&id)
             .or(sym.ty.as_ref())
-            .map(|t| t.to_string())
+            .map(|t| {
+                t.display(&check_result.bind.ty_table, &check_result.bind.interner)
+                    .to_string()
+            })
             .unwrap_or_else(|| "dynamic".to_string());
 
         let origin = sym

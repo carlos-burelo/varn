@@ -74,7 +74,8 @@ pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) 
     by_id.sort_by_key(|(id, _)| **id);
     for (id, entry) in by_id {
         let (line, col) = line_col(source, entry.start);
-        let _ = writeln!(out, "{id} | {line}:{col} | {}", entry.ty);
+        let ty = entry.ty.display(&check.bind.ty_table, &check.bind.interner);
+        let _ = writeln!(out, "{id} | {line}:{col} | {ty}");
     }
 
     out

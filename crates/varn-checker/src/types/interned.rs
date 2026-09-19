@@ -214,6 +214,220 @@ impl CheckerTyTable {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    /// Copy `id`'s shape from `other` into `self`, recursively, returning the
+    /// id it now has *in `self`*. `Atom`/`TypeTag` payloads pass through
+    /// unchanged (they're already `self`-relative — see the reintern helpers
+    /// that call this) but a `CheckerTyId` embedded inside a shape (an array's
+    /// element, a union's members, a function's params/return, ...) is only
+    /// meaningful relative to the table it was interned in — copying the raw
+    /// id across tables the way `Symbol::name`/`origin_module` copy an `Atom`
+    /// would silently point at whatever shape happens to sit at that index in
+    /// `self`. Needed anywhere a `Type` crosses from one table's lineage into
+    /// another's, e.g. reconstructing an imported `Symbol` whose `ty` was
+    /// interned by the module that exports it (`binder/imports.rs`).
+    ///
+    /// `cache` carries entries across sibling calls within one reintern (not
+    /// just recursive ones) so a shape referenced twice — a diamond, or the
+    /// same member type repeated in a union — is translated once.
+    pub fn reintern(
+        &mut self,
+        other: &CheckerTyTable,
+        id: CheckerTyId,
+        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
+    ) -> CheckerTyId {
+        if let Some(&done) = cache.get(&id) {
+            return done;
+        }
+        let kind = *other.get(id);
+        let translated = match kind {
+            TypeKind::Intrinsic(tag) => TypeKind::Intrinsic(tag),
+            TypeKind::This => TypeKind::This,
+            TypeKind::Array(inner) => TypeKind::Array(self.reintern(other, inner, cache)),
+            TypeKind::Union(list) => TypeKind::Union(self.reintern_list(other, list, cache)),
+            TypeKind::Intersection(list) => {
+                TypeKind::Intersection(self.reintern_list(other, list, cache))
+            }
+            TypeKind::Tuple(list) => TypeKind::Tuple(self.reintern_list(other, list, cache)),
+            TypeKind::Named(n, o) => TypeKind::Named(n, o),
+            TypeKind::Generic(n, list, o) => {
+                TypeKind::Generic(n, self.reintern_list(other, list, cache), o)
+            }
+            TypeKind::TemplateLiteral(list) => {
+                TypeKind::TemplateLiteral(self.reintern_list(other, list, cache))
+            }
+            TypeKind::Fn(fid) => TypeKind::Fn(self.reintern_function(other, fid, cache)),
+            TypeKind::Object(oid) => TypeKind::Object(self.reintern_object_members(other, oid, cache)),
+            TypeKind::Typeof(e) => TypeKind::Typeof(e),
+            TypeKind::KeyOf(inner) => TypeKind::KeyOf(self.reintern(other, inner, cache)),
+            TypeKind::IndexedAccess { object, index } => TypeKind::IndexedAccess {
+                object: self.reintern(other, object, cache),
+                index: self.reintern(other, index, cache),
+            },
+            TypeKind::Mapped {
+                key_var,
+                source,
+                value,
+                optional,
+                readonly,
+            } => TypeKind::Mapped {
+                key_var,
+                source: self.reintern(other, source, cache),
+                value: self.reintern(other, value, cache),
+                optional,
+                readonly,
+            },
+            TypeKind::Conditional {
+                check,
+                extends,
+                true_type,
+                false_type,
+            } => TypeKind::Conditional {
+                check: self.reintern(other, check, cache),
+                extends: self.reintern(other, extends, cache),
+                true_type: self.reintern(other, true_type, cache),
+                false_type: self.reintern(other, false_type, cache),
+            },
+            TypeKind::Infer(n) => TypeKind::Infer(n),
+            TypeKind::EnumVariant {
+                enum_name,
+                variant_name,
+                type_args,
+                payload_ty,
+            } => TypeKind::EnumVariant {
+                enum_name,
+                variant_name,
+                type_args: self.reintern_list(other, type_args, cache),
+                payload_ty: self.reintern(other, payload_ty, cache),
+            },
+            TypeKind::TypePredicate {
+                parameter_name,
+                target_type,
+            } => TypeKind::TypePredicate {
+                parameter_name,
+                target_type: self.reintern(other, target_type, cache),
+            },
+        };
+        let new_id = self.intern(translated);
+        cache.insert(id, new_id);
+        new_id
+    }
+
+    fn reintern_list(
+        &mut self,
+        other: &CheckerTyTable,
+        id: TyListId,
+        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
+    ) -> TyListId {
+        let translated: Vec<CheckerTyId> = other
+            .get_list(id)
+            .to_vec()
+            .into_iter()
+            .map(|t| self.reintern(other, t, cache))
+            .collect();
+        self.intern_list(&translated)
+    }
+
+    fn reintern_function(
+        &mut self,
+        other: &CheckerTyTable,
+        id: FunctionTypeId,
+        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
+    ) -> FunctionTypeId {
+        let f = other.get_function(id).clone();
+        let params = f
+            .params
+            .into_iter()
+            .map(|p| crate::types::FunctionParam {
+                name: p.name,
+                ty: self.reintern(other, p.ty, cache),
+                optional: p.optional,
+                is_rest: p.is_rest,
+            })
+            .collect();
+        let return_type = self.reintern(other, f.return_type, cache);
+        self.intern_function(crate::types::FunctionType {
+            params,
+            return_type,
+            is_arrow: f.is_arrow,
+            type_params: f.type_params,
+        })
+    }
+
+    fn reintern_object_members(
+        &mut self,
+        other: &CheckerTyTable,
+        id: ObjectMembersId,
+        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
+    ) -> ObjectMembersId {
+        use crate::types::ObjectTypeMember as M;
+        let members: Vec<M> = other
+            .get_object_members(id)
+            .to_vec()
+            .into_iter()
+            .map(|m| match m {
+                M::Property {
+                    name,
+                    ty,
+                    optional,
+                    readonly,
+                } => M::Property {
+                    name,
+                    ty: self.reintern(other, ty, cache),
+                    optional,
+                    readonly,
+                },
+                M::Method {
+                    name,
+                    params,
+                    return_type,
+                    optional,
+                    is_arrow,
+                } => M::Method {
+                    name,
+                    params: params
+                        .into_iter()
+                        .map(|p| crate::types::FunctionParam {
+                            name: p.name,
+                            ty: self.reintern(other, p.ty, cache),
+                            optional: p.optional,
+                            is_rest: p.is_rest,
+                        })
+                        .collect(),
+                    return_type: self.reintern(other, return_type, cache),
+                    optional,
+                    is_arrow,
+                },
+                M::Index {
+                    param_name,
+                    key_ty,
+                    value_ty,
+                } => M::Index {
+                    param_name,
+                    key_ty: self.reintern(other, key_ty, cache),
+                    value_ty: self.reintern(other, value_ty, cache),
+                },
+                M::Callable {
+                    params,
+                    return_type,
+                    is_arrow,
+                } => M::Callable {
+                    params: params
+                        .into_iter()
+                        .map(|p| crate::types::FunctionParam {
+                            name: p.name,
+                            ty: self.reintern(other, p.ty, cache),
+                            optional: p.optional,
+                            is_rest: p.is_rest,
+                        })
+                        .collect(),
+                    return_type: self.reintern(other, return_type, cache),
+                    is_arrow,
+                },
+            })
+            .collect();
+        self.intern_object_members(members)
+    }
 }
 
 #[cfg(test)]
