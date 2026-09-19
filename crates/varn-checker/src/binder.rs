@@ -229,6 +229,32 @@ impl<'r> Binder<'r> {
         }
     }
 
+    /// Publish every text `self.interner` holds past the live table's length,
+    /// keeping the two index-compatible.
+    ///
+    /// The companion of [`Self::resync_interner`] for batches that mint through
+    /// `AtomInterner::intern` directly (e.g. `Symbol::from_cacheable`): the
+    /// batch is preceded by one resync and there are no resolver calls inside
+    /// it, so both tables append the same texts in the same order and the new
+    /// indices agree. Without this the live table never sees the batch, and a
+    /// later snapshot taken for a different module starts from a stale base —
+    /// the divergence `intern_local` exists to prevent.
+    pub(crate) fn publish_interner_tail(&mut self) {
+        let live_len = self.resolver.interner_len();
+        if self.interner.len() <= live_len {
+            return;
+        }
+        let texts: Vec<String> = self
+            .interner
+            .iter_strings()
+            .skip(live_len)
+            .map(|s| s.to_owned())
+            .collect();
+        for text in texts {
+            self.resolver.intern(&text);
+        }
+    }
+
     pub fn bind(
         program: &Program,
         ast_arena: &'r AstArena,

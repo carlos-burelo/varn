@@ -17,7 +17,7 @@ impl<'r> super::super::Binder<'r> {
         );
         let mut sym =
             Symbol::new(SymbolKind::Namespace, n.id, n.range.start.line).with_type(namespace_ty);
-        sym.doc = n.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = n.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         self.define(n.id, sym);
 
         let child = self.scopes.child(ScopeKind::Namespace, self.current);
@@ -371,7 +371,7 @@ impl<'r> super::super::Binder<'r> {
         );
         let mut sym =
             Symbol::new(SymbolKind::Struct, s.id, s.range.start.line).with_type(struct_ty);
-        sym.doc = s.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = s.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         self.define(s.id, sym);
 
         let mut members = Vec::new();

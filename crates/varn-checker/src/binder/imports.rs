@@ -174,6 +174,7 @@ impl<'r> super::Binder<'r> {
                                 resolved.to_cacheable(&foreign),
                                 &mut self.interner,
                             );
+                            self.publish_interner_tail();
                             // Same crossing as `foreign`/`self.interner` above,
                             // for `CheckerTyId` instead of `Atom`: `s.ty` (and
                             // any `type_param_constraints`) came from
@@ -229,8 +230,7 @@ impl<'r> super::Binder<'r> {
                             let mut ty_cache = rustc_hash::FxHashMap::default();
                             s.ty = s.ty.map(|t| {
                                 crate::types::Type(
-                                    self.ty_table
-                                        .reintern(decode_source(t.0), t.0, &mut ty_cache),
+                                    self.ty_table.reintern(decode_source(t.0), t.0, &mut ty_cache),
                                     t.1,
                                 )
                             });
@@ -253,6 +253,15 @@ impl<'r> super::Binder<'r> {
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;
+                            // The rehydrated symbol keeps the declaring
+                            // module's alias NODE, not just its expanded
+                            // `ty`: an imported alias (`Json` from
+                            // `std:encoding`) must still be expandable in
+                            // THIS module's context, so its body's names are
+                            // resolved against — and interned into — the
+                            // local type table instead of being read out of
+                            // the exporter's, where the ids are foreign.
+                            s.alias_node = resolved.alias_node.clone();
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)

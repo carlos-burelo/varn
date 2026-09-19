@@ -245,51 +245,17 @@ pub(super) fn try_load_cache(
     virtual_id: &str,
     source: &str,
 ) -> Option<CachedModule> {
-    if virtual_id == "core:types" {
-        return None;
-    }
-    let hash = compute_source_hash(source);
-    let name = if virtual_id.contains(':') {
-        virtual_id.replace(':', "_")
-    } else {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        virtual_id.hash(&mut hasher);
-        format!("file_{:x}", hasher.finish())
-    };
-
-    let cache_dir = get_cache_dir(resolver);
-    let cache_file = cache_dir.join(format!(
-        "{}.{:x}.{:08x}.vnm",
-        name,
-        hash,
-        varn_modules::artifact::cache_key()
-    ));
-    if !cache_file.exists() {
-        return None;
-    }
-    let bytes = std::fs::read(&cache_file).ok()?;
-    let payload = match varn_modules::artifact::read_artifact(
-        varn_modules::artifact::ArtifactKind::CheckerInterface,
-        &bytes,
-    ) {
-        Ok(p) => p,
-        Err(_) => return None,
-    };
-    // Re-intern against this compilation's own interner (not whatever
-    // process wrote this cache file, possibly a session ago and always a
-    // different `AtomInterner`) and publish the grown table back, same
-    // pattern as `parse_and_cache`. `deserialize_module_interface` also
-    // sanitizes every `Type` this cache carries down to the ~21 ids that
-    // are valid in any `CheckerTyTable` (see its own doc) — `bind.ty_table`
-    // itself stays the fresh, intrinsics-only table `into_live` seeds; a
-    // non-intrinsic cached type is `Dynamic`, not a dangling id.
-    let mut interner = resolver.interner_snapshot();
-    let result = deserialize_module_interface(payload, &mut interner);
-    resolver.set_interner(interner);
-    match result {
-        Ok((exports, bind)) => Some(CachedModule { exports, bind }),
-        Err(_) => None,
-    }
+    // Reads disabled: the on-disk interface carries no portable encoding for a
+    // `CheckerTyId`, so `deserialize_module_interface` degrades every
+    // non-intrinsic type to `Dynamic` (see its own doc). A module served from
+    // this cache therefore has *different* (weaker, and inconsistent between
+    // runs that do and do not hit the cache) member types than the same module
+    // bound from source — the checker then reports spurious missing-member
+    // errors depending on whether a previous run warmed the cache. Writes are
+    // kept (they are inert) so the artifact format keeps being exercised;
+    // re-enable reads once a module interface can encode a type portably.
+    let _ = (resolver, virtual_id, source);
+    None
 }
 
 pub(super) fn save_to_cache(

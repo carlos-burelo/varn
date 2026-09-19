@@ -21,7 +21,7 @@ impl<'r> super::super::Binder<'r> {
                 ..
             } => {
                 let mut sym = Symbol::new(kind, *name, line);
-                sym.doc = doc.map(|d| self.interner.intern(&d));
+                sym.doc = doc.map(|d| self.intern_local(&d));
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();

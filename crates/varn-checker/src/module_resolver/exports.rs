@@ -25,6 +25,37 @@ fn intern_origin(resolver: &dyn super::ImportResolver, s: &str) -> Atom {
     resolver.intern(s)
 }
 
+/// Re-home an exported symbol to the table of the module that DECLARES it.
+///
+/// A symbol imported into this module had its `ty` re-interned into THIS
+/// module's `CheckerTyTable` (`binder/imports.rs`), so those ids are only
+/// meaningful here. Re-exporting that symbol would leak local ids to
+/// downstream importers, which decode against the declaring module's table —
+/// and an id that is in range but means something else there (an observed
+/// `Sender` reading as a union) silently types against the wrong shape. When
+/// the declaring module is reachable, hand out ITS symbol instead.
+///
+/// `None` when the symbol is declared here, or when the re-export chain does
+/// not expose a declaring module to fetch from — the caller keeps its clone.
+fn rehome_to_declaring_module(
+    resolver: &dyn super::ImportResolver,
+    bind: &BindResult,
+    visiting: &mut Vec<String>,
+    sym: &Symbol,
+) -> Option<Symbol> {
+    let origin = bind.interner.try_resolve(sym.origin_module?)?;
+    let original = bind.interner.try_resolve(sym.original_name?)?;
+    if origin == bind.source_file.as_ref() {
+        return None;
+    }
+    let map = if super::paths::is_known_module(origin) {
+        resolver.stdlib_exports(origin)
+    } else {
+        resolver.module_exports(origin, visiting)
+    };
+    map.get(original).cloned()
+}
+
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
     keys.sort();
@@ -93,7 +124,8 @@ pub(super) fn collect_exports(
                     let local_name = bind.interner.resolve(spec.local);
                     let exported_name = bind.interner.resolve(spec.exported);
                     if let Some(sym) = lookup_global(bind, local_name) {
-                        let mut s = sym.clone();
+                        let mut s = rehome_to_declaring_module(resolver, bind, visiting, sym)
+                            .unwrap_or_else(|| sym.clone());
                         s.name = spec.exported;
                         s.origin_module = s
                             .origin_module
@@ -120,7 +152,8 @@ pub(super) fn collect_exports(
                     let local_name = bind.interner.resolve(spec.local);
                     let exported_name = bind.interner.resolve(spec.exported);
                     if let Some(sym) = src_exports.get(local_name) {
-                        let mut s = sym.clone();
+                        let mut s = rehome_to_declaring_module(resolver, bind, visiting, sym)
+                            .unwrap_or_else(|| sym.clone());
                         s.name = spec.exported;
                         s.re_export_path.push(intern_origin(resolver, abs_path));
                         out.insert(exported_name.to_string(), s);
@@ -142,7 +175,8 @@ pub(super) fn collect_exports(
                 };
                 for (name, sym) in src_exports.iter() {
                     out.entry(name.clone()).or_insert_with(|| {
-                        let mut s = sym.clone();
+                        let mut s = rehome_to_declaring_module(resolver, bind, visiting, sym)
+                            .unwrap_or_else(|| sym.clone());
                         s.re_export_path.push(intern_origin(resolver, abs_path));
                         s
                     });
@@ -182,7 +216,8 @@ pub(super) fn collect_exports(
                 ns_sym.ty = Some(Type(ns_ty, false));
                 ns_sym.origin_module = Some(intern_origin(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
-                    let mut s = sub_sym.clone();
+                    let mut s = rehome_to_declaring_module(resolver, bind, visiting, sub_sym)
+                        .unwrap_or_else(|| sub_sym.clone());
                     s.re_export_path.push(intern_origin(resolver, abs_path));
                     out.insert(format!("{ns_str}.{sub_name}"), s);
                 }

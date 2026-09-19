@@ -33,8 +33,20 @@ pub fn resolve_type_node(
     // panicking on an unresolved `Atom`.
     let default_interner = varn_core::AtomInterner::new();
     let interner = ctx.and_then(|c| c.interner()).unwrap_or(&default_interner);
-    let resolve_name =
-        |a: varn_core::Atom| -> Rc<str> { Rc::from(interner.try_resolve(a).unwrap_or("")) };
+    // An alias body imported from another module carries that module's
+    // `Atom`s; `interner` here is this context's snapshot, which may not have
+    // them yet (a nested bind grew the live table after this snapshot). Fall
+    // back to the resolver's live table by TEXT rather than degrading the name
+    // to "" — an empty name silently resolves nothing downstream.
+    let resolve_name = |a: varn_core::Atom| -> Rc<str> {
+        if let Some(s) = interner.try_resolve(a) {
+            return Rc::from(s);
+        }
+        ctx.and_then(|c| c.resolver())
+            .and_then(|r| r.interner_snapshot().try_resolve(a).map(|s| s.to_owned()))
+            .map(Rc::from)
+            .unwrap_or_default()
+    };
     match &node.kind {
         TypeKind::Intrinsic(TypeTag::Int) => Type::Int,
         TypeKind::Intrinsic(TypeTag::Float) => Type::Float,

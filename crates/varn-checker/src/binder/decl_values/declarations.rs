@@ -185,7 +185,7 @@ impl<'r> super::super::Binder<'r> {
         sym.has_explicit_type = f.return_type.is_some();
         sym.is_async = f.modifiers.is_async;
         sym.is_generator = f.modifiers.is_generator;
-        sym.doc = f.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = f.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = f.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = f
             .type_params
@@ -264,7 +264,7 @@ impl<'r> super::super::Binder<'r> {
             Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(ty);
         sym.offset = t.range.start.offset;
         sym.col = t.range.start.column;
-        sym.doc = t.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = t.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
         if has_type_params {
             sym.alias_node = Some(Box::new(t.alias.clone()));
@@ -281,7 +281,7 @@ impl<'r> super::super::Binder<'r> {
             self.resolver,
             &mut self.ty_table,
         ));
-        sym.doc = e.doc.as_ref().map(|s| self.interner.intern(s.as_str()));
+        sym.doc = e.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = e.type_params.iter().map(|t| t.name).collect();
         sym.type_param_constraints = e
             .type_params

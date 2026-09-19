@@ -84,7 +84,7 @@ impl<'r> super::super::Binder<'r> {
                         &mut self.ty_table,
                     );
                     let line = method.range.start.line;
-                    let mangled_atom = self.interner.intern(&mangled);
+                    let mangled_atom = self.intern_local(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, line)
                         .with_type(fn_type);
                     sym.col = method.range.start.column;
@@ -135,7 +135,7 @@ impl<'r> super::super::Binder<'r> {
                         },
                         &mut self.ty_table,
                     );
-                    let mangled_atom = self.interner.intern(&mangled);
+                    let mangled_atom = self.intern_local(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
                         .with_type(fn_type);
                     sym.col = range.start.column;
@@ -197,7 +197,7 @@ impl<'r> super::super::Binder<'r> {
                         },
                         &mut self.ty_table,
                     );
-                    let mangled_atom = self.interner.intern(&mangled);
+                    let mangled_atom = self.intern_local(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
                         .with_type(fn_type);
                     sym.col = range.start.column;
@@ -231,7 +231,7 @@ impl<'r> super::super::Binder<'r> {
         let saved = self.current;
         self.current = child;
 
-        let this_atom = self.interner.intern("this");
+        let this_atom = self.intern_local("this");
         let this_sym = Symbol::new(SymbolKind::Parameter, this_atom, line).with_type(receiver_ty);
         self.define(this_atom, this_sym);
 

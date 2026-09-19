@@ -657,18 +657,38 @@ pub(super) fn types_compatible_impl(
                 true
             }
         }
-        (TypeKind::Named(dn, _), _) => {
+        (TypeKind::Named(dn, dn_origin), _) => {
             if is_intrinsic(bind, dn, IntrinsicType::Map) {
                 true
             } else {
-                named_fallback(declared, inferred, dn, None, bind, cache, in_progress, table, true)
+                named_fallback(
+                    declared,
+                    inferred,
+                    dn,
+                    dn_origin,
+                    bind,
+                    cache,
+                    in_progress,
+                    table,
+                    true,
+                )
             }
         }
-        (_, TypeKind::Named(in_, _)) => {
+        (_, TypeKind::Named(in_, in_origin)) => {
             if is_intrinsic(bind, in_, IntrinsicType::Map) {
                 true
             } else {
-                named_fallback(declared, inferred, in_, None, bind, cache, in_progress, table, false)
+                named_fallback(
+                    declared,
+                    inferred,
+                    in_,
+                    in_origin,
+                    bind,
+                    cache,
+                    in_progress,
+                    table,
+                    false,
+                )
             }
         }
         (TypeKind::Generic(name, args, _origin), _) => {

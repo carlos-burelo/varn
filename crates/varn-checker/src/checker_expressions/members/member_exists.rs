@@ -141,13 +141,14 @@ impl<'r> Checker<'r> {
                 if self.member_exists(&Type(payload_ty, false), key, bind) {
                     return true;
                 }
-                let enum_name_str = bind.interner.resolve(enum_name).to_string();
+                let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
                 let named = Type::named(enum_name_str, self.resolver, &mut self.ty_table);
                 self.member_exists(&named, key, bind)
             }
             TypeKind::Named(name_atom, origin_atom) => {
-                let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
-                let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
+                let name: Rc<str> = self.resolve_bind_atom(bind, name_atom);
+                let origin: Option<Rc<str>> =
+                    origin_atom.map(|o| self.resolve_bind_atom(bind, o));
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = &origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
@@ -264,8 +265,9 @@ impl<'r> Checker<'r> {
                 false
             }
             TypeKind::Generic(name_atom, _, origin_atom) => {
-                let name = bind.interner.resolve(name_atom).to_string();
-                let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
+                let name = self.resolve_bind_atom(bind, name_atom).to_string();
+                let origin: Option<Rc<str>> =
+                    origin_atom.map(|o| self.resolve_bind_atom(bind, o));
                 let ty = Type::named_with_origin(name, origin, self.resolver, &mut self.ty_table);
                 self.member_exists(&ty, key, bind)
             }
