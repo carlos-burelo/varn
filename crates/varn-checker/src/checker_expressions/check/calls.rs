@@ -24,10 +24,12 @@ impl<'r> Checker<'r> {
         self.check_expr(callee, bind);
         self.record_extension_call(callee, range, bind);
 
-        let callee_ty = self.infer_type(callee, bind).non_nullified();
+        let callee_ty_raw = self.infer_type(callee, bind);
+        let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
+        let callee_kind = *self.ty_table.get(callee_ty.0);
 
         if !matches!(
-            &callee_ty.0,
+            callee_kind,
             TypeKind::Fn(_)
                 | TypeKind::Intrinsic(varn_core::TypeTag::Dynamic)
                 | TypeKind::Named(_, _)
@@ -36,46 +38,46 @@ impl<'r> Checker<'r> {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::NotCallable,
-                    format!("type '{callee_ty}' is not callable"),
+                    format!(
+                        "type '{}' is not callable",
+                        callee_ty.display(&self.ty_table, &bind.interner)
+                    ),
                 )
                 .with_range(*range),
             );
         }
 
-        let effective_callee_ty = if let TypeKind::Fn(ft) = &callee_ty.0 {
-            let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
+        let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
+            let ft = self.ty_table.get_function(fid).clone();
+            let mapping = build_call_mapping(callee, type_args, args, &ft, self, bind);
             map_generics_cached(self, &callee_ty, &mapping)
         } else {
-            callee_ty.clone()
+            callee_ty
         };
 
         if let ExprKind::Member { property, .. } = &arena.expr(callee).kind {
             let property = *property;
-            self.record_type(
-                arena.expr(property).range.start.offset,
-                effective_callee_ty.clone(),
-            );
+            self.record_type(arena.expr(property).range.start.offset, effective_callee_ty);
         } else {
-            self.record_type(
-                arena.expr(callee).range.start.offset,
-                effective_callee_ty.clone(),
-            );
+            self.record_type(arena.expr(callee).range.start.offset, effective_callee_ty);
         }
 
-        let params_for_context: Vec<FunctionParam> =
-            if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
-                ft.params.clone()
-            } else {
-                vec![]
-            };
+        let effective_kind = *self.ty_table.get(effective_callee_ty.0);
+        let params_for_context: Vec<FunctionParam> = if let TypeKind::Fn(fid) = effective_kind {
+            self.ty_table.get_function(fid).params.clone()
+        } else {
+            vec![]
+        };
         self.check_call_args_with_context(args, &params_for_context, bind);
 
-        if let TypeKind::Fn(crate::types::FunctionType { params, .. }) = &effective_callee_ty.0 {
-            self.validate_call_arguments(args, params, range, call_id, bind);
+        if let TypeKind::Fn(fid) = effective_kind {
+            let params = self.ty_table.get_function(fid).params.clone();
+            self.validate_call_arguments(args, &params, range, call_id, bind);
         }
 
         if self.record_expr_types {
-            if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
+            if let TypeKind::Fn(fid) = effective_kind {
+                let ft = self.ty_table.get_function(fid).clone();
                 let callee_name = match &arena.expr(callee).kind {
                     ExprKind::Identifier { name } => {
                         Some(std::rc::Rc::from(bind.interner.resolve(*name)))
@@ -94,7 +96,7 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|p| crate::semantic_info::CallParamInfo {
                         name: p.name.clone(),
-                        ty: p.ty.clone(),
+                        ty: Type(p.ty, false),
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
@@ -123,7 +125,7 @@ impl<'r> Checker<'r> {
                 let call_res = crate::semantic_info::CallResolution {
                     callee_name,
                     params,
-                    return_ty: *ft.return_type.clone(),
+                    return_ty: Type(ft.return_type, false),
                     arg_to_param_map,
                 };
                 self.call_resolutions
@@ -151,8 +153,9 @@ impl<'r> Checker<'r> {
         let ExprKind::Identifier { name: method_name } = &arena.expr(property).kind else {
             return;
         };
-        let obj_ty = self.infer_type(object, bind).non_nullified();
-        let Some(tn) = extension_type_name(&obj_ty) else {
+        let obj_ty_raw = self.infer_type(object, bind);
+        let obj_ty = obj_ty_raw.non_nullified(&mut self.ty_table);
+        let Some(tn) = extension_type_name(&obj_ty, &self.ty_table, &bind.interner) else {
             return;
         };
         let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) else {
@@ -181,12 +184,12 @@ impl<'r> Checker<'r> {
 
             let expected = param.map(|p| {
                 if p.is_rest {
-                    match &p.ty.0 {
-                        TypeKind::Array(inner) => *inner.clone(),
-                        _ => p.ty.clone(),
+                    match self.ty_table.get(p.ty) {
+                        TypeKind::Array(inner) => Type(*inner, false),
+                        _ => Type(p.ty, false),
                     }
                 } else {
-                    p.ty.clone()
+                    Type(p.ty, false)
                 }
             });
             match arg {
@@ -278,11 +281,16 @@ impl<'r> Checker<'r> {
                 Arg::Positional(e) => (None, self.infer_type(*e, bind)),
                 Arg::Spread(e) => {
                     let arg_ty = self.infer_type(*e, bind);
-                    if !arg_ty.is_dynamic() && !matches!(arg_ty.0, TypeKind::Array(_)) {
+                    if !arg_ty.is_dynamic()
+                        && !matches!(self.ty_table.get(arg_ty.0), TypeKind::Array(_))
+                    {
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::TypeMismatch,
-                                format!("spread argument must be an array, got '{arg_ty}'"),
+                                format!(
+                                    "spread argument must be an array, got '{}'",
+                                    arg_ty.display(&self.ty_table, &bind.interner)
+                                ),
                             )
                             .with_range(*range),
                         );
@@ -298,7 +306,7 @@ impl<'r> Checker<'r> {
                     .enumerate()
                     .find(|(_, p)| p.name.as_deref() == Some(lbl))
                 {
-                    (Some(&p.ty), Some(i))
+                    (Some(Type(p.ty, false)), Some(i))
                 } else {
                     (None, None)
                 }
@@ -311,7 +319,7 @@ impl<'r> Checker<'r> {
                 {
                     positional_param_idx += 1;
                 }
-                let ty = params.get(positional_param_idx).map(|p| &p.ty);
+                let ty = params.get(positional_param_idx).map(|p| Type(p.ty, false));
                 let idx = if ty.is_some() {
                     Some(positional_param_idx)
                 } else {
@@ -327,14 +335,16 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(param_ty) = param_ty {
-                if !self.types_compatible_cached(param_ty, &arg_ty, Some(bind)) {
+                if !self.types_compatible_cached(&param_ty, &arg_ty, Some(bind)) {
+                    let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
+                    let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);
                     let msg = if let Some(lbl) = label_opt {
                         format!(
-                            "named argument '{lbl}' of type '{arg_ty}' is not assignable to parameter of type '{param_ty}'"
+                            "named argument '{lbl}' of type '{arg_ty_s}' is not assignable to parameter of type '{param_ty_s}'"
                         )
                     } else {
                         format!(
-                            "argument of type '{arg_ty}' is not assignable to parameter of type '{param_ty}'"
+                            "argument of type '{arg_ty_s}' is not assignable to parameter of type '{param_ty_s}'"
                         )
                     };
                     self.emit(Diagnostic::error(ErrorCode::TypeMismatch, msg).with_range(*range));
@@ -364,7 +374,10 @@ impl<'r> Checker<'r> {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
-                            format!("spread argument must be an array, got '{arg_ty}'"),
+                            format!(
+                                "spread argument must be an array, got '{}'",
+                                arg_ty.display(&self.ty_table, &bind.interner)
+                            ),
                         )
                         .with_range(*range),
                     );
@@ -381,11 +394,16 @@ impl<'r> Checker<'r> {
             };
 
             if let Some(param) = param {
-                let effective_arg_ty = spread_inner.as_ref().unwrap_or(&arg_ty);
-                let param_ty = compatible_param_type(param, spread_inner.as_ref());
+                let effective_arg_ty = spread_inner.unwrap_or(arg_ty);
+                let param_ty = compatible_param_type(param, spread_inner, &self.ty_table);
 
-                let param_accepts_array = matches!(param_ty.0, TypeKind::Array(_))
-                    || matches!(&param_ty.0, TypeKind::Union(ms) if ms.iter().any(|m| matches!(m.0, TypeKind::Array(_))));
+                let param_kind = *self.ty_table.get(param_ty.0);
+                let param_accepts_array = matches!(param_kind, TypeKind::Array(_))
+                    || matches!(param_kind, TypeKind::Union(list) if self
+                        .ty_table
+                        .get_list(list)
+                        .iter()
+                        .any(|m| matches!(self.ty_table.get(*m), TypeKind::Array(_))));
                 let arena = self.ast_arena;
                 let is_empty_array_arg = effective_arg_ty.is_dynamic()
                     && matches!(
@@ -399,11 +417,13 @@ impl<'r> Checker<'r> {
                     && param_accepts_array;
 
                 if !is_empty_array_arg
-                    && !self.types_compatible_cached(param_ty, effective_arg_ty, Some(bind))
+                    && !self.types_compatible_cached(&param_ty, &effective_arg_ty, Some(bind))
                 {
+                    let effective_arg_ty_s = effective_arg_ty.display(&self.ty_table, &bind.interner);
+                    let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                            "argument of type '{effective_arg_ty}' is not assignable to parameter of type '{param_ty}'"
+                            "argument of type '{effective_arg_ty_s}' is not assignable to parameter of type '{param_ty_s}'"
                         ))
                         .with_range(*range),
                     );
@@ -426,8 +446,8 @@ impl<'r> Checker<'r> {
             }
             Arg::Spread(expr) => {
                 let arg_ty = self.infer_type(*expr, bind);
-                let spread_inner = match &arg_ty.0 {
-                    TypeKind::Array(inner) => Some(inner.as_ref().clone()),
+                let spread_inner = match self.ty_table.get(arg_ty.0) {
+                    TypeKind::Array(inner) => Some(Type(*inner, false)),
                     _ => None,
                 };
                 match spread_inner {
@@ -470,7 +490,11 @@ impl<'r> Checker<'r> {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::ConstraintViolation,
-                            format!("type '{supplied}' does not satisfy constraint '{ct}'"),
+                            format!(
+                                "type '{}' does not satisfy constraint '{}'",
+                                supplied.display(&self.ty_table, &bind.interner),
+                                ct.display(&self.ty_table, &bind.interner)
+                            ),
                         )
                         .with_range(*range),
                     );
@@ -555,24 +579,28 @@ fn resolve_function_symbol<'a>(
     None
 }
 
-fn compatible_param_type<'a>(param: &'a FunctionParam, spread_inner: Option<&'a Type>) -> &'a Type {
+fn compatible_param_type(
+    param: &FunctionParam,
+    spread_inner: Option<Type>,
+    table: &crate::types::CheckerTyTable,
+) -> Type {
     if let Some(inner) = spread_inner {
         if param.is_rest {
-            if let TypeKind::Array(expected_inner) = &param.ty.0 {
-                expected_inner.as_ref()
+            if let TypeKind::Array(expected_inner) = table.get(param.ty) {
+                Type(*expected_inner, false)
             } else {
-                &param.ty
+                Type(param.ty, false)
             }
         } else {
             inner
         }
     } else if param.is_rest {
-        if let TypeKind::Array(inner) = &param.ty.0 {
-            inner
+        if let TypeKind::Array(inner) = table.get(param.ty) {
+            Type(*inner, false)
         } else {
-            &param.ty
+            Type(param.ty, false)
         }
     } else {
-        &param.ty
+        Type(param.ty, false)
     }
 }
