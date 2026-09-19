@@ -1,5 +1,4 @@
 use super::type_inference::pattern_lead_name;
-use super::type_resolution::resolve_type_node;
 use crate::binder::{ClassMemberInfo, ClassMemberKind};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
@@ -16,9 +15,11 @@ impl<'r> super::Binder<'r> {
             Some(Rc::from(self.source_file.as_ref()))
         };
         let mut sym = Symbol::new(SymbolKind::Interface, i.id, i.range.start.line);
-        sym.ty = Some(crate::types::Type(
-            varn_core::TypeKind::Named(id_rc.clone(), origin_rc),
-            false,
+        sym.ty = Some(Type::named_with_origin(
+            id_rc.clone(),
+            origin_rc,
+            self.resolver,
+            &mut self.ty_table,
         ));
         sym.col = i.range.start.column;
         sym.offset = i.range.start.offset;
@@ -110,12 +111,16 @@ impl<'r> super::Binder<'r> {
                 is_async,
                 range,
             } => {
+                let declared = return_type
+                    .as_ref()
+                    .map(|m| self.resolve_type(m))
+                    .unwrap_or(Type::Dynamic);
                 let ret = crate::types::async_fn_return(
-                    return_type
-                        .as_ref()
-                        .map(|m| self.resolve_type(m))
-                        .unwrap_or(Type::Dynamic),
+                    declared,
                     *is_async,
+                    &mut self.ty_table,
+                    &self.interner,
+                    Some(self.resolver),
                 );
                 let params_list = params
                     .iter()
@@ -129,12 +134,15 @@ impl<'r> super::Binder<'r> {
                             })
                             .map(|m| self.resolve_type(m))
                             .unwrap_or(Type::Dynamic);
-                        if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                            ty = Type::array(ty);
+                        if p.is_rest {
+                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
+                            if !is_array {
+                                ty = Type::array(ty, &mut self.ty_table);
+                            }
                         }
                         FunctionParam {
                             name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty,
+                            ty: ty.0,
                             optional: p.is_optional,
                             is_rest: p.is_rest,
                         }
@@ -146,12 +154,15 @@ impl<'r> super::Binder<'r> {
                     .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                     .collect();
 
-                let fn_type = Type::fn_(FunctionType {
-                    params: params_list,
-                    return_type: Box::new(ret),
-                    is_arrow: false,
-                    type_params: fn_tps,
-                });
+                let fn_type = Type::fn_(
+                    FunctionType {
+                        params: params_list,
+                        return_type: ret.0,
+                        is_arrow: false,
+                        type_params: fn_tps,
+                    },
+                    &mut self.ty_table,
+                );
 
                 let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
                 let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
@@ -188,14 +199,17 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let ret = self.resolve_type(return_type);
-                let param_name = pattern_lead_name(&param.pattern, &self.interner);
+                let param_name = pattern_lead_name(&param.pattern, &self.interner).to_string();
                 let key_ty = param
                     .type_ann
                     .as_ref()
                     .map(|m| self.resolve_type(m))
                     .unwrap_or(Type::Dynamic);
                 members.push(ClassMemberInfo {
-                    name: Rc::from(format!("[{param_name}: {key_ty}]")),
+                    name: Rc::from(format!(
+                        "[{param_name}: {}]",
+                        key_ty.display(&self.ty_table, &self.interner)
+                    )),
                     kind: ClassMemberKind::Property,
                     is_async: false,
                     is_generator: false,
@@ -232,23 +246,29 @@ impl<'r> super::Binder<'r> {
                             })
                             .map(|m| self.resolve_type(m))
                             .unwrap_or(Type::Dynamic);
-                        if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                            ty = Type::array(ty);
+                        if p.is_rest {
+                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
+                            if !is_array {
+                                ty = Type::array(ty, &mut self.ty_table);
+                            }
                         }
                         FunctionParam {
                             name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty,
+                            ty: ty.0,
                             optional: p.is_optional,
                             is_rest: p.is_rest,
                         }
                     })
                     .collect::<Vec<_>>();
-                let fn_type = Type::fn_(FunctionType {
-                    params: params_list,
-                    return_type: Box::new(ret),
-                    is_arrow: false,
-                    type_params: vec![],
-                });
+                let fn_type = Type::fn_(
+                    FunctionType {
+                        params: params_list,
+                        return_type: ret.0,
+                        is_arrow: false,
+                        type_params: vec![],
+                    },
+                    &mut self.ty_table,
+                );
                 members.push(ClassMemberInfo {
                     name: Rc::from(varn_core::MemberKey::Callable.as_str()),
                     kind: ClassMemberKind::Method,
