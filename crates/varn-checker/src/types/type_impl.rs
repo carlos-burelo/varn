@@ -1,4 +1,5 @@
 use super::*;
+use crate::module_resolver::ImportResolver;
 use std::rc::Rc;
 
 #[allow(non_upper_case_globals)]
@@ -52,8 +53,8 @@ impl Type {
         Type(table.intern(TypeKind::Fn(fid)), false)
     }
 
-    pub fn named(name: impl Into<Rc<str>>, interner: &mut varn_core::AtomInterner, table: &mut CheckerTyTable) -> Self {
-        let atom = interner.intern(&name.into());
+    pub fn named(name: impl Into<Rc<str>>, resolver: &dyn ImportResolver, table: &mut CheckerTyTable) -> Self {
+        let atom = resolver.intern(&name.into());
         Type(table.intern(TypeKind::Named(atom, None)), false)
     }
 
@@ -67,6 +68,45 @@ impl Type {
         table: &mut CheckerTyTable,
     ) -> Self {
         Type(table.intern(TypeKind::Named(name, origin)), false)
+    }
+
+    /// String-name convenience over [`Self::named_with_origin_atom`]: mints
+    /// both `Atom`s via `resolver.intern` — the shared, per-compilation
+    /// interner every other `Named`/`Generic` name comes from — rather than
+    /// asking every call site to intern for itself.
+    pub fn named_with_origin(
+        name: impl Into<Rc<str>>,
+        origin: Option<Rc<str>>,
+        resolver: &dyn ImportResolver,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        let name_atom = resolver.intern(&name.into());
+        let origin_atom = origin.map(|o| resolver.intern(&o));
+        Type::named_with_origin_atom(name_atom, origin_atom, table)
+    }
+
+    /// String-name convenience over [`Self::generic_atom`], no origin.
+    pub fn generic(
+        name: impl Into<Rc<str>>,
+        args: Vec<Type>,
+        resolver: &dyn ImportResolver,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        let atom = resolver.intern(&name.into());
+        Type::generic_atom(atom, args, None, table)
+    }
+
+    /// String-name convenience over [`Self::generic_atom`], with origin.
+    pub fn generic_with_origin(
+        name: impl Into<Rc<str>>,
+        args: Vec<Type>,
+        origin: Option<Rc<str>>,
+        resolver: &dyn ImportResolver,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        let atom = resolver.intern(&name.into());
+        let origin_atom = origin.map(|o| resolver.intern(&o));
+        Type::generic_atom(atom, args, origin_atom, table)
     }
 
     pub fn array(inner: Type, table: &mut CheckerTyTable) -> Self {

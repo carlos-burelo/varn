@@ -211,6 +211,11 @@ pub struct Checker<'r> {
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
+    /// Seeded from `bind.ty_table` and grown as checking synthesizes types
+    /// beyond what binding produced (unions from narrowing, instantiated
+    /// generics, etc). Same snapshot/publish discipline as `AtomInterner`:
+    /// see `ImportResolver::ty_table_snapshot`/`set_ty_table`.
+    pub(crate) ty_table: crate::types::CheckerTyTable,
 }
 
 /// What a caller wants from a check, beyond the diagnostics.
@@ -407,6 +412,7 @@ impl<'r> Checker<'r> {
             } else {
                 FxHashMap::default()
             },
+            ty_table: bind.ty_table.clone(),
         };
 
         for (name, class_info) in &bind.type_members.classes {
@@ -461,6 +467,15 @@ impl<'r> Checker<'r> {
                 }
             }
         }
+
+        // Publish types synthesized during checking (narrowed unions,
+        // instantiated generics, ...) the same way binding publishes its own
+        // growth: `bind.ty_table` carries it onward to emit, and
+        // `resolver.set_ty_table` makes it visible to modules that import
+        // this one afterward. Same snapshot/publish discipline as
+        // `AtomInterner`/`set_interner`.
+        bind.ty_table = checker.ty_table.clone();
+        resolver.set_ty_table(checker.ty_table.clone());
 
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);
@@ -670,6 +685,7 @@ impl<'r> Checker<'r> {
             inferred,
             view.as_ref(),
             &mut self.compat_cache,
+            &self.ty_table,
         )
     }
 
@@ -690,7 +706,7 @@ impl<'r> Checker<'r> {
             return cached.clone();
         }
         let view = crate::binder::BindView::new(bind, self.resolver);
-        let resolved = crate::binder::resolve_type_node(node, Some(&view));
+        let resolved = crate::binder::resolve_type_node(node, Some(&view), &mut self.ty_table);
         self.type_node_cache.insert(key, resolved.clone());
         resolved
     }
