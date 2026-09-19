@@ -2,10 +2,12 @@ mod async_fn;
 mod class_member_impl;
 mod context;
 mod display;
+pub mod interned;
 mod object_member_impl;
 mod type_impl;
 
 pub use async_fn::{async_fn_return, awaited, generator_of, is_awaitable};
+pub use interned::{CheckerTyId, CheckerTyTable, FunctionTypeId, ObjectMembersId, TyListId};
 
 use rustc_hash::FxHashMap;
 use std::fmt;
