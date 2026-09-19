@@ -3,10 +3,30 @@ mod traverse;
 mod types;
 
 use crate::binder::{BindResult, BindView, PendingEnrich};
+use crate::types::Type;
 use index::build_enrich_context;
 use std::rc::Rc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::AstArena;
+
+/// `Type` is a hash-consed id now, so a function's return type cannot be
+/// mutated in place the way the old owned-tree `Type` allowed — this builds
+/// the replacement `Type` (same params/is_arrow/type_params, new return
+/// type) instead. Non-`Fn` types pass through unchanged: enrichment only
+/// ever reaches this once it already knows the symbol is a function.
+fn with_new_return_type(
+    old: Type,
+    new_ret: Type,
+    table: &mut crate::types::CheckerTyTable,
+) -> Type {
+    if let varn_core::TypeKind::Fn(fid) = *table.get(old.0) {
+        let mut ft = table.get_function(fid).clone();
+        ft.return_type = new_ret.0;
+        crate::types::Type::fn_(ft, table)
+    } else {
+        old
+    }
+}
 
 /// `resolver` is threaded in rather than reached for ambiently: enrichment
 /// infers call return types, which means resolving imported signatures.
@@ -34,6 +54,7 @@ pub fn enrich_call_returns(
                 {
                     continue;
                 }
+                let mut table = std::mem::take(&mut bind.ty_table);
                 let ty = crate::checker_call_types::infer_call_type(
                     &ctx.fn_map,
                     &ctx.fn_type_params,
@@ -44,7 +65,9 @@ pub fn enrich_call_returns(
                     Some(&BindView::new(bind, resolver)),
                     None,
                     &bind.interner,
+                    &mut table,
                 );
+                bind.ty_table = table;
                 if let Some(t) = ty {
                     let name_atom = bind.arena.get(*sym_id).name;
                     let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
@@ -59,6 +82,7 @@ pub fn enrich_call_returns(
                 is_async,
             } => {
                 let stmt: varn_core::ast::StmtId = *body;
+                let mut table = std::mem::take(&mut bind.ty_table);
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -66,14 +90,24 @@ pub fn enrich_call_returns(
                     ast_arena,
                     &BindView::new(bind, resolver),
                     None,
+                    &mut table,
                 );
-                let ret_ty = types::join_types(inferred);
+                let ret_ty = types::join_types(inferred, &mut table);
                 if !ret_ty.is_dynamic() {
-                    let final_ret = crate::types::async_fn_return(ret_ty, *is_async);
-                    let sym = bind.arena.get_mut(*sym_id);
-                    if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) = &mut sym.ty {
-                        *ft.return_type = final_ret;
+                    let final_ret = crate::types::async_fn_return(
+                        ret_ty,
+                        *is_async,
+                        &mut table,
+                        &bind.interner,
+                        Some(resolver),
+                    );
+                    bind.ty_table = table;
+                    if let Some(old_ty) = bind.arena.get(*sym_id).ty {
+                        let new_ty = with_new_return_type(old_ty, final_ret, &mut bind.ty_table);
+                        bind.arena.get_mut(*sym_id).ty = Some(new_ty);
                     }
+                } else {
+                    bind.ty_table = table;
                 }
                 enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, ast_arena, bind, resolver, None);
             }
@@ -94,6 +128,7 @@ pub fn enrich_call_returns(
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
+                let mut table = std::mem::take(&mut bind.ty_table);
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -101,15 +136,27 @@ pub fn enrich_call_returns(
                     ast_arena,
                     &BindView::new(bind, resolver),
                     Some(&class_name_str),
+                    &mut table,
                 );
-                let ret = types::join_types(inferred);
+                let ret = types::join_types(inferred, &mut table);
+                bind.ty_table = table;
                 if !ret.is_dynamic() {
-                    let final_ret = crate::types::async_fn_return(ret, *is_async);
-                    if let Some(ft_map) = bind.class_methods.get_mut(class_name_str.as_str()) {
-                        if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
-                            ft_map.get_mut(key_str.as_str())
-                        {
-                            *ft.return_type = final_ret.clone();
+                    let final_ret = crate::types::async_fn_return(
+                        ret,
+                        *is_async,
+                        &mut bind.ty_table,
+                        &bind.interner,
+                        Some(resolver),
+                    );
+                    if let Some(old) = bind
+                        .class_methods
+                        .get(class_name_str.as_str())
+                        .and_then(|m| m.get(key_str.as_str()))
+                        .copied()
+                    {
+                        let new_ty = with_new_return_type(old, final_ret, &mut bind.ty_table);
+                        if let Some(ft_map) = bind.class_methods.get_mut(class_name_str.as_str()) {
+                            ft_map.insert(Rc::from(key_str.as_str()), new_ty);
                         }
                     }
                     if let Some(class_info) =
@@ -120,14 +167,13 @@ pub fn enrich_call_returns(
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
                         {
-                            if let crate::types::Type(varn_core::TypeKind::Fn(ft), _) = &mut m.ty {
-                                *ft.return_type = final_ret.clone();
-                            }
+                            let new_ty = with_new_return_type(m.ty, final_ret, &mut bind.ty_table);
+                            m.ty = new_ty;
                             if let Some(symbol_id) = m.symbol_id {
-                                if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
-                                    &mut bind.arena.get_mut(symbol_id).ty
-                                {
-                                    *ft.return_type = final_ret.clone();
+                                if let Some(old) = bind.arena.get(symbol_id).ty {
+                                    let new_ty =
+                                        with_new_return_type(old, final_ret, &mut bind.ty_table);
+                                    bind.arena.get_mut(symbol_id).ty = Some(new_ty);
                                 }
                             }
                         }
@@ -152,6 +198,7 @@ pub fn enrich_call_returns(
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
+                let mut table = std::mem::take(&mut bind.ty_table);
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -159,8 +206,10 @@ pub fn enrich_call_returns(
                     ast_arena,
                     &BindView::new(bind, resolver),
                     Some(&class_name_str),
+                    &mut table,
                 );
-                let ret = types::join_types(inferred);
+                let ret = types::join_types(inferred, &mut table);
+                bind.ty_table = table;
                 if !ret.is_dynamic() {
                     if let Some(ft_map) = bind
                         .type_members
@@ -168,7 +217,7 @@ pub fn enrich_call_returns(
                         .get_mut(class_name_str.as_str())
                     {
                         if let Some(ty) = ft_map.get_mut(key_str.as_str()) {
-                            *ty = ret.clone();
+                            *ty = ret;
                         }
                     }
                     if let Some(class_info) =
@@ -179,9 +228,9 @@ pub fn enrich_call_returns(
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
                         {
-                            m.ty = ret.clone();
+                            m.ty = ret;
                             if let Some(symbol_id) = m.symbol_id {
-                                bind.arena.get_mut(symbol_id).ty = Some(ret.clone());
+                                bind.arena.get_mut(symbol_id).ty = Some(ret);
                             }
                         }
                     }

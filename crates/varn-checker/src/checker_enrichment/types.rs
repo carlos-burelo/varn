@@ -1,6 +1,6 @@
-use crate::types::Type;
+use crate::types::{CheckerTyTable, Type};
 
-pub(super) fn join_types(mut types: Vec<Type>) -> Type {
+pub(super) fn join_types(mut types: Vec<Type>, table: &mut CheckerTyTable) -> Type {
     if types.is_empty() {
         return Type::Void;
     }
@@ -21,6 +21,6 @@ pub(super) fn join_types(mut types: Vec<Type>) -> Type {
     if types.len() == 1 {
         types.pop().unwrap()
     } else {
-        Type::union(types)
+        Type::union(types, table)
     }
 }

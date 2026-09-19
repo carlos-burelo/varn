@@ -23,10 +23,11 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
             sym_map.insert(name_rc.clone(), ty.clone());
 
             if sym.kind == SymbolKind::Function {
-                if let Type(TypeKind::Fn(FunctionType { return_type, .. }), _) = ty {
+                if let TypeKind::Fn(fid) = bind.ty_table.get(ty.0) {
+                    let FunctionType { return_type, .. } = bind.ty_table.get_function(*fid);
                     // Already `Task<R>` for async functions — the binder wrapped
                     // it when it built the type.
-                    let raw = return_type.as_ref().clone();
+                    let raw = Type(*return_type, false);
                     if !raw.is_dynamic() {
                         fn_map.insert(name_rc.clone(), raw);
                     }
