@@ -84,7 +84,7 @@ impl CheckerTyId {
     pub const THIS: CheckerTyId = CheckerTyId(20);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CheckerTyTable {
     entries: Vec<InternedTypeKind>,
     dedup: FxHashMap<InternedTypeKind, u32>,
@@ -201,6 +201,18 @@ impl CheckerTyTable {
 
     pub fn get_object_members(&self, id: ObjectMembersId) -> &[ObjectTypeMember] {
         &self.object_members[id.0 as usize]
+    }
+
+    /// Number of distinct interned shapes — used the same way
+    /// `AtomInterner::len` is used by `DiskResolver::set_interner`: to decide
+    /// whether an incoming table is a superset-by-prefix of the live one
+    /// (grew from it) rather than a stale, smaller snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 

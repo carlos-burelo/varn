@@ -60,6 +60,19 @@ pub trait ImportResolver {
     /// against the caller's now-stale, smaller table.
     fn interner_snapshot(&self) -> varn_core::AtomInterner;
 
+    /// A clone of this resolver's single, whole-compilation `CheckerTyId`
+    /// table, mirroring [`Self::interner_snapshot`] for exactly the same
+    /// reason: a module imports types from another module, so their
+    /// `CheckerTyId`s must be comparable — which only holds if every
+    /// `Binder` grows the SAME numbering from a prefix-compatible snapshot
+    /// of it, never a table of its own.
+    fn ty_table_snapshot(&self) -> crate::types::CheckerTyTable;
+
+    /// Publish `table` as the compilation's `CheckerTyId` table, replacing
+    /// what was there — same "never shrink the live table" contract as
+    /// [`Self::interner`]'s `set_interner`.
+    fn set_ty_table(&self, table: crate::types::CheckerTyTable);
+
     /// Intern `s` into this resolver's shared `Atom` table, publishing the
     /// result immediately (unlike `interner_snapshot`, which only reads).
     ///
@@ -130,6 +143,9 @@ pub struct DiskResolver {
     /// A resolver-per-file `AtomInterner` was the bug: two parses never shared
     /// one, so their `Atom` indices meant nothing to each other.
     interner: RefCell<varn_core::AtomInterner>,
+    /// The single `CheckerTyId` table for this compilation — same reasoning
+    /// and lifecycle as `interner` above (see `ImportResolver::ty_table_snapshot`).
+    ty_table: RefCell<crate::types::CheckerTyTable>,
 }
 
 impl DiskResolver {
@@ -306,6 +322,7 @@ impl DiskResolver {
         // `save_to_cache`) resolves against a table that never saw them and
         // panics out of bounds — same fix as `parse_and_cache`.
         self.set_interner(bind.interner.clone());
+        self.set_ty_table(bind.ty_table.clone());
         let bind = Rc::new(bind);
         self.store_bind(key.to_owned(), Rc::clone(&bind));
         bind
@@ -476,6 +493,17 @@ impl DiskResolver {
 impl ImportResolver for DiskResolver {
     fn interner_snapshot(&self) -> varn_core::AtomInterner {
         self.interner.borrow().clone()
+    }
+
+    fn ty_table_snapshot(&self) -> crate::types::CheckerTyTable {
+        self.ty_table.borrow().clone()
+    }
+
+    fn set_ty_table(&self, table: crate::types::CheckerTyTable) {
+        let mut live = self.ty_table.borrow_mut();
+        if table.len() >= live.len() {
+            *live = table;
+        }
     }
 
     fn intern(&self, s: &str) -> varn_core::Atom {

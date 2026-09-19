@@ -45,6 +45,14 @@ pub struct Binder<'r> {
     /// The real per-parse `AtomInterner`, threaded in from `Binder::bind`'s
     /// caller (see the doc comment on `BindResult::interner`).
     pub(crate) interner: varn_core::AtomInterner,
+    /// The shared, per-compilation `CheckerTyId` table — same lifecycle as
+    /// `interner` above: snapshotted from `ImportResolver::ty_table_snapshot`
+    /// when this `Binder` is constructed, grown while binding, published
+    /// back via `ImportResolver::set_ty_table` by whoever drives binding
+    /// (mirrors `DiskResolver::bind_and_cache`'s `set_interner` call), and
+    /// carried out to `BindResult::ty_table` so later checking/emit stages
+    /// read the same ids this bind minted.
+    pub(crate) ty_table: crate::types::CheckerTyTable,
     pub(crate) source_file: Rc<str>,
     pub(crate) sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
     pub(crate) sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
@@ -64,6 +72,10 @@ impl TypeContext for Binder<'_> {
 
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         Some(&self.interner)
+    }
+
+    fn ty_table(&self) -> Option<&crate::types::CheckerTyTable> {
+        Some(&self.ty_table)
     }
 
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
@@ -217,6 +229,7 @@ impl<'r> Binder<'r> {
             class_parents: FxHashMap::default(),
             diagnostics: varn_core::DiagnosticBag::new(),
             interner,
+            ty_table: resolver.ty_table_snapshot(),
             source_file: Rc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
             sum_variant_parent: FxHashMap::default(),
@@ -247,6 +260,7 @@ impl<'r> Binder<'r> {
             global_scope: global,
             diagnostics: b.diagnostics,
             interner: b.interner,
+            ty_table: b.ty_table,
             class_methods: b.class_methods,
             type_members: b.type_members,
             class_parents: b.class_parents,

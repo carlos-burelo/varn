@@ -97,6 +97,12 @@ pub struct BindResult {
     /// this placeholder will panic (empty table). See task-4-report.md.
     #[serde(skip)]
     pub interner: varn_core::AtomInterner,
+    /// Same caveat as `interner` above, same reason: a `CheckerTyId` is
+    /// meaningless without the table that minted it, so this is skipped on
+    /// (de)serialize too. See `ImportResolver::ty_table_snapshot`/
+    /// `set_ty_table` for how it stays comparable across modules.
+    #[serde(skip, default)]
+    pub ty_table: crate::types::CheckerTyTable,
     pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     pub type_members: TypeMembers,
     pub class_parents: FxHashMap<Rc<str>, Rc<str>>,
@@ -285,6 +291,10 @@ impl<'r> BindView<'r> {
 impl TypeContext for BindView<'_> {
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         Some(&self.bind.interner)
+    }
+
+    fn ty_table(&self) -> Option<&crate::types::CheckerTyTable> {
+        Some(&self.bind.ty_table)
     }
 
     fn get_interface_members(

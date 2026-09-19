@@ -68,4 +68,18 @@ pub trait TypeContext {
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         None
     }
+
+    /// Read-only view of the `CheckerTyId` table backing every `Type` this
+    /// context's callers already hold (an already-bound symbol's type, an
+    /// alias's target, ...). `None` by default for the same reason as
+    /// [`Self::interner`]. Deliberately NOT `&mut` — a context is handed out
+    /// widely and immutably (`Option<&dyn TypeContext>`), so anything that
+    /// needs to INTERN a *new* shape (not just look an existing id up) takes
+    /// its own `&mut CheckerTyTable` parameter alongside `ctx`, the same way
+    /// `resolve_type_node`/`infer_expr_type` already take `arena`/`ctx` as
+    /// separate explicit parameters rather than smuggling them through one
+    /// god-object.
+    fn ty_table(&self) -> Option<&CheckerTyTable> {
+        None
+    }
 }
