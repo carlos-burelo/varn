@@ -90,9 +90,10 @@ pub fn str_slice_op_id() -> u64 {
 /// nothing else in the dispatch layer. Distinct from the VM's intrinsic-class
 /// registry (which also carries `Error`/`TypeError`/`RangeError` for property
 /// fallback) — these are the op-id-dispatched primitives.
-pub const CORE_CLASSES: [TypeTag; 12] = [
+pub const CORE_CLASSES: [TypeTag; 13] = [
     TypeTag::Array,
     TypeTag::Str,
+    TypeTag::Bytes,
     TypeTag::Map,
     TypeTag::Set,
     TypeTag::Range,

@@ -13,7 +13,7 @@ async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
     }
 }
 
-export class TaskGroupImpl<T = dynamic> {
+export class TaskGroupImpl<T> {
     tasks: Array<Task<T>>;
     isCancelled: bool;
     private _finallyCbs: Array<() => void>;
@@ -75,9 +75,9 @@ export class TaskGroupImpl<T = dynamic> {
     }
 }
 
-export type TaskGroup<T = dynamic> = TaskGroupImpl<T>;
+export type TaskGroup<T> = TaskGroupImpl<T>;
 
-export function TaskGroup<T = dynamic>(): TaskGroupImpl<T> {
+export function TaskGroup<T>(): TaskGroupImpl<T> {
     return new TaskGroupImpl<T>();
 }
 

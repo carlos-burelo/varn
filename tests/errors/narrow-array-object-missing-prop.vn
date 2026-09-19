@@ -1,0 +1,5 @@
+// expect: error[VN3001]
+// El literal cumple la propiedad angosta pero omite `name`, que es requerida:
+// aceptarlo dejaria un campo tipado `str` con null dentro.
+let o: { xs: Array<i8>, name: str } = { xs: [1, 2] }
+print(o.name)

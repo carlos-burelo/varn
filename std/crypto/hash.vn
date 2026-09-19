@@ -1,10 +1,8 @@
 import {
     sha256$,
     sha512$,
-    randomBytes$,
+    randomBytesBuffer$,
     randomHex$,
-    base64Enc$,
-    base64Dec$,
     hmac$
 } from "runtime:crypto";
 
@@ -16,20 +14,12 @@ export function sha512(data: str): str {
     return sha512$(data);
 }
 
-export function randomBytes(size: int): int[] {
-    return randomBytes$(size);
+export function randomBytes(size: int): Bytes {
+    return randomBytesBuffer$(size);
 }
 
 export function randomHex(size: int): str {
     return randomHex$(size);
-}
-
-export function base64Enc(data: str): str {
-    return base64Enc$(data);
-}
-
-export function base64Dec(data: str): str {
-    return base64Dec$(data);
 }
 
 export function hmac(algo: str, key: str, data: str): str {

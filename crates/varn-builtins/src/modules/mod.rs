@@ -92,6 +92,7 @@ pub fn force_link_builtins() -> usize {
 
     register_marker!(primitives::array, __VARN_LINK_MARKER_ARRAY);
     register_marker!(primitives::bigint, __VARN_LINK_MARKER_BIGINT);
+    register_marker!(primitives::bytes, __VARN_LINK_MARKER_BYTES);
     register_marker!(primitives::bool, __VARN_LINK_MARKER_BOOL);
     register_marker!(primitives::char, __VARN_LINK_MARKER_CHAR);
     register_marker!(primitives::decimal, __VARN_LINK_MARKER_DECIMAL);

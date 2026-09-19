@@ -1,0 +1,5 @@
+// expect: error[VN3001]
+// 1e300 es finito en f64 pero se convierte en inf al angostar a f32:
+// debe fallar en compilacion, no volverse inf en runtime.
+let bad: Array<f32> = [1e300]
+print(bad[0])

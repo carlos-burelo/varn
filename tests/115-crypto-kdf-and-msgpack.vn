@@ -1,0 +1,122 @@
+import { randomBytes, pbkdf2, timingSafeEqual, hashPassword, verifyPassword } from "std:crypto";
+import { MsgPack } from "std:encoding";
+import { assertEqual, assertTrue, assertFalse } from "std:test";
+
+print("=== Suite: Cryptography KDF & MessagePack Serialization ===");
+
+function testCryptoPrimitives(): void {
+    // 1. randomBytes returning Bytes
+    let rnd = randomBytes(32);
+    assertEqual(rnd.length, 32);
+    let rndHex = rnd.toHex();
+    assertEqual(rndHex.length, 64);
+
+    // 2. pbkdf2 derivation
+    let salt = Bytes.fromString("mysalt123");
+    let key1 = pbkdf2("my_password", salt, 1000, 32);
+    let key2 = pbkdf2("my_password", salt, 1000, 32);
+    assertEqual(key1.length, 32);
+    assertEqual(key1.toHex(), key2.toHex());
+
+    let differentKey = pbkdf2("other_password", salt, 1000, 32);
+    assertTrue(key1.toHex() !== differentKey.toHex());
+
+    // 3. timingSafeEqual
+    assertTrue(timingSafeEqual(key1, key2));
+    assertFalse(timingSafeEqual(key1, differentKey));
+    assertTrue(timingSafeEqual("constant_time_secret", "constant_time_secret"));
+    assertFalse(timingSafeEqual("constant_time_secret", "wrong_secret"));
+
+    // 4. hashPassword and verifyPassword
+    let hash = hashPassword("super_secure_varn_2026", 1000);
+    assertTrue(hash.startsWith("$pbkdf2-sha256$i=1000$"));
+    assertTrue(verifyPassword("super_secure_varn_2026", hash));
+    assertFalse(verifyPassword("wrong_attempt", hash));
+    assertFalse(verifyPassword("super_secure_varn_2026_suffix", hash));
+
+    print("  ✔ std:crypto (randomBytes, pbkdf2, timingSafeEqual, hashPassword, verifyPassword)");
+}
+
+function testMsgPackPrimitives(): void {
+    // Null
+    let nullBytes = MsgPack.encode(null);
+    let nullDec = MsgPack.decode(nullBytes);
+    assertEqual(nullDec, null);
+
+    // Booleans
+    let trueBytes = MsgPack.encode(true);
+    assertEqual(MsgPack.decode(trueBytes), true);
+    let falseBytes = MsgPack.encode(false);
+    assertEqual(MsgPack.decode(falseBytes), false);
+
+    // Small integers (positive and negative fixint)
+    assertEqual(MsgPack.decode(MsgPack.encode(0)), 0);
+    assertEqual(MsgPack.decode(MsgPack.encode(42)), 42);
+    assertEqual(MsgPack.decode(MsgPack.encode(127)), 127);
+    assertEqual(MsgPack.decode(MsgPack.encode(-1)), -1);
+    assertEqual(MsgPack.decode(MsgPack.encode(-32)), -32);
+
+    // Larger integers
+    assertEqual(MsgPack.decode(MsgPack.encode(250)), 250);
+    assertEqual(MsgPack.decode(MsgPack.encode(65000)), 65000);
+    assertEqual(MsgPack.decode(MsgPack.encode(1000000)), 1000000);
+
+    // Strings
+    let shortStr = "Hello Varn MsgPack";
+    assertEqual(MsgPack.decode(MsgPack.encode(shortStr)), shortStr);
+
+    let mediumStr = "Varn ".repeat(50);
+    assertEqual(MsgPack.decode(MsgPack.encode(mediumStr)), mediumStr);
+
+    // Raw Bytes (binary format)
+    let rawBin = Bytes.alloc(4);
+    rawBin.setByte(0, 10);
+    rawBin.setByte(1, 20);
+    rawBin.setByte(2, 30);
+    rawBin.setByte(3, 40);
+    let binEncoded = MsgPack.encode(rawBin);
+    let binDecoded: Bytes = MsgPack.decode(binEncoded);
+    assertEqual(binDecoded.length, 4);
+    assertEqual(binDecoded.getByte(0), 10);
+    assertEqual(binDecoded.getByte(3), 40);
+
+    print("  ✔ std:encoding (MsgPack primitives: null, bool, int, str, Bytes)");
+}
+
+function testMsgPackStructured(): void {
+    // Arrays
+    let list = [1, 2, 3, "four", true];
+    let listEnc = MsgPack.encode(list);
+    let listDec: dynamic[] = MsgPack.decode(listEnc);
+    assertEqual(listDec.length, 5);
+    assertEqual(listDec[0], 1);
+    assertEqual(listDec[3], "four");
+    assertEqual(listDec[4], true);
+
+    // Objects / Maps
+    let user = {
+        name: "Alice",
+        age: 30,
+        active: true,
+        skills: ["systems", "compilers"],
+        meta: {
+            tier: 1
+        }
+    };
+
+    let userEnc = MsgPack.encode(user);
+    let userDec: dynamic = MsgPack.decode(userEnc);
+    assertEqual(userDec["name"], "Alice");
+    assertEqual(userDec["age"], 30);
+    assertEqual(userDec["active"], true);
+    assertEqual(userDec["skills"].length, 2);
+    assertEqual(userDec["skills"][0], "systems");
+    assertEqual(userDec["skills"][1], "compilers");
+    assertEqual(userDec["meta"]["tier"], 1);
+
+    print("  ✔ std:encoding (MsgPack complex objects, arrays, nested records)");
+}
+
+testCryptoPrimitives();
+testMsgPackPrimitives();
+testMsgPackStructured();

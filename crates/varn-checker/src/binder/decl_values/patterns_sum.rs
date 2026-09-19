@@ -137,7 +137,15 @@ impl<'r> super::super::Binder<'r> {
                     self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty);
                 }
                 if let Some(r) = rest {
-                    self.bind_pattern(r, kind, line, doc.clone(), ty);
+                    // El rest-object NO hereda el tipo del objeto fuente: sus
+                    // miembros son solo los NO excluidos, y el runtime devuelve
+                    // `null` para los excluidos. Tipar `restObj.alpha` como el
+                    // `int` del fuente es afirmar algo que el runtime no cumple
+                    // (misma mentira que K1 corrigió para `char`): se tipa
+                    // dinámico para que los accesos a excluidos sigan siendo
+                    // legales y viajen por un registro DYN, no por uno `Int`.
+                    let _ = &ty;
+                    self.bind_pattern(r, kind, line, doc.clone(), None);
                 }
             }
             Pattern::Assignment { left, right, .. } => {

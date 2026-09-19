@@ -77,7 +77,7 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
                     .into()
             }));
         }
-        let obj = ctx_ref.stack[base + src];
+        let obj = ctx_ref.stack.box_reg(base, src);
         match ctx_ref.exec_object_rest(obj, &skip_keys) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),

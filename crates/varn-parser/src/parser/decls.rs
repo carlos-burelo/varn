@@ -8,7 +8,7 @@ pub(super) use extension::parse_extension_decl;
 pub(super) use modules::{parse_export_decl, parse_import_decl};
 pub(super) use type_decls::{
     parse_enum_decl, parse_interface_decl, parse_namespace_decl, parse_struct_decl,
-    parse_sum_type_or_alias,
+    parse_type_alias_decl,
 };
 
 use crate::expressions::parse_expr;

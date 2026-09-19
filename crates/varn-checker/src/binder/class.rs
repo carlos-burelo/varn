@@ -2,7 +2,7 @@ use super::type_inference::pattern_lead_name;
 use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern};
 use varn_core::{Atom, TypeKind};
@@ -250,6 +250,54 @@ impl<'r> super::Binder<'r> {
                     self.bind_expr(*init);
                 }
                 _ => {}
+            }
+        }
+
+        // Un campo declarado sin valor (`b: int`, sin `= expr`) que ningún
+        // constructor garantiza asignar en TODOS sus caminos puede leerse
+        // antes de escribirse — el lenguaje lo permite (no es un error de
+        // compilación) y en runtime esa lectura es `null`. Tipar ese campo
+        // como el tipo declarado puro (`int`, `Ref`, ...) es la misma mentira
+        // que K1 corrigió para `char`: la VM tipada tiene un registro que NO
+        // puede representar ese `null` (`Gpr`/`Fpr` no tienen un bit para
+        // "sin escribir", a diferencia de `Ref`/`REF_UNINIT`), y la lectura
+        // revienta con `type mismatch` en vez de dar el `null` que el
+        // programa pidió. `is_optional` ya hace que `member_type.rs` envuelva
+        // el tipo en `T | null` (mismo mecanismo que un miembro opcional de
+        // interfaz/objeto) — con eso el backend lo baja a `Dynamic` y el
+        // `null` viaja por un registro que sí lo admite.
+        let declared_ctor = c.body.iter().find_map(|m| match m {
+            ClassMember::Constructor { body, .. } => Some(body),
+            _ => None,
+        });
+        let candidate_fields: Vec<Rc<str>> = c
+            .body
+            .iter()
+            .filter_map(|m| match m {
+                ClassMember::Property {
+                    key,
+                    init: None,
+                    modifiers,
+                    ..
+                } if !modifiers.is_static => Some(Rc::from(self.interner.resolve(*key))),
+                _ => None,
+            })
+            .collect();
+        if !candidate_fields.is_empty() {
+            let guaranteed: FxHashSet<Rc<str>> = match declared_ctor {
+                Some(body) => super::definite_field_assignment::fields_assigned_on_every_path(
+                    *body,
+                    self.ast_arena,
+                    &self.interner,
+                ),
+                None => FxHashSet::default(),
+            };
+            for field in &candidate_fields {
+                if !guaranteed.contains(field) {
+                    if let Some(m) = members.iter_mut().find(|m| &m.name == field) {
+                        m.is_optional = true;
+                    }
+                }
             }
         }
 

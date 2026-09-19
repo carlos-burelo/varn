@@ -48,6 +48,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
+        | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }
@@ -161,7 +162,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*object);
             args.iter().for_each(|a| f(*a));
         }
-        BuildArray { elements } | BuildTuple { elements } | BuildStr { parts: elements } => {
+        BuildArray { elements, .. } | BuildTuple { elements } | BuildStr { parts: elements } => {
             elements.iter().for_each(|e| f(*e))
         }
         BuildObject { pairs } | BuildRecord { pairs } => pairs.iter().for_each(|(_, v)| f(*v)),
@@ -208,6 +209,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
+        | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }
@@ -318,7 +320,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             f(object);
             args.iter_mut().for_each(f);
         }
-        BuildArray { elements } | BuildTuple { elements } | BuildStr { parts: elements } => {
+        BuildArray { elements, .. } | BuildTuple { elements } | BuildStr { parts: elements } => {
             elements.iter_mut().for_each(f)
         }
         BuildObject { pairs } | BuildRecord { pairs } => pairs.iter_mut().for_each(|(_, v)| f(v)),

@@ -1,0 +1,132 @@
+import { assertEqual, assertTrue, assertFalse } from "std:test";
+import { Stream, AsyncReader, AsyncWriter } from "std:io";
+import { TcpListener, TcpStream } from "std:net";
+import { Process } from "std:process";
+import { delay, Task } from "std:task";
+
+print("=== Suite: Canonical Bytes & Streaming I/O (112) ===");
+
+function testBytesBasics(): void {
+    let b = Bytes.alloc(5);
+    assertEqual(b.length, 5);
+
+    b[0] = 72; // 'H'
+    b[1] = 101; // 'e'
+    b[2] = 108; // 'l'
+    b[3] = 108; // 'l'
+    b[4] = 111; // 'o'
+
+    assertEqual(b[0], 72);
+    assertEqual(b[4], 111);
+    assertEqual(b.toString(), "Hello");
+
+    let sub = b.slice(0, 4);
+    assertEqual(sub.length, 4);
+    assertEqual(sub.toString(), "Hell");
+
+    let hex = b.toHex();
+    assertEqual(hex, "48656c6c6f");
+
+    let b64 = b.toBase64();
+    assertEqual(b64, "SGVsbG8=");
+
+    // Test binary transparency: arbitrary non-UTF8 bytes with null byte
+    let rawArr = [0x00, 0xFF, 0xFE, 0x80, 0x7F];
+    let bin = Bytes.fromBytes(rawArr);
+    assertEqual(bin.length, 5);
+    assertEqual(bin[0], 0x00);
+    assertEqual(bin[1], 0xFF);
+    assertEqual(bin[2], 0xFE);
+    assertEqual(bin[3], 0x80);
+    assertEqual(bin[4], 0x7F);
+
+    print("  ✔ Bytes (allocation, indexing, slicing, hex/base64, non-UTF8 binary integrity)");
+}
+
+class MockChunkReader implements AsyncReader {
+    chunks: Bytes[];
+    idx: int = 0;
+
+    constructor(chunks: Bytes[]) {
+        this.chunks = chunks;
+    }
+
+    async read(size: int = 4096): Task<Bytes?> {
+        if (this.idx >= this.chunks.length) {
+            return null;
+        }
+        let chunk = this.chunks[this.idx];
+        this.idx = this.idx + 1;
+        return chunk;
+    }
+}
+
+class MockChunkWriter implements AsyncWriter {
+    received: Bytes[] = [];
+    flushed: bool = false;
+
+    async write(chunk: Bytes): Task<int> {
+        this.received.push(chunk);
+        return chunk.length;
+    }
+
+    async flush(): Task<void> {
+        this.flushed = true;
+    }
+
+    close(): void {}
+}
+
+async function testStreamPipe(): Task<void> {
+    let chunk1 = Bytes.fromString("Chunk1_");
+    let chunk2 = Bytes.fromString("Chunk2_");
+    let chunk3 = Bytes.fromString("Chunk3");
+
+    let reader = new MockChunkReader([chunk1, chunk2, chunk3]);
+    let writer = new MockChunkWriter();
+
+    await Stream.pipe(reader, writer);
+
+    assertTrue(writer.flushed);
+    assertEqual(writer.received.length, 3);
+    assertEqual(writer.received[0].toString(), "Chunk1_");
+    assertEqual(writer.received[1].toString(), "Chunk2_");
+    assertEqual(writer.received[2].toString(), "Chunk3");
+
+    print("  ✔ Stream.pipe (async streaming backpressure with Reader & Writer contracts)");
+}
+
+async function testTcpBinaryRoundtrip(): Task<void> {
+    let port = 19877;
+    let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/helpers/tcp_binary_echo_server.vn"]);
+    await delay(150);
+
+    let client = await TcpStream.connect("127.0.0.1", port);
+    let original = Bytes.fromBytes([0x00, 0x01, 0xFF, 0xFE, 0x80, 0x7F, 0xAB, 0xCD]);
+    await client.writeAll(original);
+
+    let received = await client.read(1024);
+    assertTrue(received !== null);
+    let recBytes = received as Bytes;
+    assertEqual(recBytes.length, 8);
+    assertEqual(recBytes[0], 0x00);
+    assertEqual(recBytes[1], 0x01);
+    assertEqual(recBytes[2], 0xFF);
+    assertEqual(recBytes[3], 0xFE);
+    assertEqual(recBytes[4], 0x80);
+    assertEqual(recBytes[5], 0x7F);
+    assertEqual(recBytes[6], 0xAB);
+    assertEqual(recBytes[7], 0xCD);
+
+    client.close();
+    let exitInfo = proc.wait();
+    assertEqual(exitInfo.exitCode, 0);
+
+    print("  ✔ TcpStream binary roundtrip (zero-corruption raw binary transfer over sockets)");
+}
+
+testBytesBasics();
+await testStreamPipe();
+await testTcpBinaryRoundtrip();
+
+print("[PASSED] 112. Canonical Bytes & Streaming I/O");

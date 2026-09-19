@@ -3,10 +3,6 @@ use crate::value::VmValue;
 use super::ctx::ExecCtx;
 
 impl ExecCtx {
-    pub(crate) fn push(&mut self, v: VmValue) {
-        self.stack.push(v);
-    }
-
     #[inline(always)]
     pub(crate) fn record_ic_hit_getprop(&self) {
         if let Some(ref c) = self.profile_counters {

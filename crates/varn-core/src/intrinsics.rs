@@ -35,7 +35,7 @@ impl IntrinsicType {
     pub const TypeError: Self = Self(TypeTag::TypeError);
     pub const RangeError: Self = Self(TypeTag::RangeError);
     pub const Range: Self = Self(TypeTag::Range);
-    pub const Buffer: Self = Self(TypeTag::Buffer);
+    pub const Bytes: Self = Self(TypeTag::Bytes);
     pub const Regex: Self = Self(TypeTag::Regex);
     pub const DateTime: Self = Self(TypeTag::DateTime);
     pub const Duration: Self = Self(TypeTag::Duration);
@@ -78,7 +78,7 @@ impl IntrinsicType {
             "TaskHandle" => Some(Self::TaskHandle),
             "Generator" => Some(Self::Generator),
             "Range" => Some(Self::Range),
-            "Buffer" => Some(Self::Buffer),
+            "Bytes" => Some(Self::Bytes),
             "Error" => Some(Self::Error),
             "TypeError" => Some(Self::TypeError),
             "RangeError" => Some(Self::RangeError),

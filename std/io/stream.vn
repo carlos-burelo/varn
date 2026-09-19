@@ -1,24 +1,24 @@
 import { write$, writeln$, flush$, readLine$ } from "runtime:io";
 
 export interface Writer {
-    write(content: str): void
+    write(content: str): void;
 }
 
 export interface Reader {
-    read(size?: int): str
-    readAll(): str
-    pipeTo(dst: Writer): void
+    read(size?: int): str;
+    readAll(): str;
+    pipeTo(dst: Writer): void;
 }
 
-export function write(...args: dynamic[]): void {
+export function write(...args: str[]): void {
     write$(...args);
 }
 
-export function writeln(...args: dynamic[]): void {
+export function writeln(...args: str[]): void {
     writeln$(...args);
 }
 
-export function print(...args: dynamic[]): void {
+export function print(...args: str[]): void {
     writeln$(...args);
 }
 
@@ -26,10 +26,7 @@ export function flush(): void {
     flush$();
 }
 
-export function readLine(prompt?: str): str {
-    if (prompt === null) {
-        return readLine$("");
-    }
+export function readLine(prompt: str = ""): str {
     return readLine$(prompt);
 }
 

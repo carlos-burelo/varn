@@ -35,10 +35,9 @@ pub(super) fn jit_construct_fast(
     base: usize,
     args: &varn_jit::JitCallArgs,
 ) -> Option<VmValue> {
-    let v = construct_staged_fast(ctx_ref, cls, base + args.arg_start)?;
-    ctx_ref.stack[base + args.dest] = v;
-    ctx_ref.record_call_vm_fast();
-    Some(v)
+    // K3-faseA: solo lo invocaba código generado (fase B: restaurar de git).
+    let _ = (ctx_ref, cls, base, args);
+    unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL");
 }
 
 struct ActiveCtorCache {
@@ -52,20 +51,20 @@ thread_local! {
     static ACTIVE_CTOR: std::cell::RefCell<Option<ActiveCtorCache>> = const { std::cell::RefCell::new(None) };
 }
 
-/// `new cls(...)` with the arguments already staged as a contiguous window at
-/// `callee_base`, whose first slot is the callee placeholder the instance
-/// replaces. Returns `None` for any shape the fast path does not cover (async /
-/// generator / rest constructor, a constructor that is not clif-compiled, a
-/// native constructor) — the caller must then take the generic
-/// `prepare_call` path.
+/// `new cls(...)` con los argumentos ya preparados en `staging`, cuyo primer
+/// slot es el placeholder de callee que la instancia reemplaza. Devuelve
+/// `None` en todo lo que el camino rápido no cubre (ctor async/generador/rest,
+/// ctor nativo, sin plan trivial) — el llamante toma entonces la vía genérica
+/// `prepare_call`.
 ///
-/// Without this, every `new X()` reaching clif code goes through
-/// `prepare_call` + a frame push + a nested `run_until`: 10k of the 10.3k slow
-/// calls in tests/main.vn, worth ~3.5x on that suite.
+/// Sin esto, cada `new X()` pagaba `prepare_call` + frame + `run_until`
+/// anidado. El camino JIT2JIT directo (llamar al `jit_entry` del ctor) está
+/// cortado en la fase A del frame por clases (`FRAME_LAYOUT_V2_JIT_BAIL`):
+/// se restaura en la fase B.
 pub(crate) fn construct_staged_fast(
     ctx_ref: &mut ExecCtx,
     cls: &std::rc::Rc<varn_types::ClassObj>,
-    callee_base: usize,
+    staging: &[VmValue],
 ) -> Option<VmValue> {
     use crate::alloc_profile as prof;
     let on = prof::enabled();
@@ -149,16 +148,10 @@ pub(crate) fn construct_staged_fast(
     if let Some(ref closure) = ctor_closure {
         if let Some(plan) = closure.proto.trivial_field_init_plan() {
             // Fast inlining: directly assign arguments into object slots
-            // Arguments are staged at `callee_base + 1 + param_idx`.
-            let max_payload = inst.payload_size as usize;
+            // Arguments are staged at `staging[1 + param_idx]`.
             for &(param_idx, slot) in &*plan {
-                let offset = slot * 16;
-                if offset + 16 <= max_payload {
-                    let arg_idx = callee_base + 1 + param_idx;
-                    if arg_idx < ctx_ref.stack.len() {
-                        let val = ctx_ref.stack[arg_idx];
-                        unsafe { inst.write_vm_value(offset, val) };
-                    }
+                if let Some(&val) = staging.get(1 + param_idx) {
+                    inst.set_field_at(slot, val);
                 }
             }
             let t_push = if on { prof::read() } else { 0 };
@@ -171,48 +164,12 @@ pub(crate) fn construct_staged_fast(
         }
     }
 
-    let t_push = if on { prof::read() } else { 0 };
-    let instance_nv =
-        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
-    if on {
-        prof::record(prof::Seg::HeapPush, t_push, prof::read());
-    }
-    let t_frame = if on { prof::read() } else { 0 };
-
-    let (Some(closure), Some(jit_fn)) = (ctor_closure, jit_fn) else {
-        return None;
-    };
-
-    let required = callee_base + closure.proto.register_count as usize + 32;
-    if ctx_ref.stack.len() < required {
-        ctx_ref.stack.resize(required, VmValue::null());
-    }
-    ctx_ref.stack[callee_base] = instance_nv;
-
-    let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
-    frame.current_class = Some(cls.clone());
-    ctx_ref.frames.push(frame);
-
-    ctx_ref.jit_frame_prepushed = 1;
-    let res = unsafe {
-        (jit_fn)(
-            ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-            &*closure as *const crate::closure::VmClosure as *const std::ffi::c_void,
-            callee_base,
-            ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-        )
-    };
-
-    let final_instance = ctx_ref.stack[callee_base];
-    ctx_ref.frames.pop();
-    if closure.proto.upvalue_count > 0 {
-        ctx_ref.close_upvalues_above(callee_base);
-    }
-    if on {
-        prof::record(prof::Seg::CtorFrame, t_frame, prof::read());
-    }
-
-    Some(if res.is_null() { final_instance } else { res })
+    // Sin plan trivial no hay fast path: el llamante va por `prepare_call`.
+    // (El resto original —invocar el `jit_entry` del ctor directamente—
+    // exige código compilado contra el layout antiguo: cortado en la fase A,
+    // se restaura de git en la fase B.)
+    let _ = (ctor_closure, jit_fn);
+    None
 }
 
 pub(crate) extern "C" fn jit_alloc_instance_fast(

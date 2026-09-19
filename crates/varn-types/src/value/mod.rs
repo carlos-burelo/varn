@@ -131,6 +131,7 @@ pub enum Value {
     EnumVariant(Box<EnumVariantData>),
     VmValue(Box<dyn VmValuePayload>),
     Module(Rc<ModuleObj>),
+    Buffer(VmBuffer),
 }
 
 pub type ResultType = Result<Value, String>;

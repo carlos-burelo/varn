@@ -41,14 +41,14 @@ impl ExecCtx {
     ) -> VmValue {
         let mut gen_ctx = Box::new(self.fork_for_task());
         gen_ctx.gc_inhibited = true;
-        gen_ctx.stack = args;
-
-        let required = closure.proto.register_count as usize;
-        if gen_ctx.stack.len() < required {
-            gen_ctx.stack.resize(required, VmValue::null());
-        }
+        // El frame 0 del generador adopta los args preparados (el resto se
+        // ignora: son duplicados nunca leídos, igual que el trailing que el
+        // protocolo anterior dejaba en el `Vec`).
+        let alloc = gen_ctx.stack.push_frame(&closure.proto);
+        let nregs = closure.proto.register_count as usize;
+        gen_ctx.stack.adopt_values(alloc, 0, &args, nregs);
         let is_async = closure.proto.is_async;
-        let mut frame = crate::frame::CallFrame::new_owned(closure, 0);
+        let mut frame = crate::frame::CallFrame::new_owned(closure, alloc);
         frame.current_class = current_class;
         gen_ctx.frames.push(frame);
 
@@ -118,29 +118,32 @@ pub(crate) fn resolve_constructor_return(
 /// `catch` that behaves differently depending on which tier the frame came from
 /// is a bug no single-tier test can find, and exception handling is precisely
 /// what a user relies on to reason about their program.
-pub fn unwind_to_handler(ctx: &mut ExecCtx, handler: crate::frame::TryHandler, thrown: VmValue) {
+pub fn unwind_to_handler(
+    ctx: &mut ExecCtx,
+    handler: crate::frame::TryHandler,
+    thrown: VmValue,
+) -> VmResult<()> {
+    // Cerrar ANTES de liberar: el close lee el valor vivo del slot.
     while ctx.frames.len() > handler.frame_depth {
         let f = ctx.frames.pop().unwrap();
-        ctx.close_upvalues_above(f.base);
+        ctx.close_upvalues_in(f.base);
+        ctx.stack.pop_frame();
     }
 
-    // The handler's own frame is now on top. Everything above its register
-    // window is dead: the frames that owned it are gone.
+    // El frame receptor queda arriba con su región intacta (el pop solo
+    // recorta lo superior). Asegura tamaño por si `err_reg` cae en trailing.
     let target = ctx.frames.len() - 1;
     let base = ctx.frames[target].base;
-    let required_depth = base + ctx.frames[target].closure().proto.register_count as usize;
-    ctx.stack.truncate(required_depth);
-
-    // `truncate` can leave the stack SHORTER than the error slot when the
-    // handler's frame declares fewer registers than its err_reg index — grow
-    // rather than index out of bounds.
-    let slot = base + handler.err_reg as usize;
-    if slot >= ctx.stack.len() {
-        ctx.stack.resize(slot + 1, VmValue::null());
-    }
-    ctx.stack[slot] = thrown;
+    let nregs = ctx.frames[target].closure().proto.register_count as usize;
+    ctx.stack.ensure_frame_size(base, nregs);
+    // `err_reg` lo emite el compilador como `Dynamic` (`CatchParam`), así que
+    // esto no falla en programas bien tipados; si falla, el error prosigue
+    // como un throw más (el `?` lo deja en manos del siguiente handler).
+    ctx.stack
+        .unbox_into_reg(base, handler.err_reg as usize, thrown)?;
 
     ctx.frames[target].ip = handler.catch_ip;
+    Ok(())
 }
 
 impl ExecCtx {
@@ -152,7 +155,10 @@ impl ExecCtx {
                 current_class,
             } => {
                 let value = self.build_generator(closure, args, current_class);
-                self.push(value);
+                // `describe_generator` pudo dejar el callee en staging
+                // (camino `CallSelf`): se descarta, el resultado manda.
+                self.stage.clear();
+                self.stage.push(value);
             }
             PreparedCall::Frame(frame) => {
                 if self.frames.len() >= 10000 {
@@ -161,10 +167,9 @@ impl ExecCtx {
                     ));
                 }
                 self.record_call_vm_fast();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
+                // El frame ya trae su región tipada (`materialize_frame`):
+                // solo entra en la lista. Sin `resize`: el almacén dimensiona
+                // exacto y `pop_frame` restaura las cimas al retornar.
                 self.frames.push(frame);
 
                 if !self.gc_inhibited && self.heap.needs_minor_gc() {
@@ -173,11 +178,9 @@ impl ExecCtx {
 
                 if !self.gc_inhibited && self.heap.needs_gc() {
                     let mut roots: Vec<u32> = Vec::with_capacity(256);
-                    for v in &self.stack {
-                        if v.is_heap() {
-                            roots.push(v.as_heap_idx());
-                        }
-                    }
+                    let (dyn_len, ref_len) =
+                        (self.stack.dyn_.len(), self.stack.refs.len());
+                    self.stack.collect_roots(dyn_len, ref_len, &mut roots);
                     for v in &self.globals.values {
                         if v.is_heap() {
                             roots.push(v.as_heap_idx());
@@ -207,10 +210,6 @@ impl ExecCtx {
                 }
                 self.record_call_vm_fast();
                 let ctor_frame_idx = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
                 self.frames.push(frame);
                 self.pending_constructors
                     .push((ctor_frame_idx, instance_nv));
@@ -220,68 +219,51 @@ impl ExecCtx {
             }
             PreparedCall::NativeImmediate(f, arg_count) => {
                 self.record_call_native(f, None);
-                let args_start = self.stack.len() - arg_count;
-
-                let result = if arg_count <= 16 {
+                // Staging trae la ventana al FINAL del buffer (los caminos de
+                // método anteponen el `method_nv` fuera de la ventana): se
+                // consumen los últimos `arg_count`, como el `stack.len() - n`
+                // anterior, a un buffer propio ANTES de invocar (reentrancia
+                // host→VM).
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let args: Vec<VmValue> = self.stage.drain(start..).collect();
+                let result = if args.len() <= 16 {
                     let mut buf = [VmValue::null(); 16];
-                    buf[..arg_count]
-                        .copy_from_slice(&self.stack[args_start..args_start + arg_count]);
-                    self.stack.truncate(args_start - 1);
-                    (f)(self as &mut dyn NativeCtx, &buf[..arg_count])
+                    buf[..args.len()].copy_from_slice(&args);
+                    (f)(self as &mut dyn NativeCtx, &buf[..args.len()])
                 } else {
-                    let vm_args: Vec<VmValue> =
-                        self.stack[args_start..args_start + arg_count].to_vec();
-                    self.stack.truncate(args_start - 1);
-                    (f)(self as &mut dyn NativeCtx, &vm_args)
+                    (f)(self as &mut dyn NativeCtx, &args)
                 }
                 .map_err(RuntimeError::new)?;
 
-                self.push(result);
+                self.stage.clear();
+                self.stage.push(result);
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
                 self.record_call_native(f, None);
-                let args_start = self.stack.len() - arg_count;
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let args: Vec<VmValue> = self.stage.drain(start..).collect();
+                let slice = if args.len() > 1 { &args[1..] } else { &[] };
+                let result = (f)(self as &mut dyn NativeCtx, slice).map_err(RuntimeError::new)?;
 
-                let result = if arg_count <= 16 {
-                    let mut buf = [VmValue::null(); 16];
-                    buf[..arg_count]
-                        .copy_from_slice(&self.stack[args_start..args_start + arg_count]);
-                    self.stack.truncate(args_start - 1);
-                    let slice = if arg_count > 0 {
-                        &buf[1..arg_count]
-                    } else {
-                        &buf[..0]
-                    };
-                    (f)(self as &mut dyn NativeCtx, slice)
-                } else {
-                    let vm_args: Vec<VmValue> =
-                        self.stack[args_start..args_start + arg_count].to_vec();
-                    self.stack.truncate(args_start - 1);
-                    let slice = if arg_count > 0 {
-                        &vm_args[1..]
-                    } else {
-                        &vm_args[..]
-                    };
-                    (f)(self as &mut dyn NativeCtx, slice)
-                }
-                .map_err(RuntimeError::new)?;
-
-                self.push(result);
+                self.stage.clear();
+                self.stage.push(result);
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native(f, None);
                 let result = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
-                self.stack.pop();
                 let nv = if result.is_null() {
                     instance_nv
                 } else {
                     result
                 };
-                self.push(nv);
+                self.stage.clear();
+                self.stage.push(nv);
             }
             PreparedCall::PushValue(nv) => {
-                self.stack.pop();
-                self.push(nv);
+                self.stage.clear();
+                self.stage.push(nv);
             }
         }
         Ok(())

@@ -1,4 +1,4 @@
-import { JSON } from "std:json";
+import { JSON } from "std:encoding";
 
 let items = [];
 for (let i = 0; i < 50000; i = i + 1) {

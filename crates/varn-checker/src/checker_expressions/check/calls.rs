@@ -155,7 +155,7 @@ impl<'r> Checker<'r> {
         };
         let obj_ty_raw = self.infer_type(object, bind);
         let obj_ty = obj_ty_raw.non_nullified(&mut self.ty_table);
-        let Some(tn) = extension_type_name(&obj_ty, &self.ty_table, &bind.interner) else {
+        let Some(tn) = extension_type_name(self, &obj_ty, &self.ty_table, bind) else {
             return;
         };
         let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) else {
@@ -335,7 +335,11 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(param_ty) = param_ty {
-                if !self.types_compatible_cached(&param_ty, &arg_ty, Some(bind)) {
+                let expr = match arg {
+                    Arg::Positional(e) | Arg::Spread(e) => *e,
+                    Arg::Named { value, .. } => *value,
+                };
+                if !self.value_assignable_to(&param_ty, &arg_ty, Some(expr), Some(bind)) {
                     let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
                     let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);
                     let msg = if let Some(lbl) = label_opt {
@@ -416,8 +420,12 @@ impl<'r> Checker<'r> {
                     )
                     && param_accepts_array;
 
+                let expr = match arg {
+                    Arg::Positional(e) | Arg::Spread(e) => *e,
+                    Arg::Named { value, .. } => *value,
+                };
                 if !is_empty_array_arg
-                    && !self.types_compatible_cached(&param_ty, &effective_arg_ty, Some(bind))
+                    && !self.value_assignable_to(&param_ty, &effective_arg_ty, Some(expr), Some(bind))
                 {
                     let effective_arg_ty_s = effective_arg_ty.display(&self.ty_table, &bind.interner);
                     let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);

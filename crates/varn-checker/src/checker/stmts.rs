@@ -128,7 +128,12 @@ impl<'r> Checker<'r> {
                     let check_expected_kind = *self.ty_table.get(check_expected.0);
                     let is_type_param = matches!(check_expected_kind, TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                     if !is_type_param
-                        && !self.types_compatible_cached(&check_expected, &actual, Some(bind))
+                        && !self.value_assignable_to(
+                            &check_expected,
+                            &actual,
+                            argument,
+                            Some(bind),
+                        )
                     {
                         let expected_s = expected.display(&self.ty_table, &bind.interner);
                         let actual_s = actual.display(&self.ty_table, &bind.interner);
@@ -414,7 +419,7 @@ impl<'r> Checker<'r> {
                     }
 
                     if let Some(ann_ty) = &ann_ty_opt {
-                        if !self.types_compatible_cached(ann_ty, &init_ty, Some(bind)) {
+                        if !self.value_assignable_to(ann_ty, &init_ty, Some(init), Some(bind)) {
                             let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                             let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                             self.emit(
@@ -455,7 +460,7 @@ impl<'r> Checker<'r> {
                     let is_empty_array = init_ty.is_dynamic()
                         && matches!(&self.ast_arena.expr(init_expr).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
                     if !is_empty_array
-                        && !self.types_compatible_cached(ann_ty, &init_ty, Some(bind))
+                        && !self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind))
                     {
                         let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                         let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);

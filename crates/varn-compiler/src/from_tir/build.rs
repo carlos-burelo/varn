@@ -368,6 +368,15 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Let { local, ty, init } => {
                 let declared = self.ty(*ty);
+                let var = VarId::Local(LocalId(local.0));
+                // Recorded for every later `Assign` to this local (e.g. each
+                // arm of a `match` used as an initializer): a plain
+                // `lower_assign` has no declared type of its own to coerce
+                // against, so without this a `float` arm and an `int` arm
+                // each store their own type, and regalloc's meet can leave
+                // the local's register the WRONG single kind instead of the
+                // `Dynamic` the declaration actually proved.
+                self.var_ty.insert(var, declared);
                 let value = match init {
                     Some(e) => {
                         let v = self.lower_expr(e)?;
@@ -377,9 +386,31 @@ impl<'m> Builder<'m> {
                         // picks the wrong opcode.
                         self.coerce(v, declared)
                     }
-                    None => self.emit(InstKind::ConstNull, declared),
+                    // No initializer: the checker's definite-assignment pass
+                    // (`checker::definite_assignment`) already proves this
+                    // local is never READ before something assigns it for
+                    // real, so this placeholder value is never observed as
+                    // "the value of the local" — it only has to exist,
+                    // type-correctly, for the SSA var machinery. `ConstNull`
+                    // did that honestly for `Ref`/`Dynamic` (both can hold
+                    // `null`), but for `Int`/`Float`/`Bool` it produced an
+                    // SSA value TYPED as the scalar while being null itself:
+                    // `derive_register_meta` then classes the register
+                    // `Gpr`/`Fpr` (from this def's declared type) and the
+                    // REAL assignment later in the same register fails to
+                    // store — not because of a type it actually violates, but
+                    // because the placeholder claimed a class that can't
+                    // represent the "not yet assigned" state it was in.
+                    // Zero-of-the-declared-type is exactly as unobserved as
+                    // `null` was, and it round-trips through that class.
+                    None => match declared {
+                        HirType::Int => self.emit(InstKind::ConstInt(0), declared),
+                        HirType::Float => self.emit(InstKind::ConstFloat(0.0), declared),
+                        HirType::Bool => self.emit(InstKind::ConstBool(false), declared),
+                        _ => self.emit(InstKind::ConstNull, declared),
+                    },
                 };
-                self.store_var(VarId::Local(LocalId(local.0)), value);
+                self.store_var(var, value);
             }
             TirStmt::Return(v) => {
                 let val = match v {
@@ -586,13 +617,17 @@ impl<'m> Builder<'m> {
             TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), HirType::Float)),
             TirExprKind::BoolLit(b) => Ok(self.emit(InstKind::ConstBool(*b), HirType::Bool)),
             TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
-            TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Int)),
+            // `char` vive como `HeapObj::Char` internado (ver `calls.rs`:
+            // `Literal::Char -> heap.intern`), así que su tipo honesto es
+            // `Ref`, no `Int`: `Int` le mentía al regalloc (clase GPR sin flush
+            // GC) y al JIT sobre un valor que en runtime es una referencia.
+            TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Ref)),
             TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
             TirExprKind::DecimalLit(s) => {
                 let d = s.parse().unwrap_or_default();
-                Ok(self.emit(InstKind::ConstDecimal(d), HirType::Ref))
+                Ok(self.emit(InstKind::ConstDecimal(d), HirType::Dynamic))
             }
-            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Ref)),
+            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Dynamic)),
             TirExprKind::RangeLit {
                 start,
                 end,
@@ -679,6 +714,14 @@ impl<'m> Builder<'m> {
                 } else {
                     ty
                 };
+                // Nota: la aritmética entre dos enteros angostos ensancha a
+                // `int` en el CHECKER (`numeric_binary_type` trata Int/I8/
+                // I16/I32/U8/U16/U32/U64 como una sola categoría a propósito
+                // — ver `binder/type_inference.rs`), así que `e.ty` nunca es
+                // un ancho angosto aquí: no hace falta un `NarrowRangeCheck`
+                // en este punto. El único lugar donde un valor angosto nace
+                // de verdad es un cast explícito (`(a + b) as i8`), que es
+                // donde `TirExprKind::Cast` arriba ya lo hace.
                 Ok(self.emit(
                     InstKind::Binary {
                         op: bin_op(*op),
@@ -695,14 +738,33 @@ impl<'m> Builder<'m> {
                     TirUnOp::IsNull => {
                         Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
                     }
-                    _ => Ok(self.emit(
-                        InstKind::Unary {
-                            op: un_op(*op),
-                            operand: v,
+                    _ => {
+                        let result = self.emit(
+                            InstKind::Unary {
+                                op: un_op(*op),
+                                operand: v,
+                                ty,
+                            },
                             ty,
-                        },
-                        ty,
-                    )),
+                        );
+                        // A diferencia de `Binary` (que SIEMPRE ensancha a
+                        // `int`, ver la nota de arriba), `-`/`+` unario
+                        // PRESERVA el tipo del operando en el checker
+                        // (`infer_impl.rs`: `Minus | Plus => infer_type
+                        // (operand)`) — así que `e.ty` SÍ puede ser un ancho
+                        // angosto aquí, y `-i8::MIN` (128) SÍ se sale de
+                        // rango. `Not`/`BitNot` no cambian de magnitud, no
+                        // necesitan el chequeo.
+                        if matches!(op, TirUnOp::Neg) {
+                            if let Some(tag) = narrow_tag_of(e.ty) {
+                                return Ok(self.emit(
+                                    InstKind::NarrowRangeCheck { operand: result, tag },
+                                    ty,
+                                ));
+                            }
+                        }
+                        Ok(result)
+                    }
                 }
             }
             TirExprKind::Cast { operand } => {
@@ -741,6 +803,10 @@ impl<'m> Builder<'m> {
                         },
                         HirType::Float,
                     ));
+                }
+                if let Some(tag) = narrow_tag_of(e.ty) {
+                    let v = self.emit(InstKind::Cast { operand: v, ty }, ty);
+                    return Ok(self.emit(InstKind::NarrowRangeCheck { operand: v, tag }, ty));
                 }
                 Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
             }
@@ -949,7 +1015,13 @@ impl<'m> Builder<'m> {
                             varn_tir::TirArrayEl::Spread(_) => unreachable!(),
                         }
                     }
-                    Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
+                    let narrow_elem = match e.ty {
+                        BackendTy::Array(elem_id) => {
+                            narrow_tag_of(self.tir.types.get(elem_id))
+                        }
+                        _ => None,
+                    };
+                    Ok(self.emit(InstKind::BuildArray { elements: vals, narrow_elem }, ty))
                 }
             }
             TirExprKind::TupleLit(xs) => {
@@ -1249,7 +1321,18 @@ impl<'m> Builder<'m> {
         match &target.kind {
             TirExprKind::Var => match &target.res {
                 Resolution::Local(id) => {
-                    self.store_var(VarId::Local(LocalId(id.0)), value);
+                    let var = VarId::Local(LocalId(id.0));
+                    // `Assign` carries no declared type of its own (the
+                    // checker's `target.ty` on this TIR node is the ARM's
+                    // type, not the local's) — coerce to what `Let` recorded,
+                    // same as an initializer, so every store to this local
+                    // agrees on one type instead of leaving branches to fight
+                    // over the local's register kind.
+                    let value = match self.var_ty.get(&var).copied() {
+                        Some(declared) => self.coerce(value, declared),
+                        None => value,
+                    };
+                    self.store_var(var, value);
                 }
                 Resolution::Param(i) => {
                     self.store_var(VarId::Param(*i), value);
@@ -1468,14 +1551,41 @@ fn is_free_fn_name(name: &str) -> bool {
         && cs.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
+/// El `TypeTag` de un ancho angosto (`i8/i16/i32/u8/u16/u32/f32`), o `None`
+/// para cualquier otro `BackendTy` — usado para saber cuándo un cast o un
+/// resultado aritmético necesita `InstKind::NarrowRangeCheck` después de
+/// emitirse (ver `narrow_range.rs` en `varn-vm` para el porqué de estos
+/// siete y no `u64`).
+fn narrow_tag_of(bt: BackendTy) -> Option<varn_core::TypeTag> {
+    use varn_core::TypeTag as T;
+    Some(match bt {
+        BackendTy::Int8 => T::I8,
+        BackendTy::Int16 => T::I16,
+        BackendTy::Int32 => T::I32,
+        BackendTy::UInt8 => T::U8,
+        BackendTy::UInt16 => T::U16,
+        BackendTy::UInt32 => T::U32,
+        BackendTy::Float32 => T::F32,
+        _ => return None,
+    })
+}
+
 /// The layout tag the runtime lays a declared field out by.
 fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
     use varn_core::TypeTag as T;
     match bt {
         BackendTy::Int => T::Int,
+        BackendTy::Int8 => T::I8,
+        BackendTy::Int16 => T::I16,
+        BackendTy::Int32 => T::I32,
+        BackendTy::UInt8 => T::U8,
+        BackendTy::UInt16 => T::U16,
+        BackendTy::UInt32 => T::U32,
         BackendTy::Float => T::Float,
+        BackendTy::Float32 => T::F32,
         BackendTy::Bool => T::Bool,
         BackendTy::Str => T::Str,
+        BackendTy::Bytes => T::Bytes,
         BackendTy::Char => T::Char,
         BackendTy::Decimal => T::Decimal,
         BackendTy::BigInt => T::BigInt,
@@ -1817,6 +1927,39 @@ impl<'m> Builder<'m> {
 /// Build one `SsaFunc` from a `TirFunction`. `register_module_fns` is set for
 /// the module top level, which stores every free function / method as a
 /// global by qualified name (the convention the callee side reads back).
+/// Which parameters `destructure_params` (checker `emit/body.rs`) gave a
+/// `if (param === null) param = <default>` prologue: those can arrive
+/// UNSET, which only a `Dynamic`-classed register can represent (a plain
+/// `Int`/`Float`/`Ref` slot has no null of its own — `push_frame` fills an
+/// unwritten `Gpr`/`Fpr` with raw `0`/`0.0`, indistinguishable from a caller
+/// actually passing zero). Declaring the parameter's OWN type here would be
+/// correct too, but this reads the prologue the checker already emits
+/// instead of threading a `has_default` bit through `TirFunction`.
+pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
+    let mut mask = vec![false; nparams];
+    for stmt in body {
+        if let TirStmt::If { cond, .. } = stmt {
+            if let TirExprKind::Unary {
+                op: TirUnOp::IsNull,
+                operand,
+            } = &cond.kind
+            {
+                if let TirExpr {
+                    kind: TirExprKind::Var,
+                    res: Resolution::Param(i),
+                    ..
+                } = operand.as_ref()
+                {
+                    if (*i as usize) < nparams {
+                        mask[*i as usize] = true;
+                    }
+                }
+            }
+        }
+    }
+    mask
+}
+
 pub fn build_function(
     tir: &TirModule,
     func: &TirFunction,
@@ -1843,8 +1986,17 @@ fn build_inner(
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
 
+    let defaulted = defaulted_param_mask(&func.body, func.params.len());
     for (i, pty) in func.params.iter().enumerate() {
-        let t = b.ty(*pty);
+        // A defaulted param's entry value is `Dynamic`: it may arrive unset,
+        // and only `Dynamic` can hold that `null` — see `defaulted_param_mask`.
+        // The `if (param === null) param = default` prologue then narrows it
+        // back to `pty` for the rest of the body via a normal `Assign`.
+        let t = if defaulted[i] {
+            HirType::Dynamic
+        } else {
+            b.ty(*pty)
+        };
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
         b.write_var(VarId::Param(i as u32), entry, v);
@@ -1975,6 +2127,22 @@ mod tests {
         let f = build_function(&m, &m.top_level, None).unwrap();
         assert_eq!(f.blocks.len(), 1);
         assert!(matches!(f.blocks[0].term, Terminator::Return(Some(_))));
+    }
+
+    #[test]
+    fn a_char_literal_lowers_to_ref_and_verifies() {
+        // `char` es `HeapObj::Char` internado: el literal debe tiparse `Ref`
+        // (clase REF con flush GC), nunca `Int`.
+        let m = module(
+            vec![TirStmt::Return(Some(e(K::CharLit('a'), B::Char)))],
+            vec![],
+        );
+        let f = build_function(&m, &m.top_level, None).unwrap();
+        assert!(f.blocks[0].insts.iter().any(|i| matches!(
+            i.kind,
+            InstKind::ConstChar('a')
+        ) && matches!(f.value_ty(i.dest.unwrap()), HirType::Ref)));
+        crate::ssa::verify::verify(&f).unwrap();
     }
 
     #[test]

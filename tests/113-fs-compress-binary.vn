@@ -1,0 +1,98 @@
+import { File, readBytes, writeBytes, remove, FileStream } from "std:fs";
+import { Compress } from "std:compress";
+import { Stream } from "std:io";
+import { assertEqual, assertTrue } from "std:test";
+
+print("=== Suite: Binary I/O (std:fs) & Compression (std:compress) ===");
+
+function testBinaryFsOps(): void {
+    let testPath = "target/test_fs_binary.bin";
+    let testData = Bytes.alloc(4);
+    testData.setByte(0, 0xDE);
+    testData.setByte(1, 0xAD);
+    testData.setByte(2, 0xBE);
+    testData.setByte(3, 0xEF);
+
+    // 1. Standalone writeBytes and readBytes
+    writeBytes(testPath, testData);
+    let readBack = readBytes(testPath);
+    assertEqual(readBack.length, 4);
+    assertEqual(readBack.getByte(0), 0xDE);
+    assertEqual(readBack.getByte(1), 0xAD);
+    assertEqual(readBack.getByte(2), 0xBE);
+    assertEqual(readBack.getByte(3), 0xEF);
+    assertEqual(readBack.toHex(), "deadbeef");
+
+    // 2. File instance operations
+    let file = new File(testPath);
+    let appendData = Bytes.alloc(2);
+    appendData.setByte(0, 0xCA);
+    appendData.setByte(1, 0xFE);
+    file.appendBytes(appendData);
+
+    let fullData = file.readBytes();
+    assertEqual(fullData.length, 6);
+    assertEqual(fullData.toHex(), "deadbeefcafe");
+
+    print("  ✔ std:fs readBytes, writeBytes, appendBytes with Bytes buffers");
+}
+
+async function testFileStreamAsync(): Task<void> {
+    let srcPath = "target/stream_src.bin";
+    let dstPath = "target/stream_dst.bin";
+
+    let payload = Bytes.alloc(1024);
+    for (let i = 0; i < 1024; i = i + 1) {
+        payload.setByte(i, i & 0xFF);
+    }
+    writeBytes(srcPath, payload);
+
+    let srcStream = new FileStream(srcPath, "r");
+    let dstStream = new FileStream(dstPath, "w");
+
+    let piped = await Stream.pipe(srcStream, dstStream);
+    assertEqual(piped, 1024);
+
+    srcStream.close();
+    dstStream.close();
+
+    let dstData = readBytes(dstPath);
+    assertEqual(dstData.length, 1024);
+    assertEqual(dstData.getByte(255), 255);
+    assertEqual(dstData.getByte(256), 0);
+
+    print("  ✔ std:fs FileStream AsyncReader/AsyncWriter integrated with Stream.pipe");
+}
+
+function testBinaryCompression(): void {
+    let raw = Bytes.alloc(256);
+    for (let i = 0; i < 256; i = i + 1) {
+        raw.setByte(i, 42); // Highly compressible
+    }
+
+    // Gzip roundtrip on Bytes
+    let gzipped = Compress.gzip(raw);
+    assertTrue(gzipped.length < raw.length);
+    let gunzipped = Compress.gunzip(gzipped);
+    assertEqual(gunzipped.length, 256);
+    assertEqual(gunzipped.getByte(0), 42);
+    assertEqual(gunzipped.getByte(255), 42);
+
+    // Deflate roundtrip on Bytes
+    let deflated = Compress.deflate(raw);
+    assertTrue(deflated.length < raw.length);
+    let inflated = Compress.inflate(deflated);
+    assertEqual(inflated.length, 256);
+    assertEqual(inflated.getByte(0), 42);
+    assertEqual(inflated.getByte(255), 42);
+
+    print("  ✔ std:compress gzip/gunzip and deflate/inflate roundtrip on raw Bytes");
+}
+
+testBinaryFsOps();
+await testFileStreamAsync();
+testBinaryCompression();
+
+remove("target/test_fs_binary.bin");
+remove("target/stream_src.bin");
+remove("target/stream_dst.bin");

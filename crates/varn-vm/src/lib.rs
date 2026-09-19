@@ -6,6 +6,7 @@ pub(crate) mod error;
 pub mod exec;
 pub(crate) mod frame;
 pub(crate) mod frame_stack;
+pub(crate) mod frame_store;
 pub(crate) mod gc;
 pub mod gc_report;
 pub mod gc_trace;

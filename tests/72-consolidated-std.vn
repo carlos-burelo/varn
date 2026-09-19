@@ -1,7 +1,6 @@
-// Test suite for consolidated StdLib enrichments (std:time, std:sys, std:crypto, std:testing)
-
 import { DateTime, formatDurationMs } from "std:time";
-import { parseDotEnv, parseArgs } from "std:sys";
+import { parseDotEnv } from "std:sys";
+import { parseArgs } from "std:cli";
 import { uuidV4, isValidUuid } from "std:crypto";
 import { describe, test, expect } from "std:test";
 

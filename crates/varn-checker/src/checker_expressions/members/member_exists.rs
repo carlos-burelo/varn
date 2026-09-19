@@ -10,6 +10,15 @@ fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult
             return true;
         }
     }
+    // `type_members.classes` and `get_class_entry` are two views of a class:
+    // the latter is what `TypeContext::get_class_members` returns (the one
+    // `find_member_info`/`infer_member` consult), and for some binds only it
+    // carries every member. Check both, or existence and typing disagree.
+    if let Some(entry) = ext_bind.get_class_entry(name) {
+        if entry.members.iter().any(|m| m.name.as_ref() == key) {
+            return true;
+        }
+    }
     if let Some(members) = ext_bind.type_members.interfaces.get(name) {
         if members.iter().any(|m| m.name.as_ref() == key) {
             return true;
@@ -82,6 +91,21 @@ impl<'r> Checker<'r> {
                 if let Some(b) = &bind.core {
                     if let Some(members) =
                         b.class_members.get(varn_core::IntrinsicType::Str.as_str())
+                    {
+                        if members.members.iter().any(|m| m.name.as_ref() == key) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+                if key == varn_core::MemberKey::Length.as_str() {
+                    return true;
+                }
+                if let Some(b) = &bind.core {
+                    if let Some(members) =
+                        b.class_members.get(varn_core::IntrinsicType::Bytes.as_str())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -283,9 +307,10 @@ impl<'r> Checker<'r> {
         };
         if !res {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+                self,
                 ty,
                 &self.ty_table,
-                &bind.interner,
+                bind,
             ) {
                 if bind
                     .extensions

@@ -48,6 +48,7 @@ pub fn resolve_type_node(
         TypeKind::Intrinsic(TypeTag::Null) => Type::Null,
         TypeKind::Intrinsic(TypeTag::Never) => Type::Never,
         TypeKind::Intrinsic(TypeTag::Dynamic) => Type::Dynamic,
+        TypeKind::Intrinsic(TypeTag::Bytes) => Type::intrinsic(TypeTag::Bytes, table),
         TypeKind::This => Type::This,
 
         TypeKind::Array(inner) => {

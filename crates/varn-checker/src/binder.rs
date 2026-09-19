@@ -8,6 +8,7 @@ use varn_core::ast::{AstArena, ExprKind, ForInit, Program, StmtId, StmtKind, Var
 mod array_evolve;
 mod class;
 mod decl_values;
+mod definite_field_assignment;
 mod decls;
 mod imports;
 mod inference_utils;
@@ -339,6 +340,7 @@ impl<'r> Binder<'r> {
     /// checker's `compat` module), so swapping `self.ty_table` out for the
     /// call's duration is sound: nothing observes the gap.
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
+        self.sync_ty_table();
         let mut table = std::mem::take(&mut self.ty_table);
         let result = resolve_type_node(node, Some(self), &mut table);
         self.ty_table = table;
@@ -347,11 +349,30 @@ impl<'r> Binder<'r> {
 
     /// Same rationale as [`Self::resolve_type`], for `infer_expr_type`.
     pub(crate) fn infer_expr_type_self(&mut self, expr: varn_core::ast::ExprId) -> Type {
+        self.sync_ty_table();
         let mut table = std::mem::take(&mut self.ty_table);
         let arena = self.ast_arena;
         let result = infer_expr_type(expr, arena, Some(self), &mut table);
         self.ty_table = table;
         result
+    }
+
+    /// Adopt the resolver's live `CheckerTyTable` when it has grown past this
+    /// binder's snapshot. Nested imports bound during this bind publish new
+    /// entries to the live table; a `Type` flowing back from such a module
+    /// (global symbol, expanded alias, member type, …) can then carry a
+    /// `CheckerTyId` past the end of the local snapshot, and the next
+    /// `table.get(id)` indexes out of bounds.
+    ///
+    /// Merge, don't replace (see the `absorb` call in `check_internal` for
+    /// why): the live table may have grown *independently* from this
+    /// snapshot (same index, different shape), and a wholesale replacement
+    /// would repoint every id this binder already minted.
+    fn sync_ty_table(&mut self) {
+        let live = self.resolver.ty_table_snapshot();
+        if live.len() > self.ty_table.len() {
+            self.ty_table.absorb(&live);
+        }
     }
 
     fn bind_var_declarators(

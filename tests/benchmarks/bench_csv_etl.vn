@@ -1,4 +1,4 @@
-import { CSV } from "std:csv";
+import { CSV } from "std:encoding";
 
 // Real-world CSV ETL: Parse, Validate, Enrich, Aggregate, and Re-export
 

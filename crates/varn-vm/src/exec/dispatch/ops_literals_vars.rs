@@ -19,46 +19,51 @@ impl ExecCtx {
     ) -> VmResult<bool> {
         match op {
             OpCode::LoadNull => {
-                self.stack[base + first_reg] = crate::value::VmValue::null();
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::null())?;
             }
             OpCode::LoadTrue => {
-                self.stack[base + first_reg] = crate::value::VmValue::bool_true();
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::bool_true())?;
             }
             OpCode::LoadFalse => {
-                self.stack[base + first_reg] = crate::value::VmValue::bool_false();
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::bool_false())?;
             }
             OpCode::LoadInt => {
                 let val = code[*ip] as i16;
                 *ip += 1;
-                self.stack[base + first_reg] = crate::value::VmValue::from_int(val as i64);
+                self.stack.unbox_into_reg(
+                    base,
+                    first_reg,
+                    crate::value::VmValue::from_int(val as i64),
+                )?;
             }
             OpCode::LoadIntZero => {
-                self.stack[base + first_reg] = crate::value::VmValue::from_int(0);
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::from_int(0))?;
             }
             OpCode::LoadIntOne => {
-                self.stack[base + first_reg] = crate::value::VmValue::from_int(1);
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::from_int(1))?;
             }
             OpCode::LoadIntMinusOne => {
-                self.stack[base + first_reg] = crate::value::VmValue::from_int(-1);
+                self.stack
+                    .unbox_into_reg(base, first_reg, crate::value::VmValue::from_int(-1))?;
             }
             OpCode::LoadConst => {
                 let cidx = code[*ip] as usize;
                 *ip += 1;
                 let nv = closure.constants[cidx];
-                self.stack[base + first_reg] = nv;
+                self.stack.unbox_into_reg(base, first_reg, nv)?;
             }
             OpCode::Move => {
                 let w1 = code[*ip];
                 *ip += 1;
-                let dest = base + first_reg;
-                let src = base + hi(w1);
-
-                let max_idx = dest.max(src);
-                if max_idx >= self.stack.len() {
-                    self.stack
-                        .resize(max_idx + 1, crate::value::VmValue::null());
-                }
-                self.stack[dest] = self.stack[src];
+                // Los registros siempre están dentro de `register_count` (el
+                // compilador los dimensiona); el `resize` anterior era defensa
+                // muerta. `mov` convierte entre clases con chequeo.
+                self.stack.mov(base, first_reg, hi(w1))?;
             }
             OpCode::LoadGlobalIdx => {
                 let gidx = closure.module_base as usize + code[*ip] as usize;
@@ -68,7 +73,8 @@ impl ExecCtx {
                     "LoadGlobalIdx out of bounds: {gidx} >= {}",
                     self.globals.values.len()
                 );
-                self.stack[base + first_reg] = self.globals.values[gidx];
+                let nv = self.globals.values[gidx];
+                self.stack.unbox_into_reg(base, first_reg, nv)?;
                 self.record_hotspot_global(gidx);
             }
             OpCode::LoadNativeGlobalIdx => {
@@ -79,7 +85,8 @@ impl ExecCtx {
                     "LoadNativeGlobalIdx out of bounds: {gidx} >= {}",
                     self.globals.values.len()
                 );
-                self.stack[base + first_reg] = self.globals.values[gidx];
+                let nv = self.globals.values[gidx];
+                self.stack.unbox_into_reg(base, first_reg, nv)?;
                 self.record_hotspot_global(gidx);
             }
             OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
@@ -91,7 +98,7 @@ impl ExecCtx {
                     "StoreGlobalIdx out of bounds: {gidx} >= {}",
                     self.globals.values.len()
                 );
-                let val = self.stack[base + src];
+                let val = self.stack.box_reg(base, src);
                 self.globals.set_by_index_unchecked(gidx, val);
             }
             OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::DefineGlobal => {
@@ -102,20 +109,21 @@ impl ExecCtx {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (dest, uv) = (hi(w1), lo(w1));
-                self.stack[base + dest] = closure.upvalues[uv].read(&self.stack);
+                let nv = closure.upvalues[uv].read(&self.stack);
+                self.stack.unbox_into_reg(base, dest, nv)?;
             }
             OpCode::StoreUpvalue => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (uv, src) = (hi(w1), lo(w1));
-                let val = self.stack[base + src];
-                closure.upvalues[uv].write(val, &mut self.stack);
+                let val = self.stack.box_reg(base, src);
+                closure.upvalues[uv].write(val, &mut self.stack)?;
             }
             OpCode::CloseUpvalue => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let lowest = hi(w1);
-                self.close_upvalues_above(base + lowest);
+                self.close_upvalues_from_reg(base, lowest);
             }
             _ => return Ok(false),
         }

@@ -97,6 +97,14 @@ impl CheckerTyId {
         self.0 <= Self::MAX_PORTABLE
     }
 
+    /// This id's index in the table that interned it. Exposed for callers
+    /// that must decide *which* table an id is meaningful in — e.g. decoding
+    /// an imported symbol against its exporter's table only when the id is in
+    /// range there, and against the live table otherwise.
+    pub fn index(self) -> u32 {
+        self.0
+    }
+
     /// `self` if it's one of the ~21 ids valid in any table, else
     /// [`Self::DYNAMIC`] — the honest degradation for a `CheckerTyId` that
     /// crossed into a table it wasn't interned in (the on-disk module cache,
@@ -244,6 +252,22 @@ impl CheckerTyTable {
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Merge every shape in `other` into `self` without disturbing `self`'s
+    /// existing indices: shared shapes dedup to the ids `self` already has,
+    /// `other`-only shapes append. Used where two tables grew independently
+    /// from a common prefix (nested binds during an outer bind/check) and the
+    /// local table must learn the live table's shapes *without* invalidating
+    /// the ids local `Symbol`s/`Type`s already captured — a wholesale
+    /// replacement would repoint those ids at `other`'s kinds at the same
+    /// indices (same failure mode as copying a raw `Atom` across divergent
+    /// interners, and just as silent).
+    pub fn absorb(&mut self, other: &CheckerTyTable) {
+        let mut cache = FxHashMap::default();
+        for i in 0..other.entries.len() {
+            self.reintern(other, CheckerTyId(i as u32), &mut cache);
+        }
     }
 
     /// Copy `id`'s shape from `other` into `self`, recursively, returning the

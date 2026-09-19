@@ -1,0 +1,12 @@
+import { TcpListener } from "std:net";
+
+async function main() {
+    let listener = TcpListener.listen(19876);
+    let client = await listener.accept();
+    let msg = await client.readText();
+    await client.writeAll("ECHO:" + msg.trim() + "\n");
+    client.close();
+    listener.close();
+}
+
+await main();

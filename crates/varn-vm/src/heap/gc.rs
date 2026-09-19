@@ -30,9 +30,14 @@ impl HeapInner {
         }
     }
 
-    pub(crate) fn minor_gc(&mut self, stack: &mut [VmValue], extra_packed: &[u32]) {
+    pub(crate) fn minor_gc(
+        &mut self,
+        dyn_: &mut [VmValue],
+        refs: &mut [u32],
+        extra_packed: &[u32],
+    ) {
         let mut nursery = std::mem::replace(&mut self.nursery, Nursery::vacant());
-        nursery.collect(self, stack, extra_packed);
+        nursery.collect(self, dyn_, refs, extra_packed);
         self.nursery = nursery;
     }
 

@@ -431,6 +431,15 @@ pub(crate) fn stringify_csv(
                                     }
                                     out.push('\n');
                                 }
+                                varn_types::ArrayRepr::I8(_)
+                                | varn_types::ArrayRepr::I16(_)
+                                | varn_types::ArrayRepr::I32(_)
+                                | varn_types::ArrayRepr::U8(_)
+                                | varn_types::ArrayRepr::U16(_)
+                                | varn_types::ArrayRepr::U32(_)
+                                | varn_types::ArrayRepr::F32(_) => {
+                                    unreachable!("CSV rows are never narrow-typed")
+                                }
                             }
                         }
                     }

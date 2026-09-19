@@ -68,10 +68,23 @@ pub trait ImportResolver {
     /// of it, never a table of its own.
     fn ty_table_snapshot(&self) -> crate::types::CheckerTyTable;
 
-    /// Publish `table` as the compilation's `CheckerTyId` table, replacing
-    /// what was there — same "never shrink the live table" contract as
-    /// [`Self::interner`]'s `set_interner`.
+    /// Publish `table`'s shapes into the compilation's live `CheckerTyId`
+    /// table. Merging, not replacing: `table` is one module's locally-grown
+    /// view, which can disagree with the live table past their common prefix
+    /// (nested binds grow live behind any single module's back), and a
+    /// wholesale swap would repoint every id the live table already handed
+    /// out. `CheckerTyTable::absorb` keeps live's own indices stable and only
+    /// learns shapes it is missing.
     fn set_ty_table(&self, table: crate::types::CheckerTyTable);
+
+    /// Intern `kind` into the live `CheckerTyId` table itself, publishing
+    /// immediately, and return the id it now has *there*.
+    ///
+    /// For a caller that must put a type on an exported symbol (`export * as
+    /// ns`, a synthesized member) without growing any module's bind table —
+    /// the id crosses module boundaries through the `ExportMap`, so it has to
+    /// be valid in the table importers decode against, which is the live one.
+    fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId;
 
     /// Intern `s` into this resolver's shared `Atom` table, publishing the
     /// result immediately (unlike `interner_snapshot`, which only reads).
@@ -171,46 +184,35 @@ impl DiskResolver {
         self.interner.borrow().clone()
     }
 
-    /// Publish `interner` as the compilation's table, replacing what was
-    /// there. Callers pass back the `AtomInterner` a `varn_parser::parse` call
-    /// returned after seeding it from `interner_snapshot` — the grown clone
-    /// becomes the new shared table so the next module sees this one's atoms.
+    /// Publish `interner` into the compilation's shared table: keep every
+    /// entry the live table already has (its indices are the ones already
+    /// minted `Atom`s refer to) and append the texts the incoming table has
+    /// past the live length.
     ///
-    /// Refuses to shrink the live table: a bind that recurses into another
-    /// module's import (e.g. `bind_and_cache`, re-entered while an *outer*
-    /// bind is still in flight) snapshots, grows, and publishes on its own
-    /// schedule, so the outer bind's own snapshot — taken before that nested
-    /// growth happened — is stale by the time the outer bind finishes and
-    /// tries to publish its own (smaller) table. Overwriting a live table
-    /// with fewer entries always regresses a real publish, since `intern`
-    /// never removes; keeping the larger one is never wrong.
+    /// Not a wholesale replacement: a bind that recurses into another
+    /// module's import snapshots, grows, and publishes on its own schedule,
+    /// so two binders can grow *independently* from a common snapshot and
+    /// land different texts past the shared prefix (observed: a file-path
+    /// atom vs `__ext_str_shout` at index 813). Overwriting live with the
+    /// incoming table would repoint every `Atom` the live table already
+    /// handed out; a debug-only prefix-equality panic is no better — the
+    /// divergence is a consequence of the snapshot design, not a caller bug.
+    /// Appending (dedup-by-text) keeps live append-only and every already-
+    /// minted index stable; symbols carrying a diverged binder's local atom
+    /// still resolve through that binder's own interner for cross-module
+    /// reads (the `to_cacheable`/`from_cacheable` text round-trip).
     pub fn set_interner(&self, interner: varn_core::AtomInterner) {
         let mut live = self.interner.borrow_mut();
-        if interner.len() >= live.len() {
-            // `interner` is assumed to be a superset-by-prefix of `live`:
-            // every `Atom` already minted against `live` must still resolve
-            // to the same text in `interner`, or every `Symbol`/`Type` that
-            // captured one of those `Atom`s silently starts pointing at the
-            // wrong string the moment we swap the table below. This check is
-            // debug-only (real prefix corruption is a deeper invariant this
-            // function alone can't fix — see its module doc) but turns a
-            // silent divergence into a loud, local panic instead of a
-            // mysterious wrong-name diagnostic three calls later.
-            #[cfg(debug_assertions)]
-            if let Some((idx, (a, b))) = live
-                .iter_strings()
-                .zip(interner.iter_strings())
-                .enumerate()
-                .find(|(_, (a, b))| a != b)
-            {
-                panic!(
-                    "set_interner: incoming interner diverges from the live interner at index \
-                     {idx} — live has {a:?}, incoming has {b:?} (live.len()={}, incoming.len()={})",
-                    live.len(),
-                    interner.len()
-                );
-            }
-            *live = interner;
+        if interner.len() <= live.len() {
+            return;
+        }
+        let new_texts: Vec<String> = interner
+            .iter_strings()
+            .skip(live.len())
+            .map(|s| s.to_owned())
+            .collect();
+        for text in new_texts {
+            live.intern(&text);
         }
     }
 
@@ -514,10 +516,21 @@ impl ImportResolver for DiskResolver {
     }
 
     fn set_ty_table(&self, table: crate::types::CheckerTyTable) {
+        // Merge, never replace: `table` is the table of ONE module's
+        // bind/check, which grew locally from a snapshot of this live table
+        // and can disagree with it past the common prefix (nested binds grow
+        // live behind any single module's back). Replacing wholesale would
+        // repoint every id the live table already handed out — a later
+        // module's reintern would then read a different shape at the same
+        // index (observed as e.g. a `str` parameter reading as `int`).
+        // `absorb` keeps live's own indices stable and only learns shapes it
+        // is missing.
         let mut live = self.ty_table.borrow_mut();
-        if table.len() >= live.len() {
-            *live = table;
-        }
+        live.absorb(&table);
+    }
+
+    fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId {
+        self.ty_table.borrow_mut().intern(kind)
     }
 
     fn interner_len(&self) -> usize {

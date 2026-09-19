@@ -46,7 +46,7 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
         TokenKind::Break => parse_break_stmt(s),
         TokenKind::Continue => parse_continue_stmt(s),
         TokenKind::Throw => parse_throw_stmt(s),
-        TokenKind::Try => parse_try_stmt(s),
+        TokenKind::Try if s.peek_kind(1) == TokenKind::LBrace => parse_try_stmt(s),
         TokenKind::Using => parse_using_stmt(s, false),
         TokenKind::Await if next_kind == TokenKind::Using => parse_using_stmt(s, true),
         TokenKind::With => Err(String::from(

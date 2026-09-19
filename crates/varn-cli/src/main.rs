@@ -10,6 +10,7 @@ mod cli;
 mod commands;
 mod cpu_freq;
 mod doctor_impl;
+mod env_file;
 mod error;
 mod formatter;
 #[cfg(feature = "lsp")]
@@ -26,6 +27,12 @@ use varn_core::term::terminal;
 use varn_lexer as _;
 
 fn main() {
+    // Lo primero, antes de registrar la stdlib o tocar argumentos: si el
+    // proyecto trae `.env`/`.env.local`, sus claves quedan puestas en el
+    // entorno del proceso para todo lo que sigue (`RUST_BACKTRACE`,
+    // `VARN_NO_JIT`, `VARN_GC_TRACE`, …), sin pisar lo que el shell ya trae.
+    env_file::load();
+
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
     varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();

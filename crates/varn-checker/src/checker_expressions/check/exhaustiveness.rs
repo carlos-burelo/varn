@@ -70,6 +70,29 @@ impl<'r> Checker<'r> {
                             MatchPattern::Identifier(name) => {
                                 bind.interner.resolve(*name) == vname.as_ref()
                             }
+                            MatchPattern::EnumVariant { variant_name, .. } => {
+                                bind.interner.resolve(*variant_name) == vname.as_ref()
+                            }
+                            MatchPattern::Literal(lit) => {
+                                let arena = self.ast_arena;
+                                if let varn_core::ast::ExprKind::Member { property, .. } =
+                                    &arena.expr(*lit).kind
+                                {
+                                    if let varn_core::ast::ExprKind::Identifier { name } =
+                                        &arena.expr(*property).kind
+                                    {
+                                        bind.interner.resolve(*name) == vname.as_ref()
+                                    } else {
+                                        false
+                                    }
+                                } else if let varn_core::ast::ExprKind::Identifier { name } =
+                                    &arena.expr(*lit).kind
+                                {
+                                    bind.interner.resolve(*name) == vname.as_ref()
+                                } else {
+                                    false
+                                }
+                            }
                             MatchPattern::Record { fields, .. } => {
                                 fields.first().is_some_and(|(key, sub)| {
                                     bind.interner.resolve(*key) == "__variant__"

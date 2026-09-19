@@ -1,10 +1,12 @@
 use super::shape::{root_shape, Shape};
 use super::{ClassObj, RuntimeString, Value};
+use crate::class_layout::FieldLayout;
 use crate::vm_value::{VmValue, VmValueRef};
 use std::cell::{Cell, UnsafeCell};
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
+use varn_core::TypeTag;
 
 /// A property object, stored as a single allocation: the header and the
 /// object's fields share one `Rc` block, with the fields as a DST tail sized
@@ -636,38 +638,213 @@ impl InstanceData {
     }
 
     #[inline(always)]
+    pub unsafe fn read_u64(&self, offset: usize) -> u64 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const u64;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_i16(&self, offset: usize) -> i16 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const i16;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_u16(&self, offset: usize) -> u16 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const u16;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_i32(&self, offset: usize) -> i32 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const i32;
+        ptr.read()
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_f32(&self, offset: usize) -> f32 {
+        let ptr = self.raw_payload_ptr().add(offset) as *const f32;
+        ptr.read()
+    }
+
+    #[inline(always)]
     pub unsafe fn read_vm_value(&self, offset: usize) -> VmValue {
         let ptr = self.raw_payload_ptr().add(offset) as *const VmValue;
         ptr.read()
     }
 
-    /// Number of addressable field slots. The one authority on how far a
-    /// payload walk may go: reading past it is an out-of-bounds read, and
-    /// striding by anything but a whole slot splits a `VmValue` in half.
-    #[inline(always)]
+    /// Sentinel for a compact GC-ref field slot never written: `u32::MAX`
+    /// packed into an 8-byte word, mirroring `varn_vm::frame_store::
+    /// REF_UNINIT` (this crate cannot depend on `varn-vm`, so the constant is
+    /// re-declared, not shared — same value, same reasoning: heap indices
+    /// never reach that range in practice, and `get_or_compute_layout`'s
+    /// zero-filled fresh payload already stores exactly the low 32 bits of
+    /// zero, NOT this sentinel — so a never-written compact ref field reads
+    /// heap index 0, not null, until this is written on first field write.
+    /// `ClassObj::declare_field`'s `Dynamic` default only applies before a
+    /// field's real type is known; every compactable field here has a known
+    /// non-nullable type by construction (`emit/tables.rs`'s `is_optional`
+    /// check on the checker side is what routes anything possibly-unwritten
+    /// to the 16-byte `Dynamic` slot instead), so an all-zero fresh payload
+    /// is never actually observed as a value here.
+    const COMPACT_REF_UNINIT: u64 = u32::MAX as u64;
+
+    /// Resolves this instance's `ClassLayout` through the class registry.
+    /// `InstanceData` itself only knows the header word (`class_id` /
+    /// `payload_size`) needed for zero-copy allocation — the field table
+    /// lives on `ClassObj` (one per class, not per instance) and is cached
+    /// there (`get_or_compute_layout`), so this is a registry lookup plus a
+    /// cached `Rc` clone, not a recomputation.
+    #[inline]
+    fn layout(&self) -> Option<Rc<crate::class_layout::ClassLayout>> {
+        ClassObj::find_by_id(self.class_id).map(|c| c.get_or_compute_layout())
+    }
+
+    /// Number of declared fields — the one authority on how far a payload
+    /// walk may go. Was `payload_size / 16` back when every field WAS
+    /// exactly 16 bytes; now that fields pack at their real `FieldLayout`
+    /// size, only the layout's own field count says how many there are.
+    #[inline]
     pub fn slot_count(&self) -> usize {
-        self.payload_size as usize / SLOT_SIZE
+        self.layout().map(|l| l.field_count()).unwrap_or(0)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn field_at(&self, slot: usize) -> Option<VmValue> {
-        let offset = slot * SLOT_SIZE;
-        if offset + SLOT_SIZE <= self.payload_size as usize {
-            Some(unsafe { self.read_vm_value(offset) })
-        } else {
-            None
+        let layout = self.layout()?;
+        let f = layout.get_field_by_index(slot)?;
+        self.read_field(f)
+    }
+
+    #[inline]
+    pub fn set_field_at(&self, slot: usize, val: VmValue) -> bool {
+        let Some(layout) = self.layout() else {
+            return false;
+        };
+        let Some(f) = layout.get_field_by_index(slot) else {
+            return false;
+        };
+        self.write_field(f, val).is_ok()
+    }
+
+    /// Reads one field at its own `FieldLayout` — the packed-representation
+    /// counterpart of `field_at`'s old blind `slot * 16`. `str` and `char`
+    /// stay full `VmValue` slots (see `class_field_repr`'s doc comment: a
+    /// `str` can be `KIND_SSO` with no heap object at all, and `char` needs
+    /// heap access this struct doesn't have); a compact GC-ref field decodes
+    /// `COMPACT_REF_UNINIT` back to `null`, symmetric with how it is written.
+    pub fn read_field(&self, f: &FieldLayout) -> Option<VmValue> {
+        let offset = f.offset as usize;
+        if offset + f.size as usize > self.payload_size as usize {
+            return None;
+        }
+        unsafe {
+            Some(match f.type_tag {
+                TypeTag::Bool => VmValue::from_bool(self.read_bool(offset)),
+                TypeTag::I8 => VmValue::from_int(*(self.raw_payload_ptr().add(offset) as *const i8) as i64),
+                TypeTag::U8 => VmValue::from_int(self.read_u8(offset) as i64),
+                TypeTag::I16 => VmValue::from_int(self.read_i16(offset) as i64),
+                TypeTag::U16 => VmValue::from_int(self.read_u16(offset) as i64),
+                TypeTag::I32 => VmValue::from_int(self.read_i32(offset) as i64),
+                TypeTag::U32 => VmValue::from_int(self.read_u32(offset) as i64),
+                TypeTag::F32 => VmValue::from_f64(self.read_f32(offset) as f64),
+                TypeTag::Int | TypeTag::U64 => VmValue::from_int(self.read_i64(offset)),
+                TypeTag::Float => VmValue::from_f64(self.read_f64(offset)),
+                _ if f.is_gc_ref && f.size == 8 => {
+                    let raw = self.read_u64(offset);
+                    if raw == Self::COMPACT_REF_UNINIT {
+                        VmValue::null()
+                    } else {
+                        VmValue::from_heap_idx(raw as u32)
+                    }
+                }
+                _ => self.read_vm_value(offset),
+            })
         }
     }
 
-    #[inline(always)]
-    pub fn set_field_at(&self, slot: usize, val: VmValue) -> bool {
-        let offset = slot * SLOT_SIZE;
-        if offset + SLOT_SIZE <= self.payload_size as usize {
-            unsafe { self.write_vm_value(offset, val) };
-            true
-        } else {
-            false
+    /// Writes one field at its own `FieldLayout`, converting the same way
+    /// `varn_vm::frame_store`'s `Fpr`/`Ref` slot writes do: `int` widens into
+    /// a `float` field the checker proved compatible, and `null` into a
+    /// compact GC-ref field is `COMPACT_REF_UNINIT`, not an error — a `class`
+    /// -typed field genuinely can be unset before the constructor assigns it
+    /// (`tests/63-escape-analysis.vn`'s "unassigned field still reads null"
+    /// pattern applies here exactly as it does to registers). Anything else
+    /// wrong for the slot's class is a real type error, surfaced instead of
+    /// silently reinterpreted.
+    pub fn write_field(&self, f: &FieldLayout, val: VmValue) -> Result<(), &'static str> {
+        let offset = f.offset as usize;
+        if offset + f.size as usize > self.payload_size as usize {
+            return Err("field offset exceeds instance payload");
         }
+        unsafe {
+            match f.type_tag {
+                TypeTag::Bool => {
+                    if !val.is_bool() {
+                        return Err("cannot store non-bool in a bool field");
+                    }
+                    self.write_bool(offset, val.as_bool());
+                }
+                TypeTag::I8 | TypeTag::U8 | TypeTag::I16 | TypeTag::U16 | TypeTag::I32
+                | TypeTag::U32 | TypeTag::Int | TypeTag::U64 => {
+                    if !val.is_int() {
+                        return Err("cannot store non-int in an int field");
+                    }
+                    let n = val.as_int();
+                    match f.type_tag {
+                        TypeTag::I8 | TypeTag::U8 => self.write_u8(offset, n as u8),
+                        TypeTag::I16 | TypeTag::U16 => {
+                            let ptr = self.raw_payload_ptr().add(offset) as *mut i16;
+                            ptr.write(n as i16);
+                        }
+                        TypeTag::I32 | TypeTag::U32 => {
+                            let ptr = self.raw_payload_ptr().add(offset) as *mut i32;
+                            ptr.write(n as i32);
+                        }
+                        _ => self.write_i64(offset, n),
+                    }
+                }
+                TypeTag::F32 => {
+                    let v = if val.is_f64() {
+                        val.as_f64() as f32
+                    } else if val.is_int() {
+                        val.as_int() as f32
+                    } else if val.is_null() {
+                        f32::NAN
+                    } else {
+                        return Err("cannot store non-numeric in a float field");
+                    };
+                    let ptr = self.raw_payload_ptr().add(offset) as *mut f32;
+                    ptr.write(v);
+                }
+                TypeTag::Float => {
+                    // Symmetric with `frame_store`'s `Fpr`: `int` widens,
+                    // `null` (a NaN result — `VmValue::from_f64` already
+                    // folds NaN to `null`) round-trips through a real NaN
+                    // bit pattern instead of being rejected.
+                    if val.is_f64() {
+                        self.write_f64(offset, val.as_f64());
+                    } else if val.is_int() {
+                        self.write_f64(offset, val.as_int() as f64);
+                    } else if val.is_null() {
+                        self.write_f64(offset, f64::NAN);
+                    } else {
+                        return Err("cannot store non-numeric in a float field");
+                    }
+                }
+                _ if f.is_gc_ref && f.size == 8 => {
+                    if val.is_null() {
+                        self.write_u64(offset, Self::COMPACT_REF_UNINIT);
+                    } else if val.is_heap() {
+                        self.write_u64(offset, val.as_heap_idx() as u64);
+                    } else {
+                        return Err("cannot store non-reference in a reference field");
+                    }
+                }
+                _ => self.write_vm_value(offset, val),
+            }
+        }
+        Ok(())
     }
 
     // ── Field Write Methods ─────────────────────────────────────────────
@@ -699,6 +876,12 @@ impl InstanceData {
     #[inline(always)]
     pub unsafe fn write_u32(&self, offset: usize, val: u32) {
         let ptr = self.raw_payload_ptr().add(offset) as *mut u32;
+        ptr.write(val);
+    }
+
+    #[inline(always)]
+    pub unsafe fn write_u64(&self, offset: usize, val: u64) {
+        let ptr = self.raw_payload_ptr().add(offset) as *mut u64;
         ptr.write(val);
     }
 

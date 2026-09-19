@@ -6,12 +6,22 @@ import {
     readDir$,
     remove$,
     removeAll$,
+    readFileBytes$,
+    writeFileBytes$,
     rename$,
     tempDir$
 } from "runtime:fs";
 
-import { File } from "std:fs/file";
+import { File, FileStream } from "std:fs/file";
 import { Stats } from "std:fs/stats";
+
+export function readBytes(path: str): Bytes {
+    return readFileBytes$(path);
+}
+
+export function writeBytes(path: str, data: Bytes): void {
+    writeFileBytes$(path, data);
+}
 
 export function read(path: str): str {
     let file = File.open(path, "r");

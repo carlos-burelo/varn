@@ -50,7 +50,7 @@ pub(super) fn assign_registers(
                 InstKind::SelfCall { args } => args.len() as u32 + 1,
                 InstKind::MethodCall { args, .. } => args.len() as u32,
 
-                InstKind::BuildArray { elements } => elements.len() as u32,
+                InstKind::BuildArray { elements, .. } => elements.len() as u32,
                 InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
                 // Object literals stage non-contiguous values into the call
                 // area before BuildObjectWithShape.

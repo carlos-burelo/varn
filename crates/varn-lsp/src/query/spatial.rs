@@ -203,7 +203,7 @@ fn collect_decl(decl: &Decl, out: &mut Vec<SpatialEntry>) {
         Decl::Export(exp) => collect_export_decl(exp, out),
         Decl::Extension(ext) => collect_extension_decl(ext, out),
         Decl::Struct(s) => collect_struct_decl(s, out),
-        Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) | Decl::SumType(_) => {}
+        Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) => {}
     }
 }
 

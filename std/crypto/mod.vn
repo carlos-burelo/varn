@@ -11,7 +11,12 @@ export {
     sha512,
     randomBytes,
     randomHex,
-    base64Enc,
-    base64Dec,
     hmac
 } from "std:crypto/hash";
+
+export {
+    pbkdf2,
+    timingSafeEqual,
+    hashPassword,
+    verifyPassword
+} from "std:crypto/password";

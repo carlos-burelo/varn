@@ -1,0 +1,140 @@
+import { LogLevel } from "std:log/level";
+import { writeln } from "std:io";
+import { now, toISOString } from "std:time";
+import { JSON } from "std:encoding";
+import { Color } from "std:cli/color";
+
+export class Logger {
+    private _name: str;
+    private _minLevel: LogLevel;
+    private _jsonOutput: bool;
+    private _useColors: bool;
+    private _sink: ((line: str) => void)?;
+
+    constructor(
+        name: str = "app",
+        minLevel: LogLevel = LogLevel.Info,
+        jsonOutput: bool = false,
+        useColors: bool = true,
+        sink?: (line: str) => void
+    ) {
+        this._name = name;
+        this._minLevel = minLevel;
+        this._jsonOutput = jsonOutput;
+        this._useColors = useColors;
+        this._sink = sink;
+    }
+
+    get name(): str {
+        return this._name;
+    }
+
+    get level(): LogLevel {
+        return this._minLevel;
+    }
+
+    setLevel(level: LogLevel): void {
+        this._minLevel = level;
+    }
+
+    setJsonOutput(enable: bool): void {
+        this._jsonOutput = enable;
+    }
+
+    setUseColors(enable: bool): void {
+        this._useColors = enable;
+    }
+
+    setSink(sink?: (line: str) => void): void {
+        this._sink = sink;
+    }
+
+    child(subName: str): Logger {
+        let childName = this._name.length > 0 ? this._name + "." + subName : subName;
+        return new Logger(childName, this._minLevel, this._jsonOutput, this._useColors, this._sink);
+    }
+
+    log(level: LogLevel, message: str, meta?: { [key: str]: dynamic }): void {
+        if (this._levelPriority(level) < this._levelPriority(this._minLevel)) {
+            return;
+        }
+
+        let timestampStr = toISOString(now());
+        let levelTag = this._levelToString(level);
+
+        let outputLine: str = "";
+        if (this._jsonOutput) {
+            let record: { [key: str]: dynamic } = {
+                "timestamp": timestampStr,
+                "level": levelTag,
+                "target": this._name,
+                "message": message
+            };
+            if (meta !== null) {
+                record["meta"] = meta;
+            }
+            outputLine = JSON.stringify(record);
+        } else {
+            let tagStr = levelTag;
+            if (this._useColors) {
+                tagStr = this._colorizeTag(level, levelTag);
+            }
+            let metaSuffix = "";
+            if (meta !== null) {
+                metaSuffix = " " + JSON.stringify(meta);
+            }
+            outputLine = timestampStr + " [" + tagStr + "] (" + this._name + "): " + message + metaSuffix;
+        }
+
+        if (this._sink !== null) {
+            let writeFn = this._sink as (line: str) => void;
+            writeFn(outputLine);
+        } else {
+            writeln(outputLine);
+        }
+    }
+
+    trace(message: str, meta?: { [key: str]: dynamic }): void {
+        this.log(LogLevel.Trace, message, meta);
+    }
+
+    debug(message: str, meta?: { [key: str]: dynamic }): void {
+        this.log(LogLevel.Debug, message, meta);
+    }
+
+    info(message: str, meta?: { [key: str]: dynamic }): void {
+        this.log(LogLevel.Info, message, meta);
+    }
+
+    warn(message: str, meta?: { [key: str]: dynamic }): void {
+        this.log(LogLevel.Warn, message, meta);
+    }
+
+    error(message: str, meta?: { [key: str]: dynamic }): void {
+        this.log(LogLevel.Error, message, meta);
+    }
+
+    private _levelToString(level: LogLevel): str {
+        if (level === LogLevel.Trace) return "TRACE";
+        if (level === LogLevel.Debug) return "DEBUG";
+        if (level === LogLevel.Info) return "INFO";
+        if (level === LogLevel.Warn) return "WARN";
+        return "ERROR";
+    }
+
+    private _levelPriority(level: LogLevel): int {
+        if (level === LogLevel.Trace) return 0;
+        if (level === LogLevel.Debug) return 1;
+        if (level === LogLevel.Info) return 2;
+        if (level === LogLevel.Warn) return 3;
+        return 4;
+    }
+
+    private _colorizeTag(level: LogLevel, tag: str): str {
+        if (level === LogLevel.Trace) return Color.gray(tag);
+        if (level === LogLevel.Debug) return Color.cyan(tag);
+        if (level === LogLevel.Info) return Color.green(tag);
+        if (level === LogLevel.Warn) return Color.yellow(tag);
+        return Color.red(tag);
+    }
+}

@@ -357,14 +357,32 @@ impl<'r> Checker<'r> {
         // earlier in the same `compile_stdlib_bundle` loop can have grown
         // and published a bigger live `CheckerTyTable` than what `bind`
         // carries (its own snapshot is only as fresh as when *this*
-        // module's `Binder::bind` started). Adopting the live one when it's
-        // ahead is lossless (`CheckerTyTable::intern` never renumbers), and
-        // is what `Checker.ty_table`'s field doc already promises.
+        // module's `Binder::bind` started).
+        //
+        // Merge, don't replace: a nested import bound *during* this bind
+        // grew the live table independently from this bind's own snapshot,
+        // so the two can disagree past their common prefix (same index,
+        // different shape). Adopting live wholesale would repoint every id
+        // this bind already minted — e.g. an interface's `Named` suddenly
+        // reading as whatever the nested module interned at that index.
+        // `absorb` keeps every local meaning and only learns the shapes
+        // live has that this table lacks (dedup shares the rest).
         let live_ty_table = resolver.ty_table_snapshot();
         if live_ty_table.len() > bind.ty_table.len() {
-            bind.ty_table = live_ty_table;
+            bind.ty_table.absorb(&live_ty_table);
         }
 
+        // Same staleness, mirrored for `Atom`: nested imports bound during
+        // `Binder::bind` / `merge_core_members` / `enrich_call_returns` publish
+        // new atoms to the resolver's live table *after* the binder's last
+        // local mint, so `bind.interner` (a snapshot) can be behind the live
+        // table by the time checking starts. Any `Type` built from a
+        // later-bound module then carries an `Atom` this snapshot cannot
+        // resolve — `index out of bounds` in member lookups, diagnostics, and
+        // the compat engine. Adopting the live snapshot unconditionally is
+        // lossless (same prefix guarantee as above: `intern` never renumbers,
+        // so every atom this bind minted still resolves to the same text).
+        bind.interner = resolver.interner_snapshot();
         let started = Instant::now();
         let mut checker = Checker {
             resolver,
@@ -489,6 +507,14 @@ impl<'r> Checker<'r> {
         // `AtomInterner`/`set_interner`.
         bind.ty_table = checker.ty_table.clone();
         resolver.set_ty_table(checker.ty_table.clone());
+
+        // Checking also resolves imports on demand (`module_bind`/
+        // `stdlib_bind` inside member lookups, alias expansion, ...), and each
+        // of those binds mints atoms into the live table. Emit runs against
+        // `bind`, so refresh the atom snapshot once more: emitting a type whose
+        // name atom was minted after the last resync would otherwise index out
+        // of bounds in `AtomInterner::resolve`.
+        bind.interner = resolver.interner_snapshot();
 
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);
@@ -703,6 +729,89 @@ impl<'r> Checker<'r> {
             &mut self.compat_cache,
             &self.ty_table,
         )
+    }
+
+    pub(crate) fn value_assignable_to(
+        &mut self,
+        target_ty: &Type,
+        init_ty: &Type,
+        init_expr: Option<varn_core::ast::ExprId>,
+        bind: Option<&BindResult>,
+    ) -> bool {
+        if self.types_compatible_cached(target_ty, init_ty, bind) {
+            return true;
+        }
+        compat::expr_satisfies_target_type(
+            target_ty,
+            init_ty,
+            self.ast_arena,
+            init_expr,
+            &self.ty_table,
+            bind.map(|b| &b.interner),
+        )
+    }
+
+    /// Resolve an `Atom` that may have been minted by a sibling module bound
+    /// *after* `bind.interner` was snapshotted.
+    ///
+    /// During checking, on-demand nested binds (`module_bind`/`stdlib_bind`
+    /// inside member lookups, alias expansion, …) publish new atoms to the
+    /// resolver's live table. A `Type` built from such a module then carries
+    /// an `Atom` that `bind.interner` — frozen at the last resync — cannot
+    /// resolve, and a bare `resolve` would index out of bounds. The bind's
+    /// own table is the fast path; the resolver's live snapshot (same prefix
+    /// guarantee, so a hit is never wrong) is the fallback. Total miss degrades
+    /// to a `<stale:…>` marker that downstream lookups simply miss on, instead
+    /// of crashing the compiler.
+    pub(crate) fn resolve_bind_atom(
+        &self,
+        bind: &BindResult,
+        atom: varn_core::Atom,
+    ) -> Rc<str> {
+        if let Some(s) = bind.interner.try_resolve(atom) {
+            return Rc::from(s);
+        }
+        if let Some(s) = self.resolver.interner_snapshot().try_resolve(atom) {
+            return Rc::from(s);
+        }
+        Rc::from(format!("<stale:{atom:?}>"))
+    }
+
+    /// Decode a `Type` that came out of ANOTHER module's `BindResult`
+    /// (`type_members`, `class_methods`, enum members, …) into this checker's
+    /// own table.
+    ///
+    /// Those types were interned against the exporting module's
+    /// `CheckerTyTable`; this checker's table grew from a different snapshot
+    /// of the live table (see `set_ty_table`'s doc), so reading the id
+    /// directly answers with whatever shape happens to sit at that index here
+    /// — observed as a `Url.query` member typing as an unrelated `(...)=>int`
+    /// function. `CheckerTyTable::reintern` walks the foreign shape and
+    /// re-interns it locally.
+    ///
+    /// Portable ids (the ~21 intrinsics every table seeds identically) need
+    /// no translation, and an id past the exporter's table has no shape to
+    /// decode — both degrade honestly instead of indexing out of bounds.
+    pub(crate) fn reintern_foreign_ty(&mut self, bind: &BindResult, ty: Type) -> Type {
+        if ty.0.is_portable() || bind.ty_table.len() <= ty.0.index() as usize {
+            return ty;
+        }
+        let mut cache = FxHashMap::default();
+        let id = self.ty_table.reintern(&bind.ty_table, ty.0, &mut cache);
+        let ty = Type(id, ty.1);
+        // A member type written inside a class body (`tx: Sender<T>`) often
+        // carries no origin of its own; without one, later member lookups
+        // scan only the `std:` modules and miss the declaring `runtime:`
+        // module. The bind we are decoding from IS the declaring module, so
+        // stamp it as the origin when the shape has none.
+        if matches!(
+            self.ty_table.get(id),
+            varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
+        ) {
+            let origin = self.resolver.intern(bind.source_file.as_ref());
+            return ty.with_origin(origin, &mut self.ty_table);
+        }
+        ty
     }
 
     pub(crate) fn mark_infer_env_dirty(&mut self) {

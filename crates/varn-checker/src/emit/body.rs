@@ -2144,6 +2144,19 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::As { expression, .. } => {
                 let inner = self.lower_expr(*expression);
+                // `enumVal as int` means "this variant's raw value", not "the
+                // bits of the reference reinterpreted as an int" — the latter
+                // is what a bare `Cast` gives (it compiles to a `Move`,
+                // `ssa/emit/values.rs`), and a `Ref`-classed operand has no
+                // int bit pattern to reinterpret in the first place (the VM
+                // rejects the store outright once the destination register
+                // is genuinely `Gpr`). `.rawValue` is already how the
+                // language reads this value explicitly (`Status.Success.
+                // rawValue`); route the cast through the same lookup instead
+                // of inventing a second, narrower path to the same field.
+                if matches!(inner.ty, BackendTy::Enum(_)) && matches!(ty, BackendTy::Int) {
+                    return self.field_access(inner, Rc::from("rawValue"), ty, span);
+                }
                 return TirExpr {
                     kind: TirExprKind::Cast {
                         operand: Box::new(inner),
@@ -2654,6 +2667,145 @@ impl<'a> FnEmitter<'a> {
                 };
             }
 
+            ExprKind::Try { expression } => {
+                let inner = self.lower_expr(*expression);
+                let hoisted = self.hoist(inner);
+                let span = hoisted.span;
+
+                // Case 1: Enum (Result or Option)
+                if let BackendTy::Enum(eid) = hoisted.ty.non_nullable(self.tt) {
+                    if let Some(info) = self.m.enums.get(eid.0 as usize) {
+                        let is_err_res = info.variants.iter().find(|v| v.name.as_ref() == "Err");
+                        let is_ok_res = info.variants.iter().find(|v| v.name.as_ref() == "Ok");
+                        if let (Some(err_var), Some(ok_var)) = (is_err_res, is_ok_res) {
+                            let disc = TirExpr {
+                                kind: TirExprKind::Discriminant {
+                                    value: Box::new(hoisted.clone()),
+                                },
+                                ty: BackendTy::Int,
+                                res: Resolution::None,
+                                span,
+                            };
+                            let cond = TirExpr {
+                                kind: TirExprKind::Binary {
+                                    op: TirBinOp::Eq,
+                                    lhs: Box::new(disc),
+                                    rhs: Box::new(TirExpr {
+                                        kind: TirExprKind::IntLit(err_var.tag as i64),
+                                        ty: BackendTy::Int,
+                                        res: Resolution::None,
+                                        span,
+                                    }),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            };
+                            self.pending.push(TirStmt::If {
+                                cond,
+                                then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
+                                else_body: vec![],
+                            });
+                            return TirExpr {
+                                kind: TirExprKind::VariantPayload {
+                                    value: Box::new(hoisted),
+                                    tag: ok_var.tag,
+                                    field: 0,
+                                },
+                                ty,
+                                res: Resolution::EnumVariant {
+                                    enum_id: eid,
+                                    tag: ok_var.tag,
+                                },
+                                span,
+                            };
+                        }
+
+                        let is_none_opt = info.variants.iter().find(|v| v.name.as_ref() == "None");
+                        let is_some_opt = info.variants.iter().find(|v| v.name.as_ref() == "Some");
+                        if let (Some(none_var), Some(some_var)) = (is_none_opt, is_some_opt) {
+                            let disc = TirExpr {
+                                kind: TirExprKind::Discriminant {
+                                    value: Box::new(hoisted.clone()),
+                                },
+                                ty: BackendTy::Int,
+                                res: Resolution::None,
+                                span,
+                            };
+                            let cond = TirExpr {
+                                kind: TirExprKind::Binary {
+                                    op: TirBinOp::Eq,
+                                    lhs: Box::new(disc),
+                                    rhs: Box::new(TirExpr {
+                                        kind: TirExprKind::IntLit(none_var.tag as i64),
+                                        ty: BackendTy::Int,
+                                        res: Resolution::None,
+                                        span,
+                                    }),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            };
+                            self.pending.push(TirStmt::If {
+                                cond,
+                                then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
+                                else_body: vec![],
+                            });
+                            return TirExpr {
+                                kind: TirExprKind::VariantPayload {
+                                    value: Box::new(hoisted),
+                                    tag: some_var.tag,
+                                    field: 0,
+                                },
+                                ty,
+                                res: Resolution::EnumVariant {
+                                    enum_id: eid,
+                                    tag: some_var.tag,
+                                },
+                                span,
+                            };
+                        }
+                    }
+                }
+
+                // Case 2: Nullable type (T?)
+                if matches!(hoisted.ty, BackendTy::Nullable(_)) {
+                    let null_ty = BackendTy::Nullable(self.tt.intern(BackendTy::Never));
+                    let null_expr = TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: null_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                    let cond = TirExpr {
+                        kind: TirExprKind::Unary {
+                            op: TirUnOp::IsNull,
+                            operand: Box::new(hoisted.clone()),
+                        },
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
+                    self.pending.push(TirStmt::If {
+                        cond,
+                        then_body: vec![TirStmt::Return(Some(null_expr))],
+                        else_body: vec![],
+                    });
+                    let non_null_ty = hoisted.ty.non_nullable(self.tt);
+                    return TirExpr {
+                        kind: TirExprKind::Cast {
+                            operand: Box::new(hoisted),
+                        },
+                        ty: non_null_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+
+                return hoisted;
+            }
+
             _ => None,
         };
 
@@ -2683,6 +2835,48 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         let lhs = self.lower_expr(left);
         let rhs = self.lower_expr(right);
+
+        if op == BinaryOp::Eq || op == BinaryOp::NotEq {
+            let is_null_expr = |e: &TirExpr| -> bool {
+                matches!(e.kind, TirExprKind::NullLit)
+                    || e.ty.non_nullable(self.tt) == BackendTy::Never
+            };
+            let l_null = is_null_expr(&lhs);
+            let r_null = is_null_expr(&rhs);
+            if l_null || r_null {
+                let is_eq = op == BinaryOp::Eq;
+                if l_null && r_null {
+                    return TirExpr {
+                        kind: TirExprKind::BoolLit(is_eq),
+                        ty: BackendTy::Bool,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                let target = if r_null { lhs } else { rhs };
+                let is_null = TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::IsNull,
+                        operand: Box::new(target),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+                if is_eq {
+                    return is_null;
+                }
+                return TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::Not,
+                        operand: Box::new(is_null),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+        }
 
         let Some(top) = bin_op(op) else {
             if op == BinaryOp::Instanceof {
@@ -2761,6 +2955,43 @@ impl<'a> FnEmitter<'a> {
             };
             return (lhs, rhs, ty);
         }
+        if is_cmp && (l == BackendTy::Never || r == BackendTy::Never) {
+            return (lhs, rhs, BackendTy::Bool);
+        }
+        // Los ocho tipos numéricos angostos son, para efectos de qué OPCODE
+        // aritmético usar, la misma categoría que `Int`/`Float`: el checker
+        // ya lo decide así (`numeric_binary_type` en `binder/
+        // type_inference.rs` trata Int/I8/I16/I32/U8/U16/U32/U64 como una
+        // sola cosa, ídem Float/F32) — este lowering DEBE dar el mismo tipo
+        // de resultado, o `i8 + i16` cae en el `else { l }` de más abajo y
+        // castea SILENCIOSAMENTE el operando derecho al ancho del IZQUIERDO
+        // (`i16(1000) as i8` sin que el usuario lo haya pedido), reventando
+        // en runtime con "1000 no cabe en i8" sobre una suma que el checker
+        // ya había tipado como `int` sin restricción de ancho. Angostar el
+        // RESULTADO de vuelta sigue exigiendo el cast explícito de siempre
+        // (`(a + b) as i8`), que es donde el rango se verifica de verdad.
+        fn narrow_int_widened(bt: BackendTy) -> Option<BackendTy> {
+            matches!(
+                bt,
+                BackendTy::Int8
+                    | BackendTy::Int16
+                    | BackendTy::Int32
+                    | BackendTy::UInt8
+                    | BackendTy::UInt16
+                    | BackendTy::UInt32
+            )
+            .then_some(BackendTy::Int)
+        }
+        fn narrow_float_widened(bt: BackendTy) -> Option<BackendTy> {
+            matches!(bt, BackendTy::Float32).then_some(BackendTy::Float)
+        }
+        let l = narrow_int_widened(l)
+            .or_else(|| narrow_float_widened(l))
+            .unwrap_or(l);
+        let r = narrow_int_widened(r)
+            .or_else(|| narrow_float_widened(r))
+            .unwrap_or(r);
+
         if l == r {
             let ty = if is_cmp {
                 BackendTy::Bool

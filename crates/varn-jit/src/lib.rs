@@ -62,9 +62,11 @@ pub struct JitArrayLayout {
     /// Byte offset, from the `ArrayRepr` base (i.e. from payload RcBox + 16),
     /// of the `#[repr(C, u8)]` discriminant. `0` in practice; the inline fast
     /// paths load this byte and take the generic helper unless it is
-    /// `ArrayRepr::Boxed` (0). Before Task A.4 only Boxed arrays exist, so the
-    /// guard never fires — but it keeps the raw-`Vec` loads below sound the
-    /// moment typed reprs appear.
+    /// `ArrayRepr::Boxed` (0). `ArrayRepr` now also has `I64`/`F64` and 7
+    /// narrow-int/float variants (discriminants 1..9); the guard treats all
+    /// of them alike (anything non-zero takes the generic helper) and keeps
+    /// the raw-`Vec` loads below sound regardless of which typed repr shows
+    /// up at this offset.
     pub disc_off: usize,
     /// Byte offsets of (data ptr, len) of the element `Vec`, measured **from
     /// the `ArrayRepr` base** (payload RcBox + 16). They already include the

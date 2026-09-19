@@ -80,12 +80,16 @@ impl GeneratorDriver for NanGenDriver {
             if let Some(dest_reg) = inner.resume_dest.take() {
                 let input_nv = inner.ctx.heap.intern(input);
                 if let Some(frame) = inner.ctx.frames.last() {
-                    let slot = frame.base + dest_reg as usize;
-                    if slot < inner.ctx.stack.len() {
-                        inner.ctx.stack[slot] = input_nv;
-                    } else {
-                        inner.ctx.stack.resize(slot + 1, VmValue::null());
-                        inner.ctx.stack[slot] = input_nv;
+                    let base = frame.base;
+                    let nregs = frame.closure().proto.register_count as usize;
+                    inner.ctx.stack.ensure_frame_size(base, nregs);
+                    if (dest_reg as usize) < nregs {
+                        // No puede fallar en programas bien tipados; si el
+                        // input no encaja, el error sale como fallo del `next`.
+                        let _ = inner
+                            .ctx
+                            .stack
+                            .unbox_into_reg(base, dest_reg as usize, input_nv);
                     }
                 }
             }
@@ -144,8 +148,15 @@ impl GeneratorDriver for NanGenDriver {
     fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
         let inner = self.inner.borrow();
 
-        for &nv in &inner.ctx.stack {
+        // Solo DYN y REF son raíces: GPR/FPR nunca alojan heap por
+        // construcción y el colector ni los mira.
+        for &nv in &inner.ctx.stack.dyn_ {
             callback(nv);
+        }
+        for &h in &inner.ctx.stack.refs {
+            if h != crate::frame_store::REF_UNINIT {
+                callback(VmValue::from_heap_idx(h));
+            }
         }
 
         for frame in &inner.ctx.frames {
@@ -177,8 +188,21 @@ impl GeneratorDriver for NanGenDriver {
         let mut inner = self.inner.borrow_mut();
         let ctx = &mut *inner.ctx;
 
-        for nv in ctx.stack.iter_mut() {
+        for nv in ctx.stack.dyn_.iter_mut() {
             callback(nv);
+        }
+        // REF redondea por boxeo: el callback solo reescribe índices heap in
+        // place (forwarding del minor). Los UNINIT se saltan (no son raíces).
+        // GPR/FPR nunca se visitan.
+        for h in ctx.stack.refs.iter_mut() {
+            if *h == crate::frame_store::REF_UNINIT {
+                continue;
+            }
+            let mut tmp = VmValue::from_heap_idx(*h);
+            callback(&mut tmp);
+            if tmp.is_heap() {
+                *h = tmp.as_heap_idx();
+            }
         }
 
         // Closure constants are interned (old gen) and never hold nursery

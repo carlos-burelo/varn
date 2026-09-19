@@ -28,7 +28,7 @@ impl<'r> Checker<'r> {
 
         let obj_ty = self.infer_type(object, bind);
         let non_null = obj_ty.non_nullified(&mut self.ty_table);
-        if let Some(tn) = extension_type_name(&non_null, &self.ty_table, &bind.interner) {
+        if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
                     self.extension_set_members
@@ -90,7 +90,7 @@ impl<'r> Checker<'r> {
                         _ => None,
                     })
                 }
-                TypeKind::Array(_) => Some(Type::Int),
+                TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => Some(Type::Int),
                 _ => None,
             };
             if let Some(expected_k) = key_expected {
@@ -98,7 +98,7 @@ impl<'r> Checker<'r> {
                 let actual_k = self.infer_type(property, bind);
                 let is_range_slice = matches!(
                     check_kind,
-                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str)
+                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str | varn_core::TypeTag::Bytes)
                 ) && matches!(
                     self.ty_table.get(actual_k.0),
                     TypeKind::Intrinsic(varn_core::TypeTag::Range)
@@ -167,7 +167,7 @@ impl<'r> Checker<'r> {
             TypeKind::Intrinsic(varn_core::TypeTag::Never)
         );
 
-        if let Some(tn) = extension_type_name(&check_ty, &self.ty_table, &bind.interner) {
+        if let Some(tn) = extension_type_name(self, &check_ty, &self.ty_table, bind) {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name) {
                     self.extension_members
@@ -227,9 +227,9 @@ impl<'r> Checker<'r> {
             let check_kind = *self.ty_table.get(check_ty.0);
             let is_enum = matches!(check_kind, TypeKind::EnumVariant { .. })
                 || if let TypeKind::Named(n, _) = check_kind {
-                    let n_str = bind.interner.resolve(n);
+                    let n_str = self.resolve_bind_atom(bind, n);
                     bind.interner
-                        .get(n_str)
+                        .get(&n_str)
                         .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
                         .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
                         .unwrap_or(false)
@@ -263,7 +263,7 @@ impl<'r> Checker<'r> {
 
             let origin_module = match check_kind {
                 TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
-                    orig.map(|o| std::rc::Rc::from(bind.interner.resolve(o)))
+                    orig.map(|o| self.resolve_bind_atom(bind, o))
                 }
                 TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(match tag {
                     varn_core::TypeTag::Map => "core:map",
@@ -271,6 +271,7 @@ impl<'r> Checker<'r> {
                     varn_core::TypeTag::Range => "core:range",
                     varn_core::TypeTag::Array => "core:array",
                     varn_core::TypeTag::Str => "core:str",
+                    varn_core::TypeTag::Bytes => "core:bytes",
                     varn_core::TypeTag::TaskHandle => "core:task",
                     _ => "core:primitives",
                 })),
@@ -294,7 +295,7 @@ impl<'r> Checker<'r> {
         let obj_kind = *self.ty_table.get(obj_ty.0);
         let class_name = match obj_kind {
             TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
-                Some(bind.interner.resolve(n).to_string())
+                Some(self.resolve_bind_atom(bind, n).to_string())
             }
             _ => None,
         };
@@ -352,12 +353,15 @@ impl<'r> Checker<'r> {
 }
 
 pub(crate) fn extension_type_name(
+    checker: &Checker,
     ty: &Type,
     table: &crate::types::CheckerTyTable,
-    interner: &varn_core::AtomInterner,
+    bind: &BindResult,
 ) -> Option<std::rc::Rc<str>> {
     match table.get(ty.0) {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(std::rc::Rc::from(interner.resolve(*n))),
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
+            Some(checker.resolve_bind_atom(bind, *n))
+        }
         TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(tag.name())),
         _ => None,
     }

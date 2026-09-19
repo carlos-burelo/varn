@@ -96,6 +96,7 @@ pub(crate) fn apply_kinds(
         | OpCode::AddImm
         | OpCode::SubImm
         | OpCode::ModInt
+        | OpCode::GetEnumTag
         | OpCode::ArrayLength => state[dest] = K::Int,
         // An int literal into a float-typed sink loads as an unboxed f64
         // (`def_const_int` branches on the same meta).
@@ -208,7 +209,6 @@ pub(crate) fn apply_kinds(
         | OpCode::BuildStr
         | OpCode::MakeEnumVariant
         | OpCode::CallNativeOp
-        | OpCode::GetEnumTag
         | OpCode::Add
         | OpCode::Sub
         | OpCode::Mul

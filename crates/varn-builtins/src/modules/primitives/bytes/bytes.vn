@@ -1,0 +1,16 @@
+export declare class Bytes {
+    readonly length: int;
+
+    getByte(index: int): int;
+    setByte(index: int, value: int): void;
+    slice(start?: int, end?: int): Bytes;
+    toString(): str;
+    toHex(): str;
+    toBase64(): str;
+    fill(value: int, start?: int, end?: int): Bytes;
+    copy(target: Bytes, targetStart?: int, sourceStart?: int, sourceEnd?: int): int;
+
+    static alloc(size: int): Bytes;
+    static fromString(s: str): Bytes;
+    static fromBytes(bytes: int[]): Bytes;
+}

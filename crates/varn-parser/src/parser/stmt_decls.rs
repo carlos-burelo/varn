@@ -64,14 +64,12 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Interface(decl)))))
         }
         TokenKind::Type => {
-            let mut decl = match super::decls::parse_sum_type_or_alias(s) {
+            let mut decl = match super::decls::parse_type_alias_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            match &mut decl {
-                Decl::TypeAlias(d) => d.doc = s.current_doc(),
-                Decl::SumType(d) => d.doc = s.current_doc(),
-                _ => {}
+            if let Decl::TypeAlias(d) = &mut decl {
+                d.doc = s.current_doc();
             }
             let range = *decl.range();
             Ok(s.stmt(range, StmtKind::Decl(Box::new(decl))))

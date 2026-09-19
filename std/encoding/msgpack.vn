@@ -1,0 +1,386 @@
+// MessagePack binary serialization for Varn (RFC / Official MsgPack Specification)
+
+class ByteWriter {
+    buf: Bytes;
+    pos: int = 0;
+
+    constructor(initialCap: int = 256) {
+        this.buf = Bytes.alloc(initialCap);
+    }
+
+    private ensure(needed: int): void {
+        if (this.pos + needed > this.buf.length) {
+            let nextCap = (this.buf.length * 2) + needed;
+            let next = Bytes.alloc(nextCap);
+            this.buf.copy(next, 0, 0, this.pos);
+            this.buf = next;
+        }
+    }
+
+    writeU8(b: int): void {
+        this.ensure(1);
+        this.buf.setByte(this.pos, b & 0xFF);
+        this.pos = this.pos + 1;
+    }
+
+    writeU16(val: int): void {
+        this.ensure(2);
+        this.buf.setByte(this.pos, (val >> 8) & 0xFF);
+        this.buf.setByte(this.pos + 1, val & 0xFF);
+        this.pos = this.pos + 2;
+    }
+
+    writeU32(val: int): void {
+        this.ensure(4);
+        this.buf.setByte(this.pos, (val >> 24) & 0xFF);
+        this.buf.setByte(this.pos + 1, (val >> 16) & 0xFF);
+        this.buf.setByte(this.pos + 2, (val >> 8) & 0xFF);
+        this.buf.setByte(this.pos + 3, val & 0xFF);
+        this.pos = this.pos + 4;
+    }
+
+    writeI64(val: int): void {
+        this.ensure(8);
+        for (let i = 7; i >= 0; i = i - 1) {
+            this.buf.setByte(this.pos + (7 - i), (val >> (i * 8)) & 0xFF);
+        }
+        this.pos = this.pos + 8;
+    }
+
+    writeBytes(b: Bytes): void {
+        this.ensure(b.length);
+        b.copy(this.buf, this.pos, 0, b.length);
+        this.pos = this.pos + b.length;
+    }
+
+    toBytes(): Bytes {
+        return this.buf.slice(0, this.pos);
+    }
+}
+
+class ByteReader {
+    buf: Bytes;
+    pos: int = 0;
+
+    constructor(buf: Bytes) {
+        this.buf = buf;
+    }
+
+    readU8(): int {
+        if (this.pos >= this.buf.length) throw new Error("MsgPack: unexpected EOF");
+        let b = this.buf.getByte(this.pos);
+        this.pos = this.pos + 1;
+        return b;
+    }
+
+    readU16(): int {
+        let b1 = this.readU8();
+        let b2 = this.readU8();
+        return (b1 << 8) | b2;
+    }
+
+    readU32(): int {
+        let b1 = this.readU8();
+        let b2 = this.readU8();
+        let b3 = this.readU8();
+        let b4 = this.readU8();
+        return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4;
+    }
+
+    readI64(): int {
+        let val = 0;
+        for (let i = 0; i < 8; i = i + 1) {
+            val = (val << 8) | this.readU8();
+        }
+        return val;
+    }
+
+    readBytes(len: int): Bytes {
+        if (this.pos + len > this.buf.length) throw new Error("MsgPack: unexpected EOF reading bytes");
+        let slice = this.buf.slice(this.pos, this.pos + len);
+        this.pos = this.pos + len;
+        return slice;
+    }
+}
+
+function encodeValue(w: ByteWriter, val: dynamic): void {
+    if (val === null) {
+        w.writeU8(0xC0);
+        return;
+    }
+
+    let t = typeof val;
+
+    if (t === "bool") {
+        w.writeU8((val as bool) ? 0xC3 : 0xC2);
+        return;
+    }
+
+    if (t === "int") {
+        let n = val as int;
+        if (n >= 0 && n <= 127) {
+            w.writeU8(n);
+        } else if (n < 0 && n >= -32) {
+            w.writeU8(0xE0 | (n & 0x1F));
+        } else if (n >= 0 && n <= 255) {
+            w.writeU8(0xCC);
+            w.writeU8(n);
+        } else if (n >= 0 && n <= 65535) {
+            w.writeU8(0xCD);
+            w.writeU16(n);
+        } else if (n >= 0 && n <= 4294967295) {
+            w.writeU8(0xCE);
+            w.writeU32(n);
+        } else if (n >= -128 && n < 0) {
+            w.writeU8(0xD0);
+            w.writeU8(n & 0xFF);
+        } else if (n >= -32768 && n < 0) {
+            w.writeU8(0xD1);
+            w.writeU16(n & 0xFFFF);
+        } else if (n >= -2147483648 && n < 0) {
+            w.writeU8(0xD2);
+            w.writeU32(n & 0xFFFFFFFF);
+        } else {
+            w.writeU8(0xD3);
+            w.writeI64(n);
+        }
+        return;
+    }
+
+    if (t === "str") {
+        let raw = Bytes.fromString(val as str);
+        let len = raw.length;
+        if (len <= 31) {
+            w.writeU8(0xA0 | len);
+        } else if (len <= 255) {
+            w.writeU8(0xD9);
+            w.writeU8(len);
+        } else if (len <= 65535) {
+            w.writeU8(0xDA);
+            w.writeU16(len);
+        } else {
+            w.writeU8(0xDB);
+            w.writeU32(len);
+        }
+        w.writeBytes(raw);
+        return;
+    }
+
+    if (t === "Bytes") {
+        let b = val as Bytes;
+        let len = b.length;
+        if (len <= 255) {
+            w.writeU8(0xC4);
+            w.writeU8(len);
+        } else if (len <= 65535) {
+            w.writeU8(0xC5);
+            w.writeU16(len);
+        } else {
+            w.writeU8(0xC6);
+            w.writeU32(len);
+        }
+        w.writeBytes(b);
+        return;
+    }
+
+    if (t === "Array" || Array.isArray(val)) {
+        let arr = val as dynamic[];
+        let len = arr.length;
+        if (len <= 15) {
+            w.writeU8(0x90 | len);
+        } else if (len <= 65535) {
+            w.writeU8(0xDC);
+            w.writeU16(len);
+        } else {
+            w.writeU8(0xDD);
+            w.writeU32(len);
+        }
+        for (let el of arr) {
+            encodeValue(w, el);
+        }
+        return;
+    }
+
+    if (t === "object" || t === "record") {
+        let obj = val as { [key: str]: dynamic };
+        let keys: str[] = [];
+        for (let k in obj) {
+            keys.push(k);
+        }
+        let len = keys.length;
+        if (len <= 15) {
+            w.writeU8(0x80 | len);
+        } else if (len <= 65535) {
+            w.writeU8(0xDE);
+            w.writeU16(len);
+        } else {
+            w.writeU8(0xDF);
+            w.writeU32(len);
+        }
+        for (let k of keys) {
+            encodeValue(w, k);
+            encodeValue(w, obj[k]);
+        }
+        return;
+    }
+
+    throw new Error(`MsgPack: unsupported type '${t}'`);
+}
+
+function decodeValue(r: ByteReader): dynamic {
+    let tag = r.readU8();
+
+    // Positive fixint (0x00 - 0x7f)
+    if (tag <= 0x7F) {
+        return tag;
+    }
+
+    // Negative fixint (0xe0 - 0xff)
+    if (tag >= 0xE0) {
+        return tag - 256;
+    }
+
+    // Fixmap (0x80 - 0x8f)
+    if ((tag & 0xF0) === 0x80) {
+        let len = tag & 0x0F;
+        let map: { [key: str]: dynamic } = {};
+        for (let i = 0; i < len; i = i + 1) {
+            let k = decodeValue(r) as str;
+            let v = decodeValue(r);
+            map[k] = v;
+        }
+        return map;
+    }
+
+    // Fixarray (0x90 - 0x9f)
+    if ((tag & 0xF0) === 0x90) {
+        let len = tag & 0x0F;
+        let arr: dynamic[] = [];
+        for (let i = 0; i < len; i = i + 1) {
+            arr.push(decodeValue(r));
+        }
+        return arr;
+    }
+
+    // Fixstr (0xa0 - 0xbf)
+    if ((tag & 0xE0) === 0xA0) {
+        let len = tag & 0x1F;
+        let b = r.readBytes(len);
+        return b.toString();
+    }
+
+    // Null
+    if (tag === 0xC0) {
+        return null;
+    }
+
+    // Boolean
+    if (tag === 0xC2) return false;
+    if (tag === 0xC3) return true;
+
+    // Bin 8, 16, 32
+    if (tag === 0xC4) {
+        let len = r.readU8();
+        return r.readBytes(len);
+    }
+    if (tag === 0xC5) {
+        let len = r.readU16();
+        return r.readBytes(len);
+    }
+    if (tag === 0xC6) {
+        let len = r.readU32();
+        return r.readBytes(len);
+    }
+
+    // Unsigned ints
+    if (tag === 0xCC) return r.readU8();
+    if (tag === 0xCD) return r.readU16();
+    if (tag === 0xCE) return r.readU32();
+    if (tag === 0xCF) return r.readI64();
+
+    // Signed ints
+    if (tag === 0xD0) {
+        let v = r.readU8();
+        return v >= 128 ? v - 256 : v;
+    }
+    if (tag === 0xD1) {
+        let v = r.readU16();
+        return v >= 32768 ? v - 65536 : v;
+    }
+    if (tag === 0xD2) {
+        let v = r.readU32();
+        return v >= 2147483648 ? v - 4294967296 : v;
+    }
+    if (tag === 0xD3) {
+        return r.readI64();
+    }
+
+    // Strings 8, 16, 32
+    if (tag === 0xD9) {
+        let len = r.readU8();
+        return r.readBytes(len).toString();
+    }
+    if (tag === 0xDA) {
+        let len = r.readU16();
+        return r.readBytes(len).toString();
+    }
+    if (tag === 0xDB) {
+        let len = r.readU32();
+        return r.readBytes(len).toString();
+    }
+
+    // Array 16, 32
+    if (tag === 0xDC) {
+        let len = r.readU16();
+        let arr: dynamic[] = [];
+        for (let i = 0; i < len; i = i + 1) {
+            arr.push(decodeValue(r));
+        }
+        return arr;
+    }
+    if (tag === 0xDD) {
+        let len = r.readU32();
+        let arr: dynamic[] = [];
+        for (let i = 0; i < len; i = i + 1) {
+            arr.push(decodeValue(r));
+        }
+        return arr;
+    }
+
+    // Map 16, 32
+    if (tag === 0xDE) {
+        let len = r.readU16();
+        let map: { [key: str]: dynamic } = {};
+        for (let i = 0; i < len; i = i + 1) {
+            let k = decodeValue(r) as str;
+            let v = decodeValue(r);
+            map[k] = v;
+        }
+        return map;
+    }
+    if (tag === 0xDF) {
+        let len = r.readU32();
+        let map: { [key: str]: dynamic } = {};
+        for (let i = 0; i < len; i = i + 1) {
+            let k = decodeValue(r) as str;
+            let v = decodeValue(r);
+            map[k] = v;
+        }
+        return map;
+    }
+
+    throw new Error("MsgPack: unknown tag 0x" + tag.toHex());
+}
+
+export namespace MsgPack {
+    export function encode(val: dynamic): Bytes {
+        let w = new ByteWriter();
+        encodeValue(w, val);
+        return w.toBytes();
+    }
+
+    export function decode<T = dynamic>(buf: Bytes): T {
+        let r = new ByteReader(buf);
+        return decodeValue(r) as T;
+    }
+}

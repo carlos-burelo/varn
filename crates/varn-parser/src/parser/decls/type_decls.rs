@@ -135,7 +135,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
     })
 }
 
-pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
+pub fn parse_type_alias_decl(s: &mut TokenStream) -> Result<Decl, String> {
     let range = s.range();
     s.expect(TokenKind::Type)?;
     let id = s.expect_id()?;
@@ -147,11 +147,6 @@ pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
     };
 
     s.expect(TokenKind::Eq)?;
-
-    if s.check(TokenKind::Pipe) {
-        let decl = parse_sum_type_body(id, type_params, range, s)?;
-        return Ok(Decl::SumType(decl));
-    }
 
     let alias = parse_type(s)?;
     s.eat_semicolon();

@@ -1,36 +1,60 @@
 import {
     open$,
     readFd$,
+    readFdBytes$,
     writeFd$,
+    writeFdBytes$,
     seek$,
     close$
 } from "runtime:fs";
 
-import { Writer } from "std:io";
+import { Writer, AsyncReader, AsyncWriter } from "std:io";
 
 export class File {
     private _fd: int;
     private _path: str;
     private _mode: str;
 
-    constructor(fd: int, path: str, mode: str) {
-        this._fd = fd;
+    constructor(path: str, mode: str = "r") {
+        this._fd = open$(path, mode);
         this._path = path;
         this._mode = mode;
     }
 
     static open(path: str, mode: str): File {
-        let fd = open$(path, mode);
-        return new File(fd, path, mode);
+        return new File(path, mode);
     }
 
     write(content: str): int {
         return writeFd$(this._fd, content);
     }
 
+    writeBytes(data: Bytes): int {
+        return writeFdBytes$(this._fd, data);
+    }
+
+    append(content: str): int {
+        let fd = open$(this._path, "a");
+        let written = writeFd$(fd, content);
+        close$(fd);
+        return written;
+    }
+
+    appendBytes(data: Bytes): int {
+        let fd = open$(this._path, "a");
+        let written = writeFdBytes$(fd, data);
+        close$(fd);
+        return written;
+    }
+
     read(size?: int): str {
         let readSize = size ?? 4096;
         return readFd$(this._fd, readSize);
+    }
+
+    readBytes(size?: int): Bytes {
+        let readSize = size ?? 4096;
+        return readFdBytes$(this._fd, readSize);
     }
 
     readAll(): str {
@@ -69,5 +93,44 @@ export class File {
 
     dispose(): void {
         this.close();
+    }
+
+    stream(): FileStream {
+        return new FileStream(this._path, this._mode);
+    }
+}
+
+export class FileStream implements AsyncReader, AsyncWriter {
+    private _fd: int;
+    private _path: str;
+    private _mode: str;
+
+    constructor(path: str, mode: str = "r") {
+        this._fd = open$(path, mode);
+        this._path = path;
+        this._mode = mode;
+    }
+
+    static open(path: str, mode: str): FileStream {
+        return new FileStream(path, mode);
+    }
+
+    async read(size?: int): Task<Bytes?> {
+        let readSize = size ?? 8192;
+        let b = readFdBytes$(this._fd, readSize);
+        if (b.length === 0) {
+            return null;
+        }
+        return b;
+    }
+
+    async write(data: Bytes): Task<int> {
+        return writeFdBytes$(this._fd, data);
+    }
+
+    async flush(): Task<void> {}
+
+    close(): void {
+        close$(this._fd);
     }
 }

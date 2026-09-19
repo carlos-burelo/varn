@@ -12,7 +12,7 @@ export declare class Array<T> {
     filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
     find(predicate: (item: T, index: int, array: T[]) => bool): T?;
     findIndex(predicate: (item: T, index: int, array: T[]) => bool): int;
-    flat(depth?: int): T[];
+    flat(depth?: int): dynamic[];
     flatMap<U>(callback: (item: T, index: int, array: T[]) => U[]): U[];
     forEach(callback: (item: T, index: int, array: T[]) => void): void;
     map<U>(callback: (item: T, index: int, array: T[]) => U): U[];

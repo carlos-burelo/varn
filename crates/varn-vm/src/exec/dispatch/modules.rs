@@ -28,7 +28,7 @@ impl ExecCtx {
             return Ok(());
         }
         let base = self.frames[frame_idx].base;
-        self.stack[base + dest_reg] = module_nv;
+        self.stack.unbox_into_reg(base, dest_reg, module_nv)?;
         Ok(())
     }
 
@@ -47,7 +47,7 @@ impl ExecCtx {
         *ip += 1;
 
         let base = self.frames[frame_idx].base;
-        let module_val = self.stack[base + src_reg];
+        let module_val = self.stack.box_reg(base, src_reg);
         if !module_val.is_heap() {
             return Err(crate::error::RuntimeError::new(format!(
                 "OpLoadModuleSlot: target is not a module object: {:?}",
@@ -57,7 +57,7 @@ impl ExecCtx {
 
         if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get(module_val.as_heap_idx()) {
             if let Some(val) = m.get_slot(slot_idx) {
-                self.stack[base + dest_reg] = val;
+                self.stack.unbox_into_reg(base, dest_reg, val)?;
             } else {
                 return Err(crate::error::RuntimeError::new(format!(
                     "OpLoadModuleSlot: slot {} out of bounds for module {}",
@@ -87,7 +87,7 @@ impl ExecCtx {
         *ip += 1;
 
         let base = self.frames[frame_idx].base;
-        let val_nv = self.stack[base + val_reg];
+        let val_nv = self.stack.box_reg(base, val_reg);
 
         let exports_nv = if let Some(nv) = self.module_exports.get(&frame_idx).copied() {
             nv

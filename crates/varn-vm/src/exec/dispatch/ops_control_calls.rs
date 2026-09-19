@@ -25,6 +25,9 @@ impl ExecCtx {
         if self.settings.no_jit {
             return false;
         }
+        if crate::jit::tiering::FRAME_LAYOUT_V2_JIT_BAIL {
+            return false;
+        }
         let proto = &closure.proto;
         let n = proto.backedge_count.get().wrapping_add(1);
         if n < VmClosure::osr_backedge_threshold() {
@@ -114,7 +117,7 @@ impl ExecCtx {
             OpCode::JumpIfFalse => {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
-                let cond = self.stack[base + first_reg];
+                let cond = self.stack.box_reg(base, first_reg);
                 if !cond.is_truthy() {
                     *ip += offset;
                 }
@@ -123,7 +126,7 @@ impl ExecCtx {
             OpCode::JumpIfTrue => {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
-                let cond = self.stack[base + first_reg];
+                let cond = self.stack.box_reg(base, first_reg);
                 if cond.is_truthy() {
                     *ip += offset;
                 }
@@ -132,7 +135,7 @@ impl ExecCtx {
             OpCode::Return => {
                 let w1 = code[*ip];
                 let src = lo(w1);
-                let res = self.reg_return(base, src);
+                let res = self.reg_return(base, src)?;
                 if self.frames.len() == depth {
                     Ok(Some(ControlCallFlow::Return(res)))
                 } else {
@@ -147,7 +150,7 @@ impl ExecCtx {
                 let (dest, callee_reg) = (hi(w1), lo(w1));
                 let (arg_count, arg_start) = (hi(w2), lo(w2));
                 self.frames[frame_idx].ip = *ip;
-                let callee = self.stack[base + callee_reg];
+                let callee = self.stack.box_reg(base, callee_reg);
                 let jumped =
                     self.exec_call_reg(callee, base, arg_start, arg_count, dest, frame_idx)?;
                 if jumped {
@@ -184,7 +187,7 @@ impl ExecCtx {
                 let (dest, obj_reg) = (hi(w1), lo(w1));
                 let (arg_count, arg_start) = (hi(w3), lo(w3));
                 self.frames[frame_idx].ip = *ip;
-                let this_val = self.stack[base + obj_reg];
+                let this_val = self.stack.box_reg(base, obj_reg);
                 let jumped = self.exec_call_method_reg(
                     this_val, base, name_idx, cs, arg_start, arg_count, dest, frame_idx, closure,
                 )?;
@@ -205,7 +208,7 @@ impl ExecCtx {
                 let (dest, this_reg) = (hi(w1), lo(w1));
                 let (arg_count, arg_start) = (hi(w3), lo(w3));
                 self.frames[frame_idx].ip = *ip;
-                let this_val = self.stack[base + this_reg];
+                let this_val = self.stack.box_reg(base, this_reg);
                 let jumped = self.exec_call_method_reg(
                     this_val, base, name_idx, first_reg, arg_start, arg_count, dest, frame_idx,
                     closure,
@@ -225,7 +228,7 @@ impl ExecCtx {
                 let (dest, callee_reg) = (hi(w1), lo(w1));
                 let (arg_count, arg_start) = (hi(w2), lo(w2));
                 self.frames[frame_idx].ip = *ip;
-                let callee = self.stack[base + callee_reg];
+                let callee = self.stack.box_reg(base, callee_reg);
                 let jumped =
                     self.exec_call_spread_reg(callee, base, arg_start, arg_count, dest, frame_idx)?;
                 if jumped {

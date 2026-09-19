@@ -9,9 +9,14 @@ export declare function decodeURIComponent$(value: str): str;
 export declare function tcpListen$(port: int): int;
 export declare function tcpAccept$(listenerId: int): Task<int>;
 export declare function tcpConnect$(host: str, port: int): Task<int>;
-export declare function tcpRead$(connId: int, len: int): Task<str>;
-export declare function tcpWrite$(connId: int, data: str): Task<int>;
+export declare function tcpRead$(connId: int, len: int): Task<Bytes?>;
+export declare function tcpWrite$(connId: int, data: Bytes | str): Task<int>;
 export declare function tcpClose$(connId: int): void;
 export declare function tcpCloseListener$(listenerId: int): void;
 export declare function parseHttpRequest$(raw: str): dynamic;
 export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: dynamic, body: str): Task<int>;
+
+export declare function udpBind$(host: str, port: int): int;
+export declare function udpSendTo$(socketId: int, host: str, port: int, data: Bytes | str): int;
+export declare function udpRecvFrom$(socketId: int, maxLen: int): Task<[Bytes, str, int]?>;
+export declare function udpClose$(socketId: int): void;

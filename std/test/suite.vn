@@ -53,21 +53,18 @@ export function suite(suiteName: str, body: () => void): void {
     describe(suiteName, body);
 }
 
-export function test(testName: str, body: dynamic): void {
+export function test(testName: str, body: () => void): void {
     try {
         for (let fn of beforeEachFns) fn();
         body();
         for (let fn of afterEachFns) fn();
         logLine("  ✔ " + testName);
     } catch (err) {
-        let errStr = (typeof err === "object" && err != null && (err as dynamic).message)
-            ? (err as dynamic).name + ": " + (err as dynamic).message
-            : "" + err;
-        logLine("  ✖ " + testName + ": " + errStr);
+        logLine("  ✖ " + testName + ": " + err);
         throw err;
     }
 }
 
-export function it(testName: str, body: dynamic): void {
+export function it(testName: str, body: () => void): void {
     test(testName, body);
 }

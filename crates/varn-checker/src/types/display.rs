@@ -36,8 +36,16 @@ impl<'t> TypeDisplay<'t> {
         }
     }
 
-    fn name(&self, atom: varn_core::Atom) -> &'t str {
-        self.interner.resolve(atom)
+    /// Never panics on cross-module staleness: a `Named`/`Generic` name minted
+    /// by a sibling module after this view's interner was snapshotted has no
+    /// text in this table. Diagnostics must degrade, not crash the compiler —
+    /// the `<stale:Atom(N)>` marker names the dangling id so the resync gap
+    /// stays visible instead of silently printing a wrong name.
+    fn name(&self, atom: varn_core::Atom) -> std::borrow::Cow<'t, str> {
+        match self.interner.try_resolve(atom) {
+            Some(s) => std::borrow::Cow::Borrowed(s),
+            None => std::borrow::Cow::Owned(format!("<stale:{atom:?}>")),
+        }
     }
 }
 

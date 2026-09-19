@@ -355,6 +355,23 @@ impl<'r> Checker<'r> {
                 }
                 ty
             }
+            ExprKind::Try { expression } => {
+                let ty = self.infer_type(*expression, bind);
+                match *self.ty_table.get(ty.0) {
+                    TypeKind::Generic(name, args_list, _)
+                        if (bind.interner.resolve(name) == "Result"
+                            || bind.interner.resolve(name) == "Option") =>
+                    {
+                        let ids = self.ty_table.get_list(args_list).to_vec();
+                        match ids.first() {
+                            Some(first) => Type(*first, false),
+                            None => Type::Dynamic,
+                        }
+                    }
+                    _ if ty.is_nullable(&self.ty_table) => ty.non_nullified(&mut self.ty_table),
+                    _ => Type::Dynamic,
+                }
+            }
             ExprKind::Logical { op, left, right } => {
                 let (op, left, right) = (*op, *left, *right);
                 let l_ty = self.infer_type(left, bind);
@@ -534,11 +551,17 @@ impl<'r> Checker<'r> {
         match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type(inner, false),
             TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => Type::Str,
+            TypeKind::Intrinsic(TypeTag::Bytes) if prop_ty.is_int() => Type::Int,
             TypeKind::Named(name, _)
                 if prop_ty.is_int()
                     && bind.interner.get(IntrinsicType::Str.as_str()) == Some(name) =>
             {
                 Type::Str
+            }
+            TypeKind::Named(name, _)
+                if bind.interner.get(IntrinsicType::Bytes.as_str()) == Some(name) && prop_ty.is_int() =>
+            {
+                Type::Int
             }
             TypeKind::Generic(name, args, _)
                 if bind.interner.get(IntrinsicType::Map.as_str()) == Some(name) =>

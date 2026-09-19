@@ -53,6 +53,7 @@ Thumbs.db
 # Env y temporales
 .env
 .env.*
+!.env.example
 *.log
 *.tmp
 *.bak

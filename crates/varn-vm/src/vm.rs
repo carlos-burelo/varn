@@ -56,10 +56,14 @@ impl Vm {
             .iter()
             .map(|uv| {
                 let inner = uv.inner.borrow();
+                // `location` nunca es `Some` en el workspace (campo a futuro
+                // del tipo transfronterizo): el upvalue entra cerrado. Con el
+                // frame por clases no hay índice lineal que heredar de todos
+                // modos (`SlotAddr` pertenece a un almacén concreto).
                 VmUpvalue {
                     inner: Rc::new(RefCell::new(VmUpvalueInner {
                         value: self.ctx.heap.intern(inner.value.clone()),
-                        stack_slot: inner.location,
+                        stack_slot: None,
                     })),
                 }
             })
@@ -160,14 +164,17 @@ impl Vm {
     }
 
     pub fn collect_gc(&mut self) -> usize {
-        let mut roots: Vec<u32> = self
-            .ctx
-            .stack
-            .iter()
-            .chain(self.ctx.globals.values.iter())
-            .filter(|v| v.is_heap())
-            .map(|v| v.as_heap_idx())
-            .collect();
+        let mut roots: Vec<u32> = Vec::new();
+        let (dyn_len, ref_len) = (self.ctx.stack.dyn_.len(), self.ctx.stack.refs.len());
+        self.ctx.stack.collect_roots(dyn_len, ref_len, &mut roots);
+        roots.extend(
+            self.ctx
+                .globals
+                .values
+                .iter()
+                .filter(|v| v.is_heap())
+                .map(|v| v.as_heap_idx()),
+        );
         for v in self.ctx.modules.values() {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());

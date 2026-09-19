@@ -8,6 +8,73 @@ use super::type_resolution::resolve_type_node;
 use crate::types::{CheckerTyTable, FunctionType, ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
+/// Resolve `atom` to owned text without panicking when it was minted by a
+/// sibling module after this context's interner snapshot: the context table
+/// first, the resolver's live table as fallback, `None` when neither knows
+/// it (callers degrade to `Dynamic`/no-match instead of crashing).
+fn ctx_resolve_text(
+    ctx: Option<&dyn crate::types::TypeContext>,
+    atom: varn_core::Atom,
+) -> Option<String> {
+    let c = ctx?;
+    if let Some(i) = c.interner() {
+        if let Some(s) = i.try_resolve(atom) {
+            return Some(s.to_string());
+        }
+    }
+    c.resolver()?
+        .interner_snapshot()
+        .try_resolve(atom)
+        .map(|s| s.to_string())
+}
+
+/// Decode a member type returned by `TypeContext::get_class_members` (and
+/// friends) into `table` when it came from another module.
+///
+/// The member tables belong to the bind of the module that DECLARES the
+/// class, so their `Type`s carry that module's `CheckerTyTable` ids. Reading
+/// one against the current table answers with whatever shape sits at that
+/// index here — observed as `Channel<T>.tx` typing as an unrelated function
+/// and then `Sender<int>.send` "not existing". `CheckerTyTable::reintern`
+/// walks and re-interns the foreign shape locally; portable ids and
+/// unreachable/degenerate sources pass through unchanged.
+fn reintern_member_type(
+    ctx: Option<&dyn crate::types::TypeContext>,
+    origin: Option<&str>,
+    ty: Type,
+    table: &mut CheckerTyTable,
+) -> Type {
+    let Some(ctx) = ctx else { return ty };
+    if ty.0.is_portable() {
+        return ty;
+    }
+    let Some(origin) = origin else { return ty };
+    if ctx.source_file().is_some_and(|s| s == origin) {
+        return ty;
+    }
+    let Some(resolver) = ctx.resolver() else { return ty };
+    let Some(b) = resolver
+        .stdlib_bind(origin)
+        .or_else(|| resolver.module_bind(origin))
+    else {
+        return ty;
+    };
+    if b.ty_table.len() <= ty.0.index() as usize {
+        return ty;
+    }
+    let mut cache = rustc_hash::FxHashMap::default();
+    let id = table.reintern(&b.ty_table, ty.0, &mut cache);
+    let ty = Type(id, ty.1);
+    if matches!(
+        table.get(id),
+        varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
+    ) {
+        let origin = resolver.intern(b.source_file.as_ref());
+        return ty.with_origin(origin, table);
+    }
+    ty
+}
+
 pub fn infer_expr_type(
     id: ExprId,
     arena: &AstArena,
@@ -34,8 +101,7 @@ pub fn infer_expr_type(
                 TypeKind::Generic(name, args, _)
                     if ctx
                         .and_then(|c| c.interner())
-                        .map(|i| i.resolve(*name) == varn_core::IntrinsicType::Task.as_str())
-                        .unwrap_or(false)
+                        .is_some_and(|i| i.get(varn_core::IntrinsicType::Task.as_str()) == Some(*name))
                         && table.get_list(*args).len() == 1 =>
                 {
                     Type(table.get_list(*args)[0], false)
@@ -44,6 +110,25 @@ pub fn infer_expr_type(
             }
         }
         ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx, table),
+        ExprKind::Try { expression } => {
+            let inner = infer_expr_type(*expression, arena, ctx, table);
+            let ok_first = match table.get(inner.0) {
+                TypeKind::Generic(name, args, _)
+                    if ctx_resolve_text(ctx, *name)
+                        .is_some_and(|n| n == "Result" || n == "Option") =>
+                {
+                    table.get_list(*args).first().copied()
+                }
+                _ => None,
+            };
+            if let Some(id) = ok_first {
+                Type(id, false)
+            } else if inner.is_nullable(table) {
+                inner.non_nullified(table)
+            } else {
+                inner
+            }
+        }
         ExprKind::Logical {
             op, left, right, ..
         } => match op {
@@ -183,16 +268,14 @@ fn infer_member(
             TypeKind::Named(name, _)
                 if ctx
                     .and_then(|c| c.interner())
-                    .map(|i| i.resolve(name) == varn_core::IntrinsicType::Str.as_str())
-                    .unwrap_or(false) =>
+                    .is_some_and(|i| i.get(varn_core::IntrinsicType::Str.as_str()) == Some(name)) =>
             {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
                 if ctx
                     .and_then(|c| c.interner())
-                    .map(|i| i.resolve(name) == varn_core::IntrinsicType::Map.as_str())
-                    .unwrap_or(false) =>
+                    .is_some_and(|i| i.get(varn_core::IntrinsicType::Map.as_str()) == Some(name)) =>
             {
                 let arg_ids = table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
@@ -227,9 +310,13 @@ fn infer_member(
         let prop_name = interner.resolve(prop_name_atom);
         match table.get(obj_ty.0).clone() {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
-                let name_str = interner.resolve(name);
-                let origin_str = origin.map(|o| interner.resolve(o));
-                if let Some(variants) = ctx.get_enum_members(name_str, origin_str) {
+                let Some(name_str) = ctx_resolve_text(Some(ctx), name) else {
+                    return Type::Dynamic;
+                };
+                let origin_str = origin.and_then(|o| ctx_resolve_text(Some(ctx), o));
+                if let Some(variants) =
+                    ctx.get_enum_members(&name_str, origin_str.as_deref())
+                {
                     if prop_name == varn_core::MemberKey::RawValue.as_str()
                         || prop_name == varn_core::MemberKey::Tag.as_str()
                     {
@@ -242,7 +329,8 @@ fn infer_member(
                     }
                     let mut found_tys = Vec::new();
                     for v in &variants {
-                        if let TypeKind::Fn(fid) = table.get(v.ty.0) {
+                        let vty = reintern_member_type(Some(ctx), origin_str.as_deref(), v.ty, table);
+                        if let TypeKind::Fn(fid) = table.get(vty.0) {
                             if let Some(p) = table
                                 .get_function(*fid)
                                 .params
@@ -258,13 +346,13 @@ fn infer_member(
                     }
                 }
                 if let Some(members) = ctx
-                    .get_class_members(name_str, origin_str)
-                    .or_else(|| ctx.get_interface_members(name_str, origin_str))
-                    .or_else(|| ctx.get_namespace_members(name_str, origin_str))
-                    .or_else(|| ctx.get_enum_members(name_str, origin_str))
+                    .get_class_members(&name_str, origin_str.as_deref())
+                    .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))
+                    .or_else(|| ctx.get_namespace_members(&name_str, origin_str.as_deref()))
+                    .or_else(|| ctx.get_enum_members(&name_str, origin_str.as_deref()))
                 {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
-                        return m.ty;
+                        return reintern_member_type(Some(ctx), origin_str.as_deref(), m.ty, table);
                     }
                 }
             }

@@ -168,14 +168,18 @@ pub(super) fn collect_exports(
                     resolver.module_exports(&src_abs, visiting)
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, *ns, 0);
-                let mut table = resolver.ty_table_snapshot();
-                ns_sym.ty = Some(Type::named_with_origin(
-                    "*",
-                    Some(Rc::from(src_abs.as_str())),
-                    resolver,
-                    &mut table,
+                // Mint straight into the LIVE type table: this symbol travels
+                // through the `ExportMap` to other modules, which decode its
+                // `ty` against the live table's id space. A snapshot-then-
+                // publish would leave the id pointing into a local lineage
+                // (`set_ty_table` merges, it does not adopt indices).
+                let name_atom = resolver.intern("*");
+                let origin_atom = resolver.intern(src_abs.as_str());
+                let ns_ty = resolver.intern_ty(varn_core::TypeKind::Named(
+                    name_atom,
+                    Some(origin_atom),
                 ));
-                resolver.set_ty_table(table);
+                ns_sym.ty = Some(Type(ns_ty, false));
                 ns_sym.origin_module = Some(intern_origin(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();

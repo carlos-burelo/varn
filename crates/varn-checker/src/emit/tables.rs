@@ -186,7 +186,24 @@ fn build_one_class(
                 if !inherited_fields.contains_key(&m.name)
                     && seen_field.insert(m.name.clone(), ()).is_none()
                 {
-                    fields.push((m.name.clone(), lower_type(&m.ty, table, interner, tt, names)));
+                    // `is_optional` on a class field (set by
+                    // `binder::class::bind_class` when no constructor
+                    // guarantees it) means the read can yield `null` at
+                    // runtime. `member_type.rs` already exposes it as
+                    // `T | null` to the checker — this is the OTHER path to
+                    // the same field (`field_access` via `ClassInfo.fields`),
+                    // so wrap at the BackendTy level too. Done here (rather
+                    // than interning a new `CheckerTy` union) because this
+                    // function only holds `&CheckerTyTable`.
+                    let inner = lower_type(&m.ty, table, interner, tt, names);
+                    let field_bt = if m.is_optional
+                        && !matches!(inner, BackendTy::Nullable(_))
+                    {
+                        BackendTy::Nullable(tt.intern(inner))
+                    } else {
+                        inner
+                    };
+                    fields.push((m.name.clone(), field_bt));
                 }
             }
             ClassMemberKind::Method | ClassMemberKind::Function => {

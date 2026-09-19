@@ -1,5 +1,17 @@
 
 export {
+    TcpStream,
+    TcpListener,
+    connect,
+    listen
+} from "std:net/socket";
+
+export {
+    UdpSocket,
+    UdpPacket
+} from "std:net/udp";
+
+export {
     encodeURIComponent,
     decodeURIComponent
 } from "std:net/encoding";

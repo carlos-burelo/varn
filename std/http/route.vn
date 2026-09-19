@@ -3,9 +3,9 @@ export class DynamicRoute {
     segments: str[];
     paramNames: { [key: int]: str };
     isWildcard: bool;
-    handler: dynamic;
+    handler: (req: Request, res: HttpResponse) => void;
 
-    constructor(method: str, pattern: str, handler: dynamic) {
+    constructor(method: str, pattern: str, handler: (req: Request, res: HttpResponse) => void) {
         this.method = method.toUpperCase();
         this.handler = handler;
         this.isWildcard = pattern === "*";

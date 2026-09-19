@@ -26,10 +26,10 @@ impl<'r> super::Binder<'r> {
             Decl::Enum(e) => self.bind_enum(e),
             Decl::Namespace(n) => self.bind_namespace(n),
             Decl::Struct(s) => self.bind_struct(s),
+            Decl::SumType(t) => self.bind_sum_type(t),
             Decl::Extension(e) => self.bind_extension(e),
             Decl::Import(i) => self.bind_import(i),
             Decl::Export(e) => self.bind_export(e),
-            Decl::SumType(t) => self.bind_sum_type(t),
         }
     }
 

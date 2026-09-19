@@ -56,8 +56,12 @@ impl<'r> Checker<'r> {
                     self.with_expected(elem_expected, |c| c.check_expr(*e, bind));
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(*e, bind);
+                        // `value_assignable_to`, not `types_compatible`: a narrow
+                        // element type (`Array<i8>`) can only accept an `int`
+                        // literal by checking the literal's value, exactly like a
+                        // scalar `let x: i8 = 42` does.
                         if !actual.is_dynamic()
-                            && !self.types_compatible_cached(expected, &actual, Some(bind))
+                            && !self.value_assignable_to(expected, &actual, Some(*e), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
                             let expected_s = expected.display(&self.ty_table, &bind.interner);
@@ -182,7 +186,7 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(*value, bind);
                         if !actual.is_dynamic()
-                            && !self.types_compatible_cached(expected, &actual, Some(bind))
+                            && !self.value_assignable_to(expected, &actual, Some(*value), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
                             let expected_s = expected.display(&self.ty_table, &bind.interner);

@@ -22,13 +22,13 @@ let originalText = "Varn Language: Fast, Type-Safe, High-Performance Systems Lan
 let gzipped = Compress.gzip(originalText);
 assert(gzipped.length > 0);
 let unzipped = Compress.gunzip(gzipped);
-assertEqual(unzipped, originalText);
+assertEqual(unzipped.toString(), originalText);
 
 // Deflate / Inflate roundtrip
 let deflated = Compress.deflate(originalText);
 assert(deflated.length > 0);
 let inflated = Compress.inflate(deflated);
-assertEqual(inflated, originalText);
+assertEqual(inflated.toString(), originalText);
 
 // ==========================================
 // 3. CLI Argument Parser (std:cli)

@@ -33,6 +33,7 @@ pub const CORE_CHAR: &str = "core:char";
 pub const CORE_DECIMAL: &str = "core:decimal";
 pub const CORE_RANGE: &str = "core:range";
 pub const CORE_ARRAY: &str = "core:array";
+pub const CORE_BYTES: &str = "core:bytes";
 
 pub const STD_TASK: &str = "std:task";
 pub const STD_COLLECTIONS: &str = "std:collections";

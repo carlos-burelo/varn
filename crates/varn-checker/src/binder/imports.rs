@@ -177,25 +177,60 @@ impl<'r> super::Binder<'r> {
                             // Same crossing as `foreign`/`self.interner` above,
                             // for `CheckerTyId` instead of `Atom`: `s.ty` (and
                             // any `type_param_constraints`) came from
-                            // `resolved`'s own bind, interned against whatever
+                            // `resolved`'s own bind, interned against the
                             // `CheckerTyTable` that module's binder/checker
                             // grew — not necessarily `self.ty_table`, which is
                             // this binder's own, still-growing-locally table
-                            // and can be missing entries the exporter minted
                             // (see `CheckerTyTable::reintern`'s doc for why a
                             // raw id can't just be copied across). Decode
-                            // against a fresh snapshot of the resolver's
-                            // shared table (which, since the exporting module
-                            // fully bound-and-published before this import
-                            // could resolve, is guaranteed to contain
-                            // everything `resolved.ty` references) and
-                            // re-intern into `self.ty_table`.
-                            let foreign_ty_table = self.resolver.ty_table_snapshot();
+                            // against the EXPORTER's own table — the live
+                            // resolver table is append-only across modules and
+                            // its indices do not necessarily match the ones the
+                            // exporter minted — and re-intern into
+                            // `self.ty_table`.
+                            let exporter_ty_table = resolved_target
+                                .as_deref()
+                                .and_then(|abs| self.resolver.module_bind(abs))
+                                .or_else(|| self.resolver.stdlib_bind(&source_str))
+                                .map(|b| b.ty_table.clone());
+                            // A re-export (`export { RawRequest } from
+                            // "std:http/request"`) hands out a symbol whose
+                            // `ty` was interned by the DECLARING module, not
+                            // the one named in the import. Decode against that
+                            // module's table first, when its `origin_module`
+                            // is reachable.
+                            let origin_ty_table = s.origin_module.and_then(|o| {
+                                let snap = self.resolver.interner_snapshot();
+                                let text = snap.try_resolve(o)?;
+                                self.resolver
+                                    .stdlib_bind(text)
+                                    .or_else(|| self.resolver.module_bind(text))
+                                    .map(|b| b.ty_table.clone())
+                            });
+                            // Symbols minted straight into the live table
+                            // (`export * as ns`'s namespace object) have no id
+                            // in any module's bind table; decode against live
+                            // as the last resort.
+                            let live_ty_table = self.resolver.ty_table_snapshot();
+                            let decode_source = |fid: crate::types::CheckerTyId| {
+                                let idx = fid.index() as usize;
+                                if let Some(t) = origin_ty_table.as_ref() {
+                                    if idx < t.len() {
+                                        return t;
+                                    }
+                                }
+                                if let Some(t) = exporter_ty_table.as_ref() {
+                                    if idx < t.len() {
+                                        return t;
+                                    }
+                                }
+                                &live_ty_table
+                            };
                             let mut ty_cache = rustc_hash::FxHashMap::default();
                             s.ty = s.ty.map(|t| {
                                 crate::types::Type(
                                     self.ty_table
-                                        .reintern(&foreign_ty_table, t.0, &mut ty_cache),
+                                        .reintern(decode_source(t.0), t.0, &mut ty_cache),
                                     t.1,
                                 )
                             });
@@ -206,7 +241,7 @@ impl<'r> super::Binder<'r> {
                                     c.map(|t| {
                                         crate::types::Type(
                                             self.ty_table.reintern(
-                                                &foreign_ty_table,
+                                                decode_source(t.0),
                                                 t.0,
                                                 &mut ty_cache,
                                             ),

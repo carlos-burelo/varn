@@ -219,7 +219,8 @@ impl Nursery {
     pub(crate) fn collect(
         &mut self,
         old_gen: &mut HeapInner,
-        stack: &mut [VmValue],
+        dyn_: &mut [VmValue],
+        refs: &mut [u32],
         extra_root_packed: &[u32],
     ) {
         self.minor_gc_count += 1;
@@ -231,8 +232,13 @@ impl Nursery {
         let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
 
         self.phase = "stack/ctx roots";
-        for slot in stack.iter_mut() {
+        for slot in dyn_.iter_mut() {
             self.update_value(slot, old_gen, &mut worklist);
+        }
+
+        self.phase = "ref roots";
+        for slot in refs.iter_mut() {
+            self.update_ref(slot, old_gen, &mut worklist);
         }
 
         let mut old_indices_to_scan = std::mem::take(&mut self.remembered);
@@ -295,6 +301,20 @@ impl Nursery {
         }
         let packed = self.evacuate(idx, old_gen, worklist);
         *val = VmValue::from_heap_idx(packed);
+    }
+
+    /// Como [`Self::update_value`] pero sobre slots REF (`u32` pelados del
+    /// frame por clases). Los GPR/FPR ni se visitan: por construcción nunca
+    /// son raíces. `REF_UNINIT` (trailing nunca escrito) se salta.
+    #[inline]
+    fn update_ref(&mut self, slot: &mut u32, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) {
+        if *slot == crate::frame_store::REF_UNINIT {
+            return;
+        }
+        if !is_nursery_idx(*slot) {
+            return;
+        }
+        *slot = self.evacuate(*slot, old_gen, worklist);
     }
 
     fn evacuate(

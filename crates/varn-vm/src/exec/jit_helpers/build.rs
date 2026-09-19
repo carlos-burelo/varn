@@ -14,8 +14,7 @@ pub(crate) extern "C" fn jit_build_array(
         let ctx_ref = &mut *ctx;
         let mut elems = Vec::with_capacity(count);
         for i in 0..count {
-            let nv = ctx_ref.stack[base + start_reg + i];
-            elems.push(nv);
+            elems.push(ctx_ref.stack.box_reg(base, start_reg + i));
         }
         ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_vm(elems);
     }
@@ -35,8 +34,8 @@ pub(crate) extern "C" fn jit_build_map(
         }
         let mut map = varn_types::value::ValueMap::default();
         for i in 0..count {
-            let k_nv = ctx_ref.stack[base + start_reg + i * 2];
-            let v_nv = ctx_ref.stack[base + start_reg + i * 2 + 1];
+            let k_nv = ctx_ref.stack.box_reg(base, start_reg + i * 2);
+            let v_nv = ctx_ref.stack.box_reg(base, start_reg + i * 2 + 1);
             let key = ctx_ref.heap.canonical_map_key(k_nv);
             map.insert(key, v_nv);
         }
@@ -99,20 +98,10 @@ unsafe fn build_shaped_from_ptr(
 ) -> VmValue {
     let ctx_ref = &mut *ctx;
     let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
-    let count = shape.property_names.len();
-
-    let required = base + start_reg + count;
-    if ctx_ref.stack.len() < required {
-        if ctx_ref.stack.capacity() < required {
-            ctx_ref
-                .stack
-                .reserve((required - ctx_ref.stack.len()).max(256));
-        }
-        ctx_ref.stack.resize(required, VmValue::null());
-    }
     crate::exec::collections::build_with_shape(
         &ctx_ref.stack,
-        base + start_reg,
+        base,
+        start_reg,
         (*shape).clone(),
         &mut ctx_ref.heap,
         may_hold_closure,
@@ -189,7 +178,7 @@ pub(crate) extern "C" fn jit_build_object(
                         .unwrap_or("")
                         .to_string()
                 });
-            let val = ctx_ref.stack[base + val_reg];
+            let val = ctx_ref.stack.box_reg(base, val_reg);
             if let Err(e) = crate::exec::props::set_property(obj_nv, &key, val, &mut ctx_ref.heap) {
                 jit_propagate_error(ctx_ref, e);
             }

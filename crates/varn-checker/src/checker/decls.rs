@@ -30,14 +30,7 @@ impl<'r> Checker<'r> {
                             let init_ty = self.infer_type(init_expr, bind);
                             let is_empty_array = init_ty.is_dynamic()
                                 && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
-                            let mut is_compatible = self.types_compatible_cached(ann_ty, &init_ty, Some(bind));
-                            if is_compatible && ann_ty.is_granular_int() {
-                                if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(init_expr).kind {
-                                    if !crate::checker::compat::literal_fits_type(ann_ty, *value, &self.ty_table) {
-                                        is_compatible = false;
-                                    }
-                                }
-                            }
+                            let is_compatible = self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind));
                             if !is_empty_array && !is_compatible {
                                 let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                                 let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
@@ -258,7 +251,7 @@ impl<'r> Checker<'r> {
                                     self.with_expected(Some(prop_ty), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
-                                        if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                        if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                             let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
                                             let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
                                             checker.emit(
@@ -414,7 +407,7 @@ impl<'r> Checker<'r> {
                                     self.with_expected(Some(prop_ty), |checker| {
                                         checker.check_expr(init_expr, bind);
                                         let init_ty = checker.infer_type(init_expr, bind);
-                                        if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                        if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                             let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
                                             let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
                                             checker.emit(

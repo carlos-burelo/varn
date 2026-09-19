@@ -21,7 +21,7 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
         let frame_idx = ctx_ref.frames.len() - 1;
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let base = ctx_ref.frames[frame_idx].base;
-        let this_val = ctx_ref.stack[base];
+        let this_val = ctx_ref.stack.box_reg(base, 0);
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
 

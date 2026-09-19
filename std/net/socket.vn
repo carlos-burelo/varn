@@ -1,0 +1,181 @@
+import {
+    tcpListen$,
+    tcpAccept$,
+    tcpConnect$,
+    tcpRead$,
+    tcpWrite$,
+    tcpClose$,
+    tcpCloseListener$
+} from "runtime:net";
+
+import { AsyncReader, AsyncWriter } from "std:io";
+
+export class TcpStream implements AsyncReader, AsyncWriter {
+    private _connId: int;
+    private _remoteHost: str;
+    private _remotePort: int;
+    private _isOpen: bool = true;
+
+    constructor(connId: int, remoteHost: str = "127.0.0.1", remotePort: int = 0) {
+        this._connId = connId;
+        this._remoteHost = remoteHost;
+        this._remotePort = remotePort;
+    }
+
+    static async connect(host: str, port: int): Task<TcpStream> {
+        let connId = await tcpConnect$(host, port);
+        return new TcpStream(connId, host, port);
+    }
+
+    get connId(): int {
+        return this._connId;
+    }
+
+    get remoteHost(): str {
+        return this._remoteHost;
+    }
+
+    get remotePort(): int {
+        return this._remotePort;
+    }
+
+    get isOpen(): bool {
+        return this._isOpen;
+    }
+
+    async read(size: int = 4096): Task<Bytes?> {
+        if (!this._isOpen) {
+            return null;
+        }
+        return await tcpRead$(this._connId, size);
+    }
+
+    async readText(size: int = 4096): Task<str> {
+        let b = await this.read(size);
+        if (b === null) {
+            return "";
+        }
+        let valid = b as Bytes;
+        return valid.toString();
+    }
+
+    async readAll(): Task<Bytes> {
+        let chunks: Bytes[] = [];
+        let totalLen = 0;
+        while (this._isOpen) {
+            let chunk = await this.read(4096);
+            if (chunk === null) {
+                break;
+            }
+            let valid = chunk as Bytes;
+            if (valid.length === 0) {
+                break;
+            }
+            chunks.push(valid);
+            totalLen = totalLen + valid.length;
+        }
+        let merged = Bytes.alloc(totalLen);
+        let offset = 0;
+        for (let i = 0; i < chunks.length; i = i + 1) {
+            let c = chunks[i];
+            c.copy(merged, offset);
+            offset = offset + c.length;
+        }
+        return merged;
+    }
+
+    async write(data: Bytes | str): Task<int> {
+        if (!this._isOpen) {
+            throw new Error("TcpWriteError: Socket is closed");
+        }
+        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let written = await tcpWrite$(this._connId, b);
+        if (written < 0) {
+            this.close();
+            throw new Error("TcpWriteError: Failed to write to socket");
+        }
+        return written;
+    }
+
+    async writeAll(data: Bytes | str): Task<void> {
+        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let offset = 0;
+        while (offset < b.length) {
+            let chunk = b.slice(offset, b.length);
+            let written = await this.write(chunk);
+            if (written <= 0) {
+                break;
+            }
+            offset = offset + written;
+        }
+    }
+
+    async flush(): Task<void> {}
+
+    close(): void {
+        if (this._isOpen) {
+            tcpClose$(this._connId);
+            this._isOpen = false;
+        }
+    }
+}
+
+export class TcpListener {
+    private _listenerId: int;
+    private _port: int;
+    private _host: str;
+    private _isListening: bool;
+
+    constructor(listenerId: int, port: int, host: str = "127.0.0.1") {
+        this._listenerId = listenerId;
+        this._port = port;
+        this._host = host;
+        this._isListening = listenerId >= 0;
+    }
+
+    static listen(port: int, host: str = "127.0.0.1"): TcpListener {
+        let listenerId = tcpListen$(port);
+        if (listenerId < 0) {
+            throw new Error("TcpListenError: Could not bind listener to port " + port);
+        }
+        return new TcpListener(listenerId, port, host);
+    }
+
+    get port(): int {
+        return this._port;
+    }
+
+    get host(): str {
+        return this._host;
+    }
+
+    get isListening(): bool {
+        return this._isListening;
+    }
+
+    async accept(): Task<TcpStream> {
+        if (!this._isListening) {
+            throw new Error("TcpAcceptError: Listener is closed");
+        }
+        let connId = await tcpAccept$(this._listenerId);
+        if (connId < 0) {
+            throw new Error("TcpAcceptError: Failed to accept connection");
+        }
+        return new TcpStream(connId, this._host, this._port);
+    }
+
+    close(): void {
+        if (this._isListening) {
+            tcpCloseListener$(this._listenerId);
+            this._isListening = false;
+        }
+    }
+}
+
+export async function connect(host: str, port: int): Task<TcpStream> {
+    return await TcpStream.connect(host, port);
+}
+
+export function listen(port: int, host: str = "127.0.0.1"): TcpListener {
+    return TcpListener.listen(port, host);
+}

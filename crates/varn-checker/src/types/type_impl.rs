@@ -35,6 +35,9 @@ impl Type {
     /// Non-intrinsic-constant tags (e.g. `Class`, `Array`, `Object` used only
     /// as a `TypeTag`, not to build a `Type`) still round-trip through the
     /// table, since only the 20 seeded intrinsics have fixed ids.
+    /// NOTE (merge main): `Bytes` has no fixed id — use
+    /// `Type::intrinsic(TypeTag::Bytes, table)` instead of a `Type::Bytes`
+    /// const, which cannot exist without resequencing every fixed id.
     pub fn intrinsic(tag: TypeTag, table: &mut CheckerTyTable) -> Self {
         Type(table.intern(TypeKind::Intrinsic(tag)), false)
     }
@@ -249,6 +252,7 @@ impl Type {
                 TypeTag::Char => Some(I::Char.as_str()),
                 TypeTag::Bool => Some(I::Bool.as_str()),
                 TypeTag::Symbol => Some(I::Symbol.as_str()),
+                TypeTag::Bytes => Some(I::Bytes.as_str()),
                 _ => None,
             },
             TypeKind::Array(_) => Some(I::Array.as_str()),
@@ -268,6 +272,15 @@ impl Type {
             TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(interner.resolve(*n)),
             _ => None,
         }
+    }
+
+    /// `Bytes` has no fixed `CheckerTyId` (only the seeded intrinsics do),
+    /// so this reads the shape via the table — unlike `is_str`/`is_bool`
+    /// which compare fixed ids directly. Ported from main's `is_bytes`
+    /// (canonical bytes, ADR-0008); main callers using `is_bytes()` with no
+    /// args must pass the table.
+    pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
+        matches!(table.get(self.0), TypeKind::Intrinsic(TypeTag::Bytes))
     }
 
     pub fn to_type_tag(&self, table: &CheckerTyTable) -> TypeTag {

@@ -34,6 +34,11 @@ estado.
 | §4 las 20 instrucciones por lectura de campo | **CORREGIDO (paso 3 y 7).** `SlotKind` con identidad y offsets fijos directos en memoria. |
 | §5 tipos sin verificar en el SSA | **CORREGIDO (paso 2).** `verify.rs` valida tipos de operandos y destinos en el pipeline SSA. |
 | Backend JIT (Cranelift) en 128-bit | **CORREGIDO Y OPERATIVO.** Migración completa del backend CLIF a `VmValue` de dos palabras (`PAIR_MIGRATION_PENDING = false`), soporte de Windows Fastcall ABI (`StructReturn` 16 B), floats en `F64`/XMM y safepoints de GC. |
+| Nominalidad estricta de clases | **CORREGIDO (ADR-0004).** Eliminada la compatibilidad estructural de clases en `compatible_named`. Una clase solo acepta instancias de su propia jerarquía nominal. |
+| Tipado estricto en numéricos | **CORREGIDO (ADR-0004).** Eliminado el narrowing implícito de `int` a tipos granulares (`i8`..`u32`). Los literales constantes son validados por rango (`literal_fits_type`); variables requieren cast explícito. |
+| Consolidación de ADTs | **CORREGIDO (ADR-0004).** Purgado `Decl::SumType` en todo el pipeline. `Enum` con payload es la única fuente de verdad para tagged unions. |
+| Operador de propagación `try <expr>` | **CORREGIDO (ADR-0005).** Soporte de operador prefijo `try` para `Result<T, E>`, `Option<T>` y `T?`. Se preservó `?` sin colisiones sintácticas. Integrado en AST, parser, checker, emisor TIR y JIT. |
+| Tipo canónico `Bytes` y Streaming I/O | **CORREGIDO (ADR-0008).** Incorporación de `Bytes` como tipo de valor/referencia de primera clase canónico (`TypeTag::Bytes`, `BackendTy::Bytes`, `core:bytes`). Eliminación de corrupción UTF-8 en sockets de red. Abstracción `Reader`/`Writer` y `Stream.pipe` con backpressure. |
 
 **Estado del backend JIT:** El backend CLIF está 100% activo y operativo. El modelo de registros maneja nativamente el valor de dos palabras (128 bits / 16 bytes), con box/unbox directo, safepoints de GC y convención de retorno adaptada a Windows y Unix. La suite completa de 1 167 tests pasa con JIT activo y 0 fallos (`bench_fib` en ~36 ms).
 

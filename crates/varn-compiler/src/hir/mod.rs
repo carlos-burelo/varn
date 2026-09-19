@@ -69,8 +69,9 @@ impl TyTable {
     }
 
     /// Import a checker-side [`varn_core::CgTy`] projection. Kinds the
-    /// backend has no representation for yet (char/decimal/bigint/fn)
-    /// stay `Dynamic` — conservative, never wrong.
+    /// backend has no precise representation for yet stay `Dynamic` —
+    /// conservative, never wrong; heap-boxed scalars (char/decimal/bigint)
+    /// project to `Ref`, matching `from_tir::ty::lower`.
     pub fn from_cg(&mut self, cg: &varn_core::CgTy) -> HirType {
         use varn_core::CgTy;
         match cg {
@@ -110,7 +111,12 @@ impl TyTable {
             // and it is what keeps every read of a module function from
             // landing in a `Dynamic` register.
             CgTy::Fn => HirType::Ref,
-            CgTy::Char | CgTy::Decimal | CgTy::BigInt | CgTy::Dynamic => HirType::Dynamic,
+            // `char` vive en el heap (`HeapObj::Char`): `Ref` es la proyección
+            // honesta y coincide con `from_tir::ty::lower`. `decimal`/`bigint`
+            // son heap con ensanchado `int` y tolerancia `dynamic`: `Dynamic`
+            // los aloja sin allocar (también como `from_tir::ty::lower`).
+            CgTy::Char => HirType::Ref,
+            CgTy::Decimal | CgTy::BigInt | CgTy::Dynamic => HirType::Dynamic,
         }
     }
 }

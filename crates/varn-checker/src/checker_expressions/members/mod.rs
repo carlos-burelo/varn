@@ -312,6 +312,24 @@ pub fn get_members_of_type(
             let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
+        TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+            add_member(
+                &mut results,
+                &mut seen,
+                Rc::from(varn_core::MemberKey::Length.as_str()),
+                Type::Int,
+                crate::semantic_info::ResolvedMemberKind::Property,
+                false,
+                false,
+                true,
+            );
+            let bytes_ty = Type::named(
+                varn_core::TypeTag::Bytes.name().to_owned(),
+                resolver,
+                table,
+            );
+            return get_members_of_type(resolver, &bytes_ty, bind, table);
+        }
         TypeKind::Intrinsic(tag) => {
             let named_ty = Type::named(tag.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &named_ty, bind, table);

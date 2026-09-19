@@ -41,7 +41,7 @@ impl ExecCtx {
                 let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
                 if uv_count == 0 {
                     if let Some(&(_, cached_val)) = self.static_closures.get(&proto_ptr) {
-                        self.stack[base + dest] = cached_val;
+                        self.stack.unbox_into_reg(base, dest, cached_val)?;
                         return Ok(Some(ObjectFlow::ContinueInstruction));
                     }
                 }
@@ -52,7 +52,7 @@ impl ExecCtx {
                     let is_local = hi(uv_desc) != 0;
                     let index = lo(uv_desc);
                     if is_local {
-                        upvalues.push(self.capture_upvalue(base + index));
+                        upvalues.push(self.capture_upvalue(self.stack.addr_of(base, index)));
                     } else {
                         upvalues.push(closure.upvalues[index].clone());
                     }
@@ -81,7 +81,7 @@ impl ExecCtx {
                 if uv_count == 0 {
                     self.static_closures.insert(proto_ptr, (proto, val));
                 }
-                self.stack[base + dest] = val;
+                self.stack.unbox_into_reg(base, dest, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::GetProperty => {
@@ -92,7 +92,7 @@ impl ExecCtx {
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
                 self.frames[frame_idx].ip = *ip;
-                let obj = self.stack[base + obj_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
                 let jumped = self.exec_get_property_reg(
                     obj, name_idx, cs_idx, first_reg, base, frame_idx, closure,
                 )?;
@@ -108,7 +108,7 @@ impl ExecCtx {
                 *ip += 1;
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
-                let obj = self.stack[base + obj_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
                 let name_nv = closure.constants[name_idx];
                 let name = self.heap.str_val(name_nv).unwrap_or_else(|| {
                     closure.proto.chunk.constants[name_idx]
@@ -117,7 +117,7 @@ impl ExecCtx {
                         .into()
                 });
                 let result = crate::exec::props::get_property_maybe(obj, &name, &mut self.heap);
-                self.stack[base + first_reg] = result;
+                self.stack.unbox_into_reg(base, first_reg, result)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::SetProperty => {
@@ -129,8 +129,8 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = first_reg;
                 self.frames[frame_idx].ip = *ip;
-                let obj = self.stack[base + obj_reg];
-                let val = self.stack[base + val_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 let jumped = self
                     .exec_set_property_reg(obj, val, name_idx, cs_idx, base, frame_idx, closure)?;
                 if jumped {
@@ -145,8 +145,9 @@ impl ExecCtx {
                 *ip += 1;
                 let slot = code[*ip] as usize;
                 *ip += 1;
-                let obj = self.stack[base + obj_reg];
-                self.stack[base + first_reg] = self.exec_get_fixed_field(obj, slot)?;
+                let obj = self.stack.box_reg(base, obj_reg);
+                let r = self.exec_get_fixed_field(obj, slot)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::SetFixedField => {
@@ -154,8 +155,8 @@ impl ExecCtx {
                 *ip += 1;
                 let slot = code[*ip] as usize;
                 *ip += 1;
-                let obj = self.stack[base + first_reg];
-                let val = self.stack[base + val_reg];
+                let obj = self.stack.box_reg(base, first_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 self.exec_set_fixed_field(obj, slot, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -163,11 +164,11 @@ impl ExecCtx {
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
 
-                let this_val = self.stack[base];
+                let this_val = self.stack.box_reg(base, 0);
                 self.frames[frame_idx].ip = *ip;
                 let val = self.exec_get_super_reg(this_val, name_idx, frame_idx, closure)?;
                 let frame_idx2 = self.frames.len() - 1;
-                self.stack[base + first_reg] = val;
+                self.stack.unbox_into_reg(base, first_reg, val)?;
                 *ip = self.frames[frame_idx2].ip;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -176,15 +177,16 @@ impl ExecCtx {
                 *ip += 1;
                 let sym_idx = code[*ip] as usize;
                 *ip += 1;
-                let obj = self.stack[base + obj_reg];
-                self.stack[base + first_reg] = self.exec_get_symbol(obj, sym_idx, closure)?;
+                let obj = self.stack.box_reg(base, obj_reg);
+                let r = self.exec_get_symbol(obj, sym_idx, closure)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::AssertNotNull => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let src = hi(w1);
-                let v = self.stack[base + src];
+                let v = self.stack.box_reg(base, src);
                 self.exec_assert_not_null(v)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -194,7 +196,7 @@ impl ExecCtx {
                 let name_idx = code[*ip] as usize;
                 *ip += 1;
                 let obj_reg = hi(w1);
-                let obj = self.stack[base + obj_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
                 let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
                 self.exec_declare_field(obj, name_idx, tag, frame_idx, closure)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
@@ -204,10 +206,10 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = hi(w1);
                 let idx_reg = lo(w1);
-                let obj = self.stack[base + obj_reg];
-                let key_nv = self.stack[base + idx_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
+                let key_nv = self.stack.box_reg(base, idx_reg);
                 let result = self.exec_get_index_nv(obj, key_nv)?;
-                self.stack[base + first_reg] = result;
+                self.stack.unbox_into_reg(base, first_reg, result)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayGetIndex => {
@@ -215,10 +217,10 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = hi(w1);
                 let idx_reg = lo(w1);
-                let obj = self.stack[base + obj_reg];
-                let key_nv = self.stack[base + idx_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
+                let key_nv = self.stack.box_reg(base, idx_reg);
                 let result = self.exec_array_get_index(obj, key_nv)?;
-                self.stack[base + first_reg] = result;
+                self.stack.unbox_into_reg(base, first_reg, result)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::MapGetIndex => {
@@ -226,10 +228,10 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = hi(w1);
                 let idx_reg = lo(w1);
-                let obj = self.stack[base + obj_reg];
-                let key_nv = self.stack[base + idx_reg];
+                let obj = self.stack.box_reg(base, obj_reg);
+                let key_nv = self.stack.box_reg(base, idx_reg);
                 let result = self.exec_map_get_index(obj, key_nv)?;
-                self.stack[base + first_reg] = result;
+                self.stack.unbox_into_reg(base, first_reg, result)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::SetIndex => {
@@ -237,9 +239,9 @@ impl ExecCtx {
                 *ip += 1;
                 let idx_reg = hi(w1);
                 let val_reg = lo(w1);
-                let obj = self.stack[base + first_reg];
-                let idx = self.stack[base + idx_reg];
-                let val = self.stack[base + val_reg];
+                let obj = self.stack.box_reg(base, first_reg);
+                let idx = self.stack.box_reg(base, idx_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 self.exec_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -248,9 +250,9 @@ impl ExecCtx {
                 *ip += 1;
                 let idx_reg = hi(w1);
                 let val_reg = lo(w1);
-                let obj = self.stack[base + first_reg];
-                let idx = self.stack[base + idx_reg];
-                let val = self.stack[base + val_reg];
+                let obj = self.stack.box_reg(base, first_reg);
+                let idx = self.stack.box_reg(base, idx_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 self.exec_array_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -259,9 +261,9 @@ impl ExecCtx {
                 *ip += 1;
                 let idx_reg = hi(w1);
                 let val_reg = lo(w1);
-                let obj = self.stack[base + first_reg];
-                let idx = self.stack[base + idx_reg];
-                let val = self.stack[base + val_reg];
+                let obj = self.stack.box_reg(base, first_reg);
+                let idx = self.stack.box_reg(base, idx_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 self.exec_map_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -273,16 +275,21 @@ impl ExecCtx {
                 *ip += 1;
                 let (dest, start_reg) = (hi(w1), lo(w1));
                 let count = hi(w2);
+                let tag_byte = lo(w2);
                 let mut elems = Vec::with_capacity(count);
                 for i in 0..count {
-                    let nv = self.stack[base + start_reg + i];
+                    let nv = self.stack.box_reg(base, start_reg + i);
                     elems.push(nv);
                 }
-                self.stack[base + dest] = if is_tuple {
+                let built = if is_tuple {
                     self.heap.alloc_tuple_vm(elems)
+                } else if tag_byte != 0 {
+                    self.heap
+                        .alloc_array_vm_narrow(elems, varn_core::TypeTag::from_u8(tag_byte as u8))
                 } else {
                     self.heap.alloc_array_vm(elems)
                 };
+                self.stack.unbox_into_reg(base, dest, built)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildMap => {
@@ -293,17 +300,17 @@ impl ExecCtx {
                 let (dest, start_reg) = (hi(w1), lo(w1));
                 let count = hi(w2);
                 if count == 0 {
-                    self.stack[base + dest] = self.heap.alloc_empty_map_vm();
+                    self.stack.unbox_into_reg(base, dest, self.heap.alloc_empty_map_vm())?;
                     return Ok(Some(ObjectFlow::ContinueInstruction));
                 }
                 let mut map = varn_types::value::ValueMap::default();
                 for i in 0..count {
-                    let k_nv = self.stack[base + start_reg + i * 2];
-                    let v_nv = self.stack[base + start_reg + i * 2 + 1];
+                    let k_nv = self.stack.box_reg(base, start_reg + i * 2);
+                    let v_nv = self.stack.box_reg(base, start_reg + i * 2 + 1);
                     let key = self.heap.canonical_map_key(k_nv);
                     map.insert(key, v_nv);
                 }
-                self.stack[base + dest] = self.heap.alloc_map_vm(map);
+                self.stack.unbox_into_reg(base, dest, self.heap.alloc_map_vm(map))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildObject => {
@@ -328,10 +335,10 @@ impl ExecCtx {
                                 .unwrap_or("")
                                 .to_string()
                         });
-                    let val = self.stack[base + val_reg];
+                    let val = self.stack.box_reg(base, val_reg);
                     crate::exec::props::set_property(obj_nv, &key, val, &mut self.heap)?;
                 }
-                self.stack[base + dest] = obj_nv;
+                self.stack.unbox_into_reg(base, dest, obj_nv)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
@@ -346,12 +353,12 @@ impl ExecCtx {
                     .resolved_shape(shape_idx)
                     .expect("invalid shape");
                 let count = shape.property_names.len();
-                let slice = &self.stack[base + start_reg..base + start_reg + count];
-                self.stack[base + dest] = if is_record {
-                    self.heap.alloc_record_with_shape_slice(&shape, slice)
+                let boxed: Vec<VmValue> = self.stack.box_range(base, start_reg, count);
+                self.stack.unbox_into_reg(base, dest, if is_record {
+                    self.heap.alloc_record_with_shape_slice(&shape, &boxed)
                 } else {
-                    self.heap.alloc_object_with_shape_slice(&shape, slice)
-                };
+                    self.heap.alloc_object_with_shape_slice(&shape, &boxed)
+                })?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ObjectRest => {
@@ -373,61 +380,71 @@ impl ExecCtx {
                             .into()
                     }));
                 }
-                let obj = self.stack[base + src];
-                self.stack[base + dest] = self.exec_object_rest(obj, &skip_keys)?;
+                let obj = self.stack.box_reg(base, src);
+                let r = self.exec_object_rest(obj, &skip_keys)?;
+                self.stack.unbox_into_reg(base, dest, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ObjectKeys => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let obj = self.stack[base + src];
-                self.stack[base + first_reg] = self.exec_object_keys(obj)?;
+                let obj = self.stack.box_reg(base, src);
+                let r = self.exec_object_keys(obj)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ObjectMerge => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let dest_nv = self.stack[base + first_reg];
-                let src_nv = self.stack[base + src];
-                self.stack[base + first_reg] =
-                    crate::exec::collections::object_merge(dest_nv, src_nv, &mut self.heap)?;
+                let dest_nv = self.stack.box_reg(base, first_reg);
+                let src_nv = self.stack.box_reg(base, src);
+                self.stack.unbox_into_reg(
+                    base,
+                    first_reg,
+                    crate::exec::collections::object_merge(dest_nv, src_nv, &mut self.heap)?,
+                )?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::WrapSpread => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let v = self.heap.extract(self.stack[base + src]);
-                self.stack[base + first_reg] =
-                    self.heap.intern(varn_types::Value::Spread(Box::new(v)));
+                let v = self.heap.extract(self.stack.box_reg(base, src));
+                self.stack.unbox_into_reg(
+                    base,
+                    first_reg,
+                    self.heap.intern(varn_types::Value::Spread(Box::new(v))),
+                )?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayLength => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let arr = self.stack[base + src];
-                self.stack[base + first_reg] = self.exec_array_length(arr)?;
+                let arr = self.stack.box_reg(base, src);
+                let r = self.exec_array_length(arr)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayPush => {
                 let val_reg = hi(code[*ip]);
                 *ip += 1;
-                let arr = self.stack[base + first_reg];
-                let val = self.stack[base + val_reg];
+                let arr = self.stack.box_reg(base, first_reg);
+                let val = self.stack.box_reg(base, val_reg);
                 self.exec_array_push(arr, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayPop => {
                 let arr_reg = hi(code[*ip]);
                 *ip += 1;
-                let arr = self.stack[base + arr_reg];
-                self.stack[base + first_reg] = self.exec_array_pop(arr)?;
+                let arr = self.stack.box_reg(base, arr_reg);
+                let r = self.exec_array_pop(arr)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayExtend => {
                 let src_reg = hi(code[*ip]);
                 *ip += 1;
-                let arr = self.stack[base + first_reg];
-                let src = self.stack[base + src_reg];
+                let arr = self.stack.box_reg(base, first_reg);
+                let src = self.stack.box_reg(base, src_reg);
                 self.exec_array_extend(arr, src)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -435,42 +452,42 @@ impl ExecCtx {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
+                let a = self.stack.box_reg(base, src1);
+                let b = self.stack.box_reg(base, src2);
                 let r = crate::exec::advanced::op_in(a, b, &self.heap);
-                self.stack[base + first_reg] = VmValue::from_bool(r);
+                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::Instanceof => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
+                let a = self.stack.box_reg(base, src1);
+                let b = self.stack.box_reg(base, src2);
                 let r = crate::exec::advanced::instanceof(a, b, &self.heap);
-                self.stack[base + first_reg] = VmValue::from_bool(r);
+                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::Typeof => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let v = self.stack[base + src];
+                let v = self.stack.box_reg(base, src);
                 let s = self.exec_typeof(v);
-                self.stack[base + first_reg] = self.heap.alloc_str(s);
+                self.stack.unbox_into_reg(base, first_reg, self.heap.alloc_str(s))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::IsNull => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let v = self.stack[base + src];
+                let v = self.stack.box_reg(base, src);
                 let res = VmValue::from_bool(v.is_null());
-                self.stack[base + first_reg] = res;
+                self.stack.unbox_into_reg(base, first_reg, res)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::IsArray => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let v = self.stack[base + src];
+                let v = self.stack.box_reg(base, src);
                 let is_arr = if v.is_heap() {
                     matches!(
                         self.heap.get(v.as_heap_idx()),
@@ -479,7 +496,7 @@ impl ExecCtx {
                 } else {
                     false
                 };
-                self.stack[base + first_reg] = VmValue::from_bool(is_arr);
+                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(is_arr))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             _ => Ok(None),

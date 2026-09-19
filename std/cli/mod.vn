@@ -2,4 +2,5 @@
 export { ParsedArgs, CLI, parseArgs } from "std:cli/args";
 export { Color } from "std:cli/color";
 export { Table } from "std:cli/table";
+export { Prompt, prompt, confirm, password } from "std:cli/prompt";
 

@@ -10,6 +10,17 @@
 use crate::closure::VmClosure;
 use varn_types::FunctionProto;
 
+/// Fase A del frame por clases: el almacén de registros particionado
+/// (`FrameStore`) invalida el layout `VmValue` contiguo que el código
+/// generado direcciona inline (stride 16B, tag/payload por offset). Mientras
+/// el lowering no aprenda el layout nuevo (fase B), compilar sería generar
+/// código contra una memoria que ya no existe: toda compilación baila.
+///
+/// TODO(fase-B): poner a `false` cuando `varn-jit` baje de SSA tipada con el
+/// layout por clases (GPR/FPR/REF/DYN) y re-auditar `jit_layout`,
+/// `frame_layout`, `emit`, `safepoints` y `clif_link`.
+pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = true;
+
 impl VmClosure {
     /// Frame entries a proto must accumulate before it is worth lowering.
     ///
@@ -192,6 +203,9 @@ impl VmClosure {
 
     /// Count one frame entry and lower the proto once it proves hot.
     pub(crate) fn hot_jit_fn(&self) -> Option<varn_jit::JitFn> {
+        if FRAME_LAYOUT_V2_JIT_BAIL {
+            return None;
+        }
         if let Some(f) = self.jit_fn() {
             varn_jit::JIT_STATS
                 .jit_cached
@@ -273,7 +287,11 @@ impl VmClosure {
     /// threshold soon enough; paying a second ~2 ms lowering to catch the
     /// other one mid-flight is not obviously worth it, and nothing measured
     /// says it is.
-    pub(crate) fn osr_jit_fn(&self, osr_ip: usize) -> Option<varn_jit::JitFn> {
+    pub(crate) fn osr_jit_fn(&self, _osr_ip: usize) -> Option<varn_jit::JitFn> {
+        if FRAME_LAYOUT_V2_JIT_BAIL {
+            return None;
+        }
+        let osr_ip = _osr_ip;
         let proto = &self.proto;
         if proto.jit_osr_failed.get() {
             return None;

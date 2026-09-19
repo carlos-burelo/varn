@@ -1,0 +1,41 @@
+import { readLine } from "std:io";
+
+export namespace Prompt {
+    export function ask(message: str, defaultValue?: str): str {
+        let suffix = "";
+        if (defaultValue !== null && defaultValue !== "") {
+            suffix = " [" + defaultValue + "]";
+        }
+        let input = readLine(message + suffix + ": ");
+        let trimmed = input.trim();
+        if (trimmed === "" && defaultValue !== null) {
+            return defaultValue;
+        }
+        return trimmed;
+    }
+
+    export function confirm(message: str, defaultValue: bool = false): bool {
+        let hint = defaultValue ? " [Y/n]: " : " [y/N]: ";
+        let response = readLine(message + hint).trim().toLowerCase();
+        if (response === "") {
+            return defaultValue;
+        }
+        return response === "y" || response === "yes" || response === "true" || response === "s" || response === "si";
+    }
+
+    export function password(message: str): str {
+        return readLine(message + ": ").trim();
+    }
+}
+
+export function prompt(message: str, defaultValue?: str): str {
+    return Prompt.ask(message, defaultValue);
+}
+
+export function confirm(message: str, defaultValue: bool = false): bool {
+    return Prompt.confirm(message, defaultValue);
+}
+
+export function password(message: str): str {
+    return Prompt.password(message);
+}

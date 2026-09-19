@@ -478,17 +478,39 @@ pub enum ArrayRepr {
     I64(Vec<i64>) = 1,
     /// `Array<float>` — raw `f64` buffer, holds no heap refs.
     F64(Vec<f64>) = 2,
+    /// `Array<i8>` — raw `i8` buffer, holds no heap refs.
+    I8(Vec<i8>) = 3,
+    /// `Array<i16>` — raw `i16` buffer, holds no heap refs.
+    I16(Vec<i16>) = 4,
+    /// `Array<i32>` — raw `i32` buffer, holds no heap refs.
+    I32(Vec<i32>) = 5,
+    /// `Array<u8>` — raw `u8` buffer, holds no heap refs.
+    U8(Vec<u8>) = 6,
+    /// `Array<u16>` — raw `u16` buffer, holds no heap refs.
+    U16(Vec<u16>) = 7,
+    /// `Array<u32>` — raw `u32` buffer, holds no heap refs.
+    U32(Vec<u32>) = 8,
+    /// `Array<f32>` — raw `f32` buffer, holds no heap refs.
+    F32(Vec<f32>) = 9,
 }
 
 impl ArrayRepr {
-    /// The `repr(C, u8)` discriminant (0 = Boxed, 1 = I64, 2 = F64). Matches
-    /// the byte the JIT reads at offset 0 of the `ArrayRepr`.
+    /// The `repr(C, u8)` discriminant (0 = Boxed, 1 = I64, 2 = F64, 3..9 = the
+    /// narrow int/float widths). Matches the byte the JIT reads at offset 0
+    /// of the `ArrayRepr`.
     #[inline(always)]
     pub fn discriminant(&self) -> u8 {
         match self {
             ArrayRepr::Boxed(_) => 0,
             ArrayRepr::I64(_) => 1,
             ArrayRepr::F64(_) => 2,
+            ArrayRepr::I8(_) => 3,
+            ArrayRepr::I16(_) => 4,
+            ArrayRepr::I32(_) => 5,
+            ArrayRepr::U8(_) => 6,
+            ArrayRepr::U16(_) => 7,
+            ArrayRepr::U32(_) => 8,
+            ArrayRepr::F32(_) => 9,
         }
     }
 
@@ -498,6 +520,13 @@ impl ArrayRepr {
             ArrayRepr::Boxed(v) => v.len(),
             ArrayRepr::I64(v) => v.len(),
             ArrayRepr::F64(v) => v.len(),
+            ArrayRepr::I8(v) => v.len(),
+            ArrayRepr::I16(v) => v.len(),
+            ArrayRepr::I32(v) => v.len(),
+            ArrayRepr::U8(v) => v.len(),
+            ArrayRepr::U16(v) => v.len(),
+            ArrayRepr::U32(v) => v.len(),
+            ArrayRepr::F32(v) => v.len(),
         }
     }
 
@@ -541,6 +570,42 @@ impl VmArray {
     #[inline(always)]
     pub fn new_f64(items: Vec<f64>) -> Self {
         Self(Rc::new(UnsafeCell::new(ArrayRepr::F64(items))))
+    }
+
+    /// `Array<i8>` backed by a raw `i8` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_i8(items: Vec<i8>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::I8(items))))
+    }
+    /// `Array<i16>` backed by a raw `i16` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_i16(items: Vec<i16>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::I16(items))))
+    }
+    /// `Array<i32>` backed by a raw `i32` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_i32(items: Vec<i32>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::I32(items))))
+    }
+    /// `Array<u8>` backed by a raw `u8` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_u8(items: Vec<u8>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::U8(items))))
+    }
+    /// `Array<u16>` backed by a raw `u16` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_u16(items: Vec<u16>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::U16(items))))
+    }
+    /// `Array<u32>` backed by a raw `u32` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_u32(items: Vec<u32>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::U32(items))))
+    }
+    /// `Array<f32>` backed by a raw `f32` buffer. See [`Self::new_f64`].
+    #[inline(always)]
+    pub fn new_f32(items: Vec<f32>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::F32(items))))
     }
 
     /// Array from boxed values, choosing the narrowest repr the values admit:
@@ -632,6 +697,13 @@ impl VmArray {
             ArrayRepr::Boxed(_) => SlotKind::Dynamic,
             ArrayRepr::I64(_) => SlotKind::Int,
             ArrayRepr::F64(_) => SlotKind::Float,
+            ArrayRepr::I8(_) => SlotKind::Int,
+            ArrayRepr::I16(_) => SlotKind::Int,
+            ArrayRepr::I32(_) => SlotKind::Int,
+            ArrayRepr::U8(_) => SlotKind::Int,
+            ArrayRepr::U16(_) => SlotKind::Int,
+            ArrayRepr::U32(_) => SlotKind::Int,
+            ArrayRepr::F32(_) => SlotKind::Float,
         }
     }
 
@@ -700,6 +772,13 @@ impl VmArray {
             ArrayRepr::Boxed(v) => v.get(idx).copied(),
             ArrayRepr::I64(v) => v.get(idx).map(|&n| VmValue::from_int(n)),
             ArrayRepr::F64(v) => v.get(idx).map(|&f| VmValue::from_f64(f)),
+            ArrayRepr::I8(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::I16(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::I32(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::U8(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::U16(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::U32(v) => v.get(idx).map(|&n| VmValue::from_int(n as i64)),
+            ArrayRepr::F32(v) => v.get(idx).map(|&f| VmValue::from_f64(f as f64)),
         }
     }
 
@@ -737,6 +816,69 @@ impl VmArray {
                     }
                     if val.is_f64() {
                         v[idx] = val.as_f64();
+                        return true;
+                    }
+                }
+                ArrayRepr::I8(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as i8;
+                        return true;
+                    }
+                }
+                ArrayRepr::I16(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as i16;
+                        return true;
+                    }
+                }
+                ArrayRepr::I32(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as i32;
+                        return true;
+                    }
+                }
+                ArrayRepr::U8(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as u8;
+                        return true;
+                    }
+                }
+                ArrayRepr::U16(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as u16;
+                        return true;
+                    }
+                }
+                ArrayRepr::U32(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int() as u32;
+                        return true;
+                    }
+                }
+                ArrayRepr::F32(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_f64() {
+                        v[idx] = val.as_f64() as f32;
                         return true;
                     }
                 }
@@ -781,6 +923,48 @@ impl VmArray {
                         return;
                     }
                 }
+                ArrayRepr::I8(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as i8);
+                        return;
+                    }
+                }
+                ArrayRepr::I16(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as i16);
+                        return;
+                    }
+                }
+                ArrayRepr::I32(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as i32);
+                        return;
+                    }
+                }
+                ArrayRepr::U8(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as u8);
+                        return;
+                    }
+                }
+                ArrayRepr::U16(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as u16);
+                        return;
+                    }
+                }
+                ArrayRepr::U32(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int() as u32);
+                        return;
+                    }
+                }
+                ArrayRepr::F32(v) => {
+                    if val.is_f64() {
+                        v.push(val.as_f64() as f32);
+                        return;
+                    }
+                }
             }
         }
         self.push_repr_change(val);
@@ -818,6 +1002,13 @@ impl VmArray {
             ArrayRepr::Boxed(v) => v.pop(),
             ArrayRepr::I64(v) => v.pop().map(VmValue::from_int),
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
+            ArrayRepr::I8(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::I16(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::I32(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::U8(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::U16(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::U32(v) => v.pop().map(|n| VmValue::from_int(n as i64)),
+            ArrayRepr::F32(v) => v.pop().map(|f| VmValue::from_f64(f as f64)),
         }
     }
     /// Box every element of a typed repr and swap the repr to `Boxed` through
@@ -834,6 +1025,13 @@ impl VmArray {
                 let boxed: Vec<VmValue> = match repr {
                     ArrayRepr::I64(v) => v.iter().map(|&n| VmValue::from_int(n)).collect(),
                     ArrayRepr::F64(v) => v.iter().map(|&f| VmValue::from_f64(f)).collect(),
+                    ArrayRepr::I8(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::I16(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::I32(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::U8(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::U16(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::U32(v) => v.iter().map(|&n| VmValue::from_int(n as i64)).collect(),
+                    ArrayRepr::F32(v) => v.iter().map(|&f| VmValue::from_f64(f as f64)).collect(),
                     ArrayRepr::Boxed(_) => unreachable!(),
                 };
                 *repr = ArrayRepr::Boxed(boxed);

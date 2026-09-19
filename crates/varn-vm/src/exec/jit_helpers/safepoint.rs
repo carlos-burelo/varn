@@ -31,7 +31,10 @@ pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let base = ctx_ref.frames[frame_idx].base;
-        ctx_ref.close_upvalues_above(base + lowest);
+        // Fase A: `lowest` es un registro del frame actual, no un índice
+        // absoluto del almacén; `close_upvalues_from_reg` traduce cada
+        // upvalue abierto a registro dentro de la activación.
+        let alloc = ctx_ref.frames[frame_idx].base;
+        ctx_ref.close_upvalues_from_reg(alloc, lowest);
     }
 }

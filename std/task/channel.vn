@@ -10,7 +10,7 @@ import {
 
 export { Sender, Receiver, Channel, ChannelClosed, IsolateHandle };
 
-export function channel<T = dynamic>(capacity: int): Channel<T> {
+export function channel<T>(capacity: int): Channel<T> {
     return channel$<T>(capacity);
 }
 

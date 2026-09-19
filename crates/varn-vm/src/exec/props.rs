@@ -105,9 +105,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             let layout = cls.as_ref().map(|c| c.get_or_compute_layout());
             let field = layout.as_ref().and_then(|l| l.get_field(key));
             if let Some(f) = field {
-                let offset = f.offset as usize;
-                if offset + 16 <= inst.payload_size as usize {
-                    unsafe { inst.write_vm_value(offset, val) };
+                if inst.write_field(f, val).is_ok() {
                     heap.write_barrier(idx, val);
                     return Ok(());
                 }
@@ -290,18 +288,18 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
             let cls = ClassObj::find_by_id(inst.class_id)?;
             let layout = cls.get_or_compute_layout();
             let f = layout.get_field(key)?;
-            let offset = f.offset as usize;
-            if offset + 16 <= inst.payload_size as usize {
-                Some(unsafe { inst.read_vm_value(offset) })
-            } else {
-                None
-            }
+            inst.read_field(f)
         }
         Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
         Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a))
             if key == varn_core::MemberKey::Length.as_str() =>
         {
             Some(VmValue::from_int(a.len() as i64))
+        }
+        Some(HeapObj::Buffer(b))
+            if key == varn_core::MemberKey::Length.as_str() =>
+        {
+            Some(VmValue::from_int(b.len() as i64))
         }
         Some(HeapObj::Range(r)) => {
             if key == varn_core::MemberKey::Start.as_str() {
@@ -420,6 +418,12 @@ fn resolve_specialized_value_property(
             }
             None
         }
+        Value::Buffer(b) => {
+            if key == varn_core::MemberKey::Length.as_str() {
+                return Some(Ok(Value::Int(b.len() as i64)));
+            }
+            None
+        }
         Value::Map(m) => {
             let found = heap
                 .lookup_str_map_key(key)
@@ -499,7 +503,7 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
                 return heap.get_intrinsic_class(IntrinsicType::Range.as_str())
             }
             Some(HeapObj::Buffer(_)) => {
-                return heap.get_intrinsic_class(IntrinsicType::Buffer.as_str())
+                return heap.get_intrinsic_class(IntrinsicType::Bytes.as_str())
             }
             Some(HeapObj::Generator(_)) => {
                 return heap.get_intrinsic_class(IntrinsicType::Generator.as_str())
@@ -595,12 +599,7 @@ fn resolve_instance_meta_property(
                 cls.get_or_compute_layout()
                     .fields
                     .iter()
-                    .filter(|f| f.offset as usize + 16 <= inst.payload_size as usize)
-                    .map(|f| {
-                        (Rc::clone(&f.name), unsafe {
-                            inst.read_vm_value(f.offset as usize)
-                        })
-                    }),
+                    .filter_map(|f| inst.read_field(f).map(|v| (Rc::clone(&f.name), v))),
             ));
             let native = match key {
                 MemberKey::Keys => meta_keys_native,

@@ -294,6 +294,14 @@ impl<'r> super::super::Binder<'r> {
             .collect();
         self.define(e.id, sym);
 
+        self.sum_type_variants.insert(
+            Rc::from(self.interner.resolve(e.id)),
+            e.members
+                .iter()
+                .map(|m| Rc::from(self.interner.resolve(m.id)))
+                .collect(),
+        );
+
         let mut variants_info = Vec::new();
 
         for member in e.members.iter() {

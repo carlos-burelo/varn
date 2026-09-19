@@ -229,6 +229,11 @@ fn print_proto(
                 let w1 = w!();
                 format!("r{} = r{}", hi(op_val), hi(w1))
             }
+            OpCode::CheckNarrowRange => {
+                let w1 = w!();
+                let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
+                format!("r{} narrow-check {}", hi(w1), tag.name())
+            }
             OpCode::AssertNotNull => {
                 let w1 = w!();
                 format!("assert r{}", hi(w1))

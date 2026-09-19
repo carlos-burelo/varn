@@ -173,11 +173,7 @@ impl NativeCtx for ExecCtx {
                 let cls = ClassObj::find_by_id(inst.class_id)?;
                 let layout = cls.get_or_compute_layout();
                 let f = layout.get_field(key)?;
-                let offset = f.offset as usize;
-                if offset + 16 <= inst.payload_size as usize {
-                    return Some(unsafe { inst.read_vm_value(offset) });
-                }
-                return None;
+                return inst.read_field(f);
             }
 
             if let Some(HeapObj::Module(m)) = self.heap.get(obj.as_heap_idx()) {
@@ -195,13 +191,12 @@ impl NativeCtx for ExecCtx {
                 o.set_field_nv(std::rc::Rc::from(key), val);
                 self.heap.write_barrier(idx, val);
             } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
-                let maybe_field = ClassObj::find_by_id(inst.class_id)
+                let inst = inst.clone();
+                let field = ClassObj::find_by_id(inst.class_id)
                     .map(|cls| cls.get_or_compute_layout())
-                    .and_then(|layout| layout.get_field(key).map(|f| f.offset as usize));
-                if let Some(offset) = maybe_field {
-                    let inst = inst.clone();
-                    if offset + 16 <= inst.payload_size as usize {
-                        unsafe { inst.write_vm_value(offset, val) };
+                    .and_then(|layout| layout.get_field(key).cloned());
+                if let Some(f) = field {
+                    if inst.write_field(&f, val).is_ok() {
                         self.heap.write_barrier(idx, val);
                     }
                 }
@@ -298,27 +293,43 @@ impl NativeCtx for ExecCtx {
         None
     }
 
+    fn buffer_to_bytes(&self, v: VmValue) -> Option<Vec<u8>> {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                return Some(b.as_slice().to_vec());
+            }
+        }
+        None
+    }
+
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
-        let orig_len = self.stack.len();
-        self.stack.push(callee);
-        self.stack.extend_from_slice(args);
+        // La ventana vive en staging (no en el almacén): se consume al
+        // preparar y se limpia al salir, como el `truncate(orig_len)`.
+        self.stage.clear();
+        self.stage.push(callee);
+        self.stage.extend_from_slice(args);
         let prepared = match self.prepare_call(callee, args.len() + 1) {
             Ok(p) => p,
             Err(e) => {
-                self.stack.truncate(orig_len);
+                self.stage.clear();
                 return Err(e.message);
             }
         };
         let res = match prepared {
             PreparedCall::NativeImmediate(f, arg_count) => {
-                let args_start = self.stack.len() - arg_count;
-                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
+                // La ventana vive al FINAL de staging (ver dispatch_prepared_call).
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
+                self.stage.clear();
                 (f)(self as &mut dyn NativeCtx, &vm_args)
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
-                let args_start = self.stack.len() - arg_count;
-                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
-                let slice = if arg_count > 0 {
+                let take = arg_count.min(self.stage.len());
+                let start = self.stage.len() - take;
+                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
+                self.stage.clear();
+                let slice = if vm_args.len() > 0 {
                     &vm_args[1..]
                 } else {
                     &vm_args[..]
@@ -327,28 +338,28 @@ impl NativeCtx for ExecCtx {
             }
             PreparedCall::Frame(frame) => {
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
                 self.frames.push(frame);
                 self.run_until(depth).map_err(|e| e.message)
             }
-            PreparedCall::PushValue(nv) => Ok(nv),
+            PreparedCall::PushValue(nv) => {
+                self.stage.clear();
+                Ok(nv)
+            }
             PreparedCall::Generator {
                 closure,
                 args,
                 current_class,
-            } => Ok(self.build_generator(closure, args, current_class)),
+            } => {
+                let v = self.build_generator(closure, args, current_class);
+                self.stage.clear();
+                Ok(v)
+            }
             PreparedCall::Constructor(frame, instance_nv) => {
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
                 self.frames.push(frame);
                 self.pending_constructors.push((depth, instance_nv));
                 let _ = self.run_until(depth).map_err(|e| e.message)?;
+                self.stage.clear();
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
@@ -358,10 +369,11 @@ impl NativeCtx for ExecCtx {
                 } else {
                     result
                 };
+                self.stage.clear();
                 Ok(nv)
             }
         };
-        self.stack.truncate(orig_len);
+        self.stage.clear();
         res
     }
 

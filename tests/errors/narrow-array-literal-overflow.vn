@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+// 300 no cabe en i8: debe fallar en compilacion, no truncarse en runtime.
+let bad: Array<i8> = [300]
+print(bad[0])

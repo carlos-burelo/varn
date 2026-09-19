@@ -1,5 +1,10 @@
 import { parse$, stringify$ } from "runtime:csv";
-import { CsvOptions } from "std:csv/types";
+
+export interface CsvOptions {
+    delimiter?: str;
+    hasHeader?: bool;
+    trim?: bool;
+}
 
 export namespace CSV {
     export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {
@@ -8,15 +13,11 @@ export namespace CSV {
         let trim = true;
 
         if (options != null) {
-            if (options.delimiter != null) {
-                delim = options.delimiter;
-            }
-            if (options.hasHeader != null) {
-                hasHeader = options.hasHeader;
-            }
-            if (options.trim != null) {
-                trim = options.trim;
-            }
+            // Los miembros de CsvOptions son opcionales (`T?`): su lectura
+            // da null cuando el campo no vino. `??` aplica el default.
+            delim = options.delimiter ?? delim;
+            hasHeader = options.hasHeader ?? hasHeader;
+            trim = options.trim ?? trim;
         }
 
         return parse$(text, delim, hasHeader, trim) as T[];
@@ -26,9 +27,7 @@ export namespace CSV {
         let delim = ",";
 
         if (options != null) {
-            if (options.delimiter != null) {
-                delim = options.delimiter;
-            }
+            delim = options.delimiter ?? delim;
         }
 
         return stringify$(rows, delim);
