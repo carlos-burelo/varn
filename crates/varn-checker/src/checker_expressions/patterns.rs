@@ -29,7 +29,7 @@ impl<'r> Checker<'r> {
                 }
             }
             Pattern::Array { elements, rest, .. } => {
-                let elem_ty = value_ty.get_array_element_type();
+                let elem_ty = value_ty.get_array_element_type(&self.ty_table);
                 for el in elements.iter().flatten() {
                     self.check_pattern(&el.pattern, &elem_ty, bind);
                 }
@@ -121,7 +121,7 @@ impl<'r> Checker<'r> {
                 }
             }
             MatchPattern::Sequence(pats) => {
-                let elem_ty = value_ty.get_array_element_type();
+                let elem_ty = value_ty.get_array_element_type(&self.ty_table);
                 for p in pats {
                     self.check_pattern_match(p, &elem_ty, bind);
                 }
@@ -149,11 +149,20 @@ impl<'r> Checker<'r> {
         value_ty: &Type,
         bind: &BindResult,
     ) -> Option<VariantSubst> {
-        let (parent, args, origin) = match &value_ty.0 {
-            TypeKind::Generic(n, a, o) => (Some(n.clone()), a.clone(), o.clone()),
-            TypeKind::Named(n, o) => (Some(n.clone()), Vec::new(), o.clone()),
-            _ => (None, Vec::new(), None),
-        };
+        let (parent, args, origin): (Option<std::rc::Rc<str>>, Vec<Type>, Option<std::rc::Rc<str>>) =
+            match *self.ty_table.get(value_ty.0) {
+                TypeKind::Generic(n, a, o) => (
+                    Some(std::rc::Rc::from(bind.interner.resolve(n))),
+                    self.ty_table.get_list(a).iter().map(|id| Type(*id, false)).collect(),
+                    o.map(|o| std::rc::Rc::from(bind.interner.resolve(o))),
+                ),
+                TypeKind::Named(n, o) => (
+                    Some(std::rc::Rc::from(bind.interner.resolve(n))),
+                    Vec::new(),
+                    o.map(|o| std::rc::Rc::from(bind.interner.resolve(o))),
+                ),
+                _ => (None, Vec::new(), None),
+            };
 
         // Fields: this module first, then the module that defines the type.
         let mut fields = bind.sum_variant_fields.get(variant).cloned();

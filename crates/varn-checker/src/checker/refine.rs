@@ -81,12 +81,12 @@ impl<'r> Checker<'r> {
             } => {
                 let (object, property, computed) = (*object, *property, *computed);
                 let obj = self.refine(object, bind)?;
-                let TypeKind::Array(elem) = &obj.0 else {
+                let TypeKind::Array(elem) = *self.ty_table.get(obj.0) else {
                     return None;
                 };
                 if computed {
                     // `x[i]` on a proved `Array<T>` is a `T`.
-                    Some((**elem).clone())
+                    Some(Type(elem, false))
                 } else if matches!(
                     &arena.expr(property).kind,
                     ExprKind::Identifier { name }
@@ -124,7 +124,7 @@ impl<'r> Checker<'r> {
                 }
                 let l = l_ref.unwrap_or_else(|| self.checked_ty(left));
                 let r = r_ref.unwrap_or_else(|| self.checked_ty(right));
-                numeric_result(&op, &l, &r)
+                numeric_result(&op, &l, &r, &self.ty_table)
             }
 
             _ => None,
@@ -159,10 +159,15 @@ impl<'r> Checker<'r> {
 /// Result type of an arithmetic operator over two operand types, following the
 /// language's numeric rules (`int / int` is a float; `int` op `int` is an
 /// `int`). Anything not both-numeric yields no refinement.
-fn numeric_result(op: &BinaryOp, l: &Type, r: &Type) -> Option<Type> {
+fn numeric_result(
+    op: &BinaryOp,
+    l: &Type,
+    r: &Type,
+    table: &crate::types::CheckerTyTable,
+) -> Option<Type> {
     use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
 
-    let operand = |t: &Type| match &t.0 {
+    let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
             TypeTag::Int
                 | TypeTag::I8
