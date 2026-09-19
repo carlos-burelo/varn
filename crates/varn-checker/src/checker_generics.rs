@@ -1,12 +1,11 @@
 use crate::binder::{pattern_lead_name, BindResult};
 use crate::checker::Checker;
 use crate::symbol::SymbolKind;
-use crate::types::{FunctionParam, FunctionType, Type};
+use crate::types::{CheckerTyTable, FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{Arg, ArrowBody, ExprId, ExprKind, Param, StmtId, StmtKind, TypeNode};
 use varn_core::TypeKind;
-
 
 pub(crate) fn build_call_mapping(
     callee: ExprId,
@@ -74,7 +73,14 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Named { value, .. } => checker.infer_type(*value, bind),
             Arg::Spread(_) => continue,
         };
-        collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
+        collect_type_inferences(
+            &Type(param.ty, false),
+            &arg_ty,
+            type_params,
+            &mut mapping,
+            &mut checker.ty_table,
+            &bind.interner,
+        );
     }
 
     for (param, arg) in param_types.iter().zip(args.iter()) {
@@ -89,13 +95,21 @@ pub(crate) fn infer_mapping_from_args(
             continue;
         }
 
-        let mapped_param_ty = map_generics_cached(checker, &param.ty, &mapping);
+        let mapped_param_ty = map_generics_cached(checker, &Type(param.ty, false), &mapping);
         let arg_ty = match arg {
             Arg::Positional(e) => {
-                if let TypeKind::Fn(expected_fn) = &mapped_param_ty.0 {
-                    if let Some(concrete) = infer_arrow_with_context(*e, expected_fn, checker, bind)
-                    {
-                        collect_type_inferences(&param.ty, &concrete, type_params, &mut mapping);
+                let mapped_kind = *checker.ty_table.get(mapped_param_ty.0);
+                if let TypeKind::Fn(fid) = mapped_kind {
+                    let expected_fn = checker.ty_table.get_function(fid).clone();
+                    if let Some(concrete) = infer_arrow_with_context(*e, &expected_fn, checker, bind) {
+                        collect_type_inferences(
+                            &Type(param.ty, false),
+                            &concrete,
+                            type_params,
+                            &mut mapping,
+                            &mut checker.ty_table,
+                            &bind.interner,
+                        );
                         continue;
                     }
                 }
@@ -104,7 +118,14 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Named { value, .. } => checker.infer_type(*value, bind),
             Arg::Spread(_) => continue,
         };
-        collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
+        collect_type_inferences(
+            &Type(param.ty, false),
+            &arg_ty,
+            type_params,
+            &mut mapping,
+            &mut checker.ty_table,
+            &bind.interner,
+        );
     }
 
     mapping
@@ -119,6 +140,8 @@ fn infer_arrow_with_context(
     let ExprKind::Arrow { params, body, .. } = &checker.ast_arena.expr(expr).kind else {
         return None;
     };
+    let params = params.clone();
+    let body = (**body).clone();
 
     let mut actual_params = Vec::new();
     for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
@@ -133,13 +156,13 @@ fn infer_arrow_with_context(
 
         actual_params.push(FunctionParam {
             name: Some(Rc::from(pattern_lead_name(&ap.pattern, &bind.interner))),
-            ty: explicit_ty.unwrap_or_else(|| ep.ty.clone()),
+            ty: explicit_ty.map(|t| t.0).unwrap_or(ep.ty),
             optional: ap.is_optional,
             is_rest: ap.is_rest,
         });
     }
 
-    let arrow_scope = find_arrow_scope(checker.current_scope, params, bind);
+    let arrow_scope = find_arrow_scope(checker.current_scope, &params, bind);
     let saved_scope = checker.current_scope;
 
     if let Some(scope_id) = arrow_scope {
@@ -164,14 +187,14 @@ fn infer_arrow_with_context(
                         })
                         .map(|m| checker.resolve_type_node_cached(m, bind));
 
-                    let ty = explicit_ty.unwrap_or_else(|| ep.ty.clone());
+                    let ty = explicit_ty.unwrap_or(Type(ep.ty, false));
                     checker.symbol_types.insert(sym_id, ty);
                 }
             }
         }
     }
 
-    let ret_ty = match body.as_ref() {
+    let ret_ty = match &body {
         ArrowBody::Expr(e) => {
             let e = *e;
             let saved_pipeline = checker.in_pipeline_rhs;
@@ -192,7 +215,7 @@ fn infer_arrow_with_context(
             } else if returns.len() == 1 {
                 returns.pop().expect("returns len==1 but pop failed")
             } else {
-                Type::union(returns)
+                Type::union(returns, &mut checker.ty_table)
             }
         }
     };
@@ -201,12 +224,15 @@ fn infer_arrow_with_context(
         checker.current_scope = saved_scope;
     }
 
-    Some(Type::fn_(FunctionType {
-        params: actual_params,
-        return_type: Box::new(ret_ty),
-        is_arrow: true,
-        type_params: Vec::new(),
-    }))
+    Some(Type::fn_(
+        FunctionType {
+            params: actual_params,
+            return_type: ret_ty.0,
+            is_arrow: true,
+            type_params: Vec::new(),
+        },
+        &mut checker.ty_table,
+    ))
 }
 
 pub(crate) fn find_arrow_scope(
@@ -251,7 +277,8 @@ pub(crate) fn find_arrow_scope(
 fn collect_returns(stmt: StmtId, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {
     match &checker.ast_arena.stmt(stmt).kind {
         StmtKind::Block { stmts } => {
-            for &s in stmts {
+            let stmts = stmts.clone();
+            for s in stmts {
                 collect_returns(s, out, checker, bind);
             }
         }
@@ -283,38 +310,83 @@ pub(crate) fn collect_type_inferences(
     actual: &Type,
     params: &[Rc<str>],
     out: &mut FxHashMap<Rc<str>, Type>,
+    table: &mut CheckerTyTable,
+    interner: &varn_core::AtomInterner,
 ) {
-    match &expected.0 {
-        TypeKind::Named(name, _origin) if params.contains(name) => {
-            let entry = out.entry(name.clone()).or_insert_with(|| actual.clone());
+    let expected_kind = *table.get(expected.0);
+    match expected_kind {
+        TypeKind::Named(name, _origin) if params.iter().any(|p| p.as_ref() == interner.resolve(name)) => {
+            let name_rc: Rc<str> = Rc::from(interner.resolve(name));
+            let entry = out.entry(name_rc).or_insert(*actual);
             if entry != actual {
-                *entry = Type::union(vec![entry.clone(), actual.clone()]);
+                *entry = Type::union(vec![*entry, *actual], table);
             }
         }
         TypeKind::Generic(_, e_args, _) => {
-            if let TypeKind::Generic(_, a_args, _) = &actual.0 {
-                for (ea, aa) in e_args.iter().zip(a_args.iter()) {
-                    collect_type_inferences(ea, aa, params, out);
+            if let TypeKind::Generic(_, a_args, _) = *table.get(actual.0) {
+                let e_ids = table.get_list(e_args).to_vec();
+                let a_ids = table.get_list(a_args).to_vec();
+                for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
+                    collect_type_inferences(
+                        &Type(*ea, false),
+                        &Type(*aa, false),
+                        params,
+                        out,
+                        table,
+                        interner,
+                    );
                 }
             }
         }
         TypeKind::Array(e_inner) => {
-            if let TypeKind::Array(a_inner) = &actual.0 {
-                collect_type_inferences(e_inner, a_inner, params, out);
+            if let TypeKind::Array(a_inner) = *table.get(actual.0) {
+                collect_type_inferences(
+                    &Type(e_inner, false),
+                    &Type(a_inner, false),
+                    params,
+                    out,
+                    table,
+                    interner,
+                );
             }
         }
-        TypeKind::Fn(e_ft) => {
-            if let TypeKind::Fn(a_ft) = &actual.0 {
+        TypeKind::Fn(e_fid) => {
+            if let TypeKind::Fn(a_fid) = *table.get(actual.0) {
+                let e_ft = table.get_function(e_fid).clone();
+                let a_ft = table.get_function(a_fid).clone();
                 for (ep, ap) in e_ft.params.iter().zip(a_ft.params.iter()) {
-                    collect_type_inferences(&ep.ty, &ap.ty, params, out);
+                    collect_type_inferences(
+                        &Type(ep.ty, false),
+                        &Type(ap.ty, false),
+                        params,
+                        out,
+                        table,
+                        interner,
+                    );
                 }
-                collect_type_inferences(&e_ft.return_type, &a_ft.return_type, params, out);
+                collect_type_inferences(
+                    &Type(e_ft.return_type, false),
+                    &Type(a_ft.return_type, false),
+                    params,
+                    out,
+                    table,
+                    interner,
+                );
             }
         }
         TypeKind::Union(e_members) => {
-            if let TypeKind::Union(a_members) = &actual.0 {
-                for (ea, aa) in e_members.iter().zip(a_members.iter()) {
-                    collect_type_inferences(ea, aa, params, out);
+            if let TypeKind::Union(a_members) = *table.get(actual.0) {
+                let e_ids = table.get_list(e_members).to_vec();
+                let a_ids = table.get_list(a_members).to_vec();
+                for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
+                    collect_type_inferences(
+                        &Type(*ea, false),
+                        &Type(*aa, false),
+                        params,
+                        out,
+                        table,
+                        interner,
+                    );
                 }
             }
         }
@@ -322,8 +394,8 @@ pub(crate) fn collect_type_inferences(
     }
 }
 
-fn is_generic_possible(ty: &Type) -> bool {
-    !matches!(&ty.0, TypeKind::Intrinsic(_) | TypeKind::This)
+fn is_generic_possible(ty: &Type, table: &CheckerTyTable) -> bool {
+    !matches!(table.get(ty.0), TypeKind::Intrinsic(_) | TypeKind::This)
 }
 
 pub(crate) fn map_generics_cached(
@@ -331,28 +403,35 @@ pub(crate) fn map_generics_cached(
     base: &Type,
     mapping: &FxHashMap<Rc<str>, Type>,
 ) -> Type {
-    if mapping.is_empty() || !is_generic_possible(base) {
-        return base.clone();
+    if mapping.is_empty() || !is_generic_possible(base, &checker.ty_table) {
+        return *base;
     }
 
-    if let TypeKind::Named(n, _) = &base.0 {
-        if let Some(t) = mapping.get(n) {
-            return t.clone();
+    // Atom-keyed view of `mapping`, since `Type::map_generics` compares
+    // against `TypeKind::Named`'s own `Atom` slot, not a source-text name.
+    let atom_mapping: FxHashMap<varn_core::Atom, Type> = mapping
+        .iter()
+        .map(|(k, v)| (checker.resolver.intern(k), *v))
+        .collect();
+
+    if let TypeKind::Named(n, _) = *checker.ty_table.get(base.0) {
+        if let Some(t) = atom_mapping.get(&n) {
+            return *t;
         } else {
-            return base.clone();
+            return *base;
         }
     }
 
     let sorted_args: Vec<Type> = {
         let mut pairs: Vec<(&Rc<str>, &Type)> = mapping.iter().collect();
-        pairs.sort_by_key(|(a, _)| *a);
-        pairs.into_iter().map(|(_, v)| v.clone()).collect()
+        pairs.sort_by_key(|(a, _)| a.clone());
+        pairs.into_iter().map(|(_, v)| *v).collect()
     };
-    let key = (base.clone(), sorted_args);
+    let key = (*base, sorted_args);
     if let Some(cached) = checker.map_generics_cache.get(&key) {
-        return cached.clone();
+        return *cached;
     }
-    let result = base.map_generics(mapping);
-    checker.map_generics_cache.insert(key, result.clone());
+    let result = base.map_generics(&atom_mapping, &mut checker.ty_table);
+    checker.map_generics_cache.insert(key, result);
     result
 }

@@ -21,26 +21,31 @@ impl<'r> Checker<'r> {
             _ => return Type::Dynamic,
         };
 
-        let callee_ty = self.infer_type(callee, bind).non_nullified();
+        let callee_ty_raw = self.infer_type(callee, bind);
+        let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
+        let callee_kind = *self.ty_table.get(callee_ty.0);
 
-        if let TypeKind::Named(class_name, _) = &callee_ty.0 {
+        if let TypeKind::Named(class_name, _) = callee_kind {
+            let class_name_str = bind.interner.resolve(class_name).to_string();
             if !type_args.is_empty() {
                 let resolved: Vec<Type> = type_args
                     .iter()
                     .map(|a| self.resolve_type_node_cached(a, bind))
                     .collect();
-                return Type::generic(class_name.clone(), resolved);
+                return Type::generic(class_name_str, resolved, self.resolver, &mut self.ty_table);
             }
-            return Type::named(class_name.clone());
+            return Type::named(class_name_str, self.resolver, &mut self.ty_table);
         }
-        let TypeKind::Fn(ft) = &callee_ty.0 else {
+        let TypeKind::Fn(fid) = callee_kind else {
             return Type::Dynamic;
         };
+        let ft = self.ty_table.get_function(fid).clone();
 
-        let mapping = build_call_mapping(callee, &type_args, &args, ft, self, bind);
-        let ret = map_generics_cached(self, &ft.return_type, &mapping);
+        let mapping = build_call_mapping(callee, &type_args, &args, &ft, self, bind);
+        let ret = map_generics_cached(self, &Type(ft.return_type, false), &mapping);
 
-        let ret = if matches!(ret.0, TypeKind::This) {
+        let ret_kind = *self.ty_table.get(ret.0);
+        let ret = if matches!(ret_kind, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
                 let receiver_ty = self.infer_type(*object, bind);
                 if !receiver_ty.is_dynamic() {
@@ -71,10 +76,9 @@ impl<'r> Checker<'r> {
     ) -> Type {
         let expected_params: Vec<FunctionParam> = self
             .expected_type
-            .as_ref()
             .and_then(|t| {
-                if let TypeKind::Fn(ft) = &t.0 {
-                    Some(ft.params.clone())
+                if let TypeKind::Fn(fid) = self.ty_table.get(t.0) {
+                    Some(self.ty_table.get_function(*fid).params.clone())
                 } else {
                     None
                 }
@@ -95,7 +99,10 @@ impl<'r> Checker<'r> {
                     })
                     .map(|m| self.resolve_type_node_cached(m, bind))
                     .or_else(|| {
-                        expected_params.get(i).map(|ep| ep.ty.clone()).filter(|t| !t.is_dynamic())
+                        expected_params
+                            .get(i)
+                            .map(|ep| Type(ep.ty, false))
+                            .filter(|t| !t.is_dynamic())
                     })
                     .unwrap_or_else(|| {
                         if self.warn_implicit_dynamic && !name.is_empty() && name != "_" {
@@ -106,12 +113,15 @@ impl<'r> Checker<'r> {
                         }
                         Type::Dynamic
                     });
-                if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
-                    ty = Type::array(ty);
+                if p.is_rest {
+                    let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                    if !is_array {
+                        ty = Type::array(ty, &mut self.ty_table);
+                    }
                 }
                 FunctionParam {
                     name: Some(Rc::from(name)),
-                    ty,
+                    ty: ty.0,
                     optional: p.is_optional || p.default.is_some(),
                     is_rest: p.is_rest,
                 }
@@ -139,7 +149,7 @@ impl<'r> Checker<'r> {
                     .get(name)
                     .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
                 {
-                    self.symbol_types.insert(sym_id, fp.ty.clone());
+                    self.symbol_types.insert(sym_id, Type(fp.ty, false));
                 }
             }
         }
@@ -154,7 +164,7 @@ impl<'r> Checker<'r> {
                     match return_tys.len() {
                         0 => Type::Void,
                         1 => return_tys.into_iter().next().unwrap(),
-                        _ => Type::union(return_tys),
+                        _ => Type::union(return_tys, &mut self.ty_table),
                     }
                 }
             }
@@ -164,11 +174,21 @@ impl<'r> Checker<'r> {
             self.current_scope = saved_scope;
         }
 
-        Type::fn_(FunctionType {
-            params: ps,
-            return_type: Box::new(crate::types::async_fn_return(ret_ty, is_async)),
-            is_arrow: true,
-            type_params: vec![],
-        })
+        let ret_ty = crate::types::async_fn_return(
+            ret_ty,
+            is_async,
+            &mut self.ty_table,
+            &bind.interner,
+            Some(self.resolver),
+        );
+        Type::fn_(
+            FunctionType {
+                params: ps,
+                return_type: ret_ty.0,
+                is_arrow: true,
+                type_params: vec![],
+            },
+            &mut self.ty_table,
+        )
     }
 }

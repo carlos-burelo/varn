@@ -1,6 +1,6 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
+use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 use varn_core::TypeTag;
@@ -16,9 +16,9 @@ pub(super) fn infer_member_type(
 ) -> Type {
     let arena = checker.ast_arena;
     let obj_ty_raw = checker.infer_type(object, bind);
-    let obj_ty = obj_ty_raw.non_nullified();
+    let obj_ty = obj_ty_raw.non_nullified(&mut checker.ty_table);
     let obj_ty = if matches!(
-        obj_ty.0,
+        checker.ty_table.get(obj_ty.0),
         varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Never)
     ) {
         obj_ty_raw
@@ -31,14 +31,16 @@ pub(super) fn infer_member_type(
             expr,
             arena,
             Some(&crate::binder::BindView::new(bind, checker.resolver)),
+            &mut checker.ty_table,
         );
     };
 
     let prop_name_str = bind.interner.resolve(*prop_name);
-    match &obj_ty.0 {
+    let obj_kind = *checker.ty_table.get(obj_ty.0);
+    match obj_kind {
         TypeKind::Array(_elem) => {
             if prop_name_str == varn_core::MemberKey::Length.as_str() {
-                return Type::intrinsic(TypeTag::Int);
+                return Type::intrinsic(TypeTag::Int, &mut checker.ty_table);
             }
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
@@ -61,12 +63,13 @@ pub(super) fn infer_member_type(
         expr,
         arena,
         Some(&crate::binder::BindView::new(bind, checker.resolver)),
+        &mut checker.ty_table,
     )
 }
 
-pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
-    if let TypeKind::Named(name, _) = &ty.0 {
-        match name.as_ref() {
+pub(crate) fn normalize_for_binary(ty: &Type, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> Type {
+    if let TypeKind::Named(name, _) = table.get(ty.0) {
+        match interner.resolve(*name) {
             n if n == varn_core::IntrinsicType::Str.as_str() => return Type::Str,
             n if n == varn_core::IntrinsicType::Int.as_str() => return Type::Int,
             n if n == varn_core::IntrinsicType::Float.as_str() => return Type::Float,
@@ -75,7 +78,7 @@ pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
             _ => {}
         }
     }
-    ty.clone()
+    *ty
 }
 
 pub(super) fn infer_binary_type(
@@ -97,23 +100,25 @@ pub(super) fn infer_binary_type(
         | BinaryOp::Instanceof
         | BinaryOp::In => Type::Bool,
         _ => {
-            let l = normalize_for_binary(&base_type(&checker.infer_type(left, bind)));
-            let r = normalize_for_binary(&base_type(&checker.infer_type(right, bind)));
+            let l_raw = base_type(&checker.infer_type(left, bind));
+            let r_raw = base_type(&checker.infer_type(right, bind));
+            let l = normalize_for_binary(&l_raw, &checker.ty_table, &bind.interner);
+            let r = normalize_for_binary(&r_raw, &checker.ty_table, &bind.interner);
             if l.is_dynamic() || r.is_dynamic() {
                 return Type::Dynamic.tainted();
             }
             match op {
                 BinaryOp::Add => {
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Str))
-                        || matches!(r.0, TypeKind::Intrinsic(TypeTag::Str))
+                    if matches!(checker.ty_table.get(l.0), TypeKind::Intrinsic(TypeTag::Str))
+                        || matches!(checker.ty_table.get(r.0), TypeKind::Intrinsic(TypeTag::Str))
                     {
                         return Type::Str;
                     }
-                    crate::binder::type_inference::numeric_binary_type(op, &l, &r)
+                    crate::binder::type_inference::numeric_binary_type(op, &l, &r, &checker.ty_table)
                         .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    crate::binder::type_inference::numeric_binary_type(op, &l, &r)
+                    crate::binder::type_inference::numeric_binary_type(op, &l, &r, &checker.ty_table)
                         .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::BitAnd
@@ -123,7 +128,7 @@ pub(super) fn infer_binary_type(
                 | BinaryOp::Shr
                 | BinaryOp::UShr => {
                     if l.is_int() && r.is_int() {
-                        return Type::intrinsic(TypeTag::Int);
+                        return Type::intrinsic(TypeTag::Int, &mut checker.ty_table);
                     }
                     Type::Dynamic.tainted()
                 }
