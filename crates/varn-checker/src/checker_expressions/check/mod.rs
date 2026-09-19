@@ -119,7 +119,7 @@ impl<'r> Checker<'r> {
                     .map(|rt| self.resolve_type_node_cached(rt, bind))
                     .or_else(|| self.expected_return_from_fn_type());
                 self.expected_return_type = if is_async {
-                    resolved_ret.map(|t| crate::types::awaited(&t))
+                    resolved_ret.map(|t| crate::types::awaited(&t, &self.ty_table, &bind.interner))
                 } else {
                     resolved_ret
                 };
@@ -133,15 +133,19 @@ impl<'r> Checker<'r> {
                 let mut injected_type_params: Vec<Rc<str>> = vec![];
                 if let Some(expected_fn) = self.expected_fn_type() {
                     for ep in &expected_fn.params {
-                        if let varn_core::TypeKind::Named(n, _) = &ep.ty.0 {
-                            if !varn_core::IntrinsicType::from_str(n.as_ref()).is_some() {
-                                injected_type_params.push(n.clone());
+                        if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
+                            let n_str = bind.interner.resolve(*n);
+                            if varn_core::IntrinsicType::from_str(n_str).is_none() {
+                                injected_type_params.push(Rc::from(n_str));
                             }
                         }
                     }
-                    if let varn_core::TypeKind::Named(n, _) = &expected_fn.return_type.0 {
-                        if !varn_core::IntrinsicType::from_str(n.as_ref()).is_some() {
-                            injected_type_params.push(n.clone());
+                    if let varn_core::TypeKind::Named(n, _) =
+                        self.ty_table.get(expected_fn.return_type)
+                    {
+                        let n_str = bind.interner.resolve(*n);
+                        if varn_core::IntrinsicType::from_str(n_str).is_none() {
+                            injected_type_params.push(Rc::from(n_str));
                         }
                     }
                     for tp in &injected_type_params {
@@ -163,19 +167,22 @@ impl<'r> Checker<'r> {
                         let expected_ret = self.expected_return_type.clone();
                         self.with_expected(expected_ret, |c| c.check_expr(e, bind));
                         let actual = self.infer_type(e, bind);
-                        if let Some(expected) = self.expected_return_type.clone() {
-                            let is_tp = matches!(&expected.0, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
+                        if let Some(expected) = self.expected_return_type {
+                            let expected_kind = *self.ty_table.get(expected.0);
+                            let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                             let is_void = matches!(
-                                expected.0,
+                                expected_kind,
                                 varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Void)
                             );
                             if !is_tp
                                 && !is_void
                                 && !self.types_compatible_cached(&expected, &actual, Some(bind))
                             {
+                                let expected_s = expected.display(&self.ty_table, &bind.interner);
+                                let actual_s = actual.display(&self.ty_table, &bind.interner);
                                 self.emit(
                                     Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                        "type mismatch: arrow function is declared to return '{expected}', but returns '{actual}'"
+                                        "type mismatch: arrow function is declared to return '{expected_s}', but returns '{actual_s}'"
                                     ))
                                     .with_range(range),
                                 );
@@ -207,7 +214,7 @@ impl<'r> Checker<'r> {
                     .map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if is_async {
-                            crate::types::awaited(&ty)
+                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
                         } else {
                             ty
                         }
@@ -235,11 +242,13 @@ impl<'r> Checker<'r> {
                 let declared_ty = self.resolve_type_node_cached(&type_ann, bind);
                 let inferred_ty = self.infer_type(expression, bind);
                 if !self.types_compatible_cached(&declared_ty, &inferred_ty, Some(bind)) {
+                    let declared_s = declared_ty.display(&self.ty_table, &bind.interner);
+                    let inferred_s = inferred_ty.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::InvalidSatisfies,
                             format!(
-                                "expression does not satisfy '{declared_ty}': got '{inferred_ty}'"
+                                "expression does not satisfy '{declared_s}': got '{inferred_s}'"
                             ),
                         )
                         .with_range(range),
@@ -250,11 +259,14 @@ impl<'r> Checker<'r> {
                 let argument = *argument;
                 self.check_expr(argument, bind);
                 let arg_ty = self.infer_type(argument, bind);
-                if !arg_ty.is_dynamic() && !crate::types::is_awaitable(&arg_ty) {
+                if !arg_ty.is_dynamic()
+                    && !crate::types::is_awaitable(&arg_ty, &self.ty_table, &bind.interner)
+                {
+                    let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::warning(
                             ErrorCode::TypeMismatch,
-                            format!("'await' applied to non-Future type '{arg_ty}' has no effect"),
+                            format!("'await' applied to non-Future type '{arg_ty_s}' has no effect"),
                         )
                         .with_range(range),
                     );
@@ -303,24 +315,22 @@ impl<'r> Checker<'r> {
 
                 let l_base_raw = base_type(&l_ty);
                 let r_base_raw = base_type(&r_ty);
-                let l_base_norm = normalize_for_binary(&l_base_raw);
-                let r_base_norm = normalize_for_binary(&r_base_raw);
-                let l_base = &l_base_norm;
-                let r_base = &r_base_norm;
-                let is_type_param_b = |t: &Type, checker: &Checker| matches!(&t.0, varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(n.as_ref()));
+                let l_base = normalize_for_binary(&l_base_raw, &self.ty_table, &bind.interner);
+                let r_base = normalize_for_binary(&r_base_raw, &self.ty_table, &bind.interner);
+                let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.resolve(*n)));
                 if !l_base.is_dynamic()
                     && !r_base.is_dynamic()
-                    && !is_type_param_b(l_base, self)
-                    && !is_type_param_b(r_base, self)
+                    && !is_type_param_b(&l_base, self)
+                    && !is_type_param_b(&r_base, self)
                 {
-                    let is_numeric = |t: &Type| {
+                    let is_numeric = |t: &Type, checker: &Checker| {
                         t.is_numeric()
-                            || matches!(&t.0, TypeKind::Named(n, _) if n.as_ref() == IntrinsicType::Decimal.as_str())
+                            || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(*n) == IntrinsicType::Decimal.as_str())
                     };
-                    let same_numeric = is_numeric(l_base) && is_numeric(r_base);
+                    let same_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
                     let valid = match op {
                         BinaryOp::Add => {
-                            same_numeric || l_base == &Type::Str || r_base == &Type::Str
+                            same_numeric || l_base == Type::Str || r_base == Type::Str
                         }
                         BinaryOp::Sub
                         | BinaryOp::Mul
@@ -332,21 +342,23 @@ impl<'r> Checker<'r> {
                         | BinaryOp::BitXor
                         | BinaryOp::Shl
                         | BinaryOp::Shr
-                        | BinaryOp::UShr => l_base == &Type::Int && r_base == &Type::Int,
+                        | BinaryOp::UShr => l_base == Type::Int && r_base == Type::Int,
                         BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => {
-                            same_numeric || (l_base == &Type::Str && r_base == &Type::Str)
+                            same_numeric || (l_base == Type::Str && r_base == Type::Str)
                         }
                         _ => true,
                     };
                     if !valid {
+                        let l_ty_s = l_ty.display(&self.ty_table, &bind.interner);
+                        let r_ty_s = r_ty.display(&self.ty_table, &bind.interner);
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::InvalidTypeOperator,
                                 format!(
                                     "invalid binary operation '{}' between '{}' and '{}'",
                                     op_str(&op),
-                                    l_ty,
-                                    r_ty
+                                    l_ty_s,
+                                    r_ty_s
                                 ),
                             )
                             .with_range(range),
@@ -429,10 +441,12 @@ impl<'r> Checker<'r> {
                 if !is_empty_array_val
                     && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind))
                 {
+                    let value_ty_s = value_ty.display(&self.ty_table, &bind.interner);
+                    let target_ty_s = target_ty.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
-                            format!("type mismatch: cannot assign '{value_ty}' to '{target_ty}'"),
+                            format!("type mismatch: cannot assign '{value_ty_s}' to '{target_ty_s}'"),
                         )
                         .with_range(range),
                     );
@@ -479,8 +493,8 @@ impl<'r> Checker<'r> {
                         view.get_class_members(cn, None).and_then(|members| {
                             members.iter().find_map(|m| {
                                 if m.kind == crate::types::ClassMemberKind::Constructor {
-                                    if let TypeKind::Fn(ft) = &m.ty.0 {
-                                        return Some(ft.params.clone());
+                                    if let TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
+                                        return Some(self.ty_table.get_function(*fid).params.clone());
                                     }
                                 }
                                 None
@@ -600,7 +614,7 @@ impl<'r> Checker<'r> {
                             match matched.len() {
                                 0 => vec![],
                                 1 => vec![(id, matched.into_iter().next().unwrap())],
-                                _ => vec![(id, crate::types::Type::union(matched))],
+                                _ => vec![(id, crate::types::Type::union(matched, &mut self.ty_table))],
                             }
                         } else {
                             vec![]
@@ -664,9 +678,11 @@ impl<'r> Checker<'r> {
                 let (tag, template) = (*tag, *template);
                 self.check_expr(tag, bind);
                 self.check_expr(template, bind);
-                let tag_ty = self.infer_type(tag, bind).non_nullified();
-                if let TypeKind::Fn(ft) = &tag_ty.0 {
-                    self.record_type(range.start.offset, ft.return_type.as_ref().clone());
+                let tag_ty_raw = self.infer_type(tag, bind);
+                let tag_ty = tag_ty_raw.non_nullified(&mut self.ty_table);
+                if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
+                    let ret = self.ty_table.get_function(*fid).return_type;
+                    self.record_type(range.start.offset, Type(ret, false));
                 }
             }
 

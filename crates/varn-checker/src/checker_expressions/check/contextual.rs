@@ -20,7 +20,8 @@ impl<'r> Checker<'r> {
                         ..
                     }
                 );
-            if has_ann || ep.ty.is_dynamic() {
+            let ep_ty = Type(ep.ty, false);
+            if has_ann || ep_ty.is_dynamic() {
                 continue;
             }
 
@@ -31,19 +32,20 @@ impl<'r> Checker<'r> {
                 .get(name)
                 .and_then(|atom| scope.resolve(atom, &bind.scopes))
             {
-                self.symbol_types.insert(sym_id, ep.ty.clone());
+                self.symbol_types.insert(sym_id, ep_ty);
                 self.mark_infer_env_dirty();
             }
         }
     }
 
     pub(super) fn check_array_with_context(&mut self, elements: &[ArrayEl], bind: &BindResult) {
-        let elem_expected = self.expected_type.as_ref().and_then(|t| match &t.0 {
-            TypeKind::Array(inner) => Some(*inner.clone()),
+        let elem_expected = self.expected_type.and_then(|t| match *self.ty_table.get(t.0) {
+            TypeKind::Array(inner) => Some(Type(inner, false)),
             TypeKind::Generic(name, args, _)
-                if name.as_ref() == varn_core::IntrinsicType::Array.as_str() && args.len() == 1 =>
+                if bind.interner.resolve(name) == varn_core::IntrinsicType::Array.as_str()
+                    && self.ty_table.get_list(args).len() == 1 =>
             {
-                Some(args[0].clone())
+                Some(Type(self.ty_table.get_list(args)[0], false))
             }
             _ => None,
         });
@@ -51,15 +53,17 @@ impl<'r> Checker<'r> {
         for el in elements {
             match el {
                 ArrayEl::Expr(e) => {
-                    self.with_expected(elem_expected.clone(), |c| c.check_expr(*e, bind));
+                    self.with_expected(elem_expected, |c| c.check_expr(*e, bind));
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(*e, bind);
                         if !actual.is_dynamic()
                             && !self.types_compatible_cached(expected, &actual, Some(bind))
                         {
+                            let actual_s = actual.display(&self.ty_table, &bind.interner);
+                            let expected_s = expected.display(&self.ty_table, &bind.interner);
                             self.emit(
                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                    "type mismatch: array element is '{actual}', expected '{expected}'"
+                                    "type mismatch: array element is '{actual_s}', expected '{expected_s}'"
                                 ))
                                 .with_range(self.ast_arena.expr(*e).range),
                             );
@@ -77,47 +81,55 @@ impl<'r> Checker<'r> {
         properties: &[ObjectProp],
         bind: &BindResult,
     ) {
-        let expected_members: Vec<ObjectTypeMember> = if let Some(t) = &self.expected_type {
-            let ty = t.non_nullified();
+        let expected_members: Vec<ObjectTypeMember> = if let Some(t) = self.expected_type {
+            let ty = t.non_nullified(&mut self.ty_table);
             if let Some(cached) = self.expected_object_members_cache.get(&ty) {
                 cached.clone()
             } else {
-                let resolved = match &ty.0 {
-                    TypeKind::Object(m) => m.clone(),
+                let ty_kind = *self.ty_table.get(ty.0);
+                let resolved = match ty_kind {
+                    TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
                     TypeKind::Generic(name, args, _)
-                        if name.as_ref() == varn_core::IntrinsicType::Map.as_str()
-                            && args.len() == 2 =>
+                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str()
+                            && self.ty_table.get_list(args).len() == 2 =>
                     {
+                        let arg_ids = self.ty_table.get_list(args).to_vec();
                         vec![ObjectTypeMember::Index {
                             param_name: std::rc::Rc::from("key"),
-                            key_ty: Box::new(args[0].clone()),
-                            value_ty: Box::new(args[1].clone()),
+                            key_ty: arg_ids[0],
+                            value_ty: arg_ids[1],
                         }]
                     }
-                    TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
+                    TypeKind::Named(name_atom, origin_atom)
+                    | TypeKind::Generic(name_atom, _, origin_atom) => {
+                        let name = bind.interner.resolve(name_atom).to_string();
+                        let origin: Option<String> =
+                            origin_atom.map(|o| bind.interner.resolve(o).to_string());
                         let view = crate::binder::BindView::new(bind, self.resolver);
                         let members = view
-                            .get_class_members(name, origin.as_deref())
-                            .or_else(|| view.get_interface_members(name, origin.as_deref()))
-                            .or_else(|| view.get_namespace_members(name, origin.as_deref()))
-                            .or_else(|| view.get_enum_members(name, origin.as_deref()))
+                            .get_class_members(&name, origin.as_deref())
+                            .or_else(|| view.get_interface_members(&name, origin.as_deref()))
+                            .or_else(|| view.get_namespace_members(&name, origin.as_deref()))
+                            .or_else(|| view.get_enum_members(&name, origin.as_deref()))
                             .unwrap_or_default();
 
                         members
                             .into_iter()
                             .map(|m| {
-                                if let TypeKind::Fn(ft) = &m.ty.0 {
+                                let m_kind = *self.ty_table.get(m.ty.0);
+                                if let TypeKind::Fn(fid) = m_kind {
+                                    let ft = self.ty_table.get_function(fid).clone();
                                     ObjectTypeMember::Method {
                                         name: m.name,
                                         params: ft.params.clone(),
-                                        return_type: ft.return_type.clone(),
+                                        return_type: ft.return_type,
                                         optional: m.is_optional,
                                         is_arrow: ft.is_arrow,
                                     }
                                 } else {
                                     ObjectTypeMember::Property {
                                         name: m.name,
-                                        ty: m.ty,
+                                        ty: m.ty.0,
                                         optional: m.is_optional,
                                         readonly: m.is_readonly,
                                     }
@@ -142,26 +154,30 @@ impl<'r> Checker<'r> {
                     let prop_expected = key_str.and_then(|k| {
                         expected_members.iter().find_map(|m| match m {
                             ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == k => {
-                                Some(ty.clone())
+                                Some(Type(*ty, false))
                             }
-                            ObjectTypeMember::Index { value_ty, .. } => Some((**value_ty).clone()),
+                            ObjectTypeMember::Index { value_ty, .. } => {
+                                Some(Type(*value_ty, false))
+                            }
                             _ => None,
                         })
                     });
-                    self.with_expected(prop_expected.clone(), |c| c.check_expr(*value, bind));
+                    self.with_expected(prop_expected, |c| c.check_expr(*value, bind));
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(*value, bind);
                         if !actual.is_dynamic()
                             && !self.types_compatible_cached(expected, &actual, Some(bind))
                         {
+                            let actual_s = actual.display(&self.ty_table, &bind.interner);
+                            let expected_s = expected.display(&self.ty_table, &bind.interner);
                             self.emit(
                                 Diagnostic::error(
                                     ErrorCode::TypeMismatch,
                                     format!(
                                         "type mismatch: property '{}' is '{}', expected '{}'",
                                         key_str.unwrap_or("?"),
-                                        actual,
-                                        expected
+                                        actual_s,
+                                        expected_s
                                     ),
                                 )
                                 .with_range(self.ast_arena.expr(*value).range),
@@ -176,16 +192,14 @@ impl<'r> Checker<'r> {
                     ..
                 } => {
                     let saved_expected = self.expected_return_type.take();
-                    self.expected_return_type = return_type
-                        .as_ref()
-                        .map(|rt| {
-                            let ty = self.resolve_type_node_cached(rt, bind);
-                            if *is_async {
-                                crate::types::awaited(&ty)
-                            } else {
-                                ty
-                            }
-                        });
+                    self.expected_return_type = return_type.as_ref().map(|rt| {
+                        let ty = self.resolve_type_node_cached(rt, bind);
+                        if *is_async {
+                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                        } else {
+                            ty
+                        }
+                    });
 
                     let saved_scope = self.current_scope;
                     if let Some(fn_scope) = self.next_child_scope(bind) {
@@ -219,9 +233,9 @@ impl<'r> Checker<'r> {
     }
 
     pub(super) fn expected_fn_type(&self) -> Option<FunctionType> {
-        self.expected_type.as_ref().and_then(|t| {
-            if let TypeKind::Fn(ft) = &t.0 {
-                Some(ft.clone())
+        self.expected_type.and_then(|t| {
+            if let TypeKind::Fn(fid) = self.ty_table.get(t.0) {
+                Some(self.ty_table.get_function(*fid).clone())
             } else {
                 None
             }
@@ -230,7 +244,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn expected_return_from_fn_type(&self) -> Option<Type> {
         self.expected_fn_type()
-            .map(|ft| *ft.return_type)
+            .map(|ft| Type(ft.return_type, false))
             .filter(|t| !t.is_dynamic())
     }
 }
