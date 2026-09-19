@@ -118,19 +118,23 @@ impl<'r> Checker<'r> {
                     Type::Void
                 };
 
-                if let Some(expected) = self.expected_return_type.clone() {
-                    let check_expected = if matches!(expected.0, TypeKind::TypePredicate { .. }) {
+                if let Some(expected) = self.expected_return_type {
+                    let expected_kind = *self.ty_table.get(expected.0);
+                    let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. }) {
                         Type::Bool
                     } else {
-                        expected.clone()
+                        expected
                     };
-                    let is_type_param = matches!(&check_expected.0, TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
+                    let check_expected_kind = *self.ty_table.get(check_expected.0);
+                    let is_type_param = matches!(check_expected_kind, TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                     if !is_type_param
                         && !self.types_compatible_cached(&check_expected, &actual, Some(bind))
                     {
+                        let expected_s = expected.display(&self.ty_table, &bind.interner);
+                        let actual_s = actual.display(&self.ty_table, &bind.interner);
                         self.emit(
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                "type mismatch: function is declared to return '{expected}', but returns '{actual}'"
+                                "type mismatch: function is declared to return '{expected_s}', but returns '{actual_s}'"
                             ))
                             .with_range(range),
                         );
@@ -237,24 +241,26 @@ impl<'r> Checker<'r> {
                 let (left, right, body) = (left.clone(), *right, *body);
                 self.check_expr(right, bind);
                 let right_ty = self.infer_type(right, bind);
-                let elem_ty = match &right_ty.0 {
-                    TypeKind::Array(inner) => (**inner).clone(),
+                let right_kind = *self.ty_table.get(right_ty.0);
+                let elem_ty = match right_kind {
+                    TypeKind::Array(inner) => Type(inner, false),
                     TypeKind::Intrinsic(TypeTag::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
                     TypeKind::Named(name, _)
-                        if name.as_ref() == varn_core::IntrinsicType::Str.as_str() =>
+                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Str.as_str() =>
                     {
                         Type::Char
                     }
                     TypeKind::Generic(name, args, _)
-                        if name.as_ref() == varn_core::IntrinsicType::Map.as_str()
-                            && args.len() == 2 =>
+                        if bind.interner.resolve(name) == varn_core::IntrinsicType::Map.as_str()
+                            && self.ty_table.get_list(args).len() == 2 =>
                     {
-                        Type(
-                            TypeKind::Tuple(vec![args[0].clone(), args[1].clone()]),
-                            false,
-                        )
+                        let arg_ids = self.ty_table.get_list(args).to_vec();
+                        let list = self.ty_table.intern_list(&arg_ids);
+                        Type(self.ty_table.intern(TypeKind::Tuple(list)), false)
                     }
-                    TypeKind::Generic(_name, args, _) if args.len() == 1 => args[0].clone(),
+                    TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
+                        Type(self.ty_table.get_list(args)[0], false)
+                    }
                     TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
@@ -323,7 +329,7 @@ impl<'r> Checker<'r> {
                                 let catch_ty = if let Some(ann) = &clause.type_ann {
                                     checker.resolve_type_node_cached(ann, bind)
                                 } else {
-                                    Type::named("Error")
+                                    Type::named("Error", checker.resolver, &mut checker.ty_table)
                                 };
                                 checker.check_pattern(param, &catch_ty, bind);
                             }
@@ -341,11 +347,12 @@ impl<'r> Checker<'r> {
                 self.check_expr(argument, bind);
                 let thrown = self.infer_type(argument, bind);
                 if !self.is_throwable(&thrown, bind) {
+                    let thrown_s = thrown.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::InvalidThrowOperand,
                             format!(
-                                "cannot throw a value of type `{thrown}`: thrown values must be `Error` or a subclass"
+                                "cannot throw a value of type `{thrown_s}`: thrown values must be `Error` or a subclass"
                             ),
                         )
                         .with_range(self.ast_arena.expr(argument).range),
@@ -395,9 +402,10 @@ impl<'r> Checker<'r> {
                     if !init_ty.is_dynamic()
                         && !self.member_exists_cached(&init_ty, dispose_method, bind)
                     {
+                        let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                         self.emit(
                             Diagnostic::error(ErrorCode::InvalidUsingTarget, format!(
-                                "type '{init_ty}' does not implement {interface_name}: missing '{dispose_method}()' method"
+                                "type '{init_ty_s}' does not implement {interface_name}: missing '{dispose_method}()' method"
                             ))
                             .with_range(d.range),
                         );
@@ -405,9 +413,11 @@ impl<'r> Checker<'r> {
 
                     if let Some(ann_ty) = &ann_ty_opt {
                         if !self.types_compatible_cached(ann_ty, &init_ty, Some(bind)) {
+                            let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
+                            let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                             self.emit(
                                 Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                    "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"
+                                    "type mismatch: declared as '{ann_ty_s}' but initialised with '{init_ty_s}'"
                                 ))
                                 .with_range(d.range),
                             );
@@ -445,9 +455,11 @@ impl<'r> Checker<'r> {
                     if !is_empty_array
                         && !self.types_compatible_cached(ann_ty, &init_ty, Some(bind))
                     {
+                        let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
+                        let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                         self.emit(
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"
+                                "type mismatch: declared as '{ann_ty_s}' but initialised with '{init_ty_s}'"
                             ))
                             .with_range(declarator.range),
                         );
