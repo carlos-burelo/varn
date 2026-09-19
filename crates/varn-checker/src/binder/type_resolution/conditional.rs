@@ -1,4 +1,4 @@
-use crate::types::{Type, TypeContext};
+use crate::types::{CheckerTyId, CheckerTyTable, Type, TypeContext};
 use rustc_hash::FxHashMap;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
@@ -13,8 +13,9 @@ pub(super) fn resolve_conditional(
     true_type: &TypeNode,
     false_type: &TypeNode,
     ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
-    if let TypeKind::Union(members) = &check.0 {
+    if let TypeKind::Union(list) = table.get(check.0).clone() {
         if matches!(&check_node.kind, TypeKind::Named(_, None)) {
             if let TypeKind::Named(var_name, None) = &check_node.kind {
                 let var_name_str = ctx
@@ -22,39 +23,42 @@ pub(super) fn resolve_conditional(
                     .and_then(|i| i.try_resolve(*var_name))
                     .unwrap_or("")
                     .to_owned();
+                let members = table.get_list(list).to_vec();
                 let results: Vec<Type> = members
-                    .iter()
-                    .map(|m| {
+                    .into_iter()
+                    .map(|m_id| {
+                        let m = Type(m_id, false);
                         let dist_ctx = AliasSubstitutionContext {
                             inner: ctx,
                             params: vec![var_name_str.clone()],
-                            args: vec![m.clone()],
+                            args: vec![m],
                         };
                         let mut infer_bindings = FxHashMap::default();
                         let extends_ty = resolve_extends_with_infer(
                             extends,
                             Some(&dist_ctx),
                             &mut infer_bindings,
-                            m,
+                            &m,
+                            table,
                         );
-                        if type_satisfies_extends(m, &extends_ty) {
-                            resolve_with_infer_ctx(true_type, Some(&dist_ctx), infer_bindings)
+                        if type_satisfies_extends(&m, &extends_ty, table) {
+                            resolve_with_infer_ctx(true_type, Some(&dist_ctx), infer_bindings, table)
                         } else {
-                            resolve_type_node(false_type, Some(&dist_ctx))
+                            resolve_type_node(false_type, Some(&dist_ctx), table)
                         }
                     })
                     .collect();
-                return collapse_union_never(results);
+                return collapse_union_never(results, table);
             }
         }
     }
 
     let mut infer_bindings = FxHashMap::default();
-    let extends_ty = resolve_extends_with_infer(extends, ctx, &mut infer_bindings, check);
-    if type_satisfies_extends(check, &extends_ty) {
-        resolve_with_infer_ctx(true_type, ctx, infer_bindings)
+    let extends_ty = resolve_extends_with_infer(extends, ctx, &mut infer_bindings, check, table);
+    if type_satisfies_extends(check, &extends_ty, table) {
+        resolve_with_infer_ctx(true_type, ctx, infer_bindings, table)
     } else {
-        resolve_type_node(false_type, ctx)
+        resolve_type_node(false_type, ctx, table)
     }
 }
 
@@ -62,28 +66,28 @@ fn resolve_with_infer_ctx(
     node: &TypeNode,
     ctx: Option<&dyn TypeContext>,
     bindings: FxHashMap<String, Type>,
+    table: &mut CheckerTyTable,
 ) -> Type {
     if bindings.is_empty() {
-        resolve_type_node(node, ctx)
+        resolve_type_node(node, ctx, table)
     } else {
         let infer_ctx = InferBindingContext {
             inner: ctx,
             bindings,
         };
-        resolve_type_node(node, Some(&infer_ctx))
+        resolve_type_node(node, Some(&infer_ctx), table)
     }
 }
 
-fn collapse_union_never(results: Vec<Type>) -> Type {
-    use varn_core::TypeTag;
+fn collapse_union_never(results: Vec<Type>, table: &mut CheckerTyTable) -> Type {
     let non_never: Vec<Type> = results
         .into_iter()
-        .filter(|t| !matches!(&t.0, TypeKind::Intrinsic(TypeTag::Never)))
+        .filter(|t| t.0 != CheckerTyId::NEVER)
         .collect();
     match non_never.len() {
         0 => Type::Never,
         1 => non_never.into_iter().next().unwrap(),
-        _ => Type::union(non_never),
+        _ => Type::union(non_never, table),
     }
 }
 
@@ -92,6 +96,7 @@ fn resolve_extends_with_infer(
     ctx: Option<&dyn TypeContext>,
     bindings: &mut FxHashMap<String, Type>,
     check: &Type,
+    table: &mut CheckerTyTable,
 ) -> Type {
     match &node.kind {
         TypeKind::Infer(name) => {
@@ -100,76 +105,96 @@ fn resolve_extends_with_infer(
                 .and_then(|i| i.try_resolve(*name))
                 .unwrap_or("")
                 .to_owned();
-            bindings.insert(name_str, check.clone());
-            check.clone()
+            bindings.insert(name_str, *check);
+            *check
         }
         TypeKind::Generic(name, args, _) => {
             let name_str = ctx.and_then(|c| c.interner()).and_then(|i| i.try_resolve(*name));
-            if let TypeKind::Generic(check_name, check_args, _) = &check.0 {
-                if Some(check_name.as_ref()) == name_str && check_args.len() == args.len() {
-                    for (arg_node, check_arg) in args.iter().zip(check_args.iter()) {
-                        resolve_extends_with_infer(arg_node, ctx, bindings, check_arg);
+            if let TypeKind::Generic(check_name, check_args, _) = table.get(check.0).clone() {
+                let check_name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(check_name));
+                if check_name_str == name_str {
+                    let check_arg_ids = table.get_list(check_args).to_vec();
+                    if check_arg_ids.len() == args.len() {
+                        for (arg_node, check_arg) in args.iter().zip(check_arg_ids.iter()) {
+                            resolve_extends_with_infer(
+                                arg_node,
+                                ctx,
+                                bindings,
+                                &Type(*check_arg, false),
+                                table,
+                            );
+                        }
                     }
                 }
             }
-            resolve_type_node(node, ctx)
+            resolve_type_node(node, ctx, table)
         }
         TypeKind::Array(inner) => {
-            if let TypeKind::Array(check_inner) = &check.0 {
-                resolve_extends_with_infer(inner, ctx, bindings, check_inner);
+            if let TypeKind::Array(check_inner) = table.get(check.0) {
+                let check_inner = Type(*check_inner, false);
+                resolve_extends_with_infer(inner, ctx, bindings, &check_inner, table);
             }
-            resolve_type_node(node, ctx)
+            resolve_type_node(node, ctx, table)
         }
         TypeKind::Fn((params, ret)) => {
-            if let TypeKind::Fn(ft) = &check.0 {
-                resolve_extends_with_infer(ret, ctx, bindings, &ft.return_type);
+            if let TypeKind::Fn(fid) = table.get(check.0) {
+                let ft = table.get_function(*fid).clone();
+                let ret_ty = Type(ft.return_type, false);
+                resolve_extends_with_infer(ret, ctx, bindings, &ret_ty, table);
 
                 for (param_node, check_param) in params.iter().zip(ft.params.iter()) {
                     if let Some(constraint) = &param_node.constraint {
-                        resolve_extends_with_infer(constraint, ctx, bindings, &check_param.ty);
+                        let param_ty = Type(check_param.ty, false);
+                        resolve_extends_with_infer(constraint, ctx, bindings, &param_ty, table);
                     }
                 }
             }
-            resolve_type_node(node, ctx)
+            resolve_type_node(node, ctx, table)
         }
-        _ => resolve_type_node(node, ctx),
+        _ => resolve_type_node(node, ctx, table),
     }
 }
 
-fn type_satisfies_extends(check: &Type, extends: &Type) -> bool {
-    use varn_core::TypeTag;
-    if matches!(&check.0, TypeKind::Intrinsic(TypeTag::Never)) {
+fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) -> bool {
+    if check.0 == CheckerTyId::NEVER {
         return true;
     }
 
-    if matches!(&check.0, TypeKind::Intrinsic(TypeTag::Dynamic))
-        || matches!(&extends.0, TypeKind::Intrinsic(TypeTag::Dynamic))
-    {
+    if check.0 == CheckerTyId::DYNAMIC || extends.0 == CheckerTyId::DYNAMIC {
         return true;
     }
 
-    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) = (&check.0, &extends.0) {
+    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) = (table.get(check.0), table.get(extends.0)) {
         return t1 == t2;
     }
 
-    match (&check.0, &extends.0) {
-        (_, TypeKind::Union(members)) => members.iter().any(|m| type_satisfies_extends(check, m)),
+    match (table.get(check.0).clone(), table.get(extends.0).clone()) {
+        (_, TypeKind::Union(list)) => table
+            .get_list(list)
+            .iter()
+            .any(|m| type_satisfies_extends(check, &Type(*m, false), table)),
 
         (TypeKind::Generic(cn, ca, _), TypeKind::Generic(en, ea, _)) => {
+            let ca_ids = table.get_list(ca).to_vec();
+            let ea_ids = table.get_list(ea).to_vec();
             cn == en
-                && ca.len() == ea.len()
-                && ca
+                && ca_ids.len() == ea_ids.len()
+                && ca_ids
                     .iter()
-                    .zip(ea.iter())
-                    .all(|(c, e)| type_satisfies_extends(c, e))
+                    .zip(ea_ids.iter())
+                    .all(|(c, e)| type_satisfies_extends(&Type(*c, false), &Type(*e, false), table))
         }
 
         (TypeKind::Named(cn, _), TypeKind::Named(en, _)) => cn == en,
 
-        (TypeKind::Array(c), TypeKind::Array(e)) => type_satisfies_extends(c, e),
+        (TypeKind::Array(c), TypeKind::Array(e)) => {
+            type_satisfies_extends(&Type(c, false), &Type(e, false), table)
+        }
 
         (TypeKind::Fn(f_check), TypeKind::Fn(f_extends)) => {
-            type_satisfies_extends(&f_check.return_type, &f_extends.return_type)
+            let check_ret = Type(table.get_function(f_check).return_type, false);
+            let extends_ret = Type(table.get_function(f_extends).return_type, false);
+            type_satisfies_extends(&check_ret, &extends_ret, table)
         }
 
         _ => check == extends,

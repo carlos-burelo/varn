@@ -1,4 +1,4 @@
-use crate::types::{ObjectTypeMember, Type, TypeContext};
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use rustc_hash::FxHashMap;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
@@ -17,6 +17,10 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.interner())
     }
 
+    fn ty_table(&self) -> Option<&CheckerTyTable> {
+        self.inner.and_then(|c| c.ty_table())
+    }
+
     // The `TypeNode`s this wrapper's callers walk (e.g. a `typeof` inside the
     // bound type it wraps) are always local to the module being checked —
     // this context only ever narrows/extends bindings within that one
@@ -29,7 +33,7 @@ impl TypeContext for InferBindingContext<'_> {
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(ty) = self.bindings.get(name) {
-            return Some(ty.clone());
+            return Some(*ty);
         }
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
@@ -69,24 +73,33 @@ impl TypeContext for InferBindingContext<'_> {
     }
 }
 
-pub(super) fn is_member_optional(ty: &Type, key: &str, ctx: Option<&dyn TypeContext>) -> bool {
-    match &ty.0 {
-        TypeKind::Object(members) => members.iter().any(|m| match m {
+pub(super) fn is_member_optional(
+    ty: &Type,
+    key: &str,
+    ctx: Option<&dyn TypeContext>,
+    table: &CheckerTyTable,
+) -> bool {
+    match table.get(ty.0) {
+        TypeKind::Object(mid) => table.get_object_members(*mid).iter().any(|m| match m {
             ObjectTypeMember::Property { name, optional, .. } => name.as_ref() == key && *optional,
             _ => false,
         }),
-        TypeKind::Named(name, _) => ctx
-            .and_then(|c| {
-                c.get_interface_members(name, None)
-                    .or_else(|| c.get_class_members(name, None))
+        TypeKind::Named(name, _) => {
+            let name = ctx.and_then(|c| c.interner()).map(|i| i.resolve(*name));
+            name.and_then(|name| {
+                ctx.and_then(|c| {
+                    c.get_interface_members(name, None)
+                        .or_else(|| c.get_class_members(name, None))
+                })
+                .and_then(|members| {
+                    members
+                        .iter()
+                        .find(|m| m.name.as_ref() == key)
+                        .map(|m| m.is_optional)
+                })
             })
-            .and_then(|members| {
-                members
-                    .iter()
-                    .find(|m| m.name.as_ref() == key)
-                    .map(|m| m.is_optional)
-            })
-            .unwrap_or(false),
+            .unwrap_or(false)
+        }
         _ => false,
     }
 }
@@ -106,6 +119,10 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.interner())
     }
 
+    fn ty_table(&self) -> Option<&CheckerTyTable> {
+        self.inner.and_then(|c| c.ty_table())
+    }
+
     // Same reasoning as `InferBindingContext`: a mapped type's `TypeNode`s
     // are always the local module's, so forwarding is safe.
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
@@ -114,7 +131,7 @@ impl TypeContext for MappedContext<'_> {
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if name == self.key_var {
-            return Some(self.key_value.clone());
+            return Some(self.key_value);
         }
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
@@ -165,6 +182,10 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         self.inner.and_then(|c| c.interner())
     }
 
+    fn ty_table(&self) -> Option<&CheckerTyTable> {
+        self.inner.and_then(|c| c.ty_table())
+    }
+
     // Deliberately NOT forwarded, unlike `InferBindingContext`/`MappedContext`
     // above. `alias_node` (see `try_stdlib_generic_alias`) is loaded from
     // `core:types` — a *different* module than the one being checked — so
@@ -183,7 +204,7 @@ impl TypeContext for AliasSubstitutionContext<'_> {
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(pos) = self.params.iter().position(|p| p == name) {
-            return Some(self.args[pos].clone());
+            return Some(self.args[pos]);
         }
         self.inner.and_then(|c| c.resolve_symbol(name))
     }

@@ -1,4 +1,4 @@
-use crate::types::{ObjectTypeMember, Type, TypeContext};
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use std::rc::Rc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
@@ -16,21 +16,22 @@ pub(super) fn resolve_mapped(
     readonly: bool,
     source_obj: Option<Type>,
     ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
-    let keys = if let Some(ref obj) = source_obj {
-        let k = collect_type_keys(obj, ctx);
+    let keys = if let Some(obj) = source_obj {
+        let k = collect_type_keys(&obj, ctx, table);
         if k.is_empty() {
-            collect_string_literals(&source)
+            collect_string_literals(&source, table)
         } else {
             k
         }
     } else {
-        collect_string_literals(&source)
+        collect_string_literals(&source, table)
     };
 
     if keys.is_empty() {
         use varn_core::TypeTag;
-        let key_ty = match &source.0 {
+        let key_ty = match table.get(source.0) {
             TypeKind::Intrinsic(TypeTag::Str) => Some(Type::Str),
             TypeKind::Intrinsic(TypeTag::Int) => Some(Type::Int),
             _ => None,
@@ -39,14 +40,15 @@ pub(super) fn resolve_mapped(
             let mapped_ctx = MappedContext {
                 inner: ctx,
                 key_var: key_var.to_owned(),
-                key_value: key_ty.clone(),
+                key_value: key_ty,
             };
-            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx));
-            return Type::object(vec![ObjectTypeMember::Index {
+            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx), table);
+            let member = ObjectTypeMember::Index {
                 param_name: Rc::from(key_var),
-                key_ty: Box::new(key_ty),
-                value_ty: Box::new(value_ty),
-            }]);
+                key_ty: key_ty.0,
+                value_ty: value_ty.0,
+            };
+            return Type::object(vec![member], table);
         }
         return Type::Dynamic;
     }
@@ -54,26 +56,31 @@ pub(super) fn resolve_mapped(
     let members: Vec<ObjectTypeMember> = keys
         .into_iter()
         .map(|key| {
+            let key_atom = ctx
+                .and_then(|c| c.resolver())
+                .map(|r| r.intern(&key))
+                .unwrap_or_default();
+            let key_value = Type::named_atom(key_atom, table);
             let mapped_ctx = MappedContext {
                 inner: ctx,
                 key_var: key_var.to_owned(),
-                key_value: Type::named(key.to_string()),
+                key_value,
             };
-            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx));
+            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx), table);
             let member_optional = if optional {
                 true
             } else if let Some(ref obj) = source_obj {
-                is_member_optional(obj, key.as_ref(), ctx)
+                is_member_optional(obj, key.as_ref(), ctx, table)
             } else {
                 false
             };
             ObjectTypeMember::Property {
                 name: key,
-                ty: value_ty,
+                ty: value_ty.0,
                 optional: member_optional,
                 readonly,
             }
         })
         .collect();
-    Type::object(members)
+    Type::object(members, table)
 }

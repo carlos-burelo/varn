@@ -5,13 +5,14 @@ use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, 
 use super::inference_utils::{build_fn_type, build_method_params, infer_object_member_type};
 pub use super::inference_utils::{pattern_lead_name, pattern_to_string, widen_literal};
 use super::type_resolution::resolve_type_node;
-use crate::types::{FunctionType, ObjectTypeMember, Type};
+use crate::types::{CheckerTyTable, FunctionType, ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
 pub fn infer_expr_type(
     id: ExprId,
     arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
     match &arena.expr(id).kind {
         ExprKind::IntLiteral { .. } => Type::Int,
@@ -23,36 +24,39 @@ pub fn infer_expr_type(
         ExprKind::BoolLiteral { .. } => Type::Bool,
         ExprKind::NullLiteral => Type::Null,
         ExprKind::Template { .. } => Type::Str,
-        ExprKind::Paren { expression } => infer_expr_type(*expression, arena, ctx),
-        ExprKind::As { type_ann, .. } => resolve_type_node(type_ann, ctx),
+        ExprKind::Paren { expression } => infer_expr_type(*expression, arena, ctx, table),
+        ExprKind::As { type_ann, .. } => resolve_type_node(type_ann, ctx, table),
         ExprKind::Is { .. } => Type::Bool,
-        ExprKind::Satisfies { expression, .. } => infer_expr_type(*expression, arena, ctx),
+        ExprKind::Satisfies { expression, .. } => infer_expr_type(*expression, arena, ctx, table),
         ExprKind::Await { argument } => {
-            let inner = infer_expr_type(*argument, arena, ctx);
-            match &inner.0 {
+            let inner = infer_expr_type(*argument, arena, ctx, table);
+            match table.get(inner.0) {
                 TypeKind::Generic(name, args, _)
-                    if name.as_ref() == varn_core::IntrinsicType::Task.as_str()
-                        && args.len() == 1 =>
+                    if ctx
+                        .and_then(|c| c.interner())
+                        .map(|i| i.resolve(*name) == varn_core::IntrinsicType::Task.as_str())
+                        .unwrap_or(false)
+                        && table.get_list(*args).len() == 1 =>
                 {
-                    args[0].clone()
+                    Type(table.get_list(*args)[0], false)
                 }
                 _ => inner,
             }
         }
-        ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx),
+        ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx, table),
         ExprKind::Logical {
             op, left, right, ..
         } => match op {
             LogicalOp::Nullish => {
-                let rhs = infer_expr_type(*right, arena, ctx);
+                let rhs = infer_expr_type(*right, arena, ctx, table);
                 if !rhs.is_dynamic() {
                     return rhs;
                 }
-                infer_expr_type(*left, arena, ctx)
+                infer_expr_type(*left, arena, ctx, table)
             }
             LogicalOp::And | LogicalOp::Or => {
-                let l = infer_expr_type(*left, arena, ctx);
-                let r = infer_expr_type(*right, arena, ctx);
+                let l = infer_expr_type(*left, arena, ctx, table);
+                let r = infer_expr_type(*right, arena, ctx, table);
                 if l.0 == r.0 {
                     l
                 } else {
@@ -65,13 +69,13 @@ pub fn infer_expr_type(
             property,
             computed,
             ..
-        } => infer_member(*object, *property, *computed, arena, ctx),
+        } => infer_member(*object, *property, *computed, arena, ctx, table),
         ExprKind::Unary { op, operand, .. } => {
-            let inner = infer_expr_type(*operand, arena, ctx);
+            let inner = infer_expr_type(*operand, arena, ctx, table);
             match op {
                 UnaryOp::Minus | UnaryOp::Plus => inner,
                 UnaryOp::Not => Type::Bool,
-                UnaryOp::BitNot => match &inner.0 {
+                UnaryOp::BitNot => match table.get(inner.0) {
                     TypeKind::Intrinsic(varn_core::TypeTag::Int) => Type::Int,
                     _ => Type::Dynamic,
                 },
@@ -80,28 +84,29 @@ pub fn infer_expr_type(
         }
         ExprKind::Binary {
             op, left, right, ..
-        } => infer_binary(op, *left, *right, arena, ctx),
+        } => infer_binary(op, *left, *right, arena, ctx, table),
         ExprKind::Array { elements } => {
             for el in elements {
                 if let ArrayEl::Expr(first) = el {
-                    let elem_ty = infer_expr_type(*first, arena, ctx);
+                    let elem_ty = infer_expr_type(*first, arena, ctx, table);
                     if !elem_ty.is_dynamic() {
-                        return Type::array(widen_literal(elem_ty));
+                        let widened = widen_literal(elem_ty);
+                        return Type::array(widened, table);
                     }
                 }
             }
             Type::Dynamic
         }
         ExprKind::Call { callee, .. } => {
-            let callee_ty = infer_expr_type(*callee, arena, ctx);
-            if let TypeKind::Fn(ft) = &callee_ty.0 {
-                return *ft.return_type.clone();
+            let callee_ty = infer_expr_type(*callee, arena, ctx, table);
+            if let TypeKind::Fn(fid) = table.get(callee_ty.0) {
+                return Type(table.get_function(*fid).return_type, false);
             }
             Type::Dynamic
         }
         ExprKind::New {
             callee, type_args, ..
-        } => infer_new(*callee, type_args, arena, ctx),
+        } => infer_new(*callee, type_args, arena, ctx, table),
         ExprKind::Identifier { name } => ctx
             .and_then(|c| c.interner().map(|i| (c, i)))
             .and_then(|(c, i)| c.resolve_symbol(i.resolve(*name)))
@@ -117,9 +122,9 @@ pub fn infer_expr_type(
         } => {
             let mut inferred_ret = Type::Dynamic;
             if let ArrowBody::Expr(e) = body.as_ref() {
-                inferred_ret = infer_expr_type(*e, arena, ctx);
+                inferred_ret = infer_expr_type(*e, arena, ctx, table);
             }
-            build_fn_type(params, return_type, true, ctx, inferred_ret)
+            build_fn_type(params, return_type, true, ctx, table, inferred_ret)
         }
         ExprKind::Function {
             params,
@@ -128,21 +133,23 @@ pub fn infer_expr_type(
             ..
         } => {
             let ret = if *is_generator {
-                Type::generic(
-                    varn_core::IntrinsicType::Generator.as_str(),
-                    vec![Type::Dynamic],
+                crate::types::generator_of(
+                    Type::Dynamic,
+                    false,
+                    table,
+                    ctx.and_then(|c| c.resolver()),
                 )
             } else {
                 Type::Dynamic
             };
-            build_fn_type(params, return_type, false, ctx, ret)
+            build_fn_type(params, return_type, false, ctx, table, ret)
         }
         ExprKind::Match { cases, .. } => {
             let mut expr_arm_ty = None;
             for case in cases {
                 match &case.body {
                     MatchBody::Expr(e) => {
-                        let ty = infer_expr_type(*e, arena, ctx);
+                        let ty = infer_expr_type(*e, arena, ctx, table);
                         if !ty.is_dynamic() && !ty.is_never() {
                             expr_arm_ty = Some(ty);
                             break;
@@ -153,9 +160,9 @@ pub fn infer_expr_type(
             }
             expr_arm_ty.unwrap_or(Type::Dynamic)
         }
-        ExprKind::Object { properties } => infer_object(properties, arena, ctx),
-        ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
-        ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx),
+        ExprKind::Object { properties } => infer_object(properties, arena, ctx, table),
+        ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range, table),
+        ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
         _ => Type::Dynamic,
     }
 }
@@ -166,34 +173,44 @@ fn infer_member(
     computed: bool,
     arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
-    let obj_ty = infer_expr_type(object, arena, ctx);
+    let obj_ty = infer_expr_type(object, arena, ctx, table);
     if computed {
-        return match &obj_ty.0 {
-            TypeKind::Array(inner) => (**inner).clone(),
+        return match table.get(obj_ty.0).clone() {
+            TypeKind::Array(inner) => Type(inner, false),
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => Type::Str,
-            TypeKind::Named(name, _) if name.as_ref() == varn_core::IntrinsicType::Str.as_str() => {
+            TypeKind::Named(name, _)
+                if ctx
+                    .and_then(|c| c.interner())
+                    .map(|i| i.resolve(name) == varn_core::IntrinsicType::Str.as_str())
+                    .unwrap_or(false) =>
+            {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
-                if name.as_ref() == varn_core::IntrinsicType::Map.as_str() =>
+                if ctx
+                    .and_then(|c| c.interner())
+                    .map(|i| i.resolve(name) == varn_core::IntrinsicType::Map.as_str())
+                    .unwrap_or(false) =>
             {
-                if args.len() == 2 {
-                    args[1].clone()
-                } else if args.len() == 1 {
-                    args[0].clone()
+                let arg_ids = table.get_list(args).to_vec();
+                if arg_ids.len() == 2 {
+                    Type(arg_ids[1], false)
+                } else if arg_ids.len() == 1 {
+                    Type(arg_ids[0], false)
                 } else {
                     Type::Dynamic
                 }
             }
-            TypeKind::Object(members) => members
+            TypeKind::Object(mid) => table
+                .get_object_members(mid)
                 .iter()
                 .find_map(|m| match m {
-                    crate::types::ObjectTypeMember::Index { value_ty, .. } => {
-                        Some((**value_ty).clone())
-                    }
+                    crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
                     _ => None,
                 })
+                .map(|id| Type(id, false))
                 .unwrap_or(Type::Dynamic),
             _ => Type::Dynamic,
         };
@@ -208,9 +225,11 @@ fn infer_member(
             return Type::Dynamic;
         };
         let prop_name = interner.resolve(prop_name_atom);
-        match &obj_ty.0 {
+        match table.get(obj_ty.0).clone() {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
-                if let Some(variants) = ctx.get_enum_members(name.as_ref(), origin.as_deref()) {
+                let name_str = interner.resolve(name);
+                let origin_str = origin.map(|o| interner.resolve(o));
+                if let Some(variants) = ctx.get_enum_members(name_str, origin_str) {
                     if prop_name == varn_core::MemberKey::RawValue.as_str()
                         || prop_name == varn_core::MemberKey::Tag.as_str()
                     {
@@ -223,34 +242,35 @@ fn infer_member(
                     }
                     let mut found_tys = Vec::new();
                     for v in &variants {
-                        if let TypeKind::Fn(ft) = &v.ty.0 {
-                            if let Some(p) = ft
+                        if let TypeKind::Fn(fid) = table.get(v.ty.0) {
+                            if let Some(p) = table
+                                .get_function(*fid)
                                 .params
                                 .iter()
                                 .find(|p| p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name))
                             {
-                                found_tys.push(p.ty.clone());
+                                found_tys.push(Type(p.ty, false));
                             }
                         }
                     }
                     if !found_tys.is_empty() {
-                        return Type::union(found_tys);
+                        return Type::union(found_tys, table);
                     }
                 }
                 if let Some(members) = ctx
-                    .get_class_members(name.as_ref(), origin.as_deref())
-                    .or_else(|| ctx.get_interface_members(name.as_ref(), origin.as_deref()))
-                    .or_else(|| ctx.get_namespace_members(name.as_ref(), origin.as_deref()))
-                    .or_else(|| ctx.get_enum_members(name.as_ref(), origin.as_deref()))
+                    .get_class_members(name_str, origin_str)
+                    .or_else(|| ctx.get_interface_members(name_str, origin_str))
+                    .or_else(|| ctx.get_namespace_members(name_str, origin_str))
+                    .or_else(|| ctx.get_enum_members(name_str, origin_str))
                 {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
-                        return m.ty.clone();
+                        return m.ty;
                     }
                 }
             }
-            TypeKind::Object(members) => {
-                for m in members {
-                    if let Some(ty) = infer_object_member_type(m, prop_name) {
+            TypeKind::Object(mid) => {
+                for m in table.get_object_members(mid).to_vec() {
+                    if let Some(ty) = infer_object_member_type(&m, prop_name, table) {
                         return ty;
                     }
                 }
@@ -260,17 +280,20 @@ fn infer_member(
                     return Type::Int;
                 }
                 if prop_name == varn_core::MemberKey::Push.as_str() {
-                    return Type::fn_(FunctionType {
-                        params: vec![crate::types::FunctionParam {
-                            name: Some(Rc::from("item")),
-                            ty: (**inner).clone(),
-                            optional: false,
-                            is_rest: false,
-                        }],
-                        return_type: Box::new(Type::Int),
-                        is_arrow: false,
-                        type_params: vec![],
-                    });
+                    return Type::fn_(
+                        FunctionType {
+                            params: vec![crate::types::FunctionParam {
+                                name: Some(Rc::from("item")),
+                                ty: inner,
+                                optional: false,
+                                is_rest: false,
+                            }],
+                            return_type: Type::Int.0,
+                            is_arrow: false,
+                            type_params: vec![],
+                        },
+                        table,
+                    );
                 }
             }
             _ => {}
@@ -282,9 +305,9 @@ fn infer_member(
 /// Numeric result type of a binary op, from the shared rules in
 /// `varn_core::numeric`. `None` when the operands have no common numeric
 /// class — the caller picks its own fallback.
-pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type) -> Option<Type> {
+pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
     use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
-    let operand = |t: &Type| match &t.0 {
+    let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
             TypeTag::Int
                 | TypeTag::I8
@@ -313,21 +336,22 @@ fn infer_binary(
     right: ExprId,
     arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
     match op {
         BinaryOp::Add => {
-            let l = infer_expr_type(left, arena, ctx);
-            let r = infer_expr_type(right, arena, ctx);
-            match (&l.0, &r.0) {
+            let l = infer_expr_type(left, arena, ctx, table);
+            let r = infer_expr_type(right, arena, ctx, table);
+            match (table.get(l.0), table.get(r.0)) {
                 (&TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
                 | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
-                _ => numeric_binary_type(*op, &l, &r).unwrap_or(Type::Dynamic),
+                _ => numeric_binary_type(*op, &l, &r, table).unwrap_or(Type::Dynamic),
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-            let l = infer_expr_type(left, arena, ctx);
-            let r = infer_expr_type(right, arena, ctx);
-            numeric_binary_type(*op, &l, &r).unwrap_or(Type::Dynamic)
+            let l = infer_expr_type(left, arena, ctx, table);
+            let r = infer_expr_type(right, arena, ctx, table);
+            numeric_binary_type(*op, &l, &r, table).unwrap_or(Type::Dynamic)
         }
         BinaryOp::Eq
         | BinaryOp::NotEq
@@ -343,9 +367,9 @@ fn infer_binary(
         | BinaryOp::Shl
         | BinaryOp::Shr
         | BinaryOp::UShr => {
-            let l = infer_expr_type(left, arena, ctx);
-            let r = infer_expr_type(right, arena, ctx);
-            match (&l.0, &r.0) {
+            let l = infer_expr_type(left, arena, ctx, table);
+            let r = infer_expr_type(right, arena, ctx, table);
+            match (table.get(l.0), table.get(r.0)) {
                 (
                     &TypeKind::Intrinsic(varn_core::TypeTag::Int),
                     &TypeKind::Intrinsic(varn_core::TypeTag::Int),
@@ -361,50 +385,37 @@ fn infer_new(
     type_args: &[varn_core::ast::TypeNode],
     arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
     if let ExprKind::Identifier { name } = &arena.expr(callee).kind {
         let name_str = ctx
             .and_then(|c| c.interner())
             .map(|i| i.resolve(*name).to_owned())
             .unwrap_or_default();
+        let resolver = ctx.and_then(|c| c.resolver());
+        let origin = ctx.and_then(|c| c.source_file()).and_then(|s| resolver.map(|r| r.intern(s)));
         if type_args.is_empty() {
             if name_str == varn_core::IntrinsicType::Map.as_str() {
-                return Type::generic_with_origin(
-                    name_str,
-                    vec![Type::Dynamic],
-                    ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
-                );
+                return Type::generic_atom(*name, vec![Type::Dynamic], origin, table);
             }
-            return Type::named_with_origin(
-                name_str,
-                ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
-            );
+            return Type::named_with_origin_atom(*name, origin, table);
         }
         let args = type_args
             .iter()
-            .map(|m| resolve_type_node(m, ctx))
+            .map(|m| resolve_type_node(m, ctx, table))
             .collect();
-        return Type::generic_with_origin(
-            name_str,
-            args,
-            ctx.and_then(|c| c.source_file()).map(|s| s.to_owned()),
-        );
+        return Type::generic_atom(*name, args, origin, table);
     }
     if let ExprKind::Member { .. } = &arena.expr(callee).kind {
-        let callee_ty = infer_expr_type(callee, arena, ctx);
-        match &callee_ty.0 {
+        let callee_ty = infer_expr_type(callee, arena, ctx, table);
+        match table.get(callee_ty.0).clone() {
             TypeKind::Named(name, origin) => {
-                return Type::named_with_origin(
-                    name.to_string(),
-                    origin.as_ref().map(|s| s.to_string()),
-                );
+                return Type::named_with_origin_atom(name, origin, table);
             }
             TypeKind::Generic(name, args, origin) => {
-                return Type::generic_with_origin(
-                    name.to_string(),
-                    args.clone(),
-                    origin.as_ref().map(|s| s.to_string()),
-                );
+                let arg_ids = table.get_list(args).to_vec();
+                let arg_tys: Vec<Type> = arg_ids.into_iter().map(|id| Type(id, false)).collect();
+                return Type::generic_atom(name, arg_tys, origin, table);
             }
             _ => {}
         }
@@ -416,6 +427,7 @@ fn infer_object(
     properties: &[ObjectProp],
     arena: &AstArena,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Type {
     let mut members = Vec::new();
     for p in properties {
@@ -423,11 +435,11 @@ fn infer_object(
             ObjectProp::Property { key, value, .. } => {
                 let value = *value;
                 if matches!(key, PropKey::Computed(_)) {
-                    let val_ty = infer_expr_type(value, arena, ctx);
+                    let val_ty = infer_expr_type(value, arena, ctx, table);
                     members.push(ObjectTypeMember::Index {
                         param_name: Rc::from("_key"),
-                        key_ty: Box::new(Type::Str),
-                        value_ty: Box::new(val_ty),
+                        key_ty: Type::Str.0,
+                        value_ty: val_ty.0,
                     });
                     continue;
                 }
@@ -435,19 +447,20 @@ fn infer_object(
                     PropKey::Identifier(n) | PropKey::Str(n) => Rc::from(n.as_str()),
                     _ => continue,
                 };
-                let ty = infer_expr_type(value, arena, ctx);
-                if let TypeKind::Fn(ft) = &ty.0 {
+                let ty = infer_expr_type(value, arena, ctx, table);
+                if let TypeKind::Fn(fid) = table.get(ty.0) {
+                    let ft = table.get_function(*fid).clone();
                     members.push(ObjectTypeMember::Method {
                         name,
                         params: ft.params.clone(),
-                        return_type: ft.return_type.clone(),
+                        return_type: ft.return_type,
                         optional: false,
                         is_arrow: ft.is_arrow,
                     });
                 } else {
                     members.push(ObjectTypeMember::Property {
                         name,
-                        ty,
+                        ty: ty.0,
                         optional: false,
                         readonly: false,
                     });
@@ -463,27 +476,27 @@ fn infer_object(
                     PropKey::Identifier(n) | PropKey::Str(n) => Rc::from(n.as_str()),
                     _ => continue,
                 };
-                let ps = build_method_params(params, ctx);
+                let ps = build_method_params(params, ctx, table);
                 let ret = return_type
                     .as_ref()
-                    .map(|m| resolve_type_node(m, ctx))
+                    .map(|m| resolve_type_node(m, ctx, table))
                     .unwrap_or(Type::Dynamic);
                 members.push(ObjectTypeMember::Method {
                     name,
                     params: ps,
-                    return_type: Box::new(ret),
+                    return_type: ret.0,
                     optional: false,
                     is_arrow: false,
                 });
             }
             ObjectProp::Spread { argument, .. } => {
-                let spread_ty = infer_expr_type(*argument, arena, ctx);
-                if let TypeKind::Object(spread_members) = spread_ty.0 {
-                    members.extend(spread_members);
+                let spread_ty = infer_expr_type(*argument, arena, ctx, table);
+                if let TypeKind::Object(mid) = table.get(spread_ty.0) {
+                    members.extend(table.get_object_members(*mid).to_vec());
                 }
             }
             _ => {}
         }
     }
-    Type::object(members)
+    Type::object(members, table)
 }

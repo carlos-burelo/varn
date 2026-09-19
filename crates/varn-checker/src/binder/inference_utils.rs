@@ -2,7 +2,7 @@ use std::rc::Rc;
 use varn_core::ast::{Param, Pattern, TypeNode};
 
 use super::type_resolution::resolve_type_node;
-use crate::types::{FunctionParam, FunctionType, ObjectTypeMember, Type};
+use crate::types::{CheckerTyTable, FunctionParam, FunctionType, ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
 pub fn build_fn_type(
@@ -10,6 +10,7 @@ pub fn build_fn_type(
     return_type: &Option<TypeNode>,
     is_arrow: bool,
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
     inferred_ret: Type,
 ) -> Type {
     let interner = ctx.and_then(|c| c.interner());
@@ -24,14 +25,14 @@ pub fn build_fn_type(
                     Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                     _ => None,
                 })
-                .map(|m| resolve_type_node(m, ctx))
+                .map(|m| resolve_type_node(m, ctx, table))
                 .unwrap_or(Type::Dynamic);
-            if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                ty = Type::array(ty);
+            if p.is_rest && !matches!(table.get(ty.0), TypeKind::Array(_)) {
+                ty = Type::array(ty, table);
             }
             FunctionParam {
                 name: Some(name),
-                ty,
+                ty: ty.0,
                 optional: p.is_optional || p.default.is_some(),
                 is_rest: p.is_rest,
             }
@@ -39,19 +40,23 @@ pub fn build_fn_type(
         .collect();
     let ret = return_type
         .as_ref()
-        .map(|m| resolve_type_node(m, ctx))
+        .map(|m| resolve_type_node(m, ctx, table))
         .unwrap_or(inferred_ret);
-    Type::fn_(FunctionType {
-        params: ps,
-        return_type: Box::new(ret),
-        is_arrow,
-        type_params: vec![],
-    })
+    Type::fn_(
+        FunctionType {
+            params: ps,
+            return_type: ret.0,
+            is_arrow,
+            type_params: vec![],
+        },
+        table,
+    )
 }
 
 pub fn build_method_params(
     params: &[Param],
     ctx: Option<&dyn crate::types::TypeContext>,
+    table: &mut CheckerTyTable,
 ) -> Vec<FunctionParam> {
     let interner = ctx.and_then(|c| c.interner());
     params
@@ -61,14 +66,14 @@ pub fn build_method_params(
             let mut ty = p
                 .type_ann
                 .as_ref()
-                .map(|m| resolve_type_node(m, ctx))
+                .map(|m| resolve_type_node(m, ctx, table))
                 .unwrap_or(Type::Dynamic);
-            if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
-                ty = Type::array(ty);
+            if p.is_rest && !matches!(table.get(ty.0), TypeKind::Array(_)) {
+                ty = Type::array(ty, table);
             }
             FunctionParam {
                 name: Some(name),
-                ty,
+                ty: ty.0,
                 optional: p.is_optional || p.default.is_some(),
                 is_rest: p.is_rest,
             }
@@ -76,10 +81,14 @@ pub fn build_method_params(
         .collect()
 }
 
-pub fn infer_object_member_type(m: &ObjectTypeMember, prop_name: &str) -> Option<Type> {
+pub fn infer_object_member_type(
+    m: &ObjectTypeMember,
+    prop_name: &str,
+    table: &mut CheckerTyTable,
+) -> Option<Type> {
     match m {
         ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == prop_name => {
-            Some(ty.clone())
+            Some(Type(*ty, false))
         }
         ObjectTypeMember::Method {
             name,
@@ -87,12 +96,15 @@ pub fn infer_object_member_type(m: &ObjectTypeMember, prop_name: &str) -> Option
             return_type,
             is_arrow,
             ..
-        } if name.as_ref() == prop_name => Some(Type::fn_(FunctionType {
-            params: params.clone(),
-            return_type: return_type.clone(),
-            is_arrow: *is_arrow,
-            type_params: vec![],
-        })),
+        } if name.as_ref() == prop_name => Some(Type::fn_(
+            FunctionType {
+                params: params.clone(),
+                return_type: *return_type,
+                is_arrow: *is_arrow,
+                type_params: vec![],
+            },
+            table,
+        )),
         _ => None,
     }
 }

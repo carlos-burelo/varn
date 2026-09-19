@@ -12,8 +12,9 @@
 //! So the wrap happens once, where the function's type is built, and every
 //! consumer downstream just reads the type.
 
-use super::Type;
-use varn_core::{IntrinsicType, TypeKind};
+use super::{CheckerTyTable, Type};
+use crate::module_resolver::ImportResolver;
+use varn_core::{AtomInterner, IntrinsicType, TypeKind};
 
 /// The return type an `async` function's *type* carries, given the return type
 /// its *body* produces. Idempotent: a body already declared as `Task<T>` or
@@ -22,11 +23,31 @@ use varn_core::{IntrinsicType, TypeKind};
 ///
 /// `dynamic` is left alone too — wrapping it would claim knowledge the checker
 /// does not have, and `await` accepts it already.
-pub fn async_fn_return(ret: Type, is_async: bool) -> Type {
-    if !is_async || ret.is_dynamic() || is_awaitable(&ret) {
+///
+/// `resolver` mints the `Task` `Atom` into the SAME shared, per-compilation
+/// `AtomInterner` every other `Generic` name comes from
+/// (`ImportResolver::intern`) — required so a `Task<int>` built here compares
+/// equal, by `Atom`, to a user-written `Task<int>` annotation resolved
+/// through `resolve_type_node`. `None` (no resolver reachable) degrades to
+/// leaving `ret` unwrapped rather than minting an `Atom` nothing else can
+/// compare against.
+pub fn async_fn_return(
+    ret: Type,
+    is_async: bool,
+    table: &mut CheckerTyTable,
+    interner: &AtomInterner,
+    resolver: Option<&dyn ImportResolver>,
+) -> Type {
+    if !is_async || ret.is_dynamic() || is_awaitable(&ret, table, interner) {
         return ret;
     }
-    Type::generic(IntrinsicType::Task.as_str().to_owned(), vec![ret])
+    match resolver {
+        Some(r) => {
+            let atom = r.intern(IntrinsicType::Task.as_str());
+            Type::generic_atom(atom, vec![ret], None, table)
+        }
+        None => ret,
+    }
 }
 
 /// The type a generator function's *value* has, given the type its `yield`s
@@ -34,32 +55,46 @@ pub fn async_fn_return(ret: Type, is_async: bool) -> Type {
 /// `Generator<T>`, since the driver settles the body's awaits inside `next()`,
 /// but a distinct name so `for await` and the `await` inside the body are
 /// meaningful in the type system.
-pub fn generator_of(yielded: Type, is_async: bool) -> Type {
+pub fn generator_of(
+    yielded: Type,
+    is_async: bool,
+    table: &mut CheckerTyTable,
+    resolver: Option<&dyn ImportResolver>,
+) -> Type {
     let name = if is_async {
         "AsyncGenerator"
     } else {
         IntrinsicType::Generator.as_str()
     };
-    Type::generic(name.to_owned(), vec![yielded])
+    match resolver {
+        Some(r) => {
+            let atom = r.intern(name);
+            Type::generic_atom(atom, vec![yielded], None, table)
+        }
+        None => Type::Dynamic,
+    }
 }
 
 /// Whether `await` on this type has something to unwrap. `Task` is what async
 /// functions produce; `TaskHandle` is what `spawn` produces.
-pub fn is_awaitable(ty: &Type) -> bool {
-    matches!(
-        &ty.0,
-        TypeKind::Generic(name, args, _)
-            if args.len() == 1
-                && (name.as_ref() == IntrinsicType::Task.as_str()
-                    || name.as_ref() == IntrinsicType::TaskHandle.as_str())
-    )
+pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> bool {
+    match table.get(ty.0) {
+        TypeKind::Generic(name, args, _) => {
+            table.get_list(*args).len() == 1
+                && (interner.resolve(*name) == IntrinsicType::Task.as_str()
+                    || interner.resolve(*name) == IntrinsicType::TaskHandle.as_str())
+        }
+        _ => false,
+    }
 }
 
 /// The value `await` yields: the payload of an awaitable, or the type itself
 /// when there is nothing to unwrap.
-pub fn awaited(ty: &Type) -> Type {
-    match &ty.0 {
-        TypeKind::Generic(_, args, _) if is_awaitable(ty) => args[0].clone(),
-        _ => ty.clone(),
+pub fn awaited(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> Type {
+    match table.get(ty.0) {
+        TypeKind::Generic(_, args, _) if is_awaitable(ty, table, interner) => {
+            Type(table.get_list(*args)[0], false)
+        }
+        _ => *ty,
     }
 }

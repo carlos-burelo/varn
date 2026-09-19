@@ -1,9 +1,14 @@
 use super::types_compatible_impl;
 use crate::binder::BindView;
-use crate::types::{ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type};
+use crate::types::{CheckerTyId, CheckerTyTable, ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type};
 use crate::types::{FunctionParam, FunctionType};
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_core::TypeKind;
+
+#[inline]
+fn t(id: CheckerTyId) -> Type {
+    Type(id, false)
+}
 
 pub(super) fn is_known_named(bind: &BindView, name: &str) -> bool {
     bind.bind.has_named_type(name)
@@ -32,6 +37,7 @@ pub(super) fn named_members(
         .or_else(|| bind.get_enum_members(name, origin))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn compatible_named(
     declared: &str,
     origin_decl: Option<&str>,
@@ -40,6 +46,7 @@ pub(super) fn compatible_named(
     bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
     if declared == inferred {
         if origin_decl == origin_inf || origin_decl.is_none() || origin_inf.is_none() {
@@ -62,7 +69,9 @@ pub(super) fn compatible_named(
     let inf_members = named_members(bind, inferred, origin_inf);
 
     match (decl_members, inf_members) {
-        (Some(decl), Some(inf)) => class_members_compatible(&decl, &inf, bind, cache, in_progress),
+        (Some(decl), Some(inf)) => {
+            class_members_compatible(&decl, &inf, bind, cache, in_progress, table)
+        }
         _ => false,
     }
 }
@@ -73,17 +82,15 @@ fn class_members_compatible(
     bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
     for dm in decl_members {
         match dm.kind {
             ClassMemberKind::Property | ClassMemberKind::Getter | ClassMemberKind::Setter => {
-                let found = inf_members
-                    .iter()
-                    .find(|im| im.name == dm.name)
-                    .map(|m| &m.ty);
+                let found = inf_members.iter().find(|im| im.name == dm.name).map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(&dm.ty, inf_ty, Some(bind), cache, in_progress) {
+                        if !types_compatible_impl(&dm.ty, &inf_ty, Some(bind), cache, in_progress, table) {
                             return false;
                         }
                     }
@@ -101,7 +108,7 @@ fn class_members_compatible(
                 if inf_m.kind != ClassMemberKind::Method {
                     return false;
                 }
-                if !types_compatible_impl(&dm.ty, &inf_m.ty, Some(bind), cache, in_progress) {
+                if !types_compatible_impl(&dm.ty, &inf_m.ty, Some(bind), cache, in_progress, table) {
                     return false;
                 }
             }
@@ -117,17 +124,18 @@ pub(super) fn class_members_match_object(
     bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
     for dm in decl_members {
         match dm.kind {
             ClassMemberKind::Property | ClassMemberKind::Getter | ClassMemberKind::Setter => {
                 let found = inf_fields.iter().find_map(|im| match im {
-                    ObjectTypeMember::Property { name, ty, .. } if name == &dm.name => Some(ty),
+                    ObjectTypeMember::Property { name, ty, .. } if name == &dm.name => Some(*ty),
                     _ => None,
                 });
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(&dm.ty, inf_ty, Some(bind), cache, in_progress) {
+                        if !types_compatible_impl(&dm.ty, &t(inf_ty), Some(bind), cache, in_progress, table) {
                             return false;
                         }
                     }
@@ -146,9 +154,7 @@ pub(super) fn class_members_match_object(
                         return_type,
                         is_arrow,
                         ..
-                    } if name == &dm.name => {
-                        Some((params.as_slice(), return_type.as_ref(), *is_arrow))
-                    }
+                    } if name == &dm.name => Some((params.as_slice(), *return_type, *is_arrow)),
                     _ => None,
                 });
                 let Some((params, return_type, is_arrow)) = found else {
@@ -162,6 +168,7 @@ pub(super) fn class_members_match_object(
                     Some(bind),
                     cache,
                     in_progress,
+                    table,
                 ) {
                     return false;
                 }
@@ -178,19 +185,17 @@ pub(super) fn object_matches_class_members(
     bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
     for dm in decl_fields {
         match dm {
             ObjectTypeMember::Property {
                 name, ty, optional, ..
             } => {
-                let found = inf_members
-                    .iter()
-                    .find(|im| &im.name == name)
-                    .map(|m| &m.ty);
+                let found = inf_members.iter().find(|im| &im.name == name).map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(ty, inf_ty, Some(bind), cache, in_progress) {
+                        if !types_compatible_impl(&t(*ty), &inf_ty, Some(bind), cache, in_progress, table) {
                             return false;
                         }
                     }
@@ -213,12 +218,13 @@ pub(super) fn object_matches_class_members(
                 };
                 if !fn_signature_compatible_type(
                     params,
-                    return_type,
+                    *return_type,
                     *is_arrow,
                     &inf_m.ty,
                     Some(bind),
                     cache,
                     in_progress,
+                    table,
                 ) {
                     return false;
                 }
@@ -229,64 +235,78 @@ pub(super) fn object_matches_class_members(
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 fn fn_signature_compatible_type(
     params: &[FunctionParam],
-    return_type: &Type,
+    return_type: CheckerTyId,
     is_arrow: bool,
     inferred: &Type,
     bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
-    match &inferred.0 {
-        TypeKind::Fn(ft2) => {
-            let return_ok = matches!(return_type.0, TypeKind::Intrinsic(varn_core::TypeTag::Void))
-                || types_compatible_impl(return_type, &ft2.return_type, bind, cache, in_progress);
+    match table.get(inferred.0) {
+        TypeKind::Fn(fid2) => {
+            let ft2 = table.get_function(*fid2).clone();
+            let return_ok = matches!(table.get(return_type), TypeKind::Intrinsic(varn_core::TypeTag::Void))
+                || types_compatible_impl(&t(return_type), &t(ft2.return_type), bind, cache, in_progress, table);
             ft2.params.len() <= params.len()
                 && return_ok
                 && params.iter().zip(ft2.params.iter()).all(|(t1, t2)| {
-                    types_compatible_impl(&t2.ty, &t1.ty, bind, cache, in_progress)
+                    types_compatible_impl(&t(t2.ty), &t(t1.ty), bind, cache, in_progress, table)
                         && t1.optional == t2.optional
                 })
         }
         _ => {
-            let declared = Type::fn_(FunctionType {
-                params: params.to_vec(),
-                return_type: Box::new(return_type.clone()),
-                is_arrow,
-                type_params: vec![],
-            });
-            types_compatible_impl(&declared, inferred, bind, cache, in_progress)
+            let mut owned_table = table.clone();
+            let declared = Type::fn_(
+                FunctionType {
+                    params: params.to_vec(),
+                    return_type,
+                    is_arrow,
+                    type_params: vec![],
+                },
+                &mut owned_table,
+            );
+            types_compatible_impl(&declared, inferred, bind, cache, in_progress, &owned_table)
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn types_compatible_with_fn_signature(
     declared: &Type,
     params: &[FunctionParam],
-    return_type: &Type,
+    return_type: CheckerTyId,
     is_arrow: bool,
     bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
 ) -> bool {
-    match &declared.0 {
-        TypeKind::Fn(ft1) => {
+    match table.get(declared.0) {
+        TypeKind::Fn(fid1) => {
+            let ft1 = table.get_function(*fid1).clone();
             params.len() <= ft1.params.len()
-                && types_compatible_impl(&ft1.return_type, return_type, bind, cache, in_progress)
+                && types_compatible_impl(&t(ft1.return_type), &t(return_type), bind, cache, in_progress, table)
                 && ft1.params.iter().zip(params.iter()).all(|(t1, t2)| {
-                    types_compatible_impl(&t2.ty, &t1.ty, bind, cache, in_progress)
+                    types_compatible_impl(&t(t2.ty), &t(t1.ty), bind, cache, in_progress, table)
                         && t1.optional == t2.optional
                 })
         }
         _ => {
-            let inferred = Type::fn_(FunctionType {
-                params: params.to_vec(),
-                return_type: Box::new(return_type.clone()),
-                is_arrow,
-                type_params: vec![],
-            });
-            types_compatible_impl(declared, &inferred, bind, cache, in_progress)
+            let mut owned_table = table.clone();
+            let inferred = Type::fn_(
+                FunctionType {
+                    params: params.to_vec(),
+                    return_type,
+                    is_arrow,
+                    type_params: vec![],
+                },
+                &mut owned_table,
+            );
+            types_compatible_impl(declared, &inferred, bind, cache, in_progress, &owned_table)
         }
     }
 }
