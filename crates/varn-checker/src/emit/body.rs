@@ -39,6 +39,8 @@ pub(super) struct ModuleCtx<'a> {
     pub math_intrinsics: &'a FxHashMap<Atom, u8>,
 
     pub interner: &'a AtomInterner,
+
+    pub checker_table: &'a crate::types::CheckerTyTable,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -300,8 +302,10 @@ impl<'a> FnEmitter<'a> {
 
     fn expr_ty(&mut self, e: ExprId) -> BackendTy {
         let names = self.m.names;
+        let table = self.m.checker_table;
+        let interner = self.m.interner;
         match self.expr_table.get(&e.index()) {
-            Some(entry) => lower_type(&entry.ty, self.tt, names),
+            Some(entry) => lower_type(&entry.ty, table, interner, self.tt, names),
             None => BackendTy::Dynamic(DynReason::Unannotated),
         }
     }
@@ -1593,7 +1597,9 @@ impl<'a> FnEmitter<'a> {
                                 .get(&init.index())
                                 .map(|e| {
                                     let names = self.m.names;
-                                    lower_type(&e.ty, self.tt, names)
+                                    let table = self.m.checker_table;
+                                    let interner = self.m.interner;
+                                    lower_type(&e.ty, table, interner, self.tt, names)
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
                             let local = self.bind_local(Rc::from(name_str), ty);
@@ -1633,8 +1639,14 @@ impl<'a> FnEmitter<'a> {
                         .type_ann
                         .as_ref()
                         .map(|t| {
-                            let resolved = crate::binder::resolve_type_node(t, None);
-                            lower_type(&resolved, self.tt, self.m.names)
+                            // Scratch table: see the matching comment in
+                            // `emit/mod.rs`'s synthetic-constructor lowering —
+                            // `ctx=None` can't resolve names, so these ids never
+                            // need to match the module's real `CheckerTyTable`.
+                            let mut scratch = crate::types::CheckerTyTable::new();
+                            let resolved =
+                                crate::binder::resolve_type_node(t, None, &mut scratch);
+                            lower_type(&resolved, &scratch, self.m.interner, self.tt, self.m.names)
                         })
                         .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
                         .or_else(|| init.as_ref().map(|e| e.ty))

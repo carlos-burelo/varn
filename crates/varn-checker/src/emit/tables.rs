@@ -7,10 +7,10 @@
 
 use crate::binder::BindResult;
 use crate::emit::ty::{lower_type, NameResolver};
-use crate::types::{ClassMemberKind, Type};
+use crate::types::{CheckerTyTable, ClassMemberKind, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::TypeKind;
+use varn_core::{AtomInterner, TypeKind};
 use varn_tir::{BackendTy, ClassId, ClassInfo, EnumId, EnumInfo, Signature, TyTable, VariantInfo};
 
 /// Name → module-table handle, for the class and enum types the checker
@@ -84,8 +84,16 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
     // Pass 2: build the infos. Classes in parent-before-child order so
     // `ClassInfo::new_with_methods` can take the parent's `&ClassInfo`.
     let mut signatures = seed_signatures();
-    let classes = build_classes(bind, tt, &names, &class_names, &mut signatures);
-    let enums = build_enums(bind, tt, &names, &enum_names);
+    let classes = build_classes(
+        bind,
+        &bind.ty_table,
+        &bind.interner,
+        tt,
+        &names,
+        &class_names,
+        &mut signatures,
+    );
+    let enums = build_enums(bind, &bind.ty_table, &bind.interner, tt, &names, &enum_names);
 
     Tables {
         classes,
@@ -95,8 +103,11 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_classes(
     bind: &BindResult,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
     tt: &mut TyTable,
     names: &NameIndex,
     class_names: &[Rc<str>],
@@ -107,7 +118,7 @@ fn build_classes(
     // fields out first, with the slots the runtime's inherited shape uses.
     let mut built: Vec<ClassInfo> = Vec::with_capacity(class_names.len());
     for name in class_names {
-        let info = build_one_class(bind, tt, names, name, signatures, &built);
+        let info = build_one_class(bind, table, interner, tt, names, name, signatures, &built);
         built.push(info);
     }
     built
@@ -118,8 +129,11 @@ fn build_classes(
 /// both the base and the derived name. So each class is built standalone
 /// (`parent: None`), deduping fields by first sighting (the declared slot) and
 /// methods by last (the most-derived signature).
+#[allow(clippy::too_many_arguments)]
 fn build_one_class(
     bind: &BindResult,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
     tt: &mut TyTable,
     names: &NameIndex,
     name: &Rc<str>,
@@ -172,19 +186,19 @@ fn build_one_class(
                 if !inherited_fields.contains_key(&m.name)
                     && seen_field.insert(m.name.clone(), ()).is_none()
                 {
-                    fields.push((m.name.clone(), lower_type(&m.ty, tt, names)));
+                    fields.push((m.name.clone(), lower_type(&m.ty, table, interner, tt, names)));
                 }
             }
             ClassMemberKind::Method | ClassMemberKind::Function => {
-                let sig = intern_signature(&m.ty, tt, names, signatures);
+                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(m.name.clone(), sig, &mut method_names);
             }
             ClassMemberKind::Getter => {
-                let sig = intern_signature(&m.ty, tt, names, signatures);
+                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(Rc::from(format!("get {}", m.name)), sig, &mut method_names);
             }
             ClassMemberKind::Setter => {
-                let sig = intern_signature(&m.ty, tt, names, signatures);
+                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(Rc::from(format!("set {}", m.name)), sig, &mut method_names);
             }
             _ => {}
@@ -208,16 +222,19 @@ fn build_one_class(
 /// today, which would make every `return x` inside it fail coherence.
 fn intern_signature(
     ty: &Type,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
     tt: &mut TyTable,
     names: &NameIndex,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
-    let (params, return_ty) = match ty.kind() {
-        TypeKind::Fn(f) => {
-            let p_tys: Vec<BackendTy> = f
+    let (params, return_ty) = match table.get(ty.0) {
+        TypeKind::Fn(fid) => {
+            let ft = table.get_function(*fid);
+            let p_tys: Vec<BackendTy> = ft
                 .params
                 .iter()
-                .map(|p| lower_type(&p.ty, tt, names))
+                .map(|p| lower_type(&Type(p.ty, false), table, interner, tt, names))
                 .collect();
             (p_tys, BackendTy::Dynamic(varn_tir::DynReason::Unannotated))
         }
@@ -233,6 +250,8 @@ fn intern_signature(
 
 fn build_enums(
     bind: &BindResult,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
     tt: &mut TyTable,
     names: &NameIndex,
     enum_names: &[Rc<str>],
@@ -252,7 +271,7 @@ fn build_enums(
                         payload: bind
                             .sum_variant_fields
                             .get(vn)
-                            .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect())
+                            .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, table, interner, tt, names)).collect())
                             .unwrap_or_default(),
                     })
                     .collect();
@@ -289,7 +308,7 @@ fn build_enums(
                     let payload = bind
                         .sum_variant_fields
                         .get(&v.name)
-                        .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, tt, names)).collect())
+                        .map(|fs| fs.iter().map(|(_, ty)| lower_type(ty, table, interner, tt, names)).collect())
                         .unwrap_or_default();
                     VariantInfo {
                         name: v.name.clone(),

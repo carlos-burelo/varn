@@ -91,7 +91,7 @@ pub fn emit_module(
         globals.push(
             sym.ty
                 .as_ref()
-                .map(|t| lower_type(t, &mut types, &names))
+                .map(|t| lower_type(t, &bind.ty_table, interner, &mut types, &names))
                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
         );
         global_slots.insert(sym_name, slot);
@@ -181,6 +181,7 @@ pub fn emit_module(
         core_ops: &core_ops,
         math_intrinsics: &math_intrinsics,
         interner,
+        checker_table: &bind.ty_table,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -371,6 +372,7 @@ struct MCtx<'a> {
     core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
     math_intrinsics: &'a FxHashMap<Atom, u8>,
     interner: &'a AtomInterner,
+    checker_table: &'a crate::types::CheckerTyTable,
 }
 
 impl<'a> MCtx<'a> {
@@ -388,6 +390,7 @@ impl<'a> MCtx<'a> {
             core_ops: self.core_ops,
             math_intrinsics: self.math_intrinsics,
             interner: self.interner,
+            checker_table: self.checker_table,
         }
     }
 }
@@ -1499,11 +1502,20 @@ fn emit_class(
                             p.type_ann
                                 .as_ref()
                                 .map(|t| {
-                                    lower_type(
-                                        &crate::binder::resolve_type_node(t, None),
-                                        types,
-                                        ctx.names,
-                                    )
+                                    // `ctx=None` here can't resolve names anyway
+                                    // (see `resolve_type_node`'s doc), so the ids
+                                    // this produces never need to line up with the
+                                    // module's real `CheckerTyTable` — a scratch
+                                    // table (with the same fixed intrinsic ids by
+                                    // construction) is interned into and dropped
+                                    // in the same expression.
+                                    let mut scratch = crate::types::CheckerTyTable::new();
+                                    let resolved = crate::binder::resolve_type_node(
+                                        t,
+                                        None,
+                                        &mut scratch,
+                                    );
+                                    lower_type(&resolved, &scratch, ctx.interner, types, ctx.names)
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
                         })
@@ -1830,11 +1842,24 @@ fn emit_function(
     let arity = f.params.len();
     let mut param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); arity];
     let mut return_ty = BackendTy::Dynamic(DynReason::Unannotated);
-    if let Some(TypeKind::Fn(ft)) = sym_ty.as_ref().map(|t| t.kind()) {
+    if let Some(TypeKind::Fn(fn_id)) = sym_ty.as_ref().map(|t| t.kind(ctx.checker_table)) {
+        let ft = ctx.checker_table.get_function(*fn_id);
         for (i, p) in ft.params.iter().take(arity).enumerate() {
-            param_tys[i] = lower_type(&p.ty, types, ctx.names);
+            param_tys[i] = lower_type(
+                &crate::types::Type(p.ty, false),
+                ctx.checker_table,
+                ctx.interner,
+                types,
+                ctx.names,
+            );
         }
-        return_ty = lower_type(&ft.return_type, types, ctx.names);
+        return_ty = lower_type(
+            &crate::types::Type(ft.return_type, false),
+            ctx.checker_table,
+            ctx.interner,
+            types,
+            ctx.names,
+        );
     }
 
     let sig = SigId(signatures.len() as u32);

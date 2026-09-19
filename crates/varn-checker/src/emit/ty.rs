@@ -6,8 +6,8 @@
 //! `Task`, an arbitrary function type) lowers to `Dynamic(Unannotated)` — the
 //! value carries no more type information here, which is the honest state.
 
-use crate::types::Type;
-use varn_core::{TypeKind, TypeTag};
+use crate::types::{CheckerTyTable, Type};
+use varn_core::{AtomInterner, TypeKind, TypeTag};
 use varn_tir::{BackendTy, ClassId, DynReason, EnumId, TyTable};
 
 /// Resolves a type name to the module-table handle the checker assigned it.
@@ -29,10 +29,19 @@ impl NameResolver for NoNames {
     }
 }
 
-/// Lower one type. `tt` interns the structured payloads; `names` maps a named
-/// type to its class/enum handle.
-pub fn lower_type(ty: &Type, tt: &mut TyTable, names: &dyn NameResolver) -> BackendTy {
-    lower_kind(ty.kind(), tt, names)
+/// Lower one type. `table`/`interner` are the checker's hash-consed type
+/// table and the interner that resolves its `Atom` names — the source of
+/// truth `ty` is an id into, now that `Type` no longer carries a materialized
+/// tree of its own. `tt` interns the structured payloads; `names` maps a
+/// named type to its class/enum handle.
+pub fn lower_type(
+    ty: &Type,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    lower_kind(table.get(ty.0), table, interner, tt, names)
 }
 
 /// A type the TIR does not model precisely.
@@ -51,30 +60,40 @@ fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
 }
 
 fn lower_kind(
-    kind: &crate::types::SemanticTypeKind,
+    kind: &crate::types::InternedTypeKind,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    match kind {
+    match *kind {
         // `Map` / `Set` are structured intrinsics: their element types live in
         // a `Generic` node, or are absent for a bare annotation. Either way the
         // container itself is a known reference type, not `Dynamic` — this is
         // what lets `m.get(k)` reach `CallNativeOp` and `.size` a typed read.
         // `Map<V>` (key defaults to `str`) or `Map<K, V>`.
         TypeKind::Generic(name, args, _)
-            if name.as_ref() == TypeTag::Map.name() && (args.len() == 1 || args.len() == 2) =>
+            if interner.resolve(name) == TypeTag::Map.name()
+                && (table.get_list(args).len() == 1 || table.get_list(args).len() == 2) =>
         {
-            let (k, v) = if args.len() == 2 {
-                (lower_type(&args[0], tt, names), lower_type(&args[1], tt, names))
+            let arg_ids = table.get_list(args).to_vec();
+            let (k, v) = if arg_ids.len() == 2 {
+                (
+                    lower_type(&Type(arg_ids[0], false), table, interner, tt, names),
+                    lower_type(&Type(arg_ids[1], false), table, interner, tt, names),
+                )
             } else {
-                (BackendTy::Str, lower_type(&args[0], tt, names))
+                (
+                    BackendTy::Str,
+                    lower_type(&Type(arg_ids[0], false), table, interner, tt, names),
+                )
             };
             BackendTy::Map(tt.intern(k), tt.intern(v))
         }
         TypeKind::Generic(name, args, _)
-            if name.as_ref() == TypeTag::Set.name() && args.len() == 1 =>
+            if interner.resolve(name) == TypeTag::Set.name() && table.get_list(args).len() == 1 =>
         {
-            let el = lower_type(&args[0], tt, names);
+            let el = lower_type(&Type(table.get_list(args)[0], false), table, interner, tt, names);
             BackendTy::Set(tt.intern(el))
         }
         TypeKind::Intrinsic(TypeTag::Map) => {
@@ -86,48 +105,57 @@ fn lower_kind(
             BackendTy::Set(d)
         }
 
-        TypeKind::Intrinsic(tag) => lower_tag(*tag),
+        TypeKind::Intrinsic(tag) => lower_tag(tag),
 
         TypeKind::Array(el) => {
-            let inner = lower_type(el, tt, names);
+            let inner = lower_type(&Type(el, false), table, interner, tt, names);
             BackendTy::Array(tt.intern(inner))
         }
 
         TypeKind::Tuple(els) => {
-            let lowered: Vec<BackendTy> =
-                els.iter().map(|e| lower_type(e, tt, names)).collect();
+            let lowered: Vec<BackendTy> = table
+                .get_list(els)
+                .iter()
+                .map(|e| lower_type(&Type(*e, false), table, interner, tt, names))
+                .collect();
             BackendTy::Tuple(tt.intern_list(&lowered))
         }
 
-        TypeKind::Named(name, _) => resolve_named(name, names),
+        TypeKind::Named(name, _) => resolve_named(interner.resolve(name), names),
 
         // A generic reference — `Box<T>`, `Result<int, str>` — is the named
         // class / enum with its type arguments erased at the backend level.
         // Only a generic that names neither (a bare type parameter `T`, an
         // alias) stays opaque.
         TypeKind::Generic(name, _, _)
-            if names.class_id(name).is_some() || names.enum_id(name).is_some() =>
+            if names.class_id(interner.resolve(name)).is_some()
+                || names.enum_id(interner.resolve(name)).is_some() =>
         {
-            resolve_named(name, names)
+            resolve_named(interner.resolve(name), names)
         }
-        TypeKind::Generic(name, args, _) if args.is_empty() => resolve_named(name, names),
+        TypeKind::Generic(name, args, _) if table.get_list(args).is_empty() => {
+            resolve_named(interner.resolve(name), names)
+        }
 
-        TypeKind::EnumVariant { enum_name, .. } => {
-            names.enum_id(enum_name).map(BackendTy::Enum).unwrap_or_else(opaque)
-        }
+        TypeKind::EnumVariant { enum_name, .. } => names
+            .enum_id(interner.resolve(enum_name))
+            .map(BackendTy::Enum)
+            .unwrap_or_else(opaque),
 
         // `T | null` keeps its payload as Nullable; anything else is a
         // non-discriminated union and stays honestly dynamic.
-        TypeKind::Union(members) => lower_union(members, tt, names),
+        TypeKind::Union(members) => lower_union(members, table, interner, tt, names),
 
         // An object type with a single index signature is lowered to Map<K, V>.
         // An object type with named members reads like an index signature to
         // the backend: no slots, all by-name.
         TypeKind::Object(members) => {
+            let members = table.get_object_members(members);
             if members.len() == 1 {
-                if let crate::types::ObjectTypeMember::Index { key_ty, value_ty, .. } = &members[0] {
-                    let k = lower_type(key_ty, tt, names);
-                    let v = lower_type(value_ty, tt, names);
+                if let crate::types::ObjectTypeMember::Index { key_ty, value_ty, .. } = &members[0]
+                {
+                    let k = lower_type(&Type(*key_ty, false), table, interner, tt, names);
+                    let v = lower_type(&Type(*value_ty, false), table, interner, tt, names);
                     return BackendTy::Map(tt.intern(k), tt.intern(v));
                 }
             }
@@ -189,18 +217,26 @@ pub fn prime(tt: &mut TyTable) {
     debug_assert_eq!(id, NEVER_TY);
 }
 
-fn lower_union(members: &[Type], tt: &mut TyTable, names: &dyn NameResolver) -> BackendTy {
-    let is_null = |t: &Type| matches!(t.kind(), TypeKind::Intrinsic(TypeTag::Null));
-    let non_null: Vec<&Type> = members.iter().filter(|t| !is_null(t)).collect();
+fn lower_union(
+    members: crate::types::TyListId,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    let member_ids = table.get_list(members);
+    let is_null =
+        |id: &crate::types::CheckerTyId| matches!(table.get(*id), TypeKind::Intrinsic(TypeTag::Null));
+    let non_null: Vec<&crate::types::CheckerTyId> = member_ids.iter().filter(|id| !is_null(id)).collect();
 
-    if non_null.len() == members.len() {
+    if non_null.len() == member_ids.len() {
         // No null in the union — non-discriminated.
         return BackendTy::Dynamic(DynReason::Union);
     }
     match non_null.as_slice() {
         [] => BackendTy::Nullable(NEVER_TY),
         [only] => {
-            let inner = lower_type(only, tt, names);
+            let inner = lower_type(&Type(**only, false), table, interner, tt, names);
             BackendTy::Nullable(tt.intern(inner))
         }
         // `A | B | null` — the payload itself is a non-discriminated union.
@@ -211,88 +247,60 @@ fn lower_union(members: &[Type], tt: &mut TyTable, names: &dyn NameResolver) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::CheckerTyId;
     use varn_core::TypeKind;
 
-    fn t(kind: crate::types::SemanticTypeKind) -> Type {
-        Type(kind, false)
-    }
-    fn prim(tag: TypeTag) -> Type {
-        t(TypeKind::Intrinsic(tag))
-    }
-
-    fn table() -> TyTable {
+    fn table() -> (TyTable, CheckerTyTable, AtomInterner) {
         let mut tt = TyTable::default();
         prime(&mut tt);
-        tt
+        (tt, CheckerTyTable::default(), AtomInterner::new())
+    }
+
+    fn intern(ct: &mut CheckerTyTable, kind: crate::types::InternedTypeKind) -> Type {
+        Type(ct.intern(kind), false)
     }
 
     #[test]
     fn scalars_map_directly() {
-        let mut tt = table();
+        let (mut tt, mut ct, interner) = table();
+        let int_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Int));
         assert_eq!(
-            lower_type(&prim(TypeTag::Int), &mut tt, &NoNames),
+            lower_type(&int_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Int
         );
+        let str_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Str));
         assert_eq!(
-            lower_type(&prim(TypeTag::Char), &mut tt, &NoNames),
-            BackendTy::Char
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::Str), &mut tt, &NoNames),
+            lower_type(&str_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Str
         );
+        let decimal_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Decimal));
         assert_eq!(
-            lower_type(&prim(TypeTag::Decimal), &mut tt, &NoNames),
+            lower_type(&decimal_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Decimal
         );
+        let f32_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::F32));
         assert_eq!(
-            lower_type(&prim(TypeTag::I8), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::I16), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::I32), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::U8), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::U16), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::U32), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::U64), &mut tt, &NoNames),
-            BackendTy::Int
-        );
-        assert_eq!(
-            lower_type(&prim(TypeTag::F32), &mut tt, &NoNames),
+            lower_type(&f32_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Float
         );
     }
 
     #[test]
     fn dynamic_carries_unannotated_not_a_default() {
-        let mut tt = table();
+        let (mut tt, mut ct, interner) = table();
+        let dyn_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Dynamic));
         assert_eq!(
-            lower_type(&prim(TypeTag::Dynamic), &mut tt, &NoNames),
+            lower_type(&dyn_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Dynamic(DynReason::Unannotated)
         );
     }
 
     #[test]
     fn array_of_int_is_array_of_int() {
-        let mut tt = table();
-        let ty = t(TypeKind::Array(Box::new(prim(TypeTag::Int))));
-        let BackendTy::Array(id) = lower_type(&ty, &mut tt, &NoNames) else {
+        let (mut tt, mut ct, interner) = table();
+        let int_id: CheckerTyId = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let ty = intern(&mut ct, TypeKind::Array(int_id));
+        let BackendTy::Array(id) = lower_type(&ty, &ct, &interner, &mut tt, &NoNames) else {
             panic!("expected Array");
         };
         assert_eq!(tt.get(id), BackendTy::Int);
@@ -300,12 +308,12 @@ mod tests {
 
     #[test]
     fn int_or_null_is_nullable_int_not_dynamic() {
-        let mut tt = table();
-        let ty = t(TypeKind::Union(vec![
-            prim(TypeTag::Int),
-            prim(TypeTag::Null),
-        ]));
-        let BackendTy::Nullable(id) = lower_type(&ty, &mut tt, &NoNames) else {
+        let (mut tt, mut ct, interner) = table();
+        let int_id = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let null_id = ct.intern(TypeKind::Intrinsic(TypeTag::Null));
+        let list = ct.intern_list(&[int_id, null_id]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        let BackendTy::Nullable(id) = lower_type(&ty, &ct, &interner, &mut tt, &NoNames) else {
             panic!("expected Nullable");
         };
         assert_eq!(tt.get(id), BackendTy::Int);
@@ -313,13 +321,13 @@ mod tests {
 
     #[test]
     fn a_real_union_stays_dynamic_union() {
-        let mut tt = table();
-        let ty = t(TypeKind::Union(vec![
-            prim(TypeTag::Int),
-            prim(TypeTag::Str),
-        ]));
+        let (mut tt, mut ct, interner) = table();
+        let int_id = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let str_id = ct.intern(TypeKind::Intrinsic(TypeTag::Str));
+        let list = ct.intern_list(&[int_id, str_id]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
         assert_eq!(
-            lower_type(&ty, &mut tt, &NoNames),
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Dynamic(DynReason::Union)
         );
     }
@@ -328,10 +336,11 @@ mod tests {
     fn an_unresolved_named_type_is_dynamic_unannotated() {
         // A type parameter or an imported type: genuinely unknown here, not a
         // TIR representation gap.
-        let mut tt = table();
-        let ty = t(TypeKind::Named(std::rc::Rc::from("Point"), None));
+        let (mut tt, mut ct, mut interner) = table();
+        let name = interner.intern("Point");
+        let ty = intern(&mut ct, TypeKind::Named(name, None));
         assert_eq!(
-            lower_type(&ty, &mut tt, &NoNames),
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Dynamic(DynReason::Unannotated)
         );
     }
