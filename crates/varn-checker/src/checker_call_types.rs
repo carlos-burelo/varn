@@ -1,5 +1,5 @@
 use crate::binder::resolve_type_node;
-use crate::types::{Type, TypeContext};
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
@@ -18,15 +18,22 @@ pub(crate) fn infer_call_type(
     ctx: Option<&dyn TypeContext>,
     current_class: Option<&str>,
     interner: &AtomInterner,
+    table: &mut CheckerTyTable,
 ) -> Option<Type> {
     match &ast_arena.expr(expr).kind {
         ExprKind::IntLiteral { .. } => Some(Type::Int),
         ExprKind::FloatLiteral { .. } => Some(Type::Float),
         ExprKind::StrLiteral { .. } => Some(Type::Str),
         ExprKind::BoolLiteral { .. } => Some(Type::Bool),
-        ExprKind::This => current_class.map(|n| {
+        ExprKind::This => current_class.and_then(|n| {
+            let resolver = ctx.and_then(|c| c.resolver())?;
             let origin = ctx.and_then(|c| c.source_file());
-            Type::named_with_origin(Rc::from(n), origin.map(Rc::from))
+            Some(Type::named_with_origin(
+                Rc::from(n),
+                origin.map(Rc::from),
+                resolver,
+                table,
+            ))
         }),
         ExprKind::Identifier { name } => sym_map.get(interner.resolve(*name)).cloned(),
 
@@ -51,11 +58,19 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
-            let (class_name, origin): (&str, Option<&str>) = match &obj_ty.0 {
-                TypeKind::Named(n, origin) => (n.as_ref(), origin.as_deref()),
-                TypeKind::Generic(name, _, origin) => (name.as_ref(), origin.as_deref()),
-                _ => (obj_ty.stdlib_key()?, None),
+            let obj_kind = *table.get(obj_ty.0);
+            let (class_name, origin): (&str, Option<&str>) = match obj_kind {
+                TypeKind::Named(n, origin) => (
+                    interner.resolve(n),
+                    origin.map(|o| interner.resolve(o)),
+                ),
+                TypeKind::Generic(name, _, origin) => (
+                    interner.resolve(name),
+                    origin.map(|o| interner.resolve(o)),
+                ),
+                _ => (obj_ty.stdlib_key(table)?, None),
             };
 
             if let Some(ctx) = ctx {
@@ -88,6 +103,7 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
             let r = infer_call_type(
                 fn_map,
@@ -99,6 +115,7 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
 
             use varn_core::ast::operators::BinaryOp;
@@ -136,15 +153,18 @@ pub(crate) fn infer_call_type(
                 let callee_name_str = interner.resolve(callee_name);
                 if let Some(ty) = fn_map.get(callee_name_str) {
                     if let Some(tps) = fn_type_params.get(callee_name_str) {
-                        let mut mapping = FxHashMap::default();
-                        for (i, tp) in tps.iter().enumerate() {
-                            if let Some(node) = type_args.get(i) {
-                                mapping.insert(tp.clone(), resolve_type_node(node, ctx));
+                        let mut mapping: FxHashMap<varn_core::Atom, Type> = FxHashMap::default();
+                        if let Some(resolver) = ctx.and_then(|c| c.resolver()) {
+                            for (i, tp) in tps.iter().enumerate() {
+                                if let Some(node) = type_args.get(i) {
+                                    let resolved = resolve_type_node(node, ctx, table);
+                                    mapping.insert(resolver.intern(tp), resolved);
+                                }
                             }
                         }
-                        return Some(ty.map_generics(&mapping));
+                        return Some(ty.map_generics(&mapping, table));
                     }
-                    return Some(ty.clone());
+                    return Some(*ty);
                 }
             }
 
@@ -158,9 +178,10 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
-            match &callee_ty.0 {
-                TypeKind::Fn(ft) => Some((*ft.return_type).clone()),
+            match *table.get(callee_ty.0) {
+                TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
                 _ => None,
             }
         }
@@ -169,18 +190,24 @@ pub(crate) fn infer_call_type(
             callee, type_args, ..
         } => {
             if let ExprKind::Identifier { name } = &ast_arena.expr(*callee).kind {
+                let resolver = ctx.and_then(|c| c.resolver())?;
                 let name_str = interner.resolve(*name);
                 if !type_args.is_empty() {
                     let mut args = Vec::new();
                     for node in type_args {
-                        args.push(resolve_type_node(node, ctx));
+                        args.push(resolve_type_node(node, ctx, table));
                     }
-                    return Some(Type::generic(Rc::from(name_str), args));
+                    return Some(Type::generic(Rc::from(name_str), args, resolver, table));
                 }
                 if name_str == IntrinsicType::Map.as_str() {
-                    return Some(Type::generic(Rc::from(name_str), vec![Type::Dynamic]));
+                    return Some(Type::generic(
+                        Rc::from(name_str),
+                        vec![Type::Dynamic],
+                        resolver,
+                        table,
+                    ));
                 }
-                return Some(Type::named(Rc::from(name_str)));
+                return Some(Type::named(Rc::from(name_str), resolver, table));
             }
             None
         }
@@ -195,9 +222,10 @@ pub(crate) fn infer_call_type(
             ctx,
             current_class,
             interner,
+            table,
         ),
 
-        ExprKind::As { type_ann, .. } => Some(resolve_type_node(type_ann, ctx)),
+        ExprKind::As { type_ann, .. } => Some(resolve_type_node(type_ann, ctx, table)),
 
         ExprKind::Await { argument } => {
             let ty = infer_call_type(
@@ -210,14 +238,15 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
-            match &ty.0 {
+            match *table.get(ty.0) {
                 TypeKind::Generic(name, args, _)
-                    if (name.as_ref() == IntrinsicType::Task.as_str()
-                        || name.as_ref() == IntrinsicType::TaskHandle.as_str())
-                        && args.len() == 1 =>
+                    if (interner.resolve(name) == IntrinsicType::Task.as_str()
+                        || interner.resolve(name) == IntrinsicType::TaskHandle.as_str())
+                        && table.get_list(args).len() == 1 =>
                 {
-                    Some(args[0].clone())
+                    Some(Type(table.get_list(args)[0], false))
                 }
                 _ => Some(ty),
             }
@@ -239,6 +268,7 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
             let f = infer_call_type(
                 fn_map,
@@ -250,11 +280,12 @@ pub(crate) fn infer_call_type(
                 ctx,
                 current_class,
                 interner,
+                table,
             )?;
             if t == f {
                 Some(t)
             } else {
-                Some(Type::union(vec![t, f]))
+                Some(Type::union(vec![t, f], table))
             }
         }
 
@@ -267,6 +298,7 @@ pub(crate) fn infer_call_type(
             return_type,
             false,
             ctx,
+            table,
             Type::Dynamic,
         )),
 
@@ -288,6 +320,7 @@ pub(crate) fn infer_call_type(
                     ctx,
                     current_class,
                     interner,
+                    table,
                 )
                 .unwrap_or(Type::Dynamic)
             } else {
@@ -298,6 +331,7 @@ pub(crate) fn infer_call_type(
                 return_type,
                 true,
                 ctx,
+                table,
                 inferred_ret,
             ))
         }
@@ -317,6 +351,7 @@ pub(crate) fn infer_call_type(
                             ctx,
                             current_class,
                             interner,
+                            table,
                         ) {
                             tys.push(ty);
                         }
@@ -329,11 +364,11 @@ pub(crate) fn infer_call_type(
             if tys.is_empty() {
                 Some(Type::Dynamic)
             } else {
-                let first = tys[0].clone();
+                let first = tys[0];
                 if tys.iter().all(|t| t == &first) {
                     Some(first)
                 } else {
-                    Some(Type::union(tys))
+                    Some(Type::union(tys, table))
                 }
             }
         }
@@ -348,6 +383,7 @@ pub(crate) fn infer_call_type(
             ctx,
             current_class,
             interner,
+            table,
         ),
 
         _ => Some(Type::Dynamic),
