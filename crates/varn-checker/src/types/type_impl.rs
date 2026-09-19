@@ -3,108 +3,128 @@ use std::rc::Rc;
 
 #[allow(non_upper_case_globals)]
 impl Type {
-    pub const Int: Type = Type(TypeKind::Intrinsic(TypeTag::Int), false);
-    pub const Float: Type = Type(TypeKind::Intrinsic(TypeTag::Float), false);
-    pub const Decimal: Type = Type(TypeKind::Intrinsic(TypeTag::Decimal), false);
-    pub const BigInt: Type = Type(TypeKind::Intrinsic(TypeTag::BigInt), false);
-    pub const Str: Type = Type(TypeKind::Intrinsic(TypeTag::Str), false);
-    pub const Char: Type = Type(TypeKind::Intrinsic(TypeTag::Char), false);
-    pub const Bool: Type = Type(TypeKind::Intrinsic(TypeTag::Bool), false);
-    pub const Symbol: Type = Type(TypeKind::Intrinsic(TypeTag::Symbol), false);
-    pub const Void: Type = Type(TypeKind::Intrinsic(TypeTag::Void), false);
-    pub const Null: Type = Type(TypeKind::Intrinsic(TypeTag::Null), false);
-    pub const Never: Type = Type(TypeKind::Intrinsic(TypeTag::Never), false);
-    pub const Dynamic: Type = Type(TypeKind::Intrinsic(TypeTag::Dynamic), false);
-    pub const I8: Type = Type(TypeKind::Intrinsic(TypeTag::I8), false);
-    pub const I16: Type = Type(TypeKind::Intrinsic(TypeTag::I16), false);
-    pub const I32: Type = Type(TypeKind::Intrinsic(TypeTag::I32), false);
-    pub const U8: Type = Type(TypeKind::Intrinsic(TypeTag::U8), false);
-    pub const U16: Type = Type(TypeKind::Intrinsic(TypeTag::U16), false);
-    pub const U32: Type = Type(TypeKind::Intrinsic(TypeTag::U32), false);
-    pub const U64: Type = Type(TypeKind::Intrinsic(TypeTag::U64), false);
-    pub const F32: Type = Type(TypeKind::Intrinsic(TypeTag::F32), false);
-    pub const This: Type = Type(TypeKind::This, false);
-    pub fn intrinsic(tag: TypeTag) -> Self {
-        Type(TypeKind::Intrinsic(tag), false)
+    // ── Intrinsic constants ──────────────────────────────────────────────
+    //
+    // `CheckerTyTable::new` pre-seeds every one of these shapes at a FIXED
+    // `CheckerTyId` (see `interned.rs`), so these stay `const` even though
+    // `Type` now wraps a hash-consed id instead of an owned tree: no table
+    // access is needed to produce them, only to look one up later.
+    pub const Int: Type = Type(CheckerTyId::INT, false);
+    pub const Float: Type = Type(CheckerTyId::FLOAT, false);
+    pub const Decimal: Type = Type(CheckerTyId::DECIMAL, false);
+    pub const BigInt: Type = Type(CheckerTyId::BIGINT, false);
+    pub const Str: Type = Type(CheckerTyId::STR, false);
+    pub const Char: Type = Type(CheckerTyId::CHAR, false);
+    pub const Bool: Type = Type(CheckerTyId::BOOL, false);
+    pub const Symbol: Type = Type(CheckerTyId::SYMBOL, false);
+    pub const Void: Type = Type(CheckerTyId::VOID, false);
+    pub const Null: Type = Type(CheckerTyId::NULL, false);
+    pub const Never: Type = Type(CheckerTyId::NEVER, false);
+    pub const Dynamic: Type = Type(CheckerTyId::DYNAMIC, false);
+    pub const I8: Type = Type(CheckerTyId::I8, false);
+    pub const I16: Type = Type(CheckerTyId::I16, false);
+    pub const I32: Type = Type(CheckerTyId::I32, false);
+    pub const U8: Type = Type(CheckerTyId::U8, false);
+    pub const U16: Type = Type(CheckerTyId::U16, false);
+    pub const U32: Type = Type(CheckerTyId::U32, false);
+    pub const U64: Type = Type(CheckerTyId::U64, false);
+    pub const F32: Type = Type(CheckerTyId::F32, false);
+    pub const This: Type = Type(CheckerTyId::THIS, false);
+
+    /// Non-intrinsic-constant tags (e.g. `Class`, `Array`, `Object` used only
+    /// as a `TypeTag`, not to build a `Type`) still round-trip through the
+    /// table, since only the 20 seeded intrinsics have fixed ids.
+    pub fn intrinsic(tag: TypeTag, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Intrinsic(tag)), false)
     }
 
-    pub fn get_array_element_type(&self) -> Type {
-        match &self.0 {
-            TypeKind::Array(inner) => (**inner).clone(),
+    // ── Constructors that build a new shape (need `&mut CheckerTyTable`) ──
+
+    pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
+        match table.get(self.0) {
+            TypeKind::Array(inner) => Type(*inner, false),
             _ => Type::Dynamic,
         }
     }
 
-    pub fn fn_(f: FunctionType) -> Self {
-        Type(TypeKind::Fn(f), false)
+    pub fn fn_(f: FunctionType, table: &mut CheckerTyTable) -> Self {
+        let fid = table.intern_function(f);
+        Type(table.intern(TypeKind::Fn(fid)), false)
     }
 
-    pub fn named(name: impl Into<Rc<str>>) -> Self {
-        Type(TypeKind::Named(name.into(), None), false)
+    pub fn named(name: impl Into<Rc<str>>, interner: &mut varn_core::AtomInterner, table: &mut CheckerTyTable) -> Self {
+        let atom = interner.intern(&name.into());
+        Type(table.intern(TypeKind::Named(atom, None)), false)
     }
 
-    pub fn named_with_origin(name: impl Into<Rc<str>>, origin: Option<impl Into<Rc<str>>>) -> Self {
-        Type(
-            TypeKind::Named(name.into(), origin.map(|o| o.into())),
-            false,
-        )
+    pub fn named_atom(name: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Named(name, None)), false)
     }
 
-    pub fn array(inner: Type) -> Self {
-        Type(TypeKind::Array(Box::new(inner)), false)
-    }
-
-    pub fn generic(name: impl Into<Rc<str>>, args: Vec<Type>) -> Self {
-        Type(TypeKind::Generic(name.into(), args, None), false)
-    }
-
-    pub fn generic_with_origin(
-        name: impl Into<Rc<str>>,
-        args: Vec<Type>,
-        origin: Option<impl Into<Rc<str>>>,
+    pub fn named_with_origin_atom(
+        name: varn_core::Atom,
+        origin: Option<varn_core::Atom>,
+        table: &mut CheckerTyTable,
     ) -> Self {
-        Type(
-            TypeKind::Generic(name.into(), args, origin.map(|o| o.into())),
-            false,
-        )
+        Type(table.intern(TypeKind::Named(name, origin)), false)
     }
 
-    pub fn object(members: Vec<ObjectTypeMember>) -> Self {
-        Type(TypeKind::Object(members), false)
+    pub fn array(inner: Type, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Array(inner.0)), false)
     }
 
-    pub fn union(members: Vec<Type>) -> Self {
+    pub fn generic_atom(
+        name: varn_core::Atom,
+        args: Vec<Type>,
+        origin: Option<varn_core::Atom>,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        let ids: Vec<CheckerTyId> = args.iter().map(|a| a.0).collect();
+        let list = table.intern_list(&ids);
+        Type(table.intern(TypeKind::Generic(name, list, origin)), false)
+    }
+
+    pub fn object(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
+        let mid = table.intern_object_members(members);
+        Type(table.intern(TypeKind::Object(mid)), false)
+    }
+
+    pub fn union(members: Vec<Type>, table: &mut CheckerTyTable) -> Self {
         if members.len() == 1 {
-            if !matches!(members[0].0, TypeKind::Union(_)) {
+            if !matches!(table.get(members[0].0), TypeKind::Union(_)) {
                 return members.into_iter().next().unwrap();
             }
         } else if members.len() == 2 {
-            if !matches!(members[0].0, TypeKind::Union(_))
-                && !matches!(members[1].0, TypeKind::Union(_))
+            if !matches!(table.get(members[0].0), TypeKind::Union(_))
+                && !matches!(table.get(members[1].0), TypeKind::Union(_))
             {
                 if members[0] == members[1] {
                     return members.into_iter().next().unwrap();
                 } else {
-                    return Type(TypeKind::Union(members), false);
+                    let ids: Vec<CheckerTyId> = members.iter().map(|m| m.0).collect();
+                    let list = table.intern_list(&ids);
+                    return Type(table.intern(TypeKind::Union(list)), false);
                 }
             }
         } else if members.is_empty() {
-            return Type(TypeKind::Union(members), false);
+            let list = table.intern_list(&[]);
+            return Type(table.intern(TypeKind::Union(list)), false);
         }
 
         let mut seen = rustc_hash::FxHashSet::default();
         let mut flat: Vec<Type> = Vec::with_capacity(members.len());
         for m in members {
-            match m.0 {
-                TypeKind::Union(inner) => {
-                    for t in inner {
-                        if seen.insert(t.clone()) {
+            match table.get(m.0).clone() {
+                TypeKind::Union(inner_list) => {
+                    for id in table.get_list(inner_list).to_vec() {
+                        let t = Type(id, false);
+                        if seen.insert(t) {
                             flat.push(t);
                         }
                     }
                 }
                 _ => {
-                    if seen.insert(m.clone()) {
+                    if seen.insert(m) {
                         flat.push(m);
                     }
                 }
@@ -113,17 +133,67 @@ impl Type {
         if flat.len() == 1 {
             flat.remove(0)
         } else {
-            Type(TypeKind::Union(flat), false)
+            let ids: Vec<CheckerTyId> = flat.iter().map(|m| m.0).collect();
+            let list = table.intern_list(&ids);
+            Type(table.intern(TypeKind::Union(list)), false)
         }
     }
 
+    // ── Predicates on the fixed intrinsic set (no table access needed) ────
+
     pub fn is_dynamic(&self) -> bool {
-        matches!(&self.0, TypeKind::Intrinsic(TypeTag::Dynamic))
+        self.0 == CheckerTyId::DYNAMIC
     }
 
-    pub fn stdlib_key(&self) -> Option<&'static str> {
+    pub fn is_int(&self) -> bool {
+        matches!(
+            self.0,
+            CheckerTyId::INT
+                | CheckerTyId::I8
+                | CheckerTyId::I16
+                | CheckerTyId::I32
+                | CheckerTyId::U8
+                | CheckerTyId::U16
+                | CheckerTyId::U32
+                | CheckerTyId::U64
+        )
+    }
+    pub fn is_granular_int(&self) -> bool {
+        matches!(
+            self.0,
+            CheckerTyId::I8
+                | CheckerTyId::I16
+                | CheckerTyId::I32
+                | CheckerTyId::U8
+                | CheckerTyId::U16
+                | CheckerTyId::U32
+                | CheckerTyId::U64
+        )
+    }
+    pub fn is_float(&self) -> bool {
+        matches!(self.0, CheckerTyId::FLOAT | CheckerTyId::F32)
+    }
+    pub fn is_numeric(&self) -> bool {
+        self.is_int() || self.is_float() || matches!(self.0, CheckerTyId::DECIMAL | CheckerTyId::BIGINT)
+    }
+    pub fn is_str(&self) -> bool {
+        self.0 == CheckerTyId::STR
+    }
+    pub fn is_bool(&self) -> bool {
+        self.0 == CheckerTyId::BOOL
+    }
+    pub fn is_void(&self) -> bool {
+        self.0 == CheckerTyId::VOID
+    }
+    pub fn is_never(&self) -> bool {
+        self.0 == CheckerTyId::NEVER
+    }
+
+    // ── Everything else needs to read the shape via the table ─────────────
+
+    pub fn stdlib_key<'t>(&self, table: &'t CheckerTyTable) -> Option<&'t str> {
         use varn_core::IntrinsicType as I;
-        match &self.0 {
+        match table.get(self.0) {
             TypeKind::Intrinsic(tag) => match tag {
                 TypeTag::Int => Some(I::Int.as_str()),
                 TypeTag::Float => Some(I::Float.as_str()),
@@ -140,74 +210,22 @@ impl Type {
         }
     }
 
-    pub fn descriptor_key(&self) -> Option<&str> {
-        if let Some(k) = self.stdlib_key() {
+    pub fn descriptor_key<'t>(
+        &self,
+        table: &'t CheckerTyTable,
+        interner: &'t varn_core::AtomInterner,
+    ) -> Option<&'t str> {
+        if let Some(k) = self.stdlib_key(table) {
             return Some(k);
         }
-        match &self.0 {
-            TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.as_ref()),
+        match table.get(self.0) {
+            TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(interner.resolve(*n)),
             _ => None,
         }
     }
 
-    pub fn is_int(&self) -> bool {
-        matches!(
-            self.0,
-            TypeKind::Intrinsic(
-                TypeTag::Int
-                    | TypeTag::I8
-                    | TypeTag::I16
-                    | TypeTag::I32
-                    | TypeTag::U8
-                    | TypeTag::U16
-                    | TypeTag::U32
-                    | TypeTag::U64
-            )
-        )
-    }
-    pub fn is_granular_int(&self) -> bool {
-        matches!(
-            self.0,
-            TypeKind::Intrinsic(
-                TypeTag::I8
-                    | TypeTag::I16
-                    | TypeTag::I32
-                    | TypeTag::U8
-                    | TypeTag::U16
-                    | TypeTag::U32
-                    | TypeTag::U64
-            )
-        )
-    }
-    pub fn is_float(&self) -> bool {
-        matches!(
-            self.0,
-            TypeKind::Intrinsic(TypeTag::Float | TypeTag::F32)
-        )
-    }
-    pub fn is_numeric(&self) -> bool {
-        self.is_int()
-            || self.is_float()
-            || matches!(
-                self.0,
-                TypeKind::Intrinsic(TypeTag::Decimal | TypeTag::BigInt)
-            )
-    }
-    pub fn is_str(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Str))
-    }
-    pub fn is_bool(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Bool))
-    }
-    pub fn is_void(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Void))
-    }
-    pub fn is_never(&self) -> bool {
-        matches!(self.0, TypeKind::Intrinsic(TypeTag::Never))
-    }
-
-    pub fn to_type_tag(&self) -> TypeTag {
-        match &self.0 {
+    pub fn to_type_tag(&self, table: &CheckerTyTable) -> TypeTag {
+        match table.get(self.0) {
             TypeKind::Intrinsic(tag) => *tag,
             TypeKind::Array(_) => TypeTag::Array,
             TypeKind::Object(_) => TypeTag::Object,
@@ -219,220 +237,181 @@ impl Type {
         }
     }
 
-    pub fn is_nullable(&self) -> bool {
-        match &self.0 {
+    pub fn is_nullable(&self, table: &CheckerTyTable) -> bool {
+        match table.get(self.0) {
             TypeKind::Intrinsic(TypeTag::Null) => true,
-            TypeKind::Union(members) => members.iter().any(|m| m.is_nullable()),
+            TypeKind::Union(list) => table
+                .get_list(*list)
+                .iter()
+                .any(|m| Type(*m, false).is_nullable(table)),
             _ => false,
         }
     }
 
-    pub fn make_nullable(ty: Type) -> Type {
-        if ty.is_nullable() {
+    pub fn make_nullable(ty: Type, table: &mut CheckerTyTable) -> Type {
+        if ty.is_nullable(table) {
             ty
         } else {
-            Type::union(vec![ty, Type::Null])
+            Type::union(vec![ty, Type::Null], table)
         }
     }
 
-    pub fn non_nullified(&self) -> Type {
-        match &self.0 {
+    pub fn non_nullified(&self, table: &mut CheckerTyTable) -> Type {
+        match table.get(self.0).clone() {
             TypeKind::Intrinsic(TypeTag::Null) => Type::Never,
-            TypeKind::Union(members) => {
-                let mut new_members: Vec<Type> = members
-                    .iter()
-                    .filter(|m| !m.is_nullable())
-                    .cloned()
+            TypeKind::Union(list) => {
+                let members: Vec<Type> = table.get_list(list).iter().map(|id| Type(*id, false)).collect();
+                let new_members: Vec<Type> = members
+                    .into_iter()
+                    .filter(|m| !m.is_nullable(table))
                     .collect();
 
                 if new_members.is_empty() {
                     Type::Never
                 } else if new_members.len() == 1 {
-                    new_members.pop().unwrap()
+                    new_members.into_iter().next().unwrap()
                 } else {
-                    Type(TypeKind::Union(new_members), false)
+                    let ids: Vec<CheckerTyId> = new_members.iter().map(|m| m.0).collect();
+                    let new_list = table.intern_list(&ids);
+                    Type(table.intern(TypeKind::Union(new_list)), false)
                 }
             }
-            _ => self.clone(),
+            _ => *self,
         }
     }
 
-    pub fn minus_named(&self, name: &str) -> Type {
-        match &self.0 {
-            TypeKind::Named(n, _) if n.as_ref() == name => Type::Never,
-            TypeKind::Union(members) => {
-                let mut kept: Vec<Type> = members
-                    .iter()
-                    .filter(|m| !matches!(&m.0, TypeKind::Named(n, _) if n.as_ref() == name))
-                    .cloned()
-                    .collect();
+    pub fn minus_named(&self, name: varn_core::Atom, table: &mut CheckerTyTable) -> Type {
+        match table.get(self.0).clone() {
+            TypeKind::Named(n, _) if n == name => Type::Never,
+            TypeKind::Union(list) => {
+                let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
+                let mut kept: Vec<CheckerTyId> = Vec::with_capacity(members.len());
+                for id in members {
+                    let is_named_match = matches!(table.get(id), TypeKind::Named(n, _) if *n == name);
+                    if !is_named_match {
+                        kept.push(id);
+                    }
+                }
                 if kept.is_empty() {
                     Type::Never
                 } else if kept.len() == 1 {
-                    kept.pop().unwrap()
+                    Type(kept[0], false)
                 } else {
-                    Type(TypeKind::Union(kept), false)
+                    let new_list = table.intern_list(&kept);
+                    Type(table.intern(TypeKind::Union(new_list)), false)
                 }
             }
-            _ => self.clone(),
+            _ => *self,
         }
     }
 
-    pub fn minus(&self, other: &Type) -> Type {
+    pub fn minus(&self, other: &Type, table: &mut CheckerTyTable) -> Type {
         if self == other {
             return Type::Never;
         }
-        match &self.0 {
-            TypeKind::Union(members) => {
-                let mut kept: Vec<Type> = members
-                    .iter()
-                    .filter(|m| {
-                        if *m == other {
-                            return false;
+        match table.get(self.0).clone() {
+            TypeKind::Union(list) => {
+                let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
+                let dynamic_array = {
+                    let arr = Type::array(Type::Dynamic, table);
+                    arr.0
+                };
+                let mut kept: Vec<CheckerTyId> = Vec::with_capacity(members.len());
+                for id in members {
+                    if id == other.0 {
+                        continue;
+                    }
+                    if let (TypeKind::Array(_), TypeKind::Array(_)) = (table.get(id), table.get(other.0)) {
+                        if other.0 == dynamic_array || id == other.0 {
+                            continue;
                         }
-                        if let (TypeKind::Array(_), TypeKind::Array(_)) = (&m.0, &other.0) {
-                            if other.0 == TypeKind::Array(Box::new(Type::Dynamic)) || *m == other {
-                                return false;
-                            }
-                        }
-                        true
-                    })
-                    .cloned()
-                    .collect();
+                    }
+                    kept.push(id);
+                }
                 if kept.is_empty() {
                     Type::Never
                 } else if kept.len() == 1 {
-                    kept.pop().unwrap()
+                    Type(kept[0], false)
                 } else {
-                    Type(TypeKind::Union(kept), false)
+                    let new_list = table.intern_list(&kept);
+                    Type(table.intern(TypeKind::Union(new_list)), false)
                 }
             }
-            _ => self.clone(),
+            _ => *self,
         }
     }
 
-    pub fn map_generics(&self, mapping: &FxHashMap<Rc<str>, Type>) -> Type {
-        match &self.0 {
+    pub fn map_generics(&self, mapping: &FxHashMap<varn_core::Atom, Type>, table: &mut CheckerTyTable) -> Type {
+        match table.get(self.0).clone() {
             TypeKind::Named(n, _) => {
-                if let Some(t) = mapping.get(n) {
-                    return t.clone();
+                if let Some(t) = mapping.get(&n) {
+                    return *t;
                 }
-                self.clone()
+                *self
             }
             TypeKind::Generic(n, args, origin) => {
-                let new_args: Vec<Type> = args.iter().map(|a| a.map_generics(mapping)).collect();
-                Type(
-                    TypeKind::Generic(n.clone(), new_args, origin.clone()),
-                    self.1,
-                )
+                let arg_ids = table.get_list(args).to_vec();
+                let new_args: Vec<CheckerTyId> = arg_ids
+                    .into_iter()
+                    .map(|a| Type(a, false).map_generics(mapping, table).0)
+                    .collect();
+                let new_list = table.intern_list(&new_args);
+                Type(table.intern(TypeKind::Generic(n, new_list, origin)), self.1)
             }
-            TypeKind::Array(inner) => Type::array(inner.map_generics(mapping)),
-            TypeKind::Union(members) => {
-                let new_members: Vec<Type> =
-                    members.iter().map(|m| m.map_generics(mapping)).collect();
-                Type::union(new_members)
+            TypeKind::Array(inner) => {
+                let mapped = Type(inner, false).map_generics(mapping, table);
+                Type::array(mapped, table)
             }
-            TypeKind::Fn(ft) => {
+            TypeKind::Union(list) => {
+                let ids = table.get_list(list).to_vec();
+                let new_members: Vec<Type> = ids
+                    .into_iter()
+                    .map(|id| Type(id, false).map_generics(mapping, table))
+                    .collect();
+                Type::union(new_members, table)
+            }
+            TypeKind::Fn(fid) => {
+                let ft = table.get_function(fid).clone();
                 let new_params: Vec<FunctionParam> = ft
                     .params
                     .iter()
                     .map(|p| FunctionParam {
                         name: p.name.clone(),
-                        ty: p.ty.map_generics(mapping),
+                        ty: Type(p.ty, false).map_generics(mapping, table).0,
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
                     .collect();
-                let new_ret = ft.return_type.map_generics(mapping);
-                Type::fn_(FunctionType {
-                    params: new_params,
-                    return_type: Box::new(new_ret),
-                    is_arrow: ft.is_arrow,
-                    type_params: ft.type_params.clone(),
-                })
+                let new_ret = Type(ft.return_type, false).map_generics(mapping, table).0;
+                Type::fn_(
+                    FunctionType {
+                        params: new_params,
+                        return_type: new_ret,
+                        is_arrow: ft.is_arrow,
+                        type_params: ft.type_params.clone(),
+                    },
+                    table,
+                )
             }
-            TypeKind::Object(members) => {
+            TypeKind::Object(mid) => {
+                let members = table.get_object_members(mid).to_vec();
                 let new_members: Vec<ObjectTypeMember> = members
-                    .iter()
-                    .map(|m| match m {
-                        ObjectTypeMember::Property {
-                            name,
-                            ty,
-                            optional,
-                            readonly,
-                        } => ObjectTypeMember::Property {
-                            name: name.clone(),
-                            ty: ty.map_generics(mapping),
-                            optional: *optional,
-                            readonly: *readonly,
-                        },
-                        ObjectTypeMember::Method {
-                            name,
-                            params,
-                            return_type,
-                            optional,
-                            is_arrow,
-                        } => {
-                            let new_params: Vec<FunctionParam> = params
-                                .iter()
-                                .map(|p| FunctionParam {
-                                    name: p.name.clone(),
-                                    ty: p.ty.map_generics(mapping),
-                                    optional: p.optional,
-                                    is_rest: p.is_rest,
-                                })
-                                .collect();
-                            ObjectTypeMember::Method {
-                                name: name.clone(),
-                                params: new_params,
-                                return_type: Box::new(return_type.map_generics(mapping)),
-                                optional: *optional,
-                                is_arrow: *is_arrow,
-                            }
-                        }
-                        ObjectTypeMember::Index {
-                            param_name,
-                            key_ty,
-                            value_ty,
-                        } => ObjectTypeMember::Index {
-                            param_name: param_name.clone(),
-                            key_ty: Box::new(key_ty.map_generics(mapping)),
-                            value_ty: Box::new(value_ty.map_generics(mapping)),
-                        },
-                        ObjectTypeMember::Callable {
-                            params,
-                            return_type,
-                            is_arrow,
-                        } => {
-                            let new_params: Vec<FunctionParam> = params
-                                .iter()
-                                .map(|p| FunctionParam {
-                                    name: p.name.clone(),
-                                    ty: p.ty.map_generics(mapping),
-                                    optional: p.optional,
-                                    is_rest: p.is_rest,
-                                })
-                                .collect();
-                            ObjectTypeMember::Callable {
-                                params: new_params,
-                                return_type: Box::new(return_type.map_generics(mapping)),
-                                is_arrow: *is_arrow,
-                            }
-                        }
-                    })
+                    .into_iter()
+                    .map(|m| m.map_generics(mapping, table))
                     .collect();
-                Type::object(new_members)
+                Type::object(new_members, table)
             }
-            _ => self.clone(),
+            _ => *self,
         }
     }
 
-    pub fn with_origin(mut self, origin: Rc<str>) -> Self {
-        match &mut self.0 {
-            TypeKind::Named(_, ref mut o) => *o = Some(origin),
-            TypeKind::Generic(_, _, ref mut o) => *o = Some(origin),
-            _ => {}
+    pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
+        match table.get(self.0).clone() {
+            TypeKind::Named(n, _) => Type(table.intern(TypeKind::Named(n, Some(origin))), self.1),
+            TypeKind::Generic(n, args, _) => {
+                Type(table.intern(TypeKind::Generic(n, args, Some(origin))), self.1)
+            }
+            _ => self,
         }
-        self
     }
 }
