@@ -82,15 +82,29 @@ pub(crate) extern "C" fn jit_call_method_flat(
     bailed!()
 }
 
+/// The single canonical VM call out of compiled code. The compiled caller has
+/// flushed `[callee, args...]` to the homes of registers
+/// `arg_start..arg_start + argc` in activation `act_id`; this gathers them and
+/// runs the callee through [`ExecCtx::call_vm_window`], which stages them and
+/// makes a `PreparedCall` (native, interpreter frame, generator, constructor),
+/// entering the callee's compiled entry through `run_until` when one exists.
 pub(crate) extern "C" fn clif_call_fallback(
     ctx: *mut ExecCtx,
     callee_tag: u64,
     callee_payload: u64,
-    src: usize,
+    act_id: usize,
+    arg_start: usize,
     argc: usize,
 ) {
-    let _ = (ctx, callee_tag, callee_payload, src, argc);
-    bailed!()
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let callee = VmValue::from_raw_parts(callee_tag, callee_payload);
+        let window = ctx_ref.stack.box_range(act_id, arg_start, argc);
+        match ctx_ref.call_vm_window(callee, &window) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
 }
 
 /// Calls `closure`'s compiled entry with `argc` values copied from `stack[src]`,

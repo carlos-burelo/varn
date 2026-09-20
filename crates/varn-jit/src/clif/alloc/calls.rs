@@ -311,12 +311,13 @@ fn emit_vm_call(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-        for r in arg_start..(arg_start + total).min(actx.nregs) {
+    for r in arg_start..(arg_start + total).min(actx.nregs) {
         store_home(b, actx, state, r);
     }
-    let src = b.ins().iadd_imm(actx.base, arg_start as i64);
-    let n = b.ins().iconst(types::I64, total as i64);
 
+    // Exception-unwind protocol: a throw below this call that is caught below
+    // this (interpreted) caller resumes it from `next_ip`, and the callee's
+    // return lands in `dest`. See `ExecCtx::jit_resume_ip`/`jit_call_dest`.
     let resume_ip_v = b.ins().iconst(types::I64, next_ip as i64);
     b.ins().store(
         MemFlags::trusted(),
@@ -332,73 +333,33 @@ fn emit_vm_call(
         actx.helpers.jit_call_dest_offset as i32,
     );
 
-    let try_medium = b.create_block();
-    let slow = b.create_block();
-    let merge = b.create_block();
-    b.append_block_param(merge, types::I128);
-
-    // --- Tier 1: fully inline. ---
-    let (wrapper_addr, closure_ptr, callee_base) = emit_inline_frame_push(
-        b,
-        actx,
-        callee_tag,
-        callee_payload,
-        src,
-        total,
-        dest,
-        try_medium,
-    );
-    let res1 = emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_base);
-    b.ins().jump(merge, &[res1.into()]);
-
-    // --- Tier 2: one Rust call to resolve + push (handles growth). ---
-    b.switch_to_block(try_medium);
-    let wrapper_addr2 = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.jit_prepare_static_call,
-        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
-    );
-    let took_medium = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr2, 0);
-    let medium = b.create_block();
-    b.ins().brif(took_medium, medium, &[], slow, &[]);
-
-    b.switch_to_block(medium);
-    let callee_base2 = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_call_base_offset as i32,
-    );
-    let closure_ptr2 = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_call_closure_ptr_offset as i32,
-    );
-    let res2 = emit_wrapper_call_and_finish(b, actx, wrapper_addr2, closure_ptr2, callee_base2);
-    b.ins().jump(merge, &[res2.into()]);
-
-    // --- Tier 3: full generic dispatch. ---
-    b.switch_to_block(slow);
+    // One canonical VM call: `clif_call_fallback` gathers the argument window
+    // from the caller's home slots and runs the callee through
+    // `ExecCtx::call_vm_window` (prepare_call + run_until), which itself enters
+    // the callee's compiled entry when one exists. The inline/wrapper tiers are
+    // a later optimization; correctness first (Ley 8, one mechanism).
+    let start_v = b.ins().iconst(types::I64, arg_start as i64);
+    let n = b.ins().iconst(types::I64, total as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.clif_call_fallback,
-        &[actx.exec_ctx, callee_tag, callee_payload, src, n],
+        &[
+            actx.exec_ctx,
+            callee_tag,
+            callee_payload,
+            actx.base,
+            start_v,
+            n,
+        ],
     );
-    let slow_res = b.ins().load(
+    reload_boxed(b, actx, state, &regs);
+    b.ins().load(
         types::I128,
         MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_native_result_offset as i32,
-    );
-    b.ins().jump(merge, &[slow_res.into()]);
-
-    b.switch_to_block(merge);
-    let res = b.block_params(merge)[0];
-    reload_boxed(b, actx, state, &regs);
-    res
+    )
 }
 
 /// The `call_indirect` shared by tiers 1 and 2 of [`emit_vm_call`], plus the
