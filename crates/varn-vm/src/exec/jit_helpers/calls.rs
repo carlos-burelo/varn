@@ -18,16 +18,6 @@ use crate::value::VmValue;
 /// catchable runtime error.
 pub(crate) const MAX_CALL_DEPTH: usize = 10000;
 
-#[inline(always)]
-pub(super) unsafe fn jit_guard_call_depth(ctx: &mut ExecCtx) {
-    if ctx.frames.len() >= MAX_CALL_DEPTH {
-        let e = crate::error::RuntimeError::new(format!(
-            "stack overflow: call depth exceeded {MAX_CALL_DEPTH}"
-        ));
-        jit_propagate_error(ctx, e);
-    }
-}
-
 macro_rules! bailed {
     () => {
         unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL")
@@ -140,25 +130,7 @@ pub(crate) extern "C" fn clif_call_fallback(
     }
 }
 
-/// Calls `closure`'s compiled entry with `argc` values copied from `stack[src]`,
-/// on a frame of its own pushed above the caller's, and leaves the result in
-/// `ctx.jit_native_result`. Returns false — having done nothing — when the
-/// closure has no compiled entry yet.
-///
-/// The one place that knows the JIT frame protocol: every compiled caller
-/// reaches a compiled callee through it, whether the callee was resolved from a
-/// value or is the caller itself recursing.
-unsafe fn invoke_compiled_closure(
-    ctx: &mut ExecCtx,
-    closure: &crate::closure::VmClosure,
-    src: usize,
-    argc: usize,
-) -> bool {
-    let _ = (ctx, closure, src, argc);
-    bailed!()
-}
-
-/// Half of `invoke_compiled_closure`, split so a frame-aware `Call`'s CLIF
+/// Half of the compiled-call fast path, split so a frame-aware `Call`'s CLIF
 /// call site can make the one machine call that matters — into the callee's
 /// own compiled wrapper — itself, instead of crossing back into Rust only to
 /// have Rust make that same call through a bare function pointer.

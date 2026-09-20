@@ -126,7 +126,7 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
                             );
                             if let Some(handler) = machine.ctx.try_handlers.pop() {
                                 let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
-                                varn_vm::exec::frame_ctrl::unwind_to_handler(
+                                let _ = varn_vm::exec::frame_ctrl::unwind_to_handler(
                                     &mut machine.ctx,
                                     handler,
                                     thrown_val,

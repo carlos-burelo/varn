@@ -431,7 +431,7 @@ pub(crate) fn map_generics_cached(
 
     let sorted_args: Vec<Type> = {
         let mut pairs: Vec<(&Arc<str>, &Type)> = mapping.iter().collect();
-        pairs.sort_by_key(|(a, _)| a.clone());
+        pairs.sort_by(|a, b| a.0.cmp(b.0));
         pairs.into_iter().map(|(_, v)| *v).collect()
     };
     let key = (*base, sorted_args);

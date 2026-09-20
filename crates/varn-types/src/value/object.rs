@@ -567,9 +567,6 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
 
 const INSTANCE_HEADER_WORDS: usize = 1;
 
-/// Bytes one field slot occupies in an instance payload.
-const SLOT_SIZE: usize = std::mem::size_of::<VmValue>();
-
 impl InstanceData {
     /// Allocates an `InstanceData` on the heap with the specified layout.
     pub fn alloc(class: Rc<crate::value::ClassObj>) -> Rc<InstanceData> {

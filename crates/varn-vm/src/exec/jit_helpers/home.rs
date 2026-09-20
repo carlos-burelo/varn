@@ -117,7 +117,7 @@ mod tests {
         // r0 = Int (Gpr), r1 = Float (Fpr), r2 = Dynamic (Dyn).
         let (mut ctx, id) = ctx_with_frame(&[SlotKind::Int, SlotKind::Float, SlotKind::Dynamic]);
 
-        jit_store_home(&mut ctx as *mut _, id, 0, varn_types::vm_value::KIND_INT, 42);
+        jit_store_home(&mut ctx as *mut _, id, 0, varn_types::vm_value::KIND_INT, 42, 0);
         assert_eq!(ctx.stack.g(id, 0), 42);
 
         jit_store_home(
@@ -126,6 +126,7 @@ mod tests {
             1,
             varn_types::vm_value::KIND_FLOAT,
             2.5f64.to_bits(),
+            0,
         );
         assert_eq!(ctx.stack.f(id, 1), 2.5);
 
@@ -135,6 +136,7 @@ mod tests {
             2,
             varn_types::vm_value::KIND_BOOL,
             1,
+            0,
         );
         let mut out = VmValue::null();
         jit_load_home(&mut ctx as *mut _, id, 2, &mut out as *mut _);

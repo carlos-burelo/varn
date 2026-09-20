@@ -6,7 +6,7 @@
 
 use super::obj::HeapObj;
 use super::structs::HeapInner;
-use crate::closure::{VmClosure, VmClosurePayload, VmValueRef};
+use crate::closure::{VmClosurePayload, VmValueRef};
 use crate::nursery::{is_nursery_idx, old_idx_raw};
 use crate::value::VmValue;
 use std::rc::Rc;
@@ -35,18 +35,6 @@ impl HeapInner {
         self.get_by_idx(idx)
     }
 
-    #[inline(always)]
-    pub(crate) fn get_closure(&self, idx: u32) -> Option<&VmClosure> {
-        let obj = if is_nursery_idx(idx) {
-            self.nursery.get(idx)?
-        } else {
-            self.objects.get(old_idx_raw(idx) as usize)?.as_ref()?
-        };
-        match obj {
-            HeapObj::VmClosure(c) => Some(&**c),
-            _ => None,
-        }
-    }
 
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {

@@ -535,8 +535,7 @@ pub(super) fn types_compatible_impl(
 
         (TypeKind::Named(dn, origin_d), TypeKind::Named(in_, origin_i))
         | (TypeKind::Named(dn, origin_d), TypeKind::Generic(in_, _, origin_i))
-        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i))
-        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Generic(in_, _, origin_i)) => {
+        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i)) => {
             match (resolve_atom(bind, dn), resolve_atom(bind, in_)) {
                 (Some(dn_s), Some(in_s)) => compatible_named(
                     &dn_s,
@@ -632,8 +631,7 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Intrinsic(varn_core::TypeTag::Map), TypeKind::Object(_))
         | (TypeKind::Object(_), TypeKind::Intrinsic(varn_core::TypeTag::Map)) => true,
-        (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields))
-        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Object(inf_fields)) => {
+        (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => {
             if is_intrinsic(bind, dn, IntrinsicType::Map) {
                 true
             } else if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
@@ -690,8 +688,7 @@ pub(super) fn types_compatible_impl(
                     })
             }
         }
-        (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i))
-        | (TypeKind::Object(decl_fields), TypeKind::Generic(in_, _, origin_i)) => {
+        (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i)) => {
             if is_intrinsic(bind, in_, IntrinsicType::Map) {
                 true
             } else if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {

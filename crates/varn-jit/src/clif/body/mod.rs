@@ -3,7 +3,7 @@
 pub(crate) mod op_dispatch;
 
 use cranelift_codegen::ir::{
-    condcodes::IntCC, types, Function, InstBuilder, MemFlags, UserFuncName, Value,
+    condcodes::IntCC, types, Function, InstBuilder, UserFuncName, Value,
 };
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -202,7 +202,6 @@ pub(super) fn lower_raw(
         narrow_roots,
         cur_ip: std::cell::Cell::new(0),
         safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
-        caller_epoch: linker.current_epoch(),
     });
 
     let reg_offset = 1;
@@ -247,7 +246,6 @@ pub(super) fn lower_raw(
         regions: &regions,
         arrays: &cache_vars,
         strings: &str_caches,
-        objects: &obj_caches,
     };
     let arr = arrays::ArrCtx {
         vars: vars.as_slice(),

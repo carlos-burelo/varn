@@ -641,7 +641,7 @@ mod tests {
         // documentada cuando encode ve un `Typeof`: se cubre indirectamente
         // por el match exhaustivo; aquí fijamos la forma portable resultante.
         let mut t = CheckerTyTable::new();
-        let mut i = AtomInterner::new();
+        let i = AtomInterner::new();
         let dynamic = t.intern(TypeKind::Intrinsic(TypeTag::Dynamic));
         assert_eq!(
             encode(Type(dynamic, false), &t, &i),

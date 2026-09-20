@@ -294,7 +294,7 @@ impl<'r> Checker<'r> {
     fn check_internal(
         program: &Program,
         ast_arena: &'r AstArena,
-        interner: varn_core::AtomInterner,
+        _interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
         warn_implicit_dynamic: bool,

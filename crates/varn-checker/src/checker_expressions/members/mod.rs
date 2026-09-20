@@ -244,7 +244,7 @@ pub fn get_members_of_type(
                 rustc_hash::FxHashMap::default()
             };
 
-            let mut map_ty = |t: &Type, table: &mut CheckerTyTable| {
+            let map_ty = |t: &Type, table: &mut CheckerTyTable| {
                 if mapping.is_empty() {
                     *t
                 } else {
@@ -372,7 +372,7 @@ fn collect_extension_members(
         }
     };
 
-    let mut push = |name: &Arc<str>,
+    let push = |name: &Arc<str>,
                     mangled: &Arc<str>,
                     kind: crate::semantic_info::ResolvedMemberKind,
                     as_return: bool,

@@ -168,13 +168,6 @@ pub(crate) struct AllocCtx<'a> {
     pub narrow_roots: bool,
     pub cur_ip: Cell<usize>,
     pub safepoints: Option<RefCell<Vec<SafepointRecord>>>,
-    /// The VM epoch THIS lowering is compiling under (`ClifLinker::
-    /// current_epoch`, `0` outside a live VM context). Baked as an `iconst`
-    /// by the inline frame-aware `Call` fast path to guard a callee's
-    /// published `jit_entry` without a runtime epoch read — sound because
-    /// this function only ever RUNS while that same epoch is current (see
-    /// the trait method's doc for why).
-    pub caller_epoch: u64,
 }
 
 /// Store a boxed `VmValue` (`I128`; a bare `I64` is treated as an int

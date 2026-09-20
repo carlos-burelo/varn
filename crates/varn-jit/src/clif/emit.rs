@@ -530,7 +530,6 @@ pub(crate) struct LoopCaches<'a> {
     pub regions: &'a [Region],
     pub arrays: &'a HashMap<(usize, usize), RegionCache>,
     pub strings: &'a HashMap<(usize, usize), StrRegionCache>,
-    pub objects: &'a HashMap<(usize, usize), ObjRegionCache>,
 }
 
 impl LoopCaches<'_> {

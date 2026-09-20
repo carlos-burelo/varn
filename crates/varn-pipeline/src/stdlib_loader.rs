@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use varn_checker::module_resolver::ImportResolver;
@@ -34,12 +33,6 @@ type CompiledBytesMap = FxHashMap<String, (u64, Arc<[u8]>)>;
 static COMPILED_BYTES: Mutex<Option<CompiledBytesMap>> = Mutex::new(None);
 
 const STD_FINGERPRINT: u64 = 0;
-
-fn source_fingerprint(source: &str) -> u64 {
-    let mut h = rustc_hash::FxHasher::default();
-    source.hash(&mut h);
-    h.finish()
-}
 
 fn cached_proto(key: &str, fingerprint: u64) -> Option<Rc<FunctionProto>> {
     let thread_hit = PROTO_CACHE.with(|c| c.borrow().get(key).cloned());

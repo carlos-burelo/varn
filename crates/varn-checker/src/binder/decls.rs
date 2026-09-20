@@ -555,8 +555,6 @@ impl<'r> super::Binder<'r> {
     }
 
     fn bind_function_params(&mut self, params: &[Param], line: u32) {
-        use super::type_inference::infer_expr_type;
-        use super::type_resolution::resolve_type_node;
         use crate::symbol::SymbolKind;
         use crate::types::Type;
 
