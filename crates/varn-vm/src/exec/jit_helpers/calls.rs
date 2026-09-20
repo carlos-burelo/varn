@@ -177,20 +177,69 @@ unsafe fn invoke_compiled_closure(
 /// `clif_call_fallback`. A non-zero return always has a matching
 /// `jit_finish_static_call` after the wrapper call — the frame stays pushed
 /// until then.
+/// Fase B: pushes a fresh `FrameStore` activation for the callee, copies the
+/// argument registers from the caller activation's homes with `mov_cross`,
+/// pushes its `CallFrame`, and returns the callee's compiled wrapper entry so
+/// the caller invokes it directly (no Rust `call_vm_window` round-trip).
+/// Returns `0` — nothing pushed — for a non-closure, async/generator/rest, or
+/// a callee with no compiled entry; the call site then falls back to
+/// `clif_call_fallback`.
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,
     closure_payload: u64,
+    act_id: usize,
     arg_start: usize,
     arg_count: usize,
 ) -> usize {
-    let _ = (ctx, closure_tag, closure_payload, arg_start, arg_count);
-    bailed!()
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let callee = VmValue::from_raw_parts(closure_tag, closure_payload);
+        if !callee.is_heap() {
+            return 0;
+        }
+        let Some(crate::heap::HeapObj::VmClosure(closure)) =
+            ctx_ref.heap.get(callee.as_heap_idx())
+        else {
+            return 0;
+        };
+        if closure.proto.is_async || closure.proto.is_generator || closure.proto.has_rest {
+            return 0;
+        }
+        let Some(jit_fn) = closure.hot_jit_fn() else {
+            return 0;
+        };
+        let closure = closure.clone();
+
+        let callee_alloc = ctx_ref.stack.push_frame(&closure.proto);
+        for i in 0..arg_count {
+            if let Err(e) = ctx_ref.stack.mov_cross(callee_alloc, i, act_id, arg_start + i) {
+                ctx_ref.stack.pop_frame();
+                jit_propagate_error(ctx_ref, e);
+            }
+        }
+        let mut frame = crate::frame::CallFrame::new_owned(closure, callee_alloc);
+        frame.return_reg = ctx_ref.jit_call_dest as u16;
+        let closure_ptr = frame.closure_ptr as usize;
+        ctx_ref.frames.push(frame);
+        ctx_ref.jit_frame_prepushed = 1;
+        ctx_ref.jit_call_base = callee_alloc;
+        ctx_ref.jit_call_closure_ptr = closure_ptr;
+        jit_fn as usize
+    }
 }
 
-pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_base: usize) {
-    let _ = (ctx, callee_base);
-    bailed!()
+/// Pops the activation [`jit_prepare_static_call`] pushed and closes its
+/// upvalues. `callee_alloc` travels as an explicit argument (the CLIF call
+/// site's own captured value), never re-read from `jit_call_base` — a nested
+/// call in the wrapper can overwrite that shared field.
+pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.frames.pop();
+        ctx_ref.close_upvalues_in(callee_alloc);
+        ctx_ref.stack.pop_frame();
+    }
 }
 
 /// Direct self-recursion out of a frame-aware lowering: the caller pushes a

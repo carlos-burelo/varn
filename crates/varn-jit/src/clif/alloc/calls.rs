@@ -352,6 +352,50 @@ fn emit_vm_call(
     // a later optimization; correctness first (Ley 8, one mechanism).
     let start_v = b.ins().iconst(types::I64, arg_start as i64);
     let n = b.ins().iconst(types::I64, total as i64);
+
+    // Fast path: `jit_prepare_static_call` pushes the callee activation and
+    // returns its compiled wrapper entry, so the call is direct
+    // compiled→compiled. It declines (0) for a non-closure callee, an
+    // async/generator/rest callee, or one with no compiled entry; the slow
+    // path runs the whole call through the VM.
+    let wrapper_addr = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.jit_prepare_static_call,
+        &[
+            actx.exec_ctx,
+            callee_tag,
+            callee_payload,
+            actx.base,
+            start_v,
+            n,
+        ],
+    );
+    let took_fast = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr, 0);
+    let fast = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I128);
+    b.ins().brif(took_fast, fast, &[], slow, &[]);
+
+    b.switch_to_block(fast);
+    let closure_ptr = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_call_closure_ptr_offset as i32,
+    );
+    let callee_alloc = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_call_base_offset as i32,
+    );
+    let fast_res =
+        emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_alloc);
+    b.ins().jump(merge, &[fast_res.into()]);
+
+    b.switch_to_block(slow);
     call_helper_void(
         b,
         actx.cc,
@@ -365,13 +409,18 @@ fn emit_vm_call(
             n,
         ],
     );
-    reload_boxed(b, actx, state, &regs);
-    b.ins().load(
+    let slow_res = b.ins().load(
         types::I128,
         MemFlags::trusted(),
         actx.exec_ctx,
         actx.helpers.jit_native_result_offset as i32,
-    )
+    );
+    b.ins().jump(merge, &[slow_res.into()]);
+
+    b.switch_to_block(merge);
+    let res = b.block_params(merge)[0];
+    reload_boxed(b, actx, state, &regs);
+    res
 }
 
 /// The `call_indirect` shared by tiers 1 and 2 of [`emit_vm_call`], plus the
@@ -389,12 +438,9 @@ fn emit_wrapper_call_and_finish(
     closure_ptr: cranelift_codegen::ir::Value,
     callee_base: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let stack_ptr = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.stack_data_offset as i32,
-    );
+    // The wrapper's first ABI word (`stack_ptr`) is unused under the
+    // partitioned frame; pass a dummy so the arity is unchanged.
+    let stack_ptr = b.ins().iconst(types::I64, 0);
     let is_windows = actx.cc == cranelift_codegen::isa::CallConv::WindowsFastcall;
     let wrapper_res = if is_windows {
         // Mirrors `build_wrapper`'s Windows struct-return convention exactly:
