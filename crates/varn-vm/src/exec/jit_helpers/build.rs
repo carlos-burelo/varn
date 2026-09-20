@@ -55,6 +55,45 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
     }
 }
 
+/// `extern "C" fn(*mut ExecCtx, parts: *const VmValue, count)` — build an array
+/// from a boxed window staged on the caller's native stack. The SSA lowering has
+/// no contiguous home window for arbitrary elements, so it passes one; the
+/// helper is the window-taking sibling of `jit_build_array` (which reads homes).
+pub(crate) extern "C" fn jit_build_array_window(
+    ctx: *mut ExecCtx,
+    parts_ptr: *const VmValue,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let parts = std::slice::from_raw_parts(parts_ptr, count);
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_vm(parts.to_vec());
+    }
+}
+
+/// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` — build a map
+/// from a boxed `[k0, v0, k1, v1, …]` window on the caller's native stack.
+pub(crate) extern "C" fn jit_build_map_window(
+    ctx: *mut ExecCtx,
+    pairs_ptr: *const VmValue,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if count == 0 {
+            ctx_ref.jit_native_result = ctx_ref.heap.alloc_empty_map_vm();
+            return;
+        }
+        let parts = std::slice::from_raw_parts(pairs_ptr, count * 2);
+        let mut map = varn_types::value::ValueMap::default();
+        for i in 0..count {
+            let key = ctx_ref.heap.canonical_map_key(parts[i * 2]);
+            map.insert(key, parts[i * 2 + 1]);
+        }
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_map_vm(map);
+    }
+}
+
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
@@ -107,6 +146,34 @@ unsafe fn build_shaped_from_ptr(
         may_hold_closure,
         is_record,
     )
+}
+
+/// `extern "C" fn(*mut ExecCtx, vals: *const VmValue, count, shape: *const Shape,
+/// is_record, may_hold_closure)` — build an object/record from a boxed window on
+/// the caller's native stack. The window-taking sibling of
+/// `jit_build_object_with_shape` (which reads homes).
+pub(crate) extern "C" fn jit_build_object_window(
+    ctx: *mut ExecCtx,
+    vals_ptr: *const VmValue,
+    count: usize,
+    shape: *const varn_types::Shape,
+    is_record: usize,
+    may_hold_closure: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let vals = std::slice::from_raw_parts(vals_ptr, count);
+        let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
+        let out = crate::exec::collections::build_with_shape_slice(
+            &ctx_ref.stack,
+            (*shape).clone(),
+            vals,
+            &mut ctx_ref.heap,
+            may_hold_closure != 0,
+            is_record != 0,
+        );
+        ctx_ref.jit_native_result = out;
+    }
 }
 
 pub(crate) extern "C" fn jit_range(

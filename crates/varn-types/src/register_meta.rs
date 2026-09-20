@@ -47,7 +47,9 @@ impl Default for SlotKind {
 /// today — comparisons, `JumpIfFalse` and SSO/heap-str all read them boxed, so
 /// moving them would change truthiness/representation semantics rather than
 /// just relocate storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum SlotClass {
     Gpr,
     Fpr,

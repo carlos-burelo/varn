@@ -16,7 +16,7 @@ use varn_types::FunctionProto;
 /// abierta. Los protos que aún dependen de helpers tripwired (llamadas,
 /// excepciones, suspension, clases, ICs de propiedad, intrínsecos, módulos)
 /// bajan al intérprete por el subset gate de `clif::lower` — ver
-/// `docs/plans/2026-09-19-jit-fase-b-frame-clases.md`. A medida que cada
+/// `docs/plans/2026-09-20-PLAN-PENDIENTE.md`. A medida que cada
 /// helper se restaure contra `FrameStore`, se quita de `build_jit_helpers`'s
 /// lista de deshabilitados y el subset crece.
 pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = false;

@@ -129,6 +129,31 @@ pub(crate) extern "C" fn clif_call_fallback(
     }
 }
 
+/// `extern "C" fn(ctx, callee_tag, callee_payload, window: *const VmValue, argc)`
+/// — the SSA lowering's fallback for a call whose caller has no VM activation
+/// of its own to keep its argument window in. `window[0]` is the callee
+/// placeholder, `window[1..]` the arguments (built on the caller's native
+/// stack); this runs the callee through the SAME [`ExecCtx::invoke`] as
+/// `clif_call_fallback`, so there is still one invocation, and writes the
+/// boxed result to `ctx.jit_native_result`.
+pub(crate) extern "C" fn jit_invoke_window(
+    ctx: *mut ExecCtx,
+    callee_tag: u64,
+    callee_payload: u64,
+    window: *const VmValue,
+    argc: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let callee = VmValue::from_raw_parts(callee_tag, callee_payload);
+        let window = std::slice::from_raw_parts(window, argc);
+        match ctx_ref.invoke(callee, window) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
 /// Half of the compiled-call fast path, split so a frame-aware `Call`'s CLIF
 /// call site can make the one machine call that matters — into the callee's
 /// own compiled wrapper — itself, instead of crossing back into Rust only to

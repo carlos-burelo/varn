@@ -51,7 +51,15 @@ macro_rules! jit_helper_abi {
             /// `fn(ctx, closure, obj, val, name_idx, cs_idx, ip)`.
             set_property_flat => jit_set_property_flat,
             build_array => jit_build_array,
-            build_map => jit_build_map,
+            /// `extern "C" fn(*mut ExecCtx, parts: *const VmValue, count)` —
+            /// build an array from a boxed window on the caller's native stack.
+            build_array_window => jit_build_array_window,
+            /// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` —
+            /// build a map from a boxed `[k,v,…]` window.
+            build_map_window => jit_build_map_window,
+            /// `extern "C" fn(*mut ExecCtx, vals, count, shape, is_record,
+            /// may_hold_closure)` — object/record from a boxed window.
+            build_object_window => jit_build_object_window,            build_map => jit_build_map,
             build_str => jit_build_str,
             negate => jit_negate,
             logical_not => jit_logical_not,
@@ -155,6 +163,11 @@ macro_rules! jit_helper_abi {
             /// — the CLIF static-call IC miss path: dispatch the (rebound or
             /// GC-moved) callee through the interpreter/JIT with boxed args.
             clif_call_fallback => clif_call_fallback,
+            /// `extern "C" fn(*mut ExecCtx, callee_tag, callee_payload,
+            /// window: *const VmValue, argc)` — the SSA lowering's call fallback
+            /// when the caller has no VM activation to keep a window in. Runs
+            /// the callee through the same `ExecCtx::invoke`.
+            jit_invoke_window => jit_invoke_window,
             /// `extern "C" fn(*mut ExecCtx, src, argc)` — direct self-recursion
             /// out of a frame-aware lowering, which cannot pass its own `base`
             /// to the callee and has no boxed callee to route through

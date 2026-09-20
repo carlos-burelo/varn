@@ -294,6 +294,39 @@ pub fn try_compile(
     }
     super::emit::reset_disabled_helper_hit();
 
+    // Sibling lowering: consume the portable typed SSA where the compiler
+    // attached it. `debug.is_none()` keeps the inspection paths on the bytecode
+    // lowering so `vn debug -p clif` still shows the bytecode-derived IR. Any
+    // `Err` — a heap op, an unsupported scalar op, a compile failure — falls
+    // through to the bytecode path below, so correctness never depends on this
+    // succeeding.
+    if osr_ip.is_none() && debug.is_none() {
+        if let Some(ssa) = proto.ssa.as_deref() {
+            match super::from_ssa::try_lower(proto, ssa, constants, helpers, isa, linker) {
+                Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
+                    if super::trace() {
+                        eprintln!(
+                            "clif: from_ssa {}{}",
+                            proto.name.as_deref().unwrap_or("<module>"),
+                            if frame_aware { " (frame-aware)" } else { "" }
+                        );
+                    }
+                    let wrapper = build_wrapper(proto, helpers, isa, frame_aware, false)?;
+                    return finish_artifact(raw, wrapper, frame_aware, None);
+                }
+                Ok(_) => {}
+                Err(reason) => {
+                    if super::trace() {
+                        eprintln!(
+                            "clif: from_ssa bail {}: {reason}",
+                            proto.name.as_deref().unwrap_or("<module>")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     let nparams = proto.arity.saturating_sub(1);
     if proto.param_kinds.len() != nparams {
         return Err("clif: missing param kinds".into());
@@ -343,10 +376,19 @@ pub fn try_compile(
         return Err("clif: uses a helper disabled in fase B".into());
     }
     let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
+    finish_artifact(raw, wrapper, frame_aware, debug)
+}
 
-    // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
-    // only two relocation targets we admit (self-recursion inside raw, and
-    // the wrapper's call to raw) by hand.
+/// Concatenate the two pieces (raw at 0, wrapper 16-aligned after it), resolve
+/// the only two relocation targets admitted (self-recursion inside raw and the
+/// wrapper's call to raw) by hand, and hand back the executable artifact. This
+/// is the one place both lowerings converge, so neither owns the layout.
+fn finish_artifact(
+    raw: super::piece::CompiledPiece,
+    wrapper: super::piece::CompiledPiece,
+    frame_aware: bool,
+    mut debug: Option<&mut ClifDebugSink>,
+) -> Result<ClifArtifact, String> {
     let wrapper_off = (raw.code.len() + 15) & !15;
     let total = wrapper_off + wrapper.code.len();
     let mut buf = JitBuffer::new(total.max(16))?;

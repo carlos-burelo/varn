@@ -52,6 +52,37 @@ pub(crate) fn build_with_shape(
     alloc_timed(heap, obj)
 }
 
+/// Window-taking sibling of [`build_with_shape`]: the SSA lowering has no
+/// contiguous home window for an object literal's values, so it stages a boxed
+/// slice. Closure upvalues are still closed against the live frame `store`.
+pub(crate) fn build_with_shape_slice(
+    store: &crate::frame_store::FrameStore,
+    shape: Rc<varn_types::Shape>,
+    vals: &[VmValue],
+    heap: &mut Heap,
+    may_hold_closure: bool,
+    is_record: bool,
+) -> VmValue {
+    if may_hold_closure {
+        for &val_nv in vals {
+            if val_nv.is_heap() {
+                if let Some(HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
+                    for uv in &nc.upvalues {
+                        uv.close(store);
+                    }
+                }
+            }
+        }
+    }
+    let oref = ObjRef::with_shape_slice(shape, vals);
+    let obj = if is_record {
+        HeapObj::Record(oref)
+    } else {
+        HeapObj::Object(oref)
+    };
+    alloc_timed(heap, obj)
+}
+
 /// `Heap::alloc` con el tramo anotado: mover el `HeapObj` de 48 bytes y
 /// empujarlo al nursery es uno de los candidatos a explicar los ~54 ns que el
 /// allocator no explica.

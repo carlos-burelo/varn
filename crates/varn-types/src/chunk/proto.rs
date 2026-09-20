@@ -292,6 +292,15 @@ pub struct FunctionProto {
     #[serde(default)]
     pub trivial_init_memo:
         std::cell::RefCell<Option<Option<Rc<[(usize, u32, varn_core::TypeTag)]>>>>,
+
+    /// Portable typed SSA for the scalar/arith family, attached after
+    /// regalloc. `None` when the body is outside that family (or the artifact
+    /// predates this field): the JIT then lowers from bytecode as before.
+    /// Appended last so older positional payloads read a missing field as the
+    /// `None` default while `BUILD_FINGERPRINT` (which covers `varn-types`)
+    /// invalidates them anyway.
+    #[serde(default)]
+    pub ssa: Option<std::sync::Arc<crate::ssa::SsaProto>>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {

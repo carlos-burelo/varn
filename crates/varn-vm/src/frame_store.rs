@@ -61,7 +61,7 @@ pub use varn_types::register_meta::{FrameLayout, REF_UNINIT};
 ///
 /// `#[repr(C)]`: `bases` va primero y a offset fijo, porque el ABI del JIT
 /// direcciona `allocs[act_id].bases[clase]` desde código generado. Ver el
-/// contrato de fase B en `docs/plans/2026-09-19-jit-fase-b-frame-clases.md`.
+/// contrato de fase B en `docs/plans/2026-09-20-PLAN-PENDIENTE.md`.
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct FrameAlloc {

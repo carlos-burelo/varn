@@ -4,15 +4,17 @@ Idioma: español. Salida: `docs/` (acordado). Prioridad de verdad aplicada: `1. 
 Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusión`. Lo no verificable se marca `Unverified`.
 
 > **Actualización (2026-09-20, post-auditoría).** Este documento describe el
-> estado al momento de la auditoría. Cambios posteriores que invalidan varias
-> balas del resumen:
+> estado al momento de la auditoría. **El plan vivo es único:
+> `docs/plans/2026-09-20-PLAN-PENDIENTE.md`** (absorbió los planes de JIT
+> anteriores). Cambios posteriores que invalidan varias balas del resumen:
 > - **JIT activo y con par de valor único (C1).** `Ref`+`Dyn` bajan como par
 >   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
->   1223/0 en JIT y `VARN_NO_JIT=1`.
-> - **Bala 9 (JIT baja de bytecode):** sigue siendo cierto, pero la lattice de
->   re-derivación de tipo por op se eliminó (C4): `state` es proyección de
->   clase (`clif/kinds.rs::class_kind`); `box_for_target`/`apply_kinds_flow`
->   borrados. Falta bajar de SSA/TIR (requiere extender `.vnc`).
+>   1233/0 en JIT y `VARN_NO_JIT=1`.
+> - **Bala 9 (JIT baja de bytecode): PARCIALMENTE RESUELTA.** El JIT **ya baja de
+>   SSA tipado** (`varn_types::ssa` + `clif/from_ssa/`) para el subconjunto
+>   escalar/heap/agregados/campos/calls; el bytecode es el fallback. Falta
+>   método/nativa/`Try`/OSR para poder borrar `clif/kinds.rs` y el lowering desde
+>   bytecode (F5/F6 del plan único).
 > - **Bala 11 (arrays angostos migran a Boxed en escritura):** `set_vm`/`push_vm`
 >   ya escriben en los 9 reprs angostos sin migrar (solo un valor de tipo
 >   incompatible migra, que es correcto).
@@ -21,8 +23,8 @@ Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusi
 >   única materialización; `jit_call_native` único (absorbe `fnptr`/`op_id`).
 > - **Cobertura JIT:** un bug de `istore32` (valor `I32`) tiraba ~600 funciones
 >   al intérprete; corregido. `bail` de `tests/main.vn` 1031 → 416.
-> - **B7:** `charCodeAt`/`codePointAt` inlineados desde `CallNativeOp` (316 →
->   7 ms en `bench_str_ops`).
+> - **B7:** `charCodeAt`/`codePointAt` inlineados desde `CallNativeOp` (316 → 7 ms
+>   en `bench_str_ops`).
 
 ---
 
@@ -35,7 +37,7 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 | # | Ítem | Estado |
 |---|---|---|
 | 1 | Frame/args/rets/upvalues universales `Vec<VmValue>` → clases GPR/FPR/REF/DYN | **DONE** — `FrameStore` particionado; intérprete con fast-path `reg_class==Gpr` sin tag-check (`ops_math_cmp.rs:144`); GPR/FPR fuera del scan GC (`live_boxed` por clase) |
-| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **PENDIENTE** (el pilar grande). Parcial: por C4 la lattice se reemplazó por **proyección de clase** (`clif/kinds.rs::class_kind`) y `register_meta` (clase/tipo) ya se serializa en `.vnc` — se cumple "serializar clase/tipo", no "bajar de SSA" |
+| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **PARCIAL** — el JIT ya baja de SSA tipado (`varn_types::ssa` + `clif/from_ssa/`) para escalar/heap/agregados/campos/`Call`; falta método/nativa/`Try`/OSR (F5) para borrar el lowering desde bytecode (F6). Ver `docs/plans/2026-09-20-PLAN-PENDIENTE.md` |
 | 3 | Meet-a-`Dynamic` + skip de `Float` en regalloc_post | **DONE** (Anexo K2) |
 | 4 | Colapsos `Char→Dynamic`, `Nullable→Dynamic` | **PARCIAL** — `Char→Ref` honesto (K1), anchos (K4); `Nullable→Dynamic` sigue (`ssa/emit/mod.rs:270`) |
 | 5 | `ArrayRepr` mínimo `{Boxed,I64,F64}` | **DONE** (K5) |
@@ -52,7 +54,7 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 6. bytecode sobre clases / `GetFixedField` default ✅
 7. GC roots por clase ✅
 8. convención de llamada por clase ✅
-9. **entrada SSA/TIR al nativo** ❌ PENDIENTE
+9. **entrada SSA/TIR al nativo** ⚠️ PARCIAL (F1–F4 hecho; F5/F6 pendientes — ver plan único)
 10. agregados `ArrayRepr I8..F32` + `InstanceData` compacto ✅
 11. benches/gates ⚠️
 
@@ -64,10 +66,17 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 
 ### Pendiente real
 
-- **JIT desde SSA/TIR** (paso 9 / §I-2) — pilar arquitectónico.
+> El plan vivo y su estado por fases es `docs/plans/2026-09-20-PLAN-PENDIENTE.md`
+> (documento único). Resumen:
+
+- **JIT desde SSA/TIR** (paso 9 / §I-2) — **F1–F4 hechos** (escalar, heap,
+  agregados, campos, `Call`); **F5 parcial** (homes autoritativas + clases);
+  falta método/nativa/`Try`/OSR (**F6**: borrar `clif/kinds.rs` y el lowering
+  desde bytecode).
 - `Nullable` como par (valor,bit) — §I-4.
 - `u64`: sin aritmética sin signo; `u64` no es siquiera tipo de superficie en checker/parser.
 - regalloc: spill real en vez de rechazo `>256`.
+- `ArrayRepr` angosto **escritura** compacta (K5, fuera de alcance deliberado).
 
 
 

@@ -2536,6 +2536,7 @@ name = "varn-types"
 version = "0.1.0"
 dependencies = [
  "memchr",
+ "postcard",
  "rust_decimal",
  "rustc-hash 1.1.0",
  "serde",

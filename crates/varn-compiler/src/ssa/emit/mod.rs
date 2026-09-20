@@ -80,6 +80,12 @@ pub fn emit_function_meta(
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = f.return_kind;
 
+    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
+    // phi-split, register-assigned SSA here so it shares the exact value graph
+    // the bytecode was emitted from; `None` outside the projected family.
+    let ssa_proto = super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name)
+        .map(std::sync::Arc::new);
+
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
     chunk.source_file = Arc::from(source_file.as_ref());
@@ -195,6 +201,7 @@ pub fn emit_function_meta(
         jit_osr_code: RefCell::new(None),
         jit_osr_failed: Cell::new(false),
         trivial_init_memo: RefCell::new(None),
+        ssa: ssa_proto,
     })
 }
 

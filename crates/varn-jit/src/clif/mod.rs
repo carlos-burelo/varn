@@ -18,6 +18,7 @@ pub mod debug;
 pub(crate) mod emit;
 pub(crate) mod fields;
 pub(crate) mod floats;
+pub(crate) mod from_ssa;
 pub(crate) mod generic;
 pub(crate) mod globals;
 pub mod invariants;
