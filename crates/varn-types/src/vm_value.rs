@@ -472,7 +472,8 @@ use crate::register_meta::SlotKind;
 #[repr(C, u8)]
 #[derive(Debug)]
 pub enum ArrayRepr {
-    /// str / object / heterogeneous / `Dynamic` elements — NaN-boxed, as today.
+    /// str / object / heterogeneous / `Dynamic` elements — tag+payload
+    /// `VmValue` elements.
     Boxed(Vec<VmValue>) = 0,
     /// `Array<int>` — raw `i64` buffer, holds no heap refs (GC skips it in A.2).
     I64(Vec<i64>) = 1,
@@ -546,9 +547,8 @@ pub struct VmArray(pub Rc<UnsafeCell<ArrayRepr>>);
 impl VmArray {
     // ---- constructors -----------------------------------------------------
 
-    /// Boxed array from NaN-boxed values. This is the ubiquitous constructor
-    /// every current call site uses; it keeps building `Boxed` arrays exactly
-    /// as before A.1.
+    /// Boxed array from `VmValue`s. This is the ubiquitous constructor every
+    /// current call site uses; it keeps building `Boxed` arrays.
     #[inline(always)]
     pub fn new(items: Vec<VmValue>) -> Self {
         Self(Rc::new(UnsafeCell::new(ArrayRepr::Boxed(items))))

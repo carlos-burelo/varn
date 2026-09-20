@@ -3,6 +3,28 @@
 Idioma: español. Salida: `docs/` (acordado). Prioridad de verdad aplicada: `1. implementación, 2. tests, 3. comportamiento, 4. documentación, 5. README, 6. supuestos`.
 Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusión`. Lo no verificable se marca `Unverified`.
 
+> **Actualización (2026-09-20, post-auditoría).** Este documento describe el
+> estado al momento de la auditoría. Cambios posteriores que invalidan varias
+> balas del resumen:
+> - **JIT activo y con par de valor único (C1).** `Ref`+`Dyn` bajan como par
+>   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
+>   1223/0 en JIT y `VARN_NO_JIT=1`.
+> - **Bala 9 (JIT baja de bytecode):** sigue siendo cierto, pero la lattice de
+>   re-derivación de tipo por op se eliminó (C4): `state` es proyección de
+>   clase (`clif/kinds.rs::class_kind`); `box_for_target`/`apply_kinds_flow`
+>   borrados. Falta bajar de SSA/TIR (requiere extender `.vnc`).
+> - **Bala 11 (arrays angostos migran a Boxed en escritura):** `set_vm`/`push_vm`
+>   ya escriben en los 9 reprs angostos sin migrar (solo un valor de tipo
+>   incompatible migra, que es correcto).
+> - **Una convención de llamada (C2) y un ABI nativo (C3):** `ExecCtx::invoke`
+>   única ruta run-to-completion; `push_call_frame`/`push_call_frame_with_this`
+>   única materialización; `jit_call_native` único (absorbe `fnptr`/`op_id`).
+> - **Cobertura JIT:** un bug de `istore32` (valor `I32`) tiraba ~600 funciones
+>   al intérprete; corregido. `bail` de `tests/main.vn` 1031 → 416.
+> - **B7:** `charCodeAt`/`codePointAt` inlineados desde `CallNativeOp` (316 →
+>   7 ms en `bench_str_ops`).
+
+
 Mediciones ejecutadas en esta auditoría (no afirmaciones sin dato):
 - `cargo test -p varn-types --test micro_bench_map -- --nocapture`: Shape+ObjData 30.09 ms / FxHashMap 3.02 ms / InlineMap<4> 2.68 ms / Rc<RefCell<InlineMap<4>>> 5.86 ms (100k iters, 3 claves). Speedup Rc<InlineMap<4>> vs Shape: 5.13x.
 - `cargo test -p varn-tir`: 16 passed. `cargo test -p varn-compiler --lib`: 12 passed. `cargo test -p varn-vm --lib`: 1 passed (`error::size_probe::sizes`).
