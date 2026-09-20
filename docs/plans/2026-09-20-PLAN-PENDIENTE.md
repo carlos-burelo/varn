@@ -544,6 +544,48 @@ Es decir: los outliers restantes NO son la convención de llamada. Son:
 
 Hipótesis de convención de llamada/closure descartada por la medición.
 
+---
+
+## 21. Diseño: JIT desde SSA/TIR (lo faltante grande)
+
+Objetivo (§I-2 / §K-9 del audit): que el JIT baje del **mismo SSA tipado** que
+el intérprete, no reconstruya tipos desde bytecode. Hoy el JIT lee
+`register_meta` (clase/tipo serializada) y ya no re-deriva con lattice (C4),
+pero sigue consumiendo bytecode y reconstruyendo SSA con `Variables`.
+
+Contrato propuesto (una sola fuente, dos bajadas hermanas):
+
+```
+TIR/SSA tipada (varn-compiler)
+   ├─→ bytecode (intérprete)        ← hoy
+   └─→ SSA serializada en .vnc      ← nuevo
+          └─→ varn-jit baja de SSA (CLIF), sin lattice ni bytecode
+```
+
+Pasos (cada uno verde, commits atómicos):
+
+1. **Formato**: `varn-types::ssa::{SsaProto, SsaBlock, SsaInst, SsaValue, SsaTy}`
+   serializables (`postcard`), estables y sin ids internos de fase (Ley 2).
+   `SsaTy` = la proyección física (`Gpr/Fpr/Ref/Dyn`) + aridad de heap, no
+   `CheckerTyId`.
+2. **Serialización**: `FunctionProto` gana `#[serde(default)] ssa:
+   Option<Arc<SsaProto>>`; `ssa/emit` lo adjunta tras regalloc. Subir
+   `BUILD_FINGERPRINT` (cambio de forma). Bytecode sigue presente (intérprete).
+3. **Bajada**: `varn-jit` gana `clif/from_ssa.rs` que mapea cada `SsaValue` a un
+   `Value` CLIF con su clase; `AddInt`/`GetFixedField`/`Call` salen de la
+   instrucción tipada, no de re-parsear operandos. `clif/kinds.rs` desaparece.
+4. **Fallback**: si `ssa` es `None` (artefacto viejo o función no SSA-able),
+   bajar del bytecode actual. Ninguna ruta pierde corrección.
+5. **Borrar**: la lattice residual, `state`/`box_for_target` (ya borrados),
+   `derive_register_meta` como “meet degradante” → asignación por clase.
+
+Riesgo: es un cambio de formato `.vnc` (Ley 10 → declarar ganancia:
+elimina la clase de bugs de re-derivación de tipo; verificación: `tests/*` en
+ambas bajadas deben coincidir — tier-parity; borra: el lowering desde bytecode).
+
+Estado: **diseñado, no implementado** (multi-sesión).
+
+
 
 
 
