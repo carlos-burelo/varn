@@ -1,20 +1,27 @@
 # JIT fase B — lower sobre el frame por clases
 
 Estado (2026-09-20): **JIT reactivado** (`FRAME_LAYOUT_V2_JIT_BAIL = false`).
-Suite e2e 1223/1223 verde; tier-parity idéntico en los tests numéricos; bench
-`vn bench tests/main.vn` reporta **JIT 94.6% (35/37 fns)**. Los protos que aún
-tocan un helper tripwired o tienen registros `Ref` quedan al intérprete por el
-subset gate de `clif::lower` (ver "Subset activo" abajo).
+Suite e2e 1223/1223 verde (debug y release); tier-parity idéntico en los tests
+numéricos; bench `vn bench tests/main.vn` reporta **JIT 94.6% (35/37 fns)**.
 
 Implementado: contrato compartido (`SlotClass`/`FrameLayout`/`REF_UNINIT`,
 `FrameStore`/`FrameAlloc` `repr(C)`), probes ABI, helpers `home_store`/`home_load`,
 home traffic por helper, `run_compiled_frame` sobre `FrameStore`, subset gate
-(denylist de opcodes + flag de helper deshabilitado + baile de `Ref`/generator/async),
-y el flip.
+(denylist de opcodes + flag de helper deshabilitado), y el flip.
 
-Pendiente (fase B completa): helpers de llamada/nativas/IC (commits 4–5) y
-reconciliación de la procedencia de clase de los registros `Ref`; entonces se
-quitan del subset gate y el JIT cubre el 100%.
+Habilitado además: `Call` (vía `clif_call_fallback` → `call_vm_window`),
+`CallNativeOp`, `Intrinsic`, `GetProperty`/`SetProperty`, `CallMethod`,
+`InvokeVirtual`, `MakeClosure`, `CallSelf` (frame-aware) y `Try`/`Throw`/`PopTry`.
+Todos leen/escriben los homes por `FrameStore` (act_id + registro).
+
+Pendiente (fase B completa):
+- **`Ref`** (mayoría de bails restantes): `register_meta` no es autoritativo para
+  todo registro — p.ej. `TaskGroupImpl._runFinally` escribe un `bool` por un
+  registro `Ref` (`def_result` con `KIND_BOOL`), que `set_addr` rechaza. Hay que
+  reconciliar la procedencia de clase (checker/regalloc) para quitar el baile.
+- **generator/async**: falta la maquinaria de suspensión/reanudación en el
+  lowering por clases.
+- `CallSpread`, `InvokeRuntimeStatic`: sin migrar.
 
 Este documento fija el contrato y el orden de commits atómicos.
 Complementa `docs/AUDIT_RESPONSE.md` §K paso 9 y
@@ -120,13 +127,12 @@ matriz completa de `CONTRIBUTING.md`.
 `clif::lower::try_compile` deja al intérprete un proto cuando:
 
 1. es `generator`/`async`;
-2. contiene un opcode cuyo lowering todavía llama a un helper tripwired
-   (`Call`, `CallSelf`, `CallMethod`, `InvokeVirtual`, `CallSpread`,
-   `CallNativeOp`, `Intrinsic`, `MakeClosure`, `MakeClass`, `GetProperty`/`SetProperty`,
-   `Try`/`Throw`/`PopTry`, `Yield`/`Await`/`Spawn`, módulos, `LoadStaticFn`, …);
-3. tiene algún registro `Ref` (el único home con validación estricta; un
-   registro `Ref` que hoy sostiene un valor no-ref en algunos caminos — hallado
-   en `Headers.toObject` — se corrige reconciliando la procedencia de clase).
+2. contiene un opcode aún sin migrar (`CallSpread`, `InvokeRuntimeStatic`,
+   `MakeClass`, `Inherit`, `Method`, `Define*`, `DeclareField`, `BindMethod`,
+   `GetSuper`, `GetSymbol`, `Yield`/`Await`/`Spawn`, módulos, `LoadStaticFn`,
+   `MakeClosure`… ya habilitado, ver arriba);
+3. tiene algún registro `Ref` (el único home con validación estricta;
+   `register_meta` no es autoritativo todavía).
 
 Backstop independiente del denylist: `build_jit_helpers` pone a `0` la dirección
 de los helpers aún tripwired, y `call_helper` marca un flag cuando el lowering
