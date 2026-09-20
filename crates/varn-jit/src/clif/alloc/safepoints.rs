@@ -258,14 +258,29 @@ pub(crate) fn box_or_load_home(
         return super::super::emit::box_null(b);
     };
     let raw = b.use_var(var);
-    if b.func.dfg.value_type(raw) == types::F64 {
-        super::super::emit::box_f64(b, raw)
-    } else {
-        match state.get(r).copied().unwrap_or(K::Unset) {
+    // CLASS-driven (see `store_home`): a `Ref` register is a heap ref no matter
+    // what the `K` lattice thinks locally.
+    use varn_types::register_meta::{SlotClass, SlotKind};
+    let class = SlotClass::of_kind(
+        actx.register_meta
+            .get(r)
+            .map(|m| m.kind)
+            .unwrap_or(SlotKind::Dynamic),
+    );
+    match class {
+        SlotClass::Gpr => super::super::emit::box_int(b, raw),
+        SlotClass::Fpr => super::super::emit::box_f64(b, raw),
+        SlotClass::Ref => {
+            let tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            b.ins().iconcat(tag, raw)
+        }
+        SlotClass::Dyn => match state.get(r).copied().unwrap_or(K::Unset) {
             K::Int => super::super::emit::box_int(b, raw),
             K::Bool => super::super::emit::box_bool(b, raw),
             _ => load_home(b, actx, r),
-        }
+        },
     }
 }
 
@@ -281,11 +296,29 @@ pub(crate) fn store_home(
         return;
     };
     let raw = b.use_var(var);
-    if b.func.dfg.value_type(raw) == types::F64 {
-        let v = super::super::emit::box_f64(b, raw);
-        store_boxed_home(b, actx, reg, v);
-    } else {
-        match state.get(reg).copied().unwrap_or(K::Unset) {
+    // CLASS-driven, not `K`-state-driven: the physical class is the checker's
+    // proof, while the lowering's `K` lattice can be locally wrong for a
+    // register (e.g. a `Ref` receiver confused with a bool). Boxing by class
+    // keeps a Ref home a ref. For `Ref`/boxed `Dyn` the home is already current
+    // (written on def_result/Move/entry), so the store is skipped.
+    let class = varn_types::register_meta::SlotClass::of_kind(
+        actx.register_meta
+            .get(reg)
+            .map(|m| m.kind)
+            .unwrap_or(varn_types::register_meta::SlotKind::Dynamic),
+    );
+    use varn_types::register_meta::SlotClass;
+    match class {
+        SlotClass::Ref => {}
+        SlotClass::Gpr => {
+            let v = super::super::emit::box_int(b, raw);
+            store_boxed_home(b, actx, reg, v);
+        }
+        SlotClass::Fpr => {
+            let v = super::super::emit::box_f64(b, raw);
+            store_boxed_home(b, actx, reg, v);
+        }
+        SlotClass::Dyn => match state.get(reg).copied().unwrap_or(K::Unset) {
             K::Int => {
                 let v = super::super::emit::box_int(b, raw);
                 store_boxed_home(b, actx, reg, v);
@@ -294,11 +327,8 @@ pub(crate) fn store_home(
                 let v = super::super::emit::box_bool(b, raw);
                 store_boxed_home(b, actx, reg, v);
             }
-            _ => {
-                // The home slot already holds the boxed value (stored on
-                // def_result, Move, or entry). A redundant store is skipped.
-            }
-        }
+            _ => {}
+        },
     }
 }
 
