@@ -391,6 +391,42 @@ benchmarks cuyo trabajo pesado está en el top-level (`collection_pipeline`
 `is_async` solo si de verdad usa `await` (cambio de semántica de top-level
 await a validar).
 
+---
+
+## 14. Módulo JIT: async condicional + `LoadStaticFn` (parcial, con límite medido)
+
+Commits `6b3cda7c` (checker) y `9f5f424e` (JIT/VM):
+
+- El proto `<module>` es `is_async` **solo si el top-level tiene `await`**
+  (`FnEmitter::saw_await`). Los módulos sin await son síncronos y JIT-ables.
+- `jit_load_static_fn` implementado (espejo del brazo del intérprete) y
+  `LoadStaticFn` fuera del gate.
+
+Efecto (release, wall-time):
+| benchmark | NO_JIT | JIT |
+|---|---|---|
+| matrix | 235 ms | **63 ms** |
+| str_ops | 738 ms | **315 ms** |
+| fib | 4634 ms | **84 ms** |
+
+Cobertura JIT `main.vn`: bail 416 → 306. Suite 1223/0.
+
+**Límite honesto (desbloqueo de clases revertido).** Quité del gate
+`MakeClass`/`Method`/`DeclareField`/`Inherit`/etc. (el lowering ya existía en
+`clif/classes.rs`). El módulo pasó a JIT, pero **fue una regresión medible**:
+
+| benchmark (release) | intérprete | módulo JIT |
+|---|---|---|
+| collection_pipeline | 188 ms | 382 ms |
+| dto | 116 ms | 225 ms |
+
+La causa es el coste del frame-aware (constructores `this+boxed`, accesos a
+campo por helper con flush/reload): para este shape el intérprete gana. Ley 10
+— sin ganancia medible no se rompe — así que el gate de clases se mantiene.
+El camino correcto es abaratar el constructor/llamada (C2 real) antes de
+abrirlo.
+
+
 
 
 
