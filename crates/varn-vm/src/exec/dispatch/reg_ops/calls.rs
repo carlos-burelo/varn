@@ -95,20 +95,14 @@ impl ExecCtx {
                                 // Ventana: [receiver?, args...] → regs
                                 // [r0=receiver, r1..]. Con placeholder, el
                                 // receiver lo sustituye; sin él va delante.
-                                let alloc = self.stack.push_frame(&nc.proto);
-                                let mut dst = 0usize;
-                                self.stack.unbox_into_reg(alloc, dst, receiver)?;
-                                dst += 1;
                                 let first_arg = if arg_count == arity { 1 } else { 0 };
-                                for i in first_arg..arg_count {
-                                    if let Err(e) =
-                                        self.stack.mov_cross(alloc, dst, base, arg_start + i)
-                                    {
-                                        self.stack.pop_frame();
-                                        return Err(e);
-                                    }
-                                    dst += 1;
-                                }
+                                let alloc = self.push_call_frame_with_this(
+                                    &nc.proto,
+                                    receiver,
+                                    base,
+                                    arg_start + first_arg,
+                                    arg_count - first_arg,
+                                )?;
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                                 frame.return_reg = dest as u16;
                                 frame.current_class = owner;

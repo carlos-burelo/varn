@@ -247,9 +247,13 @@ Commits: `61e2f466` (C2).
 
 `tests/main.vn`: 1223/0 en JIT y `VARN_NO_JIT=1`.
 
-No abordado en C2 (queda para C3/resto): `exec_call_method_reg` conserva su
-materialización con receiver+owner_class; `invoke_vm_method_fast` no usa aún
-`push_call_frame` (forma distinta: `this` en r0). Son candidatos de un
-sub-paso si se busca C2 al 100%, pero no cambiaron de comportamiento.
+- **Forma método**: `ExecCtx::push_call_frame_with_this` (r0 = `this` + args
+  tipados en r1..) para los caminos con receiver: el fast-path bound-method de
+  `exec_call_reg` y `invoke_vm_method_fast` (rama sin rest). Antes repetían el
+  push + `mov_cross`; el de `exec_call_reg` además fugaba la activación si el
+  receiver fallaba (usaba `?` sin `pop_frame`) — corregido por el helper.
+- Las ramas con `has_rest` mantienen su empaquetado del array rest, pero
+  sobre el mismo `push_frame`/`mov_cross`.
+
 
 

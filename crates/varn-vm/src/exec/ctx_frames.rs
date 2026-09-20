@@ -109,6 +109,37 @@ impl ExecCtx {
         Ok(alloc)
     }
 
+    /// Method shape of [`Self::push_call_frame`]: write `this_val` into the
+    /// callee's `r0` and copy `arg_count` argument values from activation
+    /// `src_base` (registers `src_start..`) into `r1..`, per class. Same
+    /// pop-on-error discipline, so a bad receiver/arg tears the activation
+    /// down instead of leaving it pushed.
+    ///
+    /// Used by `exec_call_reg`'s bound-method fast path and
+    /// `invoke_vm_method_fast`; the method form is `r0 == this`, which the
+    /// closure form ([`Self::push_call_frame`]) cannot express.
+    pub(crate) fn push_call_frame_with_this(
+        &mut self,
+        proto: &Rc<varn_types::FunctionProto>,
+        this_val: VmValue,
+        src_base: usize,
+        src_start: usize,
+        arg_count: usize,
+    ) -> VmResult<usize> {
+        let alloc = self.stack.push_frame(proto);
+        if let Err(e) = self.stack.unbox_into_reg(alloc, 0, this_val) {
+            self.stack.pop_frame();
+            return Err(e);
+        }
+        for i in 0..arg_count {
+            if let Err(e) = self.stack.mov_cross(alloc, 1 + i, src_base, src_start + i) {
+                self.stack.pop_frame();
+                return Err(e);
+            }
+        }
+        Ok(alloc)
+    }
+
     pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {        for (s, uv) in &self.open_upvalues {
             if *s == slot {
                 return uv.clone();

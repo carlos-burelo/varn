@@ -620,24 +620,16 @@ impl ExecCtx {
                 "stack overflow: call depth exceeded 10000",
             ));
         }
-        let alloc = self.stack.push_frame(&nc.proto);
-        if let Err(e) = self.stack.unbox_into_reg(alloc, 0, this_val) {
-            self.stack.pop_frame();
-            return Err(e);
-        }
-        if !nc.proto.has_rest {
-            let mut failed: Option<crate::error::RuntimeError> = None;
-            for i in 0..arg_count {
-                if let Err(e) = self.stack.mov_cross(alloc, 1 + i, base, arg_start + i) {
-                    failed = Some(e);
-                    break;
-                }
-            }
-            if let Some(e) = failed {
+        let alloc = if !nc.proto.has_rest {
+            // Receiver in r0 + typed args in r1.. — one materialisation,
+            // shared with `exec_call_reg`'s bound-method fast path.
+            self.push_call_frame_with_this(&nc.proto, this_val, base, arg_start, arg_count)?
+        } else {
+            let alloc = self.stack.push_frame(&nc.proto);
+            if let Err(e) = self.stack.unbox_into_reg(alloc, 0, this_val) {
                 self.stack.pop_frame();
                 return Err(e);
             }
-        } else {
             let nparams = nc.proto.arity.saturating_sub(1);
             let rest_idx = nparams.saturating_sub(1);
             let regular_count = arg_count.min(rest_idx);
@@ -668,7 +660,8 @@ impl ExecCtx {
                 self.stack.pop_frame();
                 return Err(e);
             }
-        }
+            alloc
+        };
         let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
         frame.return_reg = dest as u16;
         frame.current_class = owner_class;
