@@ -3,6 +3,12 @@
 Fecha: 2026-09-20. Estado: `main` consolidado con **trabajo WIP mezclado
 (roto)** a propósito, para reiniciar con contexto limpio y sin ramas.
 
+> **Progreso (misma fecha, sesión de implementación):** B0 + B1/C1 cerrados.
+> `main` compila, `cargo check` limpio, `tests/main.vn` **verde en ambas
+> tiers** (`PASSED: 1223, FAILED: 0`) con `Ref`+`Dyn` activos y el gate
+> `VARN_JIT_ALLOW_REF` **eliminado**. Ver §7 para los defects concretos
+> corregidos.
+
 Prioridad de verdad: código > tests > comportamiento > docs.
 
 ---
@@ -186,3 +192,39 @@ Sitios que aún asumen "Dyn/Ref = una palabra (payload)" y hay que migrar a par
   `Ref` global; localizado con `INVOKE_NATIVE` (`VARN_HOME_TRACE`).
 - `main` está roto por el merge del par; B0 lo resuelve (completar B1 o revertir
   el par).
+
+---
+
+## 7. Progreso B0+B1/C1 (cerrado)
+
+Rama de trabajo: local (sin commits nuevos; cambios en el árbol).
+
+Defects concretos corregidos, todos consecuencia de que un valor de KIND
+`Bool`/`Int` puede vivir en un registro de clase física `Dyn`/`Ref`
+(`I128` par) y los consumidores lo leían como una sola palabra:
+
+1. `clif/body/mod.rs` — `JumpIfFalse`/`JumpIfTrue`: una condición `K::Bool`
+   con clase `Dyn` es un par; `brif` sobre el par es siempre verdadero (bucle
+   infinito en `tests/09`). Ahora extrae el payload (`isplit`).
+2. `clif/floats.rs` — comparaciones `*Float` y `Intrinsic*` math:
+   el resultado bool se escribe con `box_bool` + `def_result`/`def_boxed_leaf`
+   cuando el destino es heap-classed, en vez de un `I64` crudo.
+3. `clif/emit.rs` — helpers nuevos `def_boxed_leaf`, `def_int_result`,
+   `def_bool_result`: una sola proyección destino-clase para resultados
+   crudos (Ley 6).
+4. `clif/body/op_dispatch.rs` — aritmética (`AddInt`/`SubInt`/`MulInt`,
+   `AddImm`/`SubImm` en su fast-path de inducción, `ModInt`, `Negate`),
+   antes escribían `I64` crudo en el par.
+5. `clif/generic.rs` — `def_boxed`/comparaciones/`IsNull`/unario bool en la
+   ruta leaf.
+6. `clif/fields.rs` — `GetFixedField` ruta `narrow` (`Int`/`Bool`/`Float`):
+   `Bool` es `Dyn` (par) y debe boxearse.
+7. `clif/alloc/safepoints.rs` — **bug de layout**: `store_boxed_home` para la
+   clase `Ref` escribía un `I64` (8 bytes) en un slot `u32` (4 bytes), pisando
+   el slot vecino. Causaba `arr=heap[0]` en `ArrayPush` (`tests/42`). Ahora
+   `istore32`.
+8. `clif/lower.rs` — gate de `Ref` y `VARN_JIT_ALLOW_REF` eliminados; el
+   `eprintln!("REFMETA …")` de diagnóstico también.
+
+Pendiente de este bloque: nada. B2/B3 siguen sin tocar.
+

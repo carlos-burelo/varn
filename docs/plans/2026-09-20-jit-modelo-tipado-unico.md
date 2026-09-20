@@ -50,8 +50,10 @@ TIR (BackendTy por valor, obligatorio)
   "es par").
 - **Cierra el value-flow**: la ruta `CallMethod`→nativa marshala el receiver por
   el mismo camino que los args (causa actual: `this` no-str).
-- Estado: en curso (matrix 12 ms vs Bun 15.4; tests 1–41 verdes; markdown en
-  `CallMethod` nativa).
+- Estado: **cerrado**. `Ref`+`Dyn` bajan como par tag+payload en todo el
+  `clif/`; gate `VARN_JIT_ALLOW_REF` y su baile eliminados. `tests/main.vn`
+  verde en JIT y `VARN_NO_JIT=1` con `Ref` activo. Defectos concretos en
+  `docs/plans/2026-09-20-PLAN-PENDIENTE.md` §7.
 
 ### C2 — Una convención de llamada (VM)
 - Un único `ExecCtx::invoke(callee, args_window)` que hace staging→
