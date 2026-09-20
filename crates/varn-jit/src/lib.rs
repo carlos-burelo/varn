@@ -258,10 +258,34 @@ pub struct JitFrameLayout {
     pub frames_ptr_offset: usize,
     pub frames_len_offset: usize,
     pub frames_cap_offset: usize,
-    /// `ExecCtx.stack: Vec<VmValue>`'s len/cap words (its ptr word is
-    /// `JitHelpers::stack_data_offset`, probed once already).
+    /// `ExecCtx.stack`'s len/cap words. NOTE (fase B): `ExecCtx.stack` is now
+    /// a `FrameStore`, so these two land inside its first class vector
+    /// (`gpr`); they are stale for the legacy contiguous-frame lowering and
+    /// are superseded by the per-class pointers below. Kept so the dead
+    /// lowering still compiles until it is migrated.
     pub stack_len_offset: usize,
     pub stack_cap_offset: usize,
+    /// Byte offsets from the `ExecCtx` base to the DATA-POINTER word of each
+    /// `FrameStore` class vector, indexed by `SlotClass::index()`
+    /// (0=gpr i64, 1=fpr f64, 2=refs u32, 3=dyn VmValue). Generated code
+    /// reloads these after any call/safepoint that can push a frame and
+    /// reallocate a vector; the per-activation class bases come from the ABI
+    /// (the `FrameStore` activation id), not from here.
+    pub gpr_ptr_offset: usize,
+    pub fpr_ptr_offset: usize,
+    pub refs_ptr_offset: usize,
+    pub dyn_ptr_offset: usize,
+    /// Byte offset from the `ExecCtx` base to the DATA-POINTER word of
+    /// `FrameStore::allocs` (`Vec<FrameAlloc>`). Generated code reads an
+    /// activation's per-class base indices as
+    /// `allocs[act_id].bases[class]`, i.e. at
+    /// `allocs_ptr + act_id * alloc_size + alloc_bases_offset + class*4`.
+    pub allocs_ptr_offset: usize,
+    /// `size_of::<FrameAlloc>()` — stride between activations in `allocs`.
+    pub alloc_size: usize,
+    /// Byte offset of `FrameAlloc::bases` within a `FrameAlloc` (`0` by
+    /// `#[repr(C)]`, asserted at probe time).
+    pub alloc_bases_offset: usize,
 }
 
 /// Generates [`JitHelpers`] from the one shared list in

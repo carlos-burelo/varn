@@ -7,6 +7,7 @@
 use crate::closure::VmClosure;
 use crate::exec::ctx::ExecCtx;
 use crate::frame::CallFrame;
+use crate::frame_store::FrameStore;
 use crate::heap::HeapObj;
 use std::rc::Rc;
 use varn_types::FunctionProto;
@@ -160,6 +161,26 @@ pub(crate) fn probe() -> varn_jit::JitFrameLayout {
     let stack_len_offset = std::mem::offset_of!(ExecCtx, stack) + vec_len_off;
     let stack_cap_offset = std::mem::offset_of!(ExecCtx, stack) + vec_cap_off;
 
+    // --- ExecCtx.stack (FrameStore): data-pointer word of each class vector. ---
+    // `FrameStore` is `#[repr(C)]` with the four class vectors first, so these
+    // are stable ABI offsets. The JIT uses them to reload a class vector's
+    // data pointer after a call/safepoint may have reallocated it.
+    let stack_off = std::mem::offset_of!(ExecCtx, stack);
+    let gpr_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, gpr) + vec_ptr_off;
+    let fpr_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, fpr) + vec_ptr_off;
+    let refs_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, refs) + vec_ptr_off;
+    let dyn_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, dyn_) + vec_ptr_off;
+
+    // --- FrameStore.allocs: per-activation class bases. ---
+    let allocs_ptr_offset =
+        stack_off + std::mem::offset_of!(FrameStore, allocs) + vec_ptr_off;
+    let alloc_size = std::mem::size_of::<crate::frame_store::FrameAlloc>();
+    let alloc_bases_offset = std::mem::offset_of!(crate::frame_store::FrameAlloc, bases);
+    assert_eq!(
+        alloc_bases_offset, 0,
+        "FrameAlloc::bases must be the first repr(C) field for the JIT ABI"
+    );
+
     varn_jit::JitFrameLayout {
         closure_tag,
         closure_payload_off,
@@ -182,5 +203,84 @@ pub(crate) fn probe() -> varn_jit::JitFrameLayout {
         frames_cap_offset,
         stack_len_offset,
         stack_cap_offset,
+        gpr_ptr_offset,
+        fpr_ptr_offset,
+        refs_ptr_offset,
+        dyn_ptr_offset,
+        allocs_ptr_offset,
+        alloc_size,
+        alloc_bases_offset,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The four class data-pointer offsets must land exactly on the matching
+    /// `FrameStore` vectors' data words. This is the ABI contract the fase-B
+    /// lowering will emit against; a stale/duplicated offset here is a
+    /// generated code store into the wrong class vector.
+    #[test]
+    fn class_ptr_offsets_point_at_the_class_vectors() {
+        let mut store = crate::frame_store::FrameStore::new();
+        store.gpr.push(7);
+        store.fpr.push(1.5);
+        store.refs.push(9);
+        store.dyn_.push(varn_types::VmValue::null());
+
+        let lay = probe();
+        let stack_off = std::mem::offset_of!(ExecCtx, stack);
+        let base = &store as *const crate::frame_store::FrameStore as *const u8;
+
+        unsafe {
+            let gpr =
+                *(base.add(lay.gpr_ptr_offset - stack_off) as *const *const i64);
+            let fpr =
+                *(base.add(lay.fpr_ptr_offset - stack_off) as *const *const f64);
+            let refs =
+                *(base.add(lay.refs_ptr_offset - stack_off) as *const *const u32);
+            let dyn_ = *(base.add(lay.dyn_ptr_offset - stack_off)
+                as *const *const varn_types::VmValue);
+            assert_eq!(gpr, store.gpr.as_ptr());
+            assert_eq!(fpr, store.fpr.as_ptr());
+            assert_eq!(refs, store.refs.as_ptr());
+            assert_eq!(dyn_, store.dyn_.as_ptr());
+        }
+
+        // `FrameAlloc.bases` is the first `#[repr(C)]` field: the JIT reads it
+        // at offset 0 from an activation's `FrameAlloc`.
+        assert_eq!(std::mem::offset_of!(crate::frame_store::FrameAlloc, bases), 0);
+    }
+
+    /// `allocs[act_id].bases` resolved through the probed offsets must match
+    /// `FrameStore::alloc_bases(act_id)` — the activation's four class bases.
+    #[test]
+    fn alloc_bases_offsets_resolve_to_the_activation_bases() {
+        use varn_types::register_meta::{RegisterMeta, SlotKind};
+        let mut proto = varn_types::FunctionProto::default();
+        proto.register_count = 4;
+        proto.register_meta = [SlotKind::Dynamic, SlotKind::Int, SlotKind::Float, SlotKind::Ref]
+            .iter()
+            .map(|&kind| RegisterMeta { kind })
+            .collect();
+        let proto = std::rc::Rc::new(proto);
+
+        let mut store = crate::frame_store::FrameStore::new();
+        let id = store.push_frame(&proto);
+        let expected = store.alloc_bases(id);
+
+        let lay = probe();
+        let stack_off = std::mem::offset_of!(ExecCtx, stack);
+        let base = &store as *const crate::frame_store::FrameStore as *const u8;
+        unsafe {
+            let allocs = *(base.add(lay.allocs_ptr_offset - stack_off) as *const *const u8);
+            let fap = allocs.add(id * lay.alloc_size + lay.alloc_bases_offset);
+            let mut got = [0u32; 4];
+            for (c, slot) in got.iter_mut().enumerate() {
+                *slot = *(fap.add(c * 4) as *const u32);
+            }
+            assert_eq!(got, expected);
+        }
     }
 }
