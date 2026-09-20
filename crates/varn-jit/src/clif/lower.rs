@@ -217,7 +217,6 @@ fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
             Some(OpCode::InvokeVirtual) => "InvokeVirtual",
             Some(OpCode::CallSpread) => "CallSpread",
             Some(OpCode::CallSelf) => "CallSelf",
-            Some(OpCode::Intrinsic) => "Intrinsic",
             Some(OpCode::MakeClosure) => "MakeClosure",
             Some(OpCode::MakeClass) => "MakeClass",
             Some(OpCode::Inherit) => "Inherit",

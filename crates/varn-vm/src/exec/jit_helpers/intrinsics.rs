@@ -6,16 +6,24 @@ use crate::exec::ctx::ExecCtx;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
+/// Fase B: the compiled caller has flushed `[receiver, args...]` to the home
+/// slots of registers `reg_start..reg_start + arg_count` in activation
+/// `act_id`; this gathers them back through `FrameStore` and dispatches.
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
     ctx: *mut ExecCtx,
     wire_byte: usize,
-    args_start: usize,
+    act_id: usize,
+    reg_start: usize,
     arg_count: usize,
 ) {
-    // K3-faseA: la ventana contigua ya no existe (frame por clases) y solo la
-    // recorría código generado. Fase B: restaurar de git.
-    let _ = (ctx, wire_byte, args_start, arg_count);
-    unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL");
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = ctx_ref.stack.box_range(act_id, reg_start, arg_count);
+        match crate::exec::intrinsics::dispatch(wire_byte as u8, &args, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
 }
 
 /// Dedicated fast path for `charCodeAt(pos)` / `codePointAt(pos)`.

@@ -290,14 +290,14 @@ pub(crate) fn emit_intrinsic(
     flush_boxed(b, actx, state, &regs);
 
     let wire_v = b.ins().iconst(types::I64, wire_byte as i64);
-    let start_v = b.ins().iadd_imm(actx.base, dest as i64);
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
     let count_v = b.ins().iconst(types::I64, arg_count as i64);
 
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.dispatch_intrinsic,
-        &[actx.exec_ctx, wire_v, start_v, count_v],
+        &[actx.exec_ctx, wire_v, actx.base, dest_v, count_v],
     );
 
     reload_boxed(b, actx, state, &regs);
