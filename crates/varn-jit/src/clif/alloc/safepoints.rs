@@ -311,7 +311,11 @@ pub(crate) fn store_home(
     );
     use varn_types::register_meta::SlotClass;
     match class {
-        SlotClass::Ref => {}
+        // `Ref`/`Dyn` homes are always current: every definition of a
+        // heap-classed register goes through `def_result`/`Move`/entry, which
+        // writes the home. Re-boxing here from the `K` lattice can only hurt
+        // (the lattice may disagree with the register's class at a merge).
+        SlotClass::Ref | SlotClass::Dyn => {}
         SlotClass::Gpr => {
             let v = super::super::emit::box_int(b, raw);
             store_boxed_home(b, actx, reg, v);
@@ -320,17 +324,6 @@ pub(crate) fn store_home(
             let v = super::super::emit::box_f64(b, raw);
             store_boxed_home(b, actx, reg, v);
         }
-        SlotClass::Dyn => match state.get(reg).copied().unwrap_or(K::Unset) {
-            K::Int => {
-                let v = super::super::emit::box_int(b, raw);
-                store_boxed_home(b, actx, reg, v);
-            }
-            K::Bool => {
-                let v = super::super::emit::box_bool(b, raw);
-                store_boxed_home(b, actx, reg, v);
-            }
-            _ => {}
-        },
     }
 }
 

@@ -102,6 +102,15 @@ pub(crate) fn dispatch_opcode(
             let src = (code[ip + 1] >> 8) as usize;
             let src_is_float = meta_is_float(&proto.register_meta, src);
             let dest_is_float = meta_is_float(&proto.register_meta, first_reg);
+            if std::env::var_os("VARN_HOME_TRACE").is_some() {
+                eprintln!(
+                    "MOVE fn={:?} ip={ip} dest={first_reg} src={src} state_src={:?} meta_src={:?} meta_dest={:?}",
+                    proto.name,
+                    state.get(src).copied(),
+                    proto.register_meta.get(src).map(|m| m.kind),
+                    proto.register_meta.get(first_reg).map(|m| m.kind),
+                );
+            }
             if first_reg < vars.len() && src < vars.len() {
                 // Some(v) means boxing already computed (needed for def_var anyway).
                 // None defers box_or_pass to the if-actx block so non-frame-aware
