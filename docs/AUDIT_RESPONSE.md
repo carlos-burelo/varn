@@ -24,6 +24,52 @@ Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusi
 > - **B7:** `charCodeAt`/`codePointAt` inlineados desde `CallNativeOp` (316 →
 >   7 ms en `bench_str_ops`).
 
+---
+
+## Estado de cumplimiento (2026-09-20)
+
+Contraste de §I (borrados) y §K (11 pasos) con el código actual.
+
+### §I — qué debe borrarse
+
+| # | Ítem | Estado |
+|---|---|---|
+| 1 | Frame/args/rets/upvalues universales `Vec<VmValue>` → clases GPR/FPR/REF/DYN | **DONE** — `FrameStore` particionado; intérprete con fast-path `reg_class==Gpr` sin tag-check (`ops_math_cmp.rs:144`); GPR/FPR fuera del scan GC (`live_boxed` por clase) |
+| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **PENDIENTE** (el pilar grande). Parcial: por C4 la lattice se reemplazó por **proyección de clase** (`clif/kinds.rs::class_kind`) y `register_meta` (clase/tipo) ya se serializa en `.vnc` — se cumple "serializar clase/tipo", no "bajar de SSA" |
+| 3 | Meet-a-`Dynamic` + skip de `Float` en regalloc_post | **DONE** (Anexo K2) |
+| 4 | Colapsos `Char→Dynamic`, `Nullable→Dynamic` | **PARCIAL** — `Char→Ref` honesto (K1), anchos (K4); `Nullable→Dynamic` sigue (`ssa/emit/mod.rs:270`) |
+| 5 | `ArrayRepr` mínimo `{Boxed,I64,F64}` | **DONE** (K5) |
+| 6 | `ClassLayout` SLOT 16B + `ObjData` para clases | **DONE** (K3 + offset/tag bake-ados esta sesión) |
+| 7 | `VmValue` como intercambio compiler→VM | **PARCIAL** — `register_meta`/`SlotKind` es la prueba serializada |
+
+### §K — pasos
+
+1. clases físicas ✅ · `HirType` sin colapsos ⚠️ (`Char`=Ref, `Nullable`=Dynamic, anchos solo `BackendTy`)
+2. TIR sin degradar sin `DynReason` ✅
+3. SSA conserva payload ⚠️
+4. regalloc pools+spill+coalescer ⚠️ (coalescer ✅ K2; techo 256 sigue siendo rechazo, no spill)
+5. frame tipado ✅
+6. bytecode sobre clases / `GetFixedField` default ✅
+7. GC roots por clase ✅
+8. convención de llamada por clase ✅
+9. **entrada SSA/TIR al nativo** ❌ PENDIENTE
+10. agregados `ArrayRepr I8..F32` + `InstanceData` compacto ✅
+11. benches/gates ⚠️
+
+### Obsoletos / resueltos desde el audit
+
+- `FRAME_LAYOUT_V2_JIT_BAIL`/`PAIR_MIGRATION_PENDING` → **false**: JIT activo (el audit reportaba 0 funciones compiladas).
+- Bloqueo de build `std:reflect/introspect` → resuelto.
+- K5 "escritura angosta pendiente": **obsoleto** — `set_vm`/`push_vm` ya escriben compacto para `I8..U32/F32` cuando el valor es int/float (`vm_value.rs:926-967`).
+
+### Pendiente real
+
+- **JIT desde SSA/TIR** (paso 9 / §I-2) — pilar arquitectónico.
+- `Nullable` como par (valor,bit) — §I-4.
+- `u64`: sin aritmética sin signo; `u64` no es siquiera tipo de superficie en checker/parser.
+- regalloc: spill real en vez de rechazo `>256`.
+
+
 
 Mediciones ejecutadas en esta auditoría (no afirmaciones sin dato):
 - `cargo test -p varn-types --test micro_bench_map -- --nocapture`: Shape+ObjData 30.09 ms / FxHashMap 3.02 ms / InlineMap<4> 2.68 ms / Rc<RefCell<InlineMap<4>>> 5.86 ms (100k iters, 3 claves). Speedup Rc<InlineMap<4>> vs Shape: 5.13x.
