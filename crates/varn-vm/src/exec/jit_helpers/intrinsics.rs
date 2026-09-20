@@ -19,6 +19,17 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = ctx_ref.stack.box_range(act_id, reg_start, arg_count);
+        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+            let fname = ctx_ref
+                .frames
+                .last()
+                .and_then(|f| f.closure().proto.name.clone());
+            let tags: Vec<String> = args
+                .iter()
+                .map(|v| format!("{:#x}/{:#x}", v.raw_tag(), v.raw_payload()))
+                .collect();
+            eprintln!("INTRINSIC {fname:?} wire={wire_byte:#x} args={tags:?}");
+        }
         match crate::exec::intrinsics::dispatch(wire_byte as u8, &args, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
