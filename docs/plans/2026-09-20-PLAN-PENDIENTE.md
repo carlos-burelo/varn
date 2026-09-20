@@ -255,5 +255,32 @@ Commits: `61e2f466` (C2).
 - Las ramas con `has_rest` mantienen su empaquetado del array rest, pero
   sobre el mismo `push_frame`/`mov_cross`.
 
+---
+
+## 9. Progreso B3/C3
+
+Commit de C3 (esta sesión).
+
+- **Un ABI nativo**: `jit_call_native_op` y `jit_call_native_fnptr` (dos
+  entradas ABI, dos cuerpos) se colapsan en `jit_call_native(ctx, fn_addr,
+  op_id, act_id, reg_start, total)`. `fn_addr == 0` resuelve por `op_id` en
+  runtime; si no, ya viene resuelto en compilación. Una entrada en
+  `helper_abi`, un cuerpo, una extracción (`call_native_from_homes`).
+- **Un marshal**: `CallNativeOp` (JIT) boxea `[receiver, args...]` desde los
+  homes y llama `ExecCtx::invoke_native`; el intérprete hace lo mismo vía
+  `call_native_with_receiver` (que construye `[this, args...]` y llama
+  `invoke_native`). `this` viaja por el mismo camino que los args; `FromVm`
+  es el único unmarshal de parámetros.
+- **`str_*_intrinsic`**: siguen, pero solo como **inline CLIF** que comparte
+  la extracción (forma explícitamente permitida por el plan): `clif/strings.rs`,
+  `clif/methods.rs` y el fast-path de `emit_call_native_op` las invocan con
+  tag/payload ya extraídos; no son una ruta de dispatch paralela ni pasan por
+  su propio marshal.
+- **`FromVm`**: un solo trait en `varn-types/src/marshal.rs`; ningún call site
+  nativo tiene unmarshal propio.
+
+`tests/main.vn`: 1223/0 en JIT y `VARN_NO_JIT=1`.
+
+
 
 

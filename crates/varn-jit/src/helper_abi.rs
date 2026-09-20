@@ -144,10 +144,11 @@ macro_rules! jit_helper_abi {
             str_index_of_intrinsic => jit_str_index_of_intrinsic,
             str_last_index_of_intrinsic => jit_str_last_index_of_intrinsic,
             jit_is_native_fn => jit_is_native_fn,
-            jit_call_native_op => jit_call_native_op,
-            /// `extern "C" fn(*mut ExecCtx, fn_addr, args_start, total)` — direct
-            /// native call with the function pointer already resolved.
-            jit_call_native_fnptr => jit_call_native_fnptr,
+            /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, act_id, reg_start,
+            /// total)` — the single native `CallNativeOp` entry. `fn_addr == 0`
+            /// resolves from `op_id` at run time. Both read the same
+            /// `[receiver, args...]` home window and share one marshal.
+            jit_call_native => jit_call_native,
             /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
             /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`

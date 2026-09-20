@@ -33,14 +33,21 @@ pub(crate) extern "C" fn jit_is_native_fn(ctx: *mut ExecCtx, callee: VmValue) ->
     }
 }
 
-/// JIT helper for `CallNativeOp`: resolve the stable op-id to its native fn and
-/// invoke it. The compiled caller has already flushed `[receiver, args...]` to
-/// the home slots of registers `reg_start..reg_start + total` in activation
-/// `act_id`; this reads them back as a contiguous `VmValue` slice, exactly the
-/// layout the macro-generated wrapper expects — mirroring the interpreter's
-/// `CallNativeOp` arm (`call_native_with_receiver`).
-pub(crate) extern "C" fn jit_call_native_op(
+/// THE one helper for a native `CallNativeOp`. The compiled caller flushed
+/// `[receiver, args...]` to the home slots of registers
+/// `reg_start..reg_start + total` in activation `act_id`; this boxes that
+/// window through `FrameStore` and invokes the native via the SAME
+/// `invoke_native` marshal the interpreter's `CallNativeOp` arm uses
+/// (`call_native_with_receiver`).
+///
+/// `fn_addr == 0` means the target was not resolved at JIT-compile time —
+/// resolve it from `op_id` here (an unknown op-id raises a VM error). One
+/// entry replaces the previous `jit_call_native_op` / `jit_call_native_fnptr`
+/// pair: both read the same window and only differed in how the callee was
+/// found.
+pub(crate) extern "C" fn jit_call_native(
     ctx: *mut ExecCtx,
+    fn_addr: usize,
     op_id: u64,
     act_id: usize,
     reg_start: usize,
@@ -48,29 +55,17 @@ pub(crate) extern "C" fn jit_call_native_op(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let res = match varn_builtins::native_op_fn(op_id) {
-            Some(f) => call_native_from_homes(ctx_ref, f, act_id, reg_start, total),
-            None => jit_propagate_error(
-                ctx_ref,
-                crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
-            ),
+        let f: varn_types::NativeFn = if fn_addr != 0 {
+            std::mem::transmute(fn_addr)
+        } else {
+            match varn_builtins::native_op_fn(op_id) {
+                Some(f) => f,
+                None => jit_propagate_error(
+                    ctx_ref,
+                    crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
+                ),
+            }
         };
-        ctx_ref.jit_native_result = res;
-    }
-}
-
-/// `CallNativeOp` with the target already resolved at JIT-compile time —
-/// no per-call op-id hash lookup.
-pub(crate) extern "C" fn jit_call_native_fnptr(
-    ctx: *mut ExecCtx,
-    fn_addr: usize,
-    act_id: usize,
-    reg_start: usize,
-    total: usize,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let f: varn_types::NativeFn = std::mem::transmute(fn_addr);
         let res = call_native_from_homes(ctx_ref, f, act_id, reg_start, total);
         ctx_ref.jit_native_result = res;
     }

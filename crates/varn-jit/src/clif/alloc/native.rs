@@ -111,29 +111,19 @@ pub(crate) fn emit_call_native_op(
     flush_boxed(b, actx, state, &regs);
 
     // The helper reads the args back from the caller's home slots by
-    // `(act_id, reg_start, total)`, not a contiguous stack index.
+    // `(act_id, reg_start, total)`, not a contiguous stack index. One entry
+    // handles both a resolved target and an op-id lookup (`fn_addr == 0`).
     let dest_v = b.ins().iconst(types::I64, dest as i64);
     let total_v = b.ins().iconst(types::I64, total as i64);
     let target = (actx.helpers.resolve_native_op)(op_id);
-    let fn_addr = target.func_ptr;
-
-    if fn_addr != 0 {
-        let fn_v = b.ins().iconst(types::I64, fn_addr as i64);
-        call_helper_void(
-            b,
-            actx.cc,
-            actx.helpers.jit_call_native_fnptr,
-            &[actx.exec_ctx, fn_v, actx.base, dest_v, total_v],
-        );
-    } else {
-        let op_id_v = b.ins().iconst(types::I64, op_id as i64);
-        call_helper_void(
-            b,
-            actx.cc,
-            actx.helpers.jit_call_native_op,
-            &[actx.exec_ctx, op_id_v, actx.base, dest_v, total_v],
-        );
-    }
+    let fn_v = b.ins().iconst(types::I64, target.func_ptr as i64);
+    let op_v = b.ins().iconst(types::I64, op_id as i64);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.jit_call_native,
+        &[actx.exec_ctx, fn_v, op_v, actx.base, dest_v, total_v],
+    );
     reload_boxed(b, actx, state, &regs);
     let res = b.ins().load(
         types::I128,

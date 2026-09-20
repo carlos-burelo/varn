@@ -71,6 +71,10 @@ TIR (BackendTy por valor, obligatorio)
   `exec/dispatch/reg_ops/*`, `clif/alloc/calls.rs`.
 
 ### C3 — Un ABI nativo y un marshal
+- Estado: **cerrado** (esta sesión). Un solo `jit_call_native` (absorbe
+  `fnptr`/`op_id`), un solo `invoke_native` marshal, `FromVm` único. Los
+  `str_*_intrinsic` quedan solo como inline CLIF sobre la extracción común.
+  Detalle en `docs/plans/2026-09-20-PLAN-PENDIENTE.md` §9.
 - `CallNativeOp`, métodos nativos y `CallMethod`-nativo entran por **una**
   función con la **misma** extracción de `[this, args...]` y **un** `FromVm`.
 - **Borra**: helpers `str_*_intrinsic` dedicados como rutas (quedan, si acaso,
