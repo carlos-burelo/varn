@@ -524,6 +524,27 @@ lowering y helpers ya existían).
 
 4 cuadrantes 1233/0.
 
+---
+
+## 20. Dónde queda el tiempo (medido, no convención de llamada)
+
+`VARN_NO_JIT` vs JIT (release, wall):
+
+| benchmark | JIT | intérprete | causa |
+|---|---|---|---|
+| collection_pipeline | 204 ms | 192 ms | **allocator/GC** (100k objetos + `push`); el JIT no gana |
+| http_routing | 1044 ms | 1456 ms | **mapas dinámicos + strings** (`params[k]=v` sobre `{[key:str]:str}`, split/slice/indexOf) |
+
+Es decir: los outliers restantes NO son la convención de llamada. Son:
+- **allocator/GC** (`gc_alloc` 2.86x, `collection_pipeline`): asignación de
+  objetos/arrays; siguiente frente = allocator (bump nursery, layout, GC).
+- **mapas dinámicos y strings** (`http_routing`, `str_ops` 3.85x):
+  `Map`/objeto dinámico siguen en la ruta genérica; `slice`/`substring` sin
+  hoist.
+
+Hipótesis de convención de llamada/closure descartada por la medición.
+
+
 
 
 
