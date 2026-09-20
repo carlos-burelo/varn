@@ -97,6 +97,20 @@ unsafe fn call_native_from_homes(
 ) -> VmValue {
     ctx_ref.record_call_native(f, None);
     let args = ctx_ref.stack.box_range(act_id, reg_start, total);
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        let fname = ctx_ref
+            .frames
+            .last()
+            .and_then(|fr| fr.closure().proto.name.clone());
+        let tags: Vec<String> = args
+            .iter()
+            .map(|v| format!("{:#x}/{:#x}", v.raw_tag(), v.raw_payload()))
+            .collect();
+        eprintln!(
+            "NATIVEOP fn={fname:?} f={:#x} reg_start={reg_start} total={total} args={tags:?}",
+            f as usize
+        );
+    }
     match ctx_ref.invoke_native(f, &args) {
         Ok(v) => v,
         Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
