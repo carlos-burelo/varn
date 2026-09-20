@@ -64,22 +64,27 @@ Consumidores: `varn-pipeline` (orquesta las fases), `varn-cli/src/commands/debug
 
 ```
 crates/varn-debug/src/
-  phase.rs       trait Phase + Stage + PerModule
+  phase.rs       trait Phase + Stage + PerModule (solo metadatos)
   registry.rs    tabla estática de fases; parser de -p; print_phases; grupos
   selection.rs   PhaseSel (bitflags u64) + SubModes + Filters
   flags.rs       DebugFlags = API de compatibilidad sobre selection.rs
-  ctx.rs         DebugCtx + memoización JitHelpers/ISA
   report.rs      Report {Tree, Rows, Text, None}
   fmt.rs         Format {Plain, Text}
   render.rs      banners (Section) + paleta ANSI única (absorbe colors.rs)
   walk.rs        for_each_fn + constants_for_inspect (únicos)
   error.rs       CliError (igual)
-  lib.rs         re-exports + run_stage()
+  lib.rs         re-exports + resolved_copy()
   phases/
     tokens.rs  ast/{mod,stmt,expr,decl}.rs  modules.rs  symbols.rs
     check_types.rs (hoy expr.rs)  bytecode/{mod,ops,loops}.rs
-    scope.rs  cap_trace.rs  graph.rs  summary.rs  typeloss.rs  tir.rs
+    scope.rs  cap_trace.rs  summary.rs  typeloss.rs  tir.rs
     tiers.rs (tiers+bails comparten classify)  roots.rs  clif.rs
+
+crates/varn-pipeline/src/debug/          (opción A: orquestación, no varn-debug)
+  ctx.rs         DebugCtx (datos por etapa) + memoización JitHelpers/ISA
+  run_stage.rs   itera registry::ALL; itera el grafo por path ordenado
+  graph.rs       print_module_graph / print_graph_node / shorten_path
+  emit_debug.rs  helper + sink
 ```
 
 Principio: **una fase nueva después del refactor = 1 archivo + 1 línea en el registro**. Todo lo demás (parser, `--list-phases`, `-p all`, orquestación) se genera del registro.
@@ -114,9 +119,27 @@ pub trait Phase: Sync {
 }
 ```
 
+> **Nota (opción A):** `collect`/`render` toman `DebugCtx`, que vive en
+> `varn-pipeline`. Por el ciclo de dependencias, el trait que implementa
+> `phases/` en `varn-debug` es **solo metadatos** (lo implementado hoy:
+> `id`/`aliases`/`title`/`stage`/`per_module`/`in_all`/`groups`). El despacho
+> `collect`→`render` vive en `varn-pipeline::debug::run_stage`, que conoce el
+> `DebugCtx` y llama a las funciones de render de cada fase (hoy ya reciben
+> datos de crates bajos). Pendiente de confirmar en el Paso 3 si conviene
+> partir el trait en `PhaseMeta` (varn-debug) + despacho (pipeline).
+
 `registry::ALL: &[&dyn Phase]`, en orden de `Stage`. De ahí se generan (nunca a mano): `PHASES`, `print_phases`, `DebugFlags::parse`, el error de fase desconocida con lista de válidos, `-p all` y los grupos (`check`, `clif:all`, `roots:all`, `lsp:all`).
 
 ### 3.2 `DebugCtx` (datos por etapa, sin lógica)
+
+> **Decisión (opción A, 2026-09-19):** `DebugCtx` y `run_stage` viven en
+> **`varn-pipeline`**, no en `varn-debug`. Motivo: `varn-pipeline` ya depende de
+> `varn-debug` (`crates/varn-pipeline/Cargo.toml`), así que la dirección inversa
+> sería un ciclo. `varn-debug` conserva `Phase` (solo metadatos), `registry`,
+> `selection`, `render`, `report`, `walk`, y las funciones de render por fase
+> (que reciben datos de crates bajos: `varn-core`/`varn-checker`/`varn-tir`/
+> `varn-types`/`varn-jit`). El grafo (`ModuleGraphBuild`) y el resultado del
+> checker nunca cruzan a `varn-debug`; el pipeline los tipea y despacha.
 
 ```rust
 pub struct DebugCtx {
@@ -189,7 +212,7 @@ pub struct TreeNode { label: String, children: Vec<TreeNode> }
 
 Regla: `collect()` no imprime. Fases con métricas propias (roots, typeloss) devuelven un struct específico en su archivo y lo convierten a `Report` al final de `collect`.
 
-### 3.6 `run_stage` (orquestación, vive en varn-debug)
+### 3.6 `run_stage` (orquestación, vive en `varn-pipeline` — opción A)
 
 ```rust
 pub fn run_stage(stage: Stage, ctx: &DebugCtx, flags: &DebugFlags, out: &mut dyn Write) {
