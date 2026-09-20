@@ -534,6 +534,41 @@ impl ExecCtx {
         arg_start: usize,
         arg_count: usize,
     ) -> VmResult<VmValue> {
+        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+            let kind = |v: VmValue| -> &'static str {
+                if v.is_sso() {
+                    ":sso"
+                } else if v.is_heap() {
+                    match self.heap.get(v.as_heap_idx()) {
+                        Some(crate::heap::HeapObj::Str(_)) => ":str",
+                        Some(crate::heap::HeapObj::Array(_)) => ":array",
+                        Some(crate::heap::HeapObj::Object(_)) => ":object",
+                        Some(crate::heap::HeapObj::Instance(_)) => ":instance",
+                        Some(_) => ":heap-other",
+                        None => ":heap-none",
+                    }
+                } else {
+                    ""
+                }
+            };
+            let fname = self
+                .frames
+                .last()
+                .and_then(|fr| fr.closure().proto.name.clone());
+            let args: Vec<String> = (0..arg_count)
+                .map(|i| {
+                    let v = self.stack.box_reg(base, arg_start + i);
+                    format!("{:#x}/{:#x}{}", v.raw_tag(), v.raw_payload(), kind(v))
+                })
+                .collect();
+            eprintln!(
+                "METHODNATIVE fn={fname:?} f={:#x} recv={:#x}/{:#x}{} args={args:?}",
+                f as usize,
+                receiver.raw_tag(),
+                receiver.raw_payload(),
+                kind(receiver)
+            );
+        }
         let result = if arg_count < 16 {
             let mut buf = [VmValue::null(); 17];
             buf[0] = receiver;
