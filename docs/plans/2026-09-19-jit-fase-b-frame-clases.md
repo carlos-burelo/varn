@@ -1,9 +1,24 @@
 # JIT fase B — lower sobre el frame por clases
 
-Estado: en curso (fase A completada: `FRAME_LAYOUT_V2_JIT_BAIL = true`, intérprete
-100% funcional sobre `FrameStore`). Este documento fija el contrato y el orden de
-commits atómicos para reactivar el JIT. Complementa `docs/AUDIT_RESPONSE.md` §K
-paso 9 y `crates/varn-vm/src/jit/tiering.rs` (`TODO(fase-B)`).
+Estado (2026-09-20): **JIT reactivado** (`FRAME_LAYOUT_V2_JIT_BAIL = false`).
+Suite e2e 1223/1223 verde; tier-parity idéntico en los tests numéricos; bench
+`vn bench tests/main.vn` reporta **JIT 94.6% (35/37 fns)**. Los protos que aún
+tocan un helper tripwired o tienen registros `Ref` quedan al intérprete por el
+subset gate de `clif::lower` (ver "Subset activo" abajo).
+
+Implementado: contrato compartido (`SlotClass`/`FrameLayout`/`REF_UNINIT`,
+`FrameStore`/`FrameAlloc` `repr(C)`), probes ABI, helpers `home_store`/`home_load`,
+home traffic por helper, `run_compiled_frame` sobre `FrameStore`, subset gate
+(denylist de opcodes + flag de helper deshabilitado + baile de `Ref`/generator/async),
+y el flip.
+
+Pendiente (fase B completa): helpers de llamada/nativas/IC (commits 4–5) y
+reconciliación de la procedencia de clase de los registros `Ref`; entonces se
+quitan del subset gate y el JIT cubre el 100%.
+
+Este documento fija el contrato y el orden de commits atómicos.
+Complementa `docs/AUDIT_RESPONSE.md` §K paso 9 y
+`crates/varn-vm/src/jit/tiering.rs` (`TODO(fase-B)`).
 
 ## Por qué existe fase B
 
@@ -99,6 +114,24 @@ Con el bail en `true`: `cargo check --workspace`, `cargo test -p varn-jit
 -p varn-compiler`, `vn debug -p clif` (compila sin ejecutar), y
 `cargo run --bin vn -- run .\tests\main.vn` verde. El flip (paso 8) exige la
 matriz completa de `CONTRIBUTING.md`.
+
+## Subset activo (fase B)
+
+`clif::lower::try_compile` deja al intérprete un proto cuando:
+
+1. es `generator`/`async`;
+2. contiene un opcode cuyo lowering todavía llama a un helper tripwired
+   (`Call`, `CallSelf`, `CallMethod`, `InvokeVirtual`, `CallSpread`,
+   `CallNativeOp`, `Intrinsic`, `MakeClosure`, `MakeClass`, `GetProperty`/`SetProperty`,
+   `Try`/`Throw`/`PopTry`, `Yield`/`Await`/`Spawn`, módulos, `LoadStaticFn`, …);
+3. tiene algún registro `Ref` (el único home con validación estricta; un
+   registro `Ref` que hoy sostiene un valor no-ref en algunos caminos — hallado
+   en `Headers.toObject` — se corrige reconciliando la procedencia de clase).
+
+Backstop independiente del denylist: `build_jit_helpers` pone a `0` la dirección
+de los helpers aún tripwired, y `call_helper` marca un flag cuando el lowering
+toca uno; `try_compile` mira el flag tras bajar y balea. Así ningún código
+generado puede llamar a `unreachable!`/null por una omisión del denylist.
 
 ## Riesgos
 
