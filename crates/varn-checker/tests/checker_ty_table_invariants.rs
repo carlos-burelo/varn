@@ -233,6 +233,43 @@ fn absorb_keeps_local_indices_and_learns_missing_shapes() {
 
 /// El bool de `Type` (tainted) no participa del hash-consing: dos `Type` con
 /// el mismo id y distinto flag comparten forma.
+/// El modelo de snapshots (Binder/Checker clonan la tabla viva y crecen) es
+/// seguro **solo mientras cada copia mantenga la tabla viva como prefijo**.
+/// Este test fija esa invariante, que es la base para el dueño único pendiente
+/// (Ley 3): hoy se conserva por construcción (`absorb` solo agrega), y así se
+/// comprueba en vez de asumirse.
+#[test]
+fn cloned_tables_keep_the_live_table_as_prefix_until_they_diverge() {
+    let mut live = CheckerTyTable::new();
+    let a = live.intern(TypeKind::Array(CheckerTyId::INT));
+
+    let snapshot = live.clone();
+    assert!(live.has_prefix(&snapshot), "clon comparte el prefijo");
+
+    // `live` crece: sigue teniendo al snapshot como prefijo.
+    let b = live.intern(TypeKind::Array(CheckerTyId::STR));
+    assert!(live.has_prefix(&snapshot));
+    assert!(!snapshot.has_prefix(&live), "el snapshot NO ve el crecimiento");
+
+    // `absorb` restaura la relación: el snapshot aprende lo que le faltaba sin
+    // repuntar sus propios ids.
+    let mut snapshot2 = snapshot.clone();
+    snapshot2.absorb(&live);
+    assert!(snapshot2.has_prefix(&live));
+    assert_eq!(snapshot2.get(a), &TypeKind::Array(CheckerTyId::INT));
+    assert_eq!(snapshot2.get(b), &TypeKind::Array(CheckerTyId::STR));
+
+    // Dos tablas que crecieron en paralelo divergen en el mismo índice.
+    let mut left = CheckerTyTable::new();
+    let mut right = CheckerTyTable::new();
+    let ll = left.intern_list(&[CheckerTyId::INT]);
+    let l = left.intern(TypeKind::Tuple(ll));
+    let rl = right.intern_list(&[CheckerTyId::STR]);
+    let r = right.intern(TypeKind::Union(rl));
+    assert_eq!(l.index(), r.index());
+    assert!(!left.has_prefix(&right), "mismo índice, forma distinta");
+}
+
 #[test]
 fn tainted_flag_is_not_part_of_type_identity() {
     let mut t = CheckerTyTable::new();

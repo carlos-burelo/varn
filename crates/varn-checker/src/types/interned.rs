@@ -196,6 +196,19 @@ impl CheckerTyTable {
         CheckerTyId(i)
     }
 
+    /// True when `prefix`'s entries are the same shapes, in the same order, at
+    /// the same indices as the start of `self`.
+    ///
+    /// This is the invariant the whole snapshot model rests on: a `Binder`/
+    /// `Checker` table is safe to share ids with the live table exactly while
+    /// it keeps the live table as a prefix. `set_ty_table`/`absorb` preserve it
+    /// by construction (they only append), and this predicate is how a test —
+    /// or a future single-owner store — checks it instead of assuming it.
+    pub fn has_prefix(&self, prefix: &CheckerTyTable) -> bool {
+        let n = prefix.entries.len();
+        n <= self.entries.len() && self.entries[..n] == prefix.entries[..n]
+    }
+
     pub fn get(&self, id: CheckerTyId) -> &InternedTypeKind {
         &self.entries[id.0 as usize]
     }
