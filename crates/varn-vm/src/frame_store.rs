@@ -29,43 +29,15 @@
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
-use varn_types::register_meta::SlotKind;
 use varn_types::FunctionProto;
 
 use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 
-/// Clase física de un registro. Tres bits bastarían; `u8` por claridad.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum SlotClass {
-    Gpr,
-    Fpr,
-    Ref,
-    Dyn,
-}
-
-impl SlotClass {
-    /// Proyección honesta de la prueba del checker a almacenamiento físico.
-    #[inline(always)]
-    pub fn of_kind(kind: SlotKind) -> Self {
-        match kind {
-            SlotKind::Int => SlotClass::Gpr,
-            SlotKind::Float => SlotClass::Fpr,
-            SlotKind::Ref => SlotClass::Ref,
-            SlotKind::Dynamic | SlotKind::Bool | SlotKind::Str => SlotClass::Dyn,
-        }
-    }
-
-    #[inline(always)]
-    pub fn index(self) -> usize {
-        match self {
-            SlotClass::Gpr => 0,
-            SlotClass::Fpr => 1,
-            SlotClass::Ref => 2,
-            SlotClass::Dyn => 3,
-        }
-    }
-}
+/// La clase física vive en `varn-types` (contrato único VM+JIT); aquí solo se
+/// re-exporta para que los call-sites de la VM la sigan nombrando por este
+/// módulo. Ver `varn_types::register_meta::SlotClass` para la proyección.
+pub use varn_types::register_meta::SlotClass;
 
 /// Dirección estable de un slot dentro del almacén.
 ///
@@ -79,60 +51,23 @@ pub struct SlotAddr {
     pub idx: u32,
 }
 
-/// Traducción registro → (clase, índice) para un proto concreto.
-#[derive(Debug)]
-pub struct FrameLayout {
-    /// `slots[reg] = (clase, índice dentro de la clase)`.
-    pub slots: Vec<(SlotClass, u32)>,
-    /// Cuántos slots ocupa cada clase (`counts[clase.index()]`).
-    pub counts: [u32; 4],
-}
-
-impl FrameLayout {
-    pub fn for_proto(proto: &FunctionProto) -> Self {
-        let n = proto.register_count as usize;
-        let mut slots = Vec::with_capacity(n);
-        let mut counts = [0u32; 4];
-        for r in 0..n {
-            let kind = proto
-                .register_meta
-                .get(r)
-                .map(|m| m.kind)
-                .unwrap_or(SlotKind::Dynamic);
-            let class = SlotClass::of_kind(kind);
-            let idx = counts[class.index()];
-            counts[class.index()] += 1;
-            slots.push((class, idx));
-        }
-        Self { slots, counts }
-    }
-
-    #[inline(always)]
-    pub fn class_of(&self, reg: usize) -> SlotClass {
-        self.slots
-            .get(reg)
-            .map(|(c, _)| *c)
-            .unwrap_or(SlotClass::Dyn)
-    }
-
-    #[inline(always)]
-    pub fn idx_of(&self, reg: usize) -> u32 {
-        self.slots.get(reg).map(|(_, i)| *i).unwrap_or(0)
-    }
-}
+/// El layout registro→(clase, índice) y el sentinel `REF_UNINIT` viven en
+/// `varn-types` (contrato compartido VM+JIT); aquí solo se re-exportan para que
+/// los call-sites de la VM los sigan nombrando por este módulo. Ver
+/// `varn_types::register_meta::{FrameLayout, REF_UNINIT}`.
+pub use varn_types::register_meta::{FrameLayout, REF_UNINIT};
 
 /// Reserva de una activación: bases por clase dentro del almacén.
+///
+/// `#[repr(C)]`: `bases` va primero y a offset fijo, porque el ABI del JIT
+/// direcciona `allocs[act_id].bases[clase]` desde código generado. Ver el
+/// contrato de fase B en `docs/plans/2026-09-19-jit-fase-b-frame-clases.md`.
+#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct FrameAlloc {
     pub bases: [u32; 4],
     pub layout: Rc<FrameLayout>,
 }
-
-/// Sentinela de slot REF nunca escrito. Los trailing nunca escritos existen
-/// (el intérprete sobredimensiona `register_count`); el GC los salta por este
-/// valor y ningún lector los alcanza antes de escribir (misma disciplina que
-/// el `null()` anterior).
-pub const REF_UNINIT: u32 = u32::MAX;
 
 /// Nombre de la clase de un valor boxeado, para errores de conversión.
 fn value_kind_name(v: VmValue) -> &'static str {
@@ -150,13 +85,21 @@ fn value_kind_name(v: VmValue) -> &'static str {
 }
 
 /// Pila de activaciones partida por clases.
+///
+/// `#[repr(C)]`: los cuatro vectores por clase van primero y en orden, porque
+/// el ABI del JIT carga los punteros de datos de cada clase desde código
+/// generado (ver `JitFrameLayout`). El orden de campos es parte del contrato.
+#[repr(C)]
 #[derive(Debug, Default)]
 pub struct FrameStore {
     pub gpr: Vec<i64>,
     pub fpr: Vec<f64>,
     pub refs: Vec<u32>,
     pub dyn_: Vec<VmValue>,
-    allocs: Vec<FrameAlloc>,
+    /// Reservas de activación, indexadas por el `act_id` que ve el JIT. Parte
+    /// del ABI (el lowering lee `allocs[act_id].bases[clase]`), por eso es
+    /// `pub(crate)` en vez de privado.
+    pub(crate) allocs: Vec<FrameAlloc>,
     layouts: HashMap<usize, (Rc<FunctionProto>, Rc<FrameLayout>)>,
 }
 
