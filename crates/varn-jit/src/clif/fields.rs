@@ -254,11 +254,11 @@ pub(super) fn emit_get_fixed_field(
             .load(load_ty, MemFlags::trusted(), computed_base, load_off);
         b.ins().jump(cont, &[val.into()]);
     } else {
-        let field = emit_object_field_addr(b, c, obj, slot, slow, false);
-        // `field` points to the VmValue start; +8 reaches the payload.
-        let fld_off = if narrow { 8i32 } else { 0i32 };
-        let val = b.ins().load(load_ty, MemFlags::trusted(), field, fld_off);
-        b.ins().jump(cont, &[val.into()]);
+        // All fixed-field reads take the compact-aware runtime helper; the
+        // inline 16-byte-slot address is wrong for compact instances and for
+        // shapes whose slot indexing differs.
+        let _ = (emit_object_field_addr, load_ty, load_off, slot_off);
+        b.ins().jump(slow, &[]);
     }
 
     // ── Slow path: runtime helper ───────────────────────────────────────
@@ -388,38 +388,10 @@ pub(super) fn emit_set_fixed_field(
     let slow = b.create_block();
     let cont = b.create_block();
 
-    let slot_off = (slot * 16) as i32;
-    if let Some(&local_var) = c.local_obj_bases.get(&first_reg) {
-        let local_base = b.use_var(local_var);
-        let ok_local = b.ins().icmp_imm(IntCC::NotEqual, local_base, 0);
-        let fast_local = b.create_block();
-        let miss_local = b.create_block();
-        b.ins().brif(ok_local, fast_local, &[], miss_local, &[]);
-
-        b.switch_to_block(fast_local);
-        b.ins()
-            .store(MemFlags::trusted(), val128, local_base, slot_off);
-        b.ins().jump(cont, &[]);
-
-        b.switch_to_block(miss_local);
-        let computed_base = emit::emit_object_data_base(
-            b,
-            c.exec_ctx,
-            obj,
-            &c.helpers.object_layout,
-            &c.helpers.array_layout,
-            c.helpers.heap_field_offset,
-            slow,
-        );
-        b.def_var(local_var, computed_base);
-        b.ins()
-            .store(MemFlags::trusted(), val128, computed_base, slot_off);
-        b.ins().jump(cont, &[]);
-    } else {
-        let field = emit_object_field_addr(b, c, obj, slot, slow, true);
-        b.ins().store(MemFlags::trusted(), val128, field, 0);
-        b.ins().jump(cont, &[]);
-    }
+    // All fixed-field writes take the compact-aware runtime helper (write
+    // barrier + compact layout); the inline 16-byte-slot address is wrong.
+    let _ = (emit_object_field_addr, (slot * 16) as i32);
+    b.ins().jump(slow, &[]);
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
