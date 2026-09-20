@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex};
 use varn_checker::module_resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
-use varn_core::{ImportSpecifier, ModuleId};
+use varn_core::ModuleId;
+use varn_modules::loader::ModuleLoader as CanonicalLoader;
 use varn_types::FunctionProto;
 use varn_vm::loader::{ModuleError, ModuleLoader};
 
@@ -83,16 +84,17 @@ pub struct FileLoader;
 
 impl ModuleLoader for FileLoader {
     fn resolve(&self, spec: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        match ImportSpecifier::parse(spec) {
-            ImportSpecifier::Relative(_) | ImportSpecifier::Package(_) => {
-                varn_modules::resolver::ModuleResolver::new()
-                    .resolve(spec, from)
-                    .map_err(ModuleError::new)
-            }
-            _ => Err(ModuleError::new(format!(
-                "FileLoader cannot resolve non-local specifier: {spec}"
-            ))),
-        }
+        // One resolution: the same `ModuleResolver` every other consumer uses.
+        // This loader only ROUTES by scheme (local files), it does not resolve.
+        varn_modules::resolver::ModuleResolver::new()
+            .resolve(spec, from)
+            .map_err(ModuleError::new)
+            .and_then(|id| match id {
+                ModuleId::Local(_) => Ok(id),
+                _ => Err(ModuleError::new(format!(
+                    "FileLoader cannot resolve non-local specifier: {spec}"
+                ))),
+            })
     }
 
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
@@ -100,16 +102,19 @@ impl ModuleLoader for FileLoader {
             ModuleId::Local(p) => p.as_ref(),
             _ => return Ok(None),
         };
-        let source = std::fs::read_to_string(path)
-            .map_err(|e| ModuleError::new(format!("cannot read '{path}': {e}")))?;
-        let fingerprint = source_fingerprint(&source);
-        if let Some(hit) = cached_proto(path, fingerprint) {
+        // Source through the canonical registry (single door), not `fs` here.
+        let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
+            .map_err(|e| ModuleError::new(e.to_string()))?
+            .text;
+        let fingerprint = varn_modules::artifact::source_fingerprint(source.as_ref());
+        let key = varn_modules::artifact::module_key(id, fingerprint);
+        if let Some(hit) = cached_proto(&key, fingerprint) {
             return Ok(Some(hit));
         }
-        let proto = compile_source(&source, path)
+        let proto = compile_source(source.as_ref(), path)
             .map(Rc::new)
             .map_err(|e| ModuleError::new(format!("compile error in '{path}': {e}")))?;
-        store_proto(path, fingerprint, &proto);
+        store_proto(&key, fingerprint, &proto);
         Ok(Some(proto))
     }
 
@@ -121,15 +126,17 @@ impl ModuleLoader for FileLoader {
 pub struct StdlibLoader;
 
 impl ModuleLoader for StdlibLoader {
-    fn resolve(&self, specifier: &str, _from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        match ImportSpecifier::parse(specifier) {
-            ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
-            ImportSpecifier::Core(s) => Ok(ModuleId::Core(s)),
-            ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
-            _ => Err(ModuleError::new(format!(
-                "StdlibLoader cannot resolve non-stdlib specifier: {specifier}"
-            ))),
-        }
+    fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
+        // One resolution (shared); this loader only routes by scheme.
+        varn_modules::resolver::ModuleResolver::new()
+            .resolve(specifier, from)
+            .map_err(ModuleError::new)
+            .and_then(|id| match id {
+                ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_) => Ok(id),
+                _ => Err(ModuleError::new(format!(
+                    "StdlibLoader cannot resolve non-stdlib specifier: {specifier}"
+                ))),
+            })
     }
 
     fn native(&self, _id: &ModuleId) -> Option<varn_types::Value> {
@@ -143,35 +150,29 @@ impl ModuleLoader for StdlibLoader {
             _ => return Ok(None),
         };
 
-        if let Some(hit) = cached_proto(spec, STD_FINGERPRINT) {
+        // Same key scheme as every other per-module cache (ADR-0011).
+        let key = varn_modules::artifact::module_key(id, STD_FINGERPRINT);
+        if let Some(hit) = cached_proto(&key, STD_FINGERPRINT) {
             return Ok(Some(hit));
         }
-        let proto = Rc::new(load_uncached(spec)?);
-        store_proto(spec, STD_FINGERPRINT, &proto);
+        let proto = Rc::new(load_uncached(id, spec)?);
+        store_proto(&key, STD_FINGERPRINT, &proto);
         Ok(Some(proto))
     }
 }
 
-fn load_uncached(spec: &str) -> Result<FunctionProto, ModuleError> {
-    let provider = varn_modules::provider::get()
-        .ok_or_else(|| ModuleError::new("stdlib provider not registered"))?;
+fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError> {
+    // Same single door as the checker: the registry gives the text (and the
+    // precompiled bytecode when the bundle ships it).
+    let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
+        .map_err(|e| ModuleError::new(e.to_string()))?;
 
-    if let Some(blob) = provider.bytecode_blob(spec) {
+    if let Some(blob) = source.bytecode.as_ref() {
         return postcard::from_bytes(blob)
             .map_err(|e| ModuleError::new(format!("corrupt std bundle bytecode for {spec}: {e}")));
     }
 
-    let source = provider
-        .embedded_source(spec)
-        .map(|s| s.to_owned())
-        .or_else(|| {
-            provider
-                .source_path(spec)
-                .and_then(|p| std::fs::read_to_string(p).ok())
-        })
-        .ok_or_else(|| ModuleError::new(format!("stdlib source not found: {spec}")))?;
-
-    compile_source(&source, spec)
+    compile_source(source.text.as_ref(), spec)
         .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
@@ -350,11 +351,14 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             }
         };
         let shared_interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
-        let interface = varn_checker::module_resolver::serialize_module_interface(
-            &exports,
-            &bind,
-            &shared_interner,
-        )
+        let interface = crate::resolver::with_resolver(|r| {
+            varn_checker::module_resolver::serialize_module_interface(
+                &exports,
+                &bind,
+                &shared_interner,
+                Some(r),
+            )
+        })
         .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
         let proto = match compile_source_checked(&source, &m.id) {

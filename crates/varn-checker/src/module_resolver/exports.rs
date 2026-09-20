@@ -3,7 +3,6 @@ use crate::module_resolver::cache::ExportMap;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use std::path::Path;
-use std::rc::Rc;
 use varn_core::ast::{AstArena, Decl, ExportDecl, ExportDefaultDecl, Pattern, StmtId, StmtKind};
 use varn_core::Atom;
 

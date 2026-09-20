@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern};
-use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_core::{Diagnostic, ErrorCode};
 
 use crate::module_resolver;
 use crate::symbol::{Symbol, SymbolKind};
@@ -134,122 +134,35 @@ impl<'r> super::Binder<'r> {
                 } else {
                     match exports.get(&imported) {
                         Some(resolved) => {
-                            // `resolved` was bound in whatever module declares
-                            // it, against that compilation's view of the
-                            // shared `Atom` table at the time — not
-                            // necessarily this binder's own `self.interner`,
-                            // which can be behind (or, after a nested import
-                            // resolution, differently numbered) if this
-                            // module's own atoms and the exporter's diverged
-                            // before either got published. A raw `.clone()`
-                            // would carry its `doc`/`type_params`/
-                            // `origin_module`/`re_export_path` `Atom`s
-                            // straight through, silently pointing at whatever
-                            // text happens to sit at that index in
-                            // `self.interner` instead. Round-trip through text
-                            // — the same crossing `Symbol::to_cacheable`/
-                            // `from_cacheable` exist for when a module
-                            // interface goes to disk — decoding against the
-                            // resolver's current shared snapshot, which by now
-                            // holds everything the exporting bind published.
-                            let foreign = self.resolver.interner_snapshot();
-                            // `alias_node` is lost here too, same as the
-                            // disk-cache round trip `to_cacheable` documents
-                            // (this is that same round trip, just in-memory).
-                            // An imported type alias's `typeof`/mapped-type
-                            // expansion doesn't go through this `Symbol` at
-                            // all — it goes through the foreign-module path
-                            // in `resolve_type_alias` (`binder/types.rs`),
-                            // which reaches the origin module's own bind
-                            // instead of this locally-rehydrated copy.
-                            // `from_cacheable` mints several new atoms
-                            // (name/doc/type_params/...) into `self.interner`
-                            // in one batch — resync it to the live table
-                            // first, or those atoms number from a stale base
-                            // and can collide with whatever a nested import
-                            // above just published (see `resync_interner`'s
-                            // doc).
+                            // Cross the module boundary ONCE, through the same
+                            // portable codec the on-disk interface uses
+                            // (`types/portable.rs`): every `Atom` resolves to
+                            // text and every `CheckerTyId` to the shape in its
+                            // OWNER's table, then both re-intern into this
+                            // binder's interner/table. A raw clone would carry
+                            // the text and the id straight through, pointing at
+                            // whatever sits at the same index here.
+                            //
+                            // `resync_interner` before the batch and
+                            // `publish_interner_tail` after: `decode_symbol`
+                            // mints several atoms in a row with no resolver
+                            // call in between, and the live table must not
+                            // diverge from this one (see `resync_interner`).
                             self.resync_interner();
-                            let mut s = Symbol::from_cacheable(
-                                resolved.to_cacheable(&foreign),
+                            let foreign = self.resolver.interner_snapshot();
+                            let fallback_table = self.resolver.ty_table_snapshot();
+                            let portable = crate::module_resolver::cache::encode_symbol(
+                                resolved,
+                                &fallback_table,
+                                &foreign,
+                                Some(self.resolver),
+                            );
+                            let mut s = crate::module_resolver::cache::decode_symbol(
+                                portable,
+                                &mut self.ty_table,
                                 &mut self.interner,
                             );
                             self.publish_interner_tail();
-                            // Same crossing as `foreign`/`self.interner` above,
-                            // for `CheckerTyId` instead of `Atom`: `s.ty` (and
-                            // any `type_param_constraints`) came from
-                            // `resolved`'s own bind, interned against the
-                            // `CheckerTyTable` that module's binder/checker
-                            // grew — not necessarily `self.ty_table`, which is
-                            // this binder's own, still-growing-locally table
-                            // (see `CheckerTyTable::reintern`'s doc for why a
-                            // raw id can't just be copied across). Decode
-                            // against the EXPORTER's own table — the live
-                            // resolver table is append-only across modules and
-                            // its indices do not necessarily match the ones the
-                            // exporter minted — and re-intern into
-                            // `self.ty_table`.
-                            let exporter_ty_table = resolved_target
-                                .as_deref()
-                                .and_then(|abs| self.resolver.module_bind(abs))
-                                .or_else(|| self.resolver.stdlib_bind(&source_str))
-                                .map(|b| b.ty_table.clone());
-                            // A re-export (`export { RawRequest } from
-                            // "std:http/request"`) hands out a symbol whose
-                            // `ty` was interned by the DECLARING module, not
-                            // the one named in the import. Decode against that
-                            // module's table first, when its `origin_module`
-                            // is reachable.
-                            let origin_ty_table = s.origin_module.and_then(|o| {
-                                let snap = self.resolver.interner_snapshot();
-                                let text = snap.try_resolve(o)?;
-                                self.resolver
-                                    .stdlib_bind(text)
-                                    .or_else(|| self.resolver.module_bind(text))
-                                    .map(|b| b.ty_table.clone())
-                            });
-                            // Symbols minted straight into the live table
-                            // (`export * as ns`'s namespace object) have no id
-                            // in any module's bind table; decode against live
-                            // as the last resort.
-                            let live_ty_table = self.resolver.ty_table_snapshot();
-                            let decode_source = |fid: crate::types::CheckerTyId| {
-                                let idx = fid.index() as usize;
-                                if let Some(t) = origin_ty_table.as_ref() {
-                                    if idx < t.len() {
-                                        return t;
-                                    }
-                                }
-                                if let Some(t) = exporter_ty_table.as_ref() {
-                                    if idx < t.len() {
-                                        return t;
-                                    }
-                                }
-                                &live_ty_table
-                            };
-                            let mut ty_cache = rustc_hash::FxHashMap::default();
-                            s.ty = s.ty.map(|t| {
-                                crate::types::Type(
-                                    self.ty_table.reintern(decode_source(t.0), t.0, &mut ty_cache),
-                                    t.1,
-                                )
-                            });
-                            s.type_param_constraints = s
-                                .type_param_constraints
-                                .into_iter()
-                                .map(|c| {
-                                    c.map(|t| {
-                                        crate::types::Type(
-                                            self.ty_table.reintern(
-                                                decode_source(t.0),
-                                                t.0,
-                                                &mut ty_cache,
-                                            ),
-                                            t.1,
-                                        )
-                                    })
-                                })
-                                .collect();
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;

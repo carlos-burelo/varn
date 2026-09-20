@@ -3,7 +3,6 @@ pub mod exports;
 pub mod graph;
 pub mod paths;
 pub mod resolver;
-pub mod stdlib;
 
 pub use cache::{deserialize_module_interface, serialize_module_interface, ExportMap};
 pub use graph::ModuleGraph;

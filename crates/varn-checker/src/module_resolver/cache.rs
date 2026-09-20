@@ -1,119 +1,512 @@
+//! Formato en disco de la interfaz de un módulo.
+//!
+//! Nada de lo que cruza esta frontera puede llevar un `CheckerTyId`: un `Type`
+//! solo significa algo en la `CheckerTyTable` que lo internó, y el proceso que
+//! escribe el caché no es el que lo lee. Por eso todo tipo viaja como
+//! [`PortableType`] (nombres + estructura, sin ids) y se re-interna en la tabla
+//! del lector. Ver `types/portable.rs` y `AGENTS.md` §§0–2.
+
 use crate::binder::{BindResult, Extensions, TypeMembers};
+use crate::module_resolver::ImportResolver;
 use crate::scope::{ScopeArena, ScopeId};
-use crate::symbol::{CacheableSymbol, Symbol, SymbolArena};
-use crate::types::Type;
+use crate::symbol::{Symbol, SymbolArena};
+use crate::types::{
+    decode_portable_type, encode_portable_type, CheckerTyTable, ClassMemberInfo, ClassMemberKind,
+    PortableType, Type,
+};
 use rustc_hash::FxHashMap;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use varn_core::AtomInterner;
+use varn_core::ast::operators::Visibility;
+use varn_core::{Atom, AtomInterner, TypeTag};
 
-pub type ExportMap = FxHashMap<String, crate::symbol::Symbol>;
+pub type ExportMap = FxHashMap<String, Symbol>;
 
 /// Not stored directly: [`CachedModule`] holds the on-disk twin
-/// ([`CacheableModule`]) instead, and this is only what callers get back
-/// after re-interning against the current session.
+/// ([`PortableModule`]) instead, and this is only what callers get back after
+/// re-interning against the current session.
 pub(super) struct CachedModule {
     pub exports: ExportMap,
     pub bind: BindResult,
 }
 
-/// On-disk form of [`CachedModule`]: every `Atom`-bearing piece (`Symbol`
-/// inside `exports`, `Symbol` inside `bind.arena`) resolved to text — see
-/// [`CacheableSymbol`] for why a raw `Atom` cannot cross this boundary.
-///
-/// The other `BindResult` fields (`class_methods`, `type_members`, ...) are
-/// already keyed by `Rc<str>`/text, so they serialize as-is; `BindResult`'s
-/// own `#[serde(skip)]` fields (`diagnostics`, `interner`, `core`,
-/// `pending_enrich`, `evolved_array_types`) are in-process-only and are
-/// rebuilt to their defaults on load, same as they already are when
-/// `BindResult` itself is (de)serialized directly.
+// ── Espejo portable de `Symbol` ───────────────────────────────────────────
+
+/// On-disk form of a `Symbol`: every `Atom` resolved to text and every `Type`
+/// encoded as a [`PortableType`]. It is also the in-memory crossing used by
+/// `binder/imports.rs`, so there is exactly one way a symbol crosses a module
+/// boundary — text for `Atom`, owner-table shape for `Type`, both re-interned
+/// into the reader.
 #[derive(serde::Serialize, serde::Deserialize)]
-struct CacheableModule {
-    exports: FxHashMap<String, CacheableSymbol>,
-    arena: Vec<CacheableSymbol>,
+pub(crate) struct PortableSymbol {
+    kind: crate::symbol::SymbolKind,
+    name: String,
+    ty: Option<PortableType>,
+    line: u32,
+    col: u32,
+    has_explicit_type: bool,
+    is_async: bool,
+    is_generator: bool,
+    doc: Option<String>,
+    type_params: Vec<String>,
+    type_param_constraints: Vec<Option<PortableType>>,
+    offset: u32,
+    origin_module: Option<String>,
+    re_export_path: Vec<String>,
+    original_name: Option<String>,
+    slot_idx: Option<usize>,
+    intrinsic_wire: Option<u8>,
+}
+
+/// Codifica `ty` contra la tabla que realmente lo internó: la del bind si el id
+/// está en rango, si no la del módulo que lo declara (`origin`), y como último
+/// recurso degrada a `Dynamic` (nunca indexar fuera de rango).
+///
+/// Necesario para los símbolos RE-EXPORTADOS: su `ty` pertenece al módulo
+/// declarante, no al que re-exporta, y por eso puede estar fuera de
+/// `bind.ty_table`.
+fn encode_with_owner(
+    ty: Type,
+    origin: Option<Atom>,
+    fallback_table: &CheckerTyTable,
+    resolver: Option<&dyn ImportResolver>,
+    interner: &AtomInterner,
+) -> PortableType {
+    // Preferir la tabla del módulo DECLARANTE: un símbolo re-exportado lleva
+    // ids de ese módulo, y su número puede caer dentro del rango del bind que
+    // re-exporta con otro significado.
+    if let (Some(module), Some(resolver)) =
+        (origin.and_then(|a| interner.try_resolve(a)), resolver)
+    {
+        if let Some(b) = resolver
+            .stdlib_bind(module)
+            .or_else(|| resolver.module_bind(module))
+        {
+            if (ty.0.index() as usize) < b.ty_table.len() {
+                return encode_portable_type(ty, &b.ty_table, interner);
+            }
+        }
+    }
+    if (ty.0.index() as usize) < fallback_table.len() {
+        return encode_portable_type(ty, fallback_table, interner);
+    }
+    PortableType::Intrinsic(TypeTag::Dynamic)
+}
+
+pub(crate) fn encode_symbol(
+    s: &Symbol,
+    bind_table: &CheckerTyTable,
+    interner: &AtomInterner,
+    resolver: Option<&dyn ImportResolver>,
+) -> PortableSymbol {
+    PortableSymbol {
+        kind: s.kind,
+        name: interner.resolve(s.name).to_string(),
+        ty: s
+            .ty
+            .map(|t| encode_with_owner(t, s.origin_module, bind_table, resolver, interner)),
+        line: s.line,
+        col: s.col,
+        has_explicit_type: s.has_explicit_type,
+        is_async: s.is_async,
+        is_generator: s.is_generator,
+        doc: s.doc.map(|a| interner.resolve(a).to_string()),
+        type_params: s
+            .type_params
+            .iter()
+            .map(|a| interner.resolve(*a).to_string())
+            .collect(),
+        type_param_constraints: s
+            .type_param_constraints
+            .iter()
+            .map(|c| {
+                c.map(|t| encode_with_owner(t, s.origin_module, bind_table, resolver, interner))
+            })
+            .collect(),
+        offset: s.offset,
+        origin_module: s.origin_module.map(|a| interner.resolve(a).to_string()),
+        re_export_path: s
+            .re_export_path
+            .iter()
+            .map(|a| interner.resolve(*a).to_string())
+            .collect(),
+        original_name: s.original_name.map(|a| interner.resolve(a).to_string()),
+        slot_idx: s.slot_idx,
+        intrinsic_wire: s.intrinsic_wire,
+    }
+}
+
+pub(crate) fn decode_symbol(
+    p: PortableSymbol,
+    table: &mut CheckerTyTable,
+    interner: &mut AtomInterner,
+) -> Symbol {
+    let ty = p
+        .ty
+        .as_ref()
+        .map(|t| decode_portable_type(t, table, interner));
+    let constraints = p
+        .type_param_constraints
+        .iter()
+        .map(|c| c.as_ref().map(|t| decode_portable_type(t, table, interner)))
+        .collect();
+    Symbol {
+        kind: p.kind,
+        name: interner.intern(&p.name),
+        ty,
+        line: p.line,
+        col: p.col,
+        has_explicit_type: p.has_explicit_type,
+        is_async: p.is_async,
+        is_generator: p.is_generator,
+        doc: p.doc.map(|s| interner.intern(&s)),
+        type_params: p.type_params.iter().map(|s| interner.intern(s)).collect(),
+        type_param_constraints: constraints,
+        offset: p.offset,
+        full_range: varn_core::SourceRange::default(),
+        origin_module: p.origin_module.map(|s| interner.intern(&s)),
+        re_export_path: p.re_export_path.iter().map(|s| interner.intern(s)).collect(),
+        original_name: p.original_name.map(|s| interner.intern(&s)),
+        alias_node: None,
+        slot_idx: p.slot_idx,
+        intrinsic_wire: p.intrinsic_wire,
+    }
+}
+
+// ── Espejo portable de `ClassMemberInfo` / `TypeMembers` ──────────────────
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PortableClassMemberInfo {
+    name: Rc<str>,
+    kind: ClassMemberKind,
+    is_async: bool,
+    is_generator: bool,
+    is_static: bool,
+    is_optional: bool,
+    line: u32,
+    col: u32,
+    offset: u32,
+    ty: PortableType,
+    members: Vec<PortableClassMemberInfo>,
+    visibility: Option<Visibility>,
+    is_abstract: bool,
+    is_readonly: bool,
+    is_override: bool,
+    is_builtin_or_intrinsic: bool,
+    symbol_id: Option<usize>,
+}
+
+fn encode_member(
+    m: &ClassMemberInfo,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+) -> PortableClassMemberInfo {
+    PortableClassMemberInfo {
+        name: m.name.clone(),
+        kind: m.kind,
+        is_async: m.is_async,
+        is_generator: m.is_generator,
+        is_static: m.is_static,
+        is_optional: m.is_optional,
+        line: m.line,
+        col: m.col,
+        offset: m.offset,
+        ty: encode_portable_type(m.ty, table, interner),
+        members: m
+            .members
+            .iter()
+            .map(|c| encode_member(c, table, interner))
+            .collect(),
+        visibility: m.visibility,
+        is_abstract: m.is_abstract,
+        is_readonly: m.is_readonly,
+        is_override: m.is_override,
+        is_builtin_or_intrinsic: m.is_builtin_or_intrinsic,
+        symbol_id: m.symbol_id,
+    }
+}
+
+fn decode_member(
+    p: &PortableClassMemberInfo,
+    table: &mut CheckerTyTable,
+    interner: &mut AtomInterner,
+) -> ClassMemberInfo {
+    ClassMemberInfo {
+        name: p.name.clone(),
+        kind: p.kind,
+        is_async: p.is_async,
+        is_generator: p.is_generator,
+        is_static: p.is_static,
+        is_optional: p.is_optional,
+        line: p.line,
+        col: p.col,
+        offset: p.offset,
+        ty: decode_portable_type(&p.ty, table, interner),
+        members: p
+            .members
+            .iter()
+            .map(|c| decode_member(c, table, interner))
+            .collect(),
+        visibility: p.visibility,
+        is_abstract: p.is_abstract,
+        is_readonly: p.is_readonly,
+        is_override: p.is_override,
+        is_builtin_or_intrinsic: p.is_builtin_or_intrinsic,
+        symbol_id: p.symbol_id,
+    }
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+struct PortableTypeMembers {
+    classes: FxHashMap<Rc<str>, PortableClassMemberInfo>,
+    interfaces: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
+    enums: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
+    namespaces: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
+    flattened: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
+    getters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
+    setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
+}
+
+fn encode_member_list(
+    list: &[ClassMemberInfo],
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+) -> Vec<PortableClassMemberInfo> {
+    list.iter().map(|m| encode_member(m, table, interner)).collect()
+}
+
+fn decode_member_list(
+    list: &[PortableClassMemberInfo],
+    table: &mut CheckerTyTable,
+    interner: &mut AtomInterner,
+) -> Vec<ClassMemberInfo> {
+    list.iter().map(|m| decode_member(m, table, interner)).collect()
+}
+
+fn encode_type_members(
+    tm: &TypeMembers,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+) -> PortableTypeMembers {
+    let encode_map = |src: &FxHashMap<Rc<str>, Vec<ClassMemberInfo>>| {
+        src.iter()
+            .map(|(k, v)| (k.clone(), encode_member_list(v, table, interner)))
+            .collect()
+    };
+    let encode_ty_map = |src: &FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>| {
+        src.iter()
+            .map(|(k, inner)| {
+                (
+                    k.clone(),
+                    inner
+                        .iter()
+                        .map(|(ik, t)| (ik.clone(), encode_portable_type(*t, table, interner)))
+                        .collect(),
+                )
+            })
+            .collect()
+    };
+    PortableTypeMembers {
+        classes: tm
+            .classes
+            .iter()
+            .map(|(k, v)| (k.clone(), encode_member(v, table, interner)))
+            .collect(),
+        interfaces: encode_map(&tm.interfaces),
+        enums: encode_map(&tm.enums),
+        namespaces: encode_map(&tm.namespaces),
+        flattened: encode_map(&tm.flattened),
+        getters: encode_ty_map(&tm.getters),
+        setters: encode_ty_map(&tm.setters),
+    }
+}
+
+fn decode_type_members(
+    p: &PortableTypeMembers,
+    table: &mut CheckerTyTable,
+    interner: &mut AtomInterner,
+) -> TypeMembers {
+    let mut classes = FxHashMap::default();
+    for (k, v) in &p.classes {
+        classes.insert(k.clone(), decode_member(v, table, interner));
+    }
+    let mut interfaces = FxHashMap::default();
+    for (k, v) in &p.interfaces {
+        interfaces.insert(k.clone(), decode_member_list(v, table, interner));
+    }
+    let mut enums = FxHashMap::default();
+    for (k, v) in &p.enums {
+        enums.insert(k.clone(), decode_member_list(v, table, interner));
+    }
+    let mut namespaces = FxHashMap::default();
+    for (k, v) in &p.namespaces {
+        namespaces.insert(k.clone(), decode_member_list(v, table, interner));
+    }
+    let mut flattened = FxHashMap::default();
+    for (k, v) in &p.flattened {
+        flattened.insert(k.clone(), decode_member_list(v, table, interner));
+    }
+    let mut getters = FxHashMap::default();
+    for (k, inner) in &p.getters {
+        let mut m = FxHashMap::default();
+        for (ik, t) in inner {
+            m.insert(ik.clone(), decode_portable_type(t, table, interner));
+        }
+        getters.insert(k.clone(), m);
+    }
+    let mut setters = FxHashMap::default();
+    for (k, inner) in &p.setters {
+        let mut m = FxHashMap::default();
+        for (ik, t) in inner {
+            m.insert(ik.clone(), decode_portable_type(t, table, interner));
+        }
+        setters.insert(k.clone(), m);
+    }
+    TypeMembers {
+        classes,
+        interfaces,
+        objects: FxHashMap::default(),
+        enums,
+        namespaces,
+        flattened,
+        getters,
+        setters,
+    }
+}
+
+// ── Módulo completo ───────────────────────────────────────────────────────
+
+/// On-disk form of [`CachedModule`].
+///
+/// `BindResult`'s in-process-only fields (`diagnostics`, `interner`, `core`,
+/// `pending_enrich`, `evolved_array_types`, `type_members.objects`) are
+/// `#[serde(skip)]` there too and are rebuilt to their defaults on load.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PortableModule {
+    exports: FxHashMap<String, PortableSymbol>,
+    arena: Vec<PortableSymbol>,
     scopes: ScopeArena,
     global_scope: ScopeId,
-    class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
-    type_members: TypeMembers,
+    class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
+    type_members: PortableTypeMembers,
     class_parents: FxHashMap<Rc<str>, Rc<str>>,
     source_file: Rc<str>,
     sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
     sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
-    sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
+    sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, PortableType)>>,
     extensions: Extensions,
 }
 
-impl CacheableModule {
-    /// Resolve every `Atom` in `exports`/`bind` against `interner` — the
-    /// `AtomInterner` of the session that produced them — into the owned
-    /// form that goes to disk.
-    fn from_live(exports: &ExportMap, bind: &BindResult, interner: &AtomInterner) -> Self {
+impl PortableModule {
+    /// Codifica `exports`/`bind` contra su propia tabla e interner.
+    fn from_live(
+        exports: &ExportMap,
+        bind: &BindResult,
+        interner: &AtomInterner,
+        resolver: Option<&dyn ImportResolver>,
+    ) -> Self {
+        let table = &bind.ty_table;
         Self {
             exports: exports
                 .iter()
-                .map(|(k, v)| (k.clone(), v.to_cacheable(interner)))
+                .map(|(k, v)| (k.clone(), encode_symbol(v, table, interner, resolver)))
                 .collect(),
             arena: bind
                 .arena
                 .all()
                 .iter()
-                .map(|s| s.to_cacheable(interner))
+                .map(|s| encode_symbol(s, table, interner, resolver))
                 .collect(),
             scopes: bind.scopes.clone(),
             global_scope: bind.global_scope,
-            class_methods: bind.class_methods.clone(),
-            type_members: bind.type_members.clone(),
+            class_methods: bind
+                .class_methods
+                .iter()
+                .map(|(k, inner)| {
+                    (
+                        k.clone(),
+                        inner
+                            .iter()
+                            .map(|(ik, t)| (ik.clone(), encode_portable_type(*t, table, interner)))
+                            .collect(),
+                    )
+                })
+                .collect(),
+            type_members: encode_type_members(&bind.type_members, table, interner),
             class_parents: bind.class_parents.clone(),
             source_file: bind.source_file.clone(),
             sum_type_variants: bind.sum_type_variants.clone(),
             sum_variant_parent: bind.sum_variant_parent.clone(),
-            sum_variant_fields: bind.sum_variant_fields.clone(),
+            sum_variant_fields: bind
+                .sum_variant_fields
+                .iter()
+                .map(|(k, fields)| {
+                    (
+                        k.clone(),
+                        fields
+                            .iter()
+                            .map(|(fname, t)| (fname.clone(), encode_portable_type(*t, table, interner)))
+                            .collect(),
+                    )
+                })
+                .collect(),
             extensions: bind.extensions.clone(),
         }
     }
 
-    /// Re-intern every text field against `interner` — the current session's
-    /// `AtomInterner`, distinct from whatever produced this cache entry — and
-    /// rebuild the scope-lookup tables (`CheckerScope::bindings`, itself
-    /// `#[serde(skip)]` for the same "raw `Atom` means nothing across
-    /// sessions" reason) from `arena` now that its names are valid `Atom`s
-    /// again.
+    /// Re-interna cada texto y cada tipo contra esta sesión, con una tabla
+    /// nueva: los ids decodificados son válidos en `bind.ty_table` y ninguna
+    /// otra. Reconstruye `CheckerScope::bindings` (que viaja vacío).
     fn into_live(self, interner: &mut AtomInterner) -> (ExportMap, BindResult) {
+        let mut table = CheckerTyTable::new();
         let exports = self
             .exports
             .into_iter()
-            .map(|(k, v)| (k, Symbol::from_cacheable(v, interner)))
+            .map(|(k, v)| (k, decode_symbol(v, &mut table, interner)))
             .collect();
         let mut arena = SymbolArena::default();
         for c in self.arena {
-            arena.push(Symbol::from_cacheable(c, interner));
+            arena.push(decode_symbol(c, &mut table, interner));
         }
         let mut scopes = self.scopes;
         rebuild_scope_bindings(&mut scopes, &arena);
+
+        let mut class_methods = FxHashMap::default();
+        for (k, inner) in &self.class_methods {
+            let mut m = FxHashMap::default();
+            for (ik, t) in inner {
+                m.insert(ik.clone(), decode_portable_type(t, &mut table, interner));
+            }
+            class_methods.insert(k.clone(), m);
+        }
+        let type_members = decode_type_members(&self.type_members, &mut table, interner);
+        let mut sum_variant_fields = FxHashMap::default();
+        for (k, fields) in &self.sum_variant_fields {
+            sum_variant_fields.insert(
+                k.clone(),
+                fields
+                    .iter()
+                    .map(|(fname, t)| {
+                        (fname.clone(), decode_portable_type(t, &mut table, interner))
+                    })
+                    .collect(),
+            );
+        }
+
         let bind = BindResult {
             arena,
             scopes,
             global_scope: self.global_scope,
             diagnostics: varn_core::DiagnosticBag::default(),
             interner: interner.clone(),
-            // KNOWN CAVEAT (see `CheckerTyId`'s serde derive doc in
-            // `types/interned.rs`): a bare `CheckerTyId` round-trips a
-            // number, not a type, without the table that produced it, and
-            // this cache format carries no such table. A fresh empty table
-            // is the honest placeholder — no `Type` reached through this
-            // `BindResult`'s cached fields (`class_methods`, `type_members`,
-            // `sum_variant_fields`, ...) should be treated as resolvable
-            // against it. Fixing this for real is out of this task's scope,
-            // same as when this caveat was first documented.
-            ty_table: crate::types::CheckerTyTable::default(),
-            class_methods: self.class_methods,
-            type_members: self.type_members,
+            ty_table: table,
+            class_methods,
+            type_members,
             class_parents: self.class_parents,
             source_file: self.source_file,
             sum_type_variants: self.sum_type_variants,
             sum_variant_parent: self.sum_variant_parent,
-            sum_variant_fields: self.sum_variant_fields,
+            sum_variant_fields,
             extensions: self.extensions,
             core: None,
             pending_enrich: Vec::new(),
@@ -145,8 +538,9 @@ pub fn serialize_module_interface(
     exports: &ExportMap,
     bind: &BindResult,
     interner: &AtomInterner,
+    resolver: Option<&dyn ImportResolver>,
 ) -> Result<Vec<u8>, String> {
-    let cached = CacheableModule::from_live(exports, bind, interner);
+    let cached = PortableModule::from_live(exports, bind, interner, resolver);
     postcard::to_allocvec(&cached).map_err(|e| e.to_string())
 }
 
@@ -154,90 +548,28 @@ pub fn deserialize_module_interface(
     bytes: &[u8],
     interner: &mut AtomInterner,
 ) -> Result<(ExportMap, BindResult), String> {
-    let cached: CacheableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
-    let (mut exports, mut bind) = cached.into_live(interner);
-    for s in exports.values_mut() {
-        sanitize_symbol_types(s);
-    }
-    for s in bind.arena.all_mut() {
-        sanitize_symbol_types(s);
-    }
-    for t in bind.class_methods.values_mut().flat_map(|m| m.values_mut()) {
-        *t = t.sanitize_foreign();
-    }
-    sanitize_type_members(&mut bind.type_members);
-    for fields in bind.sum_variant_fields.values_mut() {
-        for (_, t) in fields.iter_mut() {
-            *t = t.sanitize_foreign();
-        }
-    }
+    let cached: PortableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
+    let (mut exports, bind) = cached.into_live(interner);
     super::exports::assign_slots(&mut exports);
     Ok((exports, bind))
 }
 
-/// A cached `Type` is only trustworthy against `bind.ty_table`
-/// (`CacheableModule::into_live` seeds it to `CheckerTyTable::default()`,
-/// i.e. only the fixed intrinsic ids — see that function's own doc) — every
-/// non-intrinsic `CheckerTyId` a cache file carries came from a *different*
-/// `CheckerTyTable` (whatever session wrote it) and is meaningless here.
-/// `sanitize_foreign` degrades it to `Type::Dynamic` instead of either
-/// panicking (an out-of-range index) or silently resolving to whatever shape
-/// happens to sit at that index in the fresh table — honest-unknown beats
-/// wrong-but-plausible, same call the rest of the checker already makes for
-/// a type it can't determine (see `CheckerTyId::sanitize_foreign`'s doc).
-/// Re-run whenever a cache-loaded `Symbol`/`ClassMemberInfo` reaches a
-/// call site: NOT needed once the on-disk format carries a portable
-/// encoding, at which point this whole pass — and its performance cost on
-/// every cache hit — goes away.
-fn sanitize_symbol_types(s: &mut Symbol) {
-    if let Some(t) = s.ty.as_mut() {
-        *t = t.sanitize_foreign();
-    }
-    for t in s.type_param_constraints.iter_mut().flatten() {
-        *t = t.sanitize_foreign();
-    }
-}
-
-fn sanitize_class_member_info(m: &mut crate::types::ClassMemberInfo) {
-    m.ty = m.ty.sanitize_foreign();
-    for child in &mut m.members {
-        sanitize_class_member_info(child);
-    }
-}
-
-fn sanitize_type_members(tm: &mut TypeMembers) {
-    for v in tm.classes.values_mut() {
-        sanitize_class_member_info(v);
-    }
-    for list in tm
-        .interfaces
-        .values_mut()
-        .chain(tm.enums.values_mut())
-        .chain(tm.namespaces.values_mut())
-        .chain(tm.flattened.values_mut())
-    {
-        for v in list {
-            sanitize_class_member_info(v);
-        }
-    }
-    for t in tm
-        .getters
-        .values_mut()
-        .chain(tm.setters.values_mut())
-        .flat_map(|m| m.values_mut())
-    {
-        *t = t.sanitize_foreign();
-    }
-}
-
-pub(super) fn compute_source_hash(source: &str) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    source.hash(&mut hasher);
-    hasher.finish()
-}
-
 pub(super) fn get_cache_dir(resolver: &super::DiskResolver) -> PathBuf {
     resolver.types_cache_dir()
+}
+
+/// The canonical identity for a cache entry: a `std:`/`core:`/`runtime:`
+/// specifier or an absolute path. One function, so the checker and the
+/// compiler name the same module the same way.
+fn cache_module_id(virtual_id: &str) -> varn_core::ModuleId {
+    if virtual_id.starts_with("std:")
+        || virtual_id.starts_with("core:")
+        || virtual_id.starts_with("runtime:")
+    {
+        varn_core::ModuleId::stdlib(virtual_id)
+    } else {
+        varn_core::ModuleId::local_str(virtual_id)
+    }
 }
 
 pub(super) fn try_load_cache(
@@ -245,15 +577,12 @@ pub(super) fn try_load_cache(
     virtual_id: &str,
     source: &str,
 ) -> Option<CachedModule> {
-    // Reads disabled: the on-disk interface carries no portable encoding for a
-    // `CheckerTyId`, so `deserialize_module_interface` degrades every
-    // non-intrinsic type to `Dynamic` (see its own doc). A module served from
-    // this cache therefore has *different* (weaker, and inconsistent between
-    // runs that do and do not hit the cache) member types than the same module
-    // bound from source — the checker then reports spurious missing-member
-    // errors depending on whether a previous run warmed the cache. Writes are
-    // kept (they are inert) so the artifact format keeps being exercised;
-    // re-enable reads once a module interface can encode a type portably.
+    // Lecturas deshabilitadas: un mismo `(ModuleId, fingerprint)` puede
+    // corresponder a binds distintos según de dónde vino la fuente (árbol vs
+    // bundle embebido), así que la interfaz cacheada no es todavía una verdad
+    // equivalente a la fuente. `AGENTS.md` Ley 8 / ADR-0011: la fuente es la
+    // única verdad; el store canónico sigue usándose para ESCRIBIR y queda
+    // listo para re-habilitar lecturas cuando la interfaz sea equivalente.
     let _ = (resolver, virtual_id, source);
     None
 }
@@ -268,31 +597,18 @@ pub(super) fn save_to_cache(
     if virtual_id == "core:types" {
         return;
     }
-    let hash = compute_source_hash(source);
-    let cache_dir = get_cache_dir(resolver);
-    let _ = std::fs::create_dir_all(&cache_dir);
-    let name = if virtual_id.contains(':') {
-        virtual_id.replace(':', "_")
-    } else {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        virtual_id.hash(&mut hasher);
-        format!("file_{:x}", hasher.finish())
-    };
-
-    let cache_file = cache_dir.join(format!(
-        "{}.{:x}.{:08x}.vnm",
-        name,
-        hash,
-        varn_modules::artifact::cache_key()
-    ));
+    let id = cache_module_id(virtual_id);
+    let fingerprint = varn_modules::artifact::source_fingerprint(source);
     let interner = resolver.interner_snapshot();
-    if let Ok(payload) = serialize_module_interface(exports, bind, &interner) {
-        let bytes = varn_modules::artifact::write_artifact(
+    if let Ok(payload) =
+        serialize_module_interface(exports, bind, &interner, Some(&*resolver as &dyn ImportResolver))
+    {
+        varn_modules::artifact::write_module_artifact(
+            &get_cache_dir(resolver),
             varn_modules::artifact::ArtifactKind::CheckerInterface,
-            varn_modules::artifact::ArtifactClass::Cache,
+            &id,
+            fingerprint,
             &payload,
         );
-        let _ = varn_modules::artifact::write_artifact_file(&cache_file, &bytes);
-        varn_modules::artifact::prune_superseded(&cache_file);
     }
 }

@@ -346,42 +346,34 @@ impl<'r> Checker<'r> {
         crate::core::merge_core_members(&mut bind, resolver);
         profile.merge_core_members = started.elapsed();
 
+        // `Binder::bind` (and the nested binds it resolves) mints `Atom`s and
+        // `CheckerTyId`s after `bind` took its snapshot, so both can be behind
+        // the live tables by now. `enrich_call_returns` resolves names and
+        // reads types off `bind`, so refresh BOTH here — otherwise
+        // `infer_call_type` resolves an atom past the end of `bind.interner`
+        // (observed as `index out of bounds: the len is 335 but the index is
+        // 335` when checking a core module on the runtime path).
+        bind.interner = resolver.interner_snapshot();
+        let live_ty_table = resolver.ty_table_snapshot();
+        if live_ty_table.len() > bind.ty_table.len() {
+            bind.ty_table.absorb(&live_ty_table);
+        }
+
         let started = Instant::now();
         enrich_call_returns(&mut bind, ast_arena, resolver);
         profile.enrich_call_returns = started.elapsed();
 
         let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());
 
-        // Same reasoning as the unconditional `interner` refresh above,
-        // mirrored for `CheckerTyId`: a sibling core/stdlib module bound
-        // earlier in the same `compile_stdlib_bundle` loop can have grown
-        // and published a bigger live `CheckerTyTable` than what `bind`
-        // carries (its own snapshot is only as fresh as when *this*
-        // module's `Binder::bind` started).
-        //
-        // Merge, don't replace: a nested import bound *during* this bind
-        // grew the live table independently from this bind's own snapshot,
-        // so the two can disagree past their common prefix (same index,
-        // different shape). Adopting live wholesale would repoint every id
-        // this bind already minted — e.g. an interface's `Named` suddenly
-        // reading as whatever the nested module interned at that index.
-        // `absorb` keeps every local meaning and only learns the shapes
-        // live has that this table lacks (dedup shares the rest).
+        // `enrich_call_returns` may itself have triggered nested binds
+        // (`resolver` calls), so re-adopt live one more time before the
+        // checker starts: `absorb` keeps this bind's own id meanings and only
+        // learns shapes it lacks (see the pre-enrich block above), and the
+        // interner refresh is lossless for the same reason.
         let live_ty_table = resolver.ty_table_snapshot();
         if live_ty_table.len() > bind.ty_table.len() {
             bind.ty_table.absorb(&live_ty_table);
         }
-
-        // Same staleness, mirrored for `Atom`: nested imports bound during
-        // `Binder::bind` / `merge_core_members` / `enrich_call_returns` publish
-        // new atoms to the resolver's live table *after* the binder's last
-        // local mint, so `bind.interner` (a snapshot) can be behind the live
-        // table by the time checking starts. Any `Type` built from a
-        // later-bound module then carries an `Atom` this snapshot cannot
-        // resolve — `index out of bounds` in member lookups, diagnostics, and
-        // the compat engine. Adopting the live snapshot unconditionally is
-        // lossless (same prefix guarantee as above: `intern` never renumbers,
-        // so every atom this bind minted still resolves to the same text).
         bind.interner = resolver.interner_snapshot();
         let started = Instant::now();
         let mut checker = Checker {

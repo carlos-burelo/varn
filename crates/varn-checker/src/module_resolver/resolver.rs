@@ -134,14 +134,18 @@ pub trait ImportResolver {
     }
 }
 
-/// The resolver that reads modules from disk (or from the active stdlib
-/// provider) and memoizes them in a [`ModuleGraph`] it owns.
+/// The resolver that reads modules through the canonical
+/// [`varn_modules::loader::ModuleRegistry`] (filesystem + builtins/std provider)
+/// and memoizes them in a [`ModuleGraph`] it owns.
 ///
 /// One of these per workspace. The `RefCell` is an implementation detail of an
 /// object whose lifetime the caller controls — not a process-lifetime global —
 /// which is the whole difference from what this replaces.
-#[derive(Default)]
 pub struct DiskResolver {
+    /// The single loader: source for every module (file, bundle, provider)
+    /// comes from here. This resolver does not read files or talk to the
+    /// provider itself — see ADR-0011.
+    loader: varn_modules::loader::ModuleRegistry,
     graph: RefCell<ModuleGraph>,
     /// Modules whose binding is currently on the stack. Used to break
     /// mutual-import deadlocks when a module's body imports a peer that then
@@ -168,9 +172,30 @@ pub struct DiskResolver {
     ty_table: RefCell<crate::types::CheckerTyTable>,
 }
 
+impl Default for DiskResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiskResolver {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            loader: varn_modules::loader::default_registry(),
+            graph: RefCell::default(),
+            in_flight: RefCell::default(),
+            core_exports: RefCell::default(),
+            core_members: RefCell::default(),
+            interner: RefCell::default(),
+            ty_table: RefCell::default(),
+        }
+    }
+
+    /// The one way this resolver obtains a module's source or precomputed
+    /// artifacts.
+    fn load_source(&self, id: &ModuleId) -> Option<varn_modules::loader::ModuleSource> {
+        use varn_modules::loader::ModuleLoader;
+        self.loader.source(id).ok()
     }
 
     /// A clone of the compilation's `Atom` table as of now. Cheap relative to
@@ -200,7 +225,7 @@ impl DiskResolver {
     /// Appending (dedup-by-text) keeps live append-only and every already-
     /// minted index stable; symbols carrying a diverged binder's local atom
     /// still resolve through that binder's own interner for cross-module
-    /// reads (the `to_cacheable`/`from_cacheable` text round-trip).
+    /// reads (the `cache::encode_symbol`/`decode_symbol` text round-trip).
     pub fn set_interner(&self, interner: varn_core::AtomInterner) {
         let mut live = self.interner.borrow_mut();
         if interner.len() <= live.len() {
@@ -388,9 +413,10 @@ impl DiskResolver {
             );
         }
 
-        let Ok(source) = std::fs::read_to_string(abs_path) else {
+        let Some(source) = self.load_source(&ModuleId::local_str(abs_path)) else {
             return ExportMap::default();
         };
+        let source = source.text;
         let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(&source, abs_path)
         else {
             return ExportMap::default();
@@ -415,29 +441,7 @@ impl DiskResolver {
         )
     }
 
-    // ── stdlib carriers ──────────────────────────────────────────────────
-
-    fn load_from_interface_blob(
-        &self,
-        specifier: &str,
-        key: &str,
-    ) -> Option<(Rc<ExportMap>, Rc<BindResult>)> {
-        let provider = varn_modules::provider::get()?;
-        let blob = provider.interface_blob(specifier)?;
-        let mut interner = self.interner_snapshot();
-        let result = super::cache::deserialize_module_interface(blob, &mut interner);
-        self.set_interner(interner);
-        match result {
-            Ok((exports, bind)) => {
-                let exports = Rc::new(exports);
-                let bind = Rc::new(bind);
-                self.store_exports(key.to_owned(), Rc::clone(&exports));
-                self.store_bind(key.to_owned(), Rc::clone(&bind));
-                Some((exports, bind))
-            }
-            Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
-        }
-    }
+    // ── carga de stdlib (a través del loader único) ──────────────────────
 
     fn exports_from_embedded(
         &self,
@@ -560,7 +564,10 @@ impl ImportResolver for DiskResolver {
             }
         }
 
-        let source = std::fs::read_to_string(&canonical).ok()?;
+        let Some(source) = self.load_source(&ModuleId::local_str(&canonical)) else {
+            return None;
+        };
+        let source = source.text;
 
         if let Some(cached) = super::cache::try_load_cache(self, &canonical, &source) {
             let bind_rc = Rc::new(cached.bind);
@@ -629,13 +636,11 @@ impl ImportResolver for DiskResolver {
             return None;
         }
 
-        match super::stdlib::stdlib_carrier(specifier)? {
-            super::stdlib::Carrier::Blob => self
-                .load_from_interface_blob(specifier, &key)
-                .map(|(_, b)| b),
-            super::stdlib::Carrier::Embedded(source) => self.bind_from_embedded(specifier, source),
-            super::stdlib::Carrier::File(abs) => self.module_bind(&abs),
-        }
+        let source = self.load_source(&ModuleId::stdlib(specifier))?;
+        // SOURCE es la verdad; la interfaz precompilada es una optimización
+        // (ver ADR-0011). Se carga desde texto siempre que exista, para que el
+        // checker y el VM vean las mismas bytes para el mismo `ModuleId`.
+        self.bind_from_embedded(specifier, source.text.as_ref())
     }
 
     fn stdlib_exports(&self, specifier: &str) -> Rc<ExportMap> {
@@ -644,18 +649,15 @@ impl ImportResolver for DiskResolver {
             return cached;
         }
 
-        let result = match super::stdlib::stdlib_carrier(specifier) {
-            Some(super::stdlib::Carrier::Blob) => self
-                .load_from_interface_blob(specifier, &key)
-                .map(|(e, _)| e),
-            Some(super::stdlib::Carrier::Embedded(source)) => {
-                Some(self.exports_from_embedded(specifier, source, &mut Vec::new()))
-            }
-            Some(super::stdlib::Carrier::File(abs)) => {
-                Some(self.module_exports(&abs, &mut Vec::new()))
-            }
-            None => None,
-        };
+        let result = self
+            .load_source(&ModuleId::stdlib(specifier))
+            .map(|source| {
+                self.exports_from_embedded(
+                    specifier,
+                    source.text.as_ref(),
+                    &mut Vec::new(),
+                )
+            });
 
         match result {
             Some(exports) => {

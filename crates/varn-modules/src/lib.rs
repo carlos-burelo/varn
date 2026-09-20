@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod bundle;
+pub mod loader;
 pub mod provider;
 pub mod resolver;
 pub mod spec;

@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use varn_core::ModuleId;
+
 pub const ENV_DIR_NAME: &str = ".vn";
 pub const CACHE_DIR_NAME: &str = "cache";
 pub const BYTECODE_DIR_NAME: &str = "bytecode";
@@ -328,6 +330,87 @@ pub fn get_bytecode_cache_dir(project_root: &Path) -> PathBuf {
 
 pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
     get_cache_dir(project_root).join(TYPES_DIR_NAME)
+}
+
+// ---------------------------------------------------------------------------
+// Canonical per-module artifact store (ADR-0011).
+//
+// One key, one location scheme, one read/write pair for EVERY artifact that
+// belongs to a module: the checker interface, a compiled prototype, and any
+// future one. Keyed by the module's identity plus a fingerprint of its source,
+// never by a mangled path string — the previous scheme (`name.hash.key.vnm`)
+// made each consumer invent its own naming and could collide or go stale
+// independently.
+// ---------------------------------------------------------------------------
+
+/// Stable fingerprint of a module's source text.
+///
+/// `DefaultHasher::new()` uses fixed keys, so the value is identical across
+/// runs (unlike `RandomState`); it is a cache key, not a security hash.
+pub fn source_fingerprint(source: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut h);
+    h.finish()
+}
+
+/// Canonical cache key for a module artifact: identity + source fingerprint.
+/// Shared by every per-module cache (checker interface, compiled prototype) so
+/// there is one naming scheme, not one per consumer (ADR-0011).
+pub fn module_key(id: &ModuleId, fingerprint: u64) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    id.hash(&mut h);
+    format!("{:016x}_{:016x}", h.finish(), fingerprint)
+}
+
+/// Where a module artifact lives. `dir` is the artifact root (normally
+/// `get_types_cache_dir`/`get_bytecode_cache_dir`); `kind` separates the
+/// artifact family so an interface never overwrites a prototype.
+pub fn module_artifact_path(
+    dir: &Path,
+    kind: ArtifactKind,
+    id: &ModuleId,
+    fingerprint: u64,
+) -> PathBuf {
+    dir.join(format!(
+        "{}_{}.vnm",
+        kind as u16,
+        module_key(id, fingerprint)
+    ))
+}
+
+/// Persist `payload` for `(id, fingerprint, kind)`, wrapping it with the
+/// artifact envelope (schema/producer validity) and pruning superseded
+/// generations. Best-effort like the rest of the cache.
+pub fn write_module_artifact(
+    dir: &Path,
+    kind: ArtifactKind,
+    id: &ModuleId,
+    fingerprint: u64,
+    payload: &[u8],
+) {
+    let path = module_artifact_path(dir, kind, id, fingerprint);
+    if std::fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    let bytes = write_artifact(kind, ArtifactClass::Cache, payload);
+    if write_artifact_file(&path, &bytes).is_ok() {
+        prune_superseded(&path);
+    }
+}
+
+/// Read a module artifact back, validating the envelope. `None` when absent,
+/// from another schema/producer, or unreadable — the caller rebuilds.
+pub fn read_module_artifact(
+    dir: &Path,
+    kind: ArtifactKind,
+    id: &ModuleId,
+    fingerprint: u64,
+) -> Option<Vec<u8>> {
+    let path = module_artifact_path(dir, kind, id, fingerprint);
+    let bytes = std::fs::read(path).ok()?;
+    read_artifact(kind, &bytes).ok().map(|p| p.to_vec())
 }
 
 fn dirs_home() -> Option<PathBuf> {

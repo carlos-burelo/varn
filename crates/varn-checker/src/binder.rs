@@ -219,10 +219,10 @@ impl<'r> Binder<'r> {
     /// The "adopt live if it's grown past us" half of [`Self::intern_local`],
     /// exposed on its own for a caller that's about to mint several atoms at
     /// once through code that doesn't go through `intern_local` itself (e.g.
-    /// `Symbol::from_cacheable`'s several `interner.intern(text)` calls when
+    /// `cache::decode_symbol`'s several `interner.intern(text)` calls when
     /// rehydrating an imported symbol, `binder/imports.rs`) — one resync
     /// before the batch is enough, since nothing publishes to the live table
-    /// *during* that batch (no resolver calls inside `from_cacheable`).
+    /// *during* that batch (no resolver calls inside `decode_symbol`).
     pub(crate) fn resync_interner(&mut self) {
         if self.resolver.interner_len() > self.interner.len() {
             self.interner = self.resolver.interner_snapshot();

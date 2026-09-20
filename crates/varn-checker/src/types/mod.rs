@@ -4,11 +4,16 @@ mod context;
 mod display;
 pub mod interned;
 mod object_member_impl;
+mod portable;
 mod type_impl;
 
 pub use async_fn::{async_fn_return, awaited, generator_of, is_awaitable};
 pub use interned::{
     CheckerTyId, CheckerTyTable, FunctionTypeId, InternedTypeKind, ObjectMembersId, TyListId,
+};
+pub use portable::{
+    decode as decode_portable_type, encode as encode_portable_type, PortableFunction,
+    PortableObjectMember, PortableParam, PortableType,
 };
 
 use rustc_hash::FxHashMap;
