@@ -106,13 +106,24 @@ pub(super) fn declare(
             } else {
                 false
             };
+            let class = proto
+                .register_meta
+                .get(r)
+                .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind))
+                .unwrap_or(varn_types::register_meta::SlotClass::Dyn);
             let ty = if is_param_float || meta_is_float(&proto.register_meta, r) {
                 types::F64
+            } else if class == varn_types::register_meta::SlotClass::Ref {
+                // A `Ref` register carries the whole `VmValue` (tag+payload) in
+                // its variable, so `null` stays distinguishable from a heap
+                // index and consumers read it without a home round-trip.
+                types::I128
             } else {
                 types::I64
             };
             let v = b.declare_var(ty);
-            // Floats are never GC references.
+            // Floats and the I128 pair are not stack-mapped; GC roots go
+            // through the home slots (live_boxed flush/reload).
             if want_roots && ty == types::I64 {
                 b.declare_var_needs_stack_map(v);
             }

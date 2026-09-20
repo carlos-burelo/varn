@@ -12,6 +12,7 @@ use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
     box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool, def_const_int,
+    dest_is_ref,
     emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
     use_boxed, use_f64, use_int,
 };
@@ -68,7 +69,14 @@ pub(crate) fn dispatch_opcode(
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;
             let c = *constants.get(idx).ok_or("clif: constant index")?;
-            if meta_is_float(&proto.register_meta, first_reg) {
+            let dest_ref = dest_is_ref(&proto.register_meta, first_reg);
+            if dest_ref {
+                // A `Ref` variable holds the whole VmValue.
+                let tag_v = b.ins().iconst(types::I64, c.raw_tag() as i64);
+                let payload_v = b.ins().iconst(types::I64, c.raw_payload() as i64);
+                let pair = b.ins().iconcat(tag_v, payload_v);
+                b.def_var(vars[first_reg], pair);
+            } else if meta_is_float(&proto.register_meta, first_reg) {
                 let f = if c.is_f64() {
                     b.ins().f64const(c.as_f64())
                 } else if c.is_int() {
@@ -92,7 +100,12 @@ pub(crate) fn dispatch_opcode(
             }
         }
         OpCode::LoadNull => {
-            def_const(b, vars, first_reg, 0);
+            if dest_is_ref(&proto.register_meta, first_reg) {
+                let null_val = super::super::emit::box_null(b);
+                b.def_var(vars[first_reg], null_val);
+            } else {
+                def_const(b, vars, first_reg, 0);
+            }
             if let Some(actx) = actx {
                 let null_val = super::super::emit::box_null(b);
                 alloc::store_boxed_home(b, actx, first_reg, null_val);
@@ -112,34 +125,24 @@ pub(crate) fn dispatch_opcode(
                 );
             }
             if first_reg < vars.len() && src < vars.len() {
-                // Some(v) means boxing already computed (needed for def_var anyway).
-                // None defers box_or_pass to the if-actx block so non-frame-aware
-                // functions don't emit dead boxing instructions.
-                let preboxed: Option<cranelift_codegen::ir::Value> =
-                    if dest_is_float && !src_is_float {
-                        let v = if let Some(actx) = actx {
-                            alloc::box_or_load_home(b, actx, state, src)
-                        } else {
-                            box_or_pass(b, vars, state, src)
-                        };
-                        let f = unbox_f64_coerce(b, v);
-                        b.def_var(vars[first_reg], f);
-                        Some(v)
-                    } else if !dest_is_float && src_is_float {
-                        let f = b.use_var(vars[src]);
-                        let boxed = box_f64(b, f);
-                        let (_tag, payload) = b.ins().isplit(boxed);
-                        b.def_var(vars[first_reg], payload);
-                        Some(boxed)
-                    } else {
-                        let v = b.use_var(vars[src]);
-                        b.def_var(vars[first_reg], v);
-                        None
-                    };
                 if let Some(actx) = actx {
-                    let val =
-                        preboxed.unwrap_or_else(|| alloc::box_or_load_home(b, actx, state, src));
-                    alloc::store_boxed_home(b, actx, first_reg, val);
+                    // Representation-agnostic: materialize the source as a boxed
+                    // VmValue and let `def_result` store it in the destination's
+                    // class (int/float/ref/dyn), handling the pair for `Ref`.
+                    let val = alloc::box_or_load_home(b, actx, state, src);
+                    alloc::def_result(b, actx, first_reg, val);
+                } else if dest_is_float && !src_is_float {
+                    let v = box_or_pass(b, vars, state, src);
+                    let f = unbox_f64_coerce(b, v);
+                    b.def_var(vars[first_reg], f);
+                } else if !dest_is_float && src_is_float {
+                    let f = b.use_var(vars[src]);
+                    let boxed = box_f64(b, f);
+                    let (_tag, payload) = b.ins().isplit(boxed);
+                    b.def_var(vars[first_reg], payload);
+                } else {
+                    let v = b.use_var(vars[src]);
+                    b.def_var(vars[first_reg], v);
                 }
             }
         }

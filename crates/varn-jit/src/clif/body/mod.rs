@@ -18,7 +18,7 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
-    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_int,
+    box_for_target, box_or_pass, call_helper, dest_is_ref, meta_is_float, meta_is_int, unbox_int,
 };
 use super::fields;
 use super::floats;
@@ -134,13 +134,19 @@ pub(super) fn lower_raw(
 
     let zero = b.ins().iconst(types::I64, 0);
     let zero_f = b.ins().f64const(0.0);
+    // A `Ref` variable is an I128 pair; initialize it to the null VmValue.
+    let null_tag = b.ins().iconst(types::I64, 0);
+    let null_payload = b.ins().iconst(types::I64, 0);
+    let null_pair = b.ins().iconcat(null_tag, null_payload);
     for (r, v) in vars.iter().enumerate() {
         let is_param_float = if r >= 1 && r <= proto.param_kinds.len() {
             proto.param_kinds.get(r - 1) == Some(&SlotKind::Float)
         } else {
             false
         };
-        if is_param_float || meta_is_float(&proto.register_meta, r) {
+        if dest_is_ref(&proto.register_meta, r) {
+            b.def_var(*v, null_pair);
+        } else if is_param_float || meta_is_float(&proto.register_meta, r) {
             b.def_var(*v, zero_f);
         } else {
             b.def_var(*v, zero);
@@ -212,7 +218,22 @@ pub(super) fn lower_raw(
         let p = b.block_params(entry)[param_idx];
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
             || meta_is_float(&proto.register_meta, r);
-        if is_float {
+        let is_ref = proto
+            .register_meta
+            .get(r)
+            .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind))
+            == Some(varn_types::register_meta::SlotClass::Ref);
+        if is_ref {
+            // A `Ref` register carries the whole VmValue; the home slot already
+            // holds it (written by `materialize_frame`/`jit_prepare_static_call`
+            // before entry), so read it back rather than the raw param word.
+            if let Some(ref actx) = actx {
+                let home = alloc::load_home(&mut b, actx, r);
+                b.def_var(vars[r], home);
+            } else {
+                b.def_var(vars[r], p);
+            }
+        } else if is_float {
             b.def_var(vars[r], p);
         } else if proto.param_kinds.get(i) == Some(&SlotKind::Int) && actx.is_some() {
             let un = unbox_int(&mut b, p);
@@ -381,6 +402,9 @@ pub(super) fn lower_raw(
         }
         if want_roots {
             b.set_srcloc(cranelift_codegen::ir::SourceLoc::new(ip as u32));
+        }
+        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+            eprintln!("OPIP {ip} {op:?} dst={first_reg} state_dst={:?}", state.get(first_reg));
         }
 
         match op {

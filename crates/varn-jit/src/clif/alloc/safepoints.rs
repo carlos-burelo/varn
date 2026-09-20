@@ -374,12 +374,9 @@ pub(crate) fn box_or_load_home(
     match class {
         SlotClass::Gpr => super::super::emit::box_int(b, raw),
         SlotClass::Fpr => super::super::emit::box_f64(b, raw),
-        // A `Ref` register can hold `null` (a `Ref`-classed register is reused
-        // for a nullable value: `cur = cur.next`). The variable carries only the
-        // payload there, so reconstructing the tag as HEAP makes `null` read as
-        // a heap ref (`IsNull(null) == false`). The home slot is authoritative
-        // (it encodes null as `REF_UNINIT`), so read it back.
-        SlotClass::Ref => load_home(b, actx, r),
+        // A `Ref` variable holds the whole `VmValue` (tag+payload) — no home
+        // round-trip needed.
+        SlotClass::Ref => b.use_var(var),
         SlotClass::Dyn => match state.get(r).copied().unwrap_or(K::Unset) {
             K::Int => super::super::emit::box_int(b, raw),
             K::Bool => super::super::emit::box_bool(b, raw),
@@ -451,7 +448,24 @@ pub(crate) fn def_result(
             std::panic::Location::caller()
         );
     }
-    if meta_is_float(actx.register_meta, dest) {
+    let dest_class = varn_types::register_meta::SlotClass::of_kind(
+        actx.register_meta
+            .get(dest)
+            .map(|m| m.kind)
+            .unwrap_or(varn_types::register_meta::SlotKind::Dynamic),
+    );
+    if dest_class == varn_types::register_meta::SlotClass::Ref {
+        // The Ref variable carries the whole VmValue.
+        let pair = if b.func.dfg.value_type(res) == types::I128 {
+            res
+        } else {
+            let tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            b.ins().iconcat(tag, res)
+        };
+        b.def_var(actx.vars[dest], pair);
+    } else if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
     } else {
@@ -551,7 +565,16 @@ pub(crate) fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K],
 pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
     for &r in regs {
         let v = load_home(b, actx, r);
-        if meta_is_float(actx.register_meta, r) {
+        let class = varn_types::register_meta::SlotClass::of_kind(
+            actx.register_meta
+                .get(r)
+                .map(|m| m.kind)
+                .unwrap_or(varn_types::register_meta::SlotKind::Dynamic),
+        );
+        if class == varn_types::register_meta::SlotClass::Ref {
+            // Ref variables hold the whole VmValue.
+            b.def_var(actx.vars[r], v);
+        } else if meta_is_float(actx.register_meta, r) {
             let f = unbox_f64_coerce(b, v);
             b.def_var(actx.vars[r], f);
         } else {
