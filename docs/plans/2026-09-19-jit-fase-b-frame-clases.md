@@ -15,12 +15,21 @@ Habilitado además: `Call` (vía `clif_call_fallback` → `call_vm_window`),
 Todos leen/escriben los homes por `FrameStore` (act_id + registro).
 
 Pendiente (fase B completa):
-- **`Ref`** (mayoría de bails restantes): `register_meta` no es autoritativo para
-  todo registro — p.ej. `TaskGroupImpl._runFinally` escribe un `bool` por un
-  registro `Ref` (`def_result` con `KIND_BOOL`), que `set_addr` rechaza. Hay que
-  reconciliar la procedencia de clase (checker/regalloc) para quitar el baile.
-- **generator/async**: falta la maquinaria de suspensión/reanudación en el
-  lowering por clases.
+- **`Ref`** (mayoría de bails restantes). Ya corregido el bug de layout que lo
+  hacía inviable: `InstanceData` es **compacto** (`class_field_repr`) pero el
+  inline de campos y el constructor inline del JIT seguían usando stride 16B;
+  las instancias ahora van al helper compact-aware y los `Object` dinámicos
+  conservan el inline. El resto del bloqueo es de **procedencia `K`/
+  `register_meta`**: la lattice `K` (flujo) y `register_meta` (meet por SSA)
+  pueden discrepar en un registro — `Cons.length`'s `Move r2 = r6` acaba
+  boxeando el payload de un campo `Ref` como `bool` y `set_addr` lo rechaza.
+  Arreglar eso (que un registro `Ref` sostenga siempre un ref, y `typed()`/los
+  emisores coincidan) desbloquea clases/objetos/arrays/mapas/métodos.
+- **Llamada nativa directa** compiled→compiled: hoy `Call` cruza a Rust
+  (`call_vm_window` + `run_until`). Restaurar el frame push inline + wrapper, o
+  bajar de SSA con ABI por clase, es lo que lleva la ejecución a máquina nativa.
+- **Homes inline** `(clase, base+idx)` en vez de `home_store`/`home_load`.
+- **generator/async**: suspensión/reanudación por clases.
 - `CallSpread`, `InvokeRuntimeStatic`: sin migrar.
 
 Este documento fija el contrato y el orden de commits atómicos.
