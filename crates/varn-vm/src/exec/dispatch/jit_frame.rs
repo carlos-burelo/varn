@@ -14,10 +14,17 @@
 //! boundary. [`JitFrameOutcome`] carries the decision back out instead, so the
 //! caller performs the jump and this module stays honest about the fact that
 //! there are four endings, not one.
+//!
+//! Fase B: the register file is a partitioned [`crate::frame_store::FrameStore`],
+//! so the compiled entry no longer receives a contiguous stack pointer; each
+//! register's home is addressed by `FrameStore` (the activation id travels as
+//! the JIT's `base`). The frame pop/push reconciliation goes through
+//! `FrameStore::pop_frame` and `unbox_into_reg`.
 
 use super::ExecCtx;
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
+use crate::exec::frame_ctrl::{resolve_constructor_return, unwind_to_handler};
 use crate::value::VmValue;
 
 /// How a compiled frame ended, as an instruction to the frame loop.
@@ -43,6 +50,51 @@ impl JitFrameOutcome {
     }
 }
 
+/// Run one clif frame under its OWN jump buffer.
+///
+/// `base` is the `FrameStore` activation id of the running frame. The JIT's
+/// first ABI word (`stack_ptr`) is unused by the lowering now and is passed
+/// null; the frame's registers live in `FrameStore`, reached from the entry
+/// helpers.
+#[inline(never)]
+unsafe fn execute_jit_frame(
+    ctx: *mut ExecCtx,
+    jit_fn: varn_jit::JitFn,
+    closure_ptr: *const VmClosure,
+    base: usize,
+) -> Result<VmValue, i32> {
+    let saved = (*ctx).jit_jmp_buf;
+    let is_outer = saved.is_null();
+    let mut jmp_buf = crate::exec::ctx::JmpBuf::default();
+    let jmp_res = std::hint::black_box(crate::exec::ctx::my_setjmp(&mut jmp_buf));
+
+    if jmp_res == 0 {
+        (*ctx).jit_jmp_buf = &mut jmp_buf as *mut crate::exec::ctx::JmpBuf;
+        if is_outer {
+            (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf;
+        }
+        (*ctx).jit_frame_prepushed = 1;
+        let val = (jit_fn)(
+            std::ptr::null_mut(),
+            closure_ptr as *const std::ffi::c_void,
+            base,
+            ctx as *mut std::ffi::c_void,
+        );
+        std::hint::black_box(ctx);
+        (*ctx).jit_jmp_buf = saved;
+        if is_outer {
+            (*ctx).jit_suspend_buf = std::ptr::null_mut();
+        }
+        Ok(val)
+    } else {
+        (*ctx).jit_jmp_buf = saved;
+        if is_outer {
+            (*ctx).jit_suspend_buf = std::ptr::null_mut();
+        }
+        Err(jmp_res)
+    }
+}
+
 /// Enter `jit_fn` for the frame at `frame_idx` and reconcile whatever comes
 /// back.
 ///
@@ -51,11 +103,6 @@ impl JitFrameOutcome {
 /// `ctx` and `closure_ptr` must be valid, and `frame_idx` must be the index of
 /// the top frame — the caller reads it back after the compiled code has had a
 /// chance to push and pop frames of its own.
-///
-/// K3-faseA: inalcanzable — `FRAME_LAYOUT_V2_JIT_BAIL` impide compilar, así que
-/// ningún `JitFn` llega aquí. El cuerpo original (setjmp, salida con 4
-/// finales, `resolve_constructor_return`, unwind) se restaura de git en la
-/// fase B junto con el lowering al layout por clases.
 #[allow(clippy::too_many_arguments)]
 #[allow(dangerous_implicit_autorefs)]
 pub(super) unsafe fn run_compiled_frame(
@@ -68,15 +115,108 @@ pub(super) unsafe fn run_compiled_frame(
     is_first_entry: bool,
     is_osr: bool,
 ) -> JitFrameOutcome {
-    let _ = (
-        ctx,
-        jit_fn,
-        closure_ptr,
-        closure,
-        frame_idx,
-        depth,
-        is_first_entry,
-        is_osr,
-    );
-    unreachable!("K3-faseA: compiled frames are bailed; see FRAME_LAYOUT_V2_JIT_BAIL");
+    if is_first_entry {
+        varn_jit::JIT_STATS
+            .jit_runs
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    if is_osr {
+        // Not counted in `jit_runs`: this frame already counted as an
+        // interpreted entry when it started, and it is the same frame.
+        // `osr_entries` is what says the rescue happened.
+        varn_jit::JIT_STATS
+            .osr_entries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    if (*ctx).settings.trace {
+        let what = if is_osr { "JIT OSR" } else { "JIT ENTRY" };
+        let at = (*ctx).frames[frame_idx].ip;
+        (*ctx).trace_event(what, frame_idx, closure, at, None);
+    }
+
+    let base = (*ctx).frames[frame_idx].base;
+    let res = execute_jit_frame(ctx, jit_fn, closure_ptr, base);
+
+    let res = match res {
+        Ok(val) => val,
+        Err(code) => {
+            if code == 1 {
+                let handler = (*ctx).jit_panic_exception_handler.take();
+                let error = (*ctx)
+                    .jit_panic_exception_error
+                    .take()
+                    .unwrap_or(VmValue::null());
+                let err_obj = (*ctx).jit_panic_exception_err_obj.take();
+
+                if let Some(handler) = handler {
+                    if handler.frame_depth > depth {
+                        if let Err(e) = unwind_to_handler(&mut *ctx, handler, error) {
+                            return JitFrameOutcome::Failed(e);
+                        }
+                        return JitFrameOutcome::Continue;
+                    } else {
+                        (*ctx).jit_panic_exception_handler = Some(handler);
+                        (*ctx).jit_panic_exception_error = Some(error);
+                        let err = err_obj.unwrap_or_else(|| {
+                            crate::error::RuntimeError::new(format!("unhandled exception: {error}"))
+                        });
+                        (*ctx).jit_panic_exception_err_obj = Some(err.clone());
+                        return JitFrameOutcome::Failed(err);
+                    }
+                } else {
+                    return JitFrameOutcome::Failed(err_obj.unwrap());
+                }
+            } else if code == 2 {
+                // Absent when the suspending helper parked a frame other than
+                // the top one itself (see `jit_suspend_at`): a module that
+                // suspends on a top-level await leaves its frame above ours.
+                if let Some(resume_ip) = (*ctx).jit_panic_suspend_resume_ip.take() {
+                    let frame_idx2 = (*ctx).frames.len() - 1;
+                    (*ctx).frames[frame_idx2].ip = resume_ip;
+                }
+                return JitFrameOutcome::Done(VmValue::null());
+            } else {
+                panic!("Unknown longjmp code: {}", code);
+            }
+        }
+    };
+
+    // A compiled frame that executed a non-tail call pushed caller frames
+    // beneath its own callee(s); the frame that just returned is the one
+    // at the top of the stack NOW, which is not necessarily `frame_idx` if
+    // a helper popped it itself. Read it live.
+    let returning_frame_idx = (*ctx).frames.len().saturating_sub(1);
+    let frame = (*ctx).frames.pop().unwrap();
+    (*ctx).close_upvalues_in(frame.base);
+    (*ctx).stack.pop_frame();
+    let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
+        && !frame.closure().proto.chunk.source_file.is_empty();
+
+    let final_val = resolve_constructor_return(&mut *ctx, returning_frame_idx, res);
+
+    if is_module_frame {
+        let source_file = frame.closure().proto.chunk.source_file.to_string();
+        let module_exports = (*ctx).module_exports.remove(&returning_frame_idx);
+        let cached = module_exports.unwrap_or(final_val);
+        let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
+        (*ctx).modules.insert(module_id, cached);
+    }
+
+    if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
+        if let Some(caller) = (*ctx).frames.last() {
+            let caller_base = caller.base;
+            if let Err(e) = (*ctx)
+                .stack
+                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
+            {
+                return JitFrameOutcome::Failed(e);
+            }
+        }
+    }
+
+    if (*ctx).frames.len() == depth {
+        JitFrameOutcome::Done(final_val)
+    } else {
+        JitFrameOutcome::Continue
+    }
 }
