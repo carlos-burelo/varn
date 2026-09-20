@@ -228,3 +228,28 @@ Defects concretos corregidos, todos consecuencia de que un valor de KIND
 
 Pendiente de este bloque: nada. B2/B3 siguen sin tocar.
 
+---
+
+## 8. Progreso B2/C2 (cerrado)
+
+Commits: `61e2f466` (C2).
+
+- **Una invocación**: `ExecCtx::invoke(callee, window)` es la única ruta
+  run-to-completion. `clif_call_fallback` (JIT), `NativeCtx::call_vm` (host),
+  `spawn_internal` e isolates pasan por ella; `call_vm_window` eliminada y
+  `call_vm` pasa a construir la ventana `[callee, args...]`.
+- **Una materialización de frame tipada**: `ExecCtx::push_call_frame`
+  (push de activación + `mov_cross` por clase). La usan el intérprete
+  (`exec_call_reg`, `exec_call_self`) y el JIT (`jit_prepare_static_call`),
+  en vez de repetir el bucle de copia.
+- **Borrado**: `jit_call_native_fast` (tripwire fase-A sin llamador en el
+  lowering) — fuera de la lista ABI, de la tabla y del cuerpo.
+
+`tests/main.vn`: 1223/0 en JIT y `VARN_NO_JIT=1`.
+
+No abordado en C2 (queda para C3/resto): `exec_call_method_reg` conserva su
+materialización con receiver+owner_class; `invoke_vm_method_fast` no usa aún
+`push_call_frame` (forma distinta: `this` en r0). Son candidatos de un
+sub-paso si se busca C2 al 100%, pero no cambiaron de comportamiento.
+
+

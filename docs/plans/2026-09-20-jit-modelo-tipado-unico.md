@@ -56,6 +56,10 @@ TIR (BackendTy por valor, obligatorio)
   `docs/plans/2026-09-20-PLAN-PENDIENTE.md` §7.
 
 ### C2 — Una convención de llamada (VM)
+- Estado: **cerrado** (commit `61e2f466`). `ExecCtx::invoke` es la única ruta
+  run-to-completion; `push_call_frame` la única materialización tipada.
+  `call_vm_window`/`jit_call_native_fast` borrados. Detalle en
+  `docs/plans/2026-09-20-PLAN-PENDIENTE.md` §8.
 - Un único `ExecCtx::invoke(callee, args_window)` que hace staging→
   `prepare_call`→`run_until`; el intérprete (`exec_call_reg`/
   `exec_call_method_reg`) y el JIT lo usan.
