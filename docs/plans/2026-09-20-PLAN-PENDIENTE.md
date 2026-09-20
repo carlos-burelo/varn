@@ -426,6 +426,32 @@ campo por helper con flush/reload): para este shape el intérprete gana. Ley 10
 El camino correcto es abaratar el constructor/llamada (C2 real) antes de
 abrirlo.
 
+---
+
+## 15. Llamada dinámica: flush solo de la ventana (ganancia medida)
+
+Commit `a5ac33ca`: `emit_vm_call`/`emit_call_self` flusheaban **todos** los
+homes antes de cada llamada dinámica. Ese flush completo solo hace falta si un
+`Try` de este proto puede capturar debajo (entonces el frame compilado se
+abandona y el intérprete lo reanuda leyendo homes). Sin `Try`
+(`narrow_roots == true`) el frame se descarta entero y basta con que la
+**ventana de args** esté en homes (el VM lee args de homes).
+
+| (release) | antes | después |
+|---|---|---|
+| dto | 8.33x | **6.25x** |
+| collection_pipeline | 9.09x | **7.69x** |
+
+Sin regresión (fib ~tied, matrix 1.20x). Suite 1223/0 en JIT y `VARN_NO_JIT=1`.
+
+**Siguiente cuello (medido, no atacado):** `emit_call` fuerza
+`class_target = None` porque el plan de init trivial escribe campos a `slot*16`
+(falso para `InstanceData` compacto), así que `new X()` **siempre** cruza a
+Rust (`emit_vm_call`). Y todo acceso a campo de instancia (`GetFixedField`/IC)
+va por helper porque el layout compacto (`FieldRepr`) no está inlineado. Es el
+mismo bloque: hacer el lowering de campo/instancia compact-aware.
+
+
 
 
 
