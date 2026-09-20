@@ -113,7 +113,7 @@ pub struct BindResult {
     pub sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,
     pub extensions: Extensions,
     #[serde(skip)]
-    pub core: Option<Rc<CoreMembers>>,
+    pub core: Option<Arc<CoreMembers>>,
     #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
     /// Advisory element types for evolving empty-array locals (Task A0.3'),

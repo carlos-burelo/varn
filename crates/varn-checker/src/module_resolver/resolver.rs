@@ -49,7 +49,7 @@ pub trait ImportResolver {
     /// The prelude's global symbols (`core:*`), as this resolver's stdlib
     /// defines them. Part of the trait because which prelude is in force is a
     /// property of which stdlib you resolve against.
-    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>>;
+    fn core_exports(&self) -> Arc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>>;
 
     /// A clone of this resolver's single, whole-compilation `Atom` table.
     ///
@@ -106,7 +106,7 @@ pub trait ImportResolver {
     fn interner_len(&self) -> usize;
 
     /// The prelude's member tables.
-    fn core_members(&self) -> Rc<crate::core::loader::CoreMembers>;
+    fn core_members(&self) -> Arc<crate::core::loader::CoreMembers>;
 
     /// Bind whichever of `origin_modules` actually declares `type_name`.
     ///
@@ -158,8 +158,8 @@ pub struct DiskResolver {
     /// *function of the stdlib in use*: a process that switches std provenance
     /// (the language server does, between the checkout tree and the embedded
     /// bundle) would otherwise keep answering from the first one it ever saw.
-    core_exports: RefCell<Option<Rc<CoreExportsMap>>>,
-    core_members: RefCell<Option<Rc<crate::core::loader::CoreMembers>>>,
+    core_exports: RefCell<Option<Arc<CoreExportsMap>>>,
+    core_members: RefCell<Option<Arc<crate::core::loader::CoreMembers>>>,
     /// The single `Atom` table for this compilation. Every `varn_parser::parse`
     /// this resolver drives (the entry file included, via
     /// `interner_snapshot`/`set_interner`) reads from and grows this same
@@ -699,23 +699,23 @@ impl ImportResolver for DiskResolver {
         self.graph.borrow_mut().record_dep(importer, imported);
     }
 
-    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>> {
+    fn core_exports(&self) -> Arc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>> {
         if let Some(hit) = self.core_exports.borrow().as_ref() {
-            return Rc::clone(hit);
+            return Arc::clone(hit);
         }
         // Built with the borrow released: building resolves stdlib modules
         // through `self`, which takes the same borrows.
-        let built = Rc::new(crate::core::loader::build_core_exports(self));
-        *self.core_exports.borrow_mut() = Some(Rc::clone(&built));
+        let built = Arc::new(crate::core::loader::build_core_exports(self));
+        *self.core_exports.borrow_mut() = Some(Arc::clone(&built));
         built
     }
 
-    fn core_members(&self) -> Rc<crate::core::loader::CoreMembers> {
+    fn core_members(&self) -> Arc<crate::core::loader::CoreMembers> {
         if let Some(hit) = self.core_members.borrow().as_ref() {
-            return Rc::clone(hit);
+            return Arc::clone(hit);
         }
-        let built = Rc::new(crate::core::loader::build_core_members(self));
-        *self.core_members.borrow_mut() = Some(Rc::clone(&built));
+        let built = Arc::new(crate::core::loader::build_core_members(self));
+        *self.core_members.borrow_mut() = Some(Arc::clone(&built));
         built
     }
 }

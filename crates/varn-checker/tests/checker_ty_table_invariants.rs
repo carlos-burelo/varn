@@ -302,3 +302,25 @@ fn tainted_flag_is_not_part_of_type_identity() {
     assert_eq!(plain.id(), tainted.id());
     assert_eq!(plain.kind(&t), tainted.kind(&t));
 }
+
+// ── Send + Sync (Ley 3: la tabla puede compartirse entre hilos) ────────────
+
+/// `CheckerTyTable` contiene `FunctionType`/`ObjectTypeMember` (nombres de
+/// params y miembros). Mientras esos nombres fueron `Rc<str>` la tabla era
+/// `!Send + !Sync`, lo que impedía cualquier chequeo en paralelo. Con
+/// `Arc<str>` (ADR-0012) la tabla debe ser `Send + Sync`. Si este test deja de
+/// compilar, volvió un `Rc` al interior de la tabla.
+#[test]
+fn checker_ty_table_is_send_and_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<CheckerTyTable>();
+    assert_send_sync::<Type>();
+}
+
+/// `BindResult` es lo que un chequeo paralelo movería entre hilos: debe ser
+/// `Send + Sync` para que varios módulos se bindeen/chequeen en paralelo.
+#[test]
+fn bind_result_is_send_and_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<varn_checker::BindResult>();
+}
