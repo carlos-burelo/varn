@@ -2,6 +2,7 @@
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
+use varn_core::TypeTag;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
@@ -22,13 +23,6 @@ pub(crate) fn emit_call(
     target: Option<&crate::clif::lower::ClifTarget>,
     class_target: Option<&crate::clif::lower::ClifClassTarget>,
 ) -> Result<(), String> {
-    // Fase B: the inline class-construct fast path writes instance fields at a
-    // 16-byte stride, wrong for the compact `InstanceData` layout. Route
-    // `new X()` through the VM call window (compact-aware) until that path is
-    // compact-aware too.
-    let _ = class_target;
-    let class_target: Option<&crate::clif::lower::ClifClassTarget> = None;
-
     let w1 = code[ip + 1];
     let w2 = code[ip + 2];
     let dest = (w1 >> 8) as usize;
@@ -40,8 +34,8 @@ pub(crate) fn emit_call(
 
     if let Some(ct) = class_target {
         if let Some(ref plan) = ct.trivial_plan {
-            let valid_plan = plan.iter().all(|&(param_idx, _)| {
-                1 + param_idx < total && arg_start + 1 + param_idx < actx.nregs
+            let valid_plan = plan.iter().all(|fi| {
+                1 + fi.param_idx < total && arg_start + 1 + fi.param_idx < actx.nregs
             });
             if valid_plan && arg_start + total <= actx.nregs {
                 let fast_blk = b.create_block();
@@ -82,32 +76,70 @@ pub(crate) fn emit_call(
                     slow_blk,
                 );
 
-                for &(param_idx, slot) in plan {
-                    let arg_r = arg_start + 1 + param_idx;
+                // Write each field at its own COMPACT `ClassLayout` offset —
+                // the same bytes `InstanceData::write_field` produces. A class
+                // has NO shape: the layout is static and `slot` indexes it 1:1,
+                // so this is a plain store per field, no helper, no IC.
+                for fi in plan {
+                    let arg_r = arg_start + 1 + fi.param_idx;
                     let val = box_or_load_home(b, actx, state, arg_r);
-                    let val128 = if b.func.dfg.value_type(val) == types::I128 {
-                        val
-                    } else if b.func.dfg.value_type(val) == types::F64 {
-                        super::super::emit::box_f64(b, val)
-                    } else {
-                        match state.get(arg_r).copied().unwrap_or(K::Unset) {
-                            K::Int => super::super::emit::box_int(b, val),
-                            K::Bool => super::super::emit::box_bool(b, val),
-                            K::Float => {
-                                let f = b.ins().bitcast(types::F64, MemFlags::new(), val);
-                                super::super::emit::box_f64(b, f)
+                    let (tag_v, payload) = b.ins().isplit(val);
+                    let base = data_base;
+                    let off = fi.offset as i32;
+                    let m = MemFlags::new();
+                    match fi.tag {
+                        TypeTag::Bool => {
+                            b.ins().istore8(m, payload, base, off);
+                        }
+                        TypeTag::Int | TypeTag::U64 => match fi.size {
+                            1 => {
+                                b.ins().istore8(m, payload, base, off);
+                            }
+                            2 => {
+                                b.ins().istore16(m, payload, base, off);
+                            }
+                            4 => {
+                                b.ins().istore32(m, payload, base, off);
                             }
                             _ => {
-                                let tag_v = b
-                                    .ins()
-                                    .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
-                                b.ins().iconcat(tag_v, val)
+                                b.ins().store(m, payload, base, off);
                             }
+                        },
+                        TypeTag::I8 | TypeTag::U8 => {
+                            b.ins().istore8(m, payload, base, off);
                         }
-                    };
-                    let slot_off = (slot * 16) as i32;
-                    b.ins()
-                        .store(MemFlags::trusted(), val128, data_base, slot_off);
+                        TypeTag::I16 | TypeTag::U16 => {
+                            b.ins().istore16(m, payload, base, off);
+                        }
+                        TypeTag::I32 | TypeTag::U32 => {
+                            b.ins().istore32(m, payload, base, off);
+                        }
+                        TypeTag::F32 => {
+                            let f = unbox_f64_coerce(b, val);
+                            let f32v = b.ins().fdemote(types::F32, f);
+                            b.ins().store(m, f32v, base, off);
+                        }
+                        TypeTag::Float => {
+                            let f = unbox_f64_coerce(b, val);
+                            b.ins().store(m, f, base, off);
+                        }
+                        _ if fi.is_gc_ref && fi.size == 8 => {
+                            // `null` -> COMPACT_REF_UNINIT, heap -> index,
+                            // exactly as `InstanceData::write_field`.
+                            let is_null = b.ins().icmp_imm(
+                                IntCC::Equal,
+                                tag_v,
+                                varn_types::vm_value::KIND_NULL as i64,
+                            );
+                            let uninit = b.ins().iconst(types::I64, u32::MAX as i64);
+                            let stored = b.ins().select(is_null, uninit, payload);
+                            b.ins().store(m, stored, base, off);
+                        }
+                        _ => {
+                            // `str` / `char` / Dynamic: a full 16-byte VmValue.
+                            b.ins().store(m, val, base, off);
+                        }
+                    }
                 }
 
                 def_result(b, actx, dest, instance_nv);
