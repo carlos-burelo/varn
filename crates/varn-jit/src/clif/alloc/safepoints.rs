@@ -299,7 +299,10 @@ pub(crate) fn store_boxed_home_at(
                 .ins()
                 .iconst(types::I64, varn_types::register_meta::REF_UNINIT as i64);
             let v = b.ins().select(is_null, uninit, low);
-            b.ins().store(m, v, home, 0);
+            // `Ref` home slots are 4-byte `u32` heap indices (`FrameStore::refs`
+            // is `Vec<u32>`); an 8-byte store would overwrite the next slot.
+            let v32 = b.ins().ireduce(types::I32, v);
+            b.ins().istore32(m, v32, home, 0);
         }
     }
 }
@@ -355,7 +358,7 @@ pub(crate) fn load_home(
 pub(crate) fn box_or_load_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
-    state: &[K],
+    _state: &[K],
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let Some(&var) = actx.vars.get(r) else {
