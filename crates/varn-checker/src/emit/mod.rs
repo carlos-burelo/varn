@@ -263,8 +263,9 @@ pub fn emit_module(
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
             }
         }
-        std::mem::take(&mut top.locals)
+        (std::mem::take(&mut top.locals), top.saw_await())
     };
+    let (top_locals, top_has_await) = top_locals;
     let top_level = TirFunction {
         name: Arc::from("<module>"),
         sig: SigId(0),
@@ -274,8 +275,10 @@ pub fn emit_module(
         body: top_body,
         has_this: false,
         this_class: None,
-        // Module top level permits top-level `await`.
-        is_async: true,
+        // A module without a top-level `await` is synchronous: marking it
+        // async unconditionally gated the whole top level out of the JIT
+        // (`clif` rejects async in fase B), so every module ran interpreted.
+        is_async: top_has_await,
         is_generator: false,
         has_rest: false,
     };

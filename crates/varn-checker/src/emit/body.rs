@@ -61,6 +61,10 @@ pub(super) struct FnEmitter<'a> {
 
     top_level: bool,
 
+    /// Set when the top-level lowering sees a top-level `await`. Drives the
+    /// module proto's `is_async`: a module that never awaits is synchronous.
+    saw_await: bool,
+
     outer_names: FxHashSet<Arc<str>>,
 
     captures: Vec<Arc<str>>,
@@ -217,6 +221,7 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             this_enum: None,
             top_level: false,
+            saw_await: false,
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
             pending: Vec::new(),
@@ -260,6 +265,11 @@ impl<'a> FnEmitter<'a> {
     pub fn as_top_level(mut self) -> Self {
         self.top_level = true;
         self
+    }
+
+    /// Whether the top-level body lowered a top-level `await`.
+    pub fn saw_await(&self) -> bool {
+        self.saw_await
     }
 
     pub fn lower_outer_expr(&mut self, e: ExprId) -> (Vec<TirStmt>, TirExpr) {
@@ -2009,6 +2019,13 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Await { argument } => {
+                // A top-level `await` is what makes the module proto async (it
+                // permits, but does not require, top-level await). Record it so
+                // `emit/mod.rs` marks the module `is_async` only when it
+                // actually suspends — a sync module stays JIT-able.
+                if self.top_level {
+                    self.saw_await = true;
+                }
                 let fut = self.lower_expr(*argument);
                 return TirExpr {
                     kind: TirExprKind::Await {
