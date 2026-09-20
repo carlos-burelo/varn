@@ -276,43 +276,6 @@ pub fn try_compile(
     if let Some(op) = uses_disabled_opcode(proto) {
         return Err(format!("clif: opcode {op} disabled in fase B"));
     }
-    // `Ref` is the only physical class whose home store validates strictly
-    // (`set_addr` rejects a non-heap, non-null value), and `register_meta`
-    // still lets a Ref-classed register hold a non-ref value on some paths
-    // (a wrong value then reaches `ArrayLength`/`Headers.toObject`). Until the
-    // class provenance is reconciled, protos with any Ref register stay
-    // interpreted.
-    // `Ref` requires the lowering's `K` lattice and `register_meta` to agree on
-    // every register; today they can disagree (e.g. `Cons.length`'s
-    // `Move r2 = r6` boxes the field payload as a bool). Keep Ref protos
-    // interpreted until that provenance is fixed.
-    if proto
-        .register_meta
-        .iter()
-        .any(|m| m.kind == SlotKind::Ref)
-        || proto.param_kinds.iter().any(|k| *k == SlotKind::Ref)
-    {
-        // Dev escape hatch for diagnosing the Ref provenance work.
-        if std::env::var_os("VARN_JIT_ALLOW_REF").is_none() {
-            return Err("clif: Ref-class registers disabled in fase B".into());
-        }
-        eprintln!(
-            "REFMETA {:?}: {:?}",
-            proto.name,
-            proto
-                .register_meta
-                .iter()
-                .map(|m| match m.kind {
-                    SlotKind::Int => "I",
-                    SlotKind::Float => "F",
-                    SlotKind::Bool => "B",
-                    SlotKind::Str => "S",
-                    SlotKind::Ref => "R",
-                    SlotKind::Dynamic => "D",
-                })
-                .collect::<Vec<_>>()
-        );
-    }
     super::emit::reset_disabled_helper_hit();
 
     let nparams = proto.arity.saturating_sub(1);
