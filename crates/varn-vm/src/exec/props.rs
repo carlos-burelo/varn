@@ -142,6 +142,47 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
 }
 
 #[inline(always)]
+/// Read a class instance field by its BAKED compact `(offset, tag)` — no
+/// runtime layout lookup. `GetFixedField` with the compact bit set.
+pub(crate) fn get_fixed_field_at(
+    obj: VmValue,
+    offset: u32,
+    tag: varn_core::TypeTag,
+    heap: &Heap,
+) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
+            if let Some(v) = inst.read_field_at(offset, tag) {
+                return Ok(v);
+            }
+        }
+    }
+    Err(RuntimeError::new(format!(
+        "OpGetFixedField: bad compact field offset {offset} on {obj:?}"
+    )))
+}
+
+/// Write a class instance field by its BAKED compact `(offset, tag)` — no
+/// runtime layout lookup. `SetFixedField` (always compact).
+pub(crate) fn set_fixed_field_at(
+    obj: VmValue,
+    offset: u32,
+    tag: varn_core::TypeTag,
+    val: VmValue,
+    heap: &Heap,
+) -> VmResult<()> {
+    if obj.is_heap() {
+        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
+            if inst.write_field_at(offset, tag, val).is_ok() {
+                return Ok(());
+            }
+        }
+    }
+    Err(RuntimeError::new(format!(
+        "OpSetFixedField: bad compact field offset {offset} on {obj:?}"
+    )))
+}
+
 pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let idx = obj.as_heap_idx();

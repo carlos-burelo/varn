@@ -11,7 +11,20 @@ impl ExecCtx {
         &mut self,
         obj: VmValue,
         slot: usize,
+        offset: u16,
+        tag: u8,
     ) -> VmResult<VmValue> {
+        if tag != 0 {
+            if let Ok(v) = crate::exec::props::get_fixed_field_at(
+                obj,
+                offset as u32,
+                varn_core::TypeTag::from_u8(tag),
+                &self.heap,
+            ) {
+                return Ok(v);
+            }
+        }
+        // Dynamic object / record / fallback.
         crate::exec::props::get_fixed_field(obj, slot, &mut self.heap)
     }
 
@@ -20,8 +33,23 @@ impl ExecCtx {
         &mut self,
         obj: VmValue,
         slot: usize,
+        offset: u16,
+        tag: u8,
         val: VmValue,
     ) -> VmResult<()> {
+        if tag != 0 {
+            if crate::exec::props::set_fixed_field_at(
+                obj,
+                offset as u32,
+                varn_core::TypeTag::from_u8(tag),
+                val,
+                &self.heap,
+            )
+            .is_ok()
+            {
+                return Ok(());
+            }
+        }
         crate::exec::props::set_fixed_field(obj, slot, val, &mut self.heap)
     }
 

@@ -224,6 +224,30 @@ impl<'m> Builder<'m> {
         self.values[v.0 as usize].ty
     }
 
+    /// Compact `(offset, tag)` of field `slot` on a statically-typed class
+    /// receiver, or `None` if the receiver's type isn't a class. Mirrors
+    /// `ClassLayout::from_fields` exactly (same `class_field_repr`, same
+    /// slot-ordered field list), so the baked offset is byte-identical to the
+    /// runtime layout.
+    fn compact_field(&self, obj_ty: BackendTy, slot: u16) -> Option<(u32, varn_core::TypeTag)> {
+        let BackendTy::Class(c) = obj_ty.non_nullable(&self.tir.types) else {
+            return None;
+        };
+        let ci = self.tir.class(c)?;
+        let fields: Vec<(std::sync::Arc<str>, varn_core::TypeTag)> = ci
+            .fields
+            .iter()
+            .map(|f| (f.name.clone(), field_tag(f.ty)))
+            .collect();
+        let layout = varn_types::class_layout::ClassLayout::from_fields(
+            ci.name.as_ref(),
+            0,
+            &fields,
+        );
+        let f = layout.get_field_by_index(slot as usize)?;
+        Some((f.offset, f.type_tag))
+    }
+
     fn block_mut(&mut self, id: BlockId) -> &mut Block {
         &mut self.blocks[id.0 as usize]
     }
@@ -825,9 +849,18 @@ impl<'m> Builder<'m> {
             TirExprKind::Field { object, name } => {
                 let obj = self.lower_expr(object)?;
                 let kind = match &e.res {
-                    Resolution::FieldSlot(slot) => InstKind::GetFixedField {
-                        object: obj,
-                        slot: *slot,
+                    Resolution::FieldSlot(slot) => match self.compact_field(object.ty, *slot) {
+                        Some((offset, tag)) => InstKind::GetFixedField {
+                            object: obj,
+                            slot: *slot,
+                            offset,
+                            tag,
+                        },
+                        // Receiver not statically a class: dynamic lookup.
+                        None => InstKind::GetProperty {
+                            object: obj,
+                            name: name.clone(),
+                        },
                     },
                     _ => InstKind::GetProperty {
                         object: obj,
@@ -1123,6 +1156,8 @@ impl<'m> Builder<'m> {
                     InstKind::GetFixedField {
                         object: v,
                         slot: *field,
+                        offset: 0,
+                        tag: varn_core::TypeTag::Null,
                     },
                     ty,
                 ))
@@ -1362,10 +1397,19 @@ impl<'m> Builder<'m> {
             TirExprKind::Field { object, name } => {
                 let obj = self.lower_expr(object)?;
                 let kind = match &target.res {
-                    Resolution::FieldSlot(slot) => InstKind::SetFixedField {
-                        object: obj,
-                        value,
-                        slot: *slot,
+                    Resolution::FieldSlot(slot) => match self.compact_field(object.ty, *slot) {
+                        Some((offset, tag)) => InstKind::SetFixedField {
+                            object: obj,
+                            value,
+                            slot: *slot,
+                            offset,
+                            tag,
+                        },
+                        None => InstKind::SetProperty {
+                            object: obj,
+                            name: name.clone(),
+                            value,
+                        },
                     },
                     _ => InstKind::SetProperty {
                         object: obj,

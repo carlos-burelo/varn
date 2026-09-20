@@ -143,7 +143,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::IsArray { operand } => Key::IsArray(id(*operand)),
         InstKind::GetEnumTag { operand } => Key::EnumTag(id(*operand)),
 
-        InstKind::GetFixedField { object, slot } => Key::FixedField(id(*object), *slot),
+        InstKind::GetFixedField { object, slot, .. } => Key::FixedField(id(*object), *slot),
         InstKind::ArrayGetIndex { object, index } => Key::ArrayElem(id(*object), id(*index)),
         InstKind::ModuleSlot { object, slot } => Key::ModuleSlot(id(*object), *slot),
         InstKind::LoadGlobal(name) => Key::Global(name.clone()),

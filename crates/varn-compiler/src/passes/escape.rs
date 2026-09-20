@@ -124,7 +124,7 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
     let mut unresolved: FxHashSet<u32> = FxHashSet::default();
     for block in &func.blocks {
         for inst in &block.insts {
-            let (Some(dest), InstKind::GetFixedField { object, slot }) = (inst.dest, &inst.kind)
+            let (Some(dest), InstKind::GetFixedField { object, slot, .. }) = (inst.dest, &inst.kind)
             else {
                 continue;
             };

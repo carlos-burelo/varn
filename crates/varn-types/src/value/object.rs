@@ -714,6 +714,44 @@ impl InstanceData {
         self.read_field(f)
     }
 
+    /// Read a field by its BAKED compact `(offset, tag)` — no runtime layout
+    /// lookup. Mirrors [`Self::read_field`] with the `FieldLayout` derived from
+    /// the tag.
+    #[inline]
+    pub fn read_field_at(&self, offset: u32, tag: varn_core::TypeTag) -> Option<VmValue> {
+        let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
+        let f = FieldLayout {
+            name: Arc::from(""),
+            type_tag: tag,
+            offset,
+            size,
+            align,
+            is_gc_ref,
+        };
+        self.read_field(&f)
+    }
+
+    /// Write a field by its BAKED compact `(offset, tag)` — no runtime layout
+    /// lookup.
+    #[inline]
+    pub fn write_field_at(
+        &self,
+        offset: u32,
+        tag: varn_core::TypeTag,
+        val: VmValue,
+    ) -> Result<(), &'static str> {
+        let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
+        let f = FieldLayout {
+            name: Arc::from(""),
+            type_tag: tag,
+            offset,
+            size,
+            align,
+            is_gc_ref,
+        };
+        self.write_field(&f, val)
+    }
+
     #[inline]
     pub fn set_field_at(&self, slot: usize, val: VmValue) -> bool {
         let Some(layout) = self.layout() else {

@@ -356,11 +356,13 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
             opaque: false,
         },
 
-        OpCode::GetProperty
-        | OpCode::GetPropertyMaybe
-        | OpCode::GetFixedField
-        | OpCode::GetSymbol => s(3, Some(dest0), vec![hi1]),
-        OpCode::SetProperty | OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
+        OpCode::GetProperty | OpCode::GetPropertyMaybe | OpCode::GetSymbol => {
+            s(3, Some(dest0), vec![hi1])
+        }
+        // 4 words: `w3` carries the baked compact field offset.
+        OpCode::GetFixedField => s(4, Some(dest0), vec![hi1]),
+        OpCode::SetProperty => s(3, None, vec![dest0, hi1]),
+        OpCode::SetFixedField => s(4, None, vec![dest0, hi1]),
 
         OpCode::GetSuper => s(2, Some(dest0), vec![]),
 

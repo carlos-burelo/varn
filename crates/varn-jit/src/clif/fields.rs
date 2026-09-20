@@ -164,6 +164,138 @@ fn emit_object_field_addr(
 /// replaces a 16-byte i128 load + isplit + unbox with a single 8-byte i64
 /// load — typically 3× fewer CLIF instructions on the hot path, which is the
 /// inner loop of the DTO benchmark.
+#[allow(clippy::too_many_arguments)]
+fn emit_get_fixed_field_compact(
+    b: &mut FunctionBuilder,
+    c: &FldCtx,
+    actx: Option<&AllocCtx>,
+    state: &[K],
+    first_reg: usize,
+    obj_r: usize,
+    offset: u32,
+    tag: varn_core::TypeTag,
+    slot: usize,
+) -> Result<(), String> {
+    use varn_types::class_layout::class_field_repr;
+
+    let obj = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, obj_r)
+    } else {
+        use_boxed(b, c.vars, state, obj_r)?
+    };
+    let (size, _align, is_gc_ref) = class_field_repr(tag);
+
+    let slow = b.create_block();
+    let cont = b.create_block();
+    b.append_block_param(cont, types::I128);
+
+    let data_base = emit::emit_object_data_base(
+        b,
+        c.exec_ctx,
+        obj,
+        &c.helpers.object_layout,
+        &c.helpers.array_layout,
+        c.helpers.heap_field_offset,
+        slow,
+    );
+    let off = offset as i32;
+    let m = MemFlags::trusted();
+    let pair = match tag {
+        varn_core::TypeTag::Bool | varn_core::TypeTag::U8 => {
+            let b8 = b.ins().load(types::I8, m, data_base, off);
+            let v = b.ins().uextend(types::I64, b8);
+            emit::box_bool(b, v)
+        }
+        varn_core::TypeTag::I8 => {
+            let b8 = b.ins().load(types::I8, m, data_base, off);
+            let v = b.ins().sextend(types::I64, b8);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::Int | varn_core::TypeTag::U64 => {
+            let v = b.ins().load(types::I64, m, data_base, off);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::I16 => {
+            let v = b.ins().load(types::I16, m, data_base, off);
+            let v = b.ins().sextend(types::I64, v);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::U16 => {
+            let v = b.ins().load(types::I16, m, data_base, off);
+            let v = b.ins().uextend(types::I64, v);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::I32 => {
+            let v = b.ins().load(types::I32, m, data_base, off);
+            let v = b.ins().sextend(types::I64, v);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::U32 => {
+            let v = b.ins().load(types::I32, m, data_base, off);
+            let v = b.ins().uextend(types::I64, v);
+            emit::box_int(b, v)
+        }
+        varn_core::TypeTag::F32 => {
+            let f32v = b.ins().load(types::F32, m, data_base, off);
+            let f = b.ins().fpromote(types::F64, f32v);
+            emit::box_f64(b, f)
+        }
+        varn_core::TypeTag::Float => {
+            let f = b.ins().load(types::F64, m, data_base, off);
+            emit::box_f64(b, f)
+        }
+        _ if is_gc_ref && size == 8 => {
+            let raw = b.ins().load(types::I64, m, data_base, off);
+            let is_uninit = b.ins().icmp_imm(
+                IntCC::Equal,
+                raw,
+                u32::MAX as i64,
+            );
+            let null_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let heap_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            let zero = b.ins().iconst(types::I64, 0);
+            let tag_v = b.ins().select(is_uninit, null_tag, heap_tag);
+            let payload = b.ins().select(is_uninit, zero, raw);
+            b.ins().iconcat(tag_v, payload)
+        }
+        _ => b.ins().load(types::I128, m, data_base, off),
+    };
+    b.ins().jump(cont, &[pair.into()]);
+
+    // Slow path: not a compact instance (Object/Record/null). The dynamic
+    // `slot` path handles those (shape-indexed).
+    b.switch_to_block(slow);
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
+    let slot_v = b.ins().iconst(types::I64, slot as i64);
+    call_helper_void(
+        b,
+        c.cc,
+        c.helpers.get_fixed_field,
+        &[c.exec_ctx, obj_tag, obj_payload, slot_v],
+    );
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        c.exec_ctx,
+        c.helpers.jit_native_result_offset as i32,
+    );
+    b.ins().jump(cont, &[res.into()]);
+
+    b.switch_to_block(cont);
+    let res = b.block_params(cont)[0];
+    if let Some(actx) = actx {
+        super::alloc::def_result(b, actx, first_reg, res);
+    } else {
+        emit::def_boxed_leaf(b, c.register_meta, c.vars, first_reg, res);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
     c: &FldCtx,
@@ -177,6 +309,22 @@ pub(super) fn emit_get_fixed_field(
 
     let obj_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
+    // A non-`Null` field tag marks a compact CLASS field (baked offset in
+    // `w3`); `Null` is a dynamic slot access (Object/Record/enum payload).
+    let tag_byte = (code[ip + 1] & 0xFF) as u8;
+    if tag_byte != 0 {
+        return emit_get_fixed_field_compact(
+            b,
+            c,
+            actx,
+            state,
+            first_reg,
+            obj_r,
+            code[ip + 3] as u32,
+            varn_core::TypeTag::from_u8(tag_byte),
+            slot,
+        );
+    }
     // Prefer the home slot (authoritative for a nullable `Ref` receiver, which
     // the variable cannot distinguish from a heap ref).
     let obj = if let Some(actx) = actx {
@@ -333,6 +481,135 @@ pub(super) fn emit_get_fixed_field(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn emit_set_fixed_field_compact(
+    b: &mut FunctionBuilder,
+    c: &FldCtx,
+    actx: Option<&AllocCtx>,
+    state: &[K],
+    first_reg: usize,
+    val_r: usize,
+    offset: u32,
+    tag: varn_core::TypeTag,
+    slot: usize,
+) -> Result<(), String> {
+    use varn_types::class_layout::class_field_repr;
+
+    let obj = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, first_reg)
+    } else {
+        use_boxed(b, c.vars, state, first_reg)?
+    };
+    let val = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, val_r)
+    } else {
+        box_or_pass(b, c.vars, state, val_r)
+    };
+    let val128 = if b.func.dfg.value_type(val) == types::I128 {
+        val
+    } else {
+        emit::box_int(b, val)
+    };
+    let (size, _align, is_gc_ref) = class_field_repr(tag);
+
+    let slow = b.create_block();
+    let cont = b.create_block();
+    let inline = b.create_block();
+
+    // Write barrier: a store into an OLD-GEN instance needs the barrier the
+    // runtime helper carries, so only a NURSERY receiver is inlined. Anything
+    // not a heap ref, or old-gen, bails to `set_fixed_field_at`.
+    {
+        let (obj_tag, obj_payload) = b.ins().isplit(obj);
+        let kind = b.ins().band_imm(obj_tag, emit::KIND_MASK);
+        let heap_ok = b
+            .ins()
+            .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_HEAP as i64);
+        let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+        let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+        let not_old = b.ins().icmp_imm(IntCC::Equal, old_bit, 0);
+        let can_inline = b.ins().band(heap_ok, not_old);
+        b.ins().brif(can_inline, inline, &[], slow, &[]);
+    }
+
+    b.switch_to_block(inline);
+    let data_base = emit::emit_object_data_base(
+        b,
+        c.exec_ctx,
+        obj,
+        &c.helpers.object_layout,
+        &c.helpers.array_layout,
+        c.helpers.heap_field_offset,
+        slow,
+    );
+    let off = offset as i32;
+    let m = MemFlags::new();
+    let (_vt, payload) = b.ins().isplit(val128);
+    match tag {
+        varn_core::TypeTag::Bool => {
+            b.ins().istore8(m, payload, data_base, off);
+        }
+        varn_core::TypeTag::Int | varn_core::TypeTag::U64 => {
+            b.ins().store(m, payload, data_base, off);
+        }
+        varn_core::TypeTag::I8 | varn_core::TypeTag::U8 => {
+            b.ins().istore8(m, payload, data_base, off);
+        }
+        varn_core::TypeTag::I16 | varn_core::TypeTag::U16 => {
+            b.ins().istore16(m, payload, data_base, off);
+        }
+        varn_core::TypeTag::I32 | varn_core::TypeTag::U32 => {
+            b.ins().istore32(m, payload, data_base, off);
+        }
+        varn_core::TypeTag::F32 => {
+            let f = unbox_f64_coerce(b, val128);
+            let f32v = b.ins().fdemote(types::F32, f);
+            b.ins().store(m, f32v, data_base, off);
+        }
+        varn_core::TypeTag::Float => {
+            let f = unbox_f64_coerce(b, val128);
+            b.ins().store(m, f, data_base, off);
+        }
+        _ if is_gc_ref && size == 8 => {
+            let (tag_v, payload) = b.ins().isplit(val128);
+            let is_null = b.ins().icmp_imm(
+                IntCC::Equal,
+                tag_v,
+                varn_types::vm_value::KIND_NULL as i64,
+            );
+            let uninit = b.ins().iconst(types::I64, u32::MAX as i64);
+            let stored = b.ins().select(is_null, uninit, payload);
+            b.ins().store(m, stored, data_base, off);
+        }
+        _ => {
+            b.ins().store(m, val128, data_base, off);
+        }
+    }
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(slow);
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
+    let (v_tag, v_payload) = b.ins().isplit(val128);
+    let slot_v = b.ins().iconst(types::I64, slot as i64);
+    call_helper_void(
+        b,
+        c.cc,
+        c.helpers.set_fixed_field,
+        &[
+            c.exec_ctx,
+            obj_tag,
+            obj_payload,
+            slot_v,
+            v_tag,
+            v_payload,
+        ],
+    );
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
+    Ok(())
+}
+
 /// `SetFixedField obj(=first_reg), val, slot` — inline slot write for a nursery
 /// receiver (no write barrier needed); an old-gen receiver bails to the helper,
 /// which carries the barrier.
@@ -347,6 +624,20 @@ pub(super) fn emit_set_fixed_field(
 ) -> Result<(), String> {
     let val_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
+    let tag_byte = (code[ip + 1] & 0xFF) as u8;
+    if tag_byte != 0 {
+        return emit_set_fixed_field_compact(
+            b,
+            c,
+            actx,
+            state,
+            first_reg,
+            val_r,
+            code[ip + 3] as u32,
+            varn_core::TypeTag::from_u8(tag_byte),
+            slot,
+        );
+    }
     let obj = if let Some(actx) = actx {
         super::alloc::box_or_load_home(b, actx, state, first_reg)
     } else {

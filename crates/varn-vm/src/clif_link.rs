@@ -288,23 +288,20 @@ impl ClifLinker for CtxLinker {
                     let wrapper = payload
                         .as_any()
                         .downcast_ref::<crate::closure::VmClosurePayload>()?;
-                    wrapper.0.proto.trivial_field_init_plan().and_then(|p| {
-                        // Map each `(param, slot)` to its COMPACT field layout.
-                        // `slot` indexes `layout.fields` 1:1 (see
-                        // `InstanceData::field_at`).
+                    wrapper.0.proto.trivial_field_init_plan().map(|p| {
                         p.iter()
-                            .map(|&(param_idx, slot)| {
-                                layout.get_field_by_index(slot).map(|f| {
-                                    varn_jit::clif::lower::ClifFieldInit {
-                                        param_idx,
-                                        offset: f.offset,
-                                        size: f.size,
-                                        tag: f.type_tag,
-                                        is_gc_ref: f.is_gc_ref,
-                                    }
-                                })
+                            .map(|&(param_idx, offset, tag)| {
+                                let (size, _align, is_gc_ref) =
+                                    varn_types::class_layout::class_field_repr(tag);
+                                varn_jit::clif::lower::ClifFieldInit {
+                                    param_idx,
+                                    offset,
+                                    size,
+                                    tag,
+                                    is_gc_ref,
+                                }
                             })
-                            .collect::<Option<Vec<_>>>()
+                            .collect()
                     })
                 }
                 _ => None,

@@ -158,14 +158,22 @@ pub(super) fn emit_value(
                 line,
             );
         }
-        InstKind::GetFixedField { object, slot } => {
-            chunk.emit_rrc(
-                OpCode::GetFixedField,
-                d,
-                reg[object.0 as usize],
-                *slot,
-                line,
-            );
+        InstKind::GetFixedField {
+            object,
+            slot,
+            offset,
+            tag,
+        } => {
+            // `w1` low = the field's `TypeTag` (non-`Null` = compact class
+            // field); `w2` = the dynamic `slot` (for the Object/Record
+            // fallback); `w3` = the compact byte offset. A class has NO shape,
+            // so the offset is baked; a dynamic object ignores it and uses the
+            // slot.
+            let tag_byte = *tag as u8;
+            chunk.write(Chunk::pack_op(OpCode::GetFixedField, d), line);
+            chunk.write(Chunk::pack(reg[object.0 as usize], tag_byte), line);
+            chunk.write(*slot, line);
+            chunk.write(*offset as u16, line);
         }
         InstKind::GetIndex { object, index } => {
             chunk.emit_rrr(

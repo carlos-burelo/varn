@@ -60,7 +60,7 @@ const SLOT_ALIGN: u32 = 8;
 /// already calls a GC reference (`Array`/`Map`/`Set`/`Class`/`Bytes`/…) is
 /// ALWAYS `KIND_HEAP` in this runtime — no inline fast path exists for them —
 /// so those compact safely to a bare heap index.
-fn class_field_repr(tag: TypeTag) -> (u32, u32, bool) {
+pub fn class_field_repr(tag: TypeTag) -> (u32, u32, bool) {
     match tag {
         TypeTag::Str | TypeTag::Char => (SLOT_SIZE, SLOT_ALIGN, true),
         other => {

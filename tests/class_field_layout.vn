@@ -1,0 +1,67 @@
+// Compact class-field layout: a class has NO shape — fields are static
+// (`ClassLayout`), packed at their real sizes, and `slot` indexes the layout
+// 1:1. This pins that adjacent fields of DIFFERENT widths do not overwrite
+// each other (an offset/size bug corrupts the neighbouring field) and that
+// inherited fields keep their parent-defined layout.
+//
+// A `bool` (1 byte) next to an `int` (8 bytes) next to a `float` is the exact
+// shape that a `slot*16` layout gets wrong.
+
+class Base {
+    flag: bool;
+    n: int;
+    ratio: float;
+    constructor(flag: bool, n: int, ratio: float) {
+        this.flag = flag;
+        this.n = n;
+        this.ratio = ratio;
+    }
+}
+
+class Derived extends Base {
+    tag: str;
+    items: int[];
+    small: bool;
+    constructor(flag: bool, n: int, ratio: float, tag: str, items: int[], small: bool) {
+        super(flag, n, ratio);
+        this.tag = tag;
+        this.items = items;
+        this.small = small;
+    }
+}
+
+function check(cond: bool, name: str) {
+    assert("class-field-layout: " + name, cond);
+}
+
+// Round-trip every field; a width/offset mistake shifts or truncates one.
+let d = new Derived(true, 1234567890123, 2.5, "hello", [10, 20, 30], false);
+check(d.flag === true, "bool field");
+check(d.n === 1234567890123, "int field");
+check(d.ratio === 2.5, "float field");
+check(d.tag === "hello", "str field");
+check(d.items.length === 3 && d.items[1] === 20, "ref field");
+check(d.small === false, "trailing bool field");
+
+// Adjacency: write a field, re-read its neighbours to prove no overlap.
+d.n = 42;
+check(d.flag === true && d.ratio === 2.5, "int write clobbers neighbours");
+d.flag = false;
+check(d.n === 42 && d.ratio === 2.5, "bool write clobbers neighbours");
+d.small = true;
+check(d.tag === "hello" && d.n === 42, "trailing bool write clobbers");
+
+// Many instances, interleaved reads, like a DTO batch.
+let total = 0;
+let i = 0;
+while (i < 1000) {
+    let o = new Base((i % 2) === 0, i, i as float * 0.5);
+    total = total + o.n;
+    if (o.flag) {
+        total = total + 1;
+    }
+    i = i + 1;
+}
+check(total === 500000, "batch of compact instances");
+
+print("[PASSED] class field layout (compact, no shape) ");

@@ -184,6 +184,13 @@ pub enum InstKind {
     GetFixedField {
         object: Value,
         slot: u16,
+        /// Compact byte offset of the field from the instance payload start
+        /// (`ClassLayout`), baked by the compiler. `0` when `tag` is `Null`
+        /// (a dynamic/enum-payload field, which uses `slot`).
+        offset: u32,
+        /// The field's `TypeTag`: non-`Null` means a compact class field
+        /// (offset valid); `Null` means a dynamic `slot` access.
+        tag: varn_core::TypeTag,
     },
 
     GetIndex {
@@ -211,6 +218,10 @@ pub enum InstKind {
         object: Value,
         value: Value,
         slot: u16,
+        /// Compact byte offset of the field from the instance payload start.
+        offset: u32,
+        /// The field's `TypeTag` (width/kind for codegen). Non-`Null` = compact.
+        tag: varn_core::TypeTag,
     },
 
     SetIndex {

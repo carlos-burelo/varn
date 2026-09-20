@@ -142,22 +142,28 @@ impl ExecCtx {
             }
             OpCode::GetFixedField => {
                 let obj_reg = hi(code[*ip]);
+                let tag = (code[*ip] & 0xFF) as u8;
                 *ip += 1;
                 let slot = code[*ip] as usize;
                 *ip += 1;
+                let offset = code[*ip];
+                *ip += 1;
                 let obj = self.stack.box_reg(base, obj_reg);
-                let r = self.exec_get_fixed_field(obj, slot)?;
+                let r = self.exec_get_fixed_field(obj, slot, offset, tag)?;
                 self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::SetFixedField => {
                 let val_reg = hi(code[*ip]);
+                let tag = (code[*ip] & 0xFF) as u8;
                 *ip += 1;
                 let slot = code[*ip] as usize;
                 *ip += 1;
+                let offset = code[*ip];
+                *ip += 1;
                 let obj = self.stack.box_reg(base, first_reg);
                 let val = self.stack.box_reg(base, val_reg);
-                self.exec_set_fixed_field(obj, slot, val)?;
+                self.exec_set_fixed_field(obj, slot, offset, tag, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::GetSuper => {

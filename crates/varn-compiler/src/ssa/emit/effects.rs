@@ -49,14 +49,22 @@ pub(super) fn emit_effect(
             object,
             value,
             slot,
+            offset,
+            tag,
         } => {
-            chunk.emit_rrc(
-                OpCode::SetFixedField,
-                reg[object.0 as usize],
-                reg[value.0 as usize],
-                *slot,
+            // `w1` low = the field's `TypeTag` (always non-`Null` here — a
+            // class field); `w2` = the dynamic `slot` (fallback); `w3` = the
+            // compact byte offset.
+            chunk.write(
+                Chunk::pack_op(OpCode::SetFixedField, reg[object.0 as usize]),
                 line,
             );
+            chunk.write(
+                Chunk::pack(reg[value.0 as usize], *tag as u8),
+                line,
+            );
+            chunk.write(*slot, line);
+            chunk.write(*offset as u16, line);
             return Ok(true);
         }
         InstKind::SetIndex {
