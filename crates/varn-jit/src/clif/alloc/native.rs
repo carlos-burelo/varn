@@ -112,7 +112,9 @@ pub(crate) fn emit_call_native_op(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
-    let args_start = b.ins().iadd_imm(actx.base, dest as i64);
+    // The helper reads the args back from the caller's home slots by
+    // `(act_id, reg_start, total)`, not a contiguous stack index.
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
     let total_v = b.ins().iconst(types::I64, total as i64);
     let target = (actx.helpers.resolve_native_op)(op_id);
     let fn_addr = target.func_ptr;
@@ -123,7 +125,7 @@ pub(crate) fn emit_call_native_op(
             b,
             actx.cc,
             actx.helpers.jit_call_native_fnptr,
-            &[actx.exec_ctx, fn_v, args_start, total_v],
+            &[actx.exec_ctx, fn_v, actx.base, dest_v, total_v],
         );
     } else {
         let op_id_v = b.ins().iconst(types::I64, op_id as i64);
@@ -131,7 +133,7 @@ pub(crate) fn emit_call_native_op(
             b,
             actx.cc,
             actx.helpers.jit_call_native_op,
-            &[actx.exec_ctx, op_id_v, args_start, total_v],
+            &[actx.exec_ctx, op_id_v, actx.base, dest_v, total_v],
         );
     }
     reload_boxed(b, actx, state, &regs);

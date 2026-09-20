@@ -100,8 +100,6 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     h.jit_finish_static_call = 0;
     h.jit_ensure_stack_capacity = 0;
     h.jit_call_native_fast = 0;
-    h.jit_call_native_op = 0;
-    h.jit_call_native_fnptr = 0;
     h.dispatch_intrinsic = 0;
     h.invoke_virtual = 0;
     h.invoke_virtual_flat = 0;
