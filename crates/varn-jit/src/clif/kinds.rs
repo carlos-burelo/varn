@@ -7,7 +7,7 @@
 //! callee slot (`LoadNull`), which the raw path stages but never reads;
 //! `Unset` is bottom, `Mixed` top.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
@@ -327,7 +327,7 @@ pub(crate) fn kind_flow(
             *e = K::Float;
         }
     }
-    let mut entries: HashMap<usize, Vec<K>> = HashMap::new();
+    let mut entries: HashMap<usize, Vec<K>> = HashMap::default();
     entries.insert(0, entry0);
     let mut work: Vec<usize> = vec![0];
 

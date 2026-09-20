@@ -4,7 +4,7 @@ use super::VerifyError;
 use crate::node::{TirExpr, TirExprKind, TirFunction, TirModule, TirStmt};
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, TyId, TyListId};
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
     check_declarations(m, errors);
@@ -304,8 +304,8 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
 
 /// Every handle inside a type points at an entry that exists, and types do not form cycles.
 fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyError>) {
-    let mut visited = HashSet::new();
-    let mut visited_lists = HashSet::new();
+    let mut visited = HashSet::default();
+    let mut visited_lists = HashSet::default();
     check_ty_recursive(m, ty, e, errors, &mut visited, &mut visited_lists);
 }
 

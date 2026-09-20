@@ -1,6 +1,6 @@
 use super::RuntimeString;
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -46,7 +46,7 @@ impl Shape {
             property_names,
             ordered,
             json_prefixes: OnceCell::new(),
-            transitions: RefCell::new(HashMap::new()),
+            transitions: RefCell::new(HashMap::default()),
         })
     }
 
@@ -82,7 +82,7 @@ impl Shape {
     }
 
     pub fn create_root() -> Rc<Self> {
-        Shape::create(None, HashMap::new())
+        Shape::create(None, HashMap::default())
     }
 
     pub fn transition(&self, key: RuntimeString) -> Rc<Shape> {

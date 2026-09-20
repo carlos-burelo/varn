@@ -80,7 +80,7 @@ pub struct ClifDebugSink {
     pub invariants: Vec<Violation>,
 }
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 use cranelift_codegen::ir::Function;
 

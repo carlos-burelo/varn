@@ -82,8 +82,8 @@ fn const_hint(entry: &PoolEntry) -> String {
     }
 }
 
-fn build_fn_index(proto: &FunctionProto) -> std::collections::HashMap<u16, String> {
-    let mut map = std::collections::HashMap::new();
+fn build_fn_index(proto: &FunctionProto) -> rustc_hash::FxHashMap<u16, String> {
+    let mut map = rustc_hash::FxHashMap::default();
     for (i, entry) in proto.chunk.constants.iter().enumerate() {
         if let PoolEntry::Function(f) = entry {
             let name = f.name.as_deref().unwrap_or("<anon>").to_owned();

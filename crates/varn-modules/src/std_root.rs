@@ -137,8 +137,8 @@ pub fn in_source_tree(file: &str) -> bool {
     };
 
     thread_local! {
-        static MEMO: std::cell::RefCell<std::collections::HashMap<Box<str>, bool>> =
-            std::cell::RefCell::new(std::collections::HashMap::new());
+        static MEMO: std::cell::RefCell<rustc_hash::FxHashMap<Box<str>, bool>> =
+            std::cell::RefCell::new(rustc_hash::FxHashMap::default());
     }
     if let Some(hit) = MEMO.with(|m| m.borrow().get(file).copied()) {
         return hit;

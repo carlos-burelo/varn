@@ -1,6 +1,6 @@
 use super::{RuntimeString, Value};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -8,7 +8,7 @@ static NEXT_CLASS_ID: AtomicU32 = AtomicU32::new(1);
 
 thread_local! {
     static CLASS_REGISTRY: RefCell<HashMap<u32, std::rc::Weak<ClassObj>>> =
-        RefCell::new(HashMap::new());
+        RefCell::new(HashMap::default());
 }
 
 #[derive(Debug)]
@@ -62,18 +62,18 @@ impl ClassObj {
             vtable_version: AtomicU32::new(1),
             vtable: RefCell::new(Vec::new()),
             vtable_owners: RefCell::new(Vec::new()),
-            method_map: RefCell::new(HashMap::new()),
-            statics: RefCell::new(HashMap::new()),
+            method_map: RefCell::new(HashMap::default()),
+            statics: RefCell::new(HashMap::default()),
             static_fields: RefCell::new(Vec::new()),
             root_shape: RefCell::new(super::shape::root_shape()),
-            getter_map: RefCell::new(HashMap::new()),
+            getter_map: RefCell::new(HashMap::default()),
             getter_vtable: RefCell::new(Vec::new()),
             getter_vtable_owners: RefCell::new(Vec::new()),
-            setter_map: RefCell::new(HashMap::new()),
+            setter_map: RefCell::new(HashMap::default()),
             setter_vtable: RefCell::new(Vec::new()),
             setter_vtable_owners: RefCell::new(Vec::new()),
-            static_getter_map: RefCell::new(HashMap::new()),
-            static_setter_map: RefCell::new(HashMap::new()),
+            static_getter_map: RefCell::new(HashMap::default()),
+            static_setter_map: RefCell::new(HashMap::default()),
             ctor_cache: RefCell::new(None),
             ctor_rt_cache: RefCell::new(None),
             instance_shape_cache: RefCell::new(None),
@@ -112,7 +112,7 @@ impl ClassObj {
     pub fn init_root_shape(self: &Rc<Self>) {
         let mut root = self.root_shape.borrow_mut();
         if root.class.is_none() {
-            *root = super::shape::Shape::create(Some(self.clone()), HashMap::new());
+            *root = super::shape::Shape::create(Some(self.clone()), HashMap::default());
         }
     }
 

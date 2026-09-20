@@ -150,7 +150,7 @@ pub struct DiskResolver {
     /// Modules whose binding is currently on the stack. Used to break
     /// mutual-import deadlocks when a module's body imports a peer that then
     /// asks for `core:types` again to expand a generic alias.
-    in_flight: RefCell<std::collections::HashSet<String>>,
+    in_flight: RefCell<rustc_hash::FxHashSet<String>>,
     /// The prelude, derived once from the stdlib this resolver serves.
     ///
     /// Lives here rather than in a process-wide static because it is a

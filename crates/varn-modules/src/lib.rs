@@ -306,13 +306,13 @@ struct RawManifest {
     main: Option<String>,
 
     #[serde(default)]
-    exports: std::collections::HashMap<String, String>,
+    exports: rustc_hash::FxHashMap<String, String>,
     #[serde(default)]
-    dependencies: std::collections::HashMap<String, String>,
+    dependencies: rustc_hash::FxHashMap<String, String>,
     #[serde(default, alias = "dev-dependencies", alias = "dev_dependencies")]
-    dev_dependencies: std::collections::HashMap<String, String>,
+    dev_dependencies: rustc_hash::FxHashMap<String, String>,
     #[serde(default, alias = "peer-dependencies", alias = "peer_dependencies")]
-    peer_dependencies: std::collections::HashMap<String, String>,
+    peer_dependencies: rustc_hash::FxHashMap<String, String>,
     #[serde(default)]
     workspaces: Vec<String>,
 }
@@ -322,10 +322,10 @@ pub struct PackageManifest {
     pub name: Option<String>,
     pub version: Option<String>,
     pub main: Option<String>,
-    pub exports: std::collections::HashMap<String, String>,
-    pub dependencies: std::collections::HashMap<String, String>,
-    pub dev_dependencies: std::collections::HashMap<String, String>,
-    pub peer_dependencies: std::collections::HashMap<String, String>,
+    pub exports: rustc_hash::FxHashMap<String, String>,
+    pub dependencies: rustc_hash::FxHashMap<String, String>,
+    pub dev_dependencies: rustc_hash::FxHashMap<String, String>,
+    pub peer_dependencies: rustc_hash::FxHashMap<String, String>,
     pub workspaces: Vec<String>,
 }
 

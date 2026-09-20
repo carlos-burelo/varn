@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 use std::path::Path;
 
 use crate::{
@@ -14,12 +14,12 @@ pub struct InstallResult {
 
 pub fn resolve_and_install(
     project_root: &Path,
-    deps: &std::collections::HashMap<String, DepOrigin>,
+    deps: &rustc_hash::FxHashMap<String, DepOrigin>,
     existing_lock: Option<&PmLockfile>,
     force_update: bool,
 ) -> Result<InstallResult, String> {
     let mut packages: Vec<LockPackage> = Vec::new();
-    let mut visited: HashSet<String> = HashSet::new();
+    let mut visited: HashSet<String> = HashSet::default();
 
     resolve_recursive(
         project_root,
@@ -42,7 +42,7 @@ pub fn resolve_and_install(
 
 fn resolve_recursive(
     project_root: &Path,
-    deps: &std::collections::HashMap<String, DepOrigin>,
+    deps: &rustc_hash::FxHashMap<String, DepOrigin>,
     existing_lock: Option<&PmLockfile>,
     force_update: bool,
     packages: &mut Vec<LockPackage>,

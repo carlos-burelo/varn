@@ -7,7 +7,7 @@
 
 use cranelift_codegen::ir::types;
 use cranelift_frontend::{FunctionBuilder, Variable};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
@@ -196,7 +196,7 @@ pub(super) fn declare(
         .collect();
     // Variables for caching the object's inline field data base pointer across
     // multiple GetFixedField accesses to the same register.
-    let mut local_obj_bases: HashMap<usize, Variable> = HashMap::new();
+    let mut local_obj_bases: HashMap<usize, Variable> = HashMap::default();
     let mut scan_ip = 0usize;
     while scan_ip < code.len() {
         if let Some(info) = decode(code, scan_ip, pool) {

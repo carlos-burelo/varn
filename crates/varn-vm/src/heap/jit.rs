@@ -164,7 +164,7 @@ impl Heap {
         const SENTINEL_FIELD: u64 = 0xFEED_BEEF_CAFE_1234;
         const TAIL: usize = 3;
 
-        let shape = varn_types::Shape::create(None, std::collections::HashMap::new());
+        let shape = varn_types::Shape::create(None, rustc_hash::FxHashMap::default());
         let shape_id = shape.id;
         // Both words carry the sentinel, so the word-stepping probe below
         // lands on the FIRST word of the tail whichever half it scans first.

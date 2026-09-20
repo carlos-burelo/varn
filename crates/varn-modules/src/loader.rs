@@ -15,7 +15,7 @@
 //! explicit order. Loading never compiles: `interface`/`bytecode` ride along as
 //! optional precomputed artifacts.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 use std::rc::Rc;

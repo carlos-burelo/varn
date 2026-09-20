@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 use varn_core::ast::*;
 use varn_core::AtomInterner;
 
@@ -21,7 +21,7 @@ struct ImportCollector<'a> {
 impl<'a> ImportCollector<'a> {
     fn new(ast_arena: &'a AstArena, interner: &'a AtomInterner) -> Self {
         Self {
-            imports: HashSet::new(),
+            imports: HashSet::default(),
             ast_arena,
             interner,
         }

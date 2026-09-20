@@ -4,7 +4,7 @@
 //! docstring: every walker over `chunk.code` advances with the shared
 //! decoder, and loop-boundary detection is no exception.
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 
 use varn_core::OpCode;
 
@@ -14,8 +14,8 @@ use crate::chunk::PoolEntry;
 /// `(header_instr, latch_instr)` pairs, one per `Loop` opcode. Both are
 /// instruction indices (not code-word offsets).
 pub fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, usize)> {
-    let mut word_to_instr: std::collections::HashMap<usize, usize> =
-        std::collections::HashMap::new();
+    let mut word_to_instr: rustc_hash::FxHashMap<usize, usize> =
+        rustc_hash::FxHashMap::default();
     let mut offset = 0usize;
     let mut instr_idx = 0usize;
     while offset < code.len() {
@@ -106,7 +106,7 @@ pub fn natural_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<NaturalLoop> 
     back_edges
         .into_iter()
         .map(|(header, latch)| {
-            let mut def_set = HashSet::new();
+            let mut def_set = HashSet::default();
             let mut has_calls = false;
             let mut mutates_arrays = false;
             for &instr_offset in instr_offsets.iter().take(latch + 1).skip(header) {

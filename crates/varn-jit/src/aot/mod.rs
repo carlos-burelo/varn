@@ -12,7 +12,7 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_types::chunk::{Literal, PoolEntry};
 
 /// The result of an AOT compilation: raw bytes of the object file ready to be
@@ -180,7 +180,7 @@ fn emit_module_body(
     }
 
     // String constant data: we'll store (ptr, len) pairs for each string const
-    let mut data_ids: HashMap<usize, cranelift_module::DataId> = HashMap::new();
+    let mut data_ids: HashMap<usize, cranelift_module::DataId> = HashMap::default();
 
     let mut ip = 0usize;
     while ip < code.len() {

@@ -29,7 +29,7 @@ pub(crate) struct FldCtx<'a> {
     pub exec_ctx: cranelift_codegen::ir::Value,
     pub register_meta: &'a [RegisterMeta],
     pub loop_caches: emit::LoopCaches<'a>,
-    pub local_obj_bases: &'a std::collections::HashMap<usize, Variable>,
+    pub local_obj_bases: &'a rustc_hash::FxHashMap<usize, Variable>,
 }
 
 /// Resolve boxed object `obj` + `slot` to the inline field's machine address,

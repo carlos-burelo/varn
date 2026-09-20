@@ -123,7 +123,7 @@ impl ModuleGraph {
     pub fn invalidate(&mut self, id: &ModuleId) {
         let key = id.as_str();
         let mut to_clear = Vec::new();
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = rustc_hash::FxHashSet::default();
         let mut queue = vec![key.clone()];
 
         while let Some(k) = queue.pop() {

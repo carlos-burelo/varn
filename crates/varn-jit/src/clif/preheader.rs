@@ -11,7 +11,7 @@
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 use super::emit::{
     self, call_helper, emit_array_payload, emit_object_data_base, ObjRegionCache, RegionCache,

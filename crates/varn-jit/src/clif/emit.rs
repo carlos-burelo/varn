@@ -4,7 +4,7 @@
 //! per-opcode walk there stays under the file-size governance limit; these
 //! are the leaf builders that walk calls.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
 use cranelift_frontend::{FunctionBuilder, Variable};

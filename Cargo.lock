@@ -2411,6 +2411,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "rustc-hash 1.1.0",
  "varn-core",
  "varn-types",
 ]
@@ -2447,6 +2448,7 @@ name = "varn-modules"
 version = "0.1.0"
 dependencies = [
  "postcard",
+ "rustc-hash 1.1.0",
  "semver",
  "serde",
  "toml",
@@ -2498,6 +2500,7 @@ version = "0.1.0"
 dependencies = [
  "flate2",
  "hex",
+ "rustc-hash 1.1.0",
  "semver",
  "serde",
  "serde_json",

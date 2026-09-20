@@ -16,7 +16,7 @@ pub enum SendValue {
     Decimal(Decimal),
     Char(char),
     Array(Vec<SendValue>),
-    Object(std::collections::HashMap<String, SendValue>),
+    Object(rustc_hash::FxHashMap<String, SendValue>),
     Map(Vec<(SendValue, SendValue)>),
     Set(Vec<SendValue>),
     /// Endpoint de canal (id en varn_runtime::channel). Se transfiere por
@@ -91,7 +91,7 @@ impl Value {
                         }
                     }
                 }
-                let mut map = std::collections::HashMap::new();
+                let mut map = rustc_hash::FxHashMap::default();
                 for (k, nv) in obj.read().iter() {
                     let v = nv_to_value(nv);
                     map.insert(k.to_string(), v.to_sendable()?);
@@ -121,7 +121,7 @@ impl Value {
                 Ok(SendValue::Set(items))
             }
             Value::Range(r) => {
-                let mut fields = std::collections::HashMap::new();
+                let mut fields = rustc_hash::FxHashMap::default();
                 fields.insert("start".to_string(), SendValue::Int(r.start));
                 fields.insert("end".to_string(), SendValue::Int(r.end));
                 fields.insert("inclusive".to_string(), SendValue::Bool(r.inclusive));

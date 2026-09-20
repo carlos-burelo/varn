@@ -124,7 +124,7 @@ impl ExecCtx {
                         return Ok(sv);
                     }
                 }
-                let mut map = std::collections::HashMap::new();
+                let mut map = rustc_hash::FxHashMap::default();
                 for (k, nv) in borrow.iter() {
                     map.insert(k.to_string(), self.to_sendable(nv)?);
                 }
@@ -371,7 +371,7 @@ pub(super) fn to_sendable(
                         return Ok(sv);
                     }
                 }
-                let mut map = std::collections::HashMap::new();
+                let mut map = rustc_hash::FxHashMap::default();
                 for (k, nv) in borrow.iter() {
                     map.insert(k.to_string(), ctx.to_sendable(nv)?);
                 }
@@ -411,7 +411,7 @@ pub(super) fn to_sendable(
                 )))
             }
             Some(HeapObj::Range(r)) => {
-                let mut fields = std::collections::HashMap::new();
+                let mut fields = rustc_hash::FxHashMap::default();
                 fields.insert(
                     "start".to_string(),
                     varn_types::value::SendValue::Int(r.start),

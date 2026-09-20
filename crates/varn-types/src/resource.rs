@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 pub struct ResourceStore {
     next_id: u32,
@@ -10,7 +10,7 @@ impl ResourceStore {
     pub fn new() -> Self {
         Self {
             next_id: 1,
-            map: HashMap::new(),
+            map: HashMap::default(),
         }
     }
 

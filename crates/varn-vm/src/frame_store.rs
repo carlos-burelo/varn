@@ -26,7 +26,7 @@
 //! el checker probó estático siempre trae su tag; si no, es `type mismatch`,
 //! no basura reinterpretada).
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
 use varn_types::register_meta::SlotKind;
@@ -165,7 +165,7 @@ impl FrameStore {
             refs: Vec::with_capacity(2048),
             dyn_: Vec::with_capacity(8192),
             allocs: Vec::with_capacity(512),
-            layouts: HashMap::new(),
+            layouts: HashMap::default(),
         }
     }
 

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 use varn_core::ast::*;
 
 pub fn collect_imports(program: &Program) -> HashSet<String> {
@@ -14,7 +14,7 @@ struct ImportCollector {
 impl ImportCollector {
     fn new() -> Self {
         Self {
-            imports: HashSet::new(),
+            imports: HashSet::default(),
         }
     }
 

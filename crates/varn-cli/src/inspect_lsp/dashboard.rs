@@ -213,8 +213,8 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             }
         }
 
-        let mut line_spans: std::collections::HashMap<u32, Vec<(u32, u32, u32)>> =
-            std::collections::HashMap::new();
+        let mut line_spans: rustc_hash::FxHashMap<u32, Vec<(u32, u32, u32)>> =
+            rustc_hash::FxHashMap::default();
         for (line, col, len, tt) in &abs_spans {
             line_spans.entry(*line).or_default().push((*col, *len, *tt));
         }
