@@ -181,11 +181,23 @@ pub(crate) struct AllocCtx<'a> {
 /// payload) into register `reg`'s home slot of the current activation,
 /// through the `home_store` runtime helper — the class and index come from
 /// the VM's `FrameStore`, not from inline address arithmetic.
+#[track_caller]
 pub(crate) fn store_boxed_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     reg: usize,
     boxed: cranelift_codegen::ir::Value,
+) {
+    let site = std::panic::Location::caller().line();
+    store_boxed_home_at(b, actx, reg, boxed, site);
+}
+
+pub(crate) fn store_boxed_home_at(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    reg: usize,
+    boxed: cranelift_codegen::ir::Value,
+    site: u32,
 ) {
     let (tag, payload) = if b.func.dfg.value_type(boxed) == types::I128 {
         b.ins().isplit(boxed)
@@ -196,11 +208,12 @@ pub(crate) fn store_boxed_home(
         (tag, boxed)
     };
     let reg_v = b.ins().iconst(types::I64, reg as i64);
+    let site_v = b.ins().iconst(types::I64, site as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.home_store,
-        &[actx.exec_ctx, actx.base, reg_v, tag, payload],
+        &[actx.exec_ctx, actx.base, reg_v, tag, payload, site_v],
     );
 }
 
@@ -289,12 +302,14 @@ pub(crate) fn store_home(
     }
 }
 
+#[track_caller]
 pub(crate) fn def_result(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     dest: usize,
     res: cranelift_codegen::ir::Value,
 ) {
+    let site = std::panic::Location::caller().line();
     if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
@@ -307,7 +322,7 @@ pub(crate) fn def_result(
         };
         b.def_var(actx.vars[dest], payload);
     }
-    store_boxed_home(b, actx, dest, res);
+    store_boxed_home_at(b, actx, dest, res, site);
 }
 
 pub(crate) fn emit_backedge_safepoint(

@@ -31,13 +31,28 @@ pub(crate) extern "C" fn jit_store_home(
     reg: usize,
     tag: u64,
     payload: u64,
+    site: usize,
 ) {
     // SAFETY: generated code passes the live `ExecCtx` and its own activation.
     let ctx = unsafe { &mut *ctx };
     let addr = ctx.stack.addr_of(act_id, reg);
     let v = VmValue::from_raw_parts(tag, payload);
-    if ctx.stack.set_addr(addr, v).is_err() {
-        debug_assert!(false, "jit_store_home: class mismatch for register {reg}");
+    if let Err(e) = ctx.stack.set_addr(addr, v) {
+        let fname = ctx
+            .frames
+            .last()
+            .and_then(|f| f.closure().proto.name.as_ref().map(|n| n.to_string()))
+            .unwrap_or_else(|| "<none>".to_string());
+        debug_assert!(
+            false,
+            "jit_store_home: mismatch fn={fname} site_line={site} act={act_id} reg={reg} idx={} class={:?} tag={:#x} payload={:#x} kind={} err={}",
+            addr.idx,
+            addr.class,
+            v.raw_tag(),
+            v.raw_payload(),
+            v.kind(),
+            e
+        );
     }
 }
 

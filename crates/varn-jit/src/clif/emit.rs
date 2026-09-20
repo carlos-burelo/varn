@@ -628,12 +628,35 @@ pub(super) fn retag_raw_return(
     }
 }
 
+thread_local! {
+    /// Set when the lowering emits a call to a helper the VM left at address 0
+    /// (its body is still a fase-A tripwire). `try_compile` reads it and bails
+    /// the whole function instead of emitting a call to `unreachable!`/null.
+    static DISABLED_HELPER_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(crate) fn reset_disabled_helper_hit() {
+    DISABLED_HELPER_HIT.with(|c| c.set(false));
+}
+
+pub(crate) fn disabled_helper_hit() -> bool {
+    DISABLED_HELPER_HIT.with(|c| c.get())
+}
+
+#[inline]
+fn note_if_disabled(helper: usize) {
+    if helper == 0 {
+        DISABLED_HELPER_HIT.with(|c| c.set(true));
+    }
+}
+
 pub(super) fn call_helper(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
     helper: usize,
     args: &[cranelift_codegen::ir::Value],
 ) -> cranelift_codegen::ir::Value {
+    note_if_disabled(helper);
     let mut sig = Signature::new(cc);
     for _ in 0..args.len() {
         sig.params.push(AbiParam::new(types::I64));
@@ -653,6 +676,7 @@ pub(super) fn call_helper_void(
     helper: usize,
     args: &[cranelift_codegen::ir::Value],
 ) {
+    note_if_disabled(helper);
     let mut sig = Signature::new(cc);
     for _ in 0..args.len() {
         sig.params.push(AbiParam::new(types::I64));

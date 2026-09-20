@@ -197,6 +197,65 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     r
 }
 
+/// Fase B: opcodes whose lowering reaches a helper that is still a fase-A
+/// tripwire, or that need call/exception/suspension machinery not yet migrated.
+/// A proto containing any of them is left to the interpreter. Belt to
+/// `call_helper`'s disabled-helper flag: this catches the paths that invoke a
+/// disabled helper directly (clif→clif / wrapper calls) rather than through
+/// `call_helper`.
+fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
+    let code = &proto.chunk.code;
+    let pool = &proto.chunk.constants;
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let Some(info) = decode(code, ip, pool) else {
+            break;
+        };
+        let name = match OpCode::from_u8(code[ip] as u8) {
+            Some(OpCode::Call) => "Call",
+            Some(OpCode::CallMethod) => "CallMethod",
+            Some(OpCode::InvokeVirtual) => "InvokeVirtual",
+            Some(OpCode::CallSpread) => "CallSpread",
+            Some(OpCode::CallSelf) => "CallSelf",
+            Some(OpCode::CallNativeOp) => "CallNativeOp",
+            Some(OpCode::Intrinsic) => "Intrinsic",
+            Some(OpCode::MakeClosure) => "MakeClosure",
+            Some(OpCode::MakeClass) => "MakeClass",
+            Some(OpCode::Inherit) => "Inherit",
+            Some(OpCode::Method) => "Method",
+            Some(OpCode::DefineStatic) => "DefineStatic",
+            Some(OpCode::DefineGetter) => "DefineGetter",
+            Some(OpCode::DefineSetter) => "DefineSetter",
+            Some(OpCode::DefineStaticGetter) => "DefineStaticGetter",
+            Some(OpCode::DefineStaticSetter) => "DefineStaticSetter",
+            Some(OpCode::DeclareField) => "DeclareField",
+            Some(OpCode::BindMethod) => "BindMethod",
+            Some(OpCode::GetSuper) => "GetSuper",
+            Some(OpCode::GetProperty) => "GetProperty",
+            Some(OpCode::GetPropertyMaybe) => "GetPropertyMaybe",
+            Some(OpCode::SetProperty) => "SetProperty",
+            Some(OpCode::GetSymbol) => "GetSymbol",
+            Some(OpCode::Try) => "Try",
+            Some(OpCode::Throw) => "Throw",
+            Some(OpCode::PopTry) => "PopTry",
+            Some(OpCode::Yield) => "Yield",
+            Some(OpCode::Await) => "Await",
+            Some(OpCode::Spawn) => "Spawn",
+            Some(OpCode::LoadModule) => "LoadModule",
+            Some(OpCode::LoadModuleSlot) => "LoadModuleSlot",
+            Some(OpCode::StoreModuleSlot) => "StoreModuleSlot",
+            Some(OpCode::InvokeRuntimeStatic) => "InvokeRuntimeStatic",
+            Some(OpCode::LoadStaticFn) => "LoadStaticFn",
+            _ => {
+                ip += info.len;
+                continue;
+            }
+        };
+        return Some(name);
+    }
+    None
+}
+
 /// Lower `proto`. `osr_ip` selects the ENTRY, not the body: `None` builds the
 /// ordinary entry (arguments in registers, execution from ip 0), `Some(ip)`
 /// builds an on-stack-replacement entry that takes no arguments, reloads the
@@ -218,6 +277,29 @@ pub fn try_compile(
     if crate::PAIR_MIGRATION_PENDING {
         return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
     }
+
+    // Fase B subset gate: call/exception/suspension-heavy protos stay
+    // interpreted until their helpers are migrated to `FrameStore`.
+    if proto.is_generator || proto.is_async {
+        return Err("clif: generator/async not JIT-able in fase B".into());
+    }
+    if let Some(op) = uses_disabled_opcode(proto) {
+        return Err(format!("clif: opcode {op} disabled in fase B"));
+    }
+    // `Ref` is the only physical class whose home store validates strictly
+    // (`set_addr` rejects a non-heap, non-null value), and the current
+    // `register_meta` still lets a Ref-classed register hold a non-ref value
+    // on some paths (exposed by `Headers.toObject`). Until the class
+    // provenance is reconciled, protos with any Ref register stay interpreted.
+    if proto
+        .register_meta
+        .iter()
+        .any(|m| m.kind == SlotKind::Ref)
+        || proto.param_kinds.iter().any(|k| *k == SlotKind::Ref)
+    {
+        return Err("clif: Ref-class registers disabled in fase B".into());
+    }
+    super::emit::reset_disabled_helper_hit();
 
     let nparams = proto.arity.saturating_sub(1);
     if proto.param_kinds.len() != nparams {
@@ -264,6 +346,9 @@ pub fn try_compile(
         }
         other => other?,
     };
+    if super::emit::disabled_helper_hit() {
+        return Err("clif: uses a helper disabled in fase B".into());
+    }
     let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the

@@ -10,16 +10,16 @@
 use crate::closure::VmClosure;
 use varn_types::FunctionProto;
 
-/// Fase A del frame por clases: el almacén de registros particionado
-/// (`FrameStore`) invalida el layout `VmValue` contiguo que el código
-/// generado direcciona inline (stride 16B, tag/payload por offset). Mientras
-/// el lowering no aprenda el layout nuevo (fase B), compilar sería generar
-/// código contra una memoria que ya no existe: toda compilación baila.
-///
-/// TODO(fase-B): poner a `false` cuando `varn-jit` baje de SSA tipada con el
-/// layout por clases (GPR/FPR/REF/DYN) y re-auditar `jit_layout`,
-/// `frame_layout`, `emit`, `safepoints` y `clif_link`.
-pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = true;
+/// Fase B del frame por clases: el lowering ya direcciona los homes por
+/// `FrameStore` (helpers `home_store`/`home_load`, actividad = `base`) y el
+/// wrapper carga los argumentos por clase, así que la compilación está
+/// abierta. Los protos que aún dependen de helpers tripwired (llamadas,
+/// excepciones, suspension, clases, ICs de propiedad, intrínsecos, módulos)
+/// bajan al intérprete por el subset gate de `clif::lower` — ver
+/// `docs/plans/2026-09-19-jit-fase-b-frame-clases.md`. A medida que cada
+/// helper se restaure contra `FrameStore`, se quita de `build_jit_helpers`'s
+/// lista de deshabilitados y el subset crece.
+pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = false;
 
 impl VmClosure {
     /// Frame entries a proto must accumulate before it is worth lowering.

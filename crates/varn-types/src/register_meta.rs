@@ -83,6 +83,7 @@ pub struct RegisterMeta {
     pub kind: SlotKind,
 }
 
+
 /// Sentinel stored in a `Ref` slot that has never been written.
 ///
 /// The interpreter over-dimensions `register_count`, so trailing `Ref` slots
