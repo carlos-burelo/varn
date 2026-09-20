@@ -496,26 +496,18 @@ de 16B). `alloc_instance_fast` ya zero-fillea → paridad.
 
 ---
 
-## 18. Siguiente pecado dinámico: acceso a campo de clase vía helper
+## 18. Acceso a campo de clase inline — HECHO
 
-`GetFixedField`/`SetFixedField` para instancias siguen yendo al helper
-`get_fixed_field`/`set_fixed_field` (Rust), que hace **lookup de layout en
-runtime** (`ClassObj::find_by_id` + `get_or_compute_layout`) por acceso. Es el
-pecado dinámico que queda.
+Commit `1de8615e`. Una clase NO tiene shape: el offset+tag del campo se
+**bake-an** en `GetFixedField`/`SetFixedField` (4º word = offset compacto; byte
+bajo de `w1` = `TypeTag`, `Null` = acceso por slot dinámico; `w2` = slot para
+el fallback Object/Record). El JIT inlina load/store por tag; el intérprete
+lee/escribe por offset; el helper por slot queda como fallback dinámico.
 
-El compilador conoce la clase (`Resolution::FieldSlot(slot)`), así que puede
-**bake-ar** el `(offset, size, tag)` compacto en la instrucción (como
-`from_tir/build.rs:828` ya resuelve el slot). Plan:
+`bench dto` (release): **9.09x → 1.33x** (288 → 55 ms). collection_pipeline
+11.11x → 7.14x. Test nuevo `tests/class_field_layout.vn` (herencia + anchos
+mixtos + adyacencia) en `main.vn`. 4 cuadrantes 1233/0.
 
-1. Extender `InstKind::GetFixedField/SetFixedField` con el `FieldRepr` resuelto
-   (el compilador computa el mismo `ClassLayout` que `class_layout.rs`).
-2. Codificarlo en el bytecode (hoy `w2 = slot`; hay bits libres en el byte
-   bajo de `w1`) o un 4º word; actualizar el decoder.
-3. En `clif/fields.rs`, inline: `emit_object_data_base` + load/store compacto
-   en `offset` (sin helper, sin lookup). Mantener el helper como slow path
-   para receptores no-clase / null (igual que hoy `narrow`).
-4. Tests: `tests/53`, `tests/107`, `tests/116`, `tests/63` + un DTO con
-   campos angostos.
 
 
 
