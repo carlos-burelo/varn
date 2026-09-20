@@ -309,6 +309,29 @@ Lo que **no** se hizo (para C4 al 100% según el plan):
   punto, o exponer TIR al backend; es un cambio de formato (Ley 10: declarar
   ganancia/verificación/borrado antes de hacerlo).
 
+---
+
+## 11. Progreso B6/B7 (esta sesión)
+
+- **Fix de cobertura (bug de C1)**: `istore32` con valor `I32` fallaba el
+  verifier de Cranelift y tiraba ~600 funciones al intérprete en silencio.
+  Ahora `bail` de `tests/main.vn` bajó de 1031 a 416 (clif=1123). Commit
+  `848dfd87`.
+- **B7 `charCodeAt`**: llega como `CallNativeOp` (tabla de métodos core), no
+  como `Intrinsic`, así que el scan de regiones no lo reconocía, lo marcaba
+  como alloc y hacía una llamada nativa por iteración. Ahora se reconoce por
+  op-id (`is_str_char_index_op_id`), se registra como string site y se inlinea
+  con la misma vista de bytes hoistada. `bench_str_ops char_code`: **316 → 7 ms**
+  (checksum idéntico). Commit `2dfbdc9e`.
+- **B7 `str_concat`**: se quita el flush/reload muerto (solo asigna; no GC ni
+  reentrada). Commit `2257984d`.
+
+Pendiente B7: `slice`/`substring` hoistado (vista de bytes + helper que
+asigna), `int_to_str`, `prefix_suffix` (receptor no loop-invariant, coste por
+llamada). Medir con `compare.ps1 -Only str_ops` (el wall-time del harness está
+dominado por carga de módulos; usar las `ms` internas por sección).
+
+
 
 
 
