@@ -311,7 +311,12 @@ fn emit_vm_call(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    for r in arg_start..(arg_start + total).min(actx.nregs) {
+    // Every register's home must be current before the call: if the callee (or
+    // anything below) throws and the exception is caught below this caller, the
+    // compiled frame is abandoned and the interpreter RESUMES this frame reading
+    // its registers out of their homes. `flush_boxed` only covers the heap
+    // classes, so flush the GPR/FPR homes too (tests/65-safepoint-roots).
+    for r in 0..actx.nregs {
         store_home(b, actx, state, r);
     }
 

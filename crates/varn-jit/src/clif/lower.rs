@@ -232,9 +232,6 @@ fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
             Some(OpCode::GetPropertyMaybe) => "GetPropertyMaybe",
             Some(OpCode::SetProperty) => "SetProperty",
             Some(OpCode::GetSymbol) => "GetSymbol",
-            Some(OpCode::Try) => "Try",
-            Some(OpCode::Throw) => "Throw",
-            Some(OpCode::PopTry) => "PopTry",
             Some(OpCode::Yield) => "Yield",
             Some(OpCode::Await) => "Await",
             Some(OpCode::Spawn) => "Spawn",
@@ -284,10 +281,11 @@ pub fn try_compile(
         return Err(format!("clif: opcode {op} disabled in fase B"));
     }
     // `Ref` is the only physical class whose home store validates strictly
-    // (`set_addr` rejects a non-heap, non-null value), and the current
-    // `register_meta` still lets a Ref-classed register hold a non-ref value
-    // on some paths (exposed by `Headers.toObject`). Until the class
-    // provenance is reconciled, protos with any Ref register stay interpreted.
+    // (`set_addr` rejects a non-heap, non-null value), and `register_meta`
+    // still lets a Ref-classed register hold a non-ref value on some paths
+    // (a wrong value then reaches `ArrayLength`/`Headers.toObject`). Until the
+    // class provenance is reconciled, protos with any Ref register stay
+    // interpreted.
     if proto
         .register_meta
         .iter()
