@@ -16,6 +16,8 @@ use std::fmt::Write as _;
 use varn_core::OpCode;
 use varn_types::{FunctionProto, PoolEntry};
 
+use crate::render::truncate;
+
 use crate::flags::DebugFlags;
 
 const BOLD: &str = "\x1b[1m";
@@ -166,14 +168,4 @@ fn count_one(proto: &FunctionProto) -> Counts {
     generic.sort_by(|a, b| b.1.cmp(&a.1));
     c.by_op = generic;
     c
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        return s.to_owned();
-    }
-    let cut: String = s.chars().take(max.saturating_sub(1)).collect();
-    let mut out = String::with_capacity(max);
-    let _ = write!(out, "{cut}…");
-    out
 }

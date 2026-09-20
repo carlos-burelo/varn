@@ -7,6 +7,8 @@
 
 use varn_types::{FunctionProto, PoolEntry};
 
+use crate::render::truncate;
+
 const BOLD: &str = "\x1b[1m";
 const DIM: &str = "\x1b[2m";
 const R: &str = "\x1b[0m";
@@ -73,12 +75,4 @@ pub fn debug_summary(proto: &FunctionProto) {
             flag
         );
     }
-}
-
-fn truncate(s: &str, width: usize) -> String {
-    if s.chars().count() <= width {
-        return s.to_owned();
-    }
-    let head: String = s.chars().take(width.saturating_sub(1)).collect();
-    format!("{head}…")
 }

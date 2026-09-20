@@ -13,6 +13,7 @@ pub mod loop_diagnostics;
 pub mod modules;
 pub mod phase;
 pub mod registry;
+pub mod render;
 pub mod report;
 pub mod roots;
 pub mod scope;

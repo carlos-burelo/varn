@@ -14,6 +14,8 @@ use varn_jit::clif::lower::NoLinker;
 use varn_jit::{JitHelpers, SIZE_GATE_WORDS};
 use varn_types::{FunctionProto, Literal, PoolEntry, VmValue};
 
+use crate::render::truncate;
+
 use crate::flags::DebugFlags;
 
 const BOLD: &str = "\x1b[1m";
@@ -243,13 +245,4 @@ pub fn debug_bails(
             );
         }
     }
-}
-
-fn truncate(s: &str, width: usize) -> String {
-    if s.chars().count() <= width {
-        return s.to_owned();
-    }
-    let keep = width.saturating_sub(1);
-    let head: String = s.chars().take(keep).collect();
-    format!("{head}…")
 }
