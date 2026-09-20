@@ -1,7 +1,6 @@
 use crate::binder::BindResult;
 use crate::module_resolver::cache::ExportMap;
 use crate::module_resolver::graph::ModuleGraph;
-use std::cell::RefCell;
 use std::path::Path;
 use std::sync::Arc;
 use varn_core::ModuleId;
@@ -146,19 +145,19 @@ pub struct DiskResolver {
     /// comes from here. This resolver does not read files or talk to the
     /// provider itself — see ADR-0011.
     loader: varn_modules::loader::ModuleRegistry,
-    graph: RefCell<ModuleGraph>,
+    graph: parking_lot::Mutex<ModuleGraph>,
     /// Modules whose binding is currently on the stack. Used to break
     /// mutual-import deadlocks when a module's body imports a peer that then
     /// asks for `core:types` again to expand a generic alias.
-    in_flight: RefCell<rustc_hash::FxHashSet<String>>,
+    in_flight: parking_lot::Mutex<rustc_hash::FxHashSet<String>>,
     /// The prelude, derived once from the stdlib this resolver serves.
     ///
     /// Lives here rather than in a process-wide static because it is a
     /// *function of the stdlib in use*: a process that switches std provenance
     /// (the language server does, between the checkout tree and the embedded
     /// bundle) would otherwise keep answering from the first one it ever saw.
-    core_exports: RefCell<Option<Arc<CoreExportsMap>>>,
-    core_members: RefCell<Option<Arc<crate::core::loader::CoreMembers>>>,
+    core_exports: parking_lot::Mutex<Option<Arc<CoreExportsMap>>>,
+    core_members: parking_lot::Mutex<Option<Arc<crate::core::loader::CoreMembers>>>,
     /// The single `Atom` table for this compilation. Every `varn_parser::parse`
     /// this resolver drives (the entry file included, via
     /// `interner_snapshot`/`set_interner`) reads from and grows this same
@@ -166,10 +165,10 @@ pub struct DiskResolver {
     /// the same text minted while parsing another — see `Symbol::origin_module`.
     /// A resolver-per-file `AtomInterner` was the bug: two parses never shared
     /// one, so their `Atom` indices meant nothing to each other.
-    interner: RefCell<varn_core::AtomInterner>,
+    interner: parking_lot::Mutex<varn_core::AtomInterner>,
     /// The single `CheckerTyId` table for this compilation — same reasoning
     /// and lifecycle as `interner` above (see `ImportResolver::ty_table_snapshot`).
-    ty_table: RefCell<std::sync::Arc<crate::types::CheckerTyTable>>,
+    ty_table: parking_lot::Mutex<std::sync::Arc<crate::types::CheckerTyTable>>,
 }
 
 impl Default for DiskResolver {
@@ -182,12 +181,12 @@ impl DiskResolver {
     pub fn new() -> Self {
         Self {
             loader: varn_modules::loader::default_registry(),
-            graph: RefCell::default(),
-            in_flight: RefCell::default(),
-            core_exports: RefCell::default(),
-            core_members: RefCell::default(),
-            interner: RefCell::default(),
-            ty_table: RefCell::default(),
+            graph: parking_lot::Mutex::default(),
+            in_flight: parking_lot::Mutex::default(),
+            core_exports: parking_lot::Mutex::default(),
+            core_members: parking_lot::Mutex::default(),
+            interner: parking_lot::Mutex::default(),
+            ty_table: parking_lot::Mutex::default(),
         }
     }
 
@@ -198,17 +197,6 @@ impl DiskResolver {
         self.loader.source(id).ok()
     }
 
-    /// Mutate the live `CheckerTyTable` in place. Used by the interface cache
-    /// to decode into the SAME table consumers will read from, so decoded ids
-    /// are valid for everyone (ADR-0011, Ley 2).
-    pub(crate) fn with_ty_table_mut<R>(
-        &self,
-        f: impl FnOnce(&mut crate::types::CheckerTyTable) -> R,
-    ) -> R {
-        let mut live = self.ty_table.borrow_mut();
-        f(std::sync::Arc::make_mut(&mut live))
-    }
-
     /// A clone of the compilation's `Atom` table as of now. Cheap relative to
     /// a parse, and the only way to hand modules-so-far's interned text to a
     /// caller without exposing the `RefCell` itself: `AtomInterner::clone`
@@ -217,7 +205,7 @@ impl DiskResolver {
     /// resolves identically through the resolver's live table or through any
     /// other snapshot taken later.
     pub fn interner_snapshot(&self) -> varn_core::AtomInterner {
-        self.interner.borrow().clone()
+        self.interner.lock().clone()
     }
 
     /// Publish `interner` into the compilation's shared table: keep every
@@ -238,7 +226,7 @@ impl DiskResolver {
     /// still resolve through that binder's own interner for cross-module
     /// reads (the `cache::encode_symbol`/`decode_symbol` text round-trip).
     pub fn set_interner(&self, interner: varn_core::AtomInterner) {
-        let mut live = self.interner.borrow_mut();
+        let mut live = self.interner.lock();
         if interner.len() <= live.len() {
             return;
         }
@@ -254,15 +242,15 @@ impl DiskResolver {
 
     /// Evict `id` and everything that transitively imports it.
     pub fn invalidate(&self, id: &ModuleId) {
-        self.graph.borrow_mut().invalidate(id);
+        self.graph.lock().invalidate(id);
     }
 
     /// Drop every memoized module, the prelude included: a std swap invalidates
     /// it just as surely as an edit invalidates a workspace module.
     pub fn clear(&self) {
-        self.graph.borrow_mut().clear();
-        *self.core_exports.borrow_mut() = None;
-        *self.core_members.borrow_mut() = None;
+        self.graph.lock().clear();
+        *self.core_exports.lock() = None;
+        *self.core_members.lock() = None;
     }
 
     pub fn types_cache_dir(&self) -> std::path::PathBuf {
@@ -270,7 +258,7 @@ impl DiskResolver {
         // re-entrant, and a borrow spanning a call into another crate is the
         // kind of thing that only fails once someone makes that crate call
         // back.
-        let root = self.graph.borrow_mut().project_root_or_init().clone();
+        let root = self.graph.lock().project_root_or_init().clone();
         varn_modules::artifact::get_types_cache_dir(&root)
     }
 
@@ -281,44 +269,44 @@ impl DiskResolver {
     // resolve would panic at runtime.
 
     pub(super) fn cached_bind(&self, key: &str) -> Option<Arc<BindResult>> {
-        self.graph.borrow().bind(key)
+        self.graph.lock().bind(key)
     }
 
     pub(super) fn store_bind(&self, key: String, bind: Arc<BindResult>) {
-        self.graph.borrow_mut().insert_bind(key, bind);
+        self.graph.lock().insert_bind(key, bind);
     }
 
     pub(super) fn cached_exports(&self, key: &str) -> Option<Arc<ExportMap>> {
-        self.graph.borrow().exports(key)
+        self.graph.lock().exports(key)
     }
 
     pub(super) fn store_exports(&self, key: String, exports: Arc<ExportMap>) {
-        self.graph.borrow_mut().insert_exports(key, exports);
+        self.graph.lock().insert_exports(key, exports);
     }
 
     pub(super) fn cached_program(&self, key: &str) -> Option<Arc<varn_core::ast::Program>> {
-        self.graph.borrow().program(key)
+        self.graph.lock().program(key)
     }
 
     pub(super) fn store_program(&self, key: String, program: Arc<varn_core::ast::Program>) {
-        self.graph.borrow_mut().insert_program(key, program);
+        self.graph.lock().insert_program(key, program);
     }
 
     pub(super) fn cached_arena(&self, key: &str) -> Option<Arc<varn_core::ast::AstArena>> {
-        self.graph.borrow().arena(key)
+        self.graph.lock().arena(key)
     }
 
     pub(super) fn store_arena(&self, key: String, arena: Arc<varn_core::ast::AstArena>) {
-        self.graph.borrow_mut().insert_arena(key, arena);
+        self.graph.lock().insert_arena(key, arena);
     }
 
     pub(super) fn cached_path(&self, base_dir: &str, specifier: &str) -> Option<String> {
-        self.graph.borrow().resolved_path(base_dir, specifier)
+        self.graph.lock().resolved_path(base_dir, specifier)
     }
 
     pub(super) fn store_path(&self, base_dir: String, specifier: String, abs: String) {
         self.graph
-            .borrow_mut()
+            .lock()
             .insert_resolved_path(base_dir, specifier, abs);
     }
 
@@ -351,7 +339,7 @@ impl DiskResolver {
 
     /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
     pub(super) fn is_binding(&self, key: &str) -> bool {
-        self.in_flight.borrow().contains(key)
+        self.in_flight.lock().contains(key)
     }
 
     fn bind_and_cache(
@@ -362,9 +350,9 @@ impl DiskResolver {
         lex_errs: Vec<varn_core::Diagnostic>,
         key: &str,
     ) -> Arc<BindResult> {
-        self.in_flight.borrow_mut().insert(key.to_owned());
+        self.in_flight.lock().insert(key.to_owned());
         let mut bind = crate::binder::Binder::bind(program, ast_arena, interner, self);
-        self.in_flight.borrow_mut().remove(key);
+        self.in_flight.lock().remove(key);
         for e in lex_errs {
             bind.diagnostics.emit(e);
         }
@@ -527,11 +515,11 @@ impl DiskResolver {
 
 impl ImportResolver for DiskResolver {
     fn interner_snapshot(&self) -> varn_core::AtomInterner {
-        self.interner.borrow().clone()
+        self.interner.lock().clone()
     }
 
     fn ty_table_snapshot(&self) -> std::sync::Arc<crate::types::CheckerTyTable> {
-        self.ty_table.borrow().clone()
+        self.ty_table.lock().clone()
     }
 
     fn set_ty_table(&self, table: std::sync::Arc<crate::types::CheckerTyTable>) {
@@ -539,21 +527,21 @@ impl ImportResolver for DiskResolver {
         // which can disagree with the live table past their common prefix.
         // `absorb` keeps live's own indices stable and only learns shapes it
         // is missing.
-        let mut live = self.ty_table.borrow_mut();
+        let mut live = self.ty_table.lock();
         std::sync::Arc::make_mut(&mut live).absorb(&table);
     }
 
     fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId {
-        let mut live = self.ty_table.borrow_mut();
+        let mut live = self.ty_table.lock();
         std::sync::Arc::make_mut(&mut live).intern(kind)
     }
 
     fn interner_len(&self) -> usize {
-        self.interner.borrow().len()
+        self.interner.lock().len()
     }
 
     fn intern(&self, s: &str) -> varn_core::Atom {
-        self.interner.borrow_mut().intern(s)
+        self.interner.lock().intern(s)
     }
 
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
@@ -695,26 +683,26 @@ impl ImportResolver for DiskResolver {
     }
 
     fn record_dep(&self, importer: &str, imported: &str) {
-        self.graph.borrow_mut().record_dep(importer, imported);
+        self.graph.lock().record_dep(importer, imported);
     }
 
     fn core_exports(&self) -> Arc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>> {
-        if let Some(hit) = self.core_exports.borrow().as_ref() {
+        if let Some(hit) = self.core_exports.lock().as_ref() {
             return Arc::clone(hit);
         }
         // Built with the borrow released: building resolves stdlib modules
         // through `self`, which takes the same borrows.
         let built = Arc::new(crate::core::loader::build_core_exports(self));
-        *self.core_exports.borrow_mut() = Some(Arc::clone(&built));
+        *self.core_exports.lock() = Some(Arc::clone(&built));
         built
     }
 
     fn core_members(&self) -> Arc<crate::core::loader::CoreMembers> {
-        if let Some(hit) = self.core_members.borrow().as_ref() {
+        if let Some(hit) = self.core_members.lock().as_ref() {
             return Arc::clone(hit);
         }
         let built = Arc::new(crate::core::loader::build_core_members(self));
-        *self.core_members.borrow_mut() = Some(Arc::clone(&built));
+        *self.core_members.lock() = Some(Arc::clone(&built));
         built
     }
 }

@@ -324,3 +324,12 @@ fn bind_result_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<varn_checker::BindResult>();
 }
+
+/// El resolver es el orquestador que un pool de workers compartiría. Su estado
+/// interior mutable pasó de `RefCell` a locks (`parking_lot::Mutex`) y su loader
+/// exige `Send + Sync`, así que debe ser `Send + Sync` (ADR-0012).
+#[test]
+fn disk_resolver_is_send_and_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<varn_checker::module_resolver::DiskResolver>();
+}

@@ -15,6 +15,7 @@ varn-tir      = { path = "../varn-tir" }
 # varn-builtins is not standalone-buildable.
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 rustc-hash    = { workspace = true }
+parking_lot   = { workspace = true }
 serde         = { workspace = true, features = ["rc"] }
 postcard      = { workspace = true }
 

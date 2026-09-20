@@ -121,7 +121,7 @@ impl std::error::Error for LoadError {}
 /// `resolve` has a default implementation over `varn_modules::resolver` so every
 /// backend agrees by construction; a backend only overrides it if it genuinely
 /// resolves differently (none does today).
-pub trait ModuleLoader {
+pub trait ModuleLoader: Send + Sync {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError> {
         crate::resolver::ModuleResolver::new()
             .resolve(specifier, from)

@@ -78,3 +78,10 @@ if publish cost shows up (Ley 10: no pre-optimisation without data).
    `Send + Sync`.
 4. Delete `absorb`/`set_ty_table`/`reintern` in-process paths; keep the disk codec.
 5. Parallel module checking test.
+
+**Progress:** steps 1–3 done. `CheckerTyTable`, `BindResult`, `ModuleGraph` and
+`DiskResolver` are `Send + Sync` (compile-time assertions in
+`checker_ty_table_invariants.rs`); the resolver's interior mutability moved from
+`RefCell` to `parking_lot::Mutex` and `ModuleLoader` now requires `Send + Sync`.
+Still pending: a deterministic parallel merge (the shared `absorb`/`set_ty_table`
+publish order is sequential today) and the parallel test.
