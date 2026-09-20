@@ -517,7 +517,15 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
 /// sitio definitivo. Con checksum eso se detecta, pero se detecta *después* de
 /// haber perdido la entrada; con rename no llega a ocurrir.
 pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp = path.with_extension(format!("tmp{}", std::process::id()));
+    // The temp name MUST be unique per call, not just per process: two threads
+    // writing two different artifacts would otherwise share one temp path, and
+    // the first `rename` could publish the SECOND writer's bytes under the
+    // first artifact's name — a cross-module corruption with no error anywhere
+    // (observed as a module reading another's checker interface).
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp{}_{}", std::process::id(), seq));
     std::fs::write(&tmp, bytes)?;
     match std::fs::rename(&tmp, path) {
         Ok(()) => Ok(()),

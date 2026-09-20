@@ -198,6 +198,16 @@ impl DiskResolver {
         self.loader.source(id).ok()
     }
 
+    /// Mutate the live `CheckerTyTable` in place. Used by the interface cache
+    /// to decode into the SAME table consumers will read from, so decoded ids
+    /// are valid for everyone (ADR-0011, Ley 2).
+    pub(crate) fn with_ty_table_mut<R>(
+        &self,
+        f: impl FnOnce(&mut crate::types::CheckerTyTable) -> R,
+    ) -> R {
+        f(&mut self.ty_table.borrow_mut())
+    }
+
     /// A clone of the compilation's `Atom` table as of now. Cheap relative to
     /// a parse, and the only way to hand modules-so-far's interned text to a
     /// caller without exposing the `RefCell` itself: `AtomInterner::clone`
@@ -447,6 +457,7 @@ impl DiskResolver {
         &self,
         virtual_id: &str,
         source: &str,
+        carrier: super::CarrierKind,
         visiting: &mut Vec<String>,
     ) -> Rc<ExportMap> {
         if visiting.iter().any(|v| v == virtual_id) {
@@ -454,7 +465,7 @@ impl DiskResolver {
         }
         visiting.push(virtual_id.to_owned());
 
-        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source) {
+        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
             self.store_bind(virtual_id.to_owned(), Rc::new(cached.bind));
             visiting.pop();
             return Rc::new(cached.exports);
@@ -481,16 +492,21 @@ impl DiskResolver {
             visiting,
         );
 
-        super::cache::save_to_cache(self, virtual_id, source, &exports, bind.as_ref());
+        super::cache::save_to_cache(self, virtual_id, source, &exports, bind.as_ref(), carrier);
         visiting.pop();
         Rc::new(exports)
     }
 
-    fn bind_from_embedded(&self, virtual_id: &str, source: &str) -> Option<Rc<BindResult>> {
+    fn bind_from_embedded(
+        &self,
+        virtual_id: &str,
+        source: &str,
+        carrier: super::CarrierKind,
+    ) -> Option<Rc<BindResult>> {
         if let Some(cached) = self.cached_bind(virtual_id) {
             return Some(cached);
         }
-        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source) {
+        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
             let bind_rc = Rc::new(cached.bind);
             self.store_bind(virtual_id.to_owned(), Rc::clone(&bind_rc));
             self.store_exports(
@@ -567,16 +583,18 @@ impl ImportResolver for DiskResolver {
         let Some(source) = self.load_source(&ModuleId::local_str(&canonical)) else {
             return None;
         };
+        let carrier = super::CarrierKind::from(source.provenance);
         let source = source.text;
+        let source = source.as_ref();
 
-        if let Some(cached) = super::cache::try_load_cache(self, &canonical, &source) {
+        if let Some(cached) = super::cache::try_load_cache(self, &canonical, source, carrier) {
             let bind_rc = Rc::new(cached.bind);
             self.store_bind(canonical.clone(), Rc::clone(&bind_rc));
             self.store_exports(canonical, Rc::new(cached.exports));
             return Some(bind_rc);
         }
 
-        let (program, ast_arena, lex_errs) = self.parse_and_cache(&source, &canonical)?;
+        let (program, ast_arena, lex_errs) = self.parse_and_cache(source, &canonical)?;
         let bind = self.bind_and_cache(
             &program,
             ast_arena.as_ref(),
@@ -594,7 +612,7 @@ impl ImportResolver for DiskResolver {
             base_dir,
             &mut Vec::new(),
         );
-        super::cache::save_to_cache(self, &canonical, &source, &exports, bind.as_ref());
+        super::cache::save_to_cache(self, &canonical, source, &exports, bind.as_ref(), carrier);
 
         Some(bind)
     }
@@ -637,10 +655,11 @@ impl ImportResolver for DiskResolver {
         }
 
         let source = self.load_source(&ModuleId::stdlib(specifier))?;
+        let carrier = super::CarrierKind::from(source.provenance);
         // SOURCE es la verdad; la interfaz precompilada es una optimización
         // (ver ADR-0011). Se carga desde texto siempre que exista, para que el
         // checker y el VM vean las mismas bytes para el mismo `ModuleId`.
-        self.bind_from_embedded(specifier, source.text.as_ref())
+        self.bind_from_embedded(specifier, source.text.as_ref(), carrier)
     }
 
     fn stdlib_exports(&self, specifier: &str) -> Rc<ExportMap> {
@@ -652,9 +671,11 @@ impl ImportResolver for DiskResolver {
         let result = self
             .load_source(&ModuleId::stdlib(specifier))
             .map(|source| {
+                let carrier = super::CarrierKind::from(source.provenance);
                 self.exports_from_embedded(
                     specifier,
                     source.text.as_ref(),
+                    carrier,
                     &mut Vec::new(),
                 )
             });

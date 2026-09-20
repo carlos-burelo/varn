@@ -454,19 +454,25 @@ impl PortableModule {
         }
     }
 
-    /// Re-interna cada texto y cada tipo contra esta sesión, con una tabla
-    /// nueva: los ids decodificados son válidos en `bind.ty_table` y ninguna
-    /// otra. Reconstruye `CheckerScope::bindings` (que viaja vacío).
-    fn into_live(self, interner: &mut AtomInterner) -> (ExportMap, BindResult) {
-        let mut table = CheckerTyTable::new();
+    /// Re-interna cada texto y cada tipo contra esta sesión, decodificando
+    /// DIRECTAMENTE en `table` (la tabla viva del resolver). Una tabla nueva
+    /// aquí dejaba los `CheckerTyId` de los símbolos decodificados válidos solo
+    /// en esa tabla, y cualquier consumidor (p.ej. el prelude `core_exports`)
+    /// los leía contra la suya: una forma distinta en el mismo índice. Decodificar
+    /// en la compartida hace que todos vean los mismos ids (ADR-0011, Ley 2).
+    fn into_live(
+        self,
+        interner: &mut AtomInterner,
+        table: &mut CheckerTyTable,
+    ) -> (ExportMap, BindResult) {
         let exports = self
             .exports
             .into_iter()
-            .map(|(k, v)| (k, decode_symbol(v, &mut table, interner)))
+            .map(|(k, v)| (k, decode_symbol(v, table, interner)))
             .collect();
         let mut arena = SymbolArena::default();
         for c in self.arena {
-            arena.push(decode_symbol(c, &mut table, interner));
+            arena.push(decode_symbol(c, table, interner));
         }
         let mut scopes = self.scopes;
         rebuild_scope_bindings(&mut scopes, &arena);
@@ -475,11 +481,11 @@ impl PortableModule {
         for (k, inner) in &self.class_methods {
             let mut m = FxHashMap::default();
             for (ik, t) in inner {
-                m.insert(ik.clone(), decode_portable_type(t, &mut table, interner));
+                m.insert(ik.clone(), decode_portable_type(t, table, interner));
             }
             class_methods.insert(k.clone(), m);
         }
-        let type_members = decode_type_members(&self.type_members, &mut table, interner);
+        let type_members = decode_type_members(&self.type_members, table, interner);
         let mut sum_variant_fields = FxHashMap::default();
         for (k, fields) in &self.sum_variant_fields {
             sum_variant_fields.insert(
@@ -487,7 +493,7 @@ impl PortableModule {
                 fields
                     .iter()
                     .map(|(fname, t)| {
-                        (fname.clone(), decode_portable_type(t, &mut table, interner))
+                        (fname.clone(), decode_portable_type(t, table, interner))
                     })
                     .collect(),
             );
@@ -499,7 +505,7 @@ impl PortableModule {
             global_scope: self.global_scope,
             diagnostics: varn_core::DiagnosticBag::default(),
             interner: interner.clone(),
-            ty_table: table,
+            ty_table: table.clone(),
             class_methods,
             type_members,
             class_parents: self.class_parents,
@@ -547,9 +553,10 @@ pub fn serialize_module_interface(
 pub fn deserialize_module_interface(
     bytes: &[u8],
     interner: &mut AtomInterner,
+    table: &mut CheckerTyTable,
 ) -> Result<(ExportMap, BindResult), String> {
     let cached: PortableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
-    let (mut exports, bind) = cached.into_live(interner);
+    let (mut exports, bind) = cached.into_live(interner, table);
     super::exports::assign_slots(&mut exports);
     Ok((exports, bind))
 }
@@ -572,19 +579,56 @@ fn cache_module_id(virtual_id: &str) -> varn_core::ModuleId {
     }
 }
 
+/// The carrier a module's text came from. Two carriers of the same text can
+/// shape the bind differently (a std module reads as `Bundle` from the embedded
+/// bundle and as `File` from the checkout tree, and the difference reached
+/// `origin_module`), so the cache key must include it: the invariant is
+/// "(identity, bytes, carrier) ⇒ the same interface", and only then is serving
+/// one where the other was requested safe.
+pub(super) use super::CarrierKind;
+
+fn cache_fingerprint(source: &str, carrier: CarrierKind) -> u64 {
+    varn_modules::artifact::source_fingerprint(source) ^ ((carrier as u64) << 56)
+}
+
 pub(super) fn try_load_cache(
     resolver: &super::DiskResolver,
     virtual_id: &str,
     source: &str,
+    carrier: CarrierKind,
 ) -> Option<CachedModule> {
-    // Lecturas deshabilitadas: un mismo `(ModuleId, fingerprint)` puede
-    // corresponder a binds distintos según de dónde vino la fuente (árbol vs
-    // bundle embebido), así que la interfaz cacheada no es todavía una verdad
-    // equivalente a la fuente. `AGENTS.md` Ley 8 / ADR-0011: la fuente es la
-    // única verdad; el store canónico sigue usándose para ESCRIBIR y queda
-    // listo para re-habilitar lecturas cuando la interfaz sea equivalente.
-    let _ = (resolver, virtual_id, source);
-    None
+    if virtual_id == "core:types" {
+        return None;
+    }
+    let id = cache_module_id(virtual_id);
+    let fingerprint = cache_fingerprint(source, carrier);
+    let payload = varn_modules::artifact::read_module_artifact(
+        &get_cache_dir(resolver),
+        varn_modules::artifact::ArtifactKind::CheckerInterface,
+        &id,
+        fingerprint,
+    )?;
+    // Decode into the LIVE table so the ids every consumer reads are valid
+    // (see `into_live`'s doc); publish the grown interner back.
+    let mut interner = resolver.interner_snapshot();
+    let result = resolver.with_ty_table_mut(|table| {
+        deserialize_module_interface(&payload, &mut interner, table)
+    });
+    resolver.set_interner(interner);
+    match result {
+        Ok((exports, bind)) => {
+            // Identity guard: even with the carrier in the key, a payload must
+            // describe the module it was asked for. A mismatch is a miss,
+            // never a wrong hit.
+            let expected = varn_modules::canonical_or_original(std::path::Path::new(virtual_id));
+            let got = bind.source_file.to_string();
+            if got != virtual_id && got != expected {
+                return None;
+            }
+            Some(CachedModule { exports, bind })
+        }
+        Err(_) => None,
+    }
 }
 
 pub(super) fn save_to_cache(
@@ -593,12 +637,13 @@ pub(super) fn save_to_cache(
     source: &str,
     exports: &ExportMap,
     bind: &BindResult,
+    carrier: CarrierKind,
 ) {
     if virtual_id == "core:types" {
         return;
     }
     let id = cache_module_id(virtual_id);
-    let fingerprint = varn_modules::artifact::source_fingerprint(source);
+    let fingerprint = cache_fingerprint(source, carrier);
     let interner = resolver.interner_snapshot();
     if let Ok(payload) =
         serialize_module_interface(exports, bind, &interner, Some(&*resolver as &dyn ImportResolver))
