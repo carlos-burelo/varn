@@ -125,12 +125,20 @@ impl ClifLinker for NoLinker {
 /// prediction and the lowering dereferences a null `exec_ctx`.
 pub(super) const NEEDS_EXEC_CTX: &str = "clif: leaf lowering needs exec_ctx";
 
-/// A register that is not `int`, `float` or `bool` holds a heap reference.
+/// Whether a proto's ABI forces a frame. Only the SIGNATURE matters: a boxed
+/// parameter cannot be passed in the raw `i64`-per-arg ABI, and a boxed return
+/// cannot be delivered without `exec_ctx` (the raw entry returns `i64`).
+///
+/// Boxed LOCALS do not force a frame. The leaf lowering handles a `Dyn`
+/// variable as an `I128` pair; any op that genuinely needs `exec_ctx` (a
+/// helper on a home slot, an array/object resolve) makes `lower_raw` return
+/// [`NEEDS_EXEC_CTX`] and `try_compile` retries frame-aware — observing the
+/// body beats predicting it. Functions with calls/allocating ops are already
+/// frame-aware through `has_alloc`, so this does not open a hole there.
 pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
-    proto.param_kinds.iter().any(|k| !scalar(k))
-        || proto.register_meta.iter().skip(1).any(|m| !scalar(&m.kind))
+    proto.param_kinds.iter().any(|k| !scalar(k)) || !scalar(&proto.return_kind)
 }
 
 /// The opening guess at the calling convention, and the single authority the

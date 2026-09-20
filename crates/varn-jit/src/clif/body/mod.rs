@@ -446,38 +446,55 @@ pub(super) fn lower_raw(
                 terminated = true;
             }
             OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                let cond = match state[first_reg] {
-                    // A `Bool`/`Int` KIND may still live in a heap-classed
-                    // (`Dyn`) variable, which holds the whole tag+payload
-                    // `VmValue` pair after C1. The branch condition is the
-                    // payload word (0/1 bool, raw int); reading the pair
-                    // directly makes every `brif` unconditionally true.
-                    K::Bool | K::Int => {
-                        let v = b.use_var(vars[first_reg]);
-                        if b.func.dfg.value_type(v) == types::I128 {
-                            b.ins().isplit(v).1
-                        } else {
-                            v
+                // A statically-`Bool` register holds a boxed bool pair (Bool is
+                // `SlotClass::Dyn`): branch straight on its payload word (0/1).
+                // This keeps the condition leaf-friendly (no `exec_ctx`, no
+                // generic truthiness helper), which is what lets a function
+                // like `fib` — whose `n <= 1` comparison is a `Dyn` bool —
+                // compile as a leaf and recurse through a direct hardware call.
+                let cond = if proto.register_meta.get(first_reg).map(|m| m.kind)
+                    == Some(SlotKind::Bool)
+                {
+                    let v = b.use_var(vars[first_reg]);
+                    if b.func.dfg.value_type(v) == types::I128 {
+                        b.ins().isplit(v).1
+                    } else {
+                        v
+                    }
+                } else {
+                    match state[first_reg] {
+                        // A `Bool`/`Int` KIND may still live in a heap-classed
+                        // (`Dyn`) variable, which holds the whole tag+payload
+                        // `VmValue` pair after C1. The branch condition is the
+                        // payload word (0/1 bool, raw int); reading the pair
+                        // directly makes every `brif` unconditionally true.
+                        K::Bool | K::Int => {
+                            let v = b.use_var(vars[first_reg]);
+                            if b.func.dfg.value_type(v) == types::I128 {
+                                b.ins().isplit(v).1
+                            } else {
+                                v
+                            }
                         }
-                    }
-                    k if is_boxed_kind(k) => {
-                        let v = if let Some(ref actx) = actx {
-                            alloc::box_or_load_home(&mut b, actx, &state, first_reg)
-                        } else {
-                            box_or_pass(&mut b, &vars, &state, first_reg)
-                        };
-                        emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
-                    }
-                    _ => {
-                        if meta_is_int(&proto.register_meta, first_reg) {
-                            b.use_var(vars[first_reg])
-                        } else {
+                        k if is_boxed_kind(k) => {
                             let v = if let Some(ref actx) = actx {
                                 alloc::box_or_load_home(&mut b, actx, &state, first_reg)
                             } else {
                                 box_or_pass(&mut b, &vars, &state, first_reg)
                             };
                             emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
+                        }
+                        _ => {
+                            if meta_is_int(&proto.register_meta, first_reg) {
+                                b.use_var(vars[first_reg])
+                            } else {
+                                let v = if let Some(ref actx) = actx {
+                                    alloc::box_or_load_home(&mut b, actx, &state, first_reg)
+                                } else {
+                                    box_or_pass(&mut b, &vars, &state, first_reg)
+                                };
+                                emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
+                            }
                         }
                     }
                 };

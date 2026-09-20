@@ -11,9 +11,10 @@ use varn_types::{FunctionProto, VmValue};
 use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
-    box_bool, box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool,
-    def_const_int, def_int_result, dest_is_ref, emit_return_value, guard_overflow, meta_is_float,
-    state_meta_int, unbox_bool, unbox_f64_coerce, use_boxed, use_f64, use_int,
+    box_bool, box_f64, box_int, box_or_pass, call_helper_void, def_bool_result, def_boxed_leaf,
+    def_const, def_const_bool, def_const_int, def_int_result, dest_is_ref, emit_return_value,
+    guard_overflow, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce, use_boxed,
+    use_f64, use_int,
 };
 use super::super::fields;
 use super::super::floats;
@@ -130,6 +131,14 @@ pub(crate) fn dispatch_opcode(
                     // class (int/float/ref/dyn), handling the pair for `Ref`.
                     let val = alloc::box_or_load_home(b, actx, state, src);
                     alloc::def_result(b, actx, first_reg, val);
+                } else if dest_is_ref(&proto.register_meta, first_reg)
+                    || dest_is_ref(&proto.register_meta, src)
+                {
+                    // A heap-classed (`Ref`/`Dyn`) end holds the pair: box the
+                    // source and store by destination class (boxes an int into
+                    // a `Dyn` sink, unboxes a pair into a scalar one).
+                    let v = box_or_pass(b, vars, state, src);
+                    def_boxed_leaf(b, &proto.register_meta, vars, first_reg, v);
                 } else if dest_is_float && !src_is_float {
                     let v = box_or_pass(b, vars, state, src);
                     let f = unbox_f64_coerce(b, v);
@@ -565,15 +574,11 @@ pub(crate) fn dispatch_opcode(
                 b.def_var(vars[dest], bits);
                 state[dest] = K::Float;
             } else if proto.return_kind == SlotKind::Int {
-                b.def_var(vars[dest], res);
-                state[dest] = K::Int;
+                def_int_result(b, None, &proto.register_meta, vars, dest, res);
             } else if proto.return_kind == SlotKind::Bool {
-                b.def_var(vars[dest], res);
-                state[dest] = K::Bool;
+                def_bool_result(b, None, &proto.register_meta, vars, dest, res);
             } else {
-                let (_tag, payload) = b.ins().isplit(res);
-                b.def_var(vars[dest], payload);
-                state[dest] = K::Boxed;
+                def_boxed_leaf(b, &proto.register_meta, vars, dest, res);
             }
         }
 
