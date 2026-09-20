@@ -10,6 +10,13 @@ fn not_a_string() -> RuntimeError {
     RuntimeError::new("str intrinsic: operand is not a string")
 }
 
+#[inline]
+fn log_bad(v: VmValue) {
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!("STR BAD tag={:#x} payload={:#x}", v.raw_tag(), v.raw_payload());
+    }
+}
+
 /// Borrow a string operand straight from the heap (or the SSO buffer) with
 /// its cached ASCII state. No refcount traffic — only valid while `heap` is
 /// not mutated. SSO strings are ASCII by construction.
@@ -23,6 +30,7 @@ fn view<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> VmResult<(&'a s
             return Ok((h.as_str(), h.is_ascii_cached()));
         }
     }
+    log_bad(v);
     Err(not_a_string())
 }
 
@@ -45,6 +53,7 @@ impl StrHandle {
                 return Ok(StrHandle::Heap(h.clone()));
             }
         }
+        log_bad(v);
         Err(not_a_string())
     }
 
