@@ -280,6 +280,11 @@ pub fn try_compile(
     // (a wrong value then reaches `ArrayLength`/`Headers.toObject`). Until the
     // class provenance is reconciled, protos with any Ref register stay
     // interpreted.
+    // `Ref` homes validate strictly (`set_addr` rejects a non-heap, non-null
+    // value) and `register_meta` is not yet authoritative for every register:
+    // a Ref-classed register can hold a bool (`TaskGroupImpl._runFinally`
+    // stores `KIND_BOOL` through `def_result`). Until the class provenance is
+    // reconciled, protos with any Ref register stay interpreted.
     if proto
         .register_meta
         .iter()
