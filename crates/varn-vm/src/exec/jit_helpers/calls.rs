@@ -51,7 +51,11 @@ pub(crate) extern "C" fn jit_call_method(
     bailed!()
 }
 
-/// Flat-argument shim over [`jit_call_method`] for the CLIF backend.
+/// Flat-argument shim over [`jit_call_method`] for the CLIF backend. The
+/// compiled caller flushed its args to the caller activation's homes
+/// (`base` = act_id, `arg_start` = first argument register), which is exactly
+/// what `exec_call_method_reg` reads, so this forwards to it and runs any
+/// frame it pushed to completion.
 #[allow(clippy::too_many_arguments)]
 pub(crate) extern "C" fn jit_call_method_flat(
     ctx: *mut ExecCtx,
@@ -66,20 +70,49 @@ pub(crate) extern "C" fn jit_call_method_flat(
     dest: usize,
     ip: usize,
 ) {
-    let _ = (
-        ctx,
-        closure,
-        base,
-        this_tag,
-        this_payload,
-        name_idx,
-        cs,
-        arg_start,
-        arg_count,
-        dest,
-        ip,
-    );
-    bailed!()
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let this_val = VmValue::from_raw_parts(this_tag, this_payload);
+
+        ctx_ref.frames[frame_idx].ip = ip;
+
+        let res = ctx_ref.exec_call_method_reg(
+            this_val,
+            base,
+            name_idx,
+            cs,
+            arg_start,
+            arg_count,
+            dest,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    while ctx_ref.frames.len() > caller_depth {
+                        let f = ctx_ref.frames.pop().unwrap();
+                        ctx_ref.close_upvalues_in(f.base);
+                    }
+                    jit_propagate_error(ctx_ref, e);
+                }
+            }
+            Ok(false) => {}
+            Err(e) => {
+                while ctx_ref.frames.len() > caller_depth {
+                    let f = ctx_ref.frames.pop().unwrap();
+                    ctx_ref.close_upvalues_in(f.base);
+                }
+                jit_propagate_error(ctx_ref, e);
+            }
+        }
+
+        ctx_ref.jit_native_result = ctx_ref.stack.box_reg(base, dest);
+    }
 }
 
 /// The single canonical VM call out of compiled code. The compiled caller has

@@ -87,7 +87,6 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     // `FrameStore`.
     h.call = 0;
     h.call_method = 0;
-    h.call_method_flat = 0;
     h.clif_call_self = 0;
     h.call_spread = 0;
     h.jit_prepare_call = 0;
