@@ -5,7 +5,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
     store_home, AllocCtx,
 };
 
@@ -56,8 +56,7 @@ pub(crate) fn emit_close_upvalue(
     ip: usize,
 ) {
     let reg = (code[ip + 1] >> 8) as usize;
-    let fb = frame_base_addr(b, actx);
-    store_home(b, actx, state, fb, reg);
+        store_home(b, actx, state, reg);
     let reg_v = b.ins().iconst(types::I64, reg as i64);
     call_helper_void(
         b,
@@ -76,13 +75,12 @@ pub(crate) fn emit_make_closure(
 ) {
     let dest = (code[ip + 1] >> 8) as usize;
     let uv_count = (code[ip + 1] & 0xFF) as usize;
-    let fb = frame_base_addr(b, actx);
-    for i in 0..uv_count {
+        for i in 0..uv_count {
         let uv_desc = code[ip + 3 + i];
         let is_local = (uv_desc >> 8) != 0;
         let index = (uv_desc & 0xFF) as usize;
         if is_local {
-            store_home(b, actx, state, fb, index);
+            store_home(b, actx, state, index);
         }
     }
     let regs = live_boxed(actx, state);
@@ -171,9 +169,8 @@ pub(crate) fn emit_call_spread(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let fb = frame_base_addr(b, actx);
-    for r in arg_start..(arg_start + argc).min(actx.nregs) {
-        store_home(b, actx, state, fb, r);
+        for r in arg_start..(arg_start + argc).min(actx.nregs) {
+        store_home(b, actx, state, r);
     }
 
     call_helper_void(

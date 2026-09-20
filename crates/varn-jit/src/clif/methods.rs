@@ -7,7 +7,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::FunctionProto;
 
 use super::alloc::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
     store_home, AllocCtx,
 };
 use super::emit::{box_bool, call_helper, call_helper_void};
@@ -104,9 +104,8 @@ pub(super) fn emit_call_method(
         }
     }
 
-    let fb = frame_base_addr(b, actx);
-    for i in 0..argc {
-        store_home(b, actx, state, fb, arg_start + i);
+        for i in 0..argc {
+        store_home(b, actx, state, arg_start + i);
     }
 
     let this_val = box_or_load_home(b, actx, state, this_reg);
@@ -241,9 +240,8 @@ pub(super) fn emit_invoke_virtual(
         }
     }
 
-    let fb = frame_base_addr(b, actx);
-    for i in 0..argc {
-        store_home(b, actx, state, fb, arg_start + i);
+        for i in 0..argc {
+        store_home(b, actx, state, arg_start + i);
     }
     let this_val = box_or_load_home(b, actx, state, this_reg);
     let (this_tag, this_payload) = b.ins().isplit(this_val);

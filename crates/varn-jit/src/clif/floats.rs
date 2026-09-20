@@ -93,9 +93,7 @@ pub(super) fn emit_intrinsic_direct(
         if meta_is_float(meta, dest) {
             b.def_var(vars[dest], res);
             let boxed = box_f64(b, res);
-            let fb = super::alloc::frame_base_addr(b, actx);
-            b.ins()
-                .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+            super::alloc::store_boxed_home(b, actx, dest, boxed);
         } else {
             let boxed = box_f64(b, res);
             def_result(b, actx, dest, boxed);
@@ -258,9 +256,7 @@ pub(super) fn emit_math_intrinsic_native(
         if meta_is_float(meta, dest) {
             b.def_var(vars[dest], res);
             let boxed = box_f64(b, res);
-            let fb = super::alloc::frame_base_addr(b, actx);
-            b.ins()
-                .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+            super::alloc::store_boxed_home(b, actx, dest, boxed);
         } else {
             let boxed = box_f64(b, res);
             def_result(b, actx, dest, boxed);

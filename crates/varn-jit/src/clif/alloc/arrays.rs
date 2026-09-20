@@ -4,8 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
-    store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 
 pub(crate) fn emit_build_array(
@@ -21,9 +20,8 @@ pub(crate) fn emit_build_array(
     let start = (w1 & 0xFF) as usize;
     let count = (w2 >> 8) as usize;
 
-    let fb = frame_base_addr(b, actx);
     for i in 0..count {
-        store_home(b, actx, state, fb, start + i);
+        store_home(b, actx, state, start + i);
     }
     let start_v = b.ins().iconst(types::I64, start as i64);
     let count_v = b.ins().iconst(types::I64, count as i64);
@@ -55,9 +53,8 @@ pub(crate) fn emit_build_map(
     let start = (w1 & 0xFF) as usize;
     let count = (w2 >> 8) as usize;
 
-    let fb = frame_base_addr(b, actx);
     for i in 0..(count * 2) {
-        store_home(b, actx, state, fb, start + i);
+        store_home(b, actx, state, start + i);
     }
     let start_v = b.ins().iconst(types::I64, start as i64);
     let count_v = b.ins().iconst(types::I64, count as i64);

@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
     store_home, AllocCtx,
 };
 
@@ -27,9 +27,8 @@ pub(crate) fn emit_build_object_with_shape(
     let dest = (w1 >> 8) as usize;
     let start = (w1 & 0xFF) as usize;
 
-    let fb = frame_base_addr(b, actx);
-    for i in 0..count {
-        store_home(b, actx, state, fb, start + i);
+        for i in 0..count {
+        store_home(b, actx, state, start + i);
     }
     let start_v = b.ins().iconst(types::I64, start as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
@@ -65,13 +64,12 @@ pub(crate) fn emit_build_object(
 ) {
     let dest = (code[ip + 1] >> 8) as usize;
     let count = (code[ip + 1] & 0xFF) as usize;
-    let fb = frame_base_addr(b, actx);
-    let mut cur_ip = ip + 2;
+        let mut cur_ip = ip + 2;
     for _ in 0..count {
         cur_ip += 1;
         let val_reg = (code[cur_ip] >> 8) as usize;
         cur_ip += 1;
-        store_home(b, actx, state, fb, val_reg);
+        store_home(b, actx, state, val_reg);
     }
     let ipv = b.ins().iconst(types::I64, (ip + 1) as i64);
     let regs = live_boxed(actx, state);
@@ -101,8 +99,7 @@ pub(crate) fn emit_object_rest(
 ) {
     let dest = (code[ip + 1] >> 8) as usize;
     let src = (code[ip + 1] & 0xFF) as usize;
-    let fb = frame_base_addr(b, actx);
-    store_home(b, actx, state, fb, src);
+        store_home(b, actx, state, src);
     let ipv = b.ins().iconst(types::I64, (ip + 1) as i64);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);

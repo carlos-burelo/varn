@@ -221,20 +221,16 @@ pub(super) fn lower_raw(
             b.def_var(vars[r], p);
         }
         if let Some(ref actx) = actx {
-            let fb = alloc::frame_base_addr(&mut b, actx);
             if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
                 let boxed_p = super::emit::box_int(&mut b, p);
-                b.ins()
-                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                alloc::store_boxed_home(&mut b, actx, r, boxed_p);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
                 let boxed_p = super::emit::box_bool(&mut b, p);
-                b.ins()
-                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                alloc::store_boxed_home(&mut b, actx, r, boxed_p);
             } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
                 let f = b.use_var(vars[r]);
                 let boxed_p = super::emit::box_f64(&mut b, f);
-                b.ins()
-                    .store(MemFlags::trusted(), boxed_p, fb, (r * 16) as i32);
+                alloc::store_boxed_home(&mut b, actx, r, boxed_p);
             }
         }
     }

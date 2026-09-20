@@ -310,9 +310,7 @@ pub(super) fn emit_get_fixed_field(
                 v
             };
             let boxed = b.ins().iconcat(tag_v, payload_for_frame);
-            let fb = super::alloc::frame_base_addr(b, actx);
-            b.ins()
-                .store(MemFlags::trusted(), boxed, fb, (first_reg * 16) as i32);
+            super::alloc::store_boxed_home(b, actx, first_reg, boxed);
         }
     } else if let Some(actx) = actx {
         super::alloc::def_result(b, actx, first_reg, v);

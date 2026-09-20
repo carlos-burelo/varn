@@ -9,7 +9,7 @@ use super::super::emit::{
 };
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
     store_home, AllocCtx,
 };
 
@@ -249,9 +249,8 @@ fn emit_helper_call_window(
 ) -> cranelift_codegen::ir::Value {
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let fb = frame_base_addr(b, actx);
-    for r in arg_start..(arg_start + total).min(actx.nregs) {
-        store_home(b, actx, state, fb, r);
+        for r in arg_start..(arg_start + total).min(actx.nregs) {
+        store_home(b, actx, state, r);
     }
 
     let src = b.ins().iadd_imm(actx.base, arg_start as i64);
@@ -312,9 +311,8 @@ fn emit_vm_call(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let fb = frame_base_addr(b, actx);
-    for r in arg_start..(arg_start + total).min(actx.nregs) {
-        store_home(b, actx, state, fb, r);
+        for r in arg_start..(arg_start + total).min(actx.nregs) {
+        store_home(b, actx, state, r);
     }
     let src = b.ins().iadd_imm(actx.base, arg_start as i64);
     let n = b.ins().iconst(types::I64, total as i64);

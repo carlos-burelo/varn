@@ -6,7 +6,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use std::cell::{Cell, RefCell};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
-use varn_types::register_meta::RegisterMeta;
+use varn_types::register_meta::{RegisterMeta, SlotClass};
 
 use super::super::emit::{
     call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, unbox_int,
@@ -177,18 +177,31 @@ pub(crate) struct AllocCtx<'a> {
     pub caller_epoch: u64,
 }
 
-pub(crate) fn frame_base_addr(
+/// Store a boxed `VmValue` (`I128`; a bare `I64` is treated as an int
+/// payload) into register `reg`'s home slot of the current activation,
+/// through the `home_store` runtime helper — the class and index come from
+/// the VM's `FrameStore`, not from inline address arithmetic.
+pub(crate) fn store_boxed_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
-) -> cranelift_codegen::ir::Value {
-    let sp = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.stack_data_offset as i32,
+    reg: usize,
+    boxed: cranelift_codegen::ir::Value,
+) {
+    let (tag, payload) = if b.func.dfg.value_type(boxed) == types::I128 {
+        b.ins().isplit(boxed)
+    } else {
+        let tag = b
+            .ins()
+            .iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
+        (tag, boxed)
+    };
+    let reg_v = b.ins().iconst(types::I64, reg as i64);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.home_store,
+        &[actx.exec_ctx, actx.base, reg_v, tag, payload],
     );
-    let base_bytes = b.ins().ishl_imm(actx.base, 4);
-    b.ins().iadd(sp, base_bytes)
 }
 
 pub(crate) fn load_receiver(
@@ -198,14 +211,28 @@ pub(crate) fn load_receiver(
     load_home(b, actx, 0)
 }
 
+/// Read register `reg`'s home slot as a boxed `VmValue` (`I128`), through the
+/// `home_load` runtime helper writing into a 16-byte stack slot.
 pub(crate) fn load_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     r: usize,
 ) -> cranelift_codegen::ir::Value {
-    let fb = frame_base_addr(b, actx);
-    b.ins()
-        .load(types::I128, MemFlags::trusted(), fb, (r * 16) as i32)
+    let slot = b
+        .create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            16,
+            3,
+        ));
+    let addr = b.ins().stack_addr(types::I64, slot, 0);
+    let reg_v = b.ins().iconst(types::I64, r as i64);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.home_load,
+        &[actx.exec_ctx, actx.base, reg_v, addr],
+    );
+    b.ins().load(types::I128, MemFlags::trusted(), addr, 0)
 }
 
 pub(crate) fn box_or_load_home(
@@ -233,32 +260,30 @@ pub(crate) fn store_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    fb: cranelift_codegen::ir::Value,
     reg: usize,
 ) {
     let Some(&var) = actx.vars.get(reg) else {
         let null_val = super::super::emit::box_null(b);
-        b.ins()
-            .store(MemFlags::trusted(), null_val, fb, (reg * 16) as i32);
+        store_boxed_home(b, actx, reg, null_val);
         return;
     };
     let raw = b.use_var(var);
     if b.func.dfg.value_type(raw) == types::F64 {
         let v = super::super::emit::box_f64(b, raw);
-        b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+        store_boxed_home(b, actx, reg, v);
     } else {
         match state.get(reg).copied().unwrap_or(K::Unset) {
             K::Int => {
                 let v = super::super::emit::box_int(b, raw);
-                b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+                store_boxed_home(b, actx, reg, v);
             }
             K::Bool => {
                 let v = super::super::emit::box_bool(b, raw);
-                b.ins().store(MemFlags::trusted(), v, fb, (reg * 16) as i32);
+                store_boxed_home(b, actx, reg, v);
             }
             _ => {
-                // The slot on `ctx.stack` already holds the boxed value (stored on
-                // def_result, Move, or entry). Redundant load + store to same slot is skipped.
+                // The home slot already holds the boxed value (stored on
+                // def_result, Move, or entry). A redundant store is skipped.
             }
         }
     }
@@ -270,7 +295,6 @@ pub(crate) fn def_result(
     dest: usize,
     res: cranelift_codegen::ir::Value,
 ) {
-    let fb = frame_base_addr(b, actx);
     if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
@@ -283,8 +307,7 @@ pub(crate) fn def_result(
         };
         b.def_var(actx.vars[dest], payload);
     }
-    b.ins()
-        .store(MemFlags::trusted(), res, fb, (dest * 16) as i32);
+    store_boxed_home(b, actx, dest, res);
 }
 
 pub(crate) fn emit_backedge_safepoint(
@@ -328,15 +351,32 @@ pub(crate) fn emit_backedge_safepoint(
     b.switch_to_block(cont);
 }
 
+/// Live registers that can hold a heap reference and therefore must be
+/// flushed/reloaded around a collection: physical classes `Ref` and `Dyn`
+/// (`Dyn` covers `Bool`/`Str`/`Dynamic`). `Gpr` (raw i64) and `Fpr` (raw f64)
+/// never hold a heap index, so a collection cannot change them — this is the
+/// "GC roots by construction" half of the class model, replacing the old
+/// "everything that is not a float" over-approximation.
 pub(crate) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
     let ip = actx.cur_ip.get();
-    let live_nonfloat = (0..actx.nregs)
-        .filter(|&r| !meta_is_float(actx.register_meta, r))
+    let is_root_class = |r: usize| {
+        let kind = actx
+            .register_meta
+            .get(r)
+            .map(|m| m.kind)
+            .unwrap_or(varn_types::register_meta::SlotKind::Dynamic);
+        matches!(
+            SlotClass::of_kind(kind),
+            SlotClass::Ref | SlotClass::Dyn
+        )
+    };
+    let live_root = (0..actx.nregs)
+        .filter(|&r| is_root_class(r))
         .filter(|&r| actx.live.is_live_after(ip, r));
     let rooted = |r: usize| !actx.narrow_roots || state.get(r).copied().is_none_or(is_root_kind);
-    let regs: Vec<usize> = live_nonfloat.clone().filter(|&r| rooted(r)).collect();
+    let regs: Vec<usize> = live_root.clone().filter(|&r| rooted(r)).collect();
     if let Some(rec) = &actx.safepoints {
-        let unboxed: Vec<usize> = live_nonfloat.filter(|&r| !rooted(r)).collect();
+        let unboxed: Vec<usize> = live_root.filter(|&r| !rooted(r)).collect();
         rec.borrow_mut().push((ip, regs.clone(), unboxed));
     }
     regs
@@ -347,18 +387,14 @@ fn is_root_kind(k: K) -> bool {
 }
 
 pub(crate) fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
-    let fb = frame_base_addr(b, actx);
     for &r in regs {
-        store_home(b, actx, state, fb, r);
+        store_home(b, actx, state, r);
     }
 }
 
 pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
-    let fb = frame_base_addr(b, actx);
     for &r in regs {
-        let v = b
-            .ins()
-            .load(types::I128, MemFlags::trusted(), fb, (r * 16) as i32);
+        let v = load_home(b, actx, r);
         if meta_is_float(actx.register_meta, r) {
             let f = unbox_f64_coerce(b, v);
             b.def_var(actx.vars[r], f);

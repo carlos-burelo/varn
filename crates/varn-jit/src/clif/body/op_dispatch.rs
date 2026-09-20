@@ -85,21 +85,17 @@ pub(crate) fn dispatch_opcode(
                 def_const(b, vars, first_reg, c.raw_payload() as i64);
             }
             if let Some(actx) = actx {
-                let fb = alloc::frame_base_addr(b, actx);
                 let tag_v = b.ins().iconst(types::I64, c.raw_tag() as i64);
                 let payload_v = b.ins().iconst(types::I64, c.raw_payload() as i64);
                 let val128 = b.ins().iconcat(tag_v, payload_v);
-                b.ins()
-                    .store(MemFlags::trusted(), val128, fb, (first_reg * 16) as i32);
+                alloc::store_boxed_home(b, actx, first_reg, val128);
             }
         }
         OpCode::LoadNull => {
             def_const(b, vars, first_reg, 0);
             if let Some(actx) = actx {
-                let fb = alloc::frame_base_addr(b, actx);
                 let null_val = super::super::emit::box_null(b);
-                b.ins()
-                    .store(MemFlags::trusted(), null_val, fb, (first_reg * 16) as i32);
+                alloc::store_boxed_home(b, actx, first_reg, null_val);
             }
         }
         OpCode::Move => {
@@ -132,11 +128,9 @@ pub(crate) fn dispatch_opcode(
                         None
                     };
                 if let Some(actx) = actx {
-                    let fb = alloc::frame_base_addr(b, actx);
                     let val =
                         preboxed.unwrap_or_else(|| alloc::box_or_load_home(b, actx, state, src));
-                    b.ins()
-                        .store(MemFlags::trusted(), val, fb, (first_reg * 16) as i32);
+                    alloc::store_boxed_home(b, actx, first_reg, val);
                 }
             }
         }
@@ -517,32 +511,24 @@ pub(crate) fn dispatch_opcode(
                     b.def_var(vars[dest], f);
                     state[dest] = K::Float;
                     let boxed = super::super::emit::box_f64(b, f);
-                    let fb = alloc::frame_base_addr(b, actx);
-                    b.ins()
-                        .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                    alloc::store_boxed_home(b, actx, dest, boxed);
                 } else if proto.return_kind == SlotKind::Float {
                     let f = unbox_f64_coerce(b, res);
                     let boxed = super::super::emit::box_f64(b, f);
                     let (_tag, payload) = b.ins().isplit(boxed);
                     b.def_var(vars[dest], payload);
                     state[dest] = K::Float;
-                    let fb = alloc::frame_base_addr(b, actx);
-                    b.ins()
-                        .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                    alloc::store_boxed_home(b, actx, dest, boxed);
                 } else if proto.return_kind == SlotKind::Int {
                     b.def_var(vars[dest], res);
                     state[dest] = K::Int;
                     let boxed = super::super::emit::box_int(b, res);
-                    let fb = alloc::frame_base_addr(b, actx);
-                    b.ins()
-                        .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                    alloc::store_boxed_home(b, actx, dest, boxed);
                 } else if proto.return_kind == SlotKind::Bool {
                     b.def_var(vars[dest], res);
                     state[dest] = K::Bool;
                     let boxed = super::super::emit::box_bool(b, res);
-                    let fb = alloc::frame_base_addr(b, actx);
-                    b.ins()
-                        .store(MemFlags::trusted(), boxed, fb, (dest * 16) as i32);
+                    alloc::store_boxed_home(b, actx, dest, boxed);
                 } else {
                     alloc::def_result(b, actx, dest, res);
                     state[dest] = K::Boxed;

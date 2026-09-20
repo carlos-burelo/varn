@@ -49,19 +49,15 @@ pub(super) fn def_const_int(
         let f = b.ins().f64const(v as f64);
         b.def_var(vars[reg], f);
         if let Some(actx) = actx {
-            let fb = super::alloc::frame_base_addr(b, actx);
             let boxed = box_f64(b, f);
-            b.ins()
-                .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+            super::alloc::store_boxed_home(b, actx, reg, boxed);
         }
     } else {
         let c = b.ins().iconst(types::I64, v);
         b.def_var(vars[reg], c);
         if let Some(actx) = actx {
-            let fb = super::alloc::frame_base_addr(b, actx);
             let boxed = box_int(b, c);
-            b.ins()
-                .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+            super::alloc::store_boxed_home(b, actx, reg, boxed);
         }
     }
 }
@@ -76,10 +72,8 @@ pub(super) fn def_const_bool(
     let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
     b.def_var(vars[reg], c);
     if let Some(actx) = actx {
-        let fb = super::alloc::frame_base_addr(b, actx);
         let boxed = box_bool(b, c);
-        b.ins()
-            .store(MemFlags::trusted(), boxed, fb, (reg * 16) as i32);
+        super::alloc::store_boxed_home(b, actx, reg, boxed);
     }
 }
 
