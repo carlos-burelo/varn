@@ -12,6 +12,7 @@ pub mod fmt;
 pub mod loop_diagnostics;
 pub mod modules;
 pub mod phase;
+pub mod phases;
 pub mod registry;
 pub mod render;
 pub mod report;

@@ -19,6 +19,13 @@ pub fn truncate(s: &str, width: usize) -> String {
     format!("{head}…")
 }
 
+/// Final path component (handles both `/` and `\`), for `Text` headers.
+pub fn basename(path: &str) -> &str {
+    path.rsplit(|c| c == '/' || c == '\\')
+        .next()
+        .unwrap_or(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::truncate;
