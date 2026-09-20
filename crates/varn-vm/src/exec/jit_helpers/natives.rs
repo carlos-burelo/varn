@@ -104,7 +104,22 @@ unsafe fn call_native_from_homes(
             .and_then(|fr| fr.closure().proto.name.clone());
         let tags: Vec<String> = args
             .iter()
-            .map(|v| format!("{:#x}/{:#x}", v.raw_tag(), v.raw_payload()))
+            .map(|v| {
+                let obj = if v.is_heap() {
+                    match ctx_ref.heap.get(v.as_heap_idx()) {
+                        Some(crate::heap::HeapObj::Str(_)) => ":str",
+                        Some(crate::heap::HeapObj::Array(_)) => ":array",
+                        Some(crate::heap::HeapObj::Object(_)) => ":object",
+                        Some(crate::heap::HeapObj::Instance(_)) => ":instance",
+                        Some(crate::heap::HeapObj::VmClosure(_)) => ":closure",
+                        Some(_) => ":heap-other",
+                        None => ":heap-none",
+                    }
+                } else {
+                    ""
+                };
+                format!("{:#x}/{:#x}{obj}", v.raw_tag(), v.raw_payload())
+            })
             .collect();
         eprintln!(
             "NATIVEOP fn={fname:?} f={:#x} reg_start={reg_start} total={total} args={tags:?}",
