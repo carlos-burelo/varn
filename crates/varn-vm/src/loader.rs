@@ -19,6 +19,14 @@ impl Display for ModuleError {
     }
 }
 
+/// Runtime-side adapter over the canonical module system.
+///
+/// Loading a module's SOURCE and RESOLVING its specifier belong to
+/// `varn_modules::loader::ModuleLoader` (ADR-0011); this trait exists only
+/// because the VM needs the compiled `FunctionProto` (and native handles) that
+/// the loader deliberately does not produce. Implementations must obtain the
+/// source through the canonical registry (`FileLoader`/`StdlibLoader` do) and
+/// compile it; they must not re-resolve or re-read on their own.
 pub trait ModuleLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError>;
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError>;
