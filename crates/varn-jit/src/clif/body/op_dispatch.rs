@@ -647,7 +647,16 @@ pub(crate) fn dispatch_opcode(
         }
         OpCode::CallNativeOp => {
             let actx = actx.ok_or("clif: CallNativeOp outside alloc fn")?;
-            alloc::emit_call_native_op(b, actx, state, &proto.register_meta, code, pool, ip)?;
+            alloc::emit_call_native_op(
+                b,
+                actx,
+                state,
+                &proto.register_meta,
+                arr.loops,
+                code,
+                pool,
+                ip,
+            )?;
         }
         OpCode::CallMethod => {
             let actx = actx.ok_or("clif: CallMethod outside alloc fn")?;

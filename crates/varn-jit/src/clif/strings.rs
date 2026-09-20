@@ -278,7 +278,7 @@ pub(super) fn emit_str_intrinsic_native(
 
 /// `charCodeAt` served from the region's hoisted byte view, when there is one.
 #[allow(clippy::too_many_arguments)]
-fn emit_char_code_inline(
+pub(super) fn emit_char_code_inline(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     loops: LoopCaches,

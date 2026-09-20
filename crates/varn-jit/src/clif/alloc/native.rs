@@ -15,6 +15,7 @@ pub(crate) fn emit_call_native_op(
     actx: &AllocCtx,
     state: &[K],
     _meta: &[RegisterMeta],
+    loops: super::super::emit::LoopCaches,
     code: &[u16],
     pool: &[PoolEntry],
     ip: usize,
@@ -26,6 +27,18 @@ pub(crate) fn emit_call_native_op(
         Some(PoolEntry::Literal(Literal::Int(i))) => *i as u64,
         _ => return Err("clif: native op-id not an int constant".into()),
     };
+
+    // `charCodeAt`/`codePointAt` inside a loop region with a hoisted byte view:
+    // a bounds compare and a byte load, no native call. Same inline the
+    // `Intrinsic` form uses; this op-id form comes from the core-type method
+    // table dispatch.
+    if total == 2 && varn_core::op_id::is_str_char_index_op_id(op_id) {
+        if super::super::strings::emit_char_code_inline(
+            b, actx, loops, actx.vars, state, ip, dest,
+        ) {
+            return Ok(());
+        }
+    }
 
     let str_starts_with_id = varn_core::op_id::str_starts_with_op_id();
     if op_id == str_starts_with_id && total == 2 {

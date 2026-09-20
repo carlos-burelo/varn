@@ -81,6 +81,24 @@ pub fn str_slice_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "slice"))
 }
 
+/// Op-id de `str::charCodeAt` / `str::codePointAt`. El lowering los inlinea
+/// (byte-load sobre una vista de bytes hoistada de la región) en vez de cruzar
+/// la frontera nativa, y el scan de regiones los trata como no-alloc.
+pub fn str_char_code_at_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "charCodeAt"))
+}
+
+pub fn str_code_point_at_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "codePointAt"))
+}
+
+/// Whether `op_id` is a char-indexing `str` method the CLIF lowering inlines.
+pub fn is_str_char_index_op_id(op_id: u64) -> bool {
+    op_id == str_char_code_at_op_id() || op_id == str_code_point_at_op_id()
+}
+
 /// The core builtin classes whose instance methods are natively registered
 /// (via the `varn_contract!` invocations in `varn-builtins/src/modules/
 /// primitives/*`) and are therefore op-id-addressable.
