@@ -318,17 +318,15 @@ pub(crate) fn emit_to_string(
 
     let v = box_or_load_home(b, actx, state, src);
     let (v_tag, v_payload) = b.ins().isplit(v);
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
 
+    // `to_string` only formats the value and allocates: no VM re-entry, no GC
+    // safepoint. The flush/reload around it was dead work.
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.to_string,
         &[actx.exec_ctx, v_tag, v_payload],
     );
-
-    reload_boxed(b, actx, state, &regs);
 
     let res = b.ins().load(
         types::I128,
