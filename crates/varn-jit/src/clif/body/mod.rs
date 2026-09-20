@@ -454,7 +454,19 @@ pub(super) fn lower_raw(
             }
             OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
                 let cond = match state[first_reg] {
-                    K::Bool | K::Int => b.use_var(vars[first_reg]),
+                    // A `Bool`/`Int` KIND may still live in a heap-classed
+                    // (`Dyn`) variable, which holds the whole tag+payload
+                    // `VmValue` pair after C1. The branch condition is the
+                    // payload word (0/1 bool, raw int); reading the pair
+                    // directly makes every `brif` unconditionally true.
+                    K::Bool | K::Int => {
+                        let v = b.use_var(vars[first_reg]);
+                        if b.func.dfg.value_type(v) == types::I128 {
+                            b.ins().isplit(v).1
+                        } else {
+                            v
+                        }
+                    }
                     k if is_boxed_kind(k) => {
                         let v = if let Some(ref actx) = actx {
                             alloc::box_or_load_home(&mut b, actx, &state, first_reg)

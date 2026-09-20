@@ -42,8 +42,8 @@ use varn_types::register_meta::RegisterMeta;
 
 use super::alloc::{box_or_load_home, def_result, AllocCtx};
 use super::emit::{
-    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper_void, meta_is_float,
-    state_meta_int, unbox_f64_coerce, unbox_int, use_boxed, use_f64, use_int,
+    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper_void, def_boxed_leaf,
+    meta_is_float, state_meta_int, unbox_f64_coerce, unbox_int, use_boxed, use_f64, use_int,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -191,7 +191,7 @@ pub(super) fn emit_array_length(
         let boxed = box_int(b, res);
         def_result(b, actx, first_reg, boxed);
     } else {
-        b.def_var(c.vars[first_reg], res);
+        super::emit::def_int_result(b, None, c.register_meta, c.vars, first_reg, res);
     }
     Ok(())
 }
@@ -344,13 +344,12 @@ pub(super) fn emit_array_get_index(
         };
         def_result(b, actx, first_reg, boxed);
     } else {
-        let payload = if b.func.dfg.value_type(res) == types::I128 {
-            let (_tag, payload) = b.ins().isplit(res);
-            payload
-        } else {
-            res
+        let boxed = match want {
+            ElemRepr::Int => box_int(b, res),
+            ElemRepr::Float => box_f64(b, res),
+            ElemRepr::Boxed => res,
         };
-        b.def_var(c.vars[first_reg], payload);
+        def_boxed_leaf(b, c.register_meta, c.vars, first_reg, boxed);
     }
     Ok(())
 }

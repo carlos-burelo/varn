@@ -102,8 +102,7 @@ pub(super) fn emit_intrinsic_direct(
         b.def_var(vars[dest], res);
     } else {
         let boxed = box_f64(b, res);
-        let (_tag, payload) = b.ins().isplit(boxed);
-        b.def_var(vars[dest], payload);
+        super::emit::def_boxed_leaf(b, meta, vars, dest, boxed);
     }
     Ok(())
 }
@@ -265,8 +264,7 @@ pub(super) fn emit_math_intrinsic_native(
         b.def_var(vars[dest], res);
     } else {
         let boxed = box_f64(b, res);
-        let (_tag, payload) = b.ins().isplit(boxed);
-        b.def_var(vars[dest], payload);
+        super::emit::def_boxed_leaf(b, meta, vars, dest, boxed);
     }
     true
 }
@@ -284,6 +282,7 @@ fn operands_native(state: &[K], a_r: usize, b_r: usize) -> bool {
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_float_op(
     b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
     vars: &[Variable],
     state: &[K],
     meta: &[RegisterMeta],
@@ -444,8 +443,20 @@ pub(super) fn emit_float_op(
                 _ => FloatCC::NotEqual,
             };
             let c = b.ins().fcmp(fcc, a, bb);
-            let ext = b.ins().uextend(types::I64, c);
-            b.def_var(vars[dest], ext);
+            // A heap-classed (`Dyn`) bool destination carries the whole
+            // tag+payload `VmValue` pair; write the boxed bool and refresh its
+            // home. A scalar destination keeps the raw 0/1 word.
+            if super::emit::dest_is_ref(meta, dest) {
+                let boxed = super::emit::box_bool(b, c);
+                if let Some(actx) = actx {
+                    def_result(b, actx, dest, boxed);
+                } else {
+                    b.def_var(vars[dest], boxed);
+                }
+            } else {
+                let ext = b.ins().uextend(types::I64, c);
+                b.def_var(vars[dest], ext);
+            }
             Ok(true)
         }
         _ => Ok(false),

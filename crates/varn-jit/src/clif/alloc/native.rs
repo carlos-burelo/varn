@@ -3,9 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::chunk::{Literal, PoolEntry};
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{
-    box_bool, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce,
-};
+use super::super::emit::{box_bool, call_helper, call_helper_void};
 use super::super::kinds::K;
 use super::safepoints::{
     box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
@@ -176,7 +174,7 @@ pub(crate) fn emit_get_enum_tag(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    meta: &[RegisterMeta],
+    _meta: &[RegisterMeta],
     code: &[u16],
     ip: usize,
 ) {
@@ -204,18 +202,10 @@ pub(crate) fn emit_get_enum_tag(
         actx.helpers.jit_native_result_offset as i32,
     );
 
-    if meta_is_float(meta, dest) {
-        let f = unbox_f64_coerce(b, res);
-        b.def_var(actx.vars[dest], f);
-    } else {
-        let payload = if b.func.dfg.value_type(res) == cranelift_codegen::ir::types::I128 {
-            let (_tag, payload) = b.ins().isplit(res);
-            payload
-        } else {
-            res
-        };
-        b.def_var(actx.vars[dest], payload);
-    }
+    // The tag is an int, but the destination's CLASS decides storage: a
+    // `Dyn`-classed register is an `I128` pair and must be boxed. `def_result`
+    // is the single projection (and refreshes the home).
+    def_result(b, actx, dest, res);
 }
 
 pub(crate) fn emit_build_str(

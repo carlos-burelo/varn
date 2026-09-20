@@ -294,38 +294,30 @@ pub(super) fn emit_get_fixed_field(
     let v = b.block_params(cont)[0];
 
     if narrow {
-        // `v` is the raw i64 payload — no unboxing needed.
+        // `v` is the raw i64 payload — no unboxing needed. The destination
+        // CLASS decides storage: `Bool` is `SlotClass::Dyn`, so its variable is
+        // an `I128` pair and must be boxed (writing the raw payload into it is
+        // a Cranelift type error).
         match dest_kind {
             Some(SlotKind::Float) => {
                 let f = b.ins().bitcast(types::F64, MemFlags::new(), v);
                 b.def_var(c.vars[first_reg], f);
+                if let Some(actx) = actx {
+                    let payload = b.ins().bitcast(types::I64, MemFlags::new(), f);
+                    let tag_v =
+                        b.ins()
+                            .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
+                    let boxed = b.ins().iconcat(tag_v, payload);
+                    super::alloc::store_boxed_home(b, actx, first_reg, boxed);
+                }
+            }
+            Some(SlotKind::Bool) => {
+                emit::def_bool_result(b, actx, c.register_meta, c.vars, first_reg, v);
             }
             _ => {
-                // Int or Bool: the payload IS the native value.
-                b.def_var(c.vars[first_reg], v);
+                // Int: the payload IS the native value.
+                emit::def_int_result(b, actx, c.register_meta, c.vars, first_reg, v);
             }
-        }
-        // When the allocator context tracks GC roots, we must still write
-        // a full VmValue (tag + payload) into the frame so the collector
-        // can distinguish heap refs from scalars. For known primitives the
-        // tag is a compile-time constant — one `iconcat` + one store.
-        if let Some(actx) = actx {
-            let kind_const = match dest_kind {
-                Some(SlotKind::Int) => varn_types::vm_value::KIND_INT,
-                Some(SlotKind::Float) => varn_types::vm_value::KIND_FLOAT,
-                Some(SlotKind::Bool) => varn_types::vm_value::KIND_BOOL,
-                _ => unreachable!(),
-            };
-            let tag_v = b.ins().iconst(types::I64, kind_const as i64);
-            let payload_for_frame = if dest_kind == Some(SlotKind::Float) {
-                // Float variable is F64; bitcast back to I64 for the frame.
-                let f = b.use_var(c.vars[first_reg]);
-                b.ins().bitcast(types::I64, MemFlags::new(), f)
-            } else {
-                v
-            };
-            let boxed = b.ins().iconcat(tag_v, payload_for_frame);
-            super::alloc::store_boxed_home(b, actx, first_reg, boxed);
         }
     } else if let Some(actx) = actx {
         super::alloc::def_result(b, actx, first_reg, v);
@@ -336,8 +328,7 @@ pub(super) fn emit_get_fixed_field(
         let i = unbox_int(b, v);
         b.def_var(c.vars[first_reg], i);
     } else {
-        let (_tag, payload) = b.ins().isplit(v);
-        b.def_var(c.vars[first_reg], payload);
+        emit::def_boxed_leaf(b, c.register_meta, c.vars, first_reg, v);
     }
     Ok(())
 }

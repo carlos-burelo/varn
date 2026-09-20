@@ -12,9 +12,8 @@ use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
     box_bool, box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool,
-    def_const_int, dest_is_ref,
-    emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
-    use_boxed, use_f64, use_int,
+    def_const_int, def_int_result, dest_is_ref, emit_return_value, guard_overflow, meta_is_float,
+    state_meta_int, unbox_bool, unbox_f64_coerce, use_boxed, use_f64, use_int,
 };
 use super::super::fields;
 use super::super::floats;
@@ -159,10 +158,10 @@ pub(crate) fn dispatch_opcode(
             // bounds — so that one still licenses skipping the guard.
             if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
                 let v = b.ins().iadd(s1, s2);
-                b.def_var(vars[first_reg], v);
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, v);
             } else if op == OpCode::MulInt && arr.loops.is_bounds_safe_arith(ip) {
                 let v = b.ins().imul(s1, s2);
-                b.def_var(vars[first_reg], v);
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, v);
             } else {
                 let (r, overflow, helper) = match op {
                     OpCode::AddInt => {
@@ -196,7 +195,7 @@ pub(crate) fn dispatch_opcode(
                     s1,
                     s2,
                 );
-                b.def_var(vars[first_reg], w);
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, w);
             }
         }
         OpCode::Negate => {
@@ -224,13 +223,7 @@ pub(crate) fn dispatch_opcode(
                 call_helper_void(b, cc, helpers.negate, &[exec_ctx, v_tag, v_payload]);
                 b.ins().jump(cont, &[]);
                 b.switch_to_block(cont);
-                if state_meta_int(&proto.register_meta, first_reg) {
-                    b.def_var(vars[first_reg], neg);
-                } else {
-                    let boxed = box_int(b, neg);
-                    let (_tag, payload) = b.ins().isplit(boxed);
-                    b.def_var(vars[first_reg], payload);
-                }
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, neg);
             } else {
                 let actx = actx.ok_or("clif: Negate outside alloc fn")?;
                 let regs = alloc::live_boxed(actx, state);
@@ -305,7 +298,7 @@ pub(crate) fn dispatch_opcode(
                 } else {
                     b.ins().iadd_imm(s, -imm)
                 };
-                b.def_var(vars[first_reg], r);
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, r);
             } else {
                 let imm_v = b.ins().iconst(types::I64, imm);
                 let (r, overflow, helper) = if op == OpCode::AddImm {
@@ -330,7 +323,7 @@ pub(crate) fn dispatch_opcode(
                     s,
                     imm_v,
                 );
-                b.def_var(vars[first_reg], w);
+                def_int_result(b, actx, &proto.register_meta, vars, first_reg, w);
             }
         }
         OpCode::ModInt => {
@@ -362,7 +355,7 @@ pub(crate) fn dispatch_opcode(
             b.ins().jump(merge, &[r.into()]);
             b.switch_to_block(merge);
             let res = b.block_params(merge)[0];
-            b.def_var(vars[first_reg], res);
+            def_int_result(b, actx, &proto.register_meta, vars, first_reg, res);
         }
         OpCode::LtInt
         | OpCode::LteInt
@@ -866,6 +859,7 @@ pub(crate) fn dispatch_opcode(
         | OpCode::NeqFloat => {
             if !floats::emit_float_op(
                 b,
+                actx,
                 vars,
                 state,
                 &proto.register_meta,

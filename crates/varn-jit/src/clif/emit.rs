@@ -99,6 +99,78 @@ pub(super) fn def_const_bool(
     }
 }
 
+/// Define a register from a BOXED `VmValue` (`I128`; a bare `I64` is treated as
+/// an int payload by the same rule `def_result` uses), honouring the
+/// destination's physical class. This is `alloc::def_result` for a lowering
+/// that has no frame (`actx == None`, i.e. a leaf): a heap-classed (`Dyn`/`Ref`)
+/// destination keeps the whole pair instead of a raw payload being written into
+/// an `I128` Variable (a Cranelift type error, and the C1 value-flow bug).
+pub(super) fn def_boxed_leaf(
+    b: &mut FunctionBuilder,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    vars: &[Variable],
+    dest: usize,
+    res: cranelift_codegen::ir::Value,
+) {
+    if dest_is_ref(meta, dest) {
+        let pair = if b.func.dfg.value_type(res) == types::I128 {
+            res
+        } else {
+            let tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            b.ins().iconcat(tag, res)
+        };
+        b.def_var(vars[dest], pair);
+    } else if meta_is_float(meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(vars[dest], f);
+    } else {
+        let payload = if b.func.dfg.value_type(res) == types::I128 {
+            let (_tag, payload) = b.ins().isplit(res);
+            payload
+        } else {
+            res
+        };
+        b.def_var(vars[dest], payload);
+    }
+}
+
+/// Define a register from a RAW integer result, boxing it for a heap-classed
+/// destination. The single place an int-producing op writes its destination,
+/// so every producer agrees with `use_int`/`JumpIfFalse` about the pair.
+pub(super) fn def_int_result(
+    b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    vars: &[Variable],
+    dest: usize,
+    raw: cranelift_codegen::ir::Value,
+) {
+    let boxed = box_int(b, raw);
+    match actx {
+        Some(actx) => super::alloc::def_result(b, actx, dest, boxed),
+        None => def_boxed_leaf(b, meta, vars, dest, boxed),
+    }
+}
+
+/// Define a register from a raw 0/1 bool result, boxing it for a heap-classed
+/// destination (bool registers are `SlotClass::Dyn`, hence an `I128` pair).
+pub(super) fn def_bool_result(
+    b: &mut FunctionBuilder,
+    actx: Option<&AllocCtx>,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    vars: &[Variable],
+    dest: usize,
+    raw: cranelift_codegen::ir::Value,
+) {
+    let boxed = box_bool(b, raw);
+    match actx {
+        Some(actx) => super::alloc::def_result(b, actx, dest, boxed),
+        None => def_boxed_leaf(b, meta, vars, dest, boxed),
+    }
+}
+
 /// Read a register as an unboxed int. `Int` vars are already raw; a boxed
 /// `VmValue`'s payload word IS the raw i64, so it's read unchanged too.
 pub(super) fn use_int(

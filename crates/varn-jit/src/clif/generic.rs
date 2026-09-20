@@ -8,7 +8,8 @@
 //! directly; arithmetic results stay boxed (unboxed at an int use).
 use super::alloc::AllocCtx;
 use super::emit::{
-    box_int, box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce,
+    box_int, box_or_pass, call_helper, call_helper_void, def_bool_result, def_boxed_leaf,
+    meta_is_float,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -56,17 +57,8 @@ fn box_operand(
 fn def_boxed(b: &mut FunctionBuilder, g: &GenCtx, dest: usize, res: cranelift_codegen::ir::Value) {
     if let Some(actx) = g.actx {
         super::alloc::def_result(b, actx, dest, res);
-    } else if meta_is_float(g.register_meta, dest) {
-        let f = unbox_f64_coerce(b, res);
-        b.def_var(g.vars[dest], f);
     } else {
-        let payload = if b.func.dfg.value_type(res) == types::I128 {
-            let (_tag, payload) = b.ins().isplit(res);
-            payload
-        } else {
-            res
-        };
-        b.def_var(g.vars[dest], payload);
+        def_boxed_leaf(b, g.register_meta, g.vars, dest, res);
     }
 }
 
@@ -131,7 +123,7 @@ pub(super) fn emit_is_null(
         let boxed = super::emit::box_bool(b, is_null);
         super::alloc::def_result(b, actx, dest, boxed);
     } else {
-        b.def_var(g.vars[dest], is_null);
+        def_bool_result(b, None, g.register_meta, g.vars, dest, is_null);
     }
 }
 
@@ -300,7 +292,7 @@ pub(super) fn emit_unary_bool(
         let boxed = super::emit::box_bool(b, cond);
         super::alloc::def_result(b, actx, dest, boxed);
     } else {
-        b.def_var(g.vars[dest], cond);
+        def_bool_result(b, None, g.register_meta, g.vars, dest, cond);
     }
 }
 
@@ -410,6 +402,6 @@ pub(super) fn emit_compare(
         let boxed = super::emit::box_bool(b, cond);
         super::alloc::def_result(b, actx, dest, boxed);
     } else {
-        b.def_var(g.vars[dest], cond);
+        def_bool_result(b, None, g.register_meta, g.vars, dest, cond);
     }
 }
