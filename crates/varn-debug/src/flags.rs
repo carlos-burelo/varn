@@ -255,69 +255,51 @@ impl DebugFlags {
                 }
             } else {
                 match phase {
-                    "tokens" => flags.tokens = true,
-                    "ast" => flags.ast = true,
-                    "bytecode" => flags.bytecode = true,
-                    "symbols" => flags.symbols = true,
-                    "binds" => flags.binds = true,
-                    "modules" => flags.modules = true,
-                    "types" => flags.types = true,
-                    "expr" => flags.expr = true,
-                    "errors" => flags.errors = true,
-                    "trace" => flags.trace = true,
-                    "calls" => flags.calls = true,
-                    "consts" => flags.consts = true,
-                    "scope" => flags.scope = true,
-                    "graph" => flags.graph = true,
-                    "cap-trace" | "cap" | "caps" => flags.cap_trace = true,
                     "check" => {
                         flags.symbols = true;
                         flags.symbols_all = true;
-                        flags.binds = true;
                         flags.types = true;
                         flags.types_all = true;
-                        flags.expr = true;
                     }
-                    "info" => flags.info = true,
+                    // CLI-only views (consumed by `inspect_lsp`), not registry
+                    // phases.
                     "lsp" => flags.lsp = true,
-                    "tir" => flags.tir = true,
-                    "tiers" => flags.tiers = true,
-                    "bails" => flags.bails = true,
-                    "roots" => flags.roots = true,
-                    "gc" => flags.gc = true,
-                    "summary" => flags.summary = true,
-                    "typeloss" => flags.typeloss = true,
-                    "clif" => flags.clif_all_on(),
+                    "types" => flags.types = true,
+                    // Not a phase: execution trace, consumed by the pipeline.
+                    "trace" => flags.trace = true,
+                    // `all` is derived from the registry's `in_all` membership,
+                    // so it cannot go stale (the old manual list already had:
+                    // it dropped typeloss/roots/tir and kept dead `expr`/`info`).
                     "all" => {
-                        flags.tokens = true;
-                        flags.ast = true;
-                        flags.bytecode = true;
-                        flags.symbols = true;
+                        for p in crate::registry::in_all() {
+                            apply_registered(&mut flags, p.id());
+                        }
                         flags.symbols_all = true;
-                        flags.modules = true;
                         flags.types = true;
                         flags.types_all = true;
-                        flags.expr = true;
-                        flags.scope = true;
-                        flags.info = true;
-                        flags.graph = true;
-                        flags.cap_trace = true;
                         flags.lsp = true;
                         flags.lsp_all();
-                        flags.tiers = true;
-                        flags.bails = true;
-                        flags.summary = true;
-                        flags.clif_all_on();
                     }
-                    unknown => {
-                        let names: Vec<&str> = PHASES.iter().map(|(n, _)| *n).collect();
-                        return Err(CliError::usage(format!(
-                            "unknown debug phase: '{unknown}'\n\
-                             Valid phases: {}\n\
-                             Run with --list-phases for descriptions.",
-                            names.join(", ")
-                        )));
-                    }
+                    // Dead flags: still parsed for one more step, removed in
+                    // DEBUG_PLAN §7.
+                    "binds" => flags.binds = true,
+                    "expr" => flags.expr = true,
+                    "errors" => flags.errors = true,
+                    "calls" => flags.calls = true,
+                    "consts" => flags.consts = true,
+                    "info" => flags.info = true,
+                    unknown => match crate::registry::lookup(unknown) {
+                        Some(p) => apply_registered(&mut flags, p.id()),
+                        None => {
+                            let names: Vec<&str> = PHASES.iter().map(|(n, _)| *n).collect();
+                            return Err(CliError::usage(format!(
+                                "unknown debug phase: '{unknown}'\n\
+                                 Valid phases: {}\n\
+                                 Run with --list-phases for descriptions.",
+                                names.join(", ")
+                            )));
+                        }
+                    },
                 }
             }
         }
@@ -365,5 +347,122 @@ impl DebugFlags {
     pub fn clif_all_on(&mut self) {
         self.clif = true;
         self.clif_all();
+    }
+}
+
+/// Set the `DebugFlags` field(s) for a registry phase id. The registry owns
+/// which names are accepted, aliases, titles and `-p all` membership; this is
+/// the single id → flag mapping.
+fn apply_registered(flags: &mut DebugFlags, id: &str) {
+    match id {
+        "tokens" => flags.tokens = true,
+        "ast" => flags.ast = true,
+        "modules" => flags.modules = true,
+        "symbols" => flags.symbols = true,
+        "check:types" => flags.check_types = true,
+        "bytecode" => flags.bytecode = true,
+        "scope" => flags.scope = true,
+        "caps" => flags.cap_trace = true,
+        "graph" => flags.graph = true,
+        "summary" => flags.summary = true,
+        "typeloss" => flags.typeloss = true,
+        "tir" => flags.tir = true,
+        "tiers" => flags.tiers = true,
+        "bails" => flags.bails = true,
+        "roots" => flags.roots = true,
+        "clif" => flags.clif_all_on(),
+        "gc" => flags.gc = true,
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_phase_sets_its_flag() {
+        assert!(DebugFlags::parse("tokens").unwrap().tokens);
+        assert!(DebugFlags::parse("symbols").unwrap().symbols);
+        assert!(DebugFlags::parse("modules").unwrap().modules);
+        assert!(DebugFlags::parse("scope").unwrap().scope);
+        assert!(DebugFlags::parse("check:types").unwrap().check_types);
+        assert!(DebugFlags::parse("cap").unwrap().cap_trace);
+        assert!(DebugFlags::parse("cap-trace").unwrap().cap_trace);
+        assert!(DebugFlags::parse("caps").unwrap().cap_trace);
+    }
+
+    #[test]
+    fn clif_bare_is_the_phase_plus_views_without_check() {
+        let f = DebugFlags::parse("clif").unwrap();
+        assert!(f.clif && f.clif_route && f.clif_kinds && f.clif_ir && f.clif_asm);
+        assert!(!f.clif_check);
+    }
+
+    #[test]
+    fn clif_all_excludes_check() {
+        let f = DebugFlags::parse("clif:all").unwrap();
+        assert!(f.clif_route && f.clif_kinds && f.clif_ir && f.clif_asm);
+        assert!(!f.clif_check);
+    }
+
+    #[test]
+    fn check_group_is_symbols_and_types_not_check_types() {
+        let f = DebugFlags::parse("check").unwrap();
+        assert!(f.symbols && f.symbols_all && f.types && f.types_all);
+        assert!(!f.check_types);
+        assert!(!f.binds && !f.expr);
+    }
+
+    #[test]
+    fn all_is_derived_and_excludes_sweep_phases() {
+        let f = DebugFlags::parse("all").unwrap();
+        for on in [
+            f.tokens,
+            f.ast,
+            f.bytecode,
+            f.symbols,
+            f.modules,
+            f.scope,
+            f.graph,
+            f.cap_trace,
+            f.tiers,
+            f.bails,
+            f.summary,
+            f.clif,
+            f.types,
+            f.lsp,
+        ] {
+            assert!(on);
+        }
+        assert!(f.symbols_all && f.types_all && f.lsp_hovers);
+        for off in [f.roots, f.typeloss, f.gc, f.tir, f.check_types] {
+            assert!(!off);
+        }
+    }
+
+    #[test]
+    fn submodes_parse() {
+        let f = DebugFlags::parse("roots:diff").unwrap();
+        assert!(f.roots && f.roots_diff && !f.roots_summary);
+        let f = DebugFlags::parse("tir:check").unwrap();
+        assert!(f.tir_check);
+        let f = DebugFlags::parse("symbols:all").unwrap();
+        assert!(f.symbols && f.symbols_all);
+    }
+
+    #[test]
+    fn unknown_and_bad_subphases_error() {
+        assert!(DebugFlags::parse("definitely-not-a-phase").is_err());
+        assert!(DebugFlags::parse("tir:nope").is_err());
+        assert!(DebugFlags::parse("clif:nope").is_err());
+    }
+
+    #[test]
+    fn any_and_needs_execution() {
+        assert!(!DebugFlags::parse("").unwrap().any());
+        assert!(DebugFlags::parse("tokens").unwrap().any());
+        assert!(!DebugFlags::parse("tokens").unwrap().needs_execution());
+        assert!(DebugFlags::parse("gc").unwrap().needs_execution());
     }
 }
