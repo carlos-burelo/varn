@@ -46,7 +46,7 @@ use varn_jit::{JitHelpers, SIZE_GATE_WORDS};
 use varn_types::{FunctionProto, PoolEntry};
 
 use crate::flags::DebugFlags;
-use crate::tiers::constants_for_inspect;
+use crate::walk::constants_for_inspect;
 
 const BOLD: &str = "\x1b[1m";
 const GREEN: &str = "\x1b[32m";

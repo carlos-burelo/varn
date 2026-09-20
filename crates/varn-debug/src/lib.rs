@@ -24,6 +24,7 @@ pub mod tiers;
 pub mod tir;
 pub mod tokens;
 pub mod typeloss;
+pub mod walk;
 
 pub use cap_trace::debug_cap_trace;
 pub use flags::{print_phases, DebugFlags};

@@ -12,9 +12,10 @@
 use varn_jit::clif::debug::inspect;
 use varn_jit::clif::lower::NoLinker;
 use varn_jit::{JitHelpers, SIZE_GATE_WORDS};
-use varn_types::{FunctionProto, Literal, PoolEntry, VmValue};
+use varn_types::{FunctionProto, PoolEntry};
 
 use crate::render::truncate;
+use crate::walk::constants_for_inspect;
 
 use crate::flags::DebugFlags;
 
@@ -119,24 +120,6 @@ fn walk(
             walk(f, helpers, isa, out);
         }
     }
-}
-
-/// Heap-free constant resolution: only `is_int()` fidelity affects the
-/// lowering's kind classification, so scalars map exactly and heap literals
-/// become non-int placeholders.
-pub(crate) fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
-    proto
-        .chunk
-        .constants
-        .iter()
-        .map(|entry| match entry {
-            PoolEntry::Literal(Literal::Null) => VmValue::null(),
-            PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
-            PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
-            PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
-            _ => VmValue::null(),
-        })
-        .collect()
 }
 
 fn matches_filter(row: &TierRow, flags: &DebugFlags) -> bool {

@@ -5,9 +5,10 @@ use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, IntelFormatter};
 use varn_jit::clif::debug::{inspect, ClifInspection};
 use varn_jit::clif::lower::NoLinker;
 use varn_jit::JitHelpers;
-use varn_types::{FunctionProto, Literal, PoolEntry, VmValue};
+use varn_types::{FunctionProto, PoolEntry};
 
 use crate::flags::DebugFlags;
+use crate::walk::constants_for_inspect;
 
 const BOLD: &str = "\x1b[1m";
 const BLUE: &str = "\x1b[34m";
@@ -59,30 +60,6 @@ fn render_recursive(
             render_recursive(f, flags, helpers, isa);
         }
     }
-}
-
-/// Heap-free constant resolution for inspection. Only `is_int()` fidelity
-/// matters to the lowering's kind classification, so scalar literals map
-/// exactly (mirroring `varn_vm::exec::calls::resolve_constants`) and heap
-/// literals (strings, bigints, symbols, chars) plus function/shape entries
-/// become `null` placeholders — they are non-int, which is the correct kind,
-/// and their real heap bits are irrelevant to a static, non-executing view.
-/// (Consequence: a string constant shows as `null` in the IR/disasm — see
-/// the phase limitations.)
-fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
-    proto
-        .chunk
-        .constants
-        .iter()
-        .map(|entry| match entry {
-            PoolEntry::Literal(Literal::Null) => VmValue::null(),
-            PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
-            PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
-            PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
-            // Heap literals + function/shape entries: non-int placeholder.
-            _ => VmValue::null(),
-        })
-        .collect()
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
