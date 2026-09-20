@@ -289,7 +289,26 @@ pub fn try_compile(
         .any(|m| m.kind == SlotKind::Ref)
         || proto.param_kinds.iter().any(|k| *k == SlotKind::Ref)
     {
-        return Err("clif: Ref-class registers disabled in fase B".into());
+        // Dev escape hatch for diagnosing the Ref provenance work.
+        if std::env::var_os("VARN_JIT_ALLOW_REF").is_none() {
+            return Err("clif: Ref-class registers disabled in fase B".into());
+        }
+        eprintln!(
+            "REFMETA {:?}: {:?}",
+            proto.name,
+            proto
+                .register_meta
+                .iter()
+                .map(|m| match m.kind {
+                    SlotKind::Int => "I",
+                    SlotKind::Float => "F",
+                    SlotKind::Bool => "B",
+                    SlotKind::Str => "S",
+                    SlotKind::Ref => "R",
+                    SlotKind::Dynamic => "D",
+                })
+                .collect::<Vec<_>>()
+        );
     }
     super::emit::reset_disabled_helper_hit();
 

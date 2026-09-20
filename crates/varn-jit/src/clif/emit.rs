@@ -557,8 +557,15 @@ impl LoopCaches<'_> {
     }
 
     /// The object-data cache `r` should use at `ip`.
-    pub(super) fn object(&self, ip: usize, r: usize) -> Option<ObjRegionCache> {
-        self.find(ip, r, |reg| &reg.objects, self.objects)
+    ///
+    /// Fase B: disabled. The hoisted base is `InstanceData::payload` for a
+    /// class instance, whose fields are COMPACT (`class_field_repr`); the
+    /// access sites then load at `slot*16`, wrong for instances. Until the
+    /// cache records the receiver's shape (instance vs dynamic object), no
+    /// object access is hoisted — `GetFixedField`/`SetFixedField` route
+    /// instances to the compact-aware helper.
+    pub(super) fn object(&self, _ip: usize, _r: usize) -> Option<ObjRegionCache> {
+        None
     }
 
     /// The hoisted byte view the char-indexing intrinsic AT `ip` reads from,
