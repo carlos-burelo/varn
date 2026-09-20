@@ -11,7 +11,6 @@
 
 pub(crate) mod isolates;
 
-use super::calls::PreparedCall;
 use super::ctx::ExecCtx;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
@@ -303,78 +302,13 @@ impl NativeCtx for ExecCtx {
     }
 
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
-        // La ventana vive en staging (no en el almacén): se consume al
-        // preparar y se limpia al salir, como el `truncate(orig_len)`.
-        self.stage.clear();
-        self.stage.push(callee);
-        self.stage.extend_from_slice(args);
-        let prepared = match self.prepare_call(callee, args.len() + 1) {
-            Ok(p) => p,
-            Err(e) => {
-                self.stage.clear();
-                return Err(e.message);
-            }
-        };
-        let res = match prepared {
-            PreparedCall::NativeImmediate(f, arg_count) => {
-                // La ventana vive al FINAL de staging (ver dispatch_prepared_call).
-                let take = arg_count.min(self.stage.len());
-                let start = self.stage.len() - take;
-                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
-                self.stage.clear();
-                (f)(self as &mut dyn NativeCtx, &vm_args)
-            }
-            PreparedCall::RawNativeImmediate(f, arg_count) => {
-                let take = arg_count.min(self.stage.len());
-                let start = self.stage.len() - take;
-                let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
-                self.stage.clear();
-                let slice = if vm_args.len() > 0 {
-                    &vm_args[1..]
-                } else {
-                    &vm_args[..]
-                };
-                (f)(self as &mut dyn NativeCtx, slice)
-            }
-            PreparedCall::Frame(frame) => {
-                let depth = self.frames.len();
-                self.frames.push(frame);
-                self.run_until(depth).map_err(|e| e.message)
-            }
-            PreparedCall::PushValue(nv) => {
-                self.stage.clear();
-                Ok(nv)
-            }
-            PreparedCall::Generator {
-                closure,
-                args,
-                current_class,
-            } => {
-                let v = self.build_generator(closure, args, current_class);
-                self.stage.clear();
-                Ok(v)
-            }
-            PreparedCall::Constructor(frame, instance_nv) => {
-                let depth = self.frames.len();
-                self.frames.push(frame);
-                self.pending_constructors.push((depth, instance_nv));
-                let _ = self.run_until(depth).map_err(|e| e.message)?;
-                self.stage.clear();
-                Ok(instance_nv)
-            }
-            PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args)?;
-                let nv = if result.is_null() {
-                    instance_nv
-                } else {
-                    result
-                };
-                self.stage.clear();
-                Ok(nv)
-            }
-        };
-        self.stage.clear();
-        res
+        // The window is `[callee, args...]`, the exact shape the interpreter's
+        // callee slot + arguments and the compiled caller's flushed staging
+        // produce; `invoke` is the single run-to-completion entry.
+        let mut window = Vec::with_capacity(args.len() + 1);
+        window.push(callee);
+        window.extend_from_slice(args);
+        self.invoke(callee, &window).map_err(|e| e.message)
     }
 
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {

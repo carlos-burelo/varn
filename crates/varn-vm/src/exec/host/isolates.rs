@@ -12,21 +12,24 @@ use crate::value::VmValue;
 use varn_types::NativeCtx;
 
 impl ExecCtx {
-    /// Like `call_vm`, but for the JIT call fallback.
+    /// THE canonical VM invocation: run `callee` to completion with a boxed
+    /// `window` whose first slot is the callee's placeholder (the register the
+    /// interpreter's callee slot / the compiled caller's staging register
+    /// occupies), followed by the arguments.
+    ///
+    /// Every run-to-completion entry into VM code goes through here:
+    /// `clif_call_fallback` (compiled caller), `NativeCtx::call_vm` (host →
+    /// VM), `spawn_internal`, and isolates. The window is adopted as staging,
+    /// so it materialises through the SAME `prepare_call`/`materialize_frame`
+    /// as the interpreter's slow path — one argument convention, not two.
     ///
     /// Fase A del frame por clases: el llamador compilado ya no puede exponer
     /// su ventana de argumentos como tramo contiguo del almacén — los home
     /// slots viven en los vectores por clase (`FrameStore`) y solo el valor
     /// completo tiene sentido fuera del frame. La ventana llega entonces
-    /// boxeada en `window`, con el callee/placeholder de los argumentos en el
-    /// primer slot (igual que flush-eaba el lowering antiguo a sus home
-    /// slots), y se trata como staging: `prepare_call` la materializa en la
-    /// región tipada del frame (`materialize_frame`), el mismo camino que
-    /// toda entrada host→VM.
-    ///
-    /// Fase B: ventana tipada directa (GPR/FPR/REF/DYN sin boxear) y el
-    /// fast-path `construct_staged_fast` de `new X()` restaurado de git.
-    pub(crate) fn call_vm_window(
+    /// boxeada en `window`, con el callee/placeholder en el primer slot, y se
+    /// trata como staging.
+    pub(crate) fn invoke(
         &mut self,
         callee: VmValue,
         window: &[VmValue],

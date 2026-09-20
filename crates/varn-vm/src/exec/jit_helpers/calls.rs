@@ -108,9 +108,8 @@ pub(crate) extern "C" fn jit_call_method_flat(
 /// The single canonical VM call out of compiled code. The compiled caller has
 /// flushed `[callee, args...]` to the homes of registers
 /// `arg_start..arg_start + argc` in activation `act_id`; this gathers them and
-/// runs the callee through [`ExecCtx::call_vm_window`], which stages them and
-/// makes a `PreparedCall` (native, interpreter frame, generator, constructor),
-/// entering the callee's compiled entry through `run_until` when one exists.
+/// runs the callee through [`ExecCtx::invoke`], the same entry the interpreter
+/// slow path and every host→VM call use.
 pub(crate) extern "C" fn clif_call_fallback(
     ctx: *mut ExecCtx,
     callee_tag: u64,
@@ -123,7 +122,7 @@ pub(crate) extern "C" fn clif_call_fallback(
         let ctx_ref = &mut *ctx;
         let callee = VmValue::from_raw_parts(callee_tag, callee_payload);
         let window = ctx_ref.stack.box_range(act_id, arg_start, argc);
-        match ctx_ref.call_vm_window(callee, &window) {
+        match ctx_ref.invoke(callee, &window) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
@@ -152,7 +151,7 @@ pub(crate) extern "C" fn clif_call_fallback(
 /// Fase B: pushes a fresh `FrameStore` activation for the callee, copies the
 /// argument registers from the caller activation's homes with `mov_cross`,
 /// pushes its `CallFrame`, and returns the callee's compiled wrapper entry so
-/// the caller invokes it directly (no Rust `call_vm_window` round-trip).
+/// the caller invokes it directly (no Rust [`ExecCtx::invoke`] round-trip).
 /// Returns `0` — nothing pushed — for a non-closure, async/generator/rest, or
 /// a callee with no compiled entry; the call site then falls back to
 /// `clif_call_fallback`.
@@ -183,13 +182,11 @@ pub(crate) extern "C" fn jit_prepare_static_call(
         };
         let closure = closure.clone();
 
-        let callee_alloc = ctx_ref.stack.push_frame(&closure.proto);
-        for i in 0..arg_count {
-            if let Err(e) = ctx_ref.stack.mov_cross(callee_alloc, i, act_id, arg_start + i) {
-                ctx_ref.stack.pop_frame();
-                jit_propagate_error(ctx_ref, e);
-            }
-        }
+        let callee_alloc =
+            match ctx_ref.push_call_frame(&closure.proto, act_id, arg_start, arg_count) {
+                Ok(a) => a,
+                Err(e) => jit_propagate_error(ctx_ref, e),
+            };
         if std::env::var_os("VARN_HOME_TRACE").is_some() {
             let copied: Vec<String> = (0..arg_count)
                 .map(|i| {

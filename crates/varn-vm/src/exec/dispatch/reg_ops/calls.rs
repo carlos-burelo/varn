@@ -37,13 +37,7 @@ impl ExecCtx {
                         // llamante: se mueve directo a los registros del
                         // callee (conversión por clase, sin boxeo intermedio
                         // cuando las clases coinciden).
-                        let alloc = self.stack.push_frame(&nc.proto);
-                        for i in 0..arg_count {
-                            if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
-                                self.stack.pop_frame();
-                                return Err(e);
-                            }
-                        }
+                        let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
                         let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                         frame.return_reg = dest as u16;
                         self.record_call_vm_fast();
@@ -162,14 +156,7 @@ impl ExecCtx {
                                     "stack overflow: call depth exceeded 10000",
                                 ));
                             }
-                            let alloc = self.stack.push_frame(&nc.proto);
-                            for i in 0..arg_count {
-                                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i)
-                                {
-                                    self.stack.pop_frame();
-                                    return Err(e);
-                                }
-                            }
+                            let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
                             let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                             frame.return_reg = dest as u16;
                             self.record_call_vm_fast();
@@ -307,13 +294,7 @@ impl ExecCtx {
                     ));
                 }
                 let owned = self.frames[frame_idx]._owned_closure.clone();
-                let alloc = self.stack.push_frame(&closure_ref.proto);
-                for i in 0..arg_count {
-                    if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
-                        self.stack.pop_frame();
-                        return Err(e);
-                    }
-                }
+                let alloc = self.push_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
                 let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
                 frame._owned_closure = owned;
                 frame.return_reg = dest as u16;

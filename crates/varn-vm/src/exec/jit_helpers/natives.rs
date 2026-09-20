@@ -33,16 +33,6 @@ pub(crate) extern "C" fn jit_is_native_fn(ctx: *mut ExecCtx, callee: VmValue) ->
     }
 }
 
-pub(crate) extern "C" fn jit_call_native_fast(
-    ctx: *mut ExecCtx,
-    callee: VmValue,
-    arg_start: usize,
-    arg_count: usize,
-) -> VmValue {
-    let _ = (ctx, callee, arg_start, arg_count);
-    bailed!()
-}
-
 /// JIT helper for `CallNativeOp`: resolve the stable op-id to its native fn and
 /// invoke it. The compiled caller has already flushed `[receiver, args...]` to
 /// the home slots of registers `reg_start..reg_start + total` in activation

@@ -82,8 +82,34 @@ impl ExecCtx {
         self.stage.pop().unwrap_or(VmValue::null())
     }
 
-    pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {
-        for (s, uv) in &self.open_upvalues {
+    /// THE frame materialisation for a non-rest VM call with typed arguments:
+    /// push a fresh activation for `nc` and copy the `arg_count`-slot window
+    /// from activation `src_base` (registers `src_start..`) into the callee's
+    /// `r0..`, converting per register class (`mov_cross`) with no boxing.
+    ///
+    /// Shared by the interpreter fast paths (`exec_call_reg`,
+    /// `exec_call_self`), the compiled caller's static-call fast path
+    /// (`jit_prepare_static_call`) and self-recursion (`clif_call_self`) — one
+    /// materialisation, not one per caller. On error the pushed activation is
+    /// popped before returning.
+    pub(crate) fn push_call_frame(
+        &mut self,
+        proto: &Rc<varn_types::FunctionProto>,
+        src_base: usize,
+        src_start: usize,
+        arg_count: usize,
+    ) -> VmResult<usize> {
+        let alloc = self.stack.push_frame(proto);
+        for i in 0..arg_count {
+            if let Err(e) = self.stack.mov_cross(alloc, i, src_base, src_start + i) {
+                self.stack.pop_frame();
+                return Err(e);
+            }
+        }
+        Ok(alloc)
+    }
+
+    pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {        for (s, uv) in &self.open_upvalues {
             if *s == slot {
                 return uv.clone();
             }
