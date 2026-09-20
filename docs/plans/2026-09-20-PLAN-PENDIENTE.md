@@ -508,6 +508,23 @@ lee/escribe por offset; el helper por slot queda como fallback dinámico.
 11.11x → 7.14x. Test nuevo `tests/class_field_layout.vn` (herencia + anchos
 mixtos + adyacencia) en `main.vn`. 4 cuadrantes 1233/0.
 
+---
+
+## 19. Clases JIT (gate abierto) — HECHO
+
+Commit `f14c01fe`. Con campo y `new X()` ya inline-compactos (sin helper de
+layout), el módulo class-heavy ya no pierde: se quitan `MakeClass`/`Inherit`/
+`Method`/`Define*`/`DeclareField`/`BindMethod`/`GetSuper` del gate fase-B (su
+lowering y helpers ya existían).
+
+| (release, absoluto) | antes | después |
+|---|---|---|
+| collection_pipeline | 338 ms | **237 ms** |
+| dto | 66 ms | **49 ms** |
+
+4 cuadrantes 1233/0.
+
+
 
 
 
