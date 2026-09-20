@@ -268,13 +268,22 @@ fn emit_vm_call(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    // Every register's home must be current before the call: if the callee (or
-    // anything below) throws and the exception is caught below this caller, the
-    // compiled frame is abandoned and the interpreter RESUMES this frame reading
-    // its registers out of their homes. `flush_boxed` only covers the heap
-    // classes, so flush the GPR/FPR homes too (tests/65-safepoint-roots).
-    for r in 0..actx.nregs {
-        store_home(b, actx, state, r);
+    // Every register's home must be current before the call ONLY when a `Try`
+    // below this call can catch a throw — then the compiled frame is abandoned
+    // and the interpreter resumes it reading registers out of their homes
+    // (`narrow_roots == false` iff the proto has a `Try`). Without a handler
+    // the frame is discarded whole on unwind, so only the ARGUMENT window must
+    // be in homes (the VM reads args from homes). Flushing all `nregs` on every
+    // dynamic call is what made constructors/methods dominate class-heavy
+    // benchmarks.
+    if !actx.narrow_roots {
+        for r in 0..actx.nregs {
+            store_home(b, actx, state, r);
+        }
+    } else {
+        for r in arg_start..(arg_start + total).min(actx.nregs) {
+            store_home(b, actx, state, r);
+        }
     }
 
     // Exception-unwind protocol: a throw below this call that is caught below
@@ -459,10 +468,16 @@ pub(crate) fn emit_call_self(
 ) -> cranelift_codegen::ir::Value {
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    // Every register home current: a throw caught below resumes this frame
-    // interpreted out of its homes.
-    for r in 0..actx.nregs {
-        store_home(b, actx, state, r);
+    // As in `emit_vm_call`: a full home flush is only needed when a `Try` can
+    // catch below this call; otherwise the argument window suffices.
+    if !actx.narrow_roots {
+        for r in 0..actx.nregs {
+            store_home(b, actx, state, r);
+        }
+    } else {
+        for r in arg_start..(arg_start + total).min(actx.nregs) {
+            store_home(b, actx, state, r);
+        }
     }
     let start_v = b.ins().iconst(types::I64, arg_start as i64);
     let n = b.ins().iconst(types::I64, total as i64);
