@@ -331,6 +331,42 @@ asigna), `int_to_str`, `prefix_suffix` (receptor no loop-invariant, coste por
 llamada). Medir con `compare.ps1 -Only str_ops` (el wall-time del harness está
 dominado por carga de módulos; usar las `ms` internas por sección).
 
+---
+
+## 12. Medición release (2026-09-20)
+
+`cargo build --release -p varn-cli` + 4 cuadrantes verdes (1223/0 cada uno).
+`cargo xtask compare` (harness release):
+
+| benchmark | Varn | Bun | ratio |
+|---|---|---|---|
+| matrix | 27.9 ms | 14.0 ms | 2.00x |
+| str_ops | 311.1 ms | 112.1 ms | 3.33x |
+| json_native | 42.9 ms | 35.5 ms | 1.20x |
+| json_pure | 412.6 ms | 349.1 ms | 1.18x |
+| csv_pipeline | 143.5 ms | 111.1 ms | 1.30x |
+| csv_etl | 28.5 ms | 29.7 ms | ~tied |
+| json_api_payloads | 44.6 ms | 25.5 ms | 1.75x |
+| gc_alloc | 150.8 ms | 48.9 ms | 3.12x |
+| dto | 234.8 ms | 23.8 ms | 10.0x |
+| collection_pipeline | 312.6 ms | 30.5 ms | 10.0x |
+| fib | 5841.0 ms | 60.2 ms | **100x** |
+| http_routing | 3173.7 ms | 142.1 ms | **25x** |
+
+Scoreboard: 0 wins, 1 tied, 11 rivals. Arranque 2.9x más rápido que Bun.
+
+**Outliers y causa raíz (no arreglados):**
+- `fib`: es recursivo pero queda **frame-aware** (`has_boxed_slots`: el bool
+  de `n<=1` es `SlotClass::Dyn`, y el slot de callee del `CallSelf` es
+  `LoadNull` Dynamic). Al ser frame-aware, cada recursión pasa por
+  `emit_call_self` (push de frame + `run_until` en Rust) en vez de una llamada
+  directa hardware. Arreglarlo requiere compilar fib como leaf: rama directa
+  sobre el payload de un bool de clase `Dyn` (hoy `JumpIfFalse` usa
+  `emit_truthy_fast`, que necesita `exec_ctx`), y refinar `has_boxed_slots`.
+- `http_routing`/`collection_pipeline`/`dto`: probablemente clases/generadores
+  gated o closure-heavy; sin investigar.
+
+
 
 
 
