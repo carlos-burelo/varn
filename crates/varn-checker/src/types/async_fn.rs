@@ -80,9 +80,9 @@ pub fn generator_of(
 pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> bool {
     match table.get(ty.0) {
         TypeKind::Generic(name, args, _) => {
-            table.get_list(*args).len() == 1
-                && (interner.resolve(*name) == IntrinsicType::Task.as_str()
-                    || interner.resolve(*name) == IntrinsicType::TaskHandle.as_str())
+            table.get_list(args).len() == 1
+                && (interner.resolve(name) == IntrinsicType::Task.as_str()
+                    || interner.resolve(name) == IntrinsicType::TaskHandle.as_str())
         }
         _ => false,
     }
@@ -93,7 +93,7 @@ pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) 
 pub fn awaited(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> Type {
     match table.get(ty.0) {
         TypeKind::Generic(_, args, _) if is_awaitable(ty, table, interner) => {
-            Type(table.get_list(*args)[0], false)
+            Type(table.get_list(args)[0], false)
         }
         _ => *ty,
     }

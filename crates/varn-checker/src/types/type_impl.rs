@@ -52,7 +52,7 @@ impl Type {
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
         match table.get(self.0) {
-            TypeKind::Array(inner) => Type(*inner, false),
+            TypeKind::Array(inner) => Type(inner, false),
             _ => Type::Dynamic,
         }
     }
@@ -269,7 +269,7 @@ impl Type {
             return Some(k);
         }
         match table.get(self.0) {
-            TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(interner.resolve(*n)),
+            TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(interner.resolve(n)),
             _ => None,
         }
     }
@@ -285,7 +285,7 @@ impl Type {
 
     pub fn to_type_tag(&self, table: &CheckerTyTable) -> TypeTag {
         match table.get(self.0) {
-            TypeKind::Intrinsic(tag) => *tag,
+            TypeKind::Intrinsic(tag) => tag,
             TypeKind::Array(_) => TypeTag::Array,
             TypeKind::Object(_) => TypeTag::Object,
             TypeKind::Named(..) => TypeTag::Class,
@@ -300,7 +300,7 @@ impl Type {
         match table.get(self.0) {
             TypeKind::Intrinsic(TypeTag::Null) => true,
             TypeKind::Union(list) => table
-                .get_list(*list)
+                .get_list(list)
                 .iter()
                 .any(|m| Type(*m, false).is_nullable(table)),
             _ => false,
@@ -346,7 +346,7 @@ impl Type {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let mut kept: Vec<CheckerTyId> = Vec::with_capacity(members.len());
                 for id in members {
-                    let is_named_match = matches!(table.get(id), TypeKind::Named(n, _) if *n == name);
+                    let is_named_match = matches!(table.get(id), TypeKind::Named(n, _) if n == name);
                     if !is_named_match {
                         kept.push(id);
                     }

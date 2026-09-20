@@ -130,7 +130,7 @@ impl<'r> Checker<'r> {
                                 .cloned()
                                 .or_else(|| bind.arena.get(sym_id).ty)
                             {
-                                if let TypeKind::Fn(fid) = *self.ty_table.get(fn_ty.0) {
+                                if let TypeKind::Fn(fid) = self.ty_table.get(fn_ty.0) {
                                     let new_ret = crate::types::generator_of(
                                         inferred_yield,
                                         f.modifiers.is_async,
@@ -576,7 +576,7 @@ impl<'r> Checker<'r> {
 
             Decl::Extension(ext) => {
                 let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
-                let ext_class_name = match *self.ty_table.get(ext_self_ty.0) {
+                let ext_class_name = match self.ty_table.get(ext_self_ty.0) {
                     TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
                         Some(Rc::from(bind.interner.resolve(n)))
                     }

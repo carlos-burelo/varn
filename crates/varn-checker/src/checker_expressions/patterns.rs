@@ -156,7 +156,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Option<VariantSubst> {
         let (parent, args, origin): (Option<std::rc::Rc<str>>, Vec<Type>, Option<std::rc::Rc<str>>) =
-            match *self.ty_table.get(value_ty.0) {
+            match self.ty_table.get(value_ty.0) {
                 TypeKind::Generic(n, a, o) => (
                     Some(std::rc::Rc::from(bind.interner.resolve(n))),
                     self.ty_table.get_list(a).iter().map(|id| Type(*id, false)).collect(),

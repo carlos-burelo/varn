@@ -119,7 +119,7 @@ pub fn resolve_type_node(
             let origin = ctx
                 .and_then(|c| c.resolve_symbol(&name_str))
                 .and_then(|t| match table.get(t.0) {
-                    TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => *o,
+                    TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o,
                     _ => None,
                 })
                 .or_else(|| {
@@ -343,7 +343,7 @@ pub fn resolve_type_node(
                 let first_kind = table.get(first.0).clone();
                 let incompatible = primitives
                     .iter()
-                    .any(|m| std::mem::discriminant(table.get(m.0)) != std::mem::discriminant(&first_kind));
+                    .any(|m| std::mem::discriminant(&table.get(m.0)) != std::mem::discriminant(&first_kind));
                 if incompatible {
                     return Type::Never;
                 }
@@ -369,7 +369,7 @@ pub fn resolve_type_node(
                                     match cm.kind {
                                         ClassMemberKind::Method => {
                                             if let TypeKind::Fn(fid) = table.get(cm.ty.0) {
-                                                let ft = table.get_function(*fid).clone();
+                                                let ft = table.get_function(fid).clone();
                                                 ObjectTypeMember::Method {
                                                     name: cm.name.clone(),
                                                     params: ft.params.clone(),

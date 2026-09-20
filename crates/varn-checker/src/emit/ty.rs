@@ -41,7 +41,7 @@ pub fn lower_type(
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    lower_kind(table.get(ty.0), table, interner, tt, names)
+    lower_kind(&table.get(ty.0), table, interner, tt, names)
 }
 
 /// A type the TIR does not model precisely.

@@ -247,7 +247,7 @@ fn intern_signature(
 ) -> varn_tir::SigId {
     let (params, return_ty) = match table.get(ty.0) {
         TypeKind::Fn(fid) => {
-            let ft = table.get_function(*fid);
+            let ft = table.get_function(fid);
             let p_tys: Vec<BackendTy> = ft
                 .params
                 .iter()

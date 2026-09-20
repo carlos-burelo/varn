@@ -24,7 +24,7 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
 
             if sym.kind == SymbolKind::Function {
                 if let TypeKind::Fn(fid) = bind.ty_table.get(ty.0) {
-                    let FunctionType { return_type, .. } = bind.ty_table.get_function(*fid);
+                    let FunctionType { return_type, .. } = bind.ty_table.get_function(fid);
                     // Already `Task<R>` for async functions — the binder wrapped
                     // it when it built the type.
                     let raw = Type(*return_type, false);

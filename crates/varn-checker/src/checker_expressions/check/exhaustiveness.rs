@@ -21,7 +21,7 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        if let TypeKind::Union(list) = *self.ty_table.get(subject_ty.0) {
+        if let TypeKind::Union(list) = self.ty_table.get(subject_ty.0) {
             let members: Vec<Type> = self
                 .ty_table
                 .get_list(list)
@@ -52,7 +52,7 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        let TypeKind::Named(type_name_atom, _) = *self.ty_table.get(subject_ty.0) else {
+        let TypeKind::Named(type_name_atom, _) = self.ty_table.get(subject_ty.0) else {
             return;
         };
         let type_name: std::rc::Rc<str> = std::rc::Rc::from(bind.interner.resolve(type_name_atom));

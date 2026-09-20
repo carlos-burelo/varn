@@ -113,29 +113,29 @@ pub enum PortableObjectMember {
 pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> PortableType {
     let name = |a: varn_core::Atom| interner.resolve(a).to_string();
     match table.get(ty.0) {
-        TypeKind::Intrinsic(tag) => PortableType::Intrinsic(*tag),
+        TypeKind::Intrinsic(tag) => PortableType::Intrinsic(tag),
         TypeKind::This => PortableType::This,
         TypeKind::Array(inner) => PortableType::Array(Box::new(encode(
-            Type(*inner, false),
+            Type(inner, false),
             table,
             interner,
         ))),
-        TypeKind::Union(list) => PortableType::Union(encode_list(*list, table, interner)),
+        TypeKind::Union(list) => PortableType::Union(encode_list(list, table, interner)),
         TypeKind::Intersection(list) => {
-            PortableType::Intersection(encode_list(*list, table, interner))
+            PortableType::Intersection(encode_list(list, table, interner))
         }
-        TypeKind::Tuple(list) => PortableType::Tuple(encode_list(*list, table, interner)),
-        TypeKind::Named(n, o) => PortableType::Named(name(*n), o.map(name)),
+        TypeKind::Tuple(list) => PortableType::Tuple(encode_list(list, table, interner)),
+        TypeKind::Named(n, o) => PortableType::Named(name(n), o.map(name)),
         TypeKind::Generic(n, list, o) => {
-            PortableType::Generic(name(*n), encode_list(*list, table, interner), o.map(name))
+            PortableType::Generic(name(n), encode_list(list, table, interner), o.map(name))
         }
         TypeKind::TemplateLiteral(list) => {
-            PortableType::TemplateLiteral(encode_list(*list, table, interner))
+            PortableType::TemplateLiteral(encode_list(list, table, interner))
         }
-        TypeKind::Fn(fid) => PortableType::Fn(encode_function(table.get_function(*fid), table, interner)),
+        TypeKind::Fn(fid) => PortableType::Fn(encode_function(table.get_function(fid), table, interner)),
         TypeKind::Object(oid) => PortableType::Object(
             table
-                .get_object_members(*oid)
+                .get_object_members(oid)
                 .iter()
                 .map(|m| encode_object_member(m, table, interner))
                 .collect(),
@@ -144,13 +144,13 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
         // Honesto-desconocido en vez de un número que apunte a otra cosa.
         TypeKind::Typeof(_) => PortableType::Intrinsic(TypeTag::Dynamic),
         TypeKind::KeyOf(inner) => PortableType::KeyOf(Box::new(encode(
-            Type(*inner, false),
+            Type(inner, false),
             table,
             interner,
         ))),
         TypeKind::IndexedAccess { object, index } => PortableType::IndexedAccess {
-            object: Box::new(encode(Type(*object, false), table, interner)),
-            index: Box::new(encode(Type(*index, false), table, interner)),
+            object: Box::new(encode(Type(object, false), table, interner)),
+            index: Box::new(encode(Type(index, false), table, interner)),
         },
         TypeKind::Mapped {
             key_var,
@@ -159,11 +159,11 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
             optional,
             readonly,
         } => PortableType::Mapped {
-            key_var: name(*key_var),
-            source: Box::new(encode(Type(*source, false), table, interner)),
-            value: Box::new(encode(Type(*value, false), table, interner)),
-            optional: *optional,
-            readonly: *readonly,
+            key_var: name(key_var),
+            source: Box::new(encode(Type(source, false), table, interner)),
+            value: Box::new(encode(Type(value, false), table, interner)),
+            optional: optional,
+            readonly: readonly,
         },
         TypeKind::Conditional {
             check,
@@ -171,29 +171,29 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
             true_type,
             false_type,
         } => PortableType::Conditional {
-            check: Box::new(encode(Type(*check, false), table, interner)),
-            extends: Box::new(encode(Type(*extends, false), table, interner)),
-            true_type: Box::new(encode(Type(*true_type, false), table, interner)),
-            false_type: Box::new(encode(Type(*false_type, false), table, interner)),
+            check: Box::new(encode(Type(check, false), table, interner)),
+            extends: Box::new(encode(Type(extends, false), table, interner)),
+            true_type: Box::new(encode(Type(true_type, false), table, interner)),
+            false_type: Box::new(encode(Type(false_type, false), table, interner)),
         },
-        TypeKind::Infer(n) => PortableType::Infer(name(*n)),
+        TypeKind::Infer(n) => PortableType::Infer(name(n)),
         TypeKind::EnumVariant {
             enum_name,
             variant_name,
             type_args,
             payload_ty,
         } => PortableType::EnumVariant {
-            enum_name: name(*enum_name),
-            variant_name: name(*variant_name),
-            type_args: encode_list(*type_args, table, interner),
-            payload_ty: Box::new(encode(Type(*payload_ty, false), table, interner)),
+            enum_name: name(enum_name),
+            variant_name: name(variant_name),
+            type_args: encode_list(type_args, table, interner),
+            payload_ty: Box::new(encode(Type(payload_ty, false), table, interner)),
         },
         TypeKind::TypePredicate {
             parameter_name,
             target_type,
         } => PortableType::TypePredicate {
-            parameter_name: name(*parameter_name),
-            target_type: Box::new(encode(Type(*target_type, false), table, interner)),
+            parameter_name: name(parameter_name),
+            target_type: Box::new(encode(Type(target_type, false), table, interner)),
         },
     }
 }
@@ -613,7 +613,7 @@ mod tests {
         let TypeKind::Fn(fid) = fresh.get(decoded.0) else {
             panic!("debe decodificar a Fn");
         };
-        let ft = fresh.get_function(*fid);
+        let ft = fresh.get_function(fid);
         assert_eq!(ft.params[0].ty, CheckerTyId::FLOAT);
         assert_eq!(ft.return_type, CheckerTyId::FLOAT);
     }
@@ -635,7 +635,7 @@ mod tests {
         let TypeKind::Object(oid) = fresh.get(decoded.0) else {
             panic!("debe decodificar a Object");
         };
-        let members = fresh.get_object_members(*oid);
+        let members = fresh.get_object_members(oid);
         assert!(matches!(
             &members[0],
             ObjectTypeMember::Index { key_ty, value_ty, .. }

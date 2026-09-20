@@ -39,7 +39,7 @@ impl<'r> Checker<'r> {
     }
 
     pub(super) fn check_array_with_context(&mut self, elements: &[ArrayEl], bind: &BindResult) {
-        let elem_expected = self.expected_type.and_then(|t| match *self.ty_table.get(t.0) {
+        let elem_expected = self.expected_type.and_then(|t| match self.ty_table.get(t.0) {
             TypeKind::Array(inner) => Some(Type(inner, false)),
             TypeKind::Generic(name, args, _)
                 if bind.interner.get(varn_core::IntrinsicType::Array.as_str()) == Some(name)
@@ -90,7 +90,7 @@ impl<'r> Checker<'r> {
             if let Some(cached) = self.expected_object_members_cache.get(&ty) {
                 cached.clone()
             } else {
-                let ty_kind = *self.ty_table.get(ty.0);
+                let ty_kind = self.ty_table.get(ty.0);
                 let resolved = match ty_kind {
                     TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
                     TypeKind::Generic(name, args, _)
@@ -136,7 +136,7 @@ impl<'r> Checker<'r> {
                         members
                             .into_iter()
                             .map(|m| {
-                                let m_kind = *self.ty_table.get(m.ty.0);
+                                let m_kind = self.ty_table.get(m.ty.0);
                                 if let TypeKind::Fn(fid) = m_kind {
                                     let ft = self.ty_table.get_function(fid).clone();
                                     ObjectTypeMember::Method {
@@ -255,7 +255,7 @@ impl<'r> Checker<'r> {
     pub(super) fn expected_fn_type(&self) -> Option<FunctionType> {
         self.expected_type.and_then(|t| {
             if let TypeKind::Fn(fid) = self.ty_table.get(t.0) {
-                Some(self.ty_table.get_function(*fid).clone())
+                Some(self.ty_table.get_function(fid).clone())
             } else {
                 None
             }

@@ -119,13 +119,13 @@ impl<'r> Checker<'r> {
                 };
 
                 if let Some(expected) = self.expected_return_type {
-                    let expected_kind = *self.ty_table.get(expected.0);
+                    let expected_kind = self.ty_table.get(expected.0);
                     let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. }) {
                         Type::Bool
                     } else {
                         expected
                     };
-                    let check_expected_kind = *self.ty_table.get(check_expected.0);
+                    let check_expected_kind = self.ty_table.get(check_expected.0);
                     let is_type_param = matches!(check_expected_kind, TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                     if !is_type_param
                         && !self.value_assignable_to(
@@ -246,7 +246,7 @@ impl<'r> Checker<'r> {
                 let (left, right, body) = (left.clone(), *right, *body);
                 self.check_expr(right, bind);
                 let right_ty = self.infer_type(right, bind);
-                let right_kind = *self.ty_table.get(right_ty.0);
+                let right_kind = self.ty_table.get(right_ty.0);
                 let elem_ty = match right_kind {
                     TypeKind::Array(inner) => Type(inner, false),
                     TypeKind::Intrinsic(TypeTag::Str) | TypeKind::TemplateLiteral(_) => Type::Char,

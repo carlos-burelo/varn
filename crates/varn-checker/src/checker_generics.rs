@@ -98,7 +98,7 @@ pub(crate) fn infer_mapping_from_args(
         let mapped_param_ty = map_generics_cached(checker, &Type(param.ty, false), &mapping);
         let arg_ty = match arg {
             Arg::Positional(e) => {
-                let mapped_kind = *checker.ty_table.get(mapped_param_ty.0);
+                let mapped_kind = checker.ty_table.get(mapped_param_ty.0);
                 if let TypeKind::Fn(fid) = mapped_kind {
                     let expected_fn = checker.ty_table.get_function(fid).clone();
                     if let Some(concrete) = infer_arrow_with_context(*e, &expected_fn, checker, bind) {
@@ -313,7 +313,7 @@ pub(crate) fn collect_type_inferences(
     table: &mut CheckerTyTable,
     interner: &varn_core::AtomInterner,
 ) {
-    let expected_kind = *table.get(expected.0);
+    let expected_kind = table.get(expected.0);
     match expected_kind {
         TypeKind::Named(name, _origin) if params.iter().any(|p| p.as_ref() == interner.resolve(name)) => {
             let name_rc: Rc<str> = Rc::from(interner.resolve(name));
@@ -323,7 +323,7 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Generic(_, e_args, _) => {
-            if let TypeKind::Generic(_, a_args, _) = *table.get(actual.0) {
+            if let TypeKind::Generic(_, a_args, _) = table.get(actual.0) {
                 let e_ids = table.get_list(e_args).to_vec();
                 let a_ids = table.get_list(a_args).to_vec();
                 for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
@@ -339,7 +339,7 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Array(e_inner) => {
-            if let TypeKind::Array(a_inner) = *table.get(actual.0) {
+            if let TypeKind::Array(a_inner) = table.get(actual.0) {
                 collect_type_inferences(
                     &Type(e_inner, false),
                     &Type(a_inner, false),
@@ -351,7 +351,7 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Fn(e_fid) => {
-            if let TypeKind::Fn(a_fid) = *table.get(actual.0) {
+            if let TypeKind::Fn(a_fid) = table.get(actual.0) {
                 let e_ft = table.get_function(e_fid).clone();
                 let a_ft = table.get_function(a_fid).clone();
                 for (ep, ap) in e_ft.params.iter().zip(a_ft.params.iter()) {
@@ -375,7 +375,7 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Union(e_members) => {
-            if let TypeKind::Union(a_members) = *table.get(actual.0) {
+            if let TypeKind::Union(a_members) = table.get(actual.0) {
                 let e_ids = table.get_list(e_members).to_vec();
                 let a_ids = table.get_list(a_members).to_vec();
                 for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
@@ -414,7 +414,7 @@ pub(crate) fn map_generics_cached(
         .map(|(k, v)| (checker.resolver.intern(k), *v))
         .collect();
 
-    if let TypeKind::Named(n, _) = *checker.ty_table.get(base.0) {
+    if let TypeKind::Named(n, _) = checker.ty_table.get(base.0) {
         if let Some(t) = atom_mapping.get(&n) {
             return *t;
         } else {

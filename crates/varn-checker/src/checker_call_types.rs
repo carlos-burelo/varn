@@ -60,7 +60,7 @@ pub(crate) fn infer_call_type(
                 interner,
                 table,
             )?;
-            let obj_kind = *table.get(obj_ty.0);
+            let obj_kind = table.get(obj_ty.0);
             let (class_name, origin): (&str, Option<&str>) = match obj_kind {
                 TypeKind::Named(n, origin) => (
                     interner.resolve(n),
@@ -180,7 +180,7 @@ pub(crate) fn infer_call_type(
                 interner,
                 table,
             )?;
-            match *table.get(callee_ty.0) {
+            match table.get(callee_ty.0) {
                 TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
                 _ => None,
             }
@@ -240,7 +240,7 @@ pub(crate) fn infer_call_type(
                 interner,
                 table,
             )?;
-            match *table.get(ty.0) {
+            match table.get(ty.0) {
                 TypeKind::Generic(name, args, _)
                     if (interner.get(IntrinsicType::Task.as_str()) == Some(name)
                         || interner.get(IntrinsicType::TaskHandle.as_str()) == Some(name))

@@ -265,7 +265,7 @@ fn fn_signature_compatible_type(
 ) -> bool {
     match table.get(inferred.0) {
         TypeKind::Fn(fid2) => {
-            let ft2 = table.get_function(*fid2).clone();
+            let ft2 = table.get_function(fid2).clone();
             let return_ok = matches!(table.get(return_type), TypeKind::Intrinsic(varn_core::TypeTag::Void))
                 || types_compatible_impl(&t(return_type), &t(ft2.return_type), bind, cache, in_progress, table);
             ft2.params.len() <= params.len()
@@ -304,7 +304,7 @@ pub(super) fn types_compatible_with_fn_signature(
 ) -> bool {
     match table.get(declared.0) {
         TypeKind::Fn(fid1) => {
-            let ft1 = table.get_function(*fid1).clone();
+            let ft1 = table.get_function(fid1).clone();
             params.len() <= ft1.params.len()
                 && types_compatible_impl(&t(ft1.return_type), &t(return_type), bind, cache, in_progress, table)
                 && ft1.params.iter().zip(params.iter()).all(|(t1, t2)| {

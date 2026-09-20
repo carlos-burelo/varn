@@ -102,14 +102,14 @@ impl<'r> Checker<'r> {
     pub(crate) fn is_throwable(&self, ty: &Type, bind: &crate::binder::BindResult) -> bool {
         match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Named(name, _) => {
-                self.is_subclass_or_same(bind.interner.resolve(*name), "Error", bind)
+                self.is_subclass_or_same(bind.interner.resolve(name), "Error", bind)
             }
             varn_core::TypeKind::Generic(name, _, _) => {
-                self.is_subclass_or_same(bind.interner.resolve(*name), "Error", bind)
+                self.is_subclass_or_same(bind.interner.resolve(name), "Error", bind)
             }
             varn_core::TypeKind::Union(list) => self
                 .ty_table
-                .get_list(*list)
+                .get_list(list)
                 .iter()
                 .all(|id| self.is_throwable(&Type(*id, false), bind)),
             varn_core::TypeKind::This => self

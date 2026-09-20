@@ -81,7 +81,7 @@ impl<'r> Checker<'r> {
             } => {
                 let (object, property, computed) = (*object, *property, *computed);
                 let obj = self.refine(object, bind)?;
-                let TypeKind::Array(elem) = *self.ty_table.get(obj.0) else {
+                let TypeKind::Array(elem) = self.ty_table.get(obj.0) else {
                     return None;
                 };
                 if computed {

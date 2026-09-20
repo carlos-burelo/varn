@@ -57,7 +57,7 @@ impl<'r> Checker<'r> {
                 if callee_ty.is_dynamic() {
                     return Type::Dynamic;
                 }
-                let callee_kind = *self.ty_table.get(callee_ty.0);
+                let callee_kind = self.ty_table.get(callee_ty.0);
                 match callee_kind {
                     TypeKind::Named(name, origin) => {
                         let name_str = bind.interner.resolve(name).to_string();
@@ -137,7 +137,7 @@ impl<'r> Checker<'r> {
                 let tag_ty = self.infer_type(*tag, bind);
                 let tag_ty = tag_ty.non_nullified(&mut self.ty_table);
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
-                    let ret = self.ty_table.get_function(*fid).return_type;
+                    let ret = self.ty_table.get_function(fid).return_type;
                     Type(ret, false)
                 } else {
                     Type::Dynamic
@@ -335,7 +335,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::NonNull { expression } => {
                 let ty = self.infer_type(*expression, bind);
-                if let TypeKind::Union(list) = *self.ty_table.get(ty.0) {
+                if let TypeKind::Union(list) = self.ty_table.get(ty.0) {
                     let ids = self.ty_table.get_list(list).to_vec();
                     let filtered: Vec<Type> = ids
                         .into_iter()
@@ -357,7 +357,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Try { expression } => {
                 let ty = self.infer_type(*expression, bind);
-                match *self.ty_table.get(ty.0) {
+                match self.ty_table.get(ty.0) {
                     TypeKind::Generic(name, args_list, _)
                         if (bind.interner.resolve(name) == "Result"
                             || bind.interner.resolve(name) == "Option") =>
@@ -437,7 +437,7 @@ impl<'r> Checker<'r> {
                         }
                         varn_core::ast::ArrayEl::Spread(e) => {
                             let ty = self.infer_type(*e, bind);
-                            if let TypeKind::Array(inner) = *self.ty_table.get(ty.0) {
+                            if let TypeKind::Array(inner) = self.ty_table.get(ty.0) {
                                 elem_tys.push(Type(inner, false));
                             }
                         }
@@ -447,7 +447,7 @@ impl<'r> Checker<'r> {
                 if elem_tys.is_empty() {
                     if let Some(expected) = self.expected_type {
                         let non_null = expected.non_nullified(&mut self.ty_table);
-                        if let TypeKind::Array(inner) = *self.ty_table.get(non_null.0) {
+                        if let TypeKind::Array(inner) = self.ty_table.get(non_null.0) {
                             Type::array(Type(inner, false), &mut self.ty_table)
                         } else {
                             Type::array(Type::Dynamic, &mut self.ty_table)
@@ -519,7 +519,7 @@ impl<'r> Checker<'r> {
                 self.in_pipeline_rhs = saved_pipeline;
                 self.pipeline_value_type = saved_pipe_ty;
                 match self.ty_table.get(res.0) {
-                    TypeKind::Fn(fid) => Type(self.ty_table.get_function(*fid).return_type, false),
+                    TypeKind::Fn(fid) => Type(self.ty_table.get_function(fid).return_type, false),
                     _ => res,
                 }
             }
@@ -547,7 +547,7 @@ impl<'r> Checker<'r> {
             return obj_ty;
         }
         let prop_ty = self.infer_type(property, bind);
-        let obj_kind = *self.ty_table.get(obj_ty.0);
+        let obj_kind = self.ty_table.get(obj_ty.0);
         match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type(inner, false),
             TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => Type::Str,
@@ -606,7 +606,7 @@ impl<'r> Checker<'r> {
         if !has_methods {
             if let Some(expected) = self.expected_type {
                 let exp = expected.non_nullified(&mut self.ty_table);
-                let exp_kind = *self.ty_table.get(exp.0);
+                let exp_kind = self.ty_table.get(exp.0);
                 let is_map = match exp_kind {
                     TypeKind::Generic(name, args, _) => {
                         bind.interner.get(IntrinsicType::Map.as_str()) == Some(name)
@@ -703,7 +703,7 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ObjectProp::Setter { .. } => {}
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
                     let spread_ty = self.infer_type(*argument, bind);
-                    let spread_kind = *self.ty_table.get(spread_ty.0);
+                    let spread_kind = self.ty_table.get(spread_ty.0);
                     if let varn_core::TypeKind::Object(mid) = spread_kind {
                         for m in self.ty_table.get_object_members(mid).to_vec() {
                             members.push(m);

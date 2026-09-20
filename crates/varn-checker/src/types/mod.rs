@@ -41,7 +41,7 @@ impl Type {
         self.0
     }
 
-    pub fn kind<'t>(&self, table: &'t CheckerTyTable) -> &'t InternedTypeKind {
+    pub fn kind(&self, table: &CheckerTyTable) -> InternedTypeKind {
         table.get(self.0)
     }
 

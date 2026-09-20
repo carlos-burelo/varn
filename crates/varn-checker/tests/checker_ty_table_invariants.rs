@@ -23,15 +23,15 @@ use varn_core::{AtomInterner, TypeKind, TypeTag};
 #[test]
 fn intrinsic_ids_are_fixed_and_portable() {
     let t = CheckerTyTable::new();
-    assert_eq!(t.get(CheckerTyId::INT), &TypeKind::Intrinsic(TypeTag::Int));
-    assert_eq!(t.get(CheckerTyId::STR), &TypeKind::Intrinsic(TypeTag::Str));
-    assert_eq!(t.get(CheckerTyId::BOOL), &TypeKind::Intrinsic(TypeTag::Bool));
-    assert_eq!(t.get(CheckerTyId::FLOAT), &TypeKind::Intrinsic(TypeTag::Float));
+    assert_eq!(t.get(CheckerTyId::INT), TypeKind::Intrinsic(TypeTag::Int));
+    assert_eq!(t.get(CheckerTyId::STR), TypeKind::Intrinsic(TypeTag::Str));
+    assert_eq!(t.get(CheckerTyId::BOOL), TypeKind::Intrinsic(TypeTag::Bool));
+    assert_eq!(t.get(CheckerTyId::FLOAT), TypeKind::Intrinsic(TypeTag::Float));
     assert_eq!(
         t.get(CheckerTyId::DYNAMIC),
-        &TypeKind::Intrinsic(TypeTag::Dynamic)
+        TypeKind::Intrinsic(TypeTag::Dynamic)
     );
-    assert_eq!(t.get(CheckerTyId::THIS), &TypeKind::This);
+    assert_eq!(t.get(CheckerTyId::THIS), TypeKind::This);
 
     assert!(CheckerTyId::INT.is_portable());
     assert!(CheckerTyId::THIS.is_portable());
@@ -71,8 +71,8 @@ fn intern_is_append_only_and_dedups() {
 
     assert_eq!(a, a_again, "la misma forma deduplica al mismo id");
     assert_ne!(a, b);
-    assert_eq!(t.get(a), &TypeKind::Array(CheckerTyId::INT));
-    assert_eq!(t.get(b), &TypeKind::Array(CheckerTyId::STR));
+    assert_eq!(t.get(a), TypeKind::Array(CheckerTyId::INT));
+    assert_eq!(t.get(b), TypeKind::Array(CheckerTyId::STR));
 }
 
 // ── divergencia: por qué un id crudo no puede cruzar ──────────────────────
@@ -126,11 +126,11 @@ fn reintern_translates_recursively_and_keeps_portable_ids() {
     let TypeKind::Array(element) = local.get(translated) else {
         panic!("debe traducirse a un Array local, no copiarse el índice");
     };
-    let TypeKind::Union(members) = local.get(*element) else {
+    let TypeKind::Union(members) = local.get(element) else {
         panic!("el elemento anidado también se traduce");
     };
     assert_eq!(
-        local.get_list(*members),
+        local.get_list(members),
         &[CheckerTyId::INT, CheckerTyId::STR],
         "la recursión preserva los miembros"
     );
@@ -179,7 +179,7 @@ fn reintern_translates_object_members() {
     let TypeKind::Object(mid) = local.get(translated) else {
         panic!("debe ser un Object local");
     };
-    let local_members = local.get_object_members(*mid);
+    let local_members = local.get_object_members(mid);
     let ObjectTypeMember::Property { name, ty, .. } = &local_members[0] else {
         panic!("primer miembro es Property");
     };
@@ -216,7 +216,7 @@ fn absorb_keeps_local_indices_and_learns_missing_shapes() {
     b.absorb(&a);
 
     // El prefijo compartido sigue igual.
-    assert_eq!(b.get(shared), &TypeKind::Array(CheckerTyId::INT));
+    assert_eq!(b.get(shared), TypeKind::Array(CheckerTyId::INT));
     // El índice divergente conserva el significado de `b`, no el de `a`.
     assert!(
         matches!(b.get(b_only), TypeKind::Union(_)),
@@ -256,8 +256,8 @@ fn cloned_tables_keep_the_live_table_as_prefix_until_they_diverge() {
     let mut snapshot2 = snapshot.clone();
     snapshot2.absorb(&live);
     assert!(snapshot2.has_prefix(&live));
-    assert_eq!(snapshot2.get(a), &TypeKind::Array(CheckerTyId::INT));
-    assert_eq!(snapshot2.get(b), &TypeKind::Array(CheckerTyId::STR));
+    assert_eq!(snapshot2.get(a), TypeKind::Array(CheckerTyId::INT));
+    assert_eq!(snapshot2.get(b), TypeKind::Array(CheckerTyId::STR));
 
     // Dos tablas que crecieron en paralelo divergen en el mismo índice.
     let mut left = CheckerTyTable::new();

@@ -26,7 +26,7 @@ impl<'r> Checker<'r> {
 
         let callee_ty_raw = self.infer_type(callee, bind);
         let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
-        let callee_kind = *self.ty_table.get(callee_ty.0);
+        let callee_kind = self.ty_table.get(callee_ty.0);
 
         if !matches!(
             callee_kind,
@@ -62,7 +62,7 @@ impl<'r> Checker<'r> {
             self.record_type(arena.expr(callee).range.start.offset, effective_callee_ty);
         }
 
-        let effective_kind = *self.ty_table.get(effective_callee_ty.0);
+        let effective_kind = self.ty_table.get(effective_callee_ty.0);
         let params_for_context: Vec<FunctionParam> = if let TypeKind::Fn(fid) = effective_kind {
             self.ty_table.get_function(fid).params.clone()
         } else {
@@ -185,7 +185,7 @@ impl<'r> Checker<'r> {
             let expected = param.map(|p| {
                 if p.is_rest {
                     match self.ty_table.get(p.ty) {
-                        TypeKind::Array(inner) => Type(*inner, false),
+                        TypeKind::Array(inner) => Type(inner, false),
                         _ => Type(p.ty, false),
                     }
                 } else {
@@ -401,7 +401,7 @@ impl<'r> Checker<'r> {
                 let effective_arg_ty = spread_inner.unwrap_or(arg_ty);
                 let param_ty = compatible_param_type(param, spread_inner, &self.ty_table);
 
-                let param_kind = *self.ty_table.get(param_ty.0);
+                let param_kind = self.ty_table.get(param_ty.0);
                 let param_accepts_array = matches!(param_kind, TypeKind::Array(_))
                     || matches!(param_kind, TypeKind::Union(list) if self
                         .ty_table
@@ -455,7 +455,7 @@ impl<'r> Checker<'r> {
             Arg::Spread(expr) => {
                 let arg_ty = self.infer_type(*expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
-                    TypeKind::Array(inner) => Some(Type(*inner, false)),
+                    TypeKind::Array(inner) => Some(Type(inner, false)),
                     _ => None,
                 };
                 match spread_inner {
@@ -595,7 +595,7 @@ fn compatible_param_type(
     if let Some(inner) = spread_inner {
         if param.is_rest {
             if let TypeKind::Array(expected_inner) = table.get(param.ty) {
-                Type(*expected_inner, false)
+                Type(expected_inner, false)
             } else {
                 Type(param.ty, false)
             }
@@ -604,7 +604,7 @@ fn compatible_param_type(
         }
     } else if param.is_rest {
         if let TypeKind::Array(inner) = table.get(param.ty) {
-            Type(*inner, false)
+            Type(inner, false)
         } else {
             Type(param.ty, false)
         }

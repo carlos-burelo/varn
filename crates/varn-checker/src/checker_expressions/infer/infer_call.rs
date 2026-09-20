@@ -23,7 +23,7 @@ impl<'r> Checker<'r> {
 
         let callee_ty_raw = self.infer_type(callee, bind);
         let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
-        let callee_kind = *self.ty_table.get(callee_ty.0);
+        let callee_kind = self.ty_table.get(callee_ty.0);
 
         if let TypeKind::Named(class_name, _) = callee_kind {
             let class_name_str = bind.interner.resolve(class_name).to_string();
@@ -44,7 +44,7 @@ impl<'r> Checker<'r> {
         let mapping = build_call_mapping(callee, &type_args, &args, &ft, self, bind);
         let ret = map_generics_cached(self, &Type(ft.return_type, false), &mapping);
 
-        let ret_kind = *self.ty_table.get(ret.0);
+        let ret_kind = self.ty_table.get(ret.0);
         let ret = if matches!(ret_kind, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
                 let receiver_ty = self.infer_type(*object, bind);
@@ -78,7 +78,7 @@ impl<'r> Checker<'r> {
             .expected_type
             .and_then(|t| {
                 if let TypeKind::Fn(fid) = self.ty_table.get(t.0) {
-                    Some(self.ty_table.get_function(*fid).params.clone())
+                    Some(self.ty_table.get_function(fid).params.clone())
                 } else {
                     None
                 }

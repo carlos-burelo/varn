@@ -80,12 +80,12 @@ pub(super) fn is_member_optional(
     table: &CheckerTyTable,
 ) -> bool {
     match table.get(ty.0) {
-        TypeKind::Object(mid) => table.get_object_members(*mid).iter().any(|m| match m {
+        TypeKind::Object(mid) => table.get_object_members(mid).iter().any(|m| match m {
             ObjectTypeMember::Property { name, optional, .. } => name.as_ref() == key && *optional,
             _ => false,
         }),
         TypeKind::Named(name, _) => {
-            let name = ctx.and_then(|c| c.interner()).map(|i| i.resolve(*name));
+            let name = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
             name.and_then(|name| {
                 ctx.and_then(|c| {
                     c.get_interface_members(name, None)

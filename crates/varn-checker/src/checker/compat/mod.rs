@@ -206,12 +206,12 @@ fn array_element_type(
     interner: Option<&varn_core::AtomInterner>,
 ) -> Option<Type> {
     match table.get(ty.0) {
-        TypeKind::Array(inner) => Some(Type(*inner, false)),
+        TypeKind::Array(inner) => Some(Type(inner, false)),
         TypeKind::Generic(name, args, _)
-            if table.get_list(*args).len() == 1
-                && interner.is_some_and(|it| it.resolve(*name) == IntrinsicType::Array.as_str()) =>
+            if table.get_list(args).len() == 1
+                && interner.is_some_and(|it| it.resolve(name) == IntrinsicType::Array.as_str()) =>
         {
-            Some(Type(table.get_list(*args)[0], false))
+            Some(Type(table.get_list(args)[0], false))
         }
         _ => None,
     }
@@ -292,7 +292,7 @@ pub(crate) fn expr_satisfies_target_type(
     if let (TypeKind::Object(mid), ExprKind::Object { properties }) =
         (table.get(target_ty.0), expr_kind)
     {
-        let members = table.get_object_members(*mid);
+        let members = table.get_object_members(mid);
         if properties.is_empty() {
             return false;
         }

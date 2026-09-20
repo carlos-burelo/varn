@@ -209,8 +209,13 @@ impl CheckerTyTable {
         n <= self.entries.len() && self.entries[..n] == prefix.entries[..n]
     }
 
-    pub fn get(&self, id: CheckerTyId) -> &InternedTypeKind {
-        &self.entries[id.0 as usize]
+    /// Returns the shape by VALUE (`InternedTypeKind` is `Copy`).
+    ///
+    /// Ley 3: a single-owner table lives behind `Rc<RefCell<..>>`, and a `Ref`
+    /// guard cannot hand out a `&` that outlives the call, so the accessor
+    /// returns the shape instead of borrowing it.
+    pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {
+        self.entries[id.0 as usize]
     }
 
     pub fn intern_list(&mut self, tys: &[CheckerTyId]) -> TyListId {
@@ -307,7 +312,7 @@ impl CheckerTyTable {
         if let Some(&done) = cache.get(&id) {
             return done;
         }
-        let kind = *other.get(id);
+        let kind = other.get(id);
         let translated = match kind {
             TypeKind::Intrinsic(tag) => TypeKind::Intrinsic(tag),
             TypeKind::This => TypeKind::This,
@@ -523,7 +528,7 @@ mod tests {
     fn get_roundtrips_the_interned_value() {
         let mut t = CheckerTyTable::default();
         let a = t.intern(TypeKind::Intrinsic(TypeTag::Bool));
-        assert_eq!(*t.get(a), TypeKind::Intrinsic(TypeTag::Bool));
+        assert_eq!(t.get(a), TypeKind::Intrinsic(TypeTag::Bool));
     }
 
     #[test]

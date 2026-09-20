@@ -56,7 +56,7 @@ impl fmt::Display for TypeDisplay<'_> {
             TypeKind::Intrinsic(tag) => write!(f, "{}", tag.name()),
             TypeKind::This => write!(f, "this"),
             TypeKind::Array(t) => {
-                let t = *t;
+                let t = t;
                 match table.get(t) {
                     TypeKind::Union(_)
                     | TypeKind::Intersection(_)
@@ -66,7 +66,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
             }
             TypeKind::Union(list) => {
-                let members: Vec<CheckerTyId> = table.get_list(*list).to_vec();
+                let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let non_null: Vec<CheckerTyId> = members
                     .iter()
                     .filter(|m| !Type(**m, false).is_nullable(table))
@@ -84,10 +84,10 @@ impl fmt::Display for TypeDisplay<'_> {
                 Ok(())
             }
             TypeKind::Named(name, origin) => {
-                let name_str = self.name(*name);
+                let name_str = self.name(name);
                 if name_str == "*" {
                     if let Some(orig) = origin {
-                        write!(f, "namespace {}", self.name(*orig))
+                        write!(f, "namespace {}", self.name(orig))
                     } else {
                         write!(f, "namespace")
                     }
@@ -96,8 +96,8 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
             }
             TypeKind::Generic(name, args, _origin) => {
-                write!(f, "{}<", self.name(*name))?;
-                for (i, arg) in table.get_list(*args).iter().enumerate() {
+                write!(f, "{}<", self.name(name))?;
+                for (i, arg) in table.get_list(args).iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
@@ -107,7 +107,7 @@ impl fmt::Display for TypeDisplay<'_> {
             }
             TypeKind::TemplateLiteral(parts) => {
                 write!(f, "`")?;
-                for (i, part) in table.get_list(*parts).iter().enumerate() {
+                for (i, part) in table.get_list(parts).iter().enumerate() {
                     if i % 2 == 0 {
                         write!(f, "{}", self.child(*part))?;
                     } else {
@@ -117,7 +117,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(f, "`")
             }
             TypeKind::Fn(fid) => {
-                let ft = table.get_function(*fid);
+                let ft = table.get_function(fid);
                 write!(f, "(")?;
                 for (i, p) in ft.params.iter().enumerate() {
                     if i > 0 {
@@ -138,7 +138,7 @@ impl fmt::Display for TypeDisplay<'_> {
             }
             TypeKind::Object(mid) => {
                 write!(f, "{{ ")?;
-                for (i, m) in table.get_object_members(*mid).iter().enumerate() {
+                for (i, m) in table.get_object_members(mid).iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
@@ -213,7 +213,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(f, " }}")
             }
             TypeKind::Intersection(list) => {
-                for (i, m) in table.get_list(*list).iter().enumerate() {
+                for (i, m) in table.get_list(list).iter().enumerate() {
                     if i > 0 {
                         write!(f, " & ")?;
                     }
@@ -226,7 +226,7 @@ impl fmt::Display for TypeDisplay<'_> {
             }
             TypeKind::Tuple(list) => {
                 write!(f, "#[")?;
-                for (i, m) in table.get_list(*list).iter().enumerate() {
+                for (i, m) in table.get_list(list).iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
@@ -237,9 +237,9 @@ impl fmt::Display for TypeDisplay<'_> {
             TypeKind::Typeof(_) => write!(f, "typeof <expr>"),
             TypeKind::EnumVariant { .. } => write!(f, "enum variant"),
 
-            TypeKind::KeyOf(t) => write!(f, "keyof {}", self.child(*t)),
+            TypeKind::KeyOf(t) => write!(f, "keyof {}", self.child(t)),
             TypeKind::IndexedAccess { object, index } => {
-                write!(f, "{}[{}]", self.child(*object), self.child(*index))
+                write!(f, "{}[{}]", self.child(object), self.child(index))
             }
             TypeKind::Mapped {
                 key_var,
@@ -251,11 +251,11 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(
                     f,
                     "{{ {}[{} in {}]{}: {} }}",
-                    if *readonly { "readonly " } else { "" },
-                    self.name(*key_var),
-                    self.child(*source),
-                    if *optional { "?" } else { "" },
-                    self.child(*value)
+                    if readonly { "readonly " } else { "" },
+                    self.name(key_var),
+                    self.child(source),
+                    if optional { "?" } else { "" },
+                    self.child(value)
                 )
             }
             TypeKind::Conditional {
@@ -267,13 +267,13 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(
                     f,
                     "{} extends {} ? {} : {}",
-                    self.child(*check),
-                    self.child(*extends),
-                    self.child(*true_type),
-                    self.child(*false_type)
+                    self.child(check),
+                    self.child(extends),
+                    self.child(true_type),
+                    self.child(false_type)
                 )
             }
-            TypeKind::Infer(name) => write!(f, "infer {}", self.name(*name)),
+            TypeKind::Infer(name) => write!(f, "infer {}", self.name(name)),
             TypeKind::TypePredicate {
                 parameter_name,
                 target_type,
@@ -281,8 +281,8 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(
                     f,
                     "{} is {}",
-                    self.name(*parameter_name),
-                    self.child(*target_type)
+                    self.name(parameter_name),
+                    self.child(target_type)
                 )
             }
         }

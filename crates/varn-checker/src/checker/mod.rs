@@ -529,7 +529,7 @@ impl<'r> Checker<'r> {
                     t.is_dynamic()
                         || match checker.ty_table.get(t.0) {
                             varn_core::TypeKind::Fn(fid) => {
-                                Type(checker.ty_table.get_function(*fid).return_type, false)
+                                Type(checker.ty_table.get_function(fid).return_type, false)
                                     .is_dynamic()
                             }
                             _ => false,

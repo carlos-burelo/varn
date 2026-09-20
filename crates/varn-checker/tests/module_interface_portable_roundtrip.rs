@@ -66,7 +66,7 @@ fn cached_interface_keeps_real_member_types() {
     // bind cargado.
     assert_eq!(
         bind2.ty_table.get(value.ty.0),
-        &varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
         "el tipo de `Box.value` debe ser `int`, no degradarse a Dynamic"
     );
 
@@ -77,7 +77,7 @@ fn cached_interface_keeps_real_member_types() {
         .expect("`Box.label` debe sobrevivir el caché");
     assert_eq!(
         bind2.ty_table.get(label.ty.0),
-        &varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
+        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
         "el tipo de `Box.label` debe ser `str`"
     );
 
@@ -90,7 +90,7 @@ fn cached_interface_keeps_real_member_types() {
     let varn_core::TypeKind::Fn(fid) = bind2.ty_table.get(make.0) else {
         panic!("`makeBox` debe decodificar a Fn, no a Dynamic");
     };
-    let ret = bind2.ty_table.get_function(*fid).return_type;
+    let ret = bind2.ty_table.get_function(fid).return_type;
     assert!(
         matches!(
             bind2.ty_table.get(ret),

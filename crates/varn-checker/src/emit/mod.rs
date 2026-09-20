@@ -1843,7 +1843,7 @@ fn emit_function(
     let mut param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); arity];
     let mut return_ty = BackendTy::Dynamic(DynReason::Unannotated);
     if let Some(TypeKind::Fn(fn_id)) = sym_ty.as_ref().map(|t| t.kind(ctx.checker_table)) {
-        let ft = ctx.checker_table.get_function(*fn_id);
+        let ft = ctx.checker_table.get_function(fn_id);
         for (i, p) in ft.params.iter().take(arity).enumerate() {
             param_tys[i] = lower_type(
                 &crate::types::Type(p.ty, false),

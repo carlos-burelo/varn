@@ -101,10 +101,10 @@ pub fn infer_expr_type(
                 TypeKind::Generic(name, args, _)
                     if ctx
                         .and_then(|c| c.interner())
-                        .is_some_and(|i| i.get(varn_core::IntrinsicType::Task.as_str()) == Some(*name))
-                        && table.get_list(*args).len() == 1 =>
+                        .is_some_and(|i| i.get(varn_core::IntrinsicType::Task.as_str()) == Some(name))
+                        && table.get_list(args).len() == 1 =>
                 {
-                    Type(table.get_list(*args)[0], false)
+                    Type(table.get_list(args)[0], false)
                 }
                 _ => inner,
             }
@@ -114,10 +114,10 @@ pub fn infer_expr_type(
             let inner = infer_expr_type(*expression, arena, ctx, table);
             let ok_first = match table.get(inner.0) {
                 TypeKind::Generic(name, args, _)
-                    if ctx_resolve_text(ctx, *name)
+                    if ctx_resolve_text(ctx, name)
                         .is_some_and(|n| n == "Result" || n == "Option") =>
                 {
-                    table.get_list(*args).first().copied()
+                    table.get_list(args).first().copied()
                 }
                 _ => None,
             };
@@ -185,7 +185,7 @@ pub fn infer_expr_type(
         ExprKind::Call { callee, .. } => {
             let callee_ty = infer_expr_type(*callee, arena, ctx, table);
             if let TypeKind::Fn(fid) = table.get(callee_ty.0) {
-                return Type(table.get_function(*fid).return_type, false);
+                return Type(table.get_function(fid).return_type, false);
             }
             Type::Dynamic
         }
@@ -332,7 +332,7 @@ fn infer_member(
                         let vty = reintern_member_type(Some(ctx), origin_str.as_deref(), v.ty, table);
                         if let TypeKind::Fn(fid) = table.get(vty.0) {
                             if let Some(p) = table
-                                .get_function(*fid)
+                                .get_function(fid)
                                 .params
                                 .iter()
                                 .find(|p| p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name))
@@ -431,8 +431,8 @@ fn infer_binary(
             let l = infer_expr_type(left, arena, ctx, table);
             let r = infer_expr_type(right, arena, ctx, table);
             match (table.get(l.0), table.get(r.0)) {
-                (&TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
-                | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
+                (TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
+                | (_, TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
                 _ => numeric_binary_type(*op, &l, &r, table).unwrap_or(Type::Dynamic),
             }
         }
@@ -459,8 +459,8 @@ fn infer_binary(
             let r = infer_expr_type(right, arena, ctx, table);
             match (table.get(l.0), table.get(r.0)) {
                 (
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                    TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                    TypeKind::Intrinsic(varn_core::TypeTag::Int),
                 ) => Type::Int,
                 _ => Type::Dynamic,
             }
@@ -537,7 +537,7 @@ fn infer_object(
                 };
                 let ty = infer_expr_type(value, arena, ctx, table);
                 if let TypeKind::Fn(fid) = table.get(ty.0) {
-                    let ft = table.get_function(*fid).clone();
+                    let ft = table.get_function(fid).clone();
                     members.push(ObjectTypeMember::Method {
                         name,
                         params: ft.params.clone(),
@@ -580,7 +580,7 @@ fn infer_object(
             ObjectProp::Spread { argument, .. } => {
                 let spread_ty = infer_expr_type(*argument, arena, ctx, table);
                 if let TypeKind::Object(mid) = table.get(spread_ty.0) {
-                    members.extend(table.get_object_members(*mid).to_vec());
+                    members.extend(table.get_object_members(mid).to_vec());
                 }
             }
             _ => {}

@@ -19,7 +19,7 @@ fn with_new_return_type(
     new_ret: Type,
     table: &mut crate::types::CheckerTyTable,
 ) -> Type {
-    if let varn_core::TypeKind::Fn(fid) = *table.get(old.0) {
+    if let varn_core::TypeKind::Fn(fid) = table.get(old.0) {
         let mut ft = table.get_function(fid).clone();
         ft.return_type = new_ret.0;
         crate::types::Type::fn_(ft, table)

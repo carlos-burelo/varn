@@ -303,7 +303,7 @@ impl<'r> super::Binder<'r> {
 
         let extends = c.super_class.as_ref().and_then(|e| {
             let super_ty = self.infer_expr_type_self(*e);
-            match *self.ty_table.get(super_ty.0) {
+            match self.ty_table.get(super_ty.0) {
                 TypeKind::Named(n, o) => Some((n, o)),
                 TypeKind::Generic(n, _, o) => Some((n, o)),
                 _ => None,

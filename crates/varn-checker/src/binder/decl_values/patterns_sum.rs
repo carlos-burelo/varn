@@ -33,7 +33,7 @@ impl<'r> super::super::Binder<'r> {
                 self.define(*name, sym);
             }
             Pattern::Array { elements, rest, .. } => {
-                let elem_ty = ty.as_ref().and_then(|t| match *self.ty_table.get(t.0) {
+                let elem_ty = ty.as_ref().and_then(|t| match self.ty_table.get(t.0) {
                     varn_core::TypeKind::Array(inner) => Some(Type(inner, false)),
                     varn_core::TypeKind::Generic(name, args, _)
                         if self.interner.resolve(name) == varn_core::IntrinsicType::Array.as_str()
@@ -56,7 +56,7 @@ impl<'r> super::super::Binder<'r> {
                 for prop in properties {
                     let mut prop_kind = kind;
                     let key_str = self.interner.resolve(prop.key).to_string();
-                    let ty_kind = ty.map(|t| *self.ty_table.get(t.0));
+                    let ty_kind = ty.map(|t| self.ty_table.get(t.0));
                     let prop_ty = match ty_kind {
                         Some(varn_core::TypeKind::Object(mid)) => {
                             self.ty_table.get_object_members(mid).to_vec().iter().find_map(|m| {

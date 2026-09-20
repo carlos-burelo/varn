@@ -147,7 +147,7 @@ pub fn get_members_of_type(
         }
     }
 
-    let ty_kind = *table.get(ty.0);
+    let ty_kind = table.get(ty.0);
     match ty_kind {
         TypeKind::Object(mid) => {
             for m in table.get_object_members(mid).to_vec() {
@@ -396,7 +396,7 @@ fn collect_extension_members(
         let TypeKind::Fn(fid) = table.get(sym_ty.0) else {
             return;
         };
-        let ft = table.get_function(*fid).clone();
+        let ft = table.get_function(fid).clone();
         // A getter reads as its return type; a method reads as its signature.
         let member_ty = if as_return {
             Type(ft.return_type, false)
@@ -444,7 +444,7 @@ fn extension_key(
     interner: &varn_core::AtomInterner,
 ) -> Option<Rc<str>> {
     match table.get(ty.0) {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(*n))),
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(n))),
         TypeKind::Intrinsic(tag) => Some(Rc::from(tag.name())),
         TypeKind::Array(_) => Some(Rc::from(varn_core::IntrinsicType::Array.as_str())),
         _ => None,
@@ -453,7 +453,7 @@ fn extension_key(
 
 impl<'r> Checker<'r> {
     pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Rc<str>> {
-        let ty_kind = *self.ty_table.get(ty.0);
+        let ty_kind = self.ty_table.get(ty.0);
         match ty_kind {
             TypeKind::Object(mid) => self
                 .ty_table

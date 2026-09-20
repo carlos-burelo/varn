@@ -134,7 +134,7 @@ impl<'r> Checker<'r> {
                 if let Some(expected_fn) = self.expected_fn_type() {
                     for ep in &expected_fn.params {
                         if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
-                            let n_str = bind.interner.resolve(*n);
+                            let n_str = bind.interner.resolve(n);
                             if varn_core::IntrinsicType::from_str(n_str).is_none() {
                                 injected_type_params.push(Rc::from(n_str));
                             }
@@ -143,7 +143,7 @@ impl<'r> Checker<'r> {
                     if let varn_core::TypeKind::Named(n, _) =
                         self.ty_table.get(expected_fn.return_type)
                     {
-                        let n_str = bind.interner.resolve(*n);
+                        let n_str = bind.interner.resolve(n);
                         if varn_core::IntrinsicType::from_str(n_str).is_none() {
                             injected_type_params.push(Rc::from(n_str));
                         }
@@ -168,7 +168,7 @@ impl<'r> Checker<'r> {
                         self.with_expected(expected_ret, |c| c.check_expr(e, bind));
                         let actual = self.infer_type(e, bind);
                         if let Some(expected) = self.expected_return_type {
-                            let expected_kind = *self.ty_table.get(expected.0);
+                            let expected_kind = self.ty_table.get(expected.0);
                             let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                             let is_void = matches!(
                                 expected_kind,
@@ -278,8 +278,8 @@ impl<'r> Checker<'r> {
                 self.check_expr(expression, bind);
                 let expr_ty = self.infer_type(expression, bind);
 
-                let is_result = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(*n) == "Result");
-                let is_option = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(*n) == "Option");
+                let is_result = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Result");
+                let is_option = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Option");
                 let is_nullable = expr_ty.is_nullable(&self.ty_table);
 
                 if !expr_ty.is_dynamic() && !is_result && !is_option && !is_nullable {
@@ -310,7 +310,7 @@ impl<'r> Checker<'r> {
                 }
 
                 if is_result {
-                    let ret_is_result = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(*n) == "Result");
+                    let ret_is_result = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Result");
                     if !ret_is_result {
                         let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
                         self.emit(
@@ -324,8 +324,8 @@ impl<'r> Checker<'r> {
                         TypeKind::Generic(_, args_e, _),
                         TypeKind::Generic(_, args_r, _),
                     ) = (
-                        *self.ty_table.get(expr_ty.0),
-                        *self.ty_table.get(expected_ret.0),
+                        self.ty_table.get(expr_ty.0),
+                        self.ty_table.get(expected_ret.0),
                     ) {
                         let e_ids = self.ty_table.get_list(args_e).to_vec();
                         let r_ids = self.ty_table.get_list(args_r).to_vec();
@@ -346,7 +346,7 @@ impl<'r> Checker<'r> {
                         }
                     }
                 } else if is_option {
-                    let ret_is_option = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(*n) == "Option");
+                    let ret_is_option = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Option");
                     if !ret_is_option {
                         let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
                         self.emit(
@@ -411,7 +411,7 @@ impl<'r> Checker<'r> {
                 let r_base_raw = base_type(&r_ty);
                 let l_base = normalize_for_binary(&l_base_raw, &self.ty_table, &bind.interner);
                 let r_base = normalize_for_binary(&r_base_raw, &self.ty_table, &bind.interner);
-                let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.resolve(*n)));
+                let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.resolve(n)));
                 if !l_base.is_dynamic()
                     && !r_base.is_dynamic()
                     && !is_type_param_b(&l_base, self)
@@ -419,7 +419,7 @@ impl<'r> Checker<'r> {
                 {
                     let is_numeric = |t: &Type, checker: &Checker| {
                         t.is_numeric()
-                            || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(*n) == IntrinsicType::Decimal.as_str())
+                            || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(n) == IntrinsicType::Decimal.as_str())
                     };
                     let same_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
                     let valid = match op {
@@ -588,7 +588,7 @@ impl<'r> Checker<'r> {
                             members.iter().find_map(|m| {
                                 if m.kind == crate::types::ClassMemberKind::Constructor {
                                     if let TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
-                                        return Some(self.ty_table.get_function(*fid).params.clone());
+                                        return Some(self.ty_table.get_function(fid).params.clone());
                                     }
                                 }
                                 None
@@ -775,7 +775,7 @@ impl<'r> Checker<'r> {
                 let tag_ty_raw = self.infer_type(tag, bind);
                 let tag_ty = tag_ty_raw.non_nullified(&mut self.ty_table);
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
-                    let ret = self.ty_table.get_function(*fid).return_type;
+                    let ret = self.ty_table.get_function(fid).return_type;
                     self.record_type(range.start.offset, Type(ret, false));
                 }
             }

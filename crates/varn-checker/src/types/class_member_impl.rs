@@ -3,7 +3,7 @@ use super::*;
 impl ClassMemberInfo {
     pub fn params_str(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> String {
         match table.get(self.ty.0) {
-            TypeKind::Fn(fid) => format_fn_params(&table.get_function(*fid).params.clone(), table, interner),
+            TypeKind::Fn(fid) => format_fn_params(&table.get_function(fid).params.clone(), table, interner),
             _ => String::new(),
         }
     }
@@ -11,7 +11,7 @@ impl ClassMemberInfo {
     pub fn return_type_str(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> String {
         match table.get(self.ty.0) {
             TypeKind::Fn(fid) => {
-                let ret = table.get_function(*fid).return_type;
+                let ret = table.get_function(fid).return_type;
                 Type(ret, false).display(table, interner).to_string()
             }
             _ => self.ty.display(table, interner).to_string(),

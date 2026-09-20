@@ -5,7 +5,7 @@ use varn_core::TypeKind;
 pub(super) fn resolve_keyof(ty: Type, ctx: Option<&dyn TypeContext>, table: &mut CheckerTyTable) -> Type {
     if let TypeKind::Object(mid) = table.get(ty.0) {
         let mut key_types: Vec<CheckerTyId> = vec![];
-        for member in table.get_object_members(*mid).to_vec() {
+        for member in table.get_object_members(mid).to_vec() {
             if let ObjectTypeMember::Index { key_ty, .. } = member {
                 if !key_types.contains(&key_ty) {
                     key_types.push(key_ty);
@@ -37,7 +37,7 @@ pub(super) fn collect_type_keys(
 ) -> Vec<Rc<str>> {
     match table.get(ty.0) {
         TypeKind::Object(mid) => table
-            .get_object_members(*mid)
+            .get_object_members(mid)
             .iter()
             .filter_map(|m| match m {
                 ObjectTypeMember::Property { name, .. } => Some(name.clone()),
@@ -46,7 +46,7 @@ pub(super) fn collect_type_keys(
             })
             .collect(),
         TypeKind::Named(name, origin) => {
-            let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(*name));
+            let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
             let origin_str = origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
             name_str
                 .and_then(|name_str| {
@@ -60,7 +60,7 @@ pub(super) fn collect_type_keys(
         }
         TypeKind::Intersection(list) => {
             let mut all_keys: Vec<Rc<str>> = vec![];
-            for part in table.get_list(*list).to_vec() {
+            for part in table.get_list(list).to_vec() {
                 for key in collect_type_keys(&Type(part, false), ctx, table) {
                     if !all_keys.contains(&key) {
                         all_keys.push(key);
@@ -70,7 +70,7 @@ pub(super) fn collect_type_keys(
             all_keys
         }
         TypeKind::Union(list) => {
-            let parts = table.get_list(*list).to_vec();
+            let parts = table.get_list(list).to_vec();
             if parts.is_empty() {
                 return vec![];
             }
@@ -95,13 +95,13 @@ pub(super) fn resolve_indexed_access(
     table: &mut CheckerTyTable,
 ) -> Type {
     let key_name_atom = match table.get(index.0) {
-        TypeKind::Named(name, _) => Some(*name),
+        TypeKind::Named(name, _) => Some(name),
         _ => None,
     };
     let key_name = key_name_atom.and_then(|a| ctx.and_then(|c| c.interner()).map(|i| i.resolve(a)));
 
     if let TypeKind::Object(mid) = table.get(obj.0) {
-        let members = table.get_object_members(*mid).to_vec();
+        let members = table.get_object_members(mid).to_vec();
         if let Some(key_name) = key_name {
             for m in &members {
                 match m {
@@ -167,8 +167,8 @@ pub(super) fn resolve_indexed_access(
     }
 
     if let TypeKind::Named(name, origin) = table.get(obj.0) {
-        let name = *name;
-        let origin = *origin;
+        let name = name;
+        let origin = origin;
         if let Some(key_name) = key_name {
             let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
             let origin_str = origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));

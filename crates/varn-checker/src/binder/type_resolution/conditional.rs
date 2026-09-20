@@ -131,14 +131,14 @@ fn resolve_extends_with_infer(
         }
         TypeKind::Array(inner) => {
             if let TypeKind::Array(check_inner) = table.get(check.0) {
-                let check_inner = Type(*check_inner, false);
+                let check_inner = Type(check_inner, false);
                 resolve_extends_with_infer(inner, ctx, bindings, &check_inner, table);
             }
             resolve_type_node(node, ctx, table)
         }
         TypeKind::Fn((params, ret)) => {
             if let TypeKind::Fn(fid) = table.get(check.0) {
-                let ft = table.get_function(*fid).clone();
+                let ft = table.get_function(fid).clone();
                 let ret_ty = Type(ft.return_type, false);
                 resolve_extends_with_infer(ret, ctx, bindings, &ret_ty, table);
 

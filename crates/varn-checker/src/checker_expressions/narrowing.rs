@@ -178,7 +178,7 @@ impl<'r> Checker<'r> {
                                 if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
                                     let original_ty = bind.arena.get(id).ty;
                                     let union_list = original_ty.and_then(|t| {
-                                        match *self.ty_table.get(t.0) {
+                                        match self.ty_table.get(t.0) {
                                             TypeKind::Union(list) => Some(list),
                                             _ => None,
                                         }
@@ -193,7 +193,7 @@ impl<'r> Checker<'r> {
                                         let mut matched: Vec<Type> = Vec::new();
                                         let mut unmatched: Vec<Type> = Vec::new();
                                         for m in members.iter() {
-                                            let m_kind = *self.ty_table.get(m.0);
+                                            let m_kind = self.ty_table.get(m.0);
                                             let hits = match m_kind {
                                                 TypeKind::Object(mid) => {
                                                     self.ty_table.get_object_members(mid).iter().any(|f| match f {
@@ -355,12 +355,12 @@ impl<'r> Checker<'r> {
                 let (callee, args) = (*callee, args.clone());
                 let callee_ty_raw = self.infer_type(callee, bind);
                 let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
-                if let TypeKind::Fn(fid) = *self.ty_table.get(callee_ty.0) {
+                if let TypeKind::Fn(fid) = self.ty_table.get(callee_ty.0) {
                     let ft = self.ty_table.get_function(fid).clone();
                     if let TypeKind::TypePredicate {
                         parameter_name,
                         target_type,
-                    } = *self.ty_table.get(ft.return_type)
+                    } = self.ty_table.get(ft.return_type)
                     {
                         let target_type = Type(target_type, false);
                         let parameter_name_str = bind.interner.resolve(parameter_name);
@@ -394,8 +394,8 @@ impl<'r> Checker<'r> {
                                     .or_else(|| bind.arena.get(id).ty);
                                 if is_true_branch {
                                     if let Some(orig) = original_ty {
-                                        let orig_kind = *self.ty_table.get(orig.0);
-                                        let target_kind = *self.ty_table.get(target_type.0);
+                                        let orig_kind = self.ty_table.get(orig.0);
+                                        let target_kind = self.ty_table.get(target_type.0);
                                         let matched: Vec<Type> = match orig_kind {
                                             TypeKind::Union(list) => self
                                                 .ty_table
@@ -404,7 +404,7 @@ impl<'r> Checker<'r> {
                                                 .into_iter()
                                                 .map(|id| Type(id, false))
                                                 .filter(|m| {
-                                                    let m_kind = *self.ty_table.get(m.0);
+                                                    let m_kind = self.ty_table.get(m.0);
                                                     match (m_kind, target_kind) {
                                                         (
                                                             TypeKind::Array(_),
@@ -471,7 +471,7 @@ impl<'r> Checker<'r> {
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
                     if let Some(ty) = bind.arena.get(id).ty {
-                        if let TypeKind::Union(list) = *self.ty_table.get(ty.0) {
+                        if let TypeKind::Union(list) = self.ty_table.get(ty.0) {
                             let members: Vec<Type> = self
                                 .ty_table
                                 .get_list(list)
@@ -511,7 +511,7 @@ impl<'r> Checker<'r> {
         };
         let prop_name = bind.interner.resolve(*prop_name);
 
-        match *self.ty_table.get(m.0) {
+        match self.ty_table.get(m.0) {
             TypeKind::Object(mid) => self.ty_table.get_object_members(mid).iter().any(|f| match f {
                 ObjectTypeMember::Property { name, ty, .. } => {
                     name.as_ref() == prop_name && *ty == disc_ty.0

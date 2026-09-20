@@ -90,7 +90,7 @@ fn extension_method_type(bind: &BindResult, mangled: &Rc<str>, table: &mut Check
     let TypeKind::Fn(fid) = table.get(sym_ty.0) else {
         return Some(sym_ty);
     };
-    let ft = table.get_function(*fid).clone();
+    let ft = table.get_function(fid).clone();
 
     let params: Vec<crate::types::FunctionParam> = ft
         .params
@@ -113,7 +113,7 @@ fn extension_method_type(bind: &BindResult, mangled: &Rc<str>, table: &mut Check
 fn extension_getter_type(bind: &BindResult, mangled: &Rc<str>, table: &CheckerTyTable) -> Option<Type> {
     let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
     match table.get(sym_ty.0) {
-        TypeKind::Fn(fid) => Some(Type(table.get_function(*fid).return_type, false)),
+        TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
         _ => Some(sym_ty),
     }
 }
@@ -158,7 +158,7 @@ impl<'r> Checker<'r> {
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
-        let ty_kind = *self.ty_table.get(ty.0);
+        let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
             TypeKind::EnumVariant {
                 enum_name,
@@ -545,7 +545,7 @@ impl<'r> Checker<'r> {
         key: &str,
         bind: &BindResult,
     ) -> Option<ObjectTypeMember> {
-        let ty_kind = *self.ty_table.get(ty.0);
+        let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
             TypeKind::EnumVariant {
                 enum_name,
@@ -678,7 +678,7 @@ impl<'r> Checker<'r> {
                 if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
                     let mangled = mangled.clone();
                     if let Some(sym) = extension_method_type(bind, &mangled, &mut self.ty_table) {
-                        let sym_kind = *self.ty_table.get(sym.0);
+                        let sym_kind = self.ty_table.get(sym.0);
                         let (params, return_type) = match sym_kind {
                             varn_core::TypeKind::Fn(fid) => {
                                 let ft = self.ty_table.get_function(fid).clone();

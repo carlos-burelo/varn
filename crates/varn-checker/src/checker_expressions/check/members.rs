@@ -70,7 +70,7 @@ impl<'r> Checker<'r> {
             }
             let obj_ty = self.infer_type(object, bind);
             let check_ty = obj_ty.non_nullified(&mut self.ty_table);
-            let check_kind = *self.ty_table.get(check_ty.0);
+            let check_kind = self.ty_table.get(check_ty.0);
             let key_expected = match check_kind {
                 TypeKind::Generic(name, args, _)
                     if bind.interner.get(varn_core::IntrinsicType::Map.as_str()) == Some(name) =>
@@ -224,7 +224,7 @@ impl<'r> Checker<'r> {
                 false
             };
 
-            let check_kind = *self.ty_table.get(check_ty.0);
+            let check_kind = self.ty_table.get(check_ty.0);
             let is_enum = matches!(check_kind, TypeKind::EnumVariant { .. })
                 || if let TypeKind::Named(n, _) = check_kind {
                     let n_str = self.resolve_bind_atom(bind, n);
@@ -237,7 +237,7 @@ impl<'r> Checker<'r> {
                     false
                 };
 
-            let final_mem_kind = *self.ty_table.get(final_mem_ty.0);
+            let final_mem_kind = self.ty_table.get(final_mem_ty.0);
             let member_kind = if is_enum {
                 crate::semantic_info::ResolvedMemberKind::EnumMember
             } else if self
@@ -292,7 +292,7 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let obj_kind = *self.ty_table.get(obj_ty.0);
+        let obj_kind = self.ty_table.get(obj_ty.0);
         let class_name = match obj_kind {
             TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
                 Some(self.resolve_bind_atom(bind, n).to_string())
@@ -360,7 +360,7 @@ pub(crate) fn extension_type_name(
 ) -> Option<std::rc::Rc<str>> {
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
-            Some(checker.resolve_bind_atom(bind, *n))
+            Some(checker.resolve_bind_atom(bind, n))
         }
         TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(tag.name())),
         _ => None,

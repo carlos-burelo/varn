@@ -36,7 +36,7 @@ pub(super) fn infer_member_type(
     };
 
     let prop_name_str = bind.interner.resolve(*prop_name);
-    let obj_kind = *checker.ty_table.get(obj_ty.0);
+    let obj_kind = checker.ty_table.get(obj_ty.0);
     match obj_kind {
         TypeKind::Array(_elem) => {
             if prop_name_str == varn_core::MemberKey::Length.as_str() {
@@ -69,7 +69,7 @@ pub(super) fn infer_member_type(
 
 pub(crate) fn normalize_for_binary(ty: &Type, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> Type {
     if let TypeKind::Named(name, _) = table.get(ty.0) {
-        match interner.resolve(*name) {
+        match interner.resolve(name) {
             n if n == varn_core::IntrinsicType::Str.as_str() => return Type::Str,
             n if n == varn_core::IntrinsicType::Int.as_str() => return Type::Int,
             n if n == varn_core::IntrinsicType::Float.as_str() => return Type::Float,
