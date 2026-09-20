@@ -245,7 +245,9 @@ pub(crate) fn load_home(
         actx.helpers.home_load,
         &[actx.exec_ctx, actx.base, reg_v, addr],
     );
-    b.ins().load(types::I128, MemFlags::trusted(), addr, 0)
+    // Plain (not `trusted`): the slot is written by the call above, and a
+    // `trusted` load here was being reordered/speculated ahead of it.
+    b.ins().load(types::I128, MemFlags::new(), addr, 0)
 }
 
 pub(crate) fn box_or_load_home(

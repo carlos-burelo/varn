@@ -37,6 +37,15 @@ pub(crate) extern "C" fn jit_store_home(
     let ctx = unsafe { &mut *ctx };
     let addr = ctx.stack.addr_of(act_id, reg);
     let v = VmValue::from_raw_parts(tag, payload);
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!(
+            "HOME store fn={:?} act={act_id} reg={reg} class={:?} tag={:#x} payload={:#x}",
+            ctx.frames.last().and_then(|f| f.closure().proto.name.clone()),
+            addr.class,
+            tag,
+            payload
+        );
+    }
     if let Err(e) = ctx.stack.set_addr(addr, v) {
         let fname = ctx
             .frames
@@ -69,6 +78,15 @@ pub(crate) extern "C" fn jit_load_home(
     let ctx = unsafe { &*ctx };
     let addr = ctx.stack.addr_of(act_id, reg);
     let v = ctx.stack.get_addr(addr);
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!(
+            "HOME load  fn={:?} act={act_id} reg={reg} class={:?} tag={:#x} payload={:#x}",
+            ctx.frames.last().and_then(|f| f.closure().proto.name.clone()),
+            addr.class,
+            v.raw_tag(),
+            v.raw_payload()
+        );
+    }
     debug_assert!(addr.idx != REF_UNINIT || v.is_null());
     unsafe { *out = v };
 }
