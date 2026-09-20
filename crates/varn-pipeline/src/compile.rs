@@ -130,7 +130,7 @@ pub fn compile(
     }
 
     if debug.bytecode {
-        // `graph_build.modules` es un `std::collections::HashMap`: su orden de
+        // `graph_build.modules` es un `rustc_hash::FxHashMap`: su orden de
         // iteración se siembra al azar en cada arranque de proceso, así que sin
         // ordenar aquí el volcado sale con los módulos barajados de una corrida
         // a otra. El bytecode en sí no cambia — sólo su presentación —, pero eso
@@ -216,7 +216,7 @@ fn print_module_graph(build: &crate::module_precompile::ModuleGraphBuild) {
     print_graph_node(
         &build.entry_path,
         &build.deps,
-        &mut std::collections::HashSet::new(),
+        &mut rustc_hash::FxHashSet::default(),
         "",
         true,
     );
@@ -226,8 +226,8 @@ fn print_module_graph(build: &crate::module_precompile::ModuleGraphBuild) {
 
 fn print_graph_node(
     node: &str,
-    deps: &std::collections::HashMap<String, Vec<String>>,
-    visited: &mut std::collections::HashSet<String>,
+    deps: &rustc_hash::FxHashMap<String, Vec<String>>,
+    visited: &mut rustc_hash::FxHashSet<String>,
     prefix: &str,
     is_last: bool,
 ) {

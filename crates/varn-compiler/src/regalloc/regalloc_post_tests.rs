@@ -7,7 +7,7 @@
 
 use crate::regalloc::liveness::{DefSites, LiveRange};
 use crate::regalloc::regalloc_post::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_types::register_meta::SlotKind;
 
 fn range(vreg: u16, start: usize, end: usize, interference: &[u16]) -> LiveRange {

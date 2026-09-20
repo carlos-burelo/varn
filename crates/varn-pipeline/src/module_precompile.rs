@@ -1,5 +1,6 @@
 use crate::hash::fnv1a64;
-use std::collections::{HashMap, HashSet, VecDeque};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::collections::VecDeque;
 use std::path::Path;
 use varn_checker::module_resolver::ImportResolver;
 
@@ -28,13 +29,13 @@ pub fn build_module_graph(
 ) -> Result<ModuleGraphBuild, String> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
-    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-    let mut source_hashes: HashMap<String, u64> = HashMap::new();
+    let mut graph: HashMap<String, Vec<String>> = HashMap::default();
+    let mut source_hashes: HashMap<String, u64> = HashMap::default();
     source_hashes.insert(canonical_entry.clone(), fnv1a64(entry_source.as_bytes()));
 
     let mut node_sources: HashMap<String, (String, Program, AstArena, varn_core::AtomInterner)> =
-        HashMap::new();
-    let mut package_nodes: HashMap<String, PackageNode> = HashMap::new();
+        HashMap::default();
+    let mut package_nodes: HashMap<String, PackageNode> = HashMap::default();
 
     let entry_dir = Path::new(&canonical_entry)
         .parent()
@@ -52,7 +53,7 @@ pub fn build_module_graph(
     graph.insert(canonical_entry.clone(), entry_deps.clone());
 
     let mut queue: VecDeque<String> = entry_deps.into_iter().collect();
-    let mut enqueued: HashSet<String> = HashSet::new();
+    let mut enqueued: HashSet<String> = HashSet::default();
     enqueued.insert(canonical_entry.clone());
 
     while let Some(module_path) = queue.pop_front() {
@@ -99,7 +100,7 @@ pub fn build_module_graph(
         node_sources.insert(module_path, (source, program, arena, interner));
     }
 
-    let mut in_degree: HashMap<&str, usize> = HashMap::new();
+    let mut in_degree: HashMap<&str, usize> = HashMap::default();
     for (node, deps) in &graph {
         in_degree.entry(node.as_str()).or_insert(0);
         for dep in deps {
@@ -137,7 +138,7 @@ pub fn build_module_graph(
             .filter(|k| !sorted.contains(*k))
             .map(|s| s.as_str())
             .collect();
-        let cycle_set: std::collections::HashSet<&str> = cycle_nodes.iter().copied().collect();
+        let cycle_set: rustc_hash::FxHashSet<&str> = cycle_nodes.iter().copied().collect();
         let mut cycle_path: Vec<String> = Vec::new();
         if let Some(&start) = cycle_nodes.first() {
             let mut stack: Vec<&str> = vec![start];
@@ -177,7 +178,7 @@ pub fn build_module_graph(
         };
     }
 
-    let mut modules: HashMap<String, FunctionProto> = HashMap::new();
+    let mut modules: HashMap<String, FunctionProto> = HashMap::default();
     modules.insert(canonical_entry.clone(), entry_proto.clone());
 
     for module_path in sorted.into_iter().rev() {

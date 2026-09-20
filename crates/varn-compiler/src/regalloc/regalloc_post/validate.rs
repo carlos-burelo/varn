@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;

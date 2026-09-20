@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
@@ -12,8 +12,8 @@ pub(crate) struct ScanResult {
 }
 
 pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult {
-    let mut defs: HashMap<u8, DefSites> = HashMap::new();
-    let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
+    let mut defs: HashMap<u8, DefSites> = HashMap::default();
+    let mut uses: HashMap<u8, Vec<usize>> = HashMap::default();
     let mut call_sites: Vec<(usize, u8, u8)> = Vec::new();
     let mut open_captures: Vec<u8> = Vec::new();
 

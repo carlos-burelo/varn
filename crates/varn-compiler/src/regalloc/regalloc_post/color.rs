@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use varn_types::register_meta::SlotKind;
 
@@ -38,17 +38,17 @@ pub(crate) fn color_with_base(
     let kind_of = |reg: u8| kinds.get(reg as usize).copied().unwrap_or(SlotKind::Dynamic);
     // Kind already occupying a new colour, if any. A colour takes the kind of
     // the first vreg assigned to it; every later occupant must match.
-    let mut color_kind: HashMap<u8, SlotKind> = HashMap::new();
+    let mut color_kind: HashMap<u8, SlotKind> = HashMap::default();
     let compatible = |color_kind: &HashMap<u8, SlotKind>, color: u8, kind: SlotKind| {
         color_kind.get(&color).is_none_or(|&k| k == kind)
     };
-    let mut coloring: HashMap<u8, u8> = HashMap::new();
+    let mut coloring: HashMap<u8, u8> = HashMap::default();
 
     let ranges_by_vreg: HashMap<u8, &LiveRange> =
         ranges.iter().map(|r| (r.vreg as u8, r)).collect();
 
-    let mut parent_of: HashMap<u8, (u8, u8)> = HashMap::new();
-    let mut block_count: HashMap<u8, u8> = HashMap::new();
+    let mut parent_of: HashMap<u8, (u8, u8)> = HashMap::default();
+    let mut block_count: HashMap<u8, u8> = HashMap::default();
     for &(start, count) in blocks {
         block_count.insert(start, count);
         for i in 0..count {
@@ -56,7 +56,7 @@ pub(crate) fn color_with_base(
         }
     }
 
-    let mut arg_starts = HashSet::new();
+    let mut arg_starts = HashSet::default();
     for &(_, arg_start, _) in &scan.call_sites {
         arg_starts.insert(arg_start);
     }
@@ -92,7 +92,7 @@ pub(crate) fn color_with_base(
         let reg = range.vreg as u8;
         let count = block_count.get(&reg).copied().unwrap_or(1);
 
-        let mut neighbor_colors = HashSet::new();
+        let mut neighbor_colors = HashSet::default();
         for offset in 0..count {
             let child = reg + offset;
             if let Some(child_range) = ranges_by_vreg.get(&child) {

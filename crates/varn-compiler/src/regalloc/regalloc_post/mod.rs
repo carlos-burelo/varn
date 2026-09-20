@@ -1,5 +1,5 @@
 use std::cell::Cell;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::time::{Duration, Instant};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
@@ -97,7 +97,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         .filter(|&&r| r >= base)
         .map(|&r| r as u16)
         .collect();
-    // `scan.defs` es un `std::collections::HashMap`, así que usa `RandomState`:
+    // `scan.defs` es un `rustc_hash::FxHashMap`, así que usa `RandomState`:
     // su orden de iteración se siembra al azar en CADA arranque de proceso.
     //
     // Ese orden no se queda aquí. Llega intacto a `ranges` (el analizador

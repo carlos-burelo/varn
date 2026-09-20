@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 /// Puntos extremos de escritura de un registro dentro de la función.
 ///
@@ -49,8 +49,8 @@ impl Default for LivenessAnalyzer {
 impl LivenessAnalyzer {
     pub fn new() -> Self {
         Self {
-            def_sites: HashMap::new(),
-            use_sites: HashMap::new(),
+            def_sites: HashMap::default(),
+            use_sites: HashMap::default(),
             live_ranges: Vec::new(),
         }
     }
