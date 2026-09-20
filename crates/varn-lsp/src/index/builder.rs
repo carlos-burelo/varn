@@ -100,20 +100,28 @@ fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::
 }
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
-    if specifier.starts_with(STD_PREFIX) || specifier.starts_with(CORE_PREFIX) {
-        let path = crate::workspace::std_sources::resolve_module_file(specifier)?;
-        return Some(path_to_uri(&path.to_string_lossy()));
+    // One resolution (shared with checker/VM): specifier -> canonical ModuleId.
+    // No second path-joining rule lives here.
+    let from = match doc_dir {
+        Some(dir) => varn_core::ModuleId::local(dir.join("__doc__.vn")),
+        None => varn_core::ModuleId::local_str("__doc__.vn"),
+    };
+    let id = varn_modules::resolver::ModuleResolver::new()
+        .resolve(specifier, &from)
+        .ok()?;
+    match id {
+        varn_core::ModuleId::Local(path) => {
+            let canonical = std::fs::canonicalize(path.as_ref()).ok()?;
+            Some(path_to_uri(&canonical.to_string_lossy()))
+        }
+        varn_core::ModuleId::Std(s)
+        | varn_core::ModuleId::Core(s)
+        | varn_core::ModuleId::Runtime(s) => {
+            let path = crate::workspace::std_sources::resolve_module_file(s.as_ref())?;
+            Some(path_to_uri(&path.to_string_lossy()))
+        }
+        varn_core::ModuleId::Package { .. } => None,
     }
-
-    if specifier.starts_with('.') {
-        let dir = doc_dir?;
-        let mut joined = dir.join(specifier);
-        varn_modules::resolver::ensure_varn_extension(&mut joined);
-        let canonical = std::fs::canonicalize(&joined).ok()?;
-        return Some(path_to_uri(&canonical.to_string_lossy()));
-    }
-
-    None
 }
 
 fn is_indexable(kind: SymbolKind, line: u32) -> bool {
