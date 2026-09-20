@@ -1,0 +1,3 @@
+
+[1mCapability Trace[0m  [2m<fixtures>\arith.vn[0m
+  [2m(no capabilities required)[0m

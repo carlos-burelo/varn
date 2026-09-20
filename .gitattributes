@@ -1,1 +1,2 @@
 *.vn linguist-language=TypeScript
+crates/varn-pipeline/tests/fixtures/**/*.golden.txt text eol=lf

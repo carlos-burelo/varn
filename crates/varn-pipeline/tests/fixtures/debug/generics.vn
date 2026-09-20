@@ -1,0 +1,26 @@
+class Box<T> {
+    value: T
+
+    constructor(v: T) {
+        this.value = v
+    }
+
+    get(): T {
+        return this.value
+    }
+
+    map<U>(f: (T) => U): Box<U> {
+        return new Box<U>(f(this.value))
+    }
+}
+
+function identity<T>(v: T): T {
+    return v
+}
+
+const intBox = new Box<int>(10)
+assert("generics get", intBox.get() === 10)
+assert("generics identity", identity<int>(42) === 42)
+const strBox = intBox.map((n) => `value=${n}`)
+assert("generics map", strBox.get() === "value=10")
+print("generics ok")

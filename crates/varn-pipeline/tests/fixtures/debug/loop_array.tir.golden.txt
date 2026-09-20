@@ -1,0 +1,1168 @@
+
+=== TIR: <fixtures>\loop_array.vn ===
+TirModule {
+    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\loop_array.vn",
+    imports: [],
+    exports: [],
+    types: TyTable {
+        entries: [
+            Never,
+            Int,
+        ],
+        dedup: {
+            Never: 0,
+            Int: 1,
+        },
+        lists: [],
+    },
+    classes: [],
+    enums: [],
+    signatures: [
+        Signature {
+            params: [],
+            return_ty: Void,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        1,
+                    ),
+                ),
+            ],
+            return_ty: Int,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        1,
+                    ),
+                ),
+                Int,
+            ],
+            return_ty: Int,
+        },
+    ],
+    functions: [
+        TirFunction {
+            name: "sum",
+            sig: SigId(
+                1,
+            ),
+            params: [
+                Array(
+                    TyId(
+                        1,
+                    ),
+                ),
+            ],
+            return_ty: Int,
+            locals: [
+                Int,
+                Array(
+                    TyId(
+                        1,
+                    ),
+                ),
+                Int,
+                Int,
+            ],
+            body: [
+                Let {
+                    local: LocalId(
+                        0,
+                    ),
+                    ty: Int,
+                    init: Some(
+                        TirExpr {
+                            kind: IntLit(
+                                0,
+                            ),
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 49,
+                                end: 50,
+                            },
+                        },
+                    ),
+                },
+                Let {
+                    local: LocalId(
+                        1,
+                    ),
+                    ty: Array(
+                        TyId(
+                            1,
+                        ),
+                    ),
+                    init: Some(
+                        TirExpr {
+                            kind: Var,
+                            ty: Array(
+                                TyId(
+                                    1,
+                                ),
+                            ),
+                            res: Param(
+                                0,
+                            ),
+                            span: Span {
+                                start: 71,
+                                end: 75,
+                            },
+                        },
+                    ),
+                },
+                Let {
+                    local: LocalId(
+                        2,
+                    ),
+                    ty: Int,
+                    init: Some(
+                        TirExpr {
+                            kind: IntLit(
+                                -1,
+                            ),
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    ),
+                },
+                Loop {
+                    cond: TirExpr {
+                        kind: BoolLit(
+                            true,
+                        ),
+                        ty: Bool,
+                        res: None,
+                        span: Span {
+                            start: 0,
+                            end: 0,
+                        },
+                    },
+                    body: [
+                        Expr(
+                            TirExpr {
+                                kind: Assign {
+                                    target: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Local(
+                                            LocalId(
+                                                2,
+                                            ),
+                                        ),
+                                        span: Span {
+                                            start: 0,
+                                            end: 0,
+                                        },
+                                    },
+                                    value: TirExpr {
+                                        kind: Binary {
+                                            op: Add,
+                                            lhs: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        2,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 0,
+                                                    end: 0,
+                                                },
+                                            },
+                                            rhs: TirExpr {
+                                                kind: IntLit(
+                                                    1,
+                                                ),
+                                                ty: Int,
+                                                res: None,
+                                                span: Span {
+                                                    start: 0,
+                                                    end: 0,
+                                                },
+                                            },
+                                        },
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 0,
+                                            end: 0,
+                                        },
+                                    },
+                                },
+                                ty: Void,
+                                res: None,
+                                span: Span {
+                                    start: 0,
+                                    end: 0,
+                                },
+                            },
+                        ),
+                        If {
+                            cond: TirExpr {
+                                kind: Binary {
+                                    op: Lt,
+                                    lhs: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Local(
+                                            LocalId(
+                                                2,
+                                            ),
+                                        ),
+                                        span: Span {
+                                            start: 0,
+                                            end: 0,
+                                        },
+                                    },
+                                    rhs: TirExpr {
+                                        kind: Field {
+                                            object: TirExpr {
+                                                kind: Var,
+                                                ty: Array(
+                                                    TyId(
+                                                        1,
+                                                    ),
+                                                ),
+                                                res: Local(
+                                                    LocalId(
+                                                        1,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 71,
+                                                    end: 75,
+                                                },
+                                            },
+                                            name: "length",
+                                        },
+                                        ty: Int,
+                                        res: ByName {
+                                            name: "length",
+                                            why: Unannotated,
+                                        },
+                                        span: Span {
+                                            start: 0,
+                                            end: 0,
+                                        },
+                                    },
+                                },
+                                ty: Bool,
+                                res: None,
+                                span: Span {
+                                    start: 0,
+                                    end: 0,
+                                },
+                            },
+                            then_body: [],
+                            else_body: [
+                                Break,
+                            ],
+                        },
+                        Let {
+                            local: LocalId(
+                                3,
+                            ),
+                            ty: Int,
+                            init: Some(
+                                TirExpr {
+                                    kind: Index {
+                                        object: TirExpr {
+                                            kind: Var,
+                                            ty: Array(
+                                                TyId(
+                                                    1,
+                                                ),
+                                            ),
+                                            res: Local(
+                                                LocalId(
+                                                    1,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 71,
+                                                end: 75,
+                                            },
+                                        },
+                                        index: TirExpr {
+                                            kind: Var,
+                                            ty: Int,
+                                            res: Local(
+                                                LocalId(
+                                                    2,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 0,
+                                                end: 0,
+                                            },
+                                        },
+                                    },
+                                    ty: Int,
+                                    res: None,
+                                    span: Span {
+                                        start: 0,
+                                        end: 0,
+                                    },
+                                },
+                            ),
+                        },
+                        Expr(
+                            TirExpr {
+                                kind: Assign {
+                                    target: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Local(
+                                            LocalId(
+                                                0,
+                                            ),
+                                        ),
+                                        span: Span {
+                                            start: 87,
+                                            end: 92,
+                                        },
+                                    },
+                                    value: TirExpr {
+                                        kind: Binary {
+                                            op: Add,
+                                            lhs: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        0,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 95,
+                                                    end: 100,
+                                                },
+                                            },
+                                            rhs: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        3,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 103,
+                                                    end: 104,
+                                                },
+                                            },
+                                        },
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 95,
+                                            end: 104,
+                                        },
+                                    },
+                                },
+                                ty: Int,
+                                res: None,
+                                span: Span {
+                                    start: 87,
+                                    end: 104,
+                                },
+                            },
+                        ),
+                    ],
+                },
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Var,
+                            ty: Int,
+                            res: Local(
+                                LocalId(
+                                    0,
+                                ),
+                            ),
+                            span: Span {
+                                start: 122,
+                                end: 127,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "firstAbove",
+            sig: SigId(
+                2,
+            ),
+            params: [
+                Array(
+                    TyId(
+                        1,
+                    ),
+                ),
+                Int,
+            ],
+            return_ty: Int,
+            locals: [
+                Int,
+                Int,
+            ],
+            body: [
+                Let {
+                    local: LocalId(
+                        0,
+                    ),
+                    ty: Int,
+                    init: Some(
+                        TirExpr {
+                            kind: IntLit(
+                                0,
+                            ),
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 198,
+                                end: 199,
+                            },
+                        },
+                    ),
+                },
+                Let {
+                    local: LocalId(
+                        1,
+                    ),
+                    ty: Int,
+                    init: Some(
+                        TirExpr {
+                            kind: Unary {
+                                op: Neg,
+                                operand: TirExpr {
+                                    kind: IntLit(
+                                        1,
+                                    ),
+                                    ty: Int,
+                                    res: None,
+                                    span: Span {
+                                        start: 218,
+                                        end: 219,
+                                    },
+                                },
+                            },
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 217,
+                                end: 219,
+                            },
+                        },
+                    ),
+                },
+                Loop {
+                    cond: TirExpr {
+                        kind: Binary {
+                            op: Lt,
+                            lhs: TirExpr {
+                                kind: Var,
+                                ty: Int,
+                                res: Local(
+                                    LocalId(
+                                        0,
+                                    ),
+                                ),
+                                span: Span {
+                                    start: 231,
+                                    end: 232,
+                                },
+                            },
+                            rhs: TirExpr {
+                                kind: Field {
+                                    object: TirExpr {
+                                        kind: Var,
+                                        ty: Array(
+                                            TyId(
+                                                1,
+                                            ),
+                                        ),
+                                        res: Param(
+                                            0,
+                                        ),
+                                        span: Span {
+                                            start: 235,
+                                            end: 238,
+                                        },
+                                    },
+                                    name: "length",
+                                },
+                                ty: Int,
+                                res: ByName {
+                                    name: "length",
+                                    why: Unannotated,
+                                },
+                                span: Span {
+                                    start: 235,
+                                    end: 245,
+                                },
+                            },
+                        },
+                        ty: Bool,
+                        res: None,
+                        span: Span {
+                            start: 231,
+                            end: 245,
+                        },
+                    },
+                    body: [
+                        If {
+                            cond: TirExpr {
+                                kind: Binary {
+                                    op: Gt,
+                                    lhs: TirExpr {
+                                        kind: Index {
+                                            object: TirExpr {
+                                                kind: Var,
+                                                ty: Array(
+                                                    TyId(
+                                                        1,
+                                                    ),
+                                                ),
+                                                res: Param(
+                                                    0,
+                                                ),
+                                                span: Span {
+                                                    start: 261,
+                                                    end: 264,
+                                                },
+                                            },
+                                            index: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        0,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 265,
+                                                    end: 266,
+                                                },
+                                            },
+                                        },
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 261,
+                                            end: 267,
+                                        },
+                                    },
+                                    rhs: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Param(
+                                            1,
+                                        ),
+                                        span: Span {
+                                            start: 270,
+                                            end: 279,
+                                        },
+                                    },
+                                },
+                                ty: Bool,
+                                res: None,
+                                span: Span {
+                                    start: 261,
+                                    end: 279,
+                                },
+                            },
+                            then_body: [
+                                Expr(
+                                    TirExpr {
+                                        kind: Assign {
+                                            target: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        1,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 295,
+                                                    end: 301,
+                                                },
+                                            },
+                                            value: TirExpr {
+                                                kind: Index {
+                                                    object: TirExpr {
+                                                        kind: Var,
+                                                        ty: Array(
+                                                            TyId(
+                                                                1,
+                                                            ),
+                                                        ),
+                                                        res: Param(
+                                                            0,
+                                                        ),
+                                                        span: Span {
+                                                            start: 304,
+                                                            end: 307,
+                                                        },
+                                                    },
+                                                    index: TirExpr {
+                                                        kind: Var,
+                                                        ty: Int,
+                                                        res: Local(
+                                                            LocalId(
+                                                                0,
+                                                            ),
+                                                        ),
+                                                        span: Span {
+                                                            start: 308,
+                                                            end: 309,
+                                                        },
+                                                    },
+                                                },
+                                                ty: Int,
+                                                res: None,
+                                                span: Span {
+                                                    start: 304,
+                                                    end: 310,
+                                                },
+                                            },
+                                        },
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 295,
+                                            end: 310,
+                                        },
+                                    },
+                                ),
+                                Break,
+                            ],
+                            else_body: [],
+                        },
+                        Expr(
+                            TirExpr {
+                                kind: Assign {
+                                    target: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Local(
+                                            LocalId(
+                                                0,
+                                            ),
+                                        ),
+                                        span: Span {
+                                            start: 347,
+                                            end: 348,
+                                        },
+                                    },
+                                    value: TirExpr {
+                                        kind: Binary {
+                                            op: Add,
+                                            lhs: TirExpr {
+                                                kind: Var,
+                                                ty: Int,
+                                                res: Local(
+                                                    LocalId(
+                                                        0,
+                                                    ),
+                                                ),
+                                                span: Span {
+                                                    start: 351,
+                                                    end: 352,
+                                                },
+                                            },
+                                            rhs: TirExpr {
+                                                kind: IntLit(
+                                                    1,
+                                                ),
+                                                ty: Int,
+                                                res: None,
+                                                span: Span {
+                                                    start: 355,
+                                                    end: 356,
+                                                },
+                                            },
+                                        },
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 351,
+                                            end: 356,
+                                        },
+                                    },
+                                },
+                                ty: Int,
+                                res: None,
+                                span: Span {
+                                    start: 347,
+                                    end: 356,
+                                },
+                            },
+                        ),
+                    ],
+                },
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Var,
+                            ty: Int,
+                            res: Local(
+                                LocalId(
+                                    1,
+                                ),
+                            ),
+                            span: Span {
+                                start: 374,
+                                end: 380,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+    ],
+    globals: [
+        Dynamic(
+            Unannotated,
+        ),
+        Dynamic(
+            Unannotated,
+        ),
+        Array(
+            TyId(
+                1,
+            ),
+        ),
+    ],
+    global_names: [
+        "sum",
+        "firstAbove",
+        "nums",
+    ],
+    class_defs: [],
+    top_level: TirFunction {
+        name: "<module>",
+        sig: SigId(
+            0,
+        ),
+        params: [],
+        return_ty: Void,
+        locals: [],
+        body: [
+            Expr(
+                TirExpr {
+                    kind: Assign {
+                        target: TirExpr {
+                            kind: Var,
+                            ty: Array(
+                                TyId(
+                                    1,
+                                ),
+                            ),
+                            res: GlobalSlot(
+                                2,
+                            ),
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        value: TirExpr {
+                            kind: ArrayLit(
+                                [
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                3,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 398,
+                                                end: 399,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                1,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 401,
+                                                end: 402,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                4,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 404,
+                                                end: 405,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                1,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 407,
+                                                end: 408,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                5,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 410,
+                                                end: 411,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            ),
+                            ty: Array(
+                                TyId(
+                                    1,
+                                ),
+                            ),
+                            res: None,
+                            span: Span {
+                                start: 397,
+                                end: 412,
+                            },
+                        },
+                    },
+                    ty: Void,
+                    res: None,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 413,
+                                end: 419,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "loop sum",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 420,
+                                        end: 430,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        0,
+                                                    ),
+                                                    span: Span {
+                                                        start: 432,
+                                                        end: 435,
+                                                    },
+                                                },
+                                                args: [
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: Var,
+                                                            ty: Array(
+                                                                TyId(
+                                                                    1,
+                                                                ),
+                                                            ),
+                                                            res: GlobalSlot(
+                                                                2,
+                                                            ),
+                                                            span: Span {
+                                                                start: 436,
+                                                                end: 440,
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                            ty: Int,
+                                            res: DirectFn(
+                                                FnId(
+                                                    0,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 432,
+                                                end: 441,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                14,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 446,
+                                                end: 448,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 432,
+                                        end: 448,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 413,
+                        end: 449,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 450,
+                                end: 456,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "loop firstAbove",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 457,
+                                        end: 474,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        1,
+                                                    ),
+                                                    span: Span {
+                                                        start: 476,
+                                                        end: 486,
+                                                    },
+                                                },
+                                                args: [
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: Var,
+                                                            ty: Array(
+                                                                TyId(
+                                                                    1,
+                                                                ),
+                                                            ),
+                                                            res: GlobalSlot(
+                                                                2,
+                                                            ),
+                                                            span: Span {
+                                                                start: 487,
+                                                                end: 491,
+                                                            },
+                                                        },
+                                                    ),
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: IntLit(
+                                                                3,
+                                                            ),
+                                                            ty: Int,
+                                                            res: None,
+                                                            span: Span {
+                                                                start: 493,
+                                                                end: 494,
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                            ty: Int,
+                                            res: DirectFn(
+                                                FnId(
+                                                    1,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 476,
+                                                end: 495,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                4,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 500,
+                                                end: 501,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 476,
+                                        end: 501,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 450,
+                        end: 502,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                0,
+                            ),
+                            span: Span {
+                                start: 503,
+                                end: 508,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "loop ok",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 509,
+                                        end: 518,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        0,
+                    ),
+                    span: Span {
+                        start: 503,
+                        end: 519,
+                    },
+                },
+            ),
+        ],
+        has_this: false,
+        this_class: None,
+        is_async: true,
+        is_generator: false,
+        has_rest: false,
+    },
+}

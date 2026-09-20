@@ -1,0 +1,46 @@
+
+  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>\generics.vn[0m
+├── [1mClassDecl[0m [34mBox[0m
+│   ├── [1mProperty[0m [36mvalue[0m
+│   ├── [1mConstructor[0m
+│   ├── [1mMethod[0m [34mget[0m
+│   └── [1mMethod[0m [34mmap[0m
+├── [1mFunctionDecl[0m [34midentity[0m
+│   └── [1mBlockStmt[0m
+│       └── [1mReturnStmt[0m
+│           └── [36mv[0m [2m(id)[0m
+├── [1mVariableDecl (Const)[0m
+│   └── [1mVar[0m [33mintBox[0m
+│       └── [1mNew[0m [34mBox[0m
+│           └── [33m10[0m [2m(int)[0m
+├── [1mExprStmt[0m
+│   └── [1mCall[0m [34massert[0m
+│       ├── [33m"generics get"[0m [2m(str)[0m
+│       └── [1mBinary[0m [33mEq[0m
+│           ├── [1mCall[0m [34mintBox.get[0m
+│           └── [33m10[0m [2m(int)[0m
+├── [1mExprStmt[0m
+│   └── [1mCall[0m [34massert[0m
+│       ├── [33m"generics identity"[0m [2m(str)[0m
+│       └── [1mBinary[0m [33mEq[0m
+│           ├── [1mCall[0m [34midentity[0m
+│           │   └── [33m42[0m [2m(int)[0m
+│           └── [33m42[0m [2m(int)[0m
+├── [1mVariableDecl (Const)[0m
+│   └── [1mVar[0m [33mstrBox[0m
+│       └── [1mCall[0m [34mintBox.map[0m
+│           └── [1mArrowFunc[0m
+│               └── [1mTemplate[0m
+│                   ├── [33m"value="[0m
+│                   ├── [36mn[0m [2m(id)[0m
+│                   └── [33m""[0m
+├── [1mExprStmt[0m
+│   └── [1mCall[0m [34massert[0m
+│       ├── [33m"generics map"[0m [2m(str)[0m
+│       └── [1mBinary[0m [33mEq[0m
+│           ├── [1mCall[0m [34mstrBox.get[0m
+│           └── [33m"value=10"[0m [2m(str)[0m
+└── [1mExprStmt[0m
+    └── [1mCall[0m [34mprint[0m
+        └── [33m"generics ok"[0m [2m(str)[0m
+  [2m── end: abstract syntax tree ──[0m

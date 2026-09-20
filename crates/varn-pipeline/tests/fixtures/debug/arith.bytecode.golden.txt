@@ -1,0 +1,64 @@
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 11, upvalues: 0)  [2m[async, state_size=1][0m
+  [2mconstants (5)[0m
+  [2m[000][0m [34mfn add[0m(arity=3)
+  [2m[001][0m [34mfn scale[0m(arity=2)
+  [2m[002][0m [32m"arith add"[0m
+  [2m[003][0m [32m"arith scale"[0m
+  [2m[004][0m [32m"arith ok"[0m
+  [2mcode (60) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   0 │ [34mLoadStaticFn        [0m │ r1 = static_fn[0]  [2m;[0m [34m→ fn add[0m
+  0002 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@0] = r1
+  0005 │   0 │ [34mLoadStaticFn        [0m │ r1 = static_fn[1]  [2m;[0m [34m→ fn scale[0m
+  0007 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@1] = r1
+  0010 │   0 │ [36mLoadInt             [0m │ r2 = 3
+  0012 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@2] = r2
+  0015 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
+  0017 │   0 │ [36mLoadConst           [0m │ r3 = const[2]  [2m;[0m [32m"arith add"[0m
+  0019 │   0 │ [36mLoadGlobalIdx       [0m │ r4 = global[@2]
+  0021 │   0 │ [32mEqInt               [0m │ r5 = r4 op r2
+  0023 │   0 │ LoadNull            [0m │ r8
+  0024 │   0 │ Move                [0m │ r9 = r3
+  0026 │   0 │ Move                [0m │ r10 = r5
+  0028 │   0 │ [35mCall                [0m │ r6 = call r1(3 args @ r8)
+  0031 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
+  0033 │   0 │ [36mLoadConst           [0m │ r3 = const[3]  [2m;[0m [32m"arith scale"[0m
+  0035 │   0 │ LoadTrue            [0m │ r5
+  0036 │   0 │ LoadNull            [0m │ r8
+  0037 │   0 │ Move                [0m │ r9 = r3
+  0039 │   0 │ Move                [0m │ r10 = r5
+  0041 │   0 │ [35mCall                [0m │ r6 = call r1(3 args @ r8)
+  0044 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@0]
+  0046 │   0 │ [36mLoadConst           [0m │ r3 = const[4]  [2m;[0m [32m"arith ok"[0m
+  0048 │   0 │ LoadNull            [0m │ r8
+  0049 │   0 │ Move                [0m │ r9 = r3
+  0051 │   0 │ [35mCall                [0m │ r6 = call r1(2 args @ r8)
+  0054 │   1 │ LoadNull            [0m │ r7
+  0055 │   1 │ [33mReturn              [0m │ r7
+  0057 │   1 │ LoadNull            [0m │ r7
+  0058 │   1 │ [33mReturn              [0m │ r7
+
+  [1mfn[0m [34madd[0m (arity: 3, regs: 5, upvalues: 0)
+    [2mcode (7) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   0 │ [32mAddInt              [0m │ r3 = r1 op r2
+    0002 │   1 │ [33mReturn              [0m │ r3
+    0004 │   1 │ LoadNull            [0m │ r4
+    0005 │   1 │ [33mReturn              [0m │ r4
+
+  [1mfn[0m [34mscale[0m (arity: 2, regs: 5, upvalues: 0)
+    [2mcode (11) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   0 │ [36mLoadInt             [0m │ r2 = 2
+    0002 │   0 │ [32mMulInt              [0m │ r3 = r1 op r2
+    0004 │   0 │ [32mAddImm              [0m │ r2 = r3 + 1
+    0006 │   1 │ [33mReturn              [0m │ r2
+    0008 │   1 │ LoadNull            [0m │ r4
+    0009 │   1 │ [33mReturn              [0m │ r4
+
+  [2m── end: bytecode ──[0m

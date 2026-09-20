@@ -1,0 +1,21 @@
+
+[1m[34mCLIF[0m[2m ─────────────────────────────── <module>[0m
+
+  [1m<module>[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+
+  [1midentity[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+
+  [1mBox.constructor[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+
+  [1mBox.get[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+
+  [1mBox.map[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+
+  [1m<closure>[0m[2m (frame-aware)[0m
+    [32mROUTE[0m
+[2m── end: CLIF ──[0m

@@ -1,0 +1,51 @@
+# check:types generics.vn
+## checker types (key = expr id)
+0 | 5:9 | Box
+2 | 5:9 | T
+3 | 5:22 | T
+4 | 5:9 | T
+5 | 9:16 | Box
+7 | 9:16 | T
+8 | 13:20 | Box
+9 | 13:27 | (_: T) => U
+10 | 13:29 | Box
+12 | 13:29 | T
+13 | 13:27 | U
+14 | 13:16 | Box<U>
+15 | 18:12 | T
+16 | 21:20 | Box
+17 | 21:29 | int
+18 | 21:16 | Box<int>
+19 | 22:1 | (label: str, cond: bool) => void
+20 | 22:8 | str
+21 | 22:24 | Box<int>
+23 | 22:24 | () => int
+24 | 22:24 | int
+25 | 22:41 | int
+26 | 22:24 | bool
+27 | 22:1 | void
+28 | 23:1 | (label: str, cond: bool) => void
+29 | 23:8 | str
+30 | 23:29 | (v: T) => T
+31 | 23:43 | int
+32 | 23:29 | int
+33 | 23:51 | int
+34 | 23:29 | bool
+35 | 23:1 | void
+36 | 24:16 | Box<int>
+38 | 24:16 | (f: (_: int) => U) => Box<U>
+39 | 24:43 | int
+40 | 24:34 | str
+41 | 24:27 | (n: int) => str
+42 | 24:16 | Box<str>
+43 | 25:1 | (label: str, cond: bool) => void
+44 | 25:8 | str
+45 | 25:24 | Box<str>
+47 | 25:24 | () => str
+48 | 25:24 | str
+49 | 25:41 | str
+50 | 25:24 | bool
+51 | 25:1 | void
+52 | 26:1 | (...args: dynamic[]) => void
+53 | 26:7 | str
+54 | 26:1 | void

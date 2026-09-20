@@ -1,0 +1,5 @@
+
+  [35mstatic scope tree[0m [2m──────────────────────────────── <fixtures>\closure.vn[0m
+└── [1mfn[0m [34m<module>[0m (upvalues: 0)
+    [2mconst pool strings: closure add5, closure counter 1, closure counter 2, closure ok[0m
+  [2m── end: static scope tree ──[0m

@@ -1,0 +1,12 @@
+
+[1mSUMMARY[0m[2m ── <module>[0m
+  funciones                       3
+  bytecode (words)               78
+  constantes                      5
+  exports                         0
+  fuera de clif por tamaño        0   [2msobre el gate de 8192 words[0m
+
+  [2mtop-10 por tamaño[0m
+    <module>                             60 words
+    scale                                11 words
+    add                                   7 words

@@ -1,0 +1,6 @@
+
+[1mTIERS[0m[2m ── <module> · 3/3 ruteadas[0m
+  [2mfunción      words  tier   razón[0m
+  <module>       101  [32mclif [0m  [2m (frame-aware: alloc+boxed+async)[0m
+  sum             33  [32mclif [0m  [2m (frame-aware: boxed)[0m
+  firstAbove      37  [32mclif [0m  [2m (frame-aware: boxed)[0m

@@ -1,0 +1,1039 @@
+
+=== TIR: <fixtures>\generics.vn ===
+TirModule {
+    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\generics.vn",
+    imports: [],
+    exports: [],
+    types: TyTable {
+        entries: [
+            Never,
+        ],
+        dedup: {
+            Never: 0,
+        },
+        lists: [],
+    },
+    classes: [
+        ClassInfo {
+            name: "Box",
+            parent: None,
+            fields: [
+                FieldInfo {
+                    name: "value",
+                    ty: Dynamic(
+                        Unannotated,
+                    ),
+                    slot: 0,
+                    offset: 0,
+                },
+            ],
+            vtable: [
+                VtableEntry {
+                    name: "get",
+                    sig: SigId(
+                        1,
+                    ),
+                },
+                VtableEntry {
+                    name: "map",
+                    sig: SigId(
+                        2,
+                    ),
+                },
+            ],
+            payload_size: 16,
+        },
+    ],
+    enums: [],
+    signatures: [
+        Signature {
+            params: [],
+            return_ty: Void,
+        },
+        Signature {
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+    ],
+    functions: [
+        TirFunction {
+            name: "identity",
+            sig: SigId(
+                3,
+            ),
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: Param(
+                                0,
+                            ),
+                            span: Span {
+                                start: 258,
+                                end: 259,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "<closure>",
+            sig: SigId(
+                0,
+            ),
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Binary {
+                                op: Add,
+                                lhs: TirExpr {
+                                    kind: Binary {
+                                        op: Add,
+                                        lhs: TirExpr {
+                                            kind: StrLit(
+                                                "value=",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 426,
+                                                end: 435,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: Var,
+                                                    ty: Int,
+                                                    res: Param(
+                                                        0,
+                                                    ),
+                                                    span: Span {
+                                                        start: 435,
+                                                        end: 436,
+                                                    },
+                                                },
+                                            },
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 426,
+                                                end: 435,
+                                            },
+                                        },
+                                    },
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 426,
+                                        end: 435,
+                                    },
+                                },
+                                rhs: TirExpr {
+                                    kind: StrLit(
+                                        "",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 426,
+                                        end: 435,
+                                    },
+                                },
+                            },
+                            ty: Str,
+                            res: None,
+                            span: Span {
+                                start: 426,
+                                end: 435,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "Box.constructor",
+            sig: SigId(
+                4,
+            ),
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Expr(
+                    TirExpr {
+                        kind: Assign {
+                            target: TirExpr {
+                                kind: Field {
+                                    object: TirExpr {
+                                        kind: Var,
+                                        ty: Class(
+                                            ClassId(
+                                                0,
+                                            ),
+                                        ),
+                                        res: None,
+                                        span: Span {
+                                            start: 61,
+                                            end: 65,
+                                        },
+                                    },
+                                    name: "value",
+                                },
+                                ty: Dynamic(
+                                    Unannotated,
+                                ),
+                                res: FieldSlot(
+                                    0,
+                                ),
+                                span: Span {
+                                    start: 61,
+                                    end: 71,
+                                },
+                            },
+                            value: TirExpr {
+                                kind: Var,
+                                ty: Dynamic(
+                                    Unannotated,
+                                ),
+                                res: Param(
+                                    0,
+                                ),
+                                span: Span {
+                                    start: 74,
+                                    end: 75,
+                                },
+                            },
+                        },
+                        ty: Dynamic(
+                            Unannotated,
+                        ),
+                        res: None,
+                        span: Span {
+                            start: 61,
+                            end: 75,
+                        },
+                    },
+                ),
+            ],
+            has_this: true,
+            this_class: Some(
+                ClassId(
+                    0,
+                ),
+            ),
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "Box.get",
+            sig: SigId(
+                1,
+            ),
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Field {
+                                object: TirExpr {
+                                    kind: Var,
+                                    ty: Class(
+                                        ClassId(
+                                            0,
+                                        ),
+                                    ),
+                                    res: None,
+                                    span: Span {
+                                        start: 113,
+                                        end: 117,
+                                    },
+                                },
+                                name: "value",
+                            },
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: FieldSlot(
+                                0,
+                            ),
+                            span: Span {
+                                start: 113,
+                                end: 123,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: true,
+            this_class: Some(
+                ClassId(
+                    0,
+                ),
+            ),
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "Box.map",
+            sig: SigId(
+                2,
+            ),
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: New {
+                                class: ClassId(
+                                    0,
+                                ),
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: Param(
+                                                        0,
+                                                    ),
+                                                    span: Span {
+                                                        start: 191,
+                                                        end: 192,
+                                                    },
+                                                },
+                                                args: [
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: Field {
+                                                                object: TirExpr {
+                                                                    kind: Var,
+                                                                    ty: Class(
+                                                                        ClassId(
+                                                                            0,
+                                                                        ),
+                                                                    ),
+                                                                    res: None,
+                                                                    span: Span {
+                                                                        start: 193,
+                                                                        end: 197,
+                                                                    },
+                                                                },
+                                                                name: "value",
+                                                            },
+                                                            ty: Dynamic(
+                                                                Unannotated,
+                                                            ),
+                                                            res: FieldSlot(
+                                                                0,
+                                                            ),
+                                                            span: Span {
+                                                                start: 193,
+                                                                end: 203,
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                            ty: Dynamic(
+                                                Unannotated,
+                                            ),
+                                            res: ByName {
+                                                name: "f",
+                                                why: Unannotated,
+                                            },
+                                            span: Span {
+                                                start: 191,
+                                                end: 204,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                            ty: Class(
+                                ClassId(
+                                    0,
+                                ),
+                            ),
+                            res: None,
+                            span: Span {
+                                start: 180,
+                                end: 205,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: true,
+            this_class: Some(
+                ClassId(
+                    0,
+                ),
+            ),
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+    ],
+    globals: [
+        Class(
+            ClassId(
+                0,
+            ),
+        ),
+        Dynamic(
+            Unannotated,
+        ),
+        Class(
+            ClassId(
+                0,
+            ),
+        ),
+        Class(
+            ClassId(
+                0,
+            ),
+        ),
+    ],
+    global_names: [
+        "Box",
+        "identity",
+        "intBox",
+        "strBox",
+    ],
+    class_defs: [
+        TirClassDef {
+            name: "Box",
+            class_id: Some(
+                ClassId(
+                    0,
+                ),
+            ),
+            enum_id: None,
+            parent: None,
+            prelude: [],
+            super_class: None,
+            statics: [],
+            methods: [
+                TirClassMember {
+                    key: "constructor",
+                    func: FnId(
+                        2,
+                    ),
+                    is_static: false,
+                    is_private: false,
+                    decorators: [],
+                },
+                TirClassMember {
+                    key: "get",
+                    func: FnId(
+                        3,
+                    ),
+                    is_static: false,
+                    is_private: false,
+                    decorators: [],
+                },
+                TirClassMember {
+                    key: "map",
+                    func: FnId(
+                        4,
+                    ),
+                    is_static: false,
+                    is_private: false,
+                    decorators: [],
+                },
+            ],
+            accessors: [],
+            decorators: [],
+            static_blocks: [],
+            variants: [],
+        },
+    ],
+    top_level: TirFunction {
+        name: "<module>",
+        sig: SigId(
+            0,
+        ),
+        params: [],
+        return_ty: Void,
+        locals: [],
+        body: [
+            BuildClass(
+                0,
+            ),
+            Expr(
+                TirExpr {
+                    kind: Assign {
+                        target: TirExpr {
+                            kind: Var,
+                            ty: Class(
+                                ClassId(
+                                    0,
+                                ),
+                            ),
+                            res: GlobalSlot(
+                                2,
+                            ),
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        value: TirExpr {
+                            kind: New {
+                                class: ClassId(
+                                    0,
+                                ),
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                10,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 291,
+                                                end: 293,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                            ty: Class(
+                                ClassId(
+                                    0,
+                                ),
+                            ),
+                            res: None,
+                            span: Span {
+                                start: 278,
+                                end: 294,
+                            },
+                        },
+                    },
+                    ty: Void,
+                    res: None,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 295,
+                                end: 301,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "generics get",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 302,
+                                        end: 316,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: MethodCall {
+                                                recv: TirExpr {
+                                                    kind: Var,
+                                                    ty: Class(
+                                                        ClassId(
+                                                            0,
+                                                        ),
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        2,
+                                                    ),
+                                                    span: Span {
+                                                        start: 318,
+                                                        end: 324,
+                                                    },
+                                                },
+                                                name: "get",
+                                                args: [],
+                                            },
+                                            ty: Int,
+                                            res: VtableSlot(
+                                                0,
+                                            ),
+                                            span: Span {
+                                                start: 318,
+                                                end: 330,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                10,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 335,
+                                                end: 337,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 318,
+                                        end: 337,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 295,
+                        end: 338,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 339,
+                                end: 345,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "generics identity",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 346,
+                                        end: 365,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        1,
+                                                    ),
+                                                    span: Span {
+                                                        start: 367,
+                                                        end: 375,
+                                                    },
+                                                },
+                                                args: [
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: IntLit(
+                                                                42,
+                                                            ),
+                                                            ty: Int,
+                                                            res: None,
+                                                            span: Span {
+                                                                start: 381,
+                                                                end: 383,
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                            ty: Int,
+                                            res: DirectFn(
+                                                FnId(
+                                                    0,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 367,
+                                                end: 384,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                42,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 389,
+                                                end: 391,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 367,
+                                        end: 391,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 339,
+                        end: 392,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Assign {
+                        target: TirExpr {
+                            kind: Var,
+                            ty: Class(
+                                ClassId(
+                                    0,
+                                ),
+                            ),
+                            res: GlobalSlot(
+                                3,
+                            ),
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        value: TirExpr {
+                            kind: MethodCall {
+                                recv: TirExpr {
+                                    kind: Var,
+                                    ty: Class(
+                                        ClassId(
+                                            0,
+                                        ),
+                                    ),
+                                    res: GlobalSlot(
+                                        2,
+                                    ),
+                                    span: Span {
+                                        start: 408,
+                                        end: 414,
+                                    },
+                                },
+                                name: "map",
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: Closure {
+                                                func: FnId(
+                                                    1,
+                                                ),
+                                                upvalues: [],
+                                            },
+                                            ty: Dynamic(
+                                                Unannotated,
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 419,
+                                                end: 438,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                            ty: Class(
+                                ClassId(
+                                    0,
+                                ),
+                            ),
+                            res: VtableSlot(
+                                1,
+                            ),
+                            span: Span {
+                                start: 408,
+                                end: 439,
+                            },
+                        },
+                    },
+                    ty: Void,
+                    res: None,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 440,
+                                end: 446,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "generics map",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 447,
+                                        end: 461,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: MethodCall {
+                                                recv: TirExpr {
+                                                    kind: Var,
+                                                    ty: Class(
+                                                        ClassId(
+                                                            0,
+                                                        ),
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        3,
+                                                    ),
+                                                    span: Span {
+                                                        start: 463,
+                                                        end: 469,
+                                                    },
+                                                },
+                                                name: "get",
+                                                args: [],
+                                            },
+                                            ty: Str,
+                                            res: VtableSlot(
+                                                0,
+                                            ),
+                                            span: Span {
+                                                start: 463,
+                                                end: 475,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: StrLit(
+                                                "value=10",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 480,
+                                                end: 490,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 463,
+                                        end: 490,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 440,
+                        end: 491,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                0,
+                            ),
+                            span: Span {
+                                start: 492,
+                                end: 497,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "generics ok",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 498,
+                                        end: 511,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        0,
+                    ),
+                    span: Span {
+                        start: 492,
+                        end: 512,
+                    },
+                },
+            ),
+        ],
+        has_this: false,
+        this_class: None,
+        is_async: true,
+        is_generator: false,
+        has_rest: false,
+    },
+}

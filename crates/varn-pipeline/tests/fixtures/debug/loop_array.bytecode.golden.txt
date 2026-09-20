@@ -1,0 +1,115 @@
+
+  [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 17, upvalues: 0)  [2m[async, state_size=1][0m
+  [2mconstants (5)[0m
+  [2m[000][0m [34mfn sum[0m(arity=2)
+  [2m[001][0m [34mfn firstAbove[0m(arity=3)
+  [2m[002][0m [32m"loop sum"[0m
+  [2m[003][0m [32m"loop firstAbove"[0m
+  [2m[004][0m [32m"loop ok"[0m
+  [2mcode (101) words[0m
+  [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+  ────────────────────────────────────────────────────────────────────────
+  0000 │   0 │ [34mLoadStaticFn        [0m │ r1 = static_fn[0]  [2m;[0m [34m→ fn sum[0m
+  0002 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@0] = r1
+  0005 │   0 │ [34mLoadStaticFn        [0m │ r1 = static_fn[1]  [2m;[0m [34m→ fn firstAbove[0m
+  0007 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@1] = r1
+  0010 │   0 │ [36mLoadInt             [0m │ r2 = 3
+  0012 │   0 │ [36mLoadIntOne          [0m │ r3 = 1
+  0013 │   0 │ [36mLoadInt             [0m │ r4 = 4
+  0015 │   0 │ [36mLoadInt             [0m │ r5 = 5
+  0017 │   0 │ Move                [0m │ r12 = r2
+  0019 │   0 │ Move                [0m │ r13 = r3
+  0021 │   0 │ Move                [0m │ r14 = r4
+  0023 │   0 │ Move                [0m │ r15 = r3
+  0025 │   0 │ Move                [0m │ r16 = r5
+  0027 │   0 │ [34mBuildArray          [0m │ r1 = [r12..+5]
+  0030 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@2] = r1
+  0033 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
+  0035 │   0 │ [36mLoadConst           [0m │ r6 = const[2]  [2m;[0m [32m"loop sum"[0m
+  0037 │   0 │ [36mLoadGlobalIdx       [0m │ r7 = global[@0]
+  0039 │   0 │ [36mLoadGlobalIdx       [0m │ r8 = global[@2]
+  0041 │   0 │ LoadNull            [0m │ r12
+  0042 │   0 │ Move                [0m │ r13 = r8
+  0044 │   0 │ [35mCall                [0m │ r3 = call r7(2 args @ r12)
+  0047 │   0 │ [36mLoadInt             [0m │ r5 = 14
+  0049 │   0 │ [32mEqInt               [0m │ r9 = r3 op r5
+  0051 │   0 │ LoadNull            [0m │ r12
+  0052 │   0 │ Move                [0m │ r13 = r6
+  0054 │   0 │ Move                [0m │ r14 = r9
+  0056 │   0 │ [35mCall                [0m │ r10 = call r1(3 args @ r12)
+  0059 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
+  0061 │   0 │ [36mLoadConst           [0m │ r6 = const[3]  [2m;[0m [32m"loop firstAbove"[0m
+  0063 │   0 │ [36mLoadGlobalIdx       [0m │ r7 = global[@1]
+  0065 │   0 │ [36mLoadGlobalIdx       [0m │ r8 = global[@2]
+  0067 │   0 │ LoadNull            [0m │ r12
+  0068 │   0 │ Move                [0m │ r13 = r8
+  0070 │   0 │ Move                [0m │ r14 = r2
+  0072 │   0 │ [35mCall                [0m │ r3 = call r7(3 args @ r12)
+  0075 │   0 │ [32mEqInt               [0m │ r9 = r3 op r4
+  0077 │   0 │ LoadNull            [0m │ r12
+  0078 │   0 │ Move                [0m │ r13 = r6
+  0080 │   0 │ Move                [0m │ r14 = r9
+  0082 │   0 │ [35mCall                [0m │ r10 = call r1(3 args @ r12)
+  0085 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@0]
+  0087 │   0 │ [36mLoadConst           [0m │ r6 = const[4]  [2m;[0m [32m"loop ok"[0m
+  0089 │   0 │ LoadNull            [0m │ r12
+  0090 │   0 │ Move                [0m │ r13 = r6
+  0092 │   0 │ [35mCall                [0m │ r10 = call r1(2 args @ r12)
+  0095 │   1 │ LoadNull            [0m │ r11
+  0096 │   1 │ [33mReturn              [0m │ r11
+  0098 │   1 │ LoadNull            [0m │ r11
+  0099 │   1 │ [33mReturn              [0m │ r11
+
+  [1mfn[0m [34msum[0m (arity: 2, regs: 8, upvalues: 0)
+    [2mcode (33) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   0 │ [36mLoadIntZero         [0m │ r2 = 0
+    0001 │   0 │ [36mLoadIntMinusOne     [0m │ r3 = -1
+    0002 │   1 │ Move                [0m │ r4 = r3
+    0004 │   1 │ Move                [0m │ r3 = r2
+    0006 │   1 │ Move                [0m │ r2 = r4
+    0008 │   0 │ [32mAddImm              [0m │ r6 = r2 + 1
+    0010 │   0 │ ArrayLength         [0m │ r2 = r1
+    0012 │   0 │ [32mLtInt               [0m │ r7 = r6 op r2
+    0014 │   1 │ [33mJumpIfFalse         [0m │ r7 → +11
+    0017 │   0 │ ArrayGetIndex       [0m │ r2 = r1[r6]
+    0019 │   0 │ [32mAddInt              [0m │ r5 = r3 op r2
+    0021 │   1 │ Move                [0m │ r2 = r6
+    0023 │   1 │ Move                [0m │ r3 = r5
+    0025 │   1 │ [33mLoop                [0m │ → +20
+    0028 │   1 │ [33mReturn              [0m │ r3
+    0030 │   1 │ LoadNull            [0m │ r4
+    0031 │   1 │ [33mReturn              [0m │ r4
+  [2marray-hoist loop diagnostics (1 loop)[0m
+    [2m@0008[0m..[2m@0025[0m  [32mHOISTED[0m
+      [2mcache_reg[0][0m ← r1 (register-invariant)
+
+  [1mfn[0m [34mfirstAbove[0m (arity: 3, regs: 9, upvalues: 0)
+    [2mcode (37) words[0m
+    [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
+    ────────────────────────────────────────────────────────────────────────
+    0000 │   0 │ [36mLoadIntZero         [0m │ r3 = 0
+    0001 │   0 │ [36mLoadIntMinusOne     [0m │ r4 = -1
+    0002 │   0 │ ArrayLength         [0m │ r5 = r1
+    0004 │   0 │ [32mLtInt               [0m │ r6 = r3 op r5
+    0006 │   1 │ [33mJumpIfFalse         [0m │ r6 → +21
+    0009 │   0 │ ArrayGetIndex       [0m │ r5 = r1[r3]
+    0011 │   0 │ [32mGtInt               [0m │ r6 = r5 op r2
+    0013 │   1 │ [33mJumpIfFalse         [0m │ r6 → +7
+    0016 │   0 │ ArrayGetIndex       [0m │ r5 = r1[r3]
+    0018 │   1 │ Move                [0m │ r3 = r5
+    0020 │   1 │ [33mJump                [0m │ → +9
+    0023 │   0 │ [32mAddImm              [0m │ r7 = r3 + 1
+    0025 │   1 │ Move                [0m │ r3 = r7
+    0027 │   1 │ [33mLoop                [0m │ → +28
+    0030 │   1 │ Move                [0m │ r3 = r4
+    0032 │   1 │ [33mReturn              [0m │ r3
+    0034 │   1 │ LoadNull            [0m │ r8
+    0035 │   1 │ [33mReturn              [0m │ r8
+  [2marray-hoist loop diagnostics (1 loop)[0m
+    [2m@0002[0m..[2m@0027[0m  [32mHOISTED[0m
+      [2mcache_reg[0][0m ← r1 (register-invariant)
+
+  [2m── end: bytecode ──[0m

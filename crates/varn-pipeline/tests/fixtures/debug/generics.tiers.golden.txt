@@ -1,0 +1,9 @@
+
+[1mTIERS[0m[2m ── <module> · 6/6 ruteadas[0m
+  [2mfunción           words  tier   razón[0m
+  <module>            126  [32mclif [0m  [2m (frame-aware: alloc+boxed+async)[0m
+  identity              5  [32mclif [0m  [2m (frame-aware: boxed)[0m
+  Box.constructor      11  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  Box.get              10  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  Box.map              24  [32mclif [0m  [2m (frame-aware: this+alloc+boxed)[0m
+  <closure>            15  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m

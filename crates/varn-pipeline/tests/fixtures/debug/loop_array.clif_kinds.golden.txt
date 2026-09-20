@@ -1,0 +1,24 @@
+
+[1m[34mCLIF[0m[2m ─────────────────────────────── <module>[0m
+
+  [1m<module>[0m[2m (frame-aware)[0m
+    [2mkinds (17 regs):[0m
+      block@0: [Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset]
+
+  [1msum[0m[2m (frame-aware)[0m
+    [2mkinds (8 regs):[0m
+      block@0: [Unset, Boxed, Unset, Unset, Unset, Unset, Unset, Unset]
+      block@8: [Unset, Boxed, Int, Int, Int, Int, Int, Bool]
+      block@17: [Unset, Boxed, Int, Int, Int, Int, Int, Bool]
+      block@28: [Unset, Boxed, Int, Int, Int, Int, Int, Bool]
+
+  [1mfirstAbove[0m[2m (frame-aware)[0m
+    [2mkinds (9 regs):[0m
+      block@0: [Unset, Boxed, Int, Unset, Unset, Unset, Unset, Unset, Unset]
+      block@2: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+      block@9: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+      block@16: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+      block@23: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+      block@30: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+      block@32: [Unset, Boxed, Int, Int, Int, Int, Bool, Int, Unset]
+[2m── end: CLIF ──[0m

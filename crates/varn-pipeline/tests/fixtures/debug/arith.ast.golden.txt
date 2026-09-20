@@ -1,0 +1,38 @@
+
+  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>\arith.vn[0m
+├── [1mFunctionDecl[0m [34madd[0m
+│   └── [1mBlockStmt[0m
+│       └── [1mReturnStmt[0m
+│           └── [1mBinary[0m [33mAdd[0m
+│               ├── [36ma[0m [2m(id)[0m
+│               └── [36mb[0m [2m(id)[0m
+├── [1mFunctionDecl[0m [34mscale[0m
+│   └── [1mBlockStmt[0m
+│       └── [1mReturnStmt[0m
+│           └── [1mBinary[0m [33mAdd[0m
+│               ├── [1mBinary[0m [33mMul[0m
+│               │   ├── [36mx[0m [2m(id)[0m
+│               │   └── [33m2[0m [2m(int)[0m
+│               └── [33m1[0m [2m(int)[0m
+├── [1mVariableDecl (Const)[0m
+│   └── [1mVar[0m [33mr[0m
+│       └── [1mCall[0m [34madd[0m
+│           ├── [33m1[0m [2m(int)[0m
+│           └── [33m2[0m [2m(int)[0m
+├── [1mExprStmt[0m
+│   └── [1mCall[0m [34massert[0m
+│       ├── [33m"arith add"[0m [2m(str)[0m
+│       └── [1mBinary[0m [33mEq[0m
+│           ├── [36mr[0m [2m(id)[0m
+│           └── [33m3[0m [2m(int)[0m
+├── [1mExprStmt[0m
+│   └── [1mCall[0m [34massert[0m
+│       ├── [33m"arith scale"[0m [2m(str)[0m
+│       └── [1mBinary[0m [33mEq[0m
+│           ├── [1mCall[0m [34mscale[0m
+│           │   └── [33m20[0m [2m(int)[0m
+│           └── [33m41[0m [2m(int)[0m
+└── [1mExprStmt[0m
+    └── [1mCall[0m [34mprint[0m
+        └── [33m"arith ok"[0m [2m(str)[0m
+  [2m── end: abstract syntax tree ──[0m

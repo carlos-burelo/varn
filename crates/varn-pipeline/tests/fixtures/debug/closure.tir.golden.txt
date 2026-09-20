@@ -1,0 +1,791 @@
+
+=== TIR: <fixtures>\closure.vn ===
+TirModule {
+    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\closure.vn",
+    imports: [],
+    exports: [],
+    types: TyTable {
+        entries: [
+            Never,
+        ],
+        dedup: {
+            Never: 0,
+        },
+        lists: [],
+    },
+    classes: [],
+    enums: [],
+    signatures: [
+        Signature {
+            params: [],
+            return_ty: Void,
+        },
+        Signature {
+            params: [
+                Int,
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+    ],
+    functions: [
+        TirFunction {
+            name: "makeAdder",
+            sig: SigId(
+                1,
+            ),
+            params: [
+                Int,
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Closure {
+                                func: FnId(
+                                    2,
+                                ),
+                                upvalues: [
+                                    ParentParam(
+                                        0,
+                                    ),
+                                ],
+                            },
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: None,
+                            span: Span {
+                                start: 57,
+                                end: 74,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "makeCounter",
+            sig: SigId(
+                2,
+            ),
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [
+                Int,
+            ],
+            body: [
+                Let {
+                    local: LocalId(
+                        0,
+                    ),
+                    ty: Int,
+                    init: Some(
+                        TirExpr {
+                            kind: IntLit(
+                                0,
+                            ),
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 126,
+                                end: 127,
+                            },
+                        },
+                    ),
+                },
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Closure {
+                                func: FnId(
+                                    3,
+                                ),
+                                upvalues: [
+                                    ParentLocal(
+                                        0,
+                                    ),
+                                ],
+                            },
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: None,
+                            span: Span {
+                                start: 139,
+                                end: 187,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "<closure>",
+            sig: SigId(
+                0,
+            ),
+            params: [
+                Dynamic(
+                    Unannotated,
+                ),
+            ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Binary {
+                                op: Add,
+                                lhs: TirExpr {
+                                    kind: Var,
+                                    ty: Int,
+                                    res: Param(
+                                        0,
+                                    ),
+                                    span: Span {
+                                        start: 69,
+                                        end: 70,
+                                    },
+                                },
+                                rhs: TirExpr {
+                                    kind: Var,
+                                    ty: Int,
+                                    res: Upvalue(
+                                        0,
+                                    ),
+                                    span: Span {
+                                        start: 73,
+                                        end: 74,
+                                    },
+                                },
+                            },
+                            ty: Int,
+                            res: None,
+                            span: Span {
+                                start: 69,
+                                end: 74,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+        TirFunction {
+            name: "<closure>",
+            sig: SigId(
+                0,
+            ),
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+            locals: [],
+            body: [
+                Expr(
+                    TirExpr {
+                        kind: Assign {
+                            target: TirExpr {
+                                kind: Var,
+                                ty: Int,
+                                res: Upvalue(
+                                    0,
+                                ),
+                                span: Span {
+                                    start: 155,
+                                    end: 156,
+                                },
+                            },
+                            value: TirExpr {
+                                kind: Binary {
+                                    op: Add,
+                                    lhs: TirExpr {
+                                        kind: Var,
+                                        ty: Int,
+                                        res: Upvalue(
+                                            0,
+                                        ),
+                                        span: Span {
+                                            start: 159,
+                                            end: 160,
+                                        },
+                                    },
+                                    rhs: TirExpr {
+                                        kind: IntLit(
+                                            1,
+                                        ),
+                                        ty: Int,
+                                        res: None,
+                                        span: Span {
+                                            start: 163,
+                                            end: 164,
+                                        },
+                                    },
+                                },
+                                ty: Int,
+                                res: None,
+                                span: Span {
+                                    start: 159,
+                                    end: 164,
+                                },
+                            },
+                        },
+                        ty: Int,
+                        res: None,
+                        span: Span {
+                            start: 155,
+                            end: 164,
+                        },
+                    },
+                ),
+                Return(
+                    Some(
+                        TirExpr {
+                            kind: Var,
+                            ty: Int,
+                            res: Upvalue(
+                                0,
+                            ),
+                            span: Span {
+                                start: 180,
+                                end: 181,
+                            },
+                        },
+                    ),
+                ),
+            ],
+            has_this: false,
+            this_class: None,
+            is_async: false,
+            is_generator: false,
+            has_rest: false,
+        },
+    ],
+    globals: [
+        Dynamic(
+            Unannotated,
+        ),
+        Dynamic(
+            Unannotated,
+        ),
+        Dynamic(
+            Unannotated,
+        ),
+        Dynamic(
+            Unannotated,
+        ),
+    ],
+    global_names: [
+        "makeAdder",
+        "makeCounter",
+        "add5",
+        "counter",
+    ],
+    class_defs: [],
+    top_level: TirFunction {
+        name: "<module>",
+        sig: SigId(
+            0,
+        ),
+        params: [],
+        return_ty: Void,
+        locals: [],
+        body: [
+            Expr(
+                TirExpr {
+                    kind: Assign {
+                        target: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: GlobalSlot(
+                                2,
+                            ),
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        value: TirExpr {
+                            kind: Call {
+                                callee: TirExpr {
+                                    kind: Var,
+                                    ty: Dynamic(
+                                        Unannotated,
+                                    ),
+                                    res: GlobalSlot(
+                                        0,
+                                    ),
+                                    span: Span {
+                                        start: 204,
+                                        end: 213,
+                                    },
+                                },
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: IntLit(
+                                                5,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 214,
+                                                end: 215,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: DirectFn(
+                                FnId(
+                                    0,
+                                ),
+                            ),
+                            span: Span {
+                                start: 204,
+                                end: 216,
+                            },
+                        },
+                    },
+                    ty: Void,
+                    res: None,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 217,
+                                end: 223,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "closure add5",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 224,
+                                        end: 238,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        2,
+                                                    ),
+                                                    span: Span {
+                                                        start: 240,
+                                                        end: 244,
+                                                    },
+                                                },
+                                                args: [
+                                                    Expr(
+                                                        TirExpr {
+                                                            kind: IntLit(
+                                                                3,
+                                                            ),
+                                                            ty: Int,
+                                                            res: None,
+                                                            span: Span {
+                                                                start: 245,
+                                                                end: 246,
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                            ty: Int,
+                                            res: ByName {
+                                                name: "add5",
+                                                why: Unannotated,
+                                            },
+                                            span: Span {
+                                                start: 240,
+                                                end: 247,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                8,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 252,
+                                                end: 253,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 240,
+                                        end: 253,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 217,
+                        end: 254,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Assign {
+                        target: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: GlobalSlot(
+                                3,
+                            ),
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        value: TirExpr {
+                            kind: Call {
+                                callee: TirExpr {
+                                    kind: Var,
+                                    ty: Dynamic(
+                                        Unannotated,
+                                    ),
+                                    res: GlobalSlot(
+                                        1,
+                                    ),
+                                    span: Span {
+                                        start: 271,
+                                        end: 282,
+                                    },
+                                },
+                                args: [],
+                            },
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: DirectFn(
+                                FnId(
+                                    1,
+                                ),
+                            ),
+                            span: Span {
+                                start: 271,
+                                end: 284,
+                            },
+                        },
+                    },
+                    ty: Void,
+                    res: None,
+                    span: Span {
+                        start: 0,
+                        end: 0,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 285,
+                                end: 291,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "closure counter 1",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 292,
+                                        end: 311,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        3,
+                                                    ),
+                                                    span: Span {
+                                                        start: 313,
+                                                        end: 320,
+                                                    },
+                                                },
+                                                args: [],
+                                            },
+                                            ty: Int,
+                                            res: ByName {
+                                                name: "counter",
+                                                why: Unannotated,
+                                            },
+                                            span: Span {
+                                                start: 313,
+                                                end: 322,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                1,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 327,
+                                                end: 328,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 313,
+                                        end: 328,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 285,
+                        end: 329,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                1,
+                            ),
+                            span: Span {
+                                start: 330,
+                                end: 336,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "closure counter 2",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 337,
+                                        end: 356,
+                                    },
+                                },
+                            ),
+                            Expr(
+                                TirExpr {
+                                    kind: Binary {
+                                        op: Eq,
+                                        lhs: TirExpr {
+                                            kind: Call {
+                                                callee: TirExpr {
+                                                    kind: Var,
+                                                    ty: Dynamic(
+                                                        Unannotated,
+                                                    ),
+                                                    res: GlobalSlot(
+                                                        3,
+                                                    ),
+                                                    span: Span {
+                                                        start: 358,
+                                                        end: 365,
+                                                    },
+                                                },
+                                                args: [],
+                                            },
+                                            ty: Int,
+                                            res: ByName {
+                                                name: "counter",
+                                                why: Unannotated,
+                                            },
+                                            span: Span {
+                                                start: 358,
+                                                end: 367,
+                                            },
+                                        },
+                                        rhs: TirExpr {
+                                            kind: IntLit(
+                                                2,
+                                            ),
+                                            ty: Int,
+                                            res: None,
+                                            span: Span {
+                                                start: 372,
+                                                end: 373,
+                                            },
+                                        },
+                                    },
+                                    ty: Bool,
+                                    res: None,
+                                    span: Span {
+                                        start: 358,
+                                        end: 373,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        1,
+                    ),
+                    span: Span {
+                        start: 330,
+                        end: 374,
+                    },
+                },
+            ),
+            Expr(
+                TirExpr {
+                    kind: Call {
+                        callee: TirExpr {
+                            kind: Var,
+                            ty: Dynamic(
+                                Unannotated,
+                            ),
+                            res: NativeGlobal(
+                                0,
+                            ),
+                            span: Span {
+                                start: 375,
+                                end: 380,
+                            },
+                        },
+                        args: [
+                            Expr(
+                                TirExpr {
+                                    kind: StrLit(
+                                        "closure ok",
+                                    ),
+                                    ty: Str,
+                                    res: None,
+                                    span: Span {
+                                        start: 381,
+                                        end: 393,
+                                    },
+                                },
+                            ),
+                        ],
+                    },
+                    ty: Void,
+                    res: NativeGlobal(
+                        0,
+                    ),
+                    span: Span {
+                        start: 375,
+                        end: 394,
+                    },
+                },
+            ),
+        ],
+        has_this: false,
+        this_class: None,
+        is_async: true,
+        is_generator: false,
+        has_rest: false,
+    },
+}

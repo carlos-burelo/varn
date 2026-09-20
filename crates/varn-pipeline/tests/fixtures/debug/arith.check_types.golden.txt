@@ -1,0 +1,31 @@
+# check:types arith.vn
+## checker types (key = expr id)
+0 | 2:12 | int
+1 | 2:16 | int
+2 | 2:12 | int
+3 | 6:12 | int
+4 | 6:16 | int
+5 | 6:12 | int
+6 | 6:20 | int
+7 | 6:12 | int
+8 | 9:11 | (a: int, b: int) => int
+9 | 9:15 | int
+10 | 9:18 | int
+11 | 9:11 | int
+12 | 10:1 | (label: str, cond: bool) => void
+13 | 10:8 | str
+14 | 10:21 | int
+15 | 10:27 | int
+16 | 10:21 | bool
+17 | 10:1 | void
+18 | 11:1 | (label: str, cond: bool) => void
+19 | 11:8 | str
+20 | 11:23 | (x: int) => int
+21 | 11:29 | int
+22 | 11:23 | int
+23 | 11:37 | int
+24 | 11:23 | bool
+25 | 11:1 | void
+26 | 12:1 | (...args: dynamic[]) => void
+27 | 12:7 | str
+28 | 12:1 | void

@@ -1,0 +1,5 @@
+
+  [35mstatic scope tree[0m [2m──────────────────────────────── <fixtures>\loop_array.vn[0m
+└── [1mfn[0m [34m<module>[0m (upvalues: 0)
+    [2mconst pool strings: loop sum, loop firstAbove, loop ok[0m
+  [2m── end: static scope tree ──[0m

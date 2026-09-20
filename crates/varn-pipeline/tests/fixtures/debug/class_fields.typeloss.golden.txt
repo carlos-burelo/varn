@@ -1,0 +1,9 @@
+
+[1m[34mTYPELOSS[0m[2m ─────────────────────────────── <module>[0m
+
+  [2mfunción                      genérico   tipado  qué quedó genérico[0m
+  <module>                     [33m       4[0m        0  [2mGetProperty×3 SetProperty  ·  celsius fahrenheit[0m
+
+  [2mEl siguiente paso es `-p check:types` sobre uno de estos accesos: un
+  `cg=` sin `fixed_field` es la puerta de anotación, y sin `cg=` es inferencia.[0m
+[2m── end: TYPELOSS ──[0m

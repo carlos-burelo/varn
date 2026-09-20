@@ -1,0 +1,5 @@
+
+  [35mstatic scope tree[0m [2m──────────────────────────────── <fixtures>\generics.vn[0m
+└── [1mfn[0m [34m<module>[0m (upvalues: 0)
+    [2mconst pool strings: Box, value, constructor, get, map, generics get, generics identity, generics map, value=10, generics ok[0m
+  [2m── end: static scope tree ──[0m

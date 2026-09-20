@@ -1,0 +1,4 @@
+
+[1m[34mTYPELOSS[0m[2m ─────────────────────────────── <module>[0m
+  [32mcada opcode tipado que el emisor pudo elegir, lo eligió[0m
+[2m── end: TYPELOSS ──[0m

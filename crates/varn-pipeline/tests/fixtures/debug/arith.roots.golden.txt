@@ -1,0 +1,11 @@
+
+[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed+async)[0m
+  [2m    ip  opcode              home  registro   unboxed   home slots[0m
+       0  LoadStaticFn           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
+       5  LoadStaticFn           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
+      28  Call                   4  [2m       0[0m  [2m     r10[0m   [2mr0 r1 r8 r9[0m
+      41  Call                   4  [2m       0[0m  [2m     r10[0m   [2mr0 r1 r8 r9[0m
+      51  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r8 r9[0m
+
+  [32m5 safepoints[0m[2m · 5 cubiertos solo por home slots · 0 con valores vivos en registro[0m
+  [2m2 registros vivos sin flushear por ser Int/Bool — no son raíces, no entran en la cuenta de arriba.[0m

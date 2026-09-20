@@ -1,0 +1,6 @@
+
+=== TIR CHECK: <fixtures>\generics.vn ===
+nodes 52   static 25   by name 1   static 96%
+  unannotated        dynamic    14   by name     1
+  from_tir(ssa): OK (6 ssa fn(s))
+  from_tir(proto): OK

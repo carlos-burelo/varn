@@ -1,0 +1,27 @@
+
+[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed+async)[0m
+  [2m    ip  opcode              home  registro   unboxed   home slots[0m
+       0  LoadStaticFn           2  [33m       1[0m  [2m        [0m   [2mr0 r1[0m
+       5  LoadStaticFn           2  [33m       1[0m  [2m        [0m   [2mr0 r1[0m
+      17  Call                   4  [2m       0[0m  [2m     r10[0m   [2mr0 r1 r3 r9[0m
+      34  Call                   6  [2m       0[0m  [2m     r10[0m   [2mr0 r1 r3 r4 r5 r9[0m
+      46  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+      52  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r3 r9[0m
+      65  Call                   5  [2m       0[0m  [2m      r2[0m   [2mr0 r1 r3 r4 r9[0m
+      76  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+      86  Call                   6  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r3 r4 r9[0m
+      98  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+     108  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r9 r10[0m
+
+[1mROOTS[0m[2m ── makeAdder  (frame-aware: alloc+boxed)[0m
+  [2m    ip  opcode              home  registro   unboxed   home slots[0m
+       0  MakeClosure            2  [2m       0[0m  [2m      r1[0m   [2mr0 r2[0m
+
+[1mROOTS[0m[2m ── makeCounter  (frame-aware: alloc+boxed)[0m
+  [2m    ip  opcode              home  registro   unboxed   home slots[0m
+       3  MakeClosure            2  [2m       0[0m  [2m      r2[0m   [2mr0 r3[0m
+
+  [32m13 safepoints[0m[2m · 11 cubiertos solo por home slots · 2 con valores vivos en registro[0m
+  [2m8 registros vivos sin flushear por ser Int/Bool — no son raíces, no entran en la cuenta de arriba.[0m
+  [33m2 raíces en registro[0m[2m (máx 1 en un safepoint) — lo que los stack maps tendrían que rootear tras el cutover.[0m
+  [2mHoy es sano porque nada bajo un raw sin frame puede alocar; deja de serlo en cuanto `has_alloc` salga de `frame_aware`.[0m

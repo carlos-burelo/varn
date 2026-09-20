@@ -1,0 +1,8 @@
+
+[1mTIERS[0m[2m ── <module> · 5/5 ruteadas[0m
+  [2mfunción       words  tier   razón[0m
+  <module>        117  [32mclif [0m  [2m (frame-aware: alloc+boxed+async)[0m
+  makeAdder         9  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
+  <closure>        11  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
+  makeCounter      12  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
+  <closure>        13  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m

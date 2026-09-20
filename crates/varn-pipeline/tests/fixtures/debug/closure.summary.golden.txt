@@ -1,0 +1,14 @@
+
+[1mSUMMARY[0m[2m ── <module>[0m
+  funciones                       5
+  bytecode (words)              162
+  constantes                      8
+  exports                         0
+  fuera de clif por tamaño        0   [2msobre el gate de 8192 words[0m
+
+  [2mtop-10 por tamaño[0m
+    <module>                            117 words
+    <closure>                            13 words
+    makeCounter                          12 words
+    <closure>                            11 words
+    makeAdder                             9 words

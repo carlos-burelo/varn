@@ -1,0 +1,14 @@
+
+[1mSUMMARY[0m[2m ── <module>[0m
+  funciones                       5
+  bytecode (words)              176
+  constantes                     19
+  exports                         0
+  fuera de clif por tamaño        0   [2msobre el gate de 8192 words[0m
+
+  [2mtop-10 por tamaño[0m
+    <module>                            126 words
+    Temperature.get fahrenheit           18 words
+    Temperature.constructor              11 words
+    Temperature.set celsius              11 words
+    Temperature.get celsius              10 words

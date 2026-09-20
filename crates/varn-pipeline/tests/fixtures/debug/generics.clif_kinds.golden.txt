@@ -1,0 +1,27 @@
+
+[1m[34mCLIF[0m[2m ─────────────────────────────── <module>[0m
+
+  [1m<module>[0m[2m (frame-aware)[0m
+    [2mkinds (15 regs):[0m
+      block@0: [Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset]
+
+  [1midentity[0m[2m (frame-aware)[0m
+    [2mkinds (3 regs):[0m
+      block@0: [Unset, Boxed, Unset]
+
+  [1mBox.constructor[0m[2m (frame-aware)[0m
+    [2mkinds (4 regs):[0m
+      block@0: [Boxed, Boxed, Unset, Unset]
+
+  [1mBox.get[0m[2m (frame-aware)[0m
+    [2mkinds (3 regs):[0m
+      block@0: [Boxed, Unset, Unset]
+
+  [1mBox.map[0m[2m (frame-aware)[0m
+    [2mkinds (10 regs):[0m
+      block@0: [Boxed, Boxed, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset]
+
+  [1m<closure>[0m[2m (frame-aware)[0m
+    [2mkinds (6 regs):[0m
+      block@0: [Unset, Boxed, Unset, Unset, Unset, Unset]
+[2m── end: CLIF ──[0m

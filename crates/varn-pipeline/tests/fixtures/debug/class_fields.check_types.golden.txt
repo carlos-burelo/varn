@@ -1,0 +1,49 @@
+# check:types class_fields.vn
+## checker types (key = expr id)
+0 | 5:9 | Temperature
+2 | 5:9 | float
+3 | 5:25 | float
+4 | 5:9 | float
+5 | 9:16 | Temperature
+7 | 9:16 | float
+8 | 13:9 | Temperature
+10 | 13:9 | float
+11 | 13:25 | float
+12 | 13:9 | float
+13 | 17:16 | Temperature
+15 | 17:16 | float
+16 | 17:32 | float
+17 | 17:16 | float
+18 | 17:38 | float
+19 | 17:16 | float
+20 | 21:15 | Temperature
+21 | 21:27 | float
+22 | 21:11 | Temperature
+23 | 22:1 | (label: str, cond: bool) => void
+24 | 22:8 | str
+25 | 22:24 | Temperature
+27 | 22:24 | float
+28 | 22:38 | float
+29 | 22:24 | bool
+30 | 22:1 | void
+31 | 23:1 | (label: str, cond: bool) => void
+32 | 23:8 | str
+33 | 23:25 | Temperature
+35 | 23:25 | float
+36 | 23:42 | float
+37 | 23:25 | bool
+38 | 23:1 | void
+39 | 24:1 | Temperature
+41 | 24:1 | float
+42 | 24:13 | float
+43 | 24:1 | float
+44 | 25:1 | (label: str, cond: bool) => void
+45 | 25:8 | str
+46 | 25:24 | Temperature
+48 | 25:24 | float
+49 | 25:41 | float
+50 | 25:24 | bool
+51 | 25:1 | void
+52 | 26:1 | (...args: dynamic[]) => void
+53 | 26:7 | str
+54 | 26:1 | void

@@ -1,0 +1,7 @@
+
+[1mModule Dependency Graph[0m
+  Entry: [36m…/debug/closure.vn[0m
+
+  └─ [36m…/debug/closure.vn[0m
+
+  1 modules total

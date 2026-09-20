@@ -1,0 +1,23 @@
+
+[1m[34mCLIF[0m[2m ─────────────────────────────── <module>[0m
+
+  [1m<module>[0m[2m (frame-aware)[0m
+    [2mkinds (12 regs):[0m
+      block@0: [Unset, Unset, Unset, Float, Unset, Float, Unset, Unset, Unset, Unset, Unset, Unset]
+
+  [1mTemperature.constructor[0m[2m (frame-aware)[0m
+    [2mkinds (4 regs):[0m
+      block@0: [Boxed, Boxed, Unset, Unset]
+
+  [1mTemperature.get celsius[0m[2m (frame-aware)[0m
+    [2mkinds (4 regs):[0m
+      block@0: [Boxed, Unset, Float, Unset]
+
+  [1mTemperature.set celsius[0m[2m (frame-aware)[0m
+    [2mkinds (4 regs):[0m
+      block@0: [Boxed, Boxed, Unset, Unset]
+
+  [1mTemperature.get fahrenheit[0m[2m (frame-aware)[0m
+    [2mkinds (6 regs):[0m
+      block@0: [Boxed, Unset, Float, Float, Float, Unset]
+[2m── end: CLIF ──[0m

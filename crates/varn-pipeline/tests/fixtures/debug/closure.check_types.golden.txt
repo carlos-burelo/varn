@@ -1,0 +1,44 @@
+# check:types closure.vn
+## checker types (key = expr id)
+0 | 2:24 | int
+1 | 2:28 | int
+2 | 2:24 | int
+3 | 2:12 | (x: int) => int
+4 | 6:13 | int
+5 | 8:9 | int
+6 | 8:13 | int
+7 | 8:17 | int
+8 | 8:13 | int
+9 | 8:9 | int
+10 | 9:16 | int
+11 | 7:12 | () => int
+12 | 13:14 | (n: int) => (a: int) => int
+13 | 13:24 | int
+14 | 13:14 | (a: int) => int
+15 | 14:1 | (label: str, cond: bool) => void
+16 | 14:8 | str
+17 | 14:24 | (a: int) => int
+18 | 14:29 | int
+19 | 14:24 | int
+20 | 14:36 | int
+21 | 14:24 | bool
+22 | 14:1 | void
+23 | 15:17 | () => () => int
+24 | 15:17 | () => int
+25 | 16:1 | (label: str, cond: bool) => void
+26 | 16:8 | str
+27 | 16:29 | () => int
+28 | 16:29 | int
+29 | 16:43 | int
+30 | 16:29 | bool
+31 | 16:1 | void
+32 | 17:1 | (label: str, cond: bool) => void
+33 | 17:8 | str
+34 | 17:29 | () => int
+35 | 17:29 | int
+36 | 17:43 | int
+37 | 17:29 | bool
+38 | 17:1 | void
+39 | 18:1 | (...args: dynamic[]) => void
+40 | 18:7 | str
+41 | 18:1 | void

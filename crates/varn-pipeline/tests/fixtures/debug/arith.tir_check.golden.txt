@@ -1,0 +1,6 @@
+
+=== TIR CHECK: <fixtures>\arith.vn ===
+nodes 31   static 15   by name 0   static 100%
+  unannotated        dynamic     5   by name     0
+  from_tir(ssa): OK (3 ssa fn(s))
+  from_tir(proto): OK
