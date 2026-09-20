@@ -111,6 +111,15 @@ fn emit_object_field_addr(
     b.ins().brif(is_valid, ok, &[], slow, &[]);
     b.switch_to_block(ok);
 
+    // Instances have a COMPACT field layout (`class_field_repr` in
+    // `varn-types::class_layout`): sizes 1/2/4/8, not a 16-byte `VmValue`
+    // slot. The constant-offset addressing below assumes 16-byte slots, which
+    // is only true for dynamic `Object`s, so send instances to the
+    // compact-aware runtime helper (`get_fixed_field`/`set_fixed_field`).
+    let obj_only = b.create_block();
+    b.ins().brif(is_inst, slow, &[], obj_only, &[]);
+    b.switch_to_block(obj_only);
+
     // 4. Load the payload pointer:
     // For Instance, payload is at instance_payload_off, and fields start at instance_values_off.
     // For Object, payload is at payload_off, and fields start at values_off.

@@ -218,6 +218,10 @@ pub(super) fn declare(
         }
     }
 
+    // Fase B: the local object-base cache would bypass `emit_object_field_addr`
+    // and load at `slot*16`, wrong for compact class instances. Disabled until
+    // the inline path is compact-aware; the runtime helper handles both shapes.
+    local_obj_bases.clear();
     // The back-edge safepoint zeroes every cache after a collection. A string
     // cache holds a raw interior pointer, so leaving it out would be the one
     // way this survives a GC — it must be in the same list as the payloads.

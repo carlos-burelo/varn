@@ -22,6 +22,13 @@ pub(crate) fn emit_call(
     target: Option<&crate::clif::lower::ClifTarget>,
     class_target: Option<&crate::clif::lower::ClifClassTarget>,
 ) -> Result<(), String> {
+    // Fase B: the inline class-construct fast path writes instance fields at a
+    // 16-byte stride, wrong for the compact `InstanceData` layout. Route
+    // `new X()` through the VM call window (compact-aware) until that path is
+    // compact-aware too.
+    let _ = class_target;
+    let class_target: Option<&crate::clif::lower::ClifClassTarget> = None;
+
     let w1 = code[ip + 1];
     let w2 = code[ip + 2];
     let dest = (w1 >> 8) as usize;

@@ -279,10 +279,10 @@ pub fn try_compile(
     // (a wrong value then reaches `ArrayLength`/`Headers.toObject`). Until the
     // class provenance is reconciled, protos with any Ref register stay
     // interpreted.
-    // `Ref` homes validate strictly and the lowering's `K` lattice / register
-    // provenance is not yet authoritative for every register (a Ref-classed
-    // receiver can carry a bool, which then reaches `ArrayLength`). Keep such
-    // protos interpreted until the class provenance is reconciled.
+    // `Ref` requires the lowering's `K` lattice and `register_meta` to agree on
+    // every register; today they can disagree (e.g. `Cons.length`'s
+    // `Move r2 = r6` boxes the field payload as a bool). Keep Ref protos
+    // interpreted until that provenance is fixed.
     if proto
         .register_meta
         .iter()
