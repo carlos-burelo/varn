@@ -3,7 +3,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
 
-use super::alloc::{box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, AllocCtx};
+use super::alloc::{box_or_load_home, def_result, AllocCtx};
 use super::emit::call_helper_void;
 use super::kinds::K;
 
@@ -23,15 +23,16 @@ pub(super) fn emit_str_concat(
     let (a_tag, a_payload) = b.ins().isplit(a);
     let (b_tag, b_payload) = b.ins().isplit(bb);
 
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
+    // `str_concat` only allocates a new string: it neither re-enters VM code
+    // nor reaches a GC safepoint, so no live register can be moved underneath
+    // it. The flush/reload around it was pure overhead (the flush is a no-op
+    // for the Ref/Dyn roots anyway — their homes are authoritative).
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.str_concat,
         &[actx.exec_ctx, a_tag, a_payload, b_tag, b_payload],
     );
-    reload_boxed(b, actx, state, &regs);
 
     let res = b.ins().load(
         types::I128,
