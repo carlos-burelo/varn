@@ -187,6 +187,16 @@ macro_rules! jit_helper_abi {
             /// `exec_ctx`, and adding one there is what forces the whole
             /// function frame-aware, losing the direct clif→clif entry.
             current_exec_ctx => jit_current_exec_ctx,
+            /// `extern "C" fn(*mut ExecCtx, act_id, reg, tag, payload)` — write
+            /// a boxed value into `reg`'s home slot of activation `act_id`,
+            /// converting to the slot's physical class (GPR/FPR/REF/DYN)
+            /// through `FrameStore`. Phase B home traffic, replacing inline
+            /// `stack[base + reg]` addressing now that the frame is
+            /// partitioned.
+            home_store => jit_store_home,
+            /// `extern "C" fn(*mut ExecCtx, act_id, reg, *mut VmValue)` — read
+            /// `reg`'s home slot of activation `act_id` as a boxed value.
+            home_load => jit_load_home,
         }
     };
 }
