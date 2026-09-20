@@ -342,6 +342,13 @@ pub(crate) fn def_result(
     res: cranelift_codegen::ir::Value,
 ) {
     let site = std::panic::Location::caller().line();
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!(
+            "DEFRESULT dest={dest} kind={:?} at={}",
+            actx.register_meta.get(dest).map(|m| m.kind),
+            std::panic::Location::caller()
+        );
+    }
     if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
