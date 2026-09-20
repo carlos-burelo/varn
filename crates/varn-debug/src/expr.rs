@@ -81,7 +81,5 @@ pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) 
     out
 }
 
-/// `-p check:types`.
-pub fn debug_check_types(program: &Program, source: &str, check: &CheckResult) {
-    print!("{}", render_check_types(program, source, check));
-}
+/// `-p check:types` — migrated to `phases::check_types` (collect/render).
+pub use crate::phases::check_types::debug_check_types;
