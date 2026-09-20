@@ -32,6 +32,16 @@ pub(super) fn meta_is_int(meta: &[varn_types::register_meta::RegisterMeta], r: u
     meta.get(r).is_some_and(|m| m.kind == SlotKind::Int)
 }
 
+/// Whether register `r`'s physical class is heap-classed (`Ref` or `Dyn`),
+/// i.e. its variable is an I128 tag+payload pair rather than a scalar word.
+pub(super) fn dest_is_ref(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
+    matches!(
+        meta.get(r)
+            .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind)),
+        Some(varn_types::register_meta::SlotClass::Ref | varn_types::register_meta::SlotClass::Dyn)
+    )
+}
+
 pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
     let c = b.ins().iconst(types::I64, v);
     b.def_var(vars[reg], c);
@@ -45,7 +55,14 @@ pub(super) fn def_const_int(
     reg: usize,
     v: i64,
 ) {
-    if meta_is_float(meta, reg) {
+    if dest_is_ref(meta, reg) {
+        let c = b.ins().iconst(types::I64, v);
+        let boxed = box_int(b, c);
+        b.def_var(vars[reg], boxed);
+        if let Some(actx) = actx {
+            super::alloc::store_boxed_home(b, actx, reg, boxed);
+        }
+    } else if meta_is_float(meta, reg) {
         let f = b.ins().f64const(v as f64);
         b.def_var(vars[reg], f);
         if let Some(actx) = actx {
@@ -65,14 +82,19 @@ pub(super) fn def_const_int(
 pub(super) fn def_const_bool(
     b: &mut FunctionBuilder,
     actx: Option<&AllocCtx>,
+    meta: &[varn_types::register_meta::RegisterMeta],
     vars: &[Variable],
     reg: usize,
     v: bool,
 ) {
     let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
-    b.def_var(vars[reg], c);
+    let boxed = box_bool(b, c);
+    if dest_is_ref(meta, reg) {
+        b.def_var(vars[reg], boxed);
+    } else {
+        b.def_var(vars[reg], c);
+    }
     if let Some(actx) = actx {
-        let boxed = box_bool(b, c);
         super::alloc::store_boxed_home(b, actx, reg, boxed);
     }
 }
@@ -87,7 +109,15 @@ pub(super) fn use_int(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
         K::Int => Ok(b.use_var(vars[r])),
-        k if is_boxed_kind(k) => Ok(b.use_var(vars[r])),
+        k if is_boxed_kind(k) => {
+            let v = b.use_var(vars[r]);
+            // A paired (heap-classed) variable: the payload word is the int.
+            if b.func.dfg.value_type(v) == types::I128 {
+                Ok(b.ins().isplit(v).1)
+            } else {
+                Ok(v)
+            }
+        }
         k => Err(format!("clif: int use of {k:?} register")),
     }
 }
@@ -334,7 +364,10 @@ pub(super) fn box_or_pass(
         return box_null(b);
     };
     let raw = b.use_var(var);
-    if b.func.dfg.value_type(raw) == types::F64 {
+    if b.func.dfg.value_type(raw) == types::I128 {
+        // A pair variable (a `Ref` register) already holds a boxed VmValue.
+        raw
+    } else if b.func.dfg.value_type(raw) == types::F64 {
         box_f64(b, raw)
     } else {
         match state.get(r).copied().unwrap_or(K::Unset) {
@@ -363,6 +396,11 @@ pub(super) fn box_for_target(
 ) {
     for r in 0..vars.len() {
         if meta_is_float(meta, r) {
+            continue;
+        }
+        // A `Ref` variable is always the full pair; never rewrite it to a
+        // payload or vice versa.
+        if dest_is_ref(meta, r) {
             continue;
         }
         if is_boxed_kind(target_state[r]) && !is_boxed_kind(state[r]) {

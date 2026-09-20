@@ -97,6 +97,35 @@ unsafe fn call_native_from_homes(
 ) -> VmValue {
     ctx_ref.record_call_native(f, None);
     let args = ctx_ref.stack.box_range(act_id, reg_start, total);
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        let fname = ctx_ref
+            .frames
+            .last()
+            .and_then(|fr| fr.closure().proto.name.clone());
+        let tags: Vec<String> = args
+            .iter()
+            .map(|v| {
+                let obj = if v.is_heap() {
+                    match ctx_ref.heap.get(v.as_heap_idx()) {
+                        Some(crate::heap::HeapObj::Str(_)) => ":str",
+                        Some(crate::heap::HeapObj::Array(_)) => ":array",
+                        Some(crate::heap::HeapObj::Object(_)) => ":object",
+                        Some(crate::heap::HeapObj::Instance(_)) => ":instance",
+                        Some(crate::heap::HeapObj::VmClosure(_)) => ":closure",
+                        Some(_) => ":heap-other",
+                        None => ":heap-none",
+                    }
+                } else {
+                    ""
+                };
+                format!("{:#x}/{:#x}{obj}", v.raw_tag(), v.raw_payload())
+            })
+            .collect();
+        eprintln!(
+            "NATIVEOP fn={fname:?} f={:#x} reg_start={reg_start} total={total} args={tags:?}",
+            f as usize
+        );
+    }
     match ctx_ref.invoke_native(f, &args) {
         Ok(v) => v,
         Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),

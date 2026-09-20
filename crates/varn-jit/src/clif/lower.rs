@@ -143,7 +143,10 @@ pub(super) fn is_frame_aware(proto: &FunctionProto, has_alloc: bool, osr: bool) 
         || proto.upvalue_count > 0
         || proto.is_generator
         || proto.is_async
-        || (has_alloc && has_boxed_slots(proto))
+        // Any boxed slot (Ref/Dyn) needs `exec_ctx` and its home slots: a
+        // `Ref` register is an I128 pair whose home is authoritative for
+        // `null`, and even a leaf must read its params from there.
+        || has_boxed_slots(proto)
 }
 
 /// Why a lowering came out frame-aware, in the order the flag tests them,

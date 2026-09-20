@@ -109,6 +109,30 @@ impl ExecCtx {
         f: varn_types::NativeFn,
         args: &[VmValue],
     ) -> Result<VmValue, String> {
+        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+            let name = varn_builtins::native_op_name_by_fn(f).unwrap_or("<anon>");
+            let kinds: Vec<String> = args
+                .iter()
+                .map(|v| {
+                    let k = if v.is_sso() {
+                        ":sso"
+                    } else if v.is_heap() {
+                        match self.heap.get(v.as_heap_idx()) {
+                            Some(crate::heap::HeapObj::Str(_)) => ":str",
+                            Some(crate::heap::HeapObj::Array(_)) => ":array",
+                            Some(crate::heap::HeapObj::Object(_)) => ":object",
+                            Some(crate::heap::HeapObj::Instance(_)) => ":instance",
+                            Some(_) => ":heap-other",
+                            None => ":heap-none",
+                        }
+                    } else {
+                        ""
+                    };
+                    format!("{:#x}/{:#x}{k}", v.raw_tag(), v.raw_payload())
+                })
+                .collect();
+            eprintln!("INVOKE_NATIVE {name} f={:#x} nargs={} {kinds:?}", f as usize, args.len());
+        }
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);
         }
