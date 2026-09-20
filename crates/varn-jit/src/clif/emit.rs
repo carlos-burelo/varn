@@ -459,45 +459,6 @@ pub(super) fn box_or_pass(
     }
 }
 
-pub(super) fn box_for_target(
-    b: &mut FunctionBuilder,
-    meta: &[varn_types::register_meta::RegisterMeta],
-    vars: &[Variable],
-    state: &[K],
-    target_state: &[K],
-) {
-    for r in 0..vars.len() {
-        if meta_is_float(meta, r) {
-            continue;
-        }
-        // A `Ref` variable is always the full pair; never rewrite it to a
-        // payload or vice versa.
-        if dest_is_ref(meta, r) {
-            continue;
-        }
-        if is_boxed_kind(target_state[r]) && !is_boxed_kind(state[r]) {
-            let boxed = box_or_pass(b, vars, state, r);
-            let payload = if b.func.dfg.value_type(boxed) == cranelift_codegen::ir::types::I128 {
-                let (_tag, payload) = b.ins().isplit(boxed);
-                payload
-            } else {
-                boxed
-            };
-            b.def_var(vars[r], payload);
-        } else if !is_boxed_kind(target_state[r]) && is_boxed_kind(state[r]) {
-            if target_state[r] == K::Int {
-                let v = b.use_var(vars[r]);
-                let un = unbox_int(b, v);
-                b.def_var(vars[r], un);
-            } else if target_state[r] == K::Bool {
-                let v = b.use_var(vars[r]);
-                let un = unbox_bool(b, v);
-                b.def_var(vars[r], un);
-            }
-        }
-    }
-}
-
 pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
     meta.get(r).is_some_and(|m| m.kind == SlotKind::Int)
 }

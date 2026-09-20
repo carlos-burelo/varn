@@ -18,7 +18,7 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
-    box_for_target, box_or_pass, call_helper, dest_is_ref, meta_is_float, meta_is_int, unbox_int,
+    box_or_pass, call_helper, dest_is_ref, meta_is_float, meta_is_int, unbox_int,
 };
 use super::fields;
 use super::floats;
@@ -352,7 +352,6 @@ pub(super) fn lower_raw(
         if let Some(blk) = blocks.get(&ip) {
             if !terminated {
                 if let Some(e) = entries.get(&ip) {
-                    box_for_target(&mut b, &proto.register_meta, &vars, &state, e);
                     state = e.clone();
                 }
                 preheader::emit_region_caches(
@@ -415,9 +414,6 @@ pub(super) fn lower_raw(
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target_ip = ip + 3 + off;
                 let target = blocks[&target_ip];
-                if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
-                }
                 b.ins().jump(target, &[]);
                 terminated = true;
             }
@@ -445,9 +441,6 @@ pub(super) fn lower_raw(
                         // `scan::loop_regions` treat the region as cacheable.
                         alloc::emit_backedge_safepoint(&mut b, actx, &state, &all_caches);
                     }
-                }
-                if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
                 }
                 b.ins().jump(target, &[]);
                 terminated = true;
@@ -503,15 +496,9 @@ pub(super) fn lower_raw(
                 }
 
                 b.switch_to_block(target_trampoline);
-                if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
-                }
                 b.ins().jump(target, &[]);
 
                 b.switch_to_block(fall_trampoline);
-                if let Some(fall_state) = entries.get(&next_ip) {
-                    box_for_target(&mut b, &proto.register_meta, &vars, &state, fall_state);
-                }
                 b.ins().jump(fall, &[]);
                 terminated = true;
             }

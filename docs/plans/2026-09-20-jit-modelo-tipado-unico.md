@@ -85,6 +85,11 @@ TIR (BackendTy por valor, obligatorio)
   `clif/body/*`, `clif/alloc/native.rs`, `clif/methods.rs`.
 
 ### C4 — Bajar el JIT de SSA/TIR (el grande)
+- Estado: **núcleo semántico cerrado** (esta sesión). `state` es proyección de
+  clase; `apply_kinds` no re-deriva por op; `apply_kinds_flow` y
+  `box_for_target` borrados. Falta el borrado físico de `kinds.rs`/`state` y,
+  para bajar de SSA/TIR, extender el contrato `.vnc`. Detalle en
+  `docs/plans/2026-09-20-PLAN-PENDIENTE.md` §10.
 - `varn-jit` consume SSA/TIR tipado (o serializa clase/tipo en `.vnc`), no
   bytecode + lattice.
 - **Borra**: `clif/kinds.rs` (lattice `K`), `box_or_load_home` heurístico,

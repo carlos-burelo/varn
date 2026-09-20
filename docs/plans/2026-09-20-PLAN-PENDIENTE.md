@@ -281,6 +281,34 @@ Commit de C3 (esta sesión).
 
 `tests/main.vn`: 1223/0 en JIT y `VARN_NO_JIT=1`.
 
+---
+
+## 10. Progreso B4/C4 (núcleo semántico)
+
+Cambio (esta sesión): la lattice de flujo deja de re-derivar el tipo por op.
+
+- **`state` = proyección de clase**: `kinds::apply_kinds` ya no clasifica por
+  opcode; el kind de un registro es su `SlotClass` (`Gpr→Int`, `Fpr→Float`,
+  `Ref/Dyn→Boxed`). `kind_flow` siembra cada bloque con esa proyección, así que
+  el fixpoint converge trivialmente. La única verdad flow-proven que se
+  conserva es el **origen de un global** (`K::Global`), que `Call` usa para
+  pedir un target estático al linker — es procedencia del valor, no su
+  representación.
+- **Borrado**: `apply_kinds_flow` (la clasificación por op, ~230 líneas),
+  `box_for_target` (reconciliación de representación en merges, ya identidad)
+  y sus 5 call sites.
+- **Evidencia de no-regresión**: cobertura JIT de `tests/main.vn` idéntica
+  (antes `clif=1122 bail=1031`; después `clif=1123 bail=1028`). Suite 1223/0
+  en ambas tiers.
+
+Lo que **no** se hizo (para C4 al 100% según el plan):
+- `clif/kinds.rs` sigue existiendo como tipo `K` + `kind_flow`; borrarlo del
+  todo exige reemplazar `state: &[K]` por consultas de clase en ~30 archivos.
+- La bajada sigue siendo desde bytecode: `varn-jit` no ve SSA/TIR. Bajar de
+  TIR/SSA exige extender el contrato serializado (`.vnc`) con el tipo por
+  punto, o exponer TIR al backend; es un cambio de formato (Ley 10: declarar
+  ganancia/verificación/borrado antes de hacerlo).
+
 
 
 

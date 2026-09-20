@@ -39,6 +39,24 @@ pub(crate) fn is_boxed_kind(k: K) -> bool {
     matches!(k, K::Boxed | K::Global(_) | K::Mixed)
 }
 
+/// The kind a register holds, projected from its physical CLASS
+/// (`register_meta`). This is C4's replacement for the flow analysis: after C1
+/// every producer writes its destination in the destination's declared class,
+/// so the kind at any use is a property of the register, not of the program
+/// point. `Bool`/`Str` are `SlotClass::Dyn` (a pair), hence `Boxed`.
+pub(crate) fn class_kind(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> K {
+    use varn_types::register_meta::SlotClass;
+    match meta
+        .get(r)
+        .map(|m| SlotClass::of_kind(m.kind))
+        .unwrap_or(SlotClass::Dyn)
+    {
+        SlotClass::Fpr => K::Float,
+        SlotClass::Gpr => K::Int,
+        SlotClass::Ref | SlotClass::Dyn => K::Boxed,
+    }
+}
+
 fn merge(cur: K, k: K) -> K {
     match (cur, k) {
         (K::Unset, x) | (x, K::Unset) => x,
@@ -64,229 +82,29 @@ pub(crate) fn apply_kinds(
     pool: &[varn_types::chunk::PoolEntry],
     ip: usize,
     op: OpCode,
-    constants: &[VmValue],
+    _constants: &[VmValue],
     meta: &[varn_types::register_meta::RegisterMeta],
-    return_kind: SlotKind,
+    _return_kind: SlotKind,
 ) {
     let dest = match decode(code, ip, pool).and_then(|i| i.def) {
         Some(d) if (d as usize) < state.len() => d as usize,
         _ => return,
     };
-    let meta_int = |r: usize| meta.get(r).is_some_and(|m| m.kind == SlotKind::Int);
-    let meta_float = |r: usize| meta.get(r).is_some_and(|m| m.kind == SlotKind::Float);
-    // A result the emitter serves in the register's declared representation
-    // (it unboxes to int / converts to f64 when the meta proves the type).
-    let typed = |r: usize| {
-        if meta_float(r) {
-            K::Float
-        } else if meta_int(r) {
-            K::Int
-        } else {
-            K::Boxed
-        }
-    };
-    // A result the emitter always produces as boxed VmValue bits. A float
-    // register still holds an unboxed `f64` (its Variable is `F64`), because
-    // the emitters convert on the way into the var.
-    let boxed = |r: usize| if meta_float(r) { K::Float } else { K::Boxed };
-    match op {
-        OpCode::AddInt
-        | OpCode::SubInt
-        | OpCode::MulInt
-        | OpCode::AddImm
-        | OpCode::SubImm
-        | OpCode::ModInt
-        | OpCode::GetEnumTag
-        | OpCode::ArrayLength => state[dest] = K::Int,
-        // An int literal into a float-typed sink loads as an unboxed f64
-        // (`def_const_int` branches on the same meta).
-        OpCode::LoadIntZero
-        | OpCode::LoadIntOne
-        | OpCode::LoadIntMinusOne
-        | OpCode::LoadInt => state[dest] = if meta_float(dest) { K::Float } else { K::Int },
-        OpCode::LoadTrue | OpCode::LoadFalse => state[dest] = K::Bool,
-        // A self-call returns in THIS function's own return convention, so
-        // its kind must follow `return_kind`, never a fixed `K::Int` — a
-        // boxed non-int return re-tagged as int here would hand the caller
-        // the payload word as if it were the integer's value.
-        OpCode::CallSelf => {
-            state[dest] = if meta_float(dest) || return_kind == SlotKind::Float {
-                K::Float
-            } else if return_kind == SlotKind::Int {
-                K::Int
-            } else if return_kind == SlotKind::Bool {
-                K::Bool
-            } else {
-                boxed(dest)
-            }
-        }
-        // A call result is ALWAYS boxed bits, even into an `int`-typed slot:
-        // the register meta types the slot, not the value, and stdlib code
-        // relies on the VM coercing a whole float (`int_div`) at the int
-        // sink rather than at the definition. Unboxing here would reinterpret
-        // those float bits as an int. The fast int-contract IC re-boxes its
-        // raw result to keep this one representation (see `lower`'s `Call`
-        // arm).
-        OpCode::Call | OpCode::CallSpread => state[dest] = boxed(dest),
-        OpCode::LoadConst => {
-            let idx = code[ip + 1] as usize;
-            state[dest] = if meta_float(dest) {
-                // A float-typed sink: the constant loads as an unboxed f64
-                // (a float literal, or an int literal widened to float).
-                K::Float
-            } else {
-                match constants.get(idx) {
-                    Some(c) if c.is_int() => K::Int,
-                    // A non-int constant (string, float, null) is carried as its
-                    // boxed VmValue bits; the lowering embeds them directly.
-                    Some(_) => K::Boxed,
-                    None => K::Mixed,
-                }
-            };
-        }
-        // Typed float arithmetic yields an unboxed f64 in a Float register; a
-        // non-float (untyped) sink keeps boxed bits and routes to the helper.
-        OpCode::AddFloat
-        | OpCode::SubFloat
-        | OpCode::MulFloat
-        | OpCode::DivFloat
-        | OpCode::ModFloat
-        | OpCode::PowFloat => {
-            state[dest] = if meta_float(dest) { K::Float } else { K::Boxed };
-        }
-        OpCode::LtInt
-        | OpCode::LteInt
-        | OpCode::GtInt
-        | OpCode::GteInt
-        | OpCode::EqInt
-        | OpCode::NeqInt
-        // Generic comparisons unbox their boxed-bool result to 0/1.
-        | OpCode::Lt
-        | OpCode::Lte
-        | OpCode::Gt
-        | OpCode::Gte
-        | OpCode::Eq
-        | OpCode::Neq
-        | OpCode::Not
-        | OpCode::IsNull
-        | OpCode::Instanceof
-        | OpCode::In
-        | OpCode::IsArray
-        | OpCode::LtFloat
-        | OpCode::GtFloat
-        | OpCode::LteFloat
-        | OpCode::GteFloat
-        | OpCode::EqFloat
-        | OpCode::NeqFloat => state[dest] = K::Bool,
-        OpCode::LoadNull => state[dest] = K::Boxed,
-        // The lowering converts across representations (int→f64 into a float
-        // sink, f64→boxed into a non-float one), so the kind follows the
-        // DESTINATION's declared representation, not the source's.
-        OpCode::Move => {
-            let src = (code[ip + 1] >> 8) as usize;
-            state[dest] = state[src];
-        }
-        // Results the emitter serves in the register's DECLARED
-        // representation: `clif::arrays` and `clif::fields` convert/unbox to the
-        // wanted repr (an `I64` into an `Int` register, an `F64` into an `F64` register).
-        OpCode::ArrayGetIndex | OpCode::GetFixedField => state[dest] = typed(dest),
-        // Everything else helper-backed lands as boxed VmValue bits (a float
-        // register still holds an unboxed `f64` — the emitters coerce on the
-        // way in). Claiming `Int` here because the register meta types the
-        // SLOT as int is a lie about the VALUE: `int_div` returns a whole
-        // float into an `int` slot, and reinterpreting those bits as an int
-        // yields garbage. Int consumers unbox at the use instead.
-        OpCode::GetProperty
-        | OpCode::BuildArray
-        | OpCode::BuildMap
-        | OpCode::BuildTuple
-        | OpCode::BuildObjectWithShape
-        | OpCode::BuildRecord
-        | OpCode::CallMethod
-        | OpCode::InvokeVirtual
-        | OpCode::BuildObject
-        | OpCode::StrConcat
-        | OpCode::BuildStr
-        | OpCode::MakeEnumVariant
-        | OpCode::CallNativeOp
-        | OpCode::Add
-        | OpCode::Sub
-        | OpCode::Mul
-        | OpCode::Div
-        | OpCode::DivInt
-        | OpCode::Mod => state[dest] = boxed(dest),
-        OpCode::Negate => {
-            let src = (code[ip + 1] >> 8) as usize;
-            if meta_float(dest) || state[src] == K::Float {
-                state[dest] = K::Float;
-            } else if meta_int(dest) || state[src] == K::Int {
-                state[dest] = K::Int;
-            } else {
-                state[dest] = boxed(dest);
-            }
-        }
-        OpCode::BitAnd
-        | OpCode::BitOr
-        | OpCode::BitXor
-        | OpCode::Shl
-        | OpCode::Shr
-        | OpCode::Ushr => {
-            if meta_int(dest) {
-                state[dest] = K::Int;
-            } else {
-                state[dest] = boxed(dest);
-            }
-        }
-        OpCode::Intrinsic
-        | OpCode::IntrinsicDirect
-        | OpCode::Typeof
-        | OpCode::ToString
-        | OpCode::GetSymbol
-        | OpCode::Pow
-        | OpCode::PowInt
-        | OpCode::StrSlice
-        | OpCode::StrLength
-        | OpCode::ArrayPop
-        | OpCode::GetIndex
-        | OpCode::MapGetIndex
-        | OpCode::GetPropertyMaybe
-        | OpCode::BindMethod
-        | OpCode::ObjectKeys
-        | OpCode::ObjectMerge
-        | OpCode::ObjectRest
-        | OpCode::WrapSpread
-        | OpCode::ArrayExtend
-        | OpCode::MakeClass
-        | OpCode::GetSuper
-        // A name-keyed `LoadGlobal` only survives for a genuinely dynamic name
-        // now (the compiler emits the indexed forms directly); still boxed.
-        | OpCode::LoadGlobal
-        | OpCode::LoadNativeGlobalIdx
-        | OpCode::LoadUpvalue
-        | OpCode::MakeClosure
-        | OpCode::LoadStaticFn
-        | OpCode::LoadModule
-        | OpCode::LoadModuleSlot
-        | OpCode::InvokeRuntimeStatic
-        | OpCode::Await
-        | OpCode::Spawn
-        // `Try` defines the catch handler's error register. The value lands
-        // there on the exception path (which leaves clif code entirely), but
-        // the register is boxed for every reader downstream.
-        | OpCode::Try => state[dest] = boxed(dest),
-        // A global load records its origin so a `Call` on it can link
-        // statically; int-typed globals still unbox to Int. The slot is
-        // MODULE-RELATIVE — `CtxLinker` carries the compiling proto's
-        // `module_base` and adds it before indexing the store.
+    // C4: the kind at a use is the destination's CLASS projection, not a
+    // re-derivation from the op. The one flow-proven fact worth keeping is a
+    // global load's ORIGIN — `Call` asks the linker for a static target from
+    // it, and that is a property of where the value came from, not of its
+    // representation (which the class already fixes).
+    state[dest] = match op {
         OpCode::LoadGlobalIdx => {
-            state[dest] = if meta_int(dest) {
+            if meta.get(dest).is_some_and(|m| m.kind == SlotKind::Int) {
                 K::Int
             } else {
                 K::Global(code[ip + 1] as u32)
-            };
+            }
         }
-        _ => {}
-    }
+        _ => class_kind(meta, dest),
+    };
 }
 
 /// Kind state at every block entry, to a fixpoint over the bytecode CFG.
@@ -297,35 +115,19 @@ pub(crate) fn kind_flow(
     constants: &[VmValue],
     block_starts: &[usize],
     nregs: usize,
-    param_kinds: &[SlotKind],
+    _param_kinds: &[SlotKind],
     meta: &[varn_types::register_meta::RegisterMeta],
     has_this: bool,
-    return_kind: SlotKind,
+    _return_kind: SlotKind,
 ) -> Result<HashMap<usize, Vec<K>>, String> {
+    // C4: every block's entry state is the class projection. There is no flow
+    // to a fixpoint — the kind is a property of the register, not the point.
     let mut entry0 = vec![K::Unset; nregs];
-    // A method/constructor receives its `this` receiver (a heap object) in
-    // register 0; every other function leaves r0 as the unused callee slot.
+    for (r, e) in entry0.iter_mut().enumerate() {
+        *e = class_kind(meta, r);
+    }
     if has_this && nregs > 0 {
         entry0[0] = K::Boxed;
-    }
-    for (i, pk) in param_kinds.iter().enumerate() {
-        let r = 1 + i;
-        if r < nregs {
-            entry0[r] = match *pk {
-                SlotKind::Int => K::Int,
-                SlotKind::Bool => K::Bool,
-                SlotKind::Float => K::Float,
-                _ => K::Boxed,
-            };
-        }
-    }
-    // A float-typed register is an F64 Variable for the whole function (static
-    // representation), so seed it `Float` at entry — params (overriding the
-    // boxed default above) and locals alike; the flow preserves it.
-    for (r, e) in entry0.iter_mut().enumerate() {
-        if meta.get(r).is_some_and(|m| m.kind == SlotKind::Float) {
-            *e = K::Float;
-        }
     }
     let mut entries: HashMap<usize, Vec<K>> = HashMap::default();
     entries.insert(0, entry0);
@@ -364,7 +166,7 @@ pub(crate) fn kind_flow(
                 }
                 OpCode::Return => break,
                 _ => {
-                    apply_kinds(&mut state, code, pool, ip, op, constants, meta, return_kind);
+                    apply_kinds(&mut state, code, pool, ip, op, constants, meta, _return_kind);
                 }
             }
             ip += info.len;
