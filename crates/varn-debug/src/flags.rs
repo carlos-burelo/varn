@@ -78,41 +78,42 @@ pub struct DebugFlags {
     pub fn_filter: Option<String>,
 }
 
-/// Every phase name `-p` accepts, with a one-line description. Single source
-/// for `--list-phases` and for the error message on an unknown phase.
-pub const PHASES: &[(&str, &str)] = &[
-    ("tokens", "flujo de tokens del lexer"),
-    ("ast", "árbol sintáctico"),
-    ("check", "símbolos, binds, tipos y expresiones"),
-    ("bytecode", "bytecode por función"),
-    ("tir", "IR tipado que emite el checker"),
-    ("clif", "lowering Cranelift (route, kinds, ir, asm, check)"),
-    ("tiers", "tier por función: clif / gate / bail"),
-    (
-        "roots",
-        "conjunto de raíces GC por safepoint, contra la liveness de Cranelift",
-    ),
-    ("bails", "solo lo que no rutea, agrupado por causa"),
-    ("summary", "tamaños, exports y top-10 de funciones"),
-    (
-        "typeloss",
-        "dónde deja de ser estático: opcodes genéricos con equivalente tipado",
-    ),
-    ("graph", "grafo de módulos"),
-    ("caps", "traza de capabilities"),
-    ("info", "metadatos del módulo"),
-    (
-        "gc",
-        "nursery/old-gen/interners al terminar de correr (única fase que ejecuta el programa)",
-    ),
-    ("all", "todo lo anterior"),
-];
+/// Valid phase spellings for `-p`: every registry id plus the non-phase names
+/// the parser also accepts (`check`/`all` groups, CLI-only `types`/`lsp`, and
+/// the `trace` toggle).
+fn valid_names() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = crate::registry::ALL.iter().map(|p| p.id()).collect();
+    names.extend(["check", "all", "types", "lsp", "trace"]);
+    names
+}
 
 pub fn print_phases() {
+    use crate::phase::Stage;
+
     eprintln!("Fases disponibles para -p / --phase:\n");
-    for (name, desc) in PHASES {
-        eprintln!("  {name:<10} {desc}");
+    for (stage, label) in [
+        (Stage::Lex, "lex"),
+        (Stage::Parse, "parse"),
+        (Stage::Check, "check"),
+        (Stage::Compile, "compile"),
+        (Stage::Exec, "exec"),
+    ] {
+        let phases: Vec<&'static dyn crate::phase::Phase> = crate::registry::ALL
+            .iter()
+            .copied()
+            .filter(|p| p.stage() == stage)
+            .collect();
+        if phases.is_empty() {
+            continue;
+        }
+        eprintln!("  [{label}]");
+        for p in phases {
+            eprintln!("  {:<12} {}", p.id(), p.title());
+        }
     }
+    eprintln!("\n  {:<12} {}", "check", "símbolos + tipos (grupo)");
+    eprintln!("  {:<12} {}", "all", "todas las fases con `in_all`");
+    eprintln!("  {:<12} {}", "types:*", "vistas del IDE (inspect_lsp)");
     eprintln!("\nSub-fases:");
     eprintln!("  check:types  (volcado determinista y diffeable: tabla de tipos + anotaciones)");
     eprintln!("  tir:check    (verifica el TIR emitido e informa cobertura sobre el módulo)");
@@ -291,7 +292,7 @@ impl DebugFlags {
                     unknown => match crate::registry::lookup(unknown) {
                         Some(p) => apply_registered(&mut flags, p.id()),
                         None => {
-                            let names: Vec<&str> = PHASES.iter().map(|(n, _)| *n).collect();
+                            let names = valid_names();
                             return Err(CliError::usage(format!(
                                 "unknown debug phase: '{unknown}'\n\
                                  Valid phases: {}\n\
@@ -464,5 +465,16 @@ mod tests {
         assert!(DebugFlags::parse("tokens").unwrap().any());
         assert!(!DebugFlags::parse("tokens").unwrap().needs_execution());
         assert!(DebugFlags::parse("gc").unwrap().needs_execution());
+    }
+
+    #[test]
+    fn valid_names_covers_registry_and_groups() {
+        let names = super::valid_names();
+        for p in crate::registry::ALL {
+            assert!(names.contains(&p.id()), "missing {}", p.id());
+        }
+        for g in ["check", "all", "types", "lsp", "trace"] {
+            assert!(names.contains(&g), "missing {g}");
+        }
     }
 }
