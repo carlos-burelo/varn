@@ -17,7 +17,7 @@
 //! branch argument, `SetProperty`, ...) drops it from consideration, since
 //! such a use could add keys or let the object outlive our view of it.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
@@ -28,7 +28,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
     // ConstInt definitions in function: SSA value -> i64
     let mut const_ints: FxHashMap<u32, i64> = FxHashMap::default();
     // Object/Record-literal defs: SSA value -> (key, value) pairs in slot order.
-    let mut obj_literals: FxHashMap<u32, Vec<(Rc<str>, Value)>> = FxHashMap::default();
+    let mut obj_literals: FxHashMap<u32, Vec<(Arc<str>, Value)>> = FxHashMap::default();
     // Tuple-literal defs: SSA value -> elements in index order.
     let mut tuple_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
 

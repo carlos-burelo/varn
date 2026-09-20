@@ -1,8 +1,14 @@
-use crate::types::{CheckerTyId, CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext};
-use std::rc::Rc;
+use crate::types::{
+    CheckerTyId, CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext,
+};
+use std::sync::Arc;
 use varn_core::TypeKind;
 
-pub(super) fn resolve_keyof(ty: Type, ctx: Option<&dyn TypeContext>, table: &mut CheckerTyTable) -> Type {
+pub(super) fn resolve_keyof(
+    ty: Type,
+    ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
+) -> Type {
     if let TypeKind::Object(mid) = table.get(ty.0) {
         let mut key_types: Vec<CheckerTyId> = vec![];
         for member in table.get_object_members(mid).to_vec() {
@@ -34,7 +40,7 @@ pub(super) fn collect_type_keys(
     ty: &Type,
     ctx: Option<&dyn TypeContext>,
     table: &CheckerTyTable,
-) -> Vec<Rc<str>> {
+) -> Vec<Arc<str>> {
     match table.get(ty.0) {
         TypeKind::Object(mid) => table
             .get_object_members(mid)
@@ -47,7 +53,8 @@ pub(super) fn collect_type_keys(
             .collect(),
         TypeKind::Named(name, origin) => {
             let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
-            let origin_str = origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
+            let origin_str =
+                origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
             name_str
                 .and_then(|name_str| {
                     ctx.and_then(|c| {
@@ -59,7 +66,7 @@ pub(super) fn collect_type_keys(
                 .unwrap_or_default()
         }
         TypeKind::Intersection(list) => {
-            let mut all_keys: Vec<Rc<str>> = vec![];
+            let mut all_keys: Vec<Arc<str>> = vec![];
             for part in table.get_list(list).to_vec() {
                 for key in collect_type_keys(&Type(part, false), ctx, table) {
                     if !all_keys.contains(&key) {
@@ -171,7 +178,8 @@ pub(super) fn resolve_indexed_access(
         let origin = origin;
         if let Some(key_name) = key_name {
             let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
-            let origin_str = origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
+            let origin_str =
+                origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
             if let Some(name_str) = name_str {
                 if let Some(members) = ctx.and_then(|c| {
                     c.get_interface_members(name_str, origin_str)

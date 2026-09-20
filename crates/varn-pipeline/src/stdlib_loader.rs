@@ -222,9 +222,9 @@ fn compile_source_inner(
         } else {
             crate::resolver::with_resolver(|r| r.module_exports(path, &mut vec![]))
         };
-    let mut export_names: Vec<std::rc::Rc<str>> = exports
+    let mut export_names: Vec<std::sync::Arc<str>> = exports
         .keys()
-        .map(|k| std::rc::Rc::from(k.as_str()))
+        .map(|k| std::sync::Arc::from(k.as_str()))
         .collect();
     export_names.sort();
     let tir = varn_checker::emit::emit_module(
@@ -275,50 +275,51 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         modules: Vec<ManifestModule>,
     }
 
-    let manifest: Manifest = if let Ok(manifest_raw) = std::fs::read_to_string(std_dir.join("std.json")) {
-        serde_json::from_str(&manifest_raw).map_err(|e| format!("invalid std.json: {e}"))?
-    } else {
-        let mut files = Vec::new();
-        fn collect_vn(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<String>) {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let p = entry.path();
-                    if p.is_dir() {
-                        collect_vn(base, &p, out);
-                    } else if p.extension().is_some_and(|e| e == "vn") {
-                        if let Ok(rel) = p.strip_prefix(base) {
-                            out.push(rel.to_string_lossy().replace('\\', "/"));
+    let manifest: Manifest =
+        if let Ok(manifest_raw) = std::fs::read_to_string(std_dir.join("std.json")) {
+            serde_json::from_str(&manifest_raw).map_err(|e| format!("invalid std.json: {e}"))?
+        } else {
+            let mut files = Vec::new();
+            fn collect_vn(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<String>) {
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.is_dir() {
+                            collect_vn(base, &p, out);
+                        } else if p.extension().is_some_and(|e| e == "vn") {
+                            if let Ok(rel) = p.strip_prefix(base) {
+                                out.push(rel.to_string_lossy().replace('\\', "/"));
+                            }
                         }
                     }
                 }
             }
-        }
-        collect_vn(std_dir, std_dir, &mut files);
-        files.sort();
-        let mut modules = Vec::new();
-        for rel_path in files {
-            let id = if rel_path.ends_with("/mod.vn") {
-                let prefix = rel_path.strip_suffix("/mod.vn").unwrap();
-                format!("std:{prefix}")
-            } else if rel_path.ends_with(".vn") {
-                let prefix = rel_path.strip_suffix(".vn").unwrap();
-                format!("std:{prefix}")
-            } else {
-                continue;
-            };
-            let full_path = std_dir.join(&rel_path);
-            let pure = if let Ok(source) = std::fs::read_to_string(&full_path) {
-                !source.contains("\"runtime:") && !source.contains("'runtime:")
-            } else {
-                false
-            };
-            modules.push(ManifestModule { id, pure });
-        }
-        Manifest {
-            version: "0.3.0".to_string(),
-            modules,
-        }
-    };
+            collect_vn(std_dir, std_dir, &mut files);
+            files.sort();
+            let mut modules = Vec::new();
+            for rel_path in files {
+                let id = if rel_path.ends_with("/mod.vn") {
+                    let prefix = rel_path.strip_suffix("/mod.vn").unwrap();
+                    format!("std:{prefix}")
+                } else if rel_path.ends_with(".vn") {
+                    let prefix = rel_path.strip_suffix(".vn").unwrap();
+                    format!("std:{prefix}")
+                } else {
+                    continue;
+                };
+                let full_path = std_dir.join(&rel_path);
+                let pure = if let Ok(source) = std::fs::read_to_string(&full_path) {
+                    !source.contains("\"runtime:") && !source.contains("'runtime:")
+                } else {
+                    false
+                };
+                modules.push(ManifestModule { id, pure });
+            }
+            Manifest {
+                version: "0.3.0".to_string(),
+                modules,
+            }
+        };
 
     let mut modules = Vec::new();
     // Report every failing module in one pass: fixing the stdlib one build

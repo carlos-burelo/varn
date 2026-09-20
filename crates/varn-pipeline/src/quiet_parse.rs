@@ -20,8 +20,8 @@ pub(crate) fn parse_module(
     // atoms. Seed from the shared snapshot, publish back only on success so a
     // failed parse of this module doesn't lose atoms already coined elsewhere.
     let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
-    let (program, interner, arena) =
-        varn_parser::parse(tokens, lexeme_buf, path, interner).map_err(|errs| {
+    let (program, interner, arena) = varn_parser::parse(tokens, lexeme_buf, path, interner)
+        .map_err(|errs| {
             let msg = &errs[0].message;
             if label.is_empty() {
                 msg.clone()

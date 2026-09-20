@@ -13,7 +13,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::nursery::pack_old_idx;
 use crate::value::VmValue;
 use std::collections::hash_map::Entry;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::{Value, VmArray};
 
 impl HeapInner {
@@ -167,7 +167,7 @@ impl HeapInner {
         if nv.is_sso() {
             let mut buf = [0u8; 5];
             let s = nv.sso_as_str(&mut buf);
-            return Ok(Value::Str(Rc::from(s)));
+            return Ok(Value::Str(Arc::from(s)));
         }
         if nv.is_heap() {
             let obj = self

@@ -1,10 +1,10 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::TypeKind;
 
-fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult) -> bool {
+fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &crate::binder::BindResult) -> bool {
     if let Some(members) = ext_bind.type_members.classes.get(name) {
         if members.members.iter().any(|m| m.name.as_ref() == key) {
             return true;
@@ -44,8 +44,8 @@ fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult
 
 fn check_origin_module(
     resolver: &dyn crate::module_resolver::ImportResolver,
-    name: &Rc<str>,
-    origin: &Option<Rc<str>>,
+    name: &Arc<str>,
+    origin: &Option<Arc<str>>,
     key: &str,
 ) -> bool {
     let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
@@ -69,7 +69,7 @@ fn check_origin_module(
 
 impl<'r> Checker<'r> {
     pub(crate) fn member_exists_cached(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
-        let ty_key = (*ty, Rc::from(key));
+        let ty_key = (*ty, Arc::from(key));
         if let Some(exists) = self.member_exists_cache.get(&ty_key) {
             return *exists;
         }
@@ -104,8 +104,9 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 if let Some(b) = &bind.core {
-                    if let Some(members) =
-                        b.class_members.get(varn_core::IntrinsicType::Bytes.as_str())
+                    if let Some(members) = b
+                        .class_members
+                        .get(varn_core::IntrinsicType::Bytes.as_str())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -142,13 +143,16 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
-                let named = Type::named(enum_name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let named = Type::named(
+                    enum_name_str,
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
                 self.member_exists(&named, key, bind)
             }
             TypeKind::Named(name_atom, origin_atom) => {
-                let name: Rc<str> = self.resolve_bind_atom(bind, name_atom);
-                let origin: Option<Rc<str>> =
-                    origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+                let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
+                let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = &origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
@@ -255,7 +259,11 @@ impl<'r> Checker<'r> {
                 }
                 if let Some(parent) = bind.class_parents.get(&name) {
                     let parent = parent.clone();
-                    let named = Type::named(parent, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    let named = Type::named(
+                        parent,
+                        self.resolver,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
                     return self.member_exists(&named, key, bind);
                 }
 
@@ -266,9 +274,13 @@ impl<'r> Checker<'r> {
             }
             TypeKind::Generic(name_atom, _, origin_atom) => {
                 let name = self.resolve_bind_atom(bind, name_atom).to_string();
-                let origin: Option<Rc<str>> =
-                    origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                let ty = Type::named_with_origin(name, origin, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+                let ty = Type::named_with_origin(
+                    name,
+                    origin,
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
                 self.member_exists(&ty, key, bind)
             }
             TypeKind::Object(mid) => self
@@ -299,11 +311,13 @@ impl<'r> Checker<'r> {
             }
             TypeKind::Union(list) => {
                 let ids = self.ty_table.get_list(list).to_vec();
-                ids.iter().all(|id| self.member_exists(&Type(*id, false), key, bind))
+                ids.iter()
+                    .all(|id| self.member_exists(&Type(*id, false), key, bind))
             }
             TypeKind::Intersection(list) => {
                 let ids = self.ty_table.get_list(list).to_vec();
-                ids.iter().any(|id| self.member_exists(&Type(*id, false), key, bind))
+                ids.iter()
+                    .any(|id| self.member_exists(&Type(*id, false), key, bind))
             }
             _ => false,
         };

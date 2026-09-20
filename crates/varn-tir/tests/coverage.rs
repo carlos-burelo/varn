@@ -3,17 +3,17 @@
 //! but which resolves by name is legal — it is an opportunity lost, not a
 //! miscompile — so it is counted, not rejected.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_tir::*;
 
 fn module() -> TirModule {
     TirModule {
-        source_file: Rc::from("test.vn"),
+        source_file: Arc::from("test.vn"),
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
         classes: vec![ClassInfo::new(
-            Rc::from("P"),
+            Arc::from("P"),
             None,
             vec![("x".into(), BackendTy::Int)],
         )],
@@ -27,7 +27,7 @@ fn module() -> TirModule {
         global_names: vec![],
         class_defs: vec![],
         top_level: TirFunction {
-            name: Rc::from("<module>"),
+            name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
             return_ty: BackendTy::Void,

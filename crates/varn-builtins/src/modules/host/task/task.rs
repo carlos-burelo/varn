@@ -87,7 +87,7 @@ varn_contract! {
                     let err_msg = format!("spawnIsolate: failed to load module '{resolved_path}': {e}");
                     let err_msg_nv = ctx.alloc_str(&err_msg);
                     let obj = varn_types::value::ObjRef::from_pairs([(
-                        std::rc::Rc::from("message"),
+                        std::sync::Arc::from("message"),
                         err_msg_nv,
                     )]);
                     async_task.reject(varn_types::value::new_object(obj));
@@ -105,7 +105,7 @@ varn_contract! {
                 };
                 let err_msg_nv = ctx.alloc_str(&err_msg);
                 let obj = varn_types::value::ObjRef::from_pairs([(
-                    std::rc::Rc::from("message"),
+                    std::sync::Arc::from("message"),
                     err_msg_nv,
                 )]);
                 async_task.reject(varn_types::value::new_object(obj));

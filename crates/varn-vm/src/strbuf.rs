@@ -2,10 +2,10 @@
 //! integer formatter.
 //!
 //! Concatenation used to build its result in a `String` and then copy it into
-//! the final `Rc<str>` — two allocations and a copy for a result like
+//! the final `Arc<str>` — two allocations and a copy for a result like
 //! `"User_" + 12345`, which is eleven bytes. [`StrBuf`] holds that on the stack
 //! and only reaches for the heap if the result actually outgrows it, so the
-//! common case pays one allocation: the `Rc<str>` the caller keeps.
+//! common case pays one allocation: the `Arc<str>` the caller keeps.
 
 use std::fmt;
 

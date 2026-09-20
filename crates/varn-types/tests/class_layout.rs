@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::TypeTag;
 use varn_types::value::ClassObj;
 
@@ -9,9 +9,9 @@ use varn_types::value::ClassObj;
 #[test]
 fn declared_field_types_reach_the_layout() {
     let cls = ClassObj::new_rc("Point");
-    cls.declare_field(Rc::from("x"), TypeTag::Int);
-    cls.declare_field(Rc::from("label"), TypeTag::Str);
-    cls.declare_field(Rc::from("loose"), TypeTag::Dynamic);
+    cls.declare_field(Arc::from("x"), TypeTag::Int);
+    cls.declare_field(Arc::from("label"), TypeTag::Str);
+    cls.declare_field(Arc::from("loose"), TypeTag::Dynamic);
 
     let layout = cls.get_or_compute_layout();
     let tag_of = |name: &str| layout.get_field(name).map(|f| f.type_tag);
@@ -31,8 +31,8 @@ fn declared_field_types_reach_the_layout() {
 #[test]
 fn redeclaring_a_field_keeps_its_slot() {
     let cls = ClassObj::new_rc("Redeclared");
-    let first = cls.declare_field(Rc::from("v"), TypeTag::Dynamic);
-    let second = cls.declare_field(Rc::from("v"), TypeTag::Int);
+    let first = cls.declare_field(Arc::from("v"), TypeTag::Dynamic);
+    let second = cls.declare_field(Arc::from("v"), TypeTag::Int);
 
     assert_eq!(first, second);
     assert_eq!(

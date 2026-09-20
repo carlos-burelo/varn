@@ -106,8 +106,8 @@ pub trait NativeCtx {
     /// Zero-copy string access: a refcount bump for heap strings instead of
     /// an allocation + byte copy. Implementations back it with their shared
     /// representation; the default falls back to copying.
-    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
-        self.str_owned(v).map(std::rc::Rc::from)
+    fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
+        self.str_owned(v).map(std::sync::Arc::from)
     }
     /// Whether `v`'s string is entirely ASCII. Backed by a per-string cached
     /// flag where the representation has one (`HeapStr`'s ascii bit) — O(1)
@@ -205,7 +205,7 @@ pub trait NativeCtx {
     fn str_map_key(&mut self, s: &str) -> crate::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => crate::value::MapKey(v),
-            None => crate::value::MapKey(self.intern(crate::Value::Str(std::rc::Rc::from(s)))),
+            None => crate::value::MapKey(self.intern(crate::Value::Str(std::sync::Arc::from(s)))),
         }
     }
 

@@ -32,13 +32,17 @@ pub(super) fn is_primitive_type(ty: &Type, table: &CheckerTyTable) -> bool {
     )
 }
 
-pub fn resolve_primitive(name: &str, ctx: Option<&dyn TypeContext>, table: &mut CheckerTyTable) -> Type {
+pub fn resolve_primitive(
+    name: &str,
+    ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
+) -> Type {
     use varn_core::TypeKind as K;
     if let Some(it) = IntrinsicType::from_str(name) {
         return Type(table.intern(K::Intrinsic(it.0)), false);
     }
     // `name`/`source_file` may not already be interned `Atom`s (the latter is
-    // stored as a plain `Rc<str>`, never routed through `AtomInterner`), so
+    // stored as a plain `Arc<str>`, never routed through `AtomInterner`), so
     // this mints them through the resolver's shared table rather than the
     // read-only `TypeContext::interner()` accessor — the same sanctioned path
     // `ImportResolver::intern`'s doc comment describes for callers with no

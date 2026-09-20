@@ -5,7 +5,7 @@ mod types;
 use crate::binder::{BindResult, BindView, PendingEnrich};
 use crate::types::Type;
 use index::build_enrich_context;
-use std::rc::Rc;
+use std::sync::Arc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::AstArena;
 
@@ -70,7 +70,7 @@ pub fn enrich_call_returns(
                 bind.ty_table = std::sync::Arc::new(table);
                 if let Some(t) = ty {
                     let name_atom = bind.arena.get(*sym_id).name;
-                    let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
+                    let name: Arc<str> = Arc::from(bind.interner.resolve(name_atom));
                     bind.arena.get_mut(*sym_id).ty = Some(t.clone());
                     sym_map.insert(name, t);
                 }
@@ -103,7 +103,11 @@ pub fn enrich_call_returns(
                     );
                     bind.ty_table = std::sync::Arc::new(table);
                     if let Some(old_ty) = bind.arena.get(*sym_id).ty {
-                        let new_ty = with_new_return_type(old_ty, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
+                        let new_ty = with_new_return_type(
+                            old_ty,
+                            final_ret,
+                            &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
+                        );
                         bind.arena.get_mut(*sym_id).ty = Some(new_ty);
                     }
                 } else {
@@ -121,7 +125,7 @@ pub fn enrich_call_returns(
                 // `class_name`/`key` forward the AST `Atom`s recorded in
                 // `PendingEnrich` (Task 4); every map consulted here
                 // (`class_methods`, `type_members.classes`) is still
-                // `Rc<str>`-keyed (out of this task's scope). Resolved to an
+                // `Arc<str>`-keyed (out of this task's scope). Resolved to an
                 // owned `String` (not a borrow of `bind.interner`) because
                 // several call sites below take `bind: &mut BindResult` as a
                 // whole, which a live borrow of `bind.interner` would block.
@@ -154,9 +158,13 @@ pub fn enrich_call_returns(
                         .and_then(|m| m.get(key_str.as_str()))
                         .copied()
                     {
-                        let new_ty = with_new_return_type(old, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
+                        let new_ty = with_new_return_type(
+                            old,
+                            final_ret,
+                            &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
+                        );
                         if let Some(ft_map) = bind.class_methods.get_mut(class_name_str.as_str()) {
-                            ft_map.insert(Rc::from(key_str.as_str()), new_ty);
+                            ft_map.insert(Arc::from(key_str.as_str()), new_ty);
                         }
                     }
                     if let Some(class_info) =
@@ -167,12 +175,19 @@ pub fn enrich_call_returns(
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
                         {
-                            let new_ty = with_new_return_type(m.ty, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
+                            let new_ty = with_new_return_type(
+                                m.ty,
+                                final_ret,
+                                &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
+                            );
                             m.ty = new_ty;
                             if let Some(symbol_id) = m.symbol_id {
                                 if let Some(old) = bind.arena.get(symbol_id).ty {
-                                    let new_ty =
-                                        with_new_return_type(old, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
+                                    let new_ty = with_new_return_type(
+                                        old,
+                                        final_ret,
+                                        &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
+                                    );
                                     bind.arena.get_mut(symbol_id).ty = Some(new_ty);
                                 }
                             }
@@ -211,10 +226,7 @@ pub fn enrich_call_returns(
                 let ret = types::join_types(inferred, &mut table);
                 bind.ty_table = std::sync::Arc::new(table);
                 if !ret.is_dynamic() {
-                    if let Some(ft_map) = bind
-                        .type_members
-                        .getters
-                        .get_mut(class_name_str.as_str())
+                    if let Some(ft_map) = bind.type_members.getters.get_mut(class_name_str.as_str())
                     {
                         if let Some(ty) = ft_map.get_mut(key_str.as_str()) {
                             *ty = ret;

@@ -3,6 +3,7 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::{ClassObj, Shape};
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
@@ -89,7 +90,7 @@ pub(crate) fn op_declare_field(
 ) -> VmResult<()> {
     if class_nv.is_heap() {
         if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap_idx()) {
-            cls.declare_field(Rc::from(name), tag);
+            cls.declare_field(Arc::from(name), tag);
             return Ok(());
         }
     }

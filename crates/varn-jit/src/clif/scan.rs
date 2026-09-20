@@ -512,4 +512,3 @@ fn find_index_origin(
         _ => None,
     }
 }
-

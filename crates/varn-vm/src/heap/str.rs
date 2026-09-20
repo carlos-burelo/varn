@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::RuntimeString;
 
 /// Lazily-computed ASCII cache for a `HeapStr`. The viewed content of a
@@ -51,7 +52,7 @@ pub enum HeapStr {
         len_ascii: std::cell::Cell<u32>,
     },
     /// A short dynamic string stored IN the heap object, with no `Rc` behind
-    /// it. `alloc_str_dynamic`'s `Rc::from` is a malloc plus a copy for every
+    /// it. `alloc_str_dynamic`'s `Arc::from` is a malloc plus a copy for every
     /// string over the 5-byte SSO limit, and the common `"prefix" + <small
     /// int>` result lands just past it. Capacity is chosen so
     /// `size_of::<HeapObj>()` does not change — the slot stride is shared with
@@ -195,10 +196,10 @@ impl HeapStr {
     #[inline]
     pub(crate) fn to_shared(&self) -> RuntimeString {
         match self {
-            HeapStr::Shared(s, _) => Rc::clone(s),
+            HeapStr::Shared(s, _) => Arc::clone(s),
             HeapStr::Ext { buf, len, .. } => {
                 let slice = unsafe { &(&*buf.get())[..*len] };
-                Rc::from(slice)
+                Arc::from(slice)
             }
             HeapStr::Slice {
                 src,
@@ -207,11 +208,11 @@ impl HeapStr {
             } => {
                 let off = *off as usize;
                 let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
-                Rc::from(&src[off..off + len])
+                Arc::from(&src[off..off + len])
             }
             HeapStr::Inline { len, bytes, .. } => {
                 let slice = unsafe { std::str::from_utf8_unchecked(&bytes[..*len as usize]) };
-                Rc::from(slice)
+                Arc::from(slice)
             }
         }
     }

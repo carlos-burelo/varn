@@ -8,7 +8,7 @@ use super::infer::member_binary::normalize_for_binary;
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::{Type, TypeContext};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ArrowBody, ExprId, ExprKind, MatchBody, MatchPattern, TemplatePart};
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind};
@@ -110,8 +110,12 @@ impl<'r> Checker<'r> {
                 is_async,
                 ..
             } => {
-                let (params, return_type, body, is_async) =
-                    (params.clone(), return_type.clone(), (**body).clone(), *is_async);
+                let (params, return_type, body, is_async) = (
+                    params.clone(),
+                    return_type.clone(),
+                    (**body).clone(),
+                    *is_async,
+                );
                 let saved_expected = self.expected_return_type.take();
 
                 let resolved_ret = return_type
@@ -130,13 +134,13 @@ impl<'r> Checker<'r> {
                     self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
                 }
 
-                let mut injected_type_params: Vec<Rc<str>> = vec![];
+                let mut injected_type_params: Vec<Arc<str>> = vec![];
                 if let Some(expected_fn) = self.expected_fn_type() {
                     for ep in &expected_fn.params {
                         if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
                             let n_str = bind.interner.resolve(n);
                             if varn_core::IntrinsicType::from_str(n_str).is_none() {
-                                injected_type_params.push(Rc::from(n_str));
+                                injected_type_params.push(Arc::from(n_str));
                             }
                         }
                     }
@@ -145,7 +149,7 @@ impl<'r> Checker<'r> {
                     {
                         let n_str = bind.interner.resolve(n);
                         if varn_core::IntrinsicType::from_str(n_str).is_none() {
-                            injected_type_params.push(Rc::from(n_str));
+                            injected_type_params.push(Arc::from(n_str));
                         }
                     }
                     for tp in &injected_type_params {
@@ -209,16 +213,14 @@ impl<'r> Checker<'r> {
             } => {
                 let (return_type, body, is_async) = (return_type.clone(), *body, *is_async);
                 let saved_expected = self.expected_return_type.take();
-                self.expected_return_type = return_type
-                    .as_ref()
-                    .map(|rt| {
-                        let ty = self.resolve_type_node_cached(rt, bind);
-                        if is_async {
-                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
-                        } else {
-                            ty
-                        }
-                    });
+                self.expected_return_type = return_type.as_ref().map(|rt| {
+                    let ty = self.resolve_type_node_cached(rt, bind);
+                    if is_async {
+                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                    } else {
+                        ty
+                    }
+                });
 
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
@@ -266,7 +268,9 @@ impl<'r> Checker<'r> {
                     self.emit(
                         Diagnostic::warning(
                             ErrorCode::TypeMismatch,
-                            format!("'await' applied to non-Future type '{arg_ty_s}' has no effect"),
+                            format!(
+                                "'await' applied to non-Future type '{arg_ty_s}' has no effect"
+                            ),
                         )
                         .with_range(range),
                     );
@@ -423,9 +427,7 @@ impl<'r> Checker<'r> {
                     };
                     let same_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
                     let valid = match op {
-                        BinaryOp::Add => {
-                            same_numeric || l_base == Type::Str || r_base == Type::Str
-                        }
+                        BinaryOp::Add => same_numeric || l_base == Type::Str || r_base == Type::Str,
                         BinaryOp::Sub
                         | BinaryOp::Mul
                         | BinaryOp::Div
@@ -540,7 +542,9 @@ impl<'r> Checker<'r> {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
-                            format!("type mismatch: cannot assign '{value_ty_s}' to '{target_ty_s}'"),
+                            format!(
+                                "type mismatch: cannot assign '{value_ty_s}' to '{target_ty_s}'"
+                            ),
                         )
                         .with_range(range),
                     );
@@ -588,7 +592,9 @@ impl<'r> Checker<'r> {
                             members.iter().find_map(|m| {
                                 if m.kind == crate::types::ClassMemberKind::Constructor {
                                     if let TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
-                                        return Some(self.ty_table.get_function(fid).params.clone());
+                                        return Some(
+                                            self.ty_table.get_function(fid).params.clone(),
+                                        );
                                     }
                                 }
                                 None
@@ -708,7 +714,13 @@ impl<'r> Checker<'r> {
                             match matched.len() {
                                 0 => vec![],
                                 1 => vec![(id, matched.into_iter().next().unwrap())],
-                                _ => vec![(id, crate::types::Type::union(matched, &mut *std::sync::Arc::make_mut(&mut self.ty_table)))],
+                                _ => vec![(
+                                    id,
+                                    crate::types::Type::union(
+                                        matched,
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                    ),
+                                )],
                             }
                         } else {
                             vec![]
@@ -773,7 +785,8 @@ impl<'r> Checker<'r> {
                 self.check_expr(tag, bind);
                 self.check_expr(template, bind);
                 let tag_ty_raw = self.infer_type(tag, bind);
-                let tag_ty = tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let tag_ty =
+                    tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
                     let ret = self.ty_table.get_function(fid).return_type;
                     self.record_type(range.start.offset, Type(ret, false));
@@ -904,7 +917,7 @@ fn closest_name(
             None => break,
         }
     }
-    let all_rc: Vec<Rc<str>> = all.into_iter().map(Rc::from).collect();
+    let all_rc: Vec<Arc<str>> = all.into_iter().map(Arc::from).collect();
     closest_in_list(name, &all_rc).map(|s| s.to_owned())
 }
 

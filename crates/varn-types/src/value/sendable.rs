@@ -3,7 +3,7 @@ use crate::value::{
 };
 use crate::vm_value::VmValue;
 use rust_decimal::Decimal;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub enum SendValue {
@@ -146,11 +146,11 @@ impl Value {
 fn endpoint_marker(dir: &str, id: u64) -> Value {
     let obj = ObjRef::from_pairs([
         (
-            std::rc::Rc::from("__chanEndpoint"),
-            value_to_nv(&Value::Str(std::rc::Rc::from(dir))),
+            std::sync::Arc::from("__chanEndpoint"),
+            value_to_nv(&Value::Str(std::sync::Arc::from(dir))),
         ),
         (
-            std::rc::Rc::from("__chanId"),
+            std::sync::Arc::from("__chanId"),
             value_to_nv(&Value::Int(id as i64)),
         ),
     ]);
@@ -178,7 +178,7 @@ impl SendValue {
             SendValue::Bool(b) => Value::Bool(*b),
             SendValue::Int(n) => Value::Int(*n),
             SendValue::Float(bits) => Value::Float(f64::from_bits(*bits)),
-            SendValue::Str(s) => Value::Str(Rc::from(s.as_str())),
+            SendValue::Str(s) => Value::Str(Arc::from(s.as_str())),
             SendValue::BigInt(b) => Value::BigInt(Box::new(*b)),
             SendValue::Decimal(d) => Value::Decimal(Box::new(*d)),
             SendValue::Char(c) => Value::Char(*c),
@@ -193,7 +193,7 @@ impl SendValue {
             SendValue::Object(fields) => Value::Object(ObjRef::from_pairs(
                 fields
                     .iter()
-                    .map(|(k, v)| (Rc::from(k.as_str()), value_to_nv(&v.to_value()))),
+                    .map(|(k, v)| (Arc::from(k.as_str()), value_to_nv(&v.to_value()))),
             )),
             // Heap-free materialization only round-trips scalar/SSO entries
             // (all `value_to_nv` handles); the ctx variant below covers the
@@ -223,10 +223,10 @@ impl SendValue {
             SendValue::ChannelReceiver(id) => endpoint_marker("rx", *id),
             SendValue::EnumVariant(ev) => {
                 Value::EnumVariant(Box::new(crate::value::EnumVariantData {
-                    enum_name: Rc::from(ev.enum_name.as_str()),
-                    variant_name: Rc::from(ev.variant_name.as_str()),
+                    enum_name: Arc::from(ev.enum_name.as_str()),
+                    variant_name: Arc::from(ev.variant_name.as_str()),
                     variant_tag: ev.variant_tag,
-                    fields: ev.fields.iter().map(|f| Rc::from(f.as_str())).collect(),
+                    fields: ev.fields.iter().map(|f| Arc::from(f.as_str())).collect(),
                     payload: ev.payload.to_value(),
                 }))
             }
@@ -287,10 +287,10 @@ impl SendValue {
                 let payload_nv = ev.payload.to_value_ctx(ctx);
                 ctx.intern(Value::EnumVariant(Box::new(
                     crate::value::EnumVariantData {
-                        enum_name: Rc::from(ev.enum_name.as_str()),
-                        variant_name: Rc::from(ev.variant_name.as_str()),
+                        enum_name: Arc::from(ev.enum_name.as_str()),
+                        variant_name: Arc::from(ev.variant_name.as_str()),
                         variant_tag: ev.variant_tag,
-                        fields: ev.fields.iter().map(|f| Rc::from(f.as_str())).collect(),
+                        fields: ev.fields.iter().map(|f| Arc::from(f.as_str())).collect(),
                         payload: ctx.extract(payload_nv),
                     },
                 )))

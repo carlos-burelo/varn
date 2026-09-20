@@ -2,6 +2,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::{value::ObjRef, Value};
 
 /// Build an object literal from `count` frame registers using a pre-resolved
@@ -237,7 +238,10 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                 heap.as_int(key) as usize
             };
             let slice = b.as_slice();
-            let val = slice.get(idx).map(|&byte| VmValue::from_int(byte as i64)).unwrap_or(VmValue::null());
+            let val = slice
+                .get(idx)
+                .map(|&byte| VmValue::from_int(byte as i64))
+                .unwrap_or(VmValue::null());
             return Ok(val);
         }
     }
@@ -472,7 +476,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
             _ => None,
         };
         if let Some((is_record, o)) = maybe_obj {
-            let kept: Vec<(Rc<str>, VmValue)> = o
+            let kept: Vec<(Arc<str>, VmValue)> = o
                 .borrow()
                 .iter()
                 .filter(|(k, _)| !exclude.iter().any(|e| e.as_str() == k.as_ref()))
@@ -537,13 +541,13 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
                 m.borrow().iter().map(|(k, v)| (*k, *v)).collect();
             for (k, nv) in entries {
                 let s = heap.str_repr(k.0);
-                target_obj.insert(Rc::from(s.as_str()), nv);
+                target_obj.insert(Arc::from(s.as_str()), nv);
             }
             return Ok(target);
         }
     }
     if let Value::Object(src) = heap.extract(spread) {
-        let pairs: Vec<(Rc<str>, VmValue)> = src.borrow().iter().collect();
+        let pairs: Vec<(Arc<str>, VmValue)> = src.borrow().iter().collect();
         for (k, nv) in pairs {
             target_obj.insert(k, nv);
         }

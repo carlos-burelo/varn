@@ -2,17 +2,17 @@ use super::type_inference::pattern_lead_name;
 use crate::binder::{ClassMemberInfo, ClassMemberKind};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{InterfaceDecl, InterfaceMember, Pattern};
 use varn_core::TypeKind;
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
-        let id_rc: Rc<str> = Rc::from(self.interner.resolve(i.id));
-        let origin_rc: Option<Rc<str>> = if self.source_file.is_empty() {
+        let id_rc: Arc<str> = Arc::from(self.interner.resolve(i.id));
+        let origin_rc: Option<Arc<str>> = if self.source_file.is_empty() {
             None
         } else {
-            Some(Rc::from(self.source_file.as_ref()))
+            Some(Arc::from(self.source_file.as_ref()))
         };
         let mut sym = Symbol::new(SymbolKind::Interface, i.id, i.range.start.line);
         sym.ty = Some(Type::named_with_origin(
@@ -28,11 +28,7 @@ impl<'r> super::Binder<'r> {
         sym.type_param_constraints = i
             .type_params
             .iter()
-            .map(|t| {
-                t.constraint
-                    .as_ref()
-                    .map(|con| self.resolve_type(con))
-            })
+            .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
         self.define(i.id, sym);
 
@@ -73,10 +69,10 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let ty = self.resolve_type(type_ann);
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
 
-                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
-                    .with_type(ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = true;
@@ -137,11 +133,14 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                ty = Type::array(
+                                    ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,
                             optional: p.is_optional,
                             is_rest: p.is_rest,
@@ -149,9 +148,9 @@ impl<'r> super::Binder<'r> {
                     })
                     .collect::<Vec<_>>();
 
-                let fn_tps: Vec<Rc<str>> = type_params
+                let fn_tps: Vec<Arc<str>> = type_params
                     .iter()
-                    .map(|tp| Rc::from(self.interner.resolve(tp.name)))
+                    .map(|tp| Arc::from(self.interner.resolve(tp.name)))
                     .collect();
 
                 let fn_type = Type::fn_(
@@ -164,7 +163,7 @@ impl<'r> super::Binder<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
                 let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
                     .with_type(fn_type.clone());
                 sym.col = range.start.column;
@@ -206,7 +205,7 @@ impl<'r> super::Binder<'r> {
                     .map(|m| self.resolve_type(m))
                     .unwrap_or(Type::Dynamic);
                 members.push(ClassMemberInfo {
-                    name: Rc::from(format!(
+                    name: Arc::from(format!(
                         "[{param_name}: {}]",
                         key_ty.display(&self.ty_table, &self.interner)
                     )),
@@ -249,11 +248,14 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                ty = Type::array(
+                                    ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,
                             optional: p.is_optional,
                             is_rest: p.is_rest,
@@ -270,7 +272,7 @@ impl<'r> super::Binder<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 members.push(ClassMemberInfo {
-                    name: Rc::from(varn_core::MemberKey::Callable.as_str()),
+                    name: Arc::from(varn_core::MemberKey::Callable.as_str()),
                     kind: ClassMemberKind::Method,
                     is_async: false,
                     is_generator: false,

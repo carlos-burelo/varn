@@ -1,8 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::OnceLock;
 
-pub type RuntimeString = Rc<str>;
+pub type RuntimeString = Arc<str>;
 
 pub use super::map::{MapKey, MapRef, ValueMap};
 

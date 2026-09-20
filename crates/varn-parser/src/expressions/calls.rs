@@ -376,10 +376,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 let op_range = s.range();
                 s.advance();
                 let full_range = s.expr_range(expr).to(op_range);
-                expr = s.expr(
-                    full_range,
-                    ExprKind::NonNull { expression: expr },
-                );
+                expr = s.expr(full_range, ExprKind::NonNull { expression: expr });
             }
 
             TokenKind::Template | TokenKind::TemplateHead => {
@@ -451,7 +448,6 @@ fn looks_like_generic_call(s: &TokenStream) -> bool {
         off += 1;
     }
 }
-
 
 fn try_parse_generic_call(
     s: &mut TokenStream,

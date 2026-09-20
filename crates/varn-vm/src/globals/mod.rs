@@ -1,14 +1,14 @@
 use crate::heap::Heap;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone)]
 #[repr(C)]
 pub struct GlobalStore {
     pub values: Vec<VmValue>,
-    names: FxHashMap<Rc<str>, usize>,
-    pub idx_to_name: Vec<Rc<str>>,
+    names: FxHashMap<Arc<str>, usize>,
+    pub idx_to_name: Vec<Arc<str>>,
 }
 
 impl GlobalStore {
@@ -29,10 +29,10 @@ impl GlobalStore {
 
         let mut values = Vec::with_capacity(order.len());
         let mut names = FxHashMap::default();
-        let mut idx_to_name: Vec<Rc<str>> = Vec::with_capacity(order.len());
+        let mut idx_to_name: Vec<Arc<str>> = Vec::with_capacity(order.len());
 
         for &name in order {
-            let rc_name: Rc<str> = Rc::from(name);
+            let rc_name: Arc<str> = Arc::from(name);
             let val = native_map.remove(name).unwrap_or(VmValue::null());
             names.insert(rc_name.clone(), values.len());
             idx_to_name.push(rc_name);
@@ -42,7 +42,7 @@ impl GlobalStore {
         // Anything the value map carried that the layout did not name (should be
         // nothing) is appended sorted — it stays reachable by name, just not at
         // a compile-time-known index.
-        let mut leftover: Vec<(Rc<str>, VmValue)> = native_map.into_iter().collect();
+        let mut leftover: Vec<(Arc<str>, VmValue)> = native_map.into_iter().collect();
         leftover.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
         for (name, val) in leftover {
             names.insert(name.clone(), values.len());
@@ -68,7 +68,7 @@ impl GlobalStore {
     /// fine: the indexed ops never consult `idx_to_name`.
     pub(crate) fn reserve_region(&mut self, count: u32) -> u32 {
         let base = self.values.len() as u32;
-        let empty: Rc<str> = Rc::from("");
+        let empty: Arc<str> = Arc::from("");
         for _ in 0..count {
             self.values.push(VmValue::null());
             self.idx_to_name.push(empty.clone());
@@ -82,7 +82,7 @@ impl GlobalStore {
             return idx;
         }
         let idx = self.values.len();
-        let rc_name: Rc<str> = Rc::from(name);
+        let rc_name: Arc<str> = Arc::from(name);
         self.idx_to_name.push(rc_name.clone());
         self.values.push(value);
         self.names.insert(rc_name, idx);

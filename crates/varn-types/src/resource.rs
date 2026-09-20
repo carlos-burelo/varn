@@ -1,5 +1,5 @@
-use std::any::Any;
 use rustc_hash::FxHashMap as HashMap;
+use std::any::Any;
 
 pub struct ResourceStore {
     next_id: u32,

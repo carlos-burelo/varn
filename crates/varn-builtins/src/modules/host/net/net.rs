@@ -168,7 +168,7 @@ varn_contract! {
                 match sock.recv_from(&mut buf) {
                     Ok((amt, src_addr)) => {
                         buf.truncate(amt);
-                        let host_rc = std::rc::Rc::from(src_addr.ip().to_string().as_str());
+                        let host_rc = std::sync::Arc::from(src_addr.ip().to_string().as_str());
                         let packet_val = varn_types::value::new_array(vec![
                             Value::Buffer(varn_types::VmBuffer::from_bytes(&buf)),
                             Value::Str(host_rc),
@@ -192,5 +192,6 @@ varn_contract! {
 }
 
 static NEXT_UDP_ID: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
-static UDP_SOCKETS: std::sync::LazyLock<std::sync::RwLock<std::collections::HashMap<i64, std::sync::Arc<std::net::UdpSocket>>>> =
-    std::sync::LazyLock::new(|| std::sync::RwLock::new(std::collections::HashMap::new()));
+static UDP_SOCKETS: std::sync::LazyLock<
+    std::sync::RwLock<std::collections::HashMap<i64, std::sync::Arc<std::net::UdpSocket>>>,
+> = std::sync::LazyLock::new(|| std::sync::RwLock::new(std::collections::HashMap::new()));

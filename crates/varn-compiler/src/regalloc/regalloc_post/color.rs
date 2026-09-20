@@ -35,7 +35,12 @@ pub(crate) fn color_with_base(
     blocks: &[(u8, u8)],
     kinds: &[SlotKind],
 ) -> Option<HashMap<u8, u8>> {
-    let kind_of = |reg: u8| kinds.get(reg as usize).copied().unwrap_or(SlotKind::Dynamic);
+    let kind_of = |reg: u8| {
+        kinds
+            .get(reg as usize)
+            .copied()
+            .unwrap_or(SlotKind::Dynamic)
+    };
     // Kind already occupying a new colour, if any. A colour takes the kind of
     // the first vreg assigned to it; every later occupant must match.
     let mut color_kind: HashMap<u8, SlotKind> = HashMap::default();
@@ -141,8 +146,8 @@ pub(crate) fn color_with_base(
                 // `register_meta` to `Dynamic`. Each block slot takes
                 // `c + offset`, so every slot must accept its occupant's kind.
                 let ends_share_kind = kind_of(u) == kind_of(v);
-                let slots_compatible = (0..count)
-                    .all(|off| compatible(&color_kind, c + off, kind_of(reg + off)));
+                let slots_compatible =
+                    (0..count).all(|off| compatible(&color_kind, c + off, kind_of(reg + off)));
                 if !neighbor_colors.contains(&c)
                     && c >= base
                     && c <= max_allowed_color
@@ -161,12 +166,10 @@ pub(crate) fn color_with_base(
             // cannot widen the search — moving an argument window is the
             // caller's allocation, not ours — so the function keeps the
             // registers the SSA emitter gave it.
-            None => (base..=max_allowed_color)
-                .find(|c| {
-                    !neighbor_colors.contains(c)
-                        && (0..count)
-                            .all(|off| compatible(&color_kind, c + off, kind_of(reg + off)))
-                })?,
+            None => (base..=max_allowed_color).find(|c| {
+                !neighbor_colors.contains(c)
+                    && (0..count).all(|off| compatible(&color_kind, c + off, kind_of(reg + off)))
+            })?,
         };
 
         for offset in 0..count {

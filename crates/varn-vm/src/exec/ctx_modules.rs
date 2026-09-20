@@ -53,10 +53,10 @@ impl ExecCtx {
                 let id_str = canonical_id_str(&id);
                 let expected_keys = get_cached_exports(&id_str);
 
-                let keys: Vec<std::rc::Rc<str>> = if let Some(parsed) = expected_keys {
+                let keys: Vec<std::sync::Arc<str>> = if let Some(parsed) = expected_keys {
                     parsed
                 } else {
-                    let mut k: Vec<std::rc::Rc<str>> = obj_ref.keys().collect();
+                    let mut k: Vec<std::sync::Arc<str>> = obj_ref.keys().collect();
                     k.sort();
                     k
                 };
@@ -225,12 +225,17 @@ impl ExecCtx {
     }
 }
 
-fn get_cached_exports(module_id: &str) -> Option<Vec<std::rc::Rc<str>>> {
+fn get_cached_exports(module_id: &str) -> Option<Vec<std::sync::Arc<str>>> {
     let spec = varn_builtins::spec_for(module_id)?;
     if spec.exports.is_empty() {
         None
     } else {
-        Some(spec.exports.iter().map(|&s| std::rc::Rc::from(s)).collect())
+        Some(
+            spec.exports
+                .iter()
+                .map(|&s| std::sync::Arc::from(s))
+                .collect(),
+        )
     }
 }
 
@@ -296,7 +301,7 @@ pub(crate) fn thaw_module(frozen: &FrozenModuleObj, heap: &mut crate::heap::Heap
         module_obj.exports[slot] = nv;
         module_obj
             .export_map
-            .insert(std::rc::Rc::from(key.as_ref()), slot);
+            .insert(std::sync::Arc::from(key.as_ref()), slot);
     }
 
     heap.alloc_module(std::rc::Rc::new(module_obj))
@@ -330,7 +335,7 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
             for (key, child_export) in fields {
                 let child_nv = thaw_export(&child_export, heap);
                 if let Some(HeapObj::Object(o)) = heap.get_by_idx_mut(raw_idx) {
-                    o.set_field_nv(std::rc::Rc::from(key.as_ref()), child_nv);
+                    o.set_field_nv(std::sync::Arc::from(key.as_ref()), child_nv);
                 }
             }
             obj_val

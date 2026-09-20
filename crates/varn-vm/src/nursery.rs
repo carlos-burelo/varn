@@ -695,7 +695,7 @@ enum ChildSlot {
     Spread,
     BoundMethodReceiver,
     ClassVtableItem(usize),
-    ClassStatic(std::rc::Rc<str>),
+    ClassStatic(std::sync::Arc<str>),
     ModuleExport(usize),
     EnumVariantPayload,
 }

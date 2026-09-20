@@ -69,7 +69,14 @@ pub(super) unsafe fn run_compiled_frame(
     is_osr: bool,
 ) -> JitFrameOutcome {
     let _ = (
-        ctx, jit_fn, closure_ptr, closure, frame_idx, depth, is_first_entry, is_osr,
+        ctx,
+        jit_fn,
+        closure_ptr,
+        closure,
+        frame_idx,
+        depth,
+        is_first_entry,
+        is_osr,
     );
     unreachable!("K3-faseA: compiled frames are bailed; see FRAME_LAYOUT_V2_JIT_BAIL");
 }

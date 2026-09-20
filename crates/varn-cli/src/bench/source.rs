@@ -1,6 +1,7 @@
 //! Benchmarking a `.vn` source file through the full pipeline.
 
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use varn_checker::module_resolver::ImportResolver;
 
@@ -32,7 +33,7 @@ fn compile_via_tir(
     program: &varn_core::ast::Program,
     ast_arena: &varn_core::ast::AstArena,
     check: &varn_checker::CheckResult,
-    export_names: Vec<Rc<str>>,
+    export_names: Vec<Arc<str>>,
 ) -> Result<FunctionProto, String> {
     let tir = varn_checker::emit::emit_module(
         program,
@@ -100,13 +101,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile, interner, arena) = varn_parser::parse_with_profile(
-        tokens,
-        lexeme_buf,
-        path,
-        varn_core::AtomInterner::new(),
-    )
-    .map_err(|errs| {
+    let (program, parse_profile, interner, arena) =
+        varn_parser::parse_with_profile(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
+            .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
                 .map(|e| {
@@ -304,17 +301,17 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             varn_core::AtomInterner::new(),
         )
         .map_err(|errs| {
-                let msgs: Vec<String> = errs
-                    .iter()
-                    .map(|e| {
-                        format!(
-                            "{}:{}:{}: {}",
-                            path, e.range.start.line, e.range.start.column, e.message
-                        )
-                    })
-                    .collect();
-                format!("parse errors:\n{}", msgs.join("\n"))
-            })?;
+            let msgs: Vec<String> = errs
+                .iter()
+                .map(|e| {
+                    format!(
+                        "{}:{}:{}: {}",
+                        path, e.range.start.line, e.range.start.column, e.message
+                    )
+                })
+                .collect();
+            format!("parse errors:\n{}", msgs.join("\n"))
+        })?;
 
         let check_result = varn_pipeline::resolver::with_resolver(|r| {
             Checker::check_with(
@@ -433,10 +430,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }
 
-fn export_names_of(filename: &str) -> Vec<Rc<str>> {
+fn export_names_of(filename: &str) -> Vec<Arc<str>> {
     let exports =
         varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
-    let mut names: Vec<Rc<str>> = exports.keys().map(|k| Rc::from(k.as_str())).collect();
+    let mut names: Vec<Arc<str>> = exports.keys().map(|k| Arc::from(k.as_str())).collect();
     names.sort();
     names
 }

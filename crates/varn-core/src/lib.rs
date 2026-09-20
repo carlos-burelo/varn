@@ -1,6 +1,6 @@
 // Varn Core Architecture Crate (v2)
-pub mod atom;
 pub mod ast;
+pub mod atom;
 pub mod cg_ty;
 pub mod diagnostics;
 pub mod doc;
@@ -21,8 +21,8 @@ pub mod type_tag;
 pub mod typed_ir;
 pub mod well_known;
 
-pub use atom::{Atom, AtomInterner};
 pub use ast::AstId;
+pub use atom::{Atom, AtomInterner};
 pub use doc::DocComment;
 
 pub use diagnostics::{
@@ -52,7 +52,7 @@ pub use typed_ir::{AnnKey, ExprAnnotation, NumericKind, TypeAnnotations};
 pub const HOST_API_VERSION: u32 = 3;
 
 /// No-op kept for API compatibility: `varn-lsp`/`varn-pipeline` call this on
-/// every module invalidation. It used to clear a `thread_local` `Rc<str>`
+/// every module invalidation. It used to clear a `thread_local` `Arc<str>`
 /// interner (`intern_string`, now removed -- it had no remaining callers);
 /// the real per-session interning now lives in `AtomInterner`
 /// (`atom.rs`), which is owned data, not global state, and clears with

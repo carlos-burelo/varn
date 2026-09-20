@@ -8,7 +8,7 @@
 //! only in this vocabulary. Anything the projection cannot express is
 //! `Dynamic` — never guessed.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CgTy {
@@ -25,7 +25,7 @@ pub enum CgTy {
     /// Instance of a source-declared class, by name. Enough to gate
     /// fixed-field/vtable dispatch; cross-module identity is resolved by
     /// the consumer against its own class table.
-    Class(Rc<str>),
+    Class(Arc<str>),
     /// `T?` — the payload type plus null.
     Nullable(Box<CgTy>),
     Fn,

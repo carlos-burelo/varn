@@ -7,7 +7,7 @@
 //! checker's packed offset has no consumer, which is the only reason the
 //! divergence is currently harmless.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_tir::{BackendTy, ClassId, ClassInfo, SigId};
 
 /// A subclass's fields come after its parent's, so a pointer to the derived
@@ -15,12 +15,12 @@ use varn_tir::{BackendTy, ClassId, ClassInfo, SigId};
 #[test]
 fn inheritance_lays_out_by_prefix() {
     let base = ClassInfo::new(
-        Rc::from("Base"),
+        Arc::from("Base"),
         None,
         vec![("a".into(), BackendTy::Int), ("b".into(), BackendTy::Bool)],
     );
     let derived = ClassInfo::new(
-        Rc::from("Derived"),
+        Arc::from("Derived"),
         Some((ClassId(0), &base)),
         vec![("c".into(), BackendTy::Float)],
     );
@@ -41,7 +41,7 @@ fn inheritance_lays_out_by_prefix() {
 #[test]
 fn slots_are_dense_and_ordered() {
     let c = ClassInfo::new(
-        Rc::from("P"),
+        Arc::from("P"),
         None,
         vec![
             ("x".into(), BackendTy::Int),
@@ -58,7 +58,7 @@ fn slots_are_dense_and_ordered() {
 #[test]
 fn declared_types_reach_the_layout() {
     let c = ClassInfo::new(
-        Rc::from("P"),
+        Arc::from("P"),
         None,
         vec![("n".into(), BackendTy::Int), ("s".into(), BackendTy::Str)],
     );
@@ -71,13 +71,13 @@ fn declared_types_reach_the_layout() {
 #[test]
 fn override_reuses_the_parent_slot() {
     let base = ClassInfo::new_with_methods(
-        Rc::from("Animal"),
+        Arc::from("Animal"),
         None,
         vec![],
         vec![("speak".into(), SigId(0)), ("name".into(), SigId(1))],
     );
     let derived = ClassInfo::new_with_methods(
-        Rc::from("Dog"),
+        Arc::from("Dog"),
         Some((ClassId(0), &base)),
         vec![],
         vec![("speak".into(), SigId(2)), ("fetch".into(), SigId(3))],

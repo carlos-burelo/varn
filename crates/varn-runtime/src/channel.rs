@@ -8,8 +8,8 @@
 //! del VM (`host_values::open_resolved`).
 
 use std::collections::{HashMap, VecDeque};
-use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::sync::{Mutex, OnceLock};
 
 use varn_types::task::AsyncTask;
@@ -73,8 +73,8 @@ fn core_of(id: u64) -> Option<std::sync::Arc<ChannelCore>> {
 /// spawnIsolate en task.rs).
 pub fn next_obj(value: Value, done: bool) -> Value {
     new_object(ObjRef::from_pairs([
-        (Rc::from("value"), value_to_nv(&value)),
-        (Rc::from("done"), VmValue::from_bool(done)),
+        (Arc::from("value"), value_to_nv(&value)),
+        (Arc::from("done"), VmValue::from_bool(done)),
     ]))
 }
 

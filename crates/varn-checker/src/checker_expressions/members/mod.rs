@@ -1,7 +1,7 @@
 mod member_exists;
 mod member_type;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
@@ -24,7 +24,7 @@ use varn_core::TypeKind;
 pub(crate) fn is_enum_type(
     resolver: &dyn crate::module_resolver::ImportResolver,
     bind: &BindResult,
-    name: &Rc<str>,
+    name: &Arc<str>,
     origin_modules: &[String],
 ) -> bool {
     if bind.get_enum_members_local(name.as_ref()).is_some() {
@@ -99,8 +99,8 @@ pub fn get_members_of_type(
     // `at` is the declaration site: `None` for members with no source of
     // their own (interface blobs, tuple indices, intrinsic properties).
     let add_member = |results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-                      seen: &mut rustc_hash::FxHashSet<Rc<str>>,
-                      name: Rc<str>,
+                      seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+                      name: Arc<str>,
                       ty: Type,
                       kind: crate::semantic_info::ResolvedMemberKind,
                       is_static: bool,
@@ -126,7 +126,7 @@ pub fn get_members_of_type(
     /// carries the declaration site the editor needs.
     fn add_declared(
         results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-        seen: &mut rustc_hash::FxHashSet<Rc<str>>,
+        seen: &mut rustc_hash::FxHashSet<Arc<str>>,
         m: &crate::types::ClassMemberInfo,
         ty: Type,
         kind: crate::semantic_info::ResolvedMemberKind,
@@ -206,7 +206,7 @@ pub fn get_members_of_type(
                 add_member(
                     &mut results,
                     &mut seen,
-                    Rc::from(idx.to_string()),
+                    Arc::from(idx.to_string()),
                     Type(*elem, false),
                     crate::semantic_info::ResolvedMemberKind::Property,
                     false,
@@ -217,7 +217,7 @@ pub fn get_members_of_type(
             add_member(
                 &mut results,
                 &mut seen,
-                Rc::from("length"),
+                Arc::from("length"),
                 Type::Int,
                 crate::semantic_info::ResolvedMemberKind::Property,
                 false,
@@ -231,8 +231,8 @@ pub fn get_members_of_type(
             return get_members_of_type(resolver, &array_ty, bind, table);
         }
         TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
-            let cn: Rc<str> = Rc::from(bind.interner.resolve(cn_atom));
-            let origin: Option<Rc<str>> = origin_atom.map(|o| Rc::from(bind.interner.resolve(o)));
+            let cn: Arc<str> = Arc::from(bind.interner.resolve(cn_atom));
+            let origin: Option<Arc<str>> = origin_atom.map(|o| Arc::from(bind.interner.resolve(o)));
             let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
                 let args: Vec<Type> = table
                     .get_list(args_list)
@@ -302,7 +302,7 @@ pub fn get_members_of_type(
             add_member(
                 &mut results,
                 &mut seen,
-                Rc::from(varn_core::MemberKey::Length.as_str()),
+                Arc::from(varn_core::MemberKey::Length.as_str()),
                 Type::Int,
                 crate::semantic_info::ResolvedMemberKind::Property,
                 false,
@@ -316,18 +316,15 @@ pub fn get_members_of_type(
             add_member(
                 &mut results,
                 &mut seen,
-                Rc::from(varn_core::MemberKey::Length.as_str()),
+                Arc::from(varn_core::MemberKey::Length.as_str()),
                 Type::Int,
                 crate::semantic_info::ResolvedMemberKind::Property,
                 false,
                 false,
                 true,
             );
-            let bytes_ty = Type::named(
-                varn_core::TypeTag::Bytes.name().to_owned(),
-                resolver,
-                table,
-            );
+            let bytes_ty =
+                Type::named(varn_core::TypeTag::Bytes.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
         TypeKind::Intrinsic(tag) => {
@@ -350,7 +347,7 @@ pub fn get_members_of_type(
 /// only tooling could see.
 fn collect_extension_members(
     results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-    seen: &mut rustc_hash::FxHashSet<Rc<str>>,
+    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
     ty: &Type,
     bind: &BindResult,
     table: &mut CheckerTyTable,
@@ -375,13 +372,13 @@ fn collect_extension_members(
         }
     };
 
-    let mut push = |name: &Rc<str>,
-                mangled: &Rc<str>,
-                kind: crate::semantic_info::ResolvedMemberKind,
-                as_return: bool,
-                results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-                seen: &mut rustc_hash::FxHashSet<Rc<str>>,
-                table: &mut CheckerTyTable| {
+    let mut push = |name: &Arc<str>,
+                    mangled: &Arc<str>,
+                    kind: crate::semantic_info::ResolvedMemberKind,
+                    as_return: bool,
+                    results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+                    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+                    table: &mut CheckerTyTable| {
         let Some(sid) = bind
             .interner
             .get(mangled.as_ref())
@@ -422,17 +419,41 @@ fn collect_extension_members(
     use crate::semantic_info::ResolvedMemberKind as K;
     if let Some(methods) = bind.extensions.methods.get(type_name.as_ref()) {
         for (name, mangled) in methods {
-            push(name, mangled, K::ExtensionMethod, false, results, seen, table);
+            push(
+                name,
+                mangled,
+                K::ExtensionMethod,
+                false,
+                results,
+                seen,
+                table,
+            );
         }
     }
     if let Some(getters) = bind.extensions.getters.get(type_name.as_ref()) {
         for (name, mangled) in getters {
-            push(name, mangled, K::ExtensionProperty, true, results, seen, table);
+            push(
+                name,
+                mangled,
+                K::ExtensionProperty,
+                true,
+                results,
+                seen,
+                table,
+            );
         }
     }
     if let Some(setters) = bind.extensions.setters.get(type_name.as_ref()) {
         for (name, mangled) in setters {
-            push(name, mangled, K::ExtensionProperty, true, results, seen, table);
+            push(
+                name,
+                mangled,
+                K::ExtensionProperty,
+                true,
+                results,
+                seen,
+                table,
+            );
         }
     }
 }
@@ -442,17 +463,17 @@ fn extension_key(
     ty: &Type,
     table: &CheckerTyTable,
     interner: &varn_core::AtomInterner,
-) -> Option<Rc<str>> {
+) -> Option<Arc<str>> {
     match table.get(ty.0) {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(n))),
-        TypeKind::Intrinsic(tag) => Some(Rc::from(tag.name())),
-        TypeKind::Array(_) => Some(Rc::from(varn_core::IntrinsicType::Array.as_str())),
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
+        TypeKind::Intrinsic(tag) => Some(Arc::from(tag.name())),
+        TypeKind::Array(_) => Some(Arc::from(varn_core::IntrinsicType::Array.as_str())),
         _ => None,
     }
 }
 
 impl<'r> Checker<'r> {
-    pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Rc<str>> {
+    pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Arc<str>> {
         let ty_kind = self.ty_table.get(ty.0);
         match ty_kind {
             TypeKind::Object(mid) => self
@@ -472,7 +493,7 @@ impl<'r> Checker<'r> {
                     .unwrap_or_default()
             }
             TypeKind::Union(list) => {
-                let mut names: Vec<Rc<str>> = Vec::new();
+                let mut names: Vec<Arc<str>> = Vec::new();
                 for id in self.ty_table.get_list(list).to_vec() {
                     let m = Type(id, false);
                     if !m.is_nullable(&self.ty_table) {

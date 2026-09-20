@@ -1,6 +1,6 @@
+use crate::vm_value::VmValue;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::vm_value::VmValue;
 
 pub const SMALL_MAP_CAP: usize = 8;
 

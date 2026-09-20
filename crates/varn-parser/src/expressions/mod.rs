@@ -228,10 +228,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 );
             } else if op_kind == TokenKind::PipeGt {
-                left = s.expr(
-                    range,
-                    ExprKind::Pipeline { left, right },
-                );
+                left = s.expr(range, ExprKind::Pipeline { left, right });
             } else if let Some(bin) = token_to_binary_op(op_kind) {
                 left = s.expr(
                     range,

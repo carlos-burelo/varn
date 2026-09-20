@@ -4,26 +4,26 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern};
 use varn_core::{Atom, TypeKind};
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
         // `name_atom` forwards the class identifier's `Atom` for fields that
-        // stay `Atom`-keyed (`PendingEnrich`); `name` is the `Rc<str>` text
+        // stay `Atom`-keyed (`PendingEnrich`); `name` is the `Arc<str>` text
         // resolved from it, needed everywhere this still feeds an unmigrated
-        // `Rc<str>`-typed API (`Symbol::new`, `ClassMemberInfo`, `Type`).
+        // `Arc<str>`-typed API (`Symbol::new`, `ClassMemberInfo`, `Type`).
         let name_atom: Atom = c.id.unwrap_or_else(|| self.intern_local("<anon>"));
-        let name: Rc<str> = Rc::from(self.interner.resolve(name_atom));
+        let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;
         let cls_type = Type::named_with_origin(
             name.clone(),
-            Some(Rc::from(self.source_file.as_ref())),
+            Some(Arc::from(self.source_file.as_ref())),
             self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
-        let mut sym =
-            Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
+        let mut sym = Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
         sym.col = c.range.start.column;
         sym.offset = c.range.start.offset;
         sym.doc = c.doc.as_ref().map(|s| self.intern_local(s.as_str()));
@@ -31,11 +31,7 @@ impl<'r> super::Binder<'r> {
         sym.type_param_constraints = c
             .type_params
             .iter()
-            .map(|t| {
-                t.constraint
-                    .as_ref()
-                    .map(|con| self.resolve_type(con))
-            })
+            .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
         self.define(name_atom, sym);
 
@@ -47,7 +43,7 @@ impl<'r> super::Binder<'r> {
 
         self.bind_type_params(&c.type_params, line);
 
-        let mut methods: FxHashMap<Rc<str>, Type> = FxHashMap::default();
+        let mut methods: FxHashMap<Arc<str>, Type> = FxHashMap::default();
         let mut members: Vec<ClassMemberInfo> = Vec::new();
 
         if let Some(primary_params) = &c.primary_params {
@@ -66,11 +62,12 @@ impl<'r> super::Binder<'r> {
                     if p.is_rest {
                         let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                         if !is_array {
-                            ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                            ty =
+                                Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         }
                     }
                     FunctionParam {
-                        name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                        name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                         ty: ty.0,
                         optional: p.is_optional || p.default.is_some(),
                         is_rest: p.is_rest,
@@ -96,7 +93,7 @@ impl<'r> super::Binder<'r> {
             let symbol_id = self.arena.push(sym);
 
             members.push(ClassMemberInfo {
-                name: Rc::from("constructor"),
+                name: Arc::from("constructor"),
                 kind: ClassMemberKind::Constructor,
                 is_async: false,
                 is_generator: false,
@@ -117,7 +114,7 @@ impl<'r> super::Binder<'r> {
 
             for p in primary_params {
                 let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
-                let key_rc: Rc<str> = Rc::from(name_str.as_str());
+                let key_rc: Arc<str> = Arc::from(name_str.as_str());
                 let key_atom = self.intern_local(&name_str);
                 let ty = p
                     .type_ann
@@ -270,7 +267,7 @@ impl<'r> super::Binder<'r> {
             ClassMember::Constructor { body, .. } => Some(body),
             _ => None,
         });
-        let candidate_fields: Vec<Rc<str>> = c
+        let candidate_fields: Vec<Arc<str>> = c
             .body
             .iter()
             .filter_map(|m| match m {
@@ -279,12 +276,12 @@ impl<'r> super::Binder<'r> {
                     init: None,
                     modifiers,
                     ..
-                } if !modifiers.is_static => Some(Rc::from(self.interner.resolve(*key))),
+                } if !modifiers.is_static => Some(Arc::from(self.interner.resolve(*key))),
                 _ => None,
             })
             .collect();
         if !candidate_fields.is_empty() {
-            let guaranteed: FxHashSet<Rc<str>> = match declared_ctor {
+            let guaranteed: FxHashSet<Arc<str>> = match declared_ctor {
                 Some(body) => super::definite_field_assignment::fields_assigned_on_every_path(
                     *body,
                     self.ast_arena,
@@ -319,7 +316,7 @@ impl<'r> super::Binder<'r> {
         let mut final_members = members.clone();
         if let Some((parent_name, parent_origin)) = extends {
             self.class_parents
-                .insert(name.clone(), Rc::from(parent_name.as_ref()));
+                .insert(name.clone(), Arc::from(parent_name.as_ref()));
             if let Some(parent_members) =
                 self.get_class_members(parent_name.as_ref(), parent_origin.as_deref())
             {
@@ -359,7 +356,7 @@ impl<'r> super::Binder<'r> {
         &mut self,
         member: &ClassMember,
         _class_name: &str,
-        _methods: &mut FxHashMap<Rc<str>, Type>,
+        _methods: &mut FxHashMap<Arc<str>, Type>,
         members: &mut Vec<ClassMemberInfo>,
     ) {
         match member {
@@ -379,11 +376,14 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                ty = Type::array(
+                                    ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
@@ -410,7 +410,7 @@ impl<'r> super::Binder<'r> {
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
-                    name: Rc::from("constructor"),
+                    name: Arc::from("constructor"),
                     kind: ClassMemberKind::Constructor,
                     is_async: false,
                     is_generator: false,
@@ -432,7 +432,7 @@ impl<'r> super::Binder<'r> {
                 for p in params {
                     if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                         let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
-                        let key_rc: Rc<str> = Rc::from(name_str.as_str());
+                        let key_rc: Arc<str> = Arc::from(name_str.as_str());
                         let key_atom = self.intern_local(&name_str);
                         let ty = p
                             .type_ann
@@ -485,14 +485,14 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
                 let ty = type_ann
                     .as_ref()
                     .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
-                    .with_type(ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();
@@ -527,7 +527,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
                 let declared_ret = return_type
                     .as_ref()
                     .map(|ann| self.resolve_type(ann))
@@ -555,11 +555,14 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                ty = Type::array(
+                                    ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                         }
                         FunctionParam {
-                            name: Some(Rc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
@@ -567,9 +570,9 @@ impl<'r> super::Binder<'r> {
                     })
                     .collect();
 
-                let fn_tps: Vec<Rc<str>> = type_params
+                let fn_tps: Vec<Arc<str>> = type_params
                     .iter()
-                    .map(|tp| Rc::from(self.interner.resolve(tp.name)))
+                    .map(|tp| Arc::from(self.interner.resolve(tp.name)))
                     .collect();
 
                 let fn_ty = Type::fn_(
@@ -618,14 +621,14 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
                 let ty = return_type
                     .as_ref()
                     .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
-                    .with_type(ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = return_type.is_some();
@@ -658,7 +661,7 @@ impl<'r> super::Binder<'r> {
                 range,
                 ..
             } => {
-                let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
                 let ty = param
                     .type_ann
                     .as_ref()
@@ -675,8 +678,8 @@ impl<'r> super::Binder<'r> {
                         _ => false,
                     };
 
-                let mut sym = Symbol::new(SymbolKind::Property, *key, range.start.line)
-                    .with_type(ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = has_explicit;

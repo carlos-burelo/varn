@@ -1,8 +1,9 @@
 use super::RuntimeString;
-use std::cell::{OnceCell, RefCell};
 use rustc_hash::FxHashMap as HashMap;
+use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 static NEXT_SHAPE_ID: AtomicU32 = AtomicU32::new(1);
 
@@ -36,7 +37,7 @@ impl Shape {
     ) -> Rc<Self> {
         let mut by_slot: Vec<(usize, RuntimeString)> = property_names
             .iter()
-            .map(|(k, &slot)| (slot, Rc::clone(k)))
+            .map(|(k, &slot)| (slot, Arc::clone(k)))
             .collect();
         by_slot.sort_unstable_by_key(|(slot, _)| *slot);
         let ordered: Vec<RuntimeString> = by_slot.into_iter().map(|(_, k)| k).collect();
@@ -92,7 +93,7 @@ impl Shape {
         }
         let mut new_props = self.property_names.clone();
         let slot = new_props.len();
-        new_props.insert(Rc::clone(&key), slot);
+        new_props.insert(Arc::clone(&key), slot);
         let child = Shape::create(self.class.clone(), new_props);
         trans.insert(key, Rc::clone(&child));
         child
@@ -104,10 +105,10 @@ impl Shape {
         if let Some(child) = trans.get(key) {
             return Rc::clone(child);
         }
-        let rc_key: RuntimeString = Rc::from(key);
+        let rc_key: RuntimeString = Arc::from(key);
         let mut new_props = self.property_names.clone();
         let slot = new_props.len();
-        new_props.insert(Rc::clone(&rc_key), slot);
+        new_props.insert(Arc::clone(&rc_key), slot);
         let child = Shape::create(self.class.clone(), new_props);
         trans.insert(rc_key, Rc::clone(&child));
         child

@@ -43,9 +43,15 @@ impl<'r> Checker<'r> {
         );
 
         match &arena.expr(expr).kind {
-            ExprKind::Member { optional: true, .. } => Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
-            ExprKind::Call { optional: true, .. } => Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
-            _ if is_opt_call => Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+            ExprKind::Member { optional: true, .. } => {
+                Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            }
+            ExprKind::Call { optional: true, .. } => {
+                Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            }
+            _ if is_opt_call => {
+                Type::make_nullable(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            }
             _ => ty,
         }
     }

@@ -1,7 +1,7 @@
 use crate::binder::resolve_type_node;
 use crate::types::{CheckerTyTable, Type, TypeContext};
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
 use varn_core::IntrinsicType;
@@ -9,10 +9,10 @@ use varn_core::TypeKind;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn infer_call_type(
-    fn_map: &FxHashMap<Rc<str>, Type>,
-    fn_type_params: &FxHashMap<Rc<str>, Vec<Rc<str>>>,
-    class_methods: &FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
-    sym_map: &FxHashMap<Rc<str>, Type>,
+    fn_map: &FxHashMap<Arc<str>, Type>,
+    fn_type_params: &FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    class_methods: &FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
+    sym_map: &FxHashMap<Arc<str>, Type>,
     expr: ExprId,
     ast_arena: &AstArena,
     ctx: Option<&dyn TypeContext>,
@@ -29,8 +29,8 @@ pub(crate) fn infer_call_type(
             let resolver = ctx.and_then(|c| c.resolver())?;
             let origin = ctx.and_then(|c| c.source_file());
             Some(Type::named_with_origin(
-                Rc::from(n),
-                origin.map(Rc::from),
+                Arc::from(n),
+                origin.map(Arc::from),
                 resolver,
                 table,
             ))
@@ -62,14 +62,12 @@ pub(crate) fn infer_call_type(
             )?;
             let obj_kind = table.get(obj_ty.0);
             let (class_name, origin): (&str, Option<&str>) = match obj_kind {
-                TypeKind::Named(n, origin) => (
-                    interner.resolve(n),
-                    origin.map(|o| interner.resolve(o)),
-                ),
-                TypeKind::Generic(name, _, origin) => (
-                    interner.resolve(name),
-                    origin.map(|o| interner.resolve(o)),
-                ),
+                TypeKind::Named(n, origin) => {
+                    (interner.resolve(n), origin.map(|o| interner.resolve(o)))
+                }
+                TypeKind::Generic(name, _, origin) => {
+                    (interner.resolve(name), origin.map(|o| interner.resolve(o)))
+                }
                 _ => (obj_ty.stdlib_key(table)?, None),
             };
 
@@ -197,17 +195,17 @@ pub(crate) fn infer_call_type(
                     for node in type_args {
                         args.push(resolve_type_node(node, ctx, table));
                     }
-                    return Some(Type::generic(Rc::from(name_str), args, resolver, table));
+                    return Some(Type::generic(Arc::from(name_str), args, resolver, table));
                 }
                 if name_str == IntrinsicType::Map.as_str() {
                     return Some(Type::generic(
-                        Rc::from(name_str),
+                        Arc::from(name_str),
                         vec![Type::Dynamic],
                         resolver,
                         table,
                     ));
                 }
-                return Some(Type::named(Rc::from(name_str), resolver, table));
+                return Some(Type::named(Arc::from(name_str), resolver, table));
             }
             None
         }

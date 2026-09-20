@@ -28,6 +28,7 @@ use rust_decimal::Decimal;
 pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
 pub use shape::{root_shape, Shape};
 use std::rc::Rc;
+use std::sync::Arc;
 pub use task::{reject_task, reject_value_task, resolve_task, Poll, TaskState};
 pub use varn_core::{TypeTag, VmValuePayload};
 
@@ -80,10 +81,10 @@ impl std::fmt::Display for RuntimeSymbol {
 
 #[derive(Debug, Clone)]
 pub struct EnumVariantData {
-    pub enum_name: Rc<str>,
-    pub variant_name: Rc<str>,
+    pub enum_name: Arc<str>,
+    pub variant_name: Arc<str>,
     pub variant_tag: i64,
-    pub fields: Vec<Rc<str>>,
+    pub fields: Vec<Arc<str>>,
     pub payload: Value,
 }
 

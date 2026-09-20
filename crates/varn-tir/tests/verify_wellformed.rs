@@ -3,17 +3,17 @@
 //! that make a dangling ClassId or an out-of-range vtable slot impossible
 //! rather than improbable.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_tir::*;
 
 fn empty_module() -> TirModule {
     TirModule {
-        source_file: Rc::from("test.vn"),
+        source_file: Arc::from("test.vn"),
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
         classes: vec![ClassInfo::new(
-            Rc::from("P"),
+            Arc::from("P"),
             None,
             vec![("x".into(), BackendTy::Int)],
         )],
@@ -27,7 +27,7 @@ fn empty_module() -> TirModule {
         global_names: vec![],
         class_defs: vec![],
         top_level: TirFunction {
-            name: Rc::from("<module>"),
+            name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
             return_ty: BackendTy::Void,
@@ -391,7 +391,7 @@ fn out_of_range_try_catch_local_is_rejected() {
 fn a_dangling_vtable_sig_is_rejected() {
     let mut m = empty_module();
     m.classes = vec![ClassInfo::new_with_methods(
-        Rc::from("P"),
+        Arc::from("P"),
         None,
         vec![("x".into(), BackendTy::Int)],
         vec![("m".into(), SigId(99))], // no entry 99 in m.signatures

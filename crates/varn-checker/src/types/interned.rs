@@ -49,7 +49,8 @@ pub struct ObjectMembersId(u32);
 /// `varn_core::TypeKind` (confirmed by reading `kinds.rs` in full — the plan
 /// draft omitted `TypePredicate`), parameters substituted per the module doc
 /// above. `Copy` because every substituted parameter is `Copy`.
-pub type InternedTypeKind = TypeKind<CheckerTyId, Atom, TyListId, FunctionTypeId, ObjectMembersId, ()>;
+pub type InternedTypeKind =
+    TypeKind<CheckerTyId, Atom, TyListId, FunctionTypeId, ObjectMembersId, ()>;
 
 /// Fixed ids for the ~21 zero-argument/intrinsic shapes every checker session
 /// needs (the `Type::Int`/`Type::Str`/... constants `type_impl.rs` exposes).
@@ -330,7 +331,9 @@ impl CheckerTyTable {
                 TypeKind::TemplateLiteral(self.reintern_list(other, list, cache))
             }
             TypeKind::Fn(fid) => TypeKind::Fn(self.reintern_function(other, fid, cache)),
-            TypeKind::Object(oid) => TypeKind::Object(self.reintern_object_members(other, oid, cache)),
+            TypeKind::Object(oid) => {
+                TypeKind::Object(self.reintern_object_members(other, oid, cache))
+            }
             TypeKind::Typeof(e) => TypeKind::Typeof(e),
             TypeKind::KeyOf(inner) => TypeKind::KeyOf(self.reintern(other, inner, cache)),
             TypeKind::IndexedAccess { object, index } => TypeKind::IndexedAccess {

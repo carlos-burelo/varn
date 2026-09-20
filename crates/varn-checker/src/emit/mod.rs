@@ -23,7 +23,7 @@ use crate::binder::BindResult;
 use crate::checker::TypeEntry;
 use body::FnEmitter;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{
     AstArena, AstId, Decl, ExportDecl, ExprId, FunctionDecl, Param, Pattern, Program, StmtId,
     StmtKind,
@@ -43,9 +43,9 @@ pub fn emit_module(
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
-    ext_calls: &FxHashMap<u32, Rc<str>>,
-    ext_members: &FxHashMap<u32, Rc<str>>,
-    ext_set_members: &FxHashMap<u32, Rc<str>>,
+    ext_calls: &FxHashMap<u32, Arc<str>>,
+    ext_members: &FxHashMap<u32, Arc<str>>,
+    ext_set_members: &FxHashMap<u32, Arc<str>>,
 ) -> TirModule {
     let interner = &bind.interner;
     let mut types = TyTable::default();
@@ -62,7 +62,7 @@ pub fn emit_module(
     // Names this file itself declares at the top level — the only ones that
     // become a module-qualified global. A builtin (`print`) or a name reaching
     // us from the prelude is NOT one of these; it resolves by bare name.
-    let mut declared: FxHashSet<Rc<str>> = FxHashSet::default();
+    let mut declared: FxHashSet<Arc<str>> = FxHashSet::default();
     for &stmt in &program.body {
         if let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind {
             collect_decl_names(d, ast_arena, &mut declared, interner);
@@ -74,13 +74,13 @@ pub fn emit_module(
     // the call site is `LoadGlobalIdx`, not a name lookup the JIT bails on.
     collect_extension_names(program, ast_arena, &mut declared, interner);
 
-    let mut global_slots: FxHashMap<Rc<str>, u32> = FxHashMap::default();
+    let mut global_slots: FxHashMap<Arc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
     for sym in bind.global_symbols() {
         if !is_value_symbol(sym.kind) {
             continue;
         }
-        let sym_name: Rc<str> = Rc::from(interner.resolve(sym.name));
+        let sym_name: Arc<str> = Arc::from(interner.resolve(sym.name));
         if !declared.contains(&sym_name) {
             continue;
         }
@@ -100,7 +100,7 @@ pub fn emit_module(
     // still need a qualified global to hang the object off. Give every
     // declared-but-unslotted name a slot.
     {
-        let mut extra: Vec<Rc<str>> = declared
+        let mut extra: Vec<Arc<str>> = declared
             .iter()
             .filter(|n| !global_slots.contains_key(n.as_ref()))
             .cloned()
@@ -112,7 +112,7 @@ pub fn emit_module(
             global_slots.insert(name, slot);
         }
     }
-    let mut global_names: Vec<Rc<str>> = vec![Rc::from(""); globals.len()];
+    let mut global_names: Vec<Arc<str>> = vec![Arc::from(""); globals.len()];
     for (name, &slot) in &global_slots {
         global_names[slot as usize] = name.clone();
     }
@@ -266,7 +266,7 @@ pub fn emit_module(
         std::mem::take(&mut top.locals)
     };
     let top_level = TirFunction {
-        name: Rc::from("<module>"),
+        name: Arc::from("<module>"),
         sig: SigId(0),
         params: vec![],
         return_ty: BackendTy::Void,
@@ -342,7 +342,7 @@ pub fn emit_module(
     let exports = collect_exports(program, ast_arena, interner);
 
     TirModule {
-        source_file: Rc::from(program.filename.as_ref()),
+        source_file: Arc::from(program.filename.as_ref()),
         imports,
         exports,
         types,
@@ -363,13 +363,13 @@ struct MCtx<'a> {
     names: &'a tables::NameIndex,
     classes: &'a [varn_tir::ClassInfo],
     enums: &'a [varn_tir::EnumInfo],
-    globals: &'a FxHashMap<Rc<str>, u32>,
+    globals: &'a FxHashMap<Arc<str>, u32>,
     fns: &'a FxHashMap<Atom, (u32, u32)>,
     call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
-    ext_calls: &'a FxHashMap<u32, Rc<str>>,
-    ext_members: &'a FxHashMap<u32, Rc<str>>,
-    ext_set_members: &'a FxHashMap<u32, Rc<str>>,
-    core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
+    ext_calls: &'a FxHashMap<u32, Arc<str>>,
+    ext_members: &'a FxHashMap<u32, Arc<str>>,
+    ext_set_members: &'a FxHashMap<u32, Arc<str>>,
+    core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
     math_intrinsics: &'a FxHashMap<Atom, u8>,
     interner: &'a AtomInterner,
     checker_table: &'a crate::types::CheckerTyTable,
@@ -398,7 +398,7 @@ impl<'a> MCtx<'a> {
 /// `(core class name, method name)` pairs a `CallNativeOp` may be emitted for:
 /// every non-static, non-async, non-generator instance `Method` of each loaded
 /// core class. Empty when no core contracts are in scope.
-fn core_method_ops(bind: &BindResult) -> FxHashSet<(Rc<str>, Rc<str>)> {
+fn core_method_ops(bind: &BindResult) -> FxHashSet<(Arc<str>, Arc<str>)> {
     let mut out = FxHashSet::default();
     let Some(core) = bind.core.as_ref() else {
         return out;
@@ -416,7 +416,7 @@ fn core_method_ops(bind: &BindResult) -> FxHashSet<(Rc<str>, Rc<str>)> {
                 && !m.is_async
                 && !m.is_generator
             {
-                out.insert((Rc::from(cname), m.name.clone()));
+                out.insert((Arc::from(cname), m.name.clone()));
             }
         }
     }
@@ -468,7 +468,7 @@ fn ns_nested_types(ns: &varn_core::ast::NamespaceDecl) -> Vec<&Decl> {
 fn emit_namespace_object(
     ns: &varn_core::ast::NamespaceDecl,
     fn_index: &FxHashMap<Atom, (u32, u32)>,
-    global_slots: &FxHashMap<Rc<str>, u32>,
+    global_slots: &FxHashMap<Arc<str>, u32>,
     interner: &AtomInterner,
     top: &mut FnEmitter,
     top_body: &mut Vec<TirStmt>,
@@ -506,7 +506,7 @@ fn emit_namespace_object(
             Decl::Function(f) => {
                 if let Some(&(fnid, _)) = fn_index.get(&f.id) {
                     entries.push(TirObjectEntry::Field {
-                        name: Rc::from(interner.resolve(f.id)),
+                        name: Arc::from(interner.resolve(f.id)),
                         value: TirExpr {
                             kind: TirExprKind::Var,
                             ty: dyno(),
@@ -526,7 +526,7 @@ fn emit_namespace_object(
                 if let Some(mname) = mname {
                     if let Some(&mslot) = global_slots.get(interner.resolve(mname)) {
                         entries.push(TirObjectEntry::Field {
-                            name: Rc::from(interner.resolve(mname)),
+                            name: Arc::from(interner.resolve(mname)),
                             value: global_ref(mslot),
                         });
                     }
@@ -537,7 +537,7 @@ fn emit_namespace_object(
                     if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) {
                         let value = top.lower_expression(init);
                         entries.push(TirObjectEntry::Field {
-                            name: Rc::from(interner.resolve(*name)),
+                            name: Arc::from(interner.resolve(*name)),
                             value,
                         });
                     }
@@ -566,11 +566,15 @@ fn emit_namespace_object(
 
 /// `let X = class { … }` — the class body of an anonymous class expression,
 /// so it is built like a named class (under `<anon>`).
-fn anon_class_of<'a>(decl: &'a Decl, ast_arena: &'a AstArena) -> Option<&'a varn_core::ast::ClassDecl> {
+fn anon_class_of<'a>(
+    decl: &'a Decl,
+    ast_arena: &'a AstArena,
+) -> Option<&'a varn_core::ast::ClassDecl> {
     let v = variable_decl(decl)?;
     for d in &v.declarators {
         if let Some(init) = d.init {
-            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &ast_arena.expr(init).kind {
+            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &ast_arena.expr(init).kind
+            {
                 return Some(declaration);
             }
         }
@@ -617,14 +621,14 @@ fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
 fn collect_decl_names(
     decl: &Decl,
     ast_arena: &AstArena,
-    out: &mut FxHashSet<Rc<str>>,
+    out: &mut FxHashSet<Arc<str>>,
     interner: &AtomInterner,
 ) {
     use varn_core::ast::{ImportSpecifier, Pattern as P};
-    fn pat_names(p: &P, out: &mut FxHashSet<Rc<str>>, interner: &AtomInterner) {
+    fn pat_names(p: &P, out: &mut FxHashSet<Arc<str>>, interner: &AtomInterner) {
         match p {
             P::Identifier { name, .. } => {
-                out.insert(Rc::from(interner.resolve(*name)));
+                out.insert(Arc::from(interner.resolve(*name)));
             }
             P::Array { elements, rest, .. } => {
                 for e in elements.iter().flatten() {
@@ -650,15 +654,15 @@ fn collect_decl_names(
     }
     match decl {
         Decl::Function(f) => {
-            out.insert(Rc::from(interner.resolve(f.id)));
+            out.insert(Arc::from(interner.resolve(f.id)));
         }
         Decl::Class(c) => {
             if let Some(id) = &c.id {
-                out.insert(Rc::from(interner.resolve(*id)));
+                out.insert(Arc::from(interner.resolve(*id)));
             }
         }
         Decl::Enum(e) => {
-            out.insert(Rc::from(interner.resolve(e.id)));
+            out.insert(Arc::from(interner.resolve(e.id)));
         }
         Decl::Variable(v) => {
             for d in &v.declarators {
@@ -669,12 +673,12 @@ fn collect_decl_names(
                         varn_core::ast::ExprKind::ClassExpr { .. }
                     )
                 }) {
-                    out.insert(Rc::from("<anon>"));
+                    out.insert(Arc::from("<anon>"));
                 }
             }
         }
         Decl::Namespace(ns) => {
-            out.insert(Rc::from(interner.resolve(ns.id)));
+            out.insert(Arc::from(interner.resolve(ns.id)));
             // A namespace member is a module binding too: a sibling reads it by
             // bare name and its qualified global backs the namespace object.
             for m in &ns.body {
@@ -686,7 +690,7 @@ fn collect_decl_names(
                 let (ImportSpecifier::Default { local, .. }
                 | ImportSpecifier::Named { local, .. }
                 | ImportSpecifier::Namespace { local, .. }) = spec;
-                out.insert(Rc::from(interner.resolve(*local)));
+                out.insert(Arc::from(interner.resolve(*local)));
             }
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => {
@@ -740,7 +744,7 @@ fn math_intrinsic_imports(
 fn collect_extension_names(
     program: &Program,
     ast_arena: &AstArena,
-    out: &mut FxHashSet<Rc<str>>,
+    out: &mut FxHashSet<Arc<str>>,
     interner: &AtomInterner,
 ) {
     use varn_core::ast::ExtensionMember;
@@ -755,15 +759,15 @@ fn collect_extension_names(
             continue;
         };
         for member in &ext.members {
-            let name: Rc<str> = match member {
+            let name: Arc<str> = match member {
                 ExtensionMember::Method(f) => {
-                    Rc::from(format!("__ext_{label}_{}", interner.resolve(f.id)))
+                    Arc::from(format!("__ext_{label}_{}", interner.resolve(f.id)))
                 }
                 ExtensionMember::Getter { key, .. } => {
-                    Rc::from(format!("__extget_{label}_{}", interner.resolve(*key)))
+                    Arc::from(format!("__extget_{label}_{}", interner.resolve(*key)))
                 }
                 ExtensionMember::Setter { key, .. } => {
-                    Rc::from(format!("__extset_{label}_{}", interner.resolve(*key)))
+                    Arc::from(format!("__extset_{label}_{}", interner.resolve(*key)))
                 }
             };
             out.insert(name);
@@ -776,13 +780,13 @@ fn collect_extension_names(
 fn extension_target_label(
     t: &varn_core::ast::types::TypeNode,
     interner: &AtomInterner,
-) -> Option<Rc<str>> {
+) -> Option<Arc<str>> {
     use varn_core::TypeKind;
     match &t.kind {
-        TypeKind::Named(n, _) => Some(Rc::from(interner.resolve(*n))),
-        TypeKind::Generic(n, _, _) => Some(Rc::from(interner.resolve(*n))),
-        TypeKind::Intrinsic(tag) => Some(Rc::from(varn_core::IntrinsicType::from(*tag).as_str())),
-        TypeKind::Array(_) => Some(Rc::from("Array")),
+        TypeKind::Named(n, _) => Some(Arc::from(interner.resolve(*n))),
+        TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(*n))),
+        TypeKind::Intrinsic(tag) => Some(Arc::from(varn_core::IntrinsicType::from(*tag).as_str())),
+        TypeKind::Array(_) => Some(Arc::from("Array")),
         _ => None,
     }
 }
@@ -824,9 +828,9 @@ fn emit_extensions(
             _ => None,
         };
         for member in &ext.members {
-            let (mangled, params, body): (Rc<str>, Vec<Rc<str>>, StmtId) = match member {
+            let (mangled, params, body): (Arc<str>, Vec<Arc<str>>, StmtId) = match member {
                 ExtensionMember::Method(f) => (
-                    Rc::from(format!("__ext_{label}_{}", ctx.interner.resolve(f.id))),
+                    Arc::from(format!("__ext_{label}_{}", ctx.interner.resolve(f.id))),
                     f.params
                         .iter()
                         .map(|p| param_name(p, ctx.interner))
@@ -834,20 +838,14 @@ fn emit_extensions(
                     f.body,
                 ),
                 ExtensionMember::Getter { key, body, .. } => (
-                    Rc::from(format!(
-                        "__extget_{label}_{}",
-                        ctx.interner.resolve(*key)
-                    )),
+                    Arc::from(format!("__extget_{label}_{}", ctx.interner.resolve(*key))),
                     vec![],
                     *body,
                 ),
                 ExtensionMember::Setter {
                     key, param, body, ..
                 } => (
-                    Rc::from(format!(
-                        "__extset_{label}_{}",
-                        ctx.interner.resolve(*key)
-                    )),
+                    Arc::from(format!("__extset_{label}_{}", ctx.interner.resolve(*key))),
                     vec![param_name(param, ctx.interner)],
                     *body,
                 ),
@@ -896,7 +894,7 @@ fn emit_extensions(
 
 /// `this.<field> = <param i>` — a parameter property / primary-constructor
 /// field assignment.
-fn param_field_assign(field: Rc<str>, param: u32) -> TirStmt {
+fn param_field_assign(field: Arc<str>, param: u32) -> TirStmt {
     this_field_assign(
         field,
         TirExpr {
@@ -909,7 +907,7 @@ fn param_field_assign(field: Rc<str>, param: u32) -> TirStmt {
 }
 
 /// `this.<field> = <value>` as a statement.
-fn this_field_assign(field: Rc<str>, value: TirExpr) -> TirStmt {
+fn this_field_assign(field: Arc<str>, value: TirExpr) -> TirStmt {
     let this = TirExpr {
         kind: TirExprKind::Var,
         ty: BackendTy::Dynamic(DynReason::Unannotated),
@@ -941,7 +939,7 @@ fn collect_exports(
     interner: &AtomInterner,
 ) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
-    let mut push = |exported: Rc<str>, local: Rc<str>, from: Option<Rc<str>>, ns: bool| {
+    let mut push = |exported: Arc<str>, local: Arc<str>, from: Option<Arc<str>>, ns: bool| {
         out.push(varn_tir::TirExport {
             exported,
             local,
@@ -966,9 +964,9 @@ fn collect_exports(
             }) => {
                 for sp in specifiers {
                     push(
-                        Rc::from(interner.resolve(sp.exported)),
-                        Rc::from(interner.resolve(sp.local)),
-                        source.map(|s| Rc::from(interner.resolve(s))),
+                        Arc::from(interner.resolve(sp.exported)),
+                        Arc::from(interner.resolve(sp.local)),
+                        source.map(|s| Arc::from(interner.resolve(s))),
                         false,
                     );
                 }
@@ -978,16 +976,16 @@ fn collect_exports(
                 alias: Some(alias),
                 ..
             }) => {
-                let alias: Rc<str> = Rc::from(interner.resolve(*alias));
+                let alias: Arc<str> = Arc::from(interner.resolve(*alias));
                 push(
                     alias.clone(),
                     alias,
-                    Some(Rc::from(interner.resolve(*source))),
+                    Some(Arc::from(interner.resolve(*source))),
                     true,
                 );
             }
             Decl::Export(ExportDecl::Default { .. }) => {
-                push(Rc::from("default"), Rc::from("default"), None, false);
+                push(Arc::from("default"), Arc::from("default"), None, false);
             }
             _ => {}
         }
@@ -1015,25 +1013,25 @@ fn collect_imports(
             .map(|s| {
                 let (local, kind) = match s {
                     IS::Default { local, .. } => (
-                        Rc::from(interner.resolve(*local)),
+                        Arc::from(interner.resolve(*local)),
                         varn_tir::TirImportKind::Default,
                     ),
                     IS::Namespace { local, .. } => (
-                        Rc::from(interner.resolve(*local)),
+                        Arc::from(interner.resolve(*local)),
                         varn_tir::TirImportKind::Namespace,
                     ),
                     IS::Named {
                         local, imported, ..
                     } => (
-                        Rc::from(interner.resolve(*local)),
-                        varn_tir::TirImportKind::Named(Rc::from(interner.resolve(*imported))),
+                        Arc::from(interner.resolve(*local)),
+                        varn_tir::TirImportKind::Named(Arc::from(interner.resolve(*imported))),
                     ),
                 };
                 varn_tir::TirImportSpec { local, kind }
             })
             .collect();
         out.push(varn_tir::TirImport {
-            source: Rc::from(interner.resolve(imp.source)),
+            source: Arc::from(interner.resolve(imp.source)),
             is_type_only: imp.is_type,
             specs,
         });
@@ -1057,7 +1055,7 @@ fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
 /// its `FnId`.
 #[allow(clippy::too_many_arguments)]
 fn emit_member_fn(
-    display_name: Rc<str>,
+    display_name: Arc<str>,
     params: &[Param],
     body: Option<StmtId>,
     ast_arena: &AstArena,
@@ -1073,7 +1071,7 @@ fn emit_member_fn(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::FnId {
     let sig_snapshot = signatures[sig.0 as usize].clone();
-    let param_names: Vec<Rc<str>> = params.iter().map(|p| param_name(p, ctx.interner)).collect();
+    let param_names: Vec<Arc<str>> = params.iter().map(|p| param_name(p, ctx.interner)).collect();
     let fn_id = varn_tir::FnId(out.len() as u32);
     // Reserve this slot; the member's own closures follow it.
     let base = out.len() as u32 + 1;
@@ -1102,7 +1100,7 @@ fn emit_member_fn(
             if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                 if let Pattern::Identifier { name, .. } = &p.pattern {
                     b.push(param_field_assign(
-                        Rc::from(ctx.interner.resolve(*name)),
+                        Arc::from(ctx.interner.resolve(*name)),
                         i as u32,
                     ));
                 }
@@ -1181,10 +1179,10 @@ fn emit_class(
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
     // An anonymous `class { … }` is bound by the binder under `<anon>`.
-    let class_name: Rc<str> = class
+    let class_name: Arc<str> = class
         .id
-        .map(|a| Rc::from(ctx.interner.resolve(a)))
-        .unwrap_or_else(|| Rc::from("<anon>"));
+        .map(|a| Arc::from(ctx.interner.resolve(a)))
+        .unwrap_or_else(|| Arc::from("<anon>"));
     let class_id = ctx.names.class_id(&class_name);
 
     let mut def = varn_tir::TirClassDef {
@@ -1271,7 +1269,7 @@ fn emit_class(
                 let value = em.lower_expression(*init);
                 stmts.append(&mut em.take_pending());
                 stmts.push(this_field_assign(
-                    Rc::from(ctx.interner.resolve(*key)),
+                    Arc::from(ctx.interner.resolve(*key)),
                     value,
                 ));
             }
@@ -1286,7 +1284,7 @@ fn emit_class(
             ClassMember::Constructor { params, body, .. } => {
                 let sig = info_sig("constructor", params.len(), signatures);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.constructor")),
+                    Arc::from(format!("{class_name}.constructor")),
                     params,
                     Some(*body),
                     ast_arena,
@@ -1302,7 +1300,7 @@ fn emit_class(
                     out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Rc::from("constructor"),
+                    key: Arc::from("constructor"),
                     func: id,
                     is_static: false,
                     is_private: false,
@@ -1320,7 +1318,7 @@ fn emit_class(
                 let key_str = ctx.interner.resolve(*key);
                 let sig = info_sig(key_str, params.len(), signatures);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.{key_str}")),
+                    Arc::from(format!("{class_name}.{key_str}")),
                     params,
                     Some(*body),
                     ast_arena,
@@ -1354,7 +1352,7 @@ fn emit_class(
                     })
                     .collect();
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_static: modifiers.is_static,
                     is_private: matches!(
@@ -1373,7 +1371,7 @@ fn emit_class(
                 let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.get {key_str}")),
+                    Arc::from(format!("{class_name}.get {key_str}")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -1389,7 +1387,7 @@ fn emit_class(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
@@ -1406,7 +1404,7 @@ fn emit_class(
                 let sig = fresh_sig(signatures, 1);
                 let ps = std::slice::from_ref(param);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.set {key_str}")),
+                    Arc::from(format!("{class_name}.set {key_str}")),
                     ps,
                     Some(*body),
                     ast_arena,
@@ -1422,7 +1420,7 @@ fn emit_class(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
@@ -1449,12 +1447,13 @@ fn emit_class(
                     def.prelude.extend(pre);
                     x
                 });
-                def.statics.push((Rc::from(ctx.interner.resolve(*key)), init_x));
+                def.statics
+                    .push((Arc::from(ctx.interner.resolve(*key)), init_x));
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.<static>")),
+                    Arc::from(format!("{class_name}.<static>")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -1510,11 +1509,8 @@ fn emit_class(
                                     // construction) is interned into and dropped
                                     // in the same expression.
                                     let mut scratch = crate::types::CheckerTyTable::new();
-                                    let resolved = crate::binder::resolve_type_node(
-                                        t,
-                                        None,
-                                        &mut scratch,
-                                    );
+                                    let resolved =
+                                        crate::binder::resolve_type_node(t, None, &mut scratch);
                                     lower_type(&resolved, &scratch, ctx.interner, types, ctx.names)
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
@@ -1523,7 +1519,7 @@ fn emit_class(
                     signatures[sig.0 as usize].params = tys;
                 }
                 let id = emit_member_fn(
-                    Rc::from(format!("{class_name}.constructor")),
+                    Arc::from(format!("{class_name}.constructor")),
                     primary,
                     None,
                     ast_arena,
@@ -1548,7 +1544,7 @@ fn emit_class(
                     }
                     if let Pattern::Identifier { name, .. } = &p.pattern {
                         body.push(param_field_assign(
-                            Rc::from(ctx.interner.resolve(*name)),
+                            Arc::from(ctx.interner.resolve(*name)),
                             i as u32,
                         ));
                     }
@@ -1557,7 +1553,7 @@ fn emit_class(
                 new.extend(std::mem::take(body));
                 *body = new;
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Rc::from("constructor"),
+                    key: Arc::from("constructor"),
                     func: id,
                     is_static: false,
                     is_private: false,
@@ -1580,7 +1576,7 @@ fn emit_enum(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
-    let name: Rc<str> = Rc::from(ctx.interner.resolve(en.id));
+    let name: Arc<str> = Arc::from(ctx.interner.resolve(en.id));
     let enum_id = ctx.names.enum_id(&name);
     let mut def = varn_tir::TirClassDef {
         name: name.clone(),
@@ -1626,9 +1622,9 @@ fn emit_enum(
             }
         }
         def.variants.push(varn_tir::TirVariantDef {
-            name: Rc::from(member_name),
+            name: Arc::from(member_name),
             tag,
-            meta: Rc::from(meta.as_str()),
+            meta: Arc::from(meta.as_str()),
             const_args,
         });
         tag += 1;
@@ -1649,7 +1645,7 @@ fn emit_enum(
                 let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.{key_str}")),
+                    Arc::from(format!("{name}.{key_str}")),
                     params,
                     Some(*body),
                     ast_arena,
@@ -1665,7 +1661,7 @@ fn emit_enum(
                     out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_static: modifiers.is_static,
                     is_private: false,
@@ -1675,7 +1671,7 @@ fn emit_enum(
             ClassMember::Constructor { params, body, .. } => {
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.constructor")),
+                    Arc::from(format!("{name}.constructor")),
                     params,
                     Some(*body),
                     ast_arena,
@@ -1691,7 +1687,7 @@ fn emit_enum(
                     out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Rc::from("constructor"),
+                    key: Arc::from("constructor"),
                     func: id,
                     is_static: false,
                     is_private: false,
@@ -1707,7 +1703,7 @@ fn emit_enum(
                 let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.get {key_str}")),
+                    Arc::from(format!("{name}.get {key_str}")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -1723,7 +1719,7 @@ fn emit_enum(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
@@ -1739,7 +1735,7 @@ fn emit_enum(
                 let key_str = ctx.interner.resolve(*key);
                 let sig = fresh_sig(signatures, 1);
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.set {key_str}")),
+                    Arc::from(format!("{name}.set {key_str}")),
                     std::slice::from_ref(param),
                     Some(*body),
                     ast_arena,
@@ -1755,7 +1751,7 @@ fn emit_enum(
                     out,
                 );
                 def.accessors.push(varn_tir::TirClassAccessor {
-                    key: Rc::from(key_str),
+                    key: Arc::from(key_str),
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
@@ -1783,12 +1779,13 @@ fn emit_enum(
                     def.prelude.extend(pre);
                     x
                 });
-                def.statics.push((Rc::from(ctx.interner.resolve(*key)), init_x));
+                def.statics
+                    .push((Arc::from(ctx.interner.resolve(*key)), init_x));
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);
                 let id = emit_member_fn(
-                    Rc::from(format!("{name}.<static>")),
+                    Arc::from(format!("{name}.<static>")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -1811,10 +1808,10 @@ fn emit_enum(
     def
 }
 
-fn param_name(p: &Param, interner: &AtomInterner) -> Rc<str> {
+fn param_name(p: &Param, interner: &AtomInterner) -> Arc<str> {
     match &p.pattern {
-        Pattern::Identifier { name, .. } => Rc::from(interner.resolve(*name)),
-        _ => Rc::from("_"),
+        Pattern::Identifier { name, .. } => Arc::from(interner.resolve(*name)),
+        _ => Arc::from("_"),
     }
 }
 
@@ -1868,7 +1865,11 @@ fn emit_function(
         return_ty,
     });
 
-    let param_names: Vec<Rc<str>> = f.params.iter().map(|p| param_name(p, ctx.interner)).collect();
+    let param_names: Vec<Arc<str>> = f
+        .params
+        .iter()
+        .map(|p| param_name(p, ctx.interner))
+        .collect();
     let (body, locals) = {
         let mut em = FnEmitter::new(
             ast_arena,
@@ -1889,7 +1890,7 @@ fn emit_function(
     };
 
     TirFunction {
-        name: Rc::from(fn_name_str),
+        name: Arc::from(fn_name_str),
         sig,
         params: param_tys,
         return_ty,
@@ -1920,7 +1921,7 @@ mod tests {
 
     fn stub_module() -> TirModule {
         TirModule {
-            source_file: Rc::from("t.vn"),
+            source_file: Arc::from("t.vn"),
             imports: vec![],
             exports: vec![],
             types: TyTable::default(),
@@ -1935,7 +1936,7 @@ mod tests {
             global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
-                name: Rc::from("<module>"),
+                name: Arc::from("<module>"),
                 sig: SigId(0),
                 params: vec![],
                 return_ty: BackendTy::Void,

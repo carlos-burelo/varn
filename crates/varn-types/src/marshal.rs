@@ -59,7 +59,7 @@ impl FromVm for String {
 }
 
 /// Borrowed-string marshaling for native params: SSO payloads decode into an
-/// inline buffer and heap strings clone their `Rc<str>` — no allocation, no
+/// inline buffer and heap strings clone their `Arc<str>` — no allocation, no
 /// byte copy. The `Rc` keeps the string alive independently of the heap
 /// slot, so callee-side heap mutation (allocation, GC) cannot invalidate it.
 ///
@@ -72,7 +72,7 @@ impl FromVm for String {
 /// O(n) walk into O(n²).
 pub enum VnStr {
     Sso { buf: [u8; 5], len: u8, ascii: bool },
-    Shared(std::rc::Rc<str>, bool),
+    Shared(std::sync::Arc<str>, bool),
 }
 
 impl VnStr {

@@ -1,6 +1,6 @@
 use crate::symbol::{Symbol, SymbolId};
 use crate::types::Type;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{
     Arg, ArrayEl, ArrowBody, Decl, ExprId, ExprKind, MatchBody, ObjectProp, Param, StmtId,
@@ -593,10 +593,13 @@ impl<'r> super::Binder<'r> {
         use crate::types::Type;
 
         for tp in type_params {
-            let name_rc: Rc<str> = Rc::from(self.interner.resolve(tp.name));
-            let tp_ty = Type::named(name_rc, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-            let mut sym =
-                Symbol::new(SymbolKind::TypeParameter, tp.name, line).with_type(tp_ty);
+            let name_rc: Arc<str> = Arc::from(self.interner.resolve(tp.name));
+            let tp_ty = Type::named(
+                name_rc,
+                self.resolver,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            );
+            let mut sym = Symbol::new(SymbolKind::TypeParameter, tp.name, line).with_type(tp_ty);
             sym.col = tp.range.start.column;
             sym.offset = tp.range.start.offset;
             self.define(tp.name, sym);
@@ -661,7 +664,7 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
             });
 
             if let Some(vname) = variant_name {
-                let field_types: Vec<(Rc<str>, Type)> = b
+                let field_types: Vec<(Arc<str>, Type)> = b
                     .sum_variant_fields
                     .get(b.interner.resolve(vname))
                     .cloned()
@@ -698,8 +701,8 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
                         _ => *field_name,
                     };
                     if b.interner.resolve(binding_name) != "_" {
-                        let sym = Symbol::new(SymbolKind::Let, binding_name, 0)
-                            .with_type(Type::Dynamic);
+                        let sym =
+                            Symbol::new(SymbolKind::Let, binding_name, 0).with_type(Type::Dynamic);
                         b.define(binding_name, sym);
                     }
                     if let Some(sub) = sub_pat {

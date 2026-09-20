@@ -30,12 +30,22 @@ let t: &mut CheckerTyTable = Arc::make_mut(&mut self.ty_table);
   its table as input and returns the grown one; the portable codec stays only for the
   on-disk interface.
 
-**Names inside the table become `Atom`, not `Rc<str>`.** `FunctionType::type_params`,
-`FunctionParam::name`, `ObjectTypeMember` names and `ClassMemberInfo::name` currently use
-`Rc<str>`, which makes the table `!Send + !Sync` and defeats `Arc` for parallelism. Since
-the per-compilation `AtomInterner` already exists, interning these names (a) removes the
-`Rc<str>` duplication, (b) makes the table `Send + Sync`, and (c) enables parallel
-module checking and incremental caching.
+**Names inside the table are `Arc<str>`, not `Rc<str>`.** `FunctionType::type_params`,
+`FunctionParam::name`, `ObjectTypeMember` names and `ClassMemberInfo::name` used
+`Rc<str>`, which makes the table `!Send + !Sync` and defeats `Arc` for parallelism.
+`Atom` was the first candidate (the per-compilation `AtomInterner` already exists), but it
+forces threading the interner through every `&str` comparison (member lookup, compat,
+narrowing) and remapping the `FxHashMap<Rc<str>, …>` maps, for a dedup gain that is
+marginal on param/member names. `Arc<str>` is a one-token change that keeps `.as_ref()` /
+`PartialEq<str>` ergonomics and delivers the same `Send + Sync`.
+
+To avoid a mixed pointer representation (Ley 6/8), the conversion was applied to **every
+name string in the workspace**, including the runtime `RuntimeString`/`Value::Str` and the
+bytecode/chunk names. The cost is atomic refcounts on string clone; accepted in exchange
+for one canonical pointer type and no cross-crate boundary conversions (Ley 10).
+Non-string `Rc` pointers (GC objects, `Rc<Shape>`, `Rc<BindResult>`, raw GC
+`into_raw`/`from_raw`) are untouched — they are not names and carry `unsafe`/layout
+contracts that are out of scope.
 
 `Arc<Vec>` + copy-on-publish is O(n) per phase; tables are hundreds-to-thousands of
 entries, so this is sufficient. `im` (persistent, O(log n)) is a measured follow-up only
@@ -58,12 +68,13 @@ if publish cost shows up (Ley 10: no pre-optimisation without data).
 - `ImportResolver::ty_table_snapshot` returns `Arc<CheckerTyTable>`.
 - `Binder`/`Checker` fields change type; the 60 `&mut …ty_table` sites become
   `Arc::make_mut`.
-- ~96 type constructors and ~420 `Rc` sites migrate as names move to `Atom`.
+- ~96 type constructors and ~420 name sites migrate from `Rc<str>` to `Arc<str>`.
 
 ## Migration (each step part of the final design, each green)
 1. `get` returns the shape by value — **done** (`d6bfff10`), prerequisite so no call site
    borrows the table.
 2. `Arc<CheckerTyTable>` + `Arc::make_mut` at the 60 mutation sites; snapshots as `Arc`.
-3. Names in table contents: `Rc<str>` → `Atom`; table becomes `Send + Sync`.
+3. Names in table contents: `Rc<str>` → `Arc<str>` workspace-wide; table becomes
+   `Send + Sync`.
 4. Delete `absorb`/`set_ty_table`/`reintern` in-process paths; keep the disk codec.
 5. Parallel module checking test.

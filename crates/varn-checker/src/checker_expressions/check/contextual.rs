@@ -39,16 +39,19 @@ impl<'r> Checker<'r> {
     }
 
     pub(super) fn check_array_with_context(&mut self, elements: &[ArrayEl], bind: &BindResult) {
-        let elem_expected = self.expected_type.and_then(|t| match self.ty_table.get(t.0) {
-            TypeKind::Array(inner) => Some(Type(inner, false)),
-            TypeKind::Generic(name, args, _)
-                if bind.interner.get(varn_core::IntrinsicType::Array.as_str()) == Some(name)
-                    && self.ty_table.get_list(args).len() == 1 =>
-            {
-                Some(Type(self.ty_table.get_list(args)[0], false))
-            }
-            _ => None,
-        });
+        let elem_expected = self
+            .expected_type
+            .and_then(|t| match self.ty_table.get(t.0) {
+                TypeKind::Array(inner) => Some(Type(inner, false)),
+                TypeKind::Generic(name, args, _)
+                    if bind.interner.get(varn_core::IntrinsicType::Array.as_str())
+                        == Some(name)
+                        && self.ty_table.get_list(args).len() == 1 =>
+                {
+                    Some(Type(self.ty_table.get_list(args)[0], false))
+                }
+                _ => None,
+            });
 
         for el in elements {
             match el {
@@ -100,7 +103,7 @@ impl<'r> Checker<'r> {
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();
                         vec![ObjectTypeMember::Index {
-                            param_name: std::rc::Rc::from("key"),
+                            param_name: std::sync::Arc::from("key"),
                             key_ty: arg_ids[0],
                             value_ty: arg_ids[1],
                         }]
@@ -186,7 +189,12 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(*value, bind);
                         if !actual.is_dynamic()
-                            && !self.value_assignable_to(expected, &actual, Some(*value), Some(bind))
+                            && !self.value_assignable_to(
+                                expected,
+                                &actual,
+                                Some(*value),
+                                Some(bind),
+                            )
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
                             let expected_s = expected.display(&self.ty_table, &bind.interner);

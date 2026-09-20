@@ -12,7 +12,7 @@
 //!
 //!   s.origin_module = resolved.origin_module.or(module_path_atom);
 //!   ...
-//!   let origin_rc: Rc<str> = Rc::from(self.interner.resolve(*origin));
+//!   let origin_rc: Arc<str> = Arc::from(self.interner.resolve(*origin));
 //!
 //! `resolved.origin_module` is an `Atom` mint by the *exporting* module's own
 //! bind (reached through the resolver's shared, growing table), while

@@ -485,7 +485,7 @@ impl IoDriver {
                 task.settle(Ok(Value::Int(-1)));
             }
             if let Some(pr) = stream_state.pending_read.take() {
-                pr.task.settle(Ok(Value::Str(std::rc::Rc::from(""))));
+                pr.task.settle(Ok(Value::Str(std::sync::Arc::from(""))));
             }
             if let Some(pw) = stream_state.pending_write.take() {
                 pw.task.settle(Ok(Value::Int(-1)));

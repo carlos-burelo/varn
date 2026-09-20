@@ -156,7 +156,10 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::NarrowRangeCheck { operand, tag } => {
             format!("narrow_range_check {} as {tag:?}", val(*operand))
         }
-        InstKind::BuildArray { elements, narrow_elem } => match narrow_elem {
+        InstKind::BuildArray {
+            elements,
+            narrow_elem,
+        } => match narrow_elem {
             Some(tag) => format!("array<{tag:?}>{}", args_list(elements)),
             None => format!("array{}", args_list(elements)),
         },

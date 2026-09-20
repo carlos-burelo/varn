@@ -1,7 +1,7 @@
 //! What the checker proved about which entity an expression names.
 
 use crate::ty::{DynReason, EnumId, FnId, LocalId, ModuleId};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// The entity an expression resolves to.
 ///
@@ -56,7 +56,7 @@ pub enum Resolution {
     /// Honestly dynamic. Carries why, so the remaining name-keyed accesses can
     /// be separated into the ones that are correct and the ones that are holes.
     ByName {
-        name: Rc<str>,
+        name: Arc<str>,
         why: DynReason,
     },
 }

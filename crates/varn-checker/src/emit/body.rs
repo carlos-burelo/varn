@@ -2,14 +2,14 @@ use crate::checker::TypeEntry;
 use crate::emit::tables::NameIndex;
 use crate::emit::ty::{lower_type, NameResolver};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
-use varn_core::{Atom, AtomInterner};
 use varn_core::ast::pattern::{MatchBinding, MatchPattern};
 use varn_core::ast::{
     Arg, ArrayEl, AstArena, AstId, ExprId, ExprKind, MatchBody, MatchCase, ObjectProp, Pattern,
     PropKey, StmtId, StmtKind,
 };
+use varn_core::{Atom, AtomInterner};
 use varn_tir::{
     BackendTy, ClassId, ClassInfo, DynReason, EnumId, EnumInfo, LocalId, Resolution, SigId,
     Signature, Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirFunction,
@@ -22,19 +22,19 @@ pub(super) struct ModuleCtx<'a> {
     pub classes: &'a [ClassInfo],
     pub enums: &'a [EnumInfo],
 
-    pub globals: &'a FxHashMap<Rc<str>, u32>,
+    pub globals: &'a FxHashMap<Arc<str>, u32>,
 
     pub fns: &'a FxHashMap<Atom, (u32, u32)>,
 
     pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
 
-    pub ext_calls: &'a FxHashMap<u32, Rc<str>>,
+    pub ext_calls: &'a FxHashMap<u32, Arc<str>>,
 
-    pub ext_members: &'a FxHashMap<u32, Rc<str>>,
+    pub ext_members: &'a FxHashMap<u32, Arc<str>>,
 
-    pub ext_set_members: &'a FxHashMap<u32, Rc<str>>,
+    pub ext_set_members: &'a FxHashMap<u32, Arc<str>>,
 
-    pub core_ops: &'a FxHashSet<(Rc<str>, Rc<str>)>,
+    pub core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
 
     pub math_intrinsics: &'a FxHashMap<Atom, u8>,
 
@@ -53,17 +53,17 @@ pub(super) struct FnEmitter<'a> {
     out_closures: &'a mut Vec<TirFunction>,
     closure_base: u32,
     pub locals: Vec<BackendTy>,
-    scopes: Vec<FxHashMap<Rc<str>, LocalId>>,
-    params: Vec<Rc<str>>,
+    scopes: Vec<FxHashMap<Arc<str>, LocalId>>,
+    params: Vec<Arc<str>>,
     this_class: Option<ClassId>,
 
     this_enum: Option<EnumId>,
 
     top_level: bool,
 
-    outer_names: FxHashSet<Rc<str>>,
+    outer_names: FxHashSet<Arc<str>>,
 
-    captures: Vec<Rc<str>>,
+    captures: Vec<Arc<str>>,
 
     pending: Vec<TirStmt>,
 
@@ -161,10 +161,10 @@ fn splice_returns_only(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
     out
 }
 
-fn pattern_lead(p: &Pattern, interner: &AtomInterner) -> Rc<str> {
+fn pattern_lead(p: &Pattern, interner: &AtomInterner) -> Arc<str> {
     match p {
-        Pattern::Identifier { name, .. } => Rc::from(interner.resolve(*name)),
-        _ => Rc::from("_"),
+        Pattern::Identifier { name, .. } => Arc::from(interner.resolve(*name)),
+        _ => Arc::from("_"),
     }
 }
 
@@ -201,7 +201,7 @@ impl<'a> FnEmitter<'a> {
         signatures: &'a mut Vec<Signature>,
         out_closures: &'a mut Vec<TirFunction>,
         closure_base: u32,
-        params: Vec<Rc<str>>,
+        params: Vec<Arc<str>>,
     ) -> Self {
         FnEmitter {
             ast_arena,
@@ -324,7 +324,7 @@ impl<'a> FnEmitter<'a> {
             let idx = match self.captures.iter().position(|c| c.as_ref() == name) {
                 Some(i) => i,
                 None => {
-                    self.captures.push(Rc::from(name));
+                    self.captures.push(Arc::from(name));
                     self.captures.len() - 1
                 }
             };
@@ -338,12 +338,12 @@ impl<'a> FnEmitter<'a> {
             return Resolution::NativeGlobal(idx);
         }
         Resolution::ByName {
-            name: Rc::from(name),
+            name: Arc::from(name),
             why: DynReason::Unannotated,
         }
     }
 
-    fn bind_local(&mut self, name: Rc<str>, ty: BackendTy) -> LocalId {
+    fn bind_local(&mut self, name: Arc<str>, ty: BackendTy) -> LocalId {
         let id = LocalId(self.locals.len() as u32);
         self.locals.push(ty);
         self.scopes.last_mut().unwrap().insert(name, id);
@@ -362,12 +362,12 @@ impl<'a> FnEmitter<'a> {
             out.push(TirStmt::Expr(TirExpr {
                 kind: TirExprKind::MethodCall {
                     recv: Box::new(resource),
-                    name: Rc::from("dispose"),
+                    name: Arc::from("dispose"),
                     args: vec![],
                 },
                 ty: BackendTy::Void,
                 res: Resolution::ByName {
-                    name: Rc::from("dispose"),
+                    name: Arc::from("dispose"),
                     why: DynReason::Unannotated,
                 },
                 span: Span::EMPTY,
@@ -528,7 +528,8 @@ impl<'a> FnEmitter<'a> {
                     match &d.id {
                         Pattern::Identifier { name, .. } => {
                             let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
-                            let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), ty);
+                            let local =
+                                self.bind_local(Arc::from(self.m.interner.resolve(*name)), ty);
                             out.extend(std::mem::take(&mut self.pending));
                             out.push(TirStmt::Let { local, ty, init });
                             if let Some(frame) = self.disposables.last_mut() {
@@ -560,10 +561,10 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn catch_type_names(&self, t: &varn_core::ast::TypeNode) -> Vec<Rc<str>> {
+    fn catch_type_names(&self, t: &varn_core::ast::TypeNode) -> Vec<Arc<str>> {
         use varn_core::TypeKind;
         match &t.kind {
-            TypeKind::Named(n, _) => vec![Rc::from(self.m.interner.resolve(*n))],
+            TypeKind::Named(n, _) => vec![Arc::from(self.m.interner.resolve(*n))],
             TypeKind::Union(items) | TypeKind::Intersection(items) => items
                 .iter()
                 .flat_map(|x| self.catch_type_names(x))
@@ -589,7 +590,7 @@ impl<'a> FnEmitter<'a> {
             kind: TirExprKind::Var,
             ty: BackendTy::Dynamic(DynReason::Unannotated),
             res: Resolution::ByName {
-                name: Rc::from(name),
+                name: Arc::from(name),
                 why: DynReason::Unannotated,
             },
             span,
@@ -616,7 +617,7 @@ impl<'a> FnEmitter<'a> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
 
         self.scopes.push(FxHashMap::default());
-        let catch_local = self.bind_local(Rc::from("<catch>"), dyn_ty);
+        let catch_local = self.bind_local(Arc::from("<catch>"), dyn_ty);
         let e_var = |span: Span| TirExpr {
             kind: TirExprKind::Var,
             ty: dyn_ty,
@@ -628,7 +629,7 @@ impl<'a> FnEmitter<'a> {
             let mut out = Vec::new();
             if let Some(Pattern::Identifier { name, .. }) = &c.param {
                 if this.m.interner.resolve(*name) != "<catch>" {
-                    let alias = this.bind_local(Rc::from(this.m.interner.resolve(*name)), dyn_ty);
+                    let alias = this.bind_local(Arc::from(this.m.interner.resolve(*name)), dyn_ty);
                     out.push(TirStmt::Let {
                         local: alias,
                         ty: dyn_ty,
@@ -767,7 +768,7 @@ impl<'a> FnEmitter<'a> {
                             .as_ref()
                             .map(|e| e.ty)
                             .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                        let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), ty);
+                        let local = self.bind_local(Arc::from(self.m.interner.resolve(*name)), ty);
                         out.extend(std::mem::take(&mut self.pending));
                         out.push(TirStmt::Let {
                             local,
@@ -786,7 +787,9 @@ impl<'a> FnEmitter<'a> {
         }
 
         if !has_continue(self.ast_arena, body) {
-            let cond = test.map(|t| self.lower_cond(t)).unwrap_or_else(|| bool_lit(true));
+            let cond = test
+                .map(|t| self.lower_cond(t))
+                .unwrap_or_else(|| bool_lit(true));
             let cond_pending = std::mem::take(&mut self.pending);
             let has_cond_pending = !cond_pending.is_empty();
             let mut loop_body = if has_cond_pending {
@@ -806,7 +809,11 @@ impl<'a> FnEmitter<'a> {
                 loop_body.extend(std::mem::take(&mut self.pending));
                 loop_body.push(TirStmt::Expr(ue));
             }
-            let loop_cond = if has_cond_pending { bool_lit(true) } else { cond };
+            let loop_cond = if has_cond_pending {
+                bool_lit(true)
+            } else {
+                cond
+            };
             out.push(TirStmt::Loop {
                 cond: loop_cond,
                 body: loop_body,
@@ -893,7 +900,7 @@ impl<'a> FnEmitter<'a> {
         let Pattern::Identifier { name, .. } = left else {
             return self.lower_for_of_protocol(left, keys, out, body, false);
         };
-        let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
+        let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
         out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
         out
     }
@@ -916,7 +923,7 @@ impl<'a> FnEmitter<'a> {
             ) = (&self.ast_arena.expr(right).kind, left)
             {
                 let (start, end, inclusive) = (*start, *end, *inclusive);
-                let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
+                let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
                 let lo = self.lower_expr(start);
                 let mut hi = self.lower_expr(end);
                 if inclusive {
@@ -1019,14 +1026,14 @@ impl<'a> FnEmitter<'a> {
         };
         let arr = self.hoist(iter);
         out.extend(std::mem::take(&mut self.pending));
-        let name: Rc<str> = Rc::from(self.m.interner.resolve(*name));
+        let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
         out.extend(self.for_of_over_array(&name, arr, elem_ty, body));
         out
     }
 
     fn for_of_over_array(
         &mut self,
-        name: &Rc<str>,
+        name: &Arc<str>,
         arr: TirExpr,
         elem_ty: BackendTy,
         body: StmtId,
@@ -1046,7 +1053,12 @@ impl<'a> FnEmitter<'a> {
             span: Span::EMPTY,
         };
 
-        let len = self.field_access(arr.clone(), Rc::from("length"), BackendTy::Int, Span::EMPTY);
+        let len = self.field_access(
+            arr.clone(),
+            Arc::from("length"),
+            BackendTy::Int,
+            Span::EMPTY,
+        );
         let cond = TirExpr {
             kind: TirExprKind::Binary {
                 op: TirBinOp::Lt,
@@ -1119,7 +1131,7 @@ impl<'a> FnEmitter<'a> {
     ) -> Vec<TirStmt> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
         let by_name = |n: &str| Resolution::ByName {
-            name: Rc::from(n),
+            name: Arc::from(n),
             why: DynReason::Unannotated,
         };
 
@@ -1157,11 +1169,11 @@ impl<'a> FnEmitter<'a> {
         let field = |recv: TirExpr, n: &str| TirExpr {
             kind: TirExprKind::Field {
                 object: Box::new(recv),
-                name: Rc::from(n),
+                name: Arc::from(n),
             },
             ty: BackendTy::Dynamic(DynReason::Unannotated),
             res: Resolution::ByName {
-                name: Rc::from(n),
+                name: Arc::from(n),
                 why: DynReason::Unannotated,
             },
             span: Span::EMPTY,
@@ -1170,7 +1182,7 @@ impl<'a> FnEmitter<'a> {
         let mut next_call = TirExpr {
             kind: TirExprKind::MethodCall {
                 recv: Box::new(it_var()),
-                name: Rc::from("next"),
+                name: Arc::from("next"),
                 args: vec![],
             },
             ty: dyn_ty,
@@ -1323,7 +1335,7 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
                 }
-                let local = self.bind_local(Rc::from(name_str), s.ty);
+                let local = self.bind_local(Arc::from(name_str), s.ty);
                 (
                     bool_lit(true),
                     vec![TirStmt::Let {
@@ -1362,8 +1374,10 @@ impl<'a> FnEmitter<'a> {
                 };
                 let mut binds = vec![];
                 if let Some(name) = binding {
-                    let local =
-                        self.bind_local(Rc::from(self.m.interner.resolve(*name)), BackendTy::Class(cid));
+                    let local = self.bind_local(
+                        Arc::from(self.m.interner.resolve(*name)),
+                        BackendTy::Class(cid),
+                    );
                     binds.push(TirStmt::Let {
                         local,
                         ty: BackendTy::Class(cid),
@@ -1458,7 +1472,7 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::EnumVariant { enum_id: eid, tag },
                 span: s.span,
             };
-            let local = self.bind_local(Rc::from(self.m.interner.resolve(b.name)), fty);
+            let local = self.bind_local(Arc::from(self.m.interner.resolve(b.name)), fty);
             binds.push(TirStmt::Let {
                 local,
                 ty: fty,
@@ -1476,13 +1490,13 @@ impl<'a> FnEmitter<'a> {
     ) -> (TirExpr, Vec<TirStmt>) {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
         let by_name = |n: &str| Resolution::ByName {
-            name: Rc::from(n),
+            name: Arc::from(n),
             why: DynReason::Unannotated,
         };
         let field = |recv: TirExpr, name: &str, ty: BackendTy| TirExpr {
             kind: TirExprKind::Field {
                 object: Box::new(recv),
-                name: Rc::from(name),
+                name: Arc::from(name),
             },
             ty,
             res: by_name(name),
@@ -1493,7 +1507,7 @@ impl<'a> FnEmitter<'a> {
                 op: TirBinOp::Eq,
                 lhs: Box::new(field(s.clone(), "__variant_name__", BackendTy::Str)),
                 rhs: Box::new(TirExpr {
-                    kind: TirExprKind::StrLit(Rc::from(variant_name)),
+                    kind: TirExprKind::StrLit(Arc::from(variant_name)),
                     ty: BackendTy::Str,
                     res: Resolution::None,
                     span: s.span,
@@ -1506,7 +1520,7 @@ impl<'a> FnEmitter<'a> {
         let mut binds = Vec::new();
         for (i, b) in bindings.iter().enumerate() {
             let init = field(s.clone(), &format!("value{i}"), dyn_ty);
-            let local = self.bind_local(Rc::from(self.m.interner.resolve(b.name)), dyn_ty);
+            let local = self.bind_local(Arc::from(self.m.interner.resolve(b.name)), dyn_ty);
             binds.push(TirStmt::Let {
                 local,
                 ty: dyn_ty,
@@ -1525,7 +1539,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Decl::Function(f) = unwrapped {
             let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
-            let local = self.bind_local(Rc::from(self.m.interner.resolve(f.id)), dyn_ty);
+            let local = self.bind_local(Arc::from(self.m.interner.resolve(f.id)), dyn_ty);
             let closure = self.lower_closure(
                 &f.params,
                 ClosureBody::Stmt(f.body),
@@ -1543,7 +1557,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Decl::Namespace(ns) = unwrapped {
             let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
-            let local = self.bind_local(Rc::from(self.m.interner.resolve(ns.id)), dyn_ty);
+            let local = self.bind_local(Arc::from(self.m.interner.resolve(ns.id)), dyn_ty);
             let mut entries: Vec<TirObjectEntry> = Vec::new();
             for m in &ns.body {
                 let Decl::Export(ExportDecl::Decl { declaration, .. }) = m else {
@@ -1559,7 +1573,7 @@ impl<'a> FnEmitter<'a> {
                         Span::EMPTY,
                     );
                     entries.push(TirObjectEntry::Field {
-                        name: Rc::from(self.m.interner.resolve(f.id)),
+                        name: Arc::from(self.m.interner.resolve(f.id)),
                         value: closure,
                     });
                 }
@@ -1590,7 +1604,8 @@ impl<'a> FnEmitter<'a> {
                 Pattern::Identifier { name, .. } => {
                     let name_str = self.m.interner.resolve(*name);
                     if let Some(init) = d.init {
-                        if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(init).kind {
+                        if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(init).kind
+                        {
                             let (subject, cases) = (*subject, cases);
                             let ty = self
                                 .expr_table
@@ -1602,7 +1617,7 @@ impl<'a> FnEmitter<'a> {
                                     lower_type(&e.ty, table, interner, self.tt, names)
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
-                            let local = self.bind_local(Rc::from(name_str), ty);
+                            let local = self.bind_local(Arc::from(name_str), ty);
                             out.push(TirStmt::Let {
                                 local,
                                 ty,
@@ -1621,11 +1636,10 @@ impl<'a> FnEmitter<'a> {
                                 ExprKind::Arrow { .. } | ExprKind::Function { .. }
                             )
                         });
-                        let is_global =
-                            self.top_level && self.m.globals.contains_key(name_str);
+                        let is_global = self.top_level && self.m.globals.contains_key(name_str);
                         if is_closure && !is_global {
                             Some(self.bind_local(
-                                Rc::from(name_str),
+                                Arc::from(name_str),
                                 BackendTy::Dynamic(DynReason::Unannotated),
                             ))
                         } else {
@@ -1644,8 +1658,7 @@ impl<'a> FnEmitter<'a> {
                             // `ctx=None` can't resolve names, so these ids never
                             // need to match the module's real `CheckerTyTable`.
                             let mut scratch = crate::types::CheckerTyTable::new();
-                            let resolved =
-                                crate::binder::resolve_type_node(t, None, &mut scratch);
+                            let resolved = crate::binder::resolve_type_node(t, None, &mut scratch);
                             lower_type(&resolved, &scratch, self.m.interner, self.tt, self.m.names)
                         })
                         .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
@@ -1680,7 +1693,8 @@ impl<'a> FnEmitter<'a> {
                         }
                     }
 
-                    let local = prebound.unwrap_or_else(|| self.bind_local(Rc::from(name_str), ty));
+                    let local =
+                        prebound.unwrap_or_else(|| self.bind_local(Arc::from(name_str), ty));
                     out.push(TirStmt::Let { local, ty, init });
                 }
 
@@ -1753,7 +1767,7 @@ impl<'a> FnEmitter<'a> {
     fn bind_pattern(&mut self, pat: &Pattern, src: TirExpr, out: &mut Vec<TirStmt>) {
         match pat {
             Pattern::Identifier { name, .. } => {
-                let local = self.bind_local(Rc::from(self.m.interner.resolve(*name)), src.ty);
+                let local = self.bind_local(Arc::from(self.m.interner.resolve(*name)), src.ty);
                 out.push(TirStmt::Let {
                     local,
                     ty: src.ty,
@@ -1766,16 +1780,16 @@ impl<'a> FnEmitter<'a> {
                 for prop in properties {
                     let field = self.field_access(
                         src.clone(),
-                        Rc::from(self.m.interner.resolve(prop.key)),
+                        Arc::from(self.m.interner.resolve(prop.key)),
                         BackendTy::Dynamic(DynReason::Unannotated),
                         src.span,
                     );
                     self.bind_pattern(&prop.value, field, out);
                 }
                 if let Some(rest_pat) = rest {
-                    let skip: Vec<Rc<str>> = properties
+                    let skip: Vec<Arc<str>> = properties
                         .iter()
-                        .map(|p| Rc::from(self.m.interner.resolve(p.key)))
+                        .map(|p| Arc::from(self.m.interner.resolve(p.key)))
                         .collect();
                     let rest_obj = TirExpr {
                         kind: TirExprKind::ObjectRest {
@@ -1818,12 +1832,12 @@ impl<'a> FnEmitter<'a> {
                     let tail = TirExpr {
                         kind: TirExprKind::MethodCall {
                             recv: Box::new(src.clone()),
-                            name: Rc::from("slice"),
+                            name: Arc::from("slice"),
                             args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
                         },
                         ty: src.ty,
                         res: Resolution::ByName {
-                            name: Rc::from("slice"),
+                            name: Arc::from("slice"),
                             why: DynReason::Unannotated,
                         },
                         span: src.span,
@@ -1895,7 +1909,7 @@ impl<'a> FnEmitter<'a> {
             ExprKind::IntLiteral { value, .. } => Some(TirExprKind::IntLit(*value)),
             ExprKind::FloatLiteral { value, .. } => Some(TirExprKind::FloatLit(*value)),
             ExprKind::BoolLiteral { value } => Some(TirExprKind::BoolLit(*value)),
-            ExprKind::StrLiteral { value } => Some(TirExprKind::StrLit(Rc::from(value.as_str()))),
+            ExprKind::StrLiteral { value } => Some(TirExprKind::StrLit(Arc::from(value.as_str()))),
             ExprKind::CharLiteral { value } => Some(TirExprKind::CharLit(*value)),
             ExprKind::NullLiteral => Some(TirExprKind::NullLit),
 
@@ -1906,7 +1920,7 @@ impl<'a> FnEmitter<'a> {
                     ty,
                     res: self.resolve_name(name_str),
                     span,
-                }
+                };
             }
 
             ExprKind::Paren { expression } => return self.lower_expr(*expression),
@@ -2155,7 +2169,7 @@ impl<'a> FnEmitter<'a> {
                 // rawValue`); route the cast through the same lookup instead
                 // of inventing a second, narrower path to the same field.
                 if matches!(inner.ty, BackendTy::Enum(_)) && matches!(ty, BackendTy::Int) {
-                    return self.field_access(inner, Rc::from("rawValue"), ty, span);
+                    return self.field_access(inner, Arc::from("rawValue"), ty, span);
                 }
                 return TirExpr {
                     kind: TirExprKind::Cast {
@@ -2219,7 +2233,7 @@ impl<'a> FnEmitter<'a> {
                             },
                             ty,
                             res: Resolution::ByName {
-                                name: Rc::from("<pipeline>"),
+                                name: Arc::from("<pipeline>"),
                                 why: DynReason::Unannotated,
                             },
                             span,
@@ -2235,7 +2249,7 @@ impl<'a> FnEmitter<'a> {
                     },
                     ty,
                     res: Resolution::ByName {
-                        name: Rc::from("<pipeline>"),
+                        name: Arc::from("<pipeline>"),
                         why: DynReason::Unannotated,
                     },
                     span,
@@ -2276,8 +2290,8 @@ impl<'a> FnEmitter<'a> {
                     unreachable!()
                 };
                 let object = *object;
-                let mangled = self.m.ext_set_members[&self.ast_arena.expr(target).range.start.offset]
-                    .clone();
+                let mangled =
+                    self.m.ext_set_members[&self.ast_arena.expr(target).range.start.offset].clone();
                 let recv = self.lower_expr(object);
                 let v = self.lower_expr(value);
                 return TirExpr {
@@ -2413,11 +2427,16 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::DecimalLiteral { raw } => {
-                let text: Rc<str> = Rc::from(self.m.interner.resolve(*raw).trim_end_matches('d'));
+                let text: Arc<str> = Arc::from(self.m.interner.resolve(*raw).trim_end_matches('d'));
                 Some(TirExprKind::DecimalLit(text))
             }
             ExprKind::BigIntLiteral { raw } => {
-                let s = self.m.interner.resolve(*raw).trim_end_matches('n').replace('_', "");
+                let s = self
+                    .m
+                    .interner
+                    .resolve(*raw)
+                    .trim_end_matches('n')
+                    .replace('_', "");
                 let n = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
                     i128::from_str_radix(r, 16)
                 } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
@@ -2432,7 +2451,7 @@ impl<'a> FnEmitter<'a> {
             }
             ExprKind::RegexLiteral { pattern, flags } => {
                 let s = TirExpr {
-                    kind: TirExprKind::StrLit(Rc::from(format!("/{pattern}/{flags}"))),
+                    kind: TirExprKind::StrLit(Arc::from(format!("/{pattern}/{flags}"))),
                     ty: BackendTy::Str,
                     res: Resolution::None,
                     span,
@@ -2502,7 +2521,7 @@ impl<'a> FnEmitter<'a> {
                         span,
                     };
                     let want = TirExpr {
-                        kind: TirExprKind::StrLit(Rc::from(name)),
+                        kind: TirExprKind::StrLit(Arc::from(name)),
                         ty: BackendTy::Str,
                         res: Resolution::None,
                         span,
@@ -2524,7 +2543,7 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::MetaAccess { target, property } => {
                 let obj = self.lower_expr(*target);
-                let key: Rc<str> = Rc::from(format!("::{}", self.m.interner.resolve(*property)));
+                let key: Arc<str> = Arc::from(format!("::{}", self.m.interner.resolve(*property)));
                 return TirExpr {
                     kind: TirExprKind::Field {
                         object: Box::new(obj),
@@ -2559,7 +2578,7 @@ impl<'a> FnEmitter<'a> {
                 };
 
                 let str_lit = |s: &str| TirExpr {
-                    kind: TirExprKind::StrLit(Rc::from(s)),
+                    kind: TirExprKind::StrLit(Arc::from(s)),
                     ty: BackendTy::Str,
                     res: Resolution::None,
                     span,
@@ -2597,7 +2616,8 @@ impl<'a> FnEmitter<'a> {
                 } = &self.ast_arena.expr(tag).kind
                 {
                     let (object, property) = (*object, *property);
-                    if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
+                    if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner)
+                    {
                         let recv = self.lower_expr(object);
                         return TirExpr {
                             kind: TirExprKind::MethodCall {
@@ -2614,7 +2634,7 @@ impl<'a> FnEmitter<'a> {
                 let callee = self.lower_expr(tag);
                 let res = match &self.ast_arena.expr(tag).kind {
                     ExprKind::Identifier { name } => Resolution::ByName {
-                        name: Rc::from(self.m.interner.resolve(*name)),
+                        name: Arc::from(self.m.interner.resolve(*name)),
                         why: DynReason::Unannotated,
                     },
                     _ => Resolution::None,
@@ -3029,10 +3049,14 @@ impl<'a> FnEmitter<'a> {
         (lhs, rhs, ty)
     }
 
-    fn member_name(ast_arena: &AstArena, property: ExprId, interner: &AtomInterner) -> Option<Rc<str>> {
+    fn member_name(
+        ast_arena: &AstArena,
+        property: ExprId,
+        interner: &AtomInterner,
+    ) -> Option<Arc<str>> {
         match &ast_arena.expr(property).kind {
-            ExprKind::Identifier { name } => Some(Rc::from(interner.resolve(*name))),
-            ExprKind::StrLiteral { value } => Some(Rc::from(value.as_str())),
+            ExprKind::Identifier { name } => Some(Arc::from(interner.resolve(*name))),
+            ExprKind::StrLiteral { value } => Some(Arc::from(value.as_str())),
             _ => None,
         }
     }
@@ -3132,7 +3156,7 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         if optional && !computed {
             let name = Self::member_name(self.ast_arena, property, self.m.interner)
-                .unwrap_or_else(|| Rc::from("<member>"));
+                .unwrap_or_else(|| Arc::from("<member>"));
             let mut recv = self.lower_expr(object);
             if !Self::is_pure(self.ast_arena, object) {
                 recv = self.hoist(recv);
@@ -3193,12 +3217,12 @@ impl<'a> FnEmitter<'a> {
                 return TirExpr {
                     kind: TirExprKind::MethodCall {
                         recv: Box::new(obj),
-                        name: Rc::from("slice"),
+                        name: Arc::from("slice"),
                         args: vec![TirArg::Expr(s), TirArg::Expr(e)],
                     },
                     ty,
                     res: Resolution::ByName {
-                        name: Rc::from("slice"),
+                        name: Arc::from("slice"),
                         why: DynReason::Unannotated,
                     },
                     span,
@@ -3223,7 +3247,7 @@ impl<'a> FnEmitter<'a> {
         }
 
         let name = Self::member_name(self.ast_arena, property, self.m.interner)
-            .unwrap_or_else(|| Rc::from("<member>"));
+            .unwrap_or_else(|| Arc::from("<member>"));
 
         if let Some(mangled) = self
             .m
@@ -3255,7 +3279,7 @@ impl<'a> FnEmitter<'a> {
         self.field_access(obj, name, ty, span)
     }
 
-    fn field_access(&mut self, obj: TirExpr, name: Rc<str>, ty: BackendTy, span: Span) -> TirExpr {
+    fn field_access(&mut self, obj: TirExpr, name: Arc<str>, ty: BackendTy, span: Span) -> TirExpr {
         match self
             .class_of(obj.ty)
             .and_then(|ci| ci.field(&name).cloned())
@@ -3296,7 +3320,7 @@ impl<'a> FnEmitter<'a> {
         let func_id = varn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
 
         self.out_closures.push(TirFunction {
-            name: Rc::from("<closure>"),
+            name: Arc::from("<closure>"),
             sig: SigId(0),
             params: vec![],
             return_ty: BackendTy::Dynamic(DynReason::Unannotated),
@@ -3310,7 +3334,7 @@ impl<'a> FnEmitter<'a> {
         });
         let slot = self.out_closures.len() - 1;
 
-        let param_names: Vec<Rc<str>> = params
+        let param_names: Vec<Arc<str>> = params
             .iter()
             .map(|p| pattern_lead(&p.pattern, self.m.interner))
             .collect();
@@ -3347,7 +3371,7 @@ impl<'a> FnEmitter<'a> {
         let captures = std::mem::take(&mut sub.captures);
 
         self.out_closures[slot] = TirFunction {
-            name: Rc::from("<closure>"),
+            name: Arc::from("<closure>"),
             sig: SigId(0),
             params: param_tys,
             return_ty: BackendTy::Dynamic(DynReason::Unannotated),
@@ -3394,7 +3418,7 @@ impl<'a> FnEmitter<'a> {
         for part in parts {
             let piece = match part {
                 TemplatePart::Literal(s) => {
-                    str_expr(TirExprKind::StrLit(Rc::from(s.as_str())), span)
+                    str_expr(TirExprKind::StrLit(Arc::from(s.as_str())), span)
                 }
                 TemplatePart::Interpolation(e) => {
                     let le = self.lower_expr(*e);
@@ -3422,7 +3446,7 @@ impl<'a> FnEmitter<'a> {
                 ),
             });
         }
-        acc.unwrap_or_else(|| str_expr(TirExprKind::StrLit(Rc::from("")), span))
+        acc.unwrap_or_else(|| str_expr(TirExprKind::StrLit(Arc::from("")), span))
     }
 
     fn lower_new(
@@ -3462,7 +3486,7 @@ impl<'a> FnEmitter<'a> {
                     },
                     ty,
                     res: Resolution::ByName {
-                        name: Rc::from("<new>"),
+                        name: Arc::from("<new>"),
                         why: DynReason::Unannotated,
                     },
                     span,
@@ -3486,7 +3510,7 @@ impl<'a> FnEmitter<'a> {
             Arg::Positional(e) => TirArg::Expr(self.lower_expr(*e)),
             Arg::Spread(e) => TirArg::Spread(self.lower_expr(*e)),
             Arg::Named { label, value } => TirArg::Named {
-                label: Rc::from(label.as_str()),
+                label: Arc::from(label.as_str()),
                 value: self.lower_expr(*value),
             },
         }
@@ -3570,7 +3594,7 @@ impl<'a> FnEmitter<'a> {
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
                     _ => Resolution::ByName {
-                        name: Rc::from(self.m.interner.resolve(*name)),
+                        name: Arc::from(self.m.interner.resolve(*name)),
                         why: DynReason::Unannotated,
                     },
                 },
@@ -3632,7 +3656,11 @@ impl<'a> FnEmitter<'a> {
         // Core-type instance method → direct op-id dispatch.
         if all_positional {
             if let Some(cls) = self.core_class_name(recv.ty) {
-                if self.m.core_ops.contains(&(Rc::from(cls), Rc::clone(&name))) {
+                if self
+                    .m
+                    .core_ops
+                    .contains(&(Arc::from(cls), Arc::clone(&name)))
+                {
                     let op_id = varn_core::op_id::core_method_op_id(cls, &name);
                     return TirExpr {
                         kind: TirExprKind::MethodCall {
@@ -3691,7 +3719,7 @@ impl<'a> FnEmitter<'a> {
             },
             ty,
             res: Resolution::ByName {
-                name: Rc::from("<call>"),
+                name: Arc::from("<call>"),
                 why: DynReason::Unannotated,
             },
             span,
@@ -3732,10 +3760,10 @@ impl<'a> FnEmitter<'a> {
     }
 }
 
-fn prop_key_name(key: &PropKey) -> Option<Rc<str>> {
+fn prop_key_name(key: &PropKey) -> Option<Arc<str>> {
     match key {
-        PropKey::Identifier(s) | PropKey::Str(s) => Some(Rc::from(s.as_str())),
-        PropKey::Int(n) => Some(Rc::from(n.to_string())),
+        PropKey::Identifier(s) | PropKey::Str(s) => Some(Arc::from(s.as_str())),
+        PropKey::Int(n) => Some(Arc::from(n.to_string())),
         PropKey::Computed(_) => None,
     }
 }
@@ -3831,7 +3859,9 @@ fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
                 finally,
             } => {
                 check(ast_arena, *block, in_nested_loop)
-                    || catches.iter().any(|c| check(ast_arena, c.body, in_nested_loop))
+                    || catches
+                        .iter()
+                        .any(|c| check(ast_arena, c.body, in_nested_loop))
                     || finally.map_or(false, |f| check(ast_arena, f, in_nested_loop))
             }
             StmtKind::Labeled { body, .. } => check(ast_arena, *body, in_nested_loop),

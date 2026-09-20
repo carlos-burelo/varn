@@ -9,7 +9,7 @@ use varn_core::ModuleId;
 pub struct ModuleObj {
     pub id: ModuleId,
     pub exports: Vec<VmValue>,
-    pub export_map: FxHashMap<Rc<str>, usize>,
+    pub export_map: FxHashMap<Arc<str>, usize>,
 }
 
 #[derive(Debug, Clone)]

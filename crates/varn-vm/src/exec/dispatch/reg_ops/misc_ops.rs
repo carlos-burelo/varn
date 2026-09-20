@@ -3,7 +3,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
-use std::rc::Rc;
+use std::sync::Arc;
 
 impl ExecCtx {
     #[inline(always)]
@@ -147,7 +147,7 @@ impl ExecCtx {
     pub(crate) fn exec_object_rest(
         &mut self,
         obj: VmValue,
-        skip_keys: &[Rc<str>],
+        skip_keys: &[Arc<str>],
     ) -> VmResult<VmValue> {
         let owned: Vec<String> = skip_keys.iter().map(|s| s.to_string()).collect();
         crate::exec::collections::object_rest(obj, &owned, &mut self.heap)

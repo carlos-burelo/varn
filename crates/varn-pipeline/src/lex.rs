@@ -1,5 +1,5 @@
 use crate::PipelineError;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::Token;
 use varn_debug::flags::DebugFlags;
 
@@ -10,7 +10,7 @@ pub fn lex(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-) -> PipelineResult<(Vec<Token>, Rc<[u8]>)> {
+) -> PipelineResult<(Vec<Token>, Arc<[u8]>)> {
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
     if !errors.is_empty() {

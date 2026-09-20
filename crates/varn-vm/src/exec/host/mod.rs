@@ -69,7 +69,7 @@ impl NativeCtx for ExecCtx {
     // whole string per call, `str_is_ascii` re-scanning it per call — an
     // O(n) cost repeated on every element of a sequential scan, i.e. the
     // very thing the cached flag exists to avoid.
-    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
+    fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
         self.heap.str_shared(v)
     }
 
@@ -188,7 +188,7 @@ impl NativeCtx for ExecCtx {
         if obj.is_heap() {
             let idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.heap.get(idx) {
-                o.set_field_nv(std::rc::Rc::from(key), val);
+                o.set_field_nv(std::sync::Arc::from(key), val);
                 self.heap.write_barrier(idx, val);
             } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
                 let inst = inst.clone();
@@ -207,7 +207,7 @@ impl NativeCtx for ExecCtx {
                     let m = std::rc::Rc::make_mut(m);
                     let slot = m.exports.len();
                     m.exports.push(val);
-                    m.export_map.insert(std::rc::Rc::from(key), slot);
+                    m.export_map.insert(std::sync::Arc::from(key), slot);
                 }
             }
         }

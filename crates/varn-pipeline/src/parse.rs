@@ -1,12 +1,12 @@
 use crate::PipelineError;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
 pub fn parse(
     tokens: Vec<varn_core::Token>,
-    lexeme_buf: Rc<[u8]>,
+    lexeme_buf: Arc<[u8]>,
     source: &str,
     path: &str,
     verbose: bool,
@@ -26,20 +26,20 @@ pub fn parse(
     let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
     let (program, interner, arena) = varn_parser::parse(tokens, lexeme_buf, path, interner)
         .map_err(|errs| {
-        let msgs: Vec<String> = errs
-            .iter()
-            .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
-            .collect();
-        let error_count = errs.len();
-        let footer = format!(
-            "\n{}: could not compile `{}` due to {} previous error{}",
-            varn_core::term::chalk::chalk("error").red().bold(),
-            path,
-            error_count,
-            if error_count > 1 { "s" } else { "" }
-        );
-        PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer))
-    })?;
+            let msgs: Vec<String> = errs
+                .iter()
+                .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
+                .collect();
+            let error_count = errs.len();
+            let footer = format!(
+                "\n{}: could not compile `{}` due to {} previous error{}",
+                varn_core::term::chalk::chalk("error").red().bold(),
+                path,
+                error_count,
+                if error_count > 1 { "s" } else { "" }
+            );
+            PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer))
+        })?;
     // Publish the entry file's own atoms into the shared table before any
     // import gets resolved: an import that reaches back into this file's
     // exports (a re-export cycle) must see these atoms, not a stale

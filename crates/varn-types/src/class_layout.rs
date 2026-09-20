@@ -4,14 +4,14 @@
 //! offsets, alignments, and sizes are known and immutable. This module provides
 //! the compile-time and runtime descriptor representing that static memory layout.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::TypeTag;
 
 /// Layout and representation of a single field within a class instance.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FieldLayout {
     /// Declared name of the field.
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     /// Static type tag of the field.
     pub type_tag: TypeTag,
     /// Byte offset relative to the payload start (after instance header).
@@ -28,7 +28,7 @@ pub struct FieldLayout {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ClassLayout {
     /// Class name.
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     /// Unique class id.
     pub class_id: u32,
     /// Total instance payload size in bytes (excluding GC object header), padded to struct alignment.
@@ -72,7 +72,7 @@ fn class_field_repr(tag: TypeTag) -> (u32, u32, bool) {
 
 impl ClassLayout {
     /// Creates a new empty class layout with default alignment of 8.
-    pub fn new(name: impl Into<Rc<str>>, class_id: u32) -> Self {
+    pub fn new(name: impl Into<Arc<str>>, class_id: u32) -> Self {
         Self {
             name: name.into(),
             class_id,
@@ -93,9 +93,9 @@ impl ClassLayout {
     /// - GC references (`str`, `object`, `class`, `array`, `map`, `set`, etc.): size 8 (packed pointer), align 8
     /// - Dynamic/Unknown: size 16 (`VmValue`), align 8
     pub fn from_fields(
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         class_id: u32,
-        fields_in: &[(Rc<str>, TypeTag)],
+        fields_in: &[(Arc<str>, TypeTag)],
     ) -> Self {
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut cur_offset = 0u32;

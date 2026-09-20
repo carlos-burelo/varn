@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern};
 use varn_core::{Diagnostic, ErrorCode};
 
@@ -105,7 +105,7 @@ impl<'r> super::Binder<'r> {
                 }
             };
 
-            let module_path: Option<Rc<str>> = resolved_target
+            let module_path: Option<Arc<str>> = resolved_target
                 .clone()
                 .or_else(|| {
                     if module_resolver::is_known_module(&source_str) {
@@ -114,7 +114,7 @@ impl<'r> super::Binder<'r> {
                         None
                     }
                 })
-                .map(Rc::from);
+                .map(Arc::from);
             let module_path_atom = module_path.as_ref().map(|s| self.intern_local(s));
 
             let exports_ref: Option<&module_resolver::ExportMap> =
@@ -124,7 +124,7 @@ impl<'r> super::Binder<'r> {
                 if imported == "*" {
                     let mut s = Symbol::new(SymbolKind::Namespace, local, line);
                     s.ty = Some(crate::types::Type::named_with_origin(
-                        Rc::from("*"),
+                        Arc::from("*"),
                         module_path.clone(),
                         self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -179,9 +179,12 @@ impl<'r> super::Binder<'r> {
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
                             {
-                                let origin_rc: Rc<str> = Rc::from(self.interner.resolve(*origin));
+                                let origin_rc: Arc<str> = Arc::from(self.interner.resolve(*origin));
                                 let origin_atom = self.resolver.intern(&origin_rc);
-                                *ty = ty.with_origin(origin_atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                *ty = ty.with_origin(
+                                    origin_atom,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                             // Free-function intrinsic import (e.g. `abs` from
                             // `std:math`): stamp the wire byte now, while the

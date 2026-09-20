@@ -4,6 +4,7 @@ use crate::symbol::{Symbol, SymbolArena, SymbolId};
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{ExprId, StmtId, TypeNode};
 use varn_core::Atom;
 
@@ -28,7 +29,7 @@ pub enum PendingEnrich {
     Method {
         // `class_name`/`key` forward the class/member name `Atom`s the
         // binder already resolved from the AST — no synthetic text here,
-        // so this stays a handle instead of re-wrapping into `Rc<str>`.
+        // so this stays a handle instead of re-wrapping into `Arc<str>`.
         class_name: Atom,
         key: Atom,
         body: StmtId,
@@ -48,30 +49,30 @@ pub enum PendingEnrich {
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TypeMembers {
-    pub classes: FxHashMap<Rc<str>, ClassMemberInfo>,
-    pub interfaces: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
+    pub classes: FxHashMap<Arc<str>, ClassMemberInfo>,
+    pub interfaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
     // Object-literal declarator names are looked up by `Atom` at every call
     // site that still compiles (`Decl::Struct.id`, `Pattern::Identifier.name`),
     // unlike the other maps here which are queried by `&str` through
     // `TypeContext`/`BindResult` accessors — so this one forwards the AST's
-    // `Atom` directly instead of re-wrapping into `Rc<str>`. `Atom` does not
+    // `Atom` directly instead of re-wrapping into `Arc<str>`. `Atom` does not
     // (and should not) derive `serde::{Serialize, Deserialize}` — a bare
     // interned index is meaningless without the matching `AtomInterner`, so
     // this field, like the binder's other in-process-only data, is skipped.
     #[serde(skip)]
     pub objects: FxHashMap<Atom, Vec<ClassMemberInfo>>,
-    pub enums: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub namespaces: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub flattened: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub getters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
-    pub setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
+    pub enums: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub namespaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub flattened: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
+    pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
 }
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Extensions {
-    pub methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
-    pub getters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
-    pub setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
+    pub methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
+    pub getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
+    pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -103,13 +104,13 @@ pub struct BindResult {
     /// `set_ty_table` for how it stays comparable across modules.
     #[serde(skip, default)]
     pub ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
-    pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
+    pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub type_members: TypeMembers,
-    pub class_parents: FxHashMap<Rc<str>, Rc<str>>,
-    pub source_file: Rc<str>,
-    pub sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
-    pub sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
-    pub sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
+    pub class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    pub source_file: Arc<str>,
+    pub sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    pub sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
+    pub sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,
     pub extensions: Extensions,
     #[serde(skip)]
     pub core: Option<Rc<CoreMembers>>,
@@ -178,7 +179,7 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.enum_members.get(name)))
     }
 
-    pub fn get_class_methods_for(&self, name: &str) -> Option<&FxHashMap<Rc<str>, Type>> {
+    pub fn get_class_methods_for(&self, name: &str) -> Option<&FxHashMap<Arc<str>, Type>> {
         self.class_methods
             .get(name)
             .or_else(|| self.core.as_ref().and_then(|b| b.class_methods.get(name)))

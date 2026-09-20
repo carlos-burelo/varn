@@ -2,8 +2,8 @@ use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use std::rc::Rc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use varn_types::chunk::ICKind;
 
 impl ExecCtx {
@@ -119,7 +119,7 @@ impl ExecCtx {
                         Some(crate::heap::HeapObj::Object(o)) => {
                             let o = o.clone();
                             if kind == ICKind::SHAPE_TRANSITION {
-                                o.insert(Rc::from(name.as_ref()), val);
+                                o.insert(Arc::from(name.as_ref()), val);
                             } else {
                                 o.set_field_at(slot, val);
                             }
@@ -208,7 +208,7 @@ impl ExecCtx {
                 // The field is new: `insert` transitions the shape and spills
                 // the value into the overflow store if the tail is full.
                 let old_shape_id = o.shape().id;
-                o.insert(Rc::from(name.as_ref()), val);
+                o.insert(Arc::from(name.as_ref()), val);
                 let new_shape_id = o.shape().id;
                 let new_slot = o.shape().property_names[name.as_ref()];
                 self.heap.write_barrier(obj.as_heap_idx(), val);

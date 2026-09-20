@@ -2,7 +2,7 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::checker_generics::{build_call_mapping, map_generics_cached};
 use crate::types::{FunctionParam, FunctionType, Type};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind, Param};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -22,7 +22,8 @@ impl<'r> Checker<'r> {
         };
 
         let callee_ty_raw = self.infer_type(callee, bind);
-        let callee_ty = callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        let callee_ty =
+            callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
         if let TypeKind::Named(class_name, _) = callee_kind {
@@ -32,9 +33,18 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|a| self.resolve_type_node_cached(a, bind))
                     .collect();
-                return Type::generic(class_name_str, resolved, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                return Type::generic(
+                    class_name_str,
+                    resolved,
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
             }
-            return Type::named(class_name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+            return Type::named(
+                class_name_str,
+                self.resolver,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            );
         }
         let TypeKind::Fn(fid) = callee_kind else {
             return Type::Dynamic;
@@ -120,7 +130,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 FunctionParam {
-                    name: Some(Rc::from(name)),
+                    name: Some(Arc::from(name)),
                     ty: ty.0,
                     optional: p.is_optional || p.default.is_some(),
                     is_rest: p.is_rest,
@@ -164,7 +174,10 @@ impl<'r> Checker<'r> {
                     match return_tys.len() {
                         0 => Type::Void,
                         1 => return_tys.into_iter().next().unwrap(),
-                        _ => Type::union(return_tys, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                        _ => Type::union(
+                            return_tys,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        ),
                     }
                 }
             }

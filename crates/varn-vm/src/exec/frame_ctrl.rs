@@ -178,8 +178,7 @@ impl ExecCtx {
 
                 if !self.gc_inhibited && self.heap.needs_gc() {
                     let mut roots: Vec<u32> = Vec::with_capacity(256);
-                    let (dyn_len, ref_len) =
-                        (self.stack.dyn_.len(), self.stack.refs.len());
+                    let (dyn_len, ref_len) = (self.stack.dyn_.len(), self.stack.refs.len());
                     self.stack.collect_roots(dyn_len, ref_len, &mut roots);
                     for v in &self.globals.values {
                         if v.is_heap() {

@@ -86,10 +86,9 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
     // the reloaded global scope chain must find the reloaded symbol, which
     // only works if `rebuild_scope_bindings` restored the Atom-keyed lookup
     // table (it deserializes empty, being `#[serde(skip)]`).
-    let atom = bind2
-        .interner
-        .get("makeGreeting")
-        .expect("the reloaded interner must have interned 'makeGreeting' while re-interning symbols");
+    let atom = bind2.interner.get("makeGreeting").expect(
+        "the reloaded interner must have interned 'makeGreeting' while re-interning symbols",
+    );
     let scope = bind2.scopes.get(bind2.global_scope);
     let resolved_id = scope
         .resolve(atom, &bind2.scopes)

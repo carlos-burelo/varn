@@ -38,7 +38,9 @@ fn cached_interface_keeps_real_member_types() {
 
     // Primer "proceso": bindea desde fuente y escribe la interfaz al caché.
     let resolver1 = DiskResolver::new();
-    let bind1 = resolver1.module_bind(&lib_str).expect("shapes.vn debe bindear");
+    let bind1 = resolver1
+        .module_bind(&lib_str)
+        .expect("shapes.vn debe bindear");
     assert!(
         !bind1.diagnostics.has_errors(),
         "shapes.vn debe bindear limpio: {:?}",
@@ -92,10 +94,7 @@ fn cached_interface_keeps_real_member_types() {
     };
     let ret = bind2.ty_table.get_function(fid).return_type;
     assert!(
-        matches!(
-            bind2.ty_table.get(ret),
-            varn_core::TypeKind::Named(_, _)
-        ),
+        matches!(bind2.ty_table.get(ret), varn_core::TypeKind::Named(_, _)),
         "el retorno de `makeBox` debe ser `Box` (Named), no Dynamic"
     );
 

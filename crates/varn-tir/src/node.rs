@@ -7,7 +7,7 @@
 
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, ClassId, EnumId, FnId, SigId, TyTable};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Byte range in the source file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -74,7 +74,7 @@ pub enum TirUnOp {
 pub enum TirArg {
     Expr(TirExpr),
     Spread(TirExpr),
-    Named { label: Rc<str>, value: TirExpr },
+    Named { label: Arc<str>, value: TirExpr },
 }
 
 impl TirArg {
@@ -99,7 +99,7 @@ pub enum TirArrayEl {
 /// One entry of an object literal.
 #[derive(Debug, Clone)]
 pub enum TirObjectEntry {
-    Field { name: Rc<str>, value: TirExpr },
+    Field { name: Arc<str>, value: TirExpr },
     Spread(TirExpr),
 }
 
@@ -109,7 +109,7 @@ pub enum TirExprKind {
     IntLit(i64),
     FloatLit(f64),
     BoolLit(bool),
-    StrLit(Rc<str>),
+    StrLit(Arc<str>),
     CharLit(char),
     NullLit,
 
@@ -129,7 +129,7 @@ pub enum TirExprKind {
     /// Field access. Slot or by-name lives in `res`, not in the kind.
     Field {
         object: Box<TirExpr>,
-        name: Rc<str>,
+        name: Arc<str>,
     },
     Index {
         object: Box<TirExpr>,
@@ -143,7 +143,7 @@ pub enum TirExprKind {
     /// Method call. Vtable slot, intrinsic or by-name lives in `res`.
     MethodCall {
         recv: Box<TirExpr>,
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<TirArg>,
     },
 
@@ -159,7 +159,7 @@ pub enum TirExprKind {
     },
     /// `#{ k: v, … }` — a deeply-immutable record; `==` on it is structural.
     RecordLit {
-        fields: Vec<(Rc<str>, TirExpr)>,
+        fields: Vec<(Arc<str>, TirExpr)>,
     },
 
     /// `await e` — only legal in a function whose `is_async` is set, which the
@@ -245,13 +245,13 @@ pub enum TirExprKind {
     },
     /// `super.name(args)` — a base method call bypassing the vtable.
     SuperMethodCall {
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<TirArg>,
     },
 
     /// A `decimal` literal, carried as its source text (minus the `d` suffix)
     /// — the backend parses it, keeping this crate free of `rust_decimal`.
-    DecimalLit(Rc<str>),
+    DecimalLit(Arc<str>),
     /// A `bigint` literal, already parsed to `i128` by the checker.
     BigIntLit(i128),
     /// `a..b` / `a..=b`.
@@ -265,13 +265,13 @@ pub enum TirExprKind {
     /// `skip_keys`.
     ObjectRest {
         object: Box<TirExpr>,
-        skip_keys: Vec<Rc<str>>,
+        skip_keys: Vec<Arc<str>>,
     },
 
     /// `recv.m(args)` resolved to an extension function: a free-function call
     /// with `recv` prepended, dispatched by the mangled `func` name.
     ExtensionCall {
-        func: Rc<str>,
+        func: Arc<str>,
         recv: Box<TirExpr>,
         args: Vec<TirArg>,
     },
@@ -324,7 +324,7 @@ pub enum TirUpvalue {
 
 #[derive(Debug, Clone)]
 pub struct TirFunction {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub sig: SigId,
     pub params: Vec<BackendTy>,
     pub return_ty: BackendTy,
@@ -347,7 +347,7 @@ pub struct TirFunction {
 /// come from the referenced table entry, not repeated here.
 #[derive(Debug, Clone, Default)]
 pub struct TirClassDef {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     /// Table handle: `Some(Ok)` a class, `Some(Err)` an enum, `None` neither
     /// resolved (a generic-only or erased declaration — still built by name).
     pub class_id: Option<ClassId>,
@@ -361,7 +361,7 @@ pub struct TirClassDef {
     /// The `extends` expression, evaluated for the `MakeClass` super argument.
     pub super_class: Option<TirExpr>,
     /// Static fields / consts: name + optional initializer.
-    pub statics: Vec<(Rc<str>, Option<TirExpr>)>,
+    pub statics: Vec<(Arc<str>, Option<TirExpr>)>,
     /// Methods and the constructor: key, body `FnId`, `is_static`.
     pub methods: Vec<TirClassMember>,
     /// Getters / setters: key, body `FnId`, `is_getter`, `is_static`.
@@ -376,7 +376,7 @@ pub struct TirClassDef {
 
 #[derive(Debug, Clone)]
 pub struct TirClassMember {
-    pub key: Rc<str>,
+    pub key: Arc<str>,
     pub func: FnId,
     pub is_static: bool,
     pub is_private: bool,
@@ -386,7 +386,7 @@ pub struct TirClassMember {
 
 #[derive(Debug, Clone)]
 pub struct TirClassAccessor {
-    pub key: Rc<str>,
+    pub key: Arc<str>,
     pub func: FnId,
     pub is_getter: bool,
     pub is_static: bool,
@@ -394,22 +394,22 @@ pub struct TirClassAccessor {
 
 #[derive(Debug, Clone)]
 pub struct TirVariantDef {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub tag: i64,
-    pub meta: Rc<str>,
+    pub meta: Arc<str>,
     pub const_args: Vec<TirExpr>,
 }
 
 #[derive(Debug, Clone)]
 pub enum TirImportKind {
     Default,
-    Named(Rc<str>),
+    Named(Arc<str>),
     Namespace,
 }
 
 #[derive(Debug, Clone)]
 pub struct TirImportSpec {
-    pub local: Rc<str>,
+    pub local: Arc<str>,
     pub kind: TirImportKind,
 }
 
@@ -417,7 +417,7 @@ pub struct TirImportSpec {
 /// `LoadModule` plus a `StoreGlobal` per bound name.
 #[derive(Debug, Clone)]
 pub struct TirImport {
-    pub source: Rc<str>,
+    pub source: Arc<str>,
     pub is_type_only: bool,
     pub specs: Vec<TirImportSpec>,
 }
@@ -427,17 +427,17 @@ pub struct TirImport {
 /// property of that source module.
 #[derive(Debug, Clone)]
 pub struct TirExport {
-    pub exported: Rc<str>,
-    pub local: Rc<str>,
+    pub exported: Arc<str>,
+    pub local: Arc<str>,
     /// `Some(src)` — a re-export; the value is `src`'s `local` property.
-    pub reexport_from: Option<Rc<str>>,
+    pub reexport_from: Option<Arc<str>>,
     /// `export * as ns from "src"` — bind the whole module object.
     pub namespace: bool,
 }
 
 #[derive(Debug)]
 pub struct TirModule {
-    pub source_file: Rc<str>,
+    pub source_file: Arc<str>,
     pub imports: Vec<TirImport>,
     pub exports: Vec<TirExport>,
     pub types: TyTable,
@@ -448,7 +448,7 @@ pub struct TirModule {
     pub globals: Vec<BackendTy>,
     /// The name of each global, parallel to `globals`. A `GlobalSlot(n)`
     /// resolution names `globals[n]` / `global_names[n]`.
-    pub global_names: Vec<Rc<str>>,
+    pub global_names: Vec<Arc<str>>,
     /// Class / enum construction, one per top-level declaration, in source
     /// order. Empty for a module with no classes or enums.
     pub class_defs: Vec<TirClassDef>,

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::generator::GeneratorDriver;
 use varn_types::value::Value;
 
@@ -19,8 +20,8 @@ use crate::value::VmValue;
 /// sides and the round trip bought nothing.
 fn make_iter_result(value: VmValue, done: bool) -> Value {
     varn_types::value::new_object(varn_types::value::ObjRef::from_pairs([
-        (Rc::from("value"), value),
-        (Rc::from("done"), varn_types::VmValue::from_bool(done)),
+        (Arc::from("value"), value),
+        (Arc::from("done"), varn_types::VmValue::from_bool(done)),
     ]))
 }
 

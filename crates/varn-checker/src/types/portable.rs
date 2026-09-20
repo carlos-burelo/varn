@@ -115,11 +115,9 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
     match table.get(ty.0) {
         TypeKind::Intrinsic(tag) => PortableType::Intrinsic(tag),
         TypeKind::This => PortableType::This,
-        TypeKind::Array(inner) => PortableType::Array(Box::new(encode(
-            Type(inner, false),
-            table,
-            interner,
-        ))),
+        TypeKind::Array(inner) => {
+            PortableType::Array(Box::new(encode(Type(inner, false), table, interner)))
+        }
         TypeKind::Union(list) => PortableType::Union(encode_list(list, table, interner)),
         TypeKind::Intersection(list) => {
             PortableType::Intersection(encode_list(list, table, interner))
@@ -132,7 +130,9 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
         TypeKind::TemplateLiteral(list) => {
             PortableType::TemplateLiteral(encode_list(list, table, interner))
         }
-        TypeKind::Fn(fid) => PortableType::Fn(encode_function(table.get_function(fid), table, interner)),
+        TypeKind::Fn(fid) => {
+            PortableType::Fn(encode_function(table.get_function(fid), table, interner))
+        }
         TypeKind::Object(oid) => PortableType::Object(
             table
                 .get_object_members(oid)
@@ -143,11 +143,9 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
         // `ExprId` es arena-relativo: no hay forma portable de escribirlo.
         // Honesto-desconocido en vez de un número que apunte a otra cosa.
         TypeKind::Typeof(_) => PortableType::Intrinsic(TypeTag::Dynamic),
-        TypeKind::KeyOf(inner) => PortableType::KeyOf(Box::new(encode(
-            Type(inner, false),
-            table,
-            interner,
-        ))),
+        TypeKind::KeyOf(inner) => {
+            PortableType::KeyOf(Box::new(encode(Type(inner, false), table, interner)))
+        }
         TypeKind::IndexedAccess { object, index } => PortableType::IndexedAccess {
             object: Box::new(encode(Type(object, false), table, interner)),
             index: Box::new(encode(Type(index, false), table, interner)),
@@ -201,11 +199,7 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
 /// Re-interna `p` en `table` (la del consumidor) resolviendo y publicando los
 /// nombres en `interner`. El id resultante es válido en `table` y en ninguna
 /// otra.
-pub fn decode(
-    p: &PortableType,
-    table: &mut CheckerTyTable,
-    interner: &mut AtomInterner,
-) -> Type {
+pub fn decode(p: &PortableType, table: &mut CheckerTyTable, interner: &mut AtomInterner) -> Type {
     let ty = match p {
         PortableType::Intrinsic(tag) => table.intern(TypeKind::Intrinsic(*tag)),
         PortableType::This => table.intern(TypeKind::This),
@@ -352,10 +346,7 @@ pub fn decode_list(
     table: &mut CheckerTyTable,
     interner: &mut AtomInterner,
 ) -> super::TyListId {
-    let ids: Vec<CheckerTyId> = list
-        .iter()
-        .map(|p| decode(p, table, interner).0)
-        .collect();
+    let ids: Vec<CheckerTyId> = list.iter().map(|p| decode(p, table, interner).0).collect();
     table.intern_list(&ids)
 }
 
@@ -392,7 +383,7 @@ fn decode_function(
         type_params: f
             .type_params
             .iter()
-            .map(|s| std::rc::Rc::from(s.as_str()))
+            .map(|s| std::sync::Arc::from(s.as_str()))
             .collect(),
     }
 }
@@ -416,7 +407,7 @@ fn decode_param(
     interner: &mut AtomInterner,
 ) -> FunctionParam {
     FunctionParam {
-        name: p.name.as_ref().map(|s| std::rc::Rc::from(s.as_str())),
+        name: p.name.as_ref().map(|s| std::sync::Arc::from(s.as_str())),
         ty: decode(&p.ty, table, interner).0,
         optional: p.optional,
         is_rest: p.is_rest,
@@ -492,7 +483,7 @@ fn decode_object_member(
             optional,
             readonly,
         } => ObjectTypeMember::Property {
-            name: std::rc::Rc::from(name.as_str()),
+            name: std::sync::Arc::from(name.as_str()),
             ty: decode(ty, table, interner).0,
             optional: *optional,
             readonly: *readonly,
@@ -504,7 +495,7 @@ fn decode_object_member(
             optional,
             is_arrow,
         } => ObjectTypeMember::Method {
-            name: std::rc::Rc::from(name.as_str()),
+            name: std::sync::Arc::from(name.as_str()),
             params: params
                 .iter()
                 .map(|p| decode_param(p, table, interner))
@@ -518,7 +509,7 @@ fn decode_object_member(
             key_ty,
             value_ty,
         } => ObjectTypeMember::Index {
-            param_name: std::rc::Rc::from(param_name.as_str()),
+            param_name: std::sync::Arc::from(param_name.as_str()),
             key_ty: decode(key_ty, table, interner).0,
             value_ty: decode(value_ty, table, interner).0,
         },
@@ -596,7 +587,7 @@ mod tests {
         let i = AtomInterner::new();
         let ret = t.intern_function(FunctionType {
             params: vec![FunctionParam {
-                name: Some(std::rc::Rc::from("x")),
+                name: Some(std::sync::Arc::from("x")),
                 ty: CheckerTyId::FLOAT,
                 optional: false,
                 is_rest: false,
@@ -623,7 +614,7 @@ mod tests {
         let mut t = CheckerTyTable::new();
         let i = AtomInterner::new();
         let oid = t.intern_object_members(vec![ObjectTypeMember::Index {
-            param_name: std::rc::Rc::from("k"),
+            param_name: std::sync::Arc::from("k"),
             key_ty: CheckerTyId::STR,
             value_ty: CheckerTyId::INT,
         }]);

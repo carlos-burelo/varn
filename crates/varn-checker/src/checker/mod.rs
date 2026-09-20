@@ -8,10 +8,10 @@ use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
 use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use varn_core::ast::{AstArena, ExprId};
 use varn_core::ast::Program;
+use varn_core::ast::{AstArena, ExprId};
 use varn_core::Diagnostic;
 
 pub(crate) use crate::checker_enrichment::enrich_call_returns;
@@ -72,7 +72,7 @@ pub struct CheckResult {
     /// alongside a separate id-keyed map, which is how the two came to hold
     /// different things.
     pub expr_types: FxHashMap<u32, ExprInfo>,
-    pub flattened_members: FxHashMap<Rc<str>, Vec<crate::types::ClassMemberInfo>>,
+    pub flattened_members: FxHashMap<Arc<str>, Vec<crate::types::ClassMemberInfo>>,
     pub profile: CheckProfile,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
     pub scope_spans: Vec<ScopeSpan>,
@@ -91,11 +91,11 @@ pub struct CheckResult {
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     /// `recv.m(..)` call ids resolved to an extension function, mapped to its
     /// mangled name.
-    pub extension_calls: FxHashMap<u32, Rc<str>>,
+    pub extension_calls: FxHashMap<u32, Arc<str>>,
     /// `recv.p` reads resolved to an extension getter.
-    pub extension_members: FxHashMap<u32, Rc<str>>,
+    pub extension_members: FxHashMap<u32, Arc<str>>,
     /// `recv.p = v` writes resolved to an extension setter.
-    pub extension_set_members: FxHashMap<u32, Rc<str>>,
+    pub extension_set_members: FxHashMap<u32, Arc<str>>,
 }
 
 impl CheckResult {
@@ -160,7 +160,7 @@ pub struct Checker<'r> {
     /// walked, not a distinct mechanism.
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
-    pub(crate) source_file: std::rc::Rc<str>,
+    pub(crate) source_file: std::sync::Arc<str>,
     pub(crate) current_scope: crate::scope::ScopeId,
     pub(crate) expected_return_type: Option<Type>,
     pub(crate) narrowed_types: FxHashMap<SymbolId, Vec<Type>>,
@@ -172,22 +172,22 @@ pub struct Checker<'r> {
     pub(crate) infer_env_rev: u32,
     pub(crate) compat_cache: FxHashMap<(Type, Type, usize), bool>,
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
-    pub(crate) symbol_type_params_cache: FxHashMap<(Rc<str>, u8), Vec<Rc<str>>>,
+    pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
     pub(crate) expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
     /// Counter behind [`TypeEntry::seq`].
     pub(crate) expr_seq: u32,
-    pub(crate) current_class: Option<Rc<str>>,
-    pub(crate) active_type_params: FxHashSet<Rc<str>>,
-    pub(crate) abstract_classes: FxHashSet<Rc<str>>,
+    pub(crate) current_class: Option<Arc<str>>,
+    pub(crate) active_type_params: FxHashSet<Arc<str>>,
+    pub(crate) abstract_classes: FxHashSet<Arc<str>>,
     pub(crate) is_assignment_target: bool,
     pub(crate) in_pipeline_rhs: bool,
     pub(crate) pipeline_value_type: Option<Type>,
-    pub(crate) extension_calls: FxHashMap<u32, Rc<str>>,
-    pub(crate) extension_members: FxHashMap<u32, Rc<str>>,
-    pub(crate) extension_set_members: FxHashMap<u32, Rc<str>>,
-    pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
-    pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), MemberTypeCacheEntry>,
+    pub(crate) extension_calls: FxHashMap<u32, Arc<str>>,
+    pub(crate) extension_members: FxHashMap<u32, Arc<str>>,
+    pub(crate) extension_set_members: FxHashMap<u32, Arc<str>>,
+    pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
+    pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
     /// Filled by `validate_named_call_arguments`: for a call with named args,
     /// `[param_pos] = Some(arg_idx)` or `None` (omitted, use the default). The
@@ -363,7 +363,7 @@ impl<'r> Checker<'r> {
         enrich_call_returns(&mut bind, ast_arena, resolver);
         profile.enrich_call_returns = started.elapsed();
 
-        let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());
+        let source_file: std::sync::Arc<str> = std::sync::Arc::from(bind.source_file.as_ref());
 
         // `enrich_call_returns` may itself have triggered nested binds
         // (`resolver` calls), so re-adopt live one more time before the
@@ -755,18 +755,14 @@ impl<'r> Checker<'r> {
     /// guarantee, so a hit is never wrong) is the fallback. Total miss degrades
     /// to a `<stale:…>` marker that downstream lookups simply miss on, instead
     /// of crashing the compiler.
-    pub(crate) fn resolve_bind_atom(
-        &self,
-        bind: &BindResult,
-        atom: varn_core::Atom,
-    ) -> Rc<str> {
+    pub(crate) fn resolve_bind_atom(&self, bind: &BindResult, atom: varn_core::Atom) -> Arc<str> {
         if let Some(s) = bind.interner.try_resolve(atom) {
-            return Rc::from(s);
+            return Arc::from(s);
         }
         if let Some(s) = self.resolver.interner_snapshot().try_resolve(atom) {
-            return Rc::from(s);
+            return Arc::from(s);
         }
-        Rc::from(format!("<stale:{atom:?}>"))
+        Arc::from(format!("<stale:{atom:?}>"))
     }
 
     /// Decode a `Type` that came out of ANOTHER module's `BindResult`
@@ -789,7 +785,8 @@ impl<'r> Checker<'r> {
             return ty;
         }
         let mut cache = FxHashMap::default();
-        let id = std::sync::Arc::make_mut(&mut self.ty_table).reintern(&bind.ty_table, ty.0, &mut cache);
+        let id =
+            std::sync::Arc::make_mut(&mut self.ty_table).reintern(&bind.ty_table, ty.0, &mut cache);
         let ty = Type(id, ty.1);
         // A member type written inside a class body (`tx: Sender<T>`) often
         // carries no origin of its own; without one, later member lookups
@@ -823,7 +820,11 @@ impl<'r> Checker<'r> {
             return cached.clone();
         }
         let view = crate::binder::BindView::new(bind, self.resolver);
-        let resolved = crate::binder::resolve_type_node(node, Some(&view), &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        let resolved = crate::binder::resolve_type_node(
+            node,
+            Some(&view),
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
         self.type_node_cache.insert(key, resolved.clone());
         resolved
     }
@@ -833,22 +834,22 @@ impl<'r> Checker<'r> {
         name: &str,
         kind: crate::symbol::SymbolKind,
         bind: &BindResult,
-    ) -> Vec<Rc<str>> {
-        let key = (Rc::from(name), symbol_kind_cache_key(kind));
+    ) -> Vec<Arc<str>> {
+        let key = (Arc::from(name), symbol_kind_cache_key(kind));
         if let Some(cached) = self.symbol_type_params_cache.get(&key) {
             return cached.clone();
         }
 
-        let resolved = if let Some(sid) = bind
-            .interner
-            .get(name)
-            .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
-        {
+        let resolved = if let Some(sid) = bind.interner.get(name).and_then(|atom| {
+            bind.scopes
+                .get(bind.global_scope)
+                .resolve(atom, &bind.scopes)
+        }) {
             let sym = bind.arena.get(sid);
             if sym.kind == kind {
                 sym.type_params
                     .iter()
-                    .map(|a| Rc::from(bind.interner.resolve(*a)))
+                    .map(|a| Arc::from(bind.interner.resolve(*a)))
                     .collect()
             } else {
                 Vec::new()
@@ -861,22 +862,26 @@ impl<'r> Checker<'r> {
         resolved
     }
 
-    pub(crate) fn symbol_type_params_any(&mut self, name: &str, bind: &BindResult) -> Vec<Rc<str>> {
-        let key = (Rc::from(name), 255);
+    pub(crate) fn symbol_type_params_any(
+        &mut self,
+        name: &str,
+        bind: &BindResult,
+    ) -> Vec<Arc<str>> {
+        let key = (Arc::from(name), 255);
         if let Some(cached) = self.symbol_type_params_cache.get(&key) {
             return cached.clone();
         }
 
-        let resolved = if let Some(sid) = bind
-            .interner
-            .get(name)
-            .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
-        {
+        let resolved = if let Some(sid) = bind.interner.get(name).and_then(|atom| {
+            bind.scopes
+                .get(bind.global_scope)
+                .resolve(atom, &bind.scopes)
+        }) {
             bind.arena
                 .get(sid)
                 .type_params
                 .iter()
-                .map(|a| Rc::from(bind.interner.resolve(*a)))
+                .map(|a| Arc::from(bind.interner.resolve(*a)))
                 .collect()
         } else {
             bind.core

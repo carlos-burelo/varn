@@ -2,7 +2,7 @@ use super::type_node_to_name;
 use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
 
 impl<'r> super::super::Binder<'r> {
@@ -27,7 +27,7 @@ impl<'r> super::super::Binder<'r> {
                         format!("__ext_{}_{}", type_name, self.interner.resolve(method.id));
                     let mut param_types: Vec<crate::types::FunctionParam> =
                         vec![crate::types::FunctionParam {
-                            name: Some(Rc::from("this")),
+                            name: Some(Arc::from("this")),
                             ty: receiver_ty.0,
                             optional: false,
                             is_rest: false,
@@ -43,15 +43,22 @@ impl<'r> super::super::Binder<'r> {
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {
-                            let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
+                            let is_array =
+                                matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                ty = Type::array(
+                                    ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                             }
                         }
                         param_types.push(crate::types::FunctionParam {
-                            name: Some(Rc::from(
-                                super::super::type_inference::pattern_to_string(&p.pattern, Some(&self.interner))
-                                    .as_str(),
+                            name: Some(Arc::from(
+                                super::super::type_inference::pattern_to_string(
+                                    &p.pattern,
+                                    Some(&self.interner),
+                                )
+                                .as_str(),
                             )),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
@@ -78,15 +85,15 @@ impl<'r> super::super::Binder<'r> {
                             type_params: method
                                 .type_params
                                 .iter()
-                                .map(|t| Rc::from(self.interner.resolve(t.name)))
+                                .map(|t| Arc::from(self.interner.resolve(t.name)))
                                 .collect(),
                         },
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     let line = method.range.start.line;
                     let mangled_atom = self.intern_local(&mangled);
-                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, line)
-                        .with_type(fn_type);
+                    let mut sym =
+                        Symbol::new(SymbolKind::Function, mangled_atom, line).with_type(fn_type);
                     sym.col = method.range.start.column;
                     sym.offset = method.range.start.offset;
                     sym.has_explicit_type = method.return_type.is_some();
@@ -95,11 +102,11 @@ impl<'r> super::super::Binder<'r> {
                     self.define(mangled_atom, sym);
                     self.extensions
                         .methods
-                        .entry(Rc::from(type_name.as_str()))
+                        .entry(Arc::from(type_name.as_str()))
                         .or_default()
                         .insert(
-                            Rc::from(self.interner.resolve(method.id)),
-                            Rc::from(mangled.as_str()),
+                            Arc::from(self.interner.resolve(method.id)),
+                            Arc::from(mangled.as_str()),
                         );
                     self.bind_extension_function_scope(
                         line,
@@ -124,7 +131,7 @@ impl<'r> super::super::Binder<'r> {
                     let fn_type = Type::fn_(
                         crate::types::FunctionType {
                             params: vec![crate::types::FunctionParam {
-                                name: Some(Rc::from("this")),
+                                name: Some(Arc::from("this")),
                                 ty: receiver_ty.0,
                                 optional: false,
                                 is_rest: false,
@@ -144,9 +151,9 @@ impl<'r> super::super::Binder<'r> {
                     self.define(mangled_atom, sym);
                     self.extensions
                         .getters
-                        .entry(Rc::from(type_name.as_str()))
+                        .entry(Arc::from(type_name.as_str()))
                         .or_default()
-                        .insert(Rc::from(key_str.as_str()), Rc::from(mangled.as_str()));
+                        .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
                     self.bind_extension_function_scope(
                         range.start.line,
                         receiver_ty.clone(),
@@ -176,15 +183,18 @@ impl<'r> super::super::Binder<'r> {
                         crate::types::FunctionType {
                             params: vec![
                                 crate::types::FunctionParam {
-                                    name: Some(Rc::from("this")),
+                                    name: Some(Arc::from("this")),
                                     ty: receiver_ty.0,
                                     optional: false,
                                     is_rest: false,
                                 },
                                 crate::types::FunctionParam {
-                                    name: Some(Rc::from(
-                                        super::super::type_inference::pattern_to_string(&param.pattern, Some(&self.interner))
-                                            .as_str(),
+                                    name: Some(Arc::from(
+                                        super::super::type_inference::pattern_to_string(
+                                            &param.pattern,
+                                            Some(&self.interner),
+                                        )
+                                        .as_str(),
                                     )),
                                     ty: param_ty.0,
                                     optional: param.is_optional,
@@ -206,9 +216,9 @@ impl<'r> super::super::Binder<'r> {
                     self.define(mangled_atom, sym);
                     self.extensions
                         .setters
-                        .entry(Rc::from(type_name.as_str()))
+                        .entry(Arc::from(type_name.as_str()))
                         .or_default()
-                        .insert(Rc::from(key_str.as_str()), Rc::from(mangled.as_str()));
+                        .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
                     self.bind_extension_function_scope(
                         range.start.line,
                         receiver_ty.clone(),

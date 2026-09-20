@@ -1,5 +1,5 @@
 use crate::types::Type;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::source::SourceRange;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,17 +66,17 @@ impl NestedTypeKind {
 #[derive(Clone, Debug)]
 pub struct MemberResolution {
     pub receiver_ty: Type,
-    pub member_name: Rc<str>,
+    pub member_name: Arc<str>,
     pub member_kind: ResolvedMemberKind,
     pub member_ty: Type,
-    pub origin_module: Option<Rc<str>>,
+    pub origin_module: Option<Arc<str>>,
     pub def_range: Option<SourceRange>,
-    pub doc: Option<Rc<str>>,
+    pub doc: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct CallParamInfo {
-    pub name: Option<Rc<str>>,
+    pub name: Option<Arc<str>>,
     pub ty: Type,
     pub optional: bool,
     pub is_rest: bool,
@@ -84,7 +84,7 @@ pub struct CallParamInfo {
 
 #[derive(Clone, Debug)]
 pub struct CallResolution {
-    pub callee_name: Option<Rc<str>>,
+    pub callee_name: Option<Arc<str>>,
     pub params: Vec<CallParamInfo>,
     pub return_ty: Type,
     pub arg_to_param_map: Vec<usize>,
@@ -92,7 +92,7 @@ pub struct CallResolution {
 
 #[derive(Clone, Debug)]
 pub struct ResolvedMemberSummary {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub ty: Type,
     pub kind: ResolvedMemberKind,
     pub is_static: bool,

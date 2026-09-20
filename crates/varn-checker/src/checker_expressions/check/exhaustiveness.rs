@@ -55,7 +55,8 @@ impl<'r> Checker<'r> {
         let TypeKind::Named(type_name_atom, _) = self.ty_table.get(subject_ty.0) else {
             return;
         };
-        let type_name: std::rc::Rc<str> = std::rc::Rc::from(bind.interner.resolve(type_name_atom));
+        let type_name: std::sync::Arc<str> =
+            std::sync::Arc::from(bind.interner.resolve(type_name_atom));
 
         if let Some(variants) = bind.sum_type_variants.get(type_name.as_ref()) {
             let uncovered: Vec<String> = variants
@@ -139,8 +140,10 @@ impl<'r> Checker<'r> {
                             MatchPattern::Wildcard => true,
                             MatchPattern::EnumVariant { variant_name, .. } => {
                                 let variant_name_str = bind.interner.resolve(*variant_name);
-                                let last_part =
-                                    variant_name_str.rsplit('.').next().unwrap_or(variant_name_str);
+                                let last_part = variant_name_str
+                                    .rsplit('.')
+                                    .next()
+                                    .unwrap_or(variant_name_str);
                                 last_part == v.name.as_ref()
                             }
                             MatchPattern::Literal(e) => {
@@ -154,8 +157,7 @@ impl<'r> Checker<'r> {
                                     } else {
                                         false
                                     }
-                                } else if let ExprKind::Identifier { name } = &arena.expr(*e).kind
-                                {
+                                } else if let ExprKind::Identifier { name } = &arena.expr(*e).kind {
                                     bind.interner.resolve(*name) == v.name.as_ref()
                                 } else {
                                     false

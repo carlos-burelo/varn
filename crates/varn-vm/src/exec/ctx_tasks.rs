@@ -110,7 +110,7 @@ impl ExecCtx {
         match rx.recv() {
             Ok(Ok(v)) => Ok(v),
             Ok(Err(v)) => Err(v),
-            Err(_) => Err(varn_types::Value::Str(std::rc::Rc::from("task dropped"))),
+            Err(_) => Err(varn_types::Value::Str(std::sync::Arc::from("task dropped"))),
         }
     }
 

@@ -59,7 +59,8 @@ impl<'r> Checker<'r> {
                         .or_else(|| bind.arena.get(id).ty.clone());
                     if let Some(ty) = original_ty {
                         if is_true_branch {
-                            let narrowed = ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                            let narrowed = ty
+                                .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             if !narrowed.is_dynamic() && narrowed != ty {
                                 narrowings.push((id, narrowed));
                             }
@@ -136,7 +137,9 @@ impl<'r> Checker<'r> {
                                     .cloned()
                                     .or_else(|| bind.arena.get(id).ty.clone());
                                 if let Some(ty) = original_ty {
-                                    let narrowed = ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                    let narrowed = ty.non_nullified(
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                    );
                                     if !narrowed.is_dynamic() {
                                         narrowings.push((id, narrowed));
                                     }
@@ -177,12 +180,11 @@ impl<'r> Checker<'r> {
                                 let scope = bind.scopes.get(self.current_scope);
                                 if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
                                     let original_ty = bind.arena.get(id).ty;
-                                    let union_list = original_ty.and_then(|t| {
-                                        match self.ty_table.get(t.0) {
+                                    let union_list =
+                                        original_ty.and_then(|t| match self.ty_table.get(t.0) {
                                             TypeKind::Union(list) => Some(list),
                                             _ => None,
-                                        }
-                                    });
+                                        });
                                     if let Some(list) = union_list {
                                         let members: Vec<Type> = self
                                             .ty_table
@@ -195,8 +197,11 @@ impl<'r> Checker<'r> {
                                         for m in members.iter() {
                                             let m_kind = self.ty_table.get(m.0);
                                             let hits = match m_kind {
-                                                TypeKind::Object(mid) => {
-                                                    self.ty_table.get_object_members(mid).iter().any(|f| match f {
+                                                TypeKind::Object(mid) => self
+                                                    .ty_table
+                                                    .get_object_members(mid)
+                                                    .iter()
+                                                    .any(|f| match f {
                                                         ObjectTypeMember::Property {
                                                             name,
                                                             ty,
@@ -206,10 +211,10 @@ impl<'r> Checker<'r> {
                                                                 && *ty == disc_ty.0
                                                         }
                                                         _ => false,
-                                                    })
-                                                }
+                                                    }),
                                                 TypeKind::Named(cn, _) => {
-                                                    let cn_str = bind.interner.resolve(cn).to_string();
+                                                    let cn_str =
+                                                        bind.interner.resolve(cn).to_string();
                                                     bind.get_interface_members_local(&cn_str)
                                                         .or_else(|| {
                                                             bind.get_class_entry(&cn_str)
@@ -238,7 +243,12 @@ impl<'r> Checker<'r> {
                                         if (is_eq && is_true_branch) || (is_neq && !is_true_branch)
                                         {
                                             if !matched.is_empty() {
-                                                if let Some(t) = make_ty(matched, &mut *std::sync::Arc::make_mut(&mut self.ty_table)) {
+                                                if let Some(t) = make_ty(
+                                                    matched,
+                                                    &mut *std::sync::Arc::make_mut(
+                                                        &mut self.ty_table,
+                                                    ),
+                                                ) {
                                                     narrowings.push((id, t));
                                                 }
                                             }
@@ -246,7 +256,10 @@ impl<'r> Checker<'r> {
                                             || (is_eq && !is_true_branch))
                                             && !matched.is_empty()
                                         {
-                                            if let Some(t) = make_ty(unmatched, &mut *std::sync::Arc::make_mut(&mut self.ty_table)) {
+                                            if let Some(t) = make_ty(
+                                                unmatched,
+                                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                            ) {
                                                 narrowings.push((id, t));
                                             }
                                         }
@@ -269,12 +282,18 @@ impl<'r> Checker<'r> {
                         if let Some(id) = scope.resolve(name, &bind.scopes) {
                             let class_name_str = bind.interner.resolve(class_name).to_string();
                             if is_true_branch {
-                                let named =
-                                    Type::named(class_name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                let named = Type::named(
+                                    class_name_str,
+                                    self.resolver,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                                 narrowings.push((id, named));
                             } else if let Some(ty) = bind.arena.get(id).ty {
                                 let class_name_atom = self.resolver.intern(&class_name_str);
-                                let narrowed = ty.minus_named(class_name_atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                let narrowed = ty.minus_named(
+                                    class_name_atom,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                                 if bind.interner.get("_") == Some(name) {
                                     narrowings.push((id, narrowed));
                                 }
@@ -341,7 +360,10 @@ impl<'r> Checker<'r> {
                                     Some(&view),
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 );
-                                let narrowed = original_ty.minus(&target_ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                let narrowed = original_ty.minus(
+                                    &target_ty,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                );
                                 if narrowed != original_ty {
                                     narrowings.push((id, narrowed));
                                 }
@@ -354,7 +376,8 @@ impl<'r> Checker<'r> {
             ExprKind::Call { callee, args, .. } => {
                 let (callee, args) = (*callee, args.clone());
                 let callee_ty_raw = self.infer_type(callee, bind);
-                let callee_ty = callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let callee_ty =
+                    callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(callee_ty.0) {
                     let ft = self.ty_table.get_function(fid).clone();
                     if let TypeKind::TypePredicate {
@@ -420,7 +443,12 @@ impl<'r> Checker<'r> {
                                             let narrowed = if matched.len() == 1 {
                                                 matched.into_iter().next().unwrap()
                                             } else {
-                                                Type::union(matched, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                                                Type::union(
+                                                    matched,
+                                                    &mut *std::sync::Arc::make_mut(
+                                                        &mut self.ty_table,
+                                                    ),
+                                                )
                                             };
                                             narrowings.push((id, narrowed));
                                         } else {
@@ -430,8 +458,10 @@ impl<'r> Checker<'r> {
                                         narrowings.push((id, target_type));
                                     }
                                 } else if let Some(original_ty) = original_ty {
-                                    let narrowed =
-                                        original_ty.minus(&target_type, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                    let narrowed = original_ty.minus(
+                                        &target_type,
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                    );
                                     if narrowed != original_ty {
                                         narrowings.push((id, narrowed));
                                     }
@@ -512,12 +542,17 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         match self.ty_table.get(m.0) {
-            TypeKind::Object(mid) => self.ty_table.get_object_members(mid).iter().any(|f| match f {
-                ObjectTypeMember::Property { name, ty, .. } => {
-                    name.as_ref() == prop_name && *ty == disc_ty.0
-                }
-                _ => false,
-            }),
+            TypeKind::Object(mid) => {
+                self.ty_table
+                    .get_object_members(mid)
+                    .iter()
+                    .any(|f| match f {
+                        ObjectTypeMember::Property { name, ty, .. } => {
+                            name.as_ref() == prop_name && *ty == disc_ty.0
+                        }
+                        _ => false,
+                    })
+            }
             TypeKind::Named(cn, _) => {
                 let cn_str = bind.interner.resolve(cn).to_string();
                 bind.get_interface_members_local(&cn_str)
@@ -552,11 +587,15 @@ impl<'r> Checker<'r> {
                     merged.push((id, types[0]));
                 }
             } else if is_union {
-                merged.push((id, Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table))));
+                merged.push((
+                    id,
+                    Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                ));
             } else {
                 let ids: Vec<crate::types::CheckerTyId> = types.iter().map(|t| t.0).collect();
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
-                let interned = std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Intersection(list));
+                let interned = std::sync::Arc::make_mut(&mut self.ty_table)
+                    .intern(TypeKind::Intersection(list));
                 merged.push((id, Type(interned, false)));
             }
         }

@@ -31,7 +31,7 @@ use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{InstKind, SsaFunc, Value};
 use crate::ssa::uses::replace_uses_with_map;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Structural identity of a redundant-eliminable expression.
 ///
@@ -42,7 +42,7 @@ enum Key {
     Int(i64),
     FloatBits(u64),
     Bool(bool),
-    Str(Rc<str>),
+    Str(Arc<str>),
     Char(char),
     BigInt(i128),
     Null,
@@ -56,7 +56,7 @@ enum Key {
     FixedField(u32, u16),
     ArrayElem(u32, u32),
     ModuleSlot(u32, u16),
-    Global(Rc<str>),
+    Global(Arc<str>),
     GlobalIdx(u32),
     NativeGlobalIdx(u32),
     Upvalue(u32),

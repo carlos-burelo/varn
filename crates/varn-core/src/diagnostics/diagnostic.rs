@@ -1,7 +1,7 @@
 use super::catalog::ErrorCode;
 use super::suggestion::Suggestion;
 use crate::source::SourceRange;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DiagnosticKind {
@@ -13,7 +13,7 @@ pub enum DiagnosticKind {
 #[derive(Clone, Debug)]
 pub struct RelatedInformation {
     pub message: String,
-    pub file: Rc<str>,
+    pub file: Arc<str>,
     pub range: SourceRange,
 }
 
@@ -23,7 +23,7 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub message: String,
     pub range: SourceRange,
-    pub file: Rc<str>,
+    pub file: Arc<str>,
     pub suggestions: Vec<Suggestion>,
     pub related: Vec<RelatedInformation>,
 }
@@ -35,7 +35,7 @@ impl Diagnostic {
             kind: DiagnosticKind::Error,
             message: message.into(),
             range: SourceRange::default(),
-            file: Rc::from(""),
+            file: Arc::from(""),
             suggestions: Vec::new(),
             related: Vec::new(),
         }
@@ -47,7 +47,7 @@ impl Diagnostic {
             kind: DiagnosticKind::Warning,
             message: message.into(),
             range: SourceRange::default(),
-            file: Rc::from(""),
+            file: Arc::from(""),
             suggestions: Vec::new(),
             related: Vec::new(),
         }
@@ -59,13 +59,13 @@ impl Diagnostic {
             kind: DiagnosticKind::Hint,
             message: message.into(),
             range: SourceRange::default(),
-            file: Rc::from(""),
+            file: Arc::from(""),
             suggestions: Vec::new(),
             related: Vec::new(),
         }
     }
 
-    pub fn with_file(mut self, file: impl Into<Rc<str>>) -> Self {
+    pub fn with_file(mut self, file: impl Into<Arc<str>>) -> Self {
         self.file = file.into();
         self
     }
@@ -83,7 +83,7 @@ impl Diagnostic {
     pub fn with_related(
         mut self,
         message: impl Into<String>,
-        file: impl Into<Rc<str>>,
+        file: impl Into<Arc<str>>,
         range: SourceRange,
     ) -> Self {
         self.related.push(RelatedInformation {

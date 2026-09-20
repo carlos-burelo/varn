@@ -16,7 +16,7 @@ use crate::types::{
 };
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::Visibility;
 use varn_core::{Atom, AtomInterner, TypeTag};
 
@@ -75,8 +75,7 @@ fn encode_with_owner(
     // Preferir la tabla del módulo DECLARANTE: un símbolo re-exportado lleva
     // ids de ese módulo, y su número puede caer dentro del rango del bind que
     // re-exporta con otro significado.
-    if let (Some(module), Some(resolver)) =
-        (origin.and_then(|a| interner.try_resolve(a)), resolver)
+    if let (Some(module), Some(resolver)) = (origin.and_then(|a| interner.try_resolve(a)), resolver)
     {
         if let Some(b) = resolver
             .stdlib_bind(module)
@@ -141,10 +140,9 @@ pub(crate) fn decode_symbol(
     table: &mut CheckerTyTable,
     interner: &mut AtomInterner,
 ) -> Symbol {
-    let ty = p
-        .ty
-        .as_ref()
-        .map(|t| decode_portable_type(t, table, interner));
+    let ty =
+        p.ty.as_ref()
+            .map(|t| decode_portable_type(t, table, interner));
     let constraints = p
         .type_param_constraints
         .iter()
@@ -165,7 +163,11 @@ pub(crate) fn decode_symbol(
         offset: p.offset,
         full_range: varn_core::SourceRange::default(),
         origin_module: p.origin_module.map(|s| interner.intern(&s)),
-        re_export_path: p.re_export_path.iter().map(|s| interner.intern(s)).collect(),
+        re_export_path: p
+            .re_export_path
+            .iter()
+            .map(|s| interner.intern(s))
+            .collect(),
         original_name: p.original_name.map(|s| interner.intern(&s)),
         alias_node: None,
         slot_idx: p.slot_idx,
@@ -177,7 +179,7 @@ pub(crate) fn decode_symbol(
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct PortableClassMemberInfo {
-    name: Rc<str>,
+    name: Arc<str>,
     kind: ClassMemberKind,
     is_async: bool,
     is_generator: bool,
@@ -258,13 +260,13 @@ fn decode_member(
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 struct PortableTypeMembers {
-    classes: FxHashMap<Rc<str>, PortableClassMemberInfo>,
-    interfaces: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
-    enums: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
-    namespaces: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
-    flattened: FxHashMap<Rc<str>, Vec<PortableClassMemberInfo>>,
-    getters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
-    setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
+    classes: FxHashMap<Arc<str>, PortableClassMemberInfo>,
+    interfaces: FxHashMap<Arc<str>, Vec<PortableClassMemberInfo>>,
+    enums: FxHashMap<Arc<str>, Vec<PortableClassMemberInfo>>,
+    namespaces: FxHashMap<Arc<str>, Vec<PortableClassMemberInfo>>,
+    flattened: FxHashMap<Arc<str>, Vec<PortableClassMemberInfo>>,
+    getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, PortableType>>,
+    setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, PortableType>>,
 }
 
 fn encode_member_list(
@@ -272,7 +274,9 @@ fn encode_member_list(
     table: &CheckerTyTable,
     interner: &AtomInterner,
 ) -> Vec<PortableClassMemberInfo> {
-    list.iter().map(|m| encode_member(m, table, interner)).collect()
+    list.iter()
+        .map(|m| encode_member(m, table, interner))
+        .collect()
 }
 
 fn decode_member_list(
@@ -280,7 +284,9 @@ fn decode_member_list(
     table: &mut CheckerTyTable,
     interner: &mut AtomInterner,
 ) -> Vec<ClassMemberInfo> {
-    list.iter().map(|m| decode_member(m, table, interner)).collect()
+    list.iter()
+        .map(|m| decode_member(m, table, interner))
+        .collect()
 }
 
 fn encode_type_members(
@@ -288,12 +294,12 @@ fn encode_type_members(
     table: &CheckerTyTable,
     interner: &AtomInterner,
 ) -> PortableTypeMembers {
-    let encode_map = |src: &FxHashMap<Rc<str>, Vec<ClassMemberInfo>>| {
+    let encode_map = |src: &FxHashMap<Arc<str>, Vec<ClassMemberInfo>>| {
         src.iter()
             .map(|(k, v)| (k.clone(), encode_member_list(v, table, interner)))
             .collect()
     };
-    let encode_ty_map = |src: &FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>| {
+    let encode_ty_map = |src: &FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>| {
         src.iter()
             .map(|(k, inner)| {
                 (
@@ -387,13 +393,13 @@ struct PortableModule {
     arena: Vec<PortableSymbol>,
     scopes: ScopeArena,
     global_scope: ScopeId,
-    class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, PortableType>>,
+    class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, PortableType>>,
     type_members: PortableTypeMembers,
-    class_parents: FxHashMap<Rc<str>, Rc<str>>,
-    source_file: Rc<str>,
-    sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
-    sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
-    sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, PortableType)>>,
+    class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    source_file: Arc<str>,
+    sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
+    sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, PortableType)>>,
     extensions: Extensions,
 }
 
@@ -445,7 +451,9 @@ impl PortableModule {
                         k.clone(),
                         fields
                             .iter()
-                            .map(|(fname, t)| (fname.clone(), encode_portable_type(*t, table, interner)))
+                            .map(|(fname, t)| {
+                                (fname.clone(), encode_portable_type(*t, table, interner))
+                            })
                             .collect(),
                     )
                 })
@@ -493,9 +501,7 @@ impl PortableModule {
                 k.clone(),
                 fields
                     .iter()
-                    .map(|(fname, t)| {
-                        (fname.clone(), decode_portable_type(t, table, interner))
-                    })
+                    .map(|(fname, t)| (fname.clone(), decode_portable_type(t, table, interner)))
                     .collect(),
             );
         }
@@ -646,9 +652,12 @@ pub(super) fn save_to_cache(
     let id = cache_module_id(virtual_id);
     let fingerprint = cache_fingerprint(source, carrier);
     let interner = resolver.interner_snapshot();
-    if let Ok(payload) =
-        serialize_module_interface(exports, bind, &interner, Some(&*resolver as &dyn ImportResolver))
-    {
+    if let Ok(payload) = serialize_module_interface(
+        exports,
+        bind,
+        &interner,
+        Some(&*resolver as &dyn ImportResolver),
+    ) {
         varn_modules::artifact::write_module_artifact(
             &get_cache_dir(resolver),
             varn_modules::artifact::ArtifactKind::CheckerInterface,

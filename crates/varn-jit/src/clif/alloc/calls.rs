@@ -459,8 +459,10 @@ fn emit_wrapper_call_and_finish(
             sig.params
                 .push(cranelift_codegen::ir::AbiParam::new(types::I64));
         }
-        sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
-        sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        sig.returns
+            .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        sig.returns
+            .push(cranelift_codegen::ir::AbiParam::new(types::I64));
         let sig_ref = b.import_signature(sig);
         let call = b.ins().call_indirect(
             sig_ref,
@@ -534,13 +536,19 @@ fn emit_inline_frame_push(
     b.switch_to_block(walk);
 
     let raw = b.ins().band_imm(callee_payload, 0xFFFF_FFFF);
-    let rc = b
-        .ins()
-        .load(types::I64, m, actx.exec_ctx, actx.helpers.heap_field_offset as i32);
+    let rc = b.ins().load(
+        types::I64,
+        m,
+        actx.exec_ctx,
+        actx.helpers.heap_field_offset as i32,
+    );
     let old_bit = b.ins().band_imm(raw, 0x8000_0000);
-    let base_old = b
-        .ins()
-        .load(types::I64, m, rc, (al.slots_vec_off + al.slots_ptr_off) as i32);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (al.slots_vec_off + al.slots_ptr_off) as i32,
+    );
     let base_nur = b.ins().load(
         types::I64,
         m,
@@ -561,28 +569,40 @@ fn emit_inline_frame_push(
 
     // Raw stored `Rc<VmClosure>` bits are the RCBOX BASE (`{strong, weak,
     // value}`'s start), not `Rc::as_ptr()`'s value — see the probe's doc.
-    let closure_rcbox = b.ins().load(types::I64, m, slot_addr, fl.closure_payload_off as i32);
+    let closure_rcbox = b
+        .ins()
+        .load(types::I64, m, slot_addr, fl.closure_payload_off as i32);
     let closure_val = b.ins().iadd_imm(closure_rcbox, 16);
 
     // --- Proto walk + eligibility. ---
-    let proto_rcbox = b.ins().load(types::I64, m, closure_val, fl.closure_proto_off as i32);
+    let proto_rcbox = b
+        .ins()
+        .load(types::I64, m, closure_val, fl.closure_proto_off as i32);
     let proto_val = b.ins().iadd_imm(proto_rcbox, 16);
 
-    let entry = b.ins().load(types::I64, m, proto_val, fl.proto_jit_entry_off as i32);
+    let entry = b
+        .ins()
+        .load(types::I64, m, proto_val, fl.proto_jit_entry_off as i32);
     let has_entry = b.ins().icmp_imm(IntCC::NotEqual, entry, 0);
     let check_epoch = b.create_block();
     b.ins().brif(has_entry, check_epoch, &[], slow, &[]);
     b.switch_to_block(check_epoch);
 
-    let epoch = b.ins().load(types::I64, m, proto_val, fl.proto_jit_epoch_off as i32);
+    let epoch = b
+        .ins()
+        .load(types::I64, m, proto_val, fl.proto_jit_epoch_off as i32);
     let caller_epoch = b.ins().iconst(types::I64, actx.caller_epoch as i64);
     let epoch_ok = b.ins().icmp(IntCC::Equal, epoch, caller_epoch);
     let check_shape = b.create_block();
     b.ins().brif(epoch_ok, check_shape, &[], slow, &[]);
     b.switch_to_block(check_shape);
 
-    let has_rest = b.ins().uload8(types::I64, m, proto_val, fl.proto_has_rest_off as i32);
-    let is_async = b.ins().uload8(types::I64, m, proto_val, fl.proto_is_async_off as i32);
+    let has_rest = b
+        .ins()
+        .uload8(types::I64, m, proto_val, fl.proto_has_rest_off as i32);
+    let is_async = b
+        .ins()
+        .uload8(types::I64, m, proto_val, fl.proto_is_async_off as i32);
     let is_gen = b
         .ins()
         .uload8(types::I64, m, proto_val, fl.proto_is_generator_off as i32);
@@ -593,9 +613,9 @@ fn emit_inline_frame_push(
     b.ins().brif(eligible, check_regs, &[], slow, &[]);
     b.switch_to_block(check_regs);
 
-    let register_count = b
-        .ins()
-        .uload16(types::I64, m, proto_val, fl.proto_register_count_off as i32);
+    let register_count =
+        b.ins()
+            .uload16(types::I64, m, proto_val, fl.proto_register_count_off as i32);
     let total_c = b.ins().iconst(types::I64, total as i64);
     let enough_regs = b
         .ins()
@@ -612,8 +632,12 @@ fn emit_inline_frame_push(
     let frames_cap = b
         .ins()
         .load(types::I64, m, actx.exec_ctx, fl.frames_cap_offset as i32);
-    let has_frame_room = b.ins().icmp(IntCC::UnsignedLessThan, frames_len, frames_cap);
-    let depth_c = b.ins().iconst(types::I64, actx.helpers.max_call_depth as i64);
+    let has_frame_room = b
+        .ins()
+        .icmp(IntCC::UnsignedLessThan, frames_len, frames_cap);
+    let depth_c = b
+        .ins()
+        .iconst(types::I64, actx.helpers.max_call_depth as i64);
     let under_depth = b.ins().icmp(IntCC::UnsignedLessThan, frames_len, depth_c);
     let frame_room_ok = b.ins().band(has_frame_room, under_depth);
     let check_stack_cap = b.create_block();
@@ -627,7 +651,9 @@ fn emit_inline_frame_push(
         .ins()
         .load(types::I64, m, actx.exec_ctx, fl.stack_cap_offset as i32);
     let need_args = b.ins().iadd_imm(src, total as i64);
-    let args_fit = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, need_args, stack_len);
+    let args_fit = b
+        .ins()
+        .icmp(IntCC::UnsignedLessThanOrEqual, need_args, stack_len);
     let required_len = b.ins().iadd(stack_len, register_count);
     let required_cap = b.ins().iadd_imm(required_len, 32);
     let stack_fits = b
@@ -659,12 +685,18 @@ fn emit_inline_frame_push(
         w += 8;
     }
     // closure_ptr: *const VmClosure — the VALUE pointer.
-    b.ins().store(m, closure_val, frame_addr, fl.frame_closure_ptr_off as i32);
+    b.ins()
+        .store(m, closure_val, frame_addr, fl.frame_closure_ptr_off as i32);
     // _owned_closure: Option<Rc<VmClosure>>, Some(_) — its raw bits are the
     // RCBOX base, same convention as the read straight off the heap slot.
+    b.ins().store(
+        m,
+        closure_rcbox,
+        frame_addr,
+        fl.frame_owned_closure_off as i32,
+    );
     b.ins()
-        .store(m, closure_rcbox, frame_addr, fl.frame_owned_closure_off as i32);
-    b.ins().store(m, callee_base, frame_addr, fl.frame_base_off as i32);
+        .store(m, callee_base, frame_addr, fl.frame_base_off as i32);
     let dest_c = b.ins().iconst(types::I64, dest as i64);
     b.ins()
         .istore16(m, dest_c, frame_addr, fl.frame_return_reg_off as i32);
@@ -678,9 +710,12 @@ fn emit_inline_frame_push(
     // Copy the arguments (compile-time unrolled — `total` is fixed per call
     // site) and null-fill the registers past them (a runtime loop — the
     // callee's `register_count` is not known until this point).
-    let stack_ptr = b
-        .ins()
-        .load(types::I64, m, actx.exec_ctx, actx.helpers.stack_data_offset as i32);
+    let stack_ptr = b.ins().load(
+        types::I64,
+        m,
+        actx.exec_ctx,
+        actx.helpers.stack_data_offset as i32,
+    );
     let callee_byte = b.ins().imul_imm(callee_base, 16);
     let dst_base = b.ins().iadd(stack_ptr, callee_byte);
     let src_byte = b.ins().imul_imm(src, 16);
@@ -715,8 +750,12 @@ fn emit_inline_frame_push(
     b.ins()
         .store(m, required_len, actx.exec_ctx, fl.stack_len_offset as i32);
     let one = b.ins().iconst(types::I64, 1);
-    b.ins()
-        .store(m, one, actx.exec_ctx, actx.helpers.frame_prepushed_offset as i32);
+    b.ins().store(
+        m,
+        one,
+        actx.exec_ctx,
+        actx.helpers.frame_prepushed_offset as i32,
+    );
 
     let wrapper_addr = entry;
     (wrapper_addr, closure_val, callee_base)

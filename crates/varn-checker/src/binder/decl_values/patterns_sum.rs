@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{Pattern, SumTypeDecl};
 
 use crate::symbol::{Symbol, SymbolKind};
@@ -36,7 +36,8 @@ impl<'r> super::super::Binder<'r> {
                 let elem_ty = ty.as_ref().and_then(|t| match self.ty_table.get(t.0) {
                     varn_core::TypeKind::Array(inner) => Some(Type(inner, false)),
                     varn_core::TypeKind::Generic(name, args, _)
-                        if self.interner.resolve(name) == varn_core::IntrinsicType::Array.as_str()
+                        if self.interner.resolve(name)
+                            == varn_core::IntrinsicType::Array.as_str()
                             && self.ty_table.get_list(args).len() == 1 =>
                     {
                         Some(Type(self.ty_table.get_list(args)[0], false))
@@ -59,8 +60,11 @@ impl<'r> super::super::Binder<'r> {
                     let ty_kind = ty.map(|t| self.ty_table.get(t.0));
                     let prop_ty = match ty_kind {
                         Some(varn_core::TypeKind::Object(mid)) => {
-                            self.ty_table.get_object_members(mid).to_vec().iter().find_map(|m| {
-                                match m {
+                            self.ty_table
+                                .get_object_members(mid)
+                                .to_vec()
+                                .iter()
+                                .find_map(|m| match m {
                                     crate::types::ObjectTypeMember::Property {
                                         name, ty, ..
                                     } if name.as_ref() == key_str => Some(Type(*ty, false)),
@@ -70,26 +74,23 @@ impl<'r> super::super::Binder<'r> {
                                         return_type,
                                         is_arrow,
                                         ..
-                                    } if name.as_ref() == key_str => {
-                                        Some(crate::types::Type::fn_(
-                                            crate::types::FunctionType {
-                                                params: params.clone(),
-                                                return_type: *return_type,
-                                                is_arrow: *is_arrow,
-                                                type_params: vec![],
-                                            },
-                                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                        ))
-                                    }
+                                    } if name.as_ref() == key_str => Some(crate::types::Type::fn_(
+                                        crate::types::FunctionType {
+                                            params: params.clone(),
+                                            return_type: *return_type,
+                                            is_arrow: *is_arrow,
+                                            type_params: vec![],
+                                        },
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                    )),
                                     _ => None,
-                                }
-                            })
+                                })
                         }
                         Some(varn_core::TypeKind::Named(name_atom, origin_atom))
                         | Some(varn_core::TypeKind::Generic(name_atom, _, origin_atom)) => {
-                            let name: Rc<str> = Rc::from(self.interner.resolve(name_atom));
-                            let origin: Option<Rc<str>> =
-                                origin_atom.map(|o| Rc::from(self.interner.resolve(o)));
+                            let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
+                            let origin: Option<Arc<str>> =
+                                origin_atom.map(|o| Arc::from(self.interner.resolve(o)));
                             self.get_class_members(name.as_ref(), origin.as_deref())
                                 .or_else(|| {
                                     self.get_interface_members(name.as_ref(), origin.as_deref())
@@ -122,7 +123,7 @@ impl<'r> super::super::Binder<'r> {
                                             prop_kind = SymbolKind::Namespace;
                                             Some(Type::named_with_origin(
                                                 key_str.clone(),
-                                                Some(Rc::from(origin_path)),
+                                                Some(Arc::from(origin_path)),
                                                 self.resolver,
                                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                             ))
@@ -168,10 +169,10 @@ impl<'r> super::super::Binder<'r> {
     }
 
     pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
-        let id_rc: Rc<str> = Rc::from(self.interner.resolve(t.id));
+        let id_rc: Arc<str> = Arc::from(self.interner.resolve(t.id));
         let alias_ty = Type::named_with_origin(
             id_rc.clone(),
-            Some(Rc::from(self.source_file.as_ref())),
+            Some(Arc::from(self.source_file.as_ref())),
             self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
@@ -186,20 +187,20 @@ impl<'r> super::super::Binder<'r> {
         // consumed well outside this cluster (`emit::tables`,
         // `checker_expressions::members::{member_exists,member_type}`,
         // `checker_expressions::patterns`, `checker_expressions::check::exhaustiveness`)
-        // and stay `Rc<str>`-keyed; text is resolved from the `Atom` here at
+        // and stay `Arc<str>`-keyed; text is resolved from the `Atom` here at
         // the point of insertion rather than migrating those consumers too.
         let mut variant_names = Vec::new();
 
         for v in &t.variants {
-            let variant_rc: Rc<str> = Rc::from(self.interner.resolve(v.name));
+            let variant_rc: Arc<str> = Arc::from(self.interner.resolve(v.name));
             variant_names.push(variant_rc.clone());
 
-            let fields: Vec<(Rc<str>, Type)> = v
+            let fields: Vec<(Arc<str>, Type)> = v
                 .fields
                 .iter()
                 .map(|f| {
                     let ty = self.resolve_type(&f.ty);
-                    (Rc::from(self.interner.resolve(f.name)), ty)
+                    (Arc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();
 
@@ -211,7 +212,7 @@ impl<'r> super::super::Binder<'r> {
             if v.fields.is_empty() {
                 let variant_ty = Type::named_with_origin(
                     id_rc.clone(),
-                    Some(Rc::from(self.source_file.as_ref())),
+                    Some(Arc::from(self.source_file.as_ref())),
                     self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
@@ -230,7 +231,7 @@ impl<'r> super::super::Binder<'r> {
                     .collect();
                 let ret_ty = Type::named_with_origin(
                     id_rc.clone(),
-                    Some(Rc::from(self.source_file.as_ref())),
+                    Some(Arc::from(self.source_file.as_ref())),
                     self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
@@ -242,7 +243,7 @@ impl<'r> super::super::Binder<'r> {
                         type_params: t
                             .type_params
                             .iter()
-                            .map(|tp| Rc::from(self.interner.resolve(tp.name)))
+                            .map(|tp| Arc::from(self.interner.resolve(tp.name)))
                             .collect(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),

@@ -42,7 +42,12 @@ pub(super) fn resolve_conditional(
                             table,
                         );
                         if type_satisfies_extends(&m, &extends_ty, table) {
-                            resolve_with_infer_ctx(true_type, Some(&dist_ctx), infer_bindings, table)
+                            resolve_with_infer_ctx(
+                                true_type,
+                                Some(&dist_ctx),
+                                infer_bindings,
+                                table,
+                            )
                         } else {
                             resolve_type_node(false_type, Some(&dist_ctx), table)
                         }
@@ -109,9 +114,13 @@ fn resolve_extends_with_infer(
             *check
         }
         TypeKind::Generic(name, args, _) => {
-            let name_str = ctx.and_then(|c| c.interner()).and_then(|i| i.try_resolve(*name));
+            let name_str = ctx
+                .and_then(|c| c.interner())
+                .and_then(|i| i.try_resolve(*name));
             if let TypeKind::Generic(check_name, check_args, _) = table.get(check.0).clone() {
-                let check_name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(check_name));
+                let check_name_str = ctx
+                    .and_then(|c| c.interner())
+                    .map(|i| i.resolve(check_name));
                 if check_name_str == name_str {
                     let check_arg_ids = table.get_list(check_args).to_vec();
                     if check_arg_ids.len() == args.len() {
@@ -164,7 +173,9 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         return true;
     }
 
-    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) = (table.get(check.0), table.get(extends.0)) {
+    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) =
+        (table.get(check.0), table.get(extends.0))
+    {
         return t1 == t2;
     }
 

@@ -1,6 +1,6 @@
 use super::*;
 use crate::module_resolver::ImportResolver;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[allow(non_upper_case_globals)]
 impl Type {
@@ -62,7 +62,11 @@ impl Type {
         Type(table.intern(TypeKind::Fn(fid)), false)
     }
 
-    pub fn named(name: impl Into<Rc<str>>, resolver: &dyn ImportResolver, table: &mut CheckerTyTable) -> Self {
+    pub fn named(
+        name: impl Into<Arc<str>>,
+        resolver: &dyn ImportResolver,
+        table: &mut CheckerTyTable,
+    ) -> Self {
         let atom = resolver.intern(&name.into());
         Type(table.intern(TypeKind::Named(atom, None)), false)
     }
@@ -84,8 +88,8 @@ impl Type {
     /// interner every other `Named`/`Generic` name comes from — rather than
     /// asking every call site to intern for itself.
     pub fn named_with_origin(
-        name: impl Into<Rc<str>>,
-        origin: Option<Rc<str>>,
+        name: impl Into<Arc<str>>,
+        origin: Option<Arc<str>>,
         resolver: &dyn ImportResolver,
         table: &mut CheckerTyTable,
     ) -> Self {
@@ -96,7 +100,7 @@ impl Type {
 
     /// String-name convenience over [`Self::generic_atom`], no origin.
     pub fn generic(
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         args: Vec<Type>,
         resolver: &dyn ImportResolver,
         table: &mut CheckerTyTable,
@@ -107,9 +111,9 @@ impl Type {
 
     /// String-name convenience over [`Self::generic_atom`], with origin.
     pub fn generic_with_origin(
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         args: Vec<Type>,
-        origin: Option<Rc<str>>,
+        origin: Option<Arc<str>>,
         resolver: &dyn ImportResolver,
         table: &mut CheckerTyTable,
     ) -> Self {
@@ -223,7 +227,9 @@ impl Type {
         matches!(self.0, CheckerTyId::FLOAT | CheckerTyId::F32)
     }
     pub fn is_numeric(&self) -> bool {
-        self.is_int() || self.is_float() || matches!(self.0, CheckerTyId::DECIMAL | CheckerTyId::BIGINT)
+        self.is_int()
+            || self.is_float()
+            || matches!(self.0, CheckerTyId::DECIMAL | CheckerTyId::BIGINT)
     }
     pub fn is_str(&self) -> bool {
         self.0 == CheckerTyId::STR
@@ -319,7 +325,11 @@ impl Type {
         match table.get(self.0).clone() {
             TypeKind::Intrinsic(TypeTag::Null) => Type::Never,
             TypeKind::Union(list) => {
-                let members: Vec<Type> = table.get_list(list).iter().map(|id| Type(*id, false)).collect();
+                let members: Vec<Type> = table
+                    .get_list(list)
+                    .iter()
+                    .map(|id| Type(*id, false))
+                    .collect();
                 let new_members: Vec<Type> = members
                     .into_iter()
                     .filter(|m| !m.is_nullable(table))
@@ -346,7 +356,8 @@ impl Type {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let mut kept: Vec<CheckerTyId> = Vec::with_capacity(members.len());
                 for id in members {
-                    let is_named_match = matches!(table.get(id), TypeKind::Named(n, _) if n == name);
+                    let is_named_match =
+                        matches!(table.get(id), TypeKind::Named(n, _) if n == name);
                     if !is_named_match {
                         kept.push(id);
                     }
@@ -380,7 +391,9 @@ impl Type {
                     if id == other.0 {
                         continue;
                     }
-                    if let (TypeKind::Array(_), TypeKind::Array(_)) = (table.get(id), table.get(other.0)) {
+                    if let (TypeKind::Array(_), TypeKind::Array(_)) =
+                        (table.get(id), table.get(other.0))
+                    {
                         if other.0 == dynamic_array || id == other.0 {
                             continue;
                         }
@@ -400,7 +413,11 @@ impl Type {
         }
     }
 
-    pub fn map_generics(&self, mapping: &FxHashMap<varn_core::Atom, Type>, table: &mut CheckerTyTable) -> Type {
+    pub fn map_generics(
+        &self,
+        mapping: &FxHashMap<varn_core::Atom, Type>,
+        table: &mut CheckerTyTable,
+    ) -> Type {
         match table.get(self.0).clone() {
             TypeKind::Named(n, _) => {
                 if let Some(t) = mapping.get(&n) {
@@ -467,9 +484,10 @@ impl Type {
     pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
         match table.get(self.0).clone() {
             TypeKind::Named(n, _) => Type(table.intern(TypeKind::Named(n, Some(origin))), self.1),
-            TypeKind::Generic(n, args, _) => {
-                Type(table.intern(TypeKind::Generic(n, args, Some(origin))), self.1)
-            }
+            TypeKind::Generic(n, args, _) => Type(
+                table.intern(TypeKind::Generic(n, args, Some(origin))),
+                self.1,
+            ),
             _ => self,
         }
     }

@@ -185,8 +185,7 @@ pub fn build_module_graph(
         if module_path == canonical_entry {
             continue;
         }
-        let Some((module_source, program, arena, interner)) = node_sources.get(&module_path)
-        else {
+        let Some((module_source, program, arena, interner)) = node_sources.get(&module_path) else {
             continue;
         };
 
@@ -213,9 +212,9 @@ pub fn build_module_graph(
         } else {
             crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]))
         };
-        let mut export_names: Vec<std::rc::Rc<str>> = exports
+        let mut export_names: Vec<std::sync::Arc<str>> = exports
             .keys()
-            .map(|k| std::rc::Rc::from(k.as_str()))
+            .map(|k| std::sync::Arc::from(k.as_str()))
             .collect();
         export_names.sort();
         let tir = varn_checker::emit::emit_module(

@@ -4,7 +4,7 @@
 //! hand and pins that the verifier rejects it — the only instrument that
 //! works before there is a language to run.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_tir::*;
 
 fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
@@ -22,7 +22,7 @@ fn int(v: i64) -> TirExpr {
 
 fn func(name: &str, is_async: bool, is_generator: bool, body: Vec<TirStmt>) -> TirFunction {
     TirFunction {
-        name: Rc::from(name),
+        name: Arc::from(name),
         sig: SigId(0),
         params: vec![],
         return_ty: BackendTy::Void,
@@ -38,7 +38,7 @@ fn func(name: &str, is_async: bool, is_generator: bool, body: Vec<TirStmt>) -> T
 
 fn module(top_level: TirFunction) -> TirModule {
     TirModule {
-        source_file: Rc::from("test.vn"),
+        source_file: Arc::from("test.vn"),
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
@@ -133,15 +133,15 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
     let mut types = TyTable::default();
     let _ = types.intern(BackendTy::Int);
     TirModule {
-        source_file: Rc::from("test.vn"),
+        source_file: Arc::from("test.vn"),
         imports: vec![],
         exports: vec![],
         types,
         classes: vec![],
         enums: vec![EnumInfo {
-            name: Rc::from("Shape"),
+            name: Arc::from("Shape"),
             variants: vec![VariantInfo {
-                name: Rc::from("Circle"),
+                name: Arc::from("Circle"),
                 tag: 0,
                 payload: vec![BackendTy::Int],
             }],

@@ -6,6 +6,7 @@ use std::cell::{Cell, UnsafeCell};
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::TypeTag;
 
 /// A property object, stored as a single allocation: the header and the
@@ -267,7 +268,7 @@ impl ObjData<[Cell<VmValue>]> {
             return;
         }
 
-        let new_shape = self.shape().transition(Rc::clone(&name));
+        let new_shape = self.shape().transition(Arc::clone(&name));
         let slot = new_shape.property_names[&name];
         self.set_shape(new_shape);
 
@@ -296,7 +297,7 @@ impl ObjData<[Cell<VmValue>]> {
             .property_names
             .iter()
             .filter(|(k, _)| k.as_ref() != name)
-            .map(|(k, &slot)| (Rc::clone(k), slot))
+            .map(|(k, &slot)| (Arc::clone(k), slot))
             .collect();
         ordered.sort_unstable_by_key(|(_, slot)| *slot);
 
@@ -307,7 +308,7 @@ impl ObjData<[Cell<VmValue>]> {
 
         let mut new_shape = root_shape();
         for (k, _) in &remaining {
-            new_shape = new_shape.transition(Rc::clone(k));
+            new_shape = new_shape.transition(Arc::clone(k));
         }
         self.set_shape(new_shape);
 
@@ -357,7 +358,7 @@ impl ObjData<[Cell<VmValue>]> {
             .shape()
             .property_names
             .iter()
-            .map(|(k, &idx)| (Rc::clone(k), idx))
+            .map(|(k, &idx)| (Arc::clone(k), idx))
             .collect();
         pairs.sort_unstable_by_key(|(_, idx)| *idx);
         pairs
@@ -382,7 +383,7 @@ impl ObjData<[Cell<VmValue>]> {
         let mut pairs = Vec::with_capacity(names.len());
         for (slot, name) in names.iter().enumerate() {
             pairs.push((
-                Rc::clone(name),
+                Arc::clone(name),
                 self.field_at(slot).unwrap_or(VmValue::null()),
             ));
         }
@@ -505,7 +506,7 @@ pub fn nv_to_value(nv: VmValue) -> Value {
     }
     if nv.is_sso() {
         let mut buf = [0u8; 5];
-        return Value::Str(Rc::from(nv.sso_as_str(&mut buf)));
+        return Value::Str(Arc::from(nv.sso_as_str(&mut buf)));
     }
 
     Value::VmValue(Box::new(VmValueRef(nv)))
@@ -741,7 +742,9 @@ impl InstanceData {
         unsafe {
             Some(match f.type_tag {
                 TypeTag::Bool => VmValue::from_bool(self.read_bool(offset)),
-                TypeTag::I8 => VmValue::from_int(*(self.raw_payload_ptr().add(offset) as *const i8) as i64),
+                TypeTag::I8 => {
+                    VmValue::from_int(*(self.raw_payload_ptr().add(offset) as *const i8) as i64)
+                }
                 TypeTag::U8 => VmValue::from_int(self.read_u8(offset) as i64),
                 TypeTag::I16 => VmValue::from_int(self.read_i16(offset) as i64),
                 TypeTag::U16 => VmValue::from_int(self.read_u16(offset) as i64),
@@ -785,8 +788,14 @@ impl InstanceData {
                     }
                     self.write_bool(offset, val.as_bool());
                 }
-                TypeTag::I8 | TypeTag::U8 | TypeTag::I16 | TypeTag::U16 | TypeTag::I32
-                | TypeTag::U32 | TypeTag::Int | TypeTag::U64 => {
+                TypeTag::I8
+                | TypeTag::U8
+                | TypeTag::I16
+                | TypeTag::U16
+                | TypeTag::I32
+                | TypeTag::U32
+                | TypeTag::Int
+                | TypeTag::U64 => {
                     if !val.is_int() {
                         return Err("cannot store non-int in an int field");
                     }

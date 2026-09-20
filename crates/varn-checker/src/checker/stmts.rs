@@ -120,7 +120,8 @@ impl<'r> Checker<'r> {
 
                 if let Some(expected) = self.expected_return_type {
                     let expected_kind = self.ty_table.get(expected.0);
-                    let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. }) {
+                    let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. })
+                    {
                         Type::Bool
                     } else {
                         expected
@@ -128,12 +129,7 @@ impl<'r> Checker<'r> {
                     let check_expected_kind = self.ty_table.get(check_expected.0);
                     let is_type_param = matches!(check_expected_kind, TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                     if !is_type_param
-                        && !self.value_assignable_to(
-                            &check_expected,
-                            &actual,
-                            argument,
-                            Some(bind),
-                        )
+                        && !self.value_assignable_to(&check_expected, &actual, argument, Some(bind))
                     {
                         let expected_s = expected.display(&self.ty_table, &bind.interner);
                         let actual_s = actual.display(&self.ty_table, &bind.interner);
@@ -220,23 +216,28 @@ impl<'r> Checker<'r> {
                 let init = init.clone();
                 let (test, update, body) = (*test, *update, *body);
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
-                    if let Some(i) = &init {
-                        match i.as_ref() {
-                            ForInit::Var { declarators, .. } => {
-                                checker.check_for_var_init(declarators, bind)
+                self.with_next_child_scope_span(
+                    bind,
+                    range.start.offset,
+                    range.end.offset,
+                    |checker| {
+                        if let Some(i) = &init {
+                            match i.as_ref() {
+                                ForInit::Var { declarators, .. } => {
+                                    checker.check_for_var_init(declarators, bind)
+                                }
+                                ForInit::Expr(e) => checker.check_expr(*e, bind),
                             }
-                            ForInit::Expr(e) => checker.check_expr(*e, bind),
                         }
-                    }
-                    if let Some(t) = test {
-                        checker.check_expr(t, bind);
-                    }
-                    if let Some(u) = update {
-                        checker.check_expr(u, bind);
-                    }
-                    checker.check_stmt(body, bind);
-                });
+                        if let Some(t) = test {
+                            checker.check_expr(t, bind);
+                        }
+                        if let Some(u) = update {
+                            checker.check_expr(u, bind);
+                        }
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 
@@ -262,20 +263,32 @@ impl<'r> Checker<'r> {
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();
-                        let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
-                        Type(std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)), false)
+                        let list =
+                            std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
+                        Type(
+                            std::sync::Arc::make_mut(&mut self.ty_table)
+                                .intern(TypeKind::Tuple(list)),
+                            false,
+                        )
                     }
-                    TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
+                    TypeKind::Generic(_name, args, _)
+                        if self.ty_table.get_list(args).len() == 1 =>
+                    {
                         Type(self.ty_table.get_list(args)[0], false)
                     }
                     TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
-                    checker.check_pattern(&left, &elem_ty, bind);
-                    checker.check_stmt(body, bind);
-                });
+                self.with_next_child_scope_span(
+                    bind,
+                    range.start.offset,
+                    range.end.offset,
+                    |checker| {
+                        checker.check_pattern(&left, &elem_ty, bind);
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 
@@ -285,10 +298,15 @@ impl<'r> Checker<'r> {
                 let (left, right, body) = (left.clone(), *right, *body);
                 self.check_expr(right, bind);
                 self.loop_depth += 1;
-                self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
-                    checker.check_pattern(&left, &Type::Str, bind);
-                    checker.check_stmt(body, bind);
-                });
+                self.with_next_child_scope_span(
+                    bind,
+                    range.start.offset,
+                    range.end.offset,
+                    |checker| {
+                        checker.check_pattern(&left, &Type::Str, bind);
+                        checker.check_stmt(body, bind);
+                    },
+                );
                 self.loop_depth -= 1;
             }
 
@@ -336,7 +354,11 @@ impl<'r> Checker<'r> {
                                 let catch_ty = if let Some(ann) = &clause.type_ann {
                                     checker.resolve_type_node_cached(ann, bind)
                                 } else {
-                                    Type::named("Error", checker.resolver, &mut *std::sync::Arc::make_mut(&mut checker.ty_table))
+                                    Type::named(
+                                        "Error",
+                                        checker.resolver,
+                                        &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
+                                    )
                                 };
                                 checker.check_pattern(param, &catch_ty, bind);
                             }

@@ -48,8 +48,7 @@ impl ExecCtx {
                 let start = self.stage.len() - take;
                 let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
                 self.stage.clear();
-                (f)(self as &mut dyn NativeCtx, &vm_args)
-                    .map_err(crate::error::RuntimeError::new)
+                (f)(self as &mut dyn NativeCtx, &vm_args).map_err(crate::error::RuntimeError::new)
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
                 let take = arg_count.min(self.stage.len());
@@ -61,8 +60,7 @@ impl ExecCtx {
                 } else {
                     &vm_args[..]
                 };
-                (f)(self as &mut dyn NativeCtx, slice)
-                    .map_err(crate::error::RuntimeError::new)
+                (f)(self as &mut dyn NativeCtx, slice).map_err(crate::error::RuntimeError::new)
             }
             PreparedCall::Frame(frame) => {
                 // El frame ya trae su región tipada (`materialize_frame`):

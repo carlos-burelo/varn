@@ -9,7 +9,7 @@ pub use stmts::parse_block;
 
 use crate::stream::TokenStream;
 use crate::ParseProfile;
-use std::rc::Rc;
+use std::sync::Arc;
 #[cfg(feature = "profiling")]
 use std::time::Instant;
 use varn_core::ast::Program;
@@ -42,8 +42,8 @@ impl std::ops::DerefMut for Parser {
 impl Parser {
     pub fn new(
         tokens: Vec<varn_core::Token>,
-        lexeme_buf: Rc<[u8]>,
-        filename: Rc<str>,
+        lexeme_buf: Arc<[u8]>,
+        filename: Arc<str>,
         interner: varn_core::AtomInterner,
     ) -> Self {
         Parser {

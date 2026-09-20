@@ -3,19 +3,19 @@ use crate::module_resolver::ImportResolver;
 use crate::symbol::Symbol;
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_modules::spec::CORE_PREFIX;
 
 #[derive(Clone, Default)]
 pub struct CoreMembers {
-    pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
-    pub class_members: FxHashMap<Rc<str>, ClassMemberInfo>,
-    pub interface_members: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub enum_members: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub namespace_members: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub flattened_members: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
-    pub class_parents: FxHashMap<Rc<str>, Rc<str>>,
-    pub class_type_params: FxHashMap<Rc<str>, Vec<Rc<str>>>,
+    pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
+    pub class_members: FxHashMap<Arc<str>, ClassMemberInfo>,
+    pub interface_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub enum_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub namespace_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub flattened_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    pub class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    pub class_type_params: FxHashMap<Arc<str>, Vec<Arc<str>>>,
 }
 
 pub fn is_core_file(filename: &str) -> bool {
@@ -30,11 +30,11 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
 ///
 /// Memoized by the resolver, not here: the result is a function of which
 /// stdlib is active, so it must not outlive a change of stdlib.
-pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> FxHashMap<Rc<str>, Symbol> {
+pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> FxHashMap<Arc<str>, Symbol> {
     let mut globals = FxHashMap::default();
     for spec in varn_modules::core_module_ids() {
         for (k, v) in resolver.stdlib_exports(spec).as_ref() {
-            globals.insert(Rc::from(k.as_str()), v.clone());
+            globals.insert(Arc::from(k.as_str()), v.clone());
         }
     }
     globals
@@ -48,11 +48,11 @@ pub(crate) fn build_core_members(resolver: &dyn ImportResolver) -> CoreMembers {
             for (name, &sid) in &scope.bindings {
                 let sym = rb.arena.get(sid);
                 if !sym.type_params.is_empty() {
-                    let name_rc: Rc<str> = Rc::from(rb.interner.resolve(*name));
-                    let tps: Vec<Rc<str>> = sym
+                    let name_rc: Arc<str> = Arc::from(rb.interner.resolve(*name));
+                    let tps: Vec<Arc<str>> = sym
                         .type_params
                         .iter()
-                        .map(|a| Rc::from(rb.interner.resolve(*a)))
+                        .map(|a| Arc::from(rb.interner.resolve(*a)))
                         .collect();
                     members.class_type_params.insert(name_rc, tps);
                 }

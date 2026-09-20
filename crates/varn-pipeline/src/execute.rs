@@ -123,10 +123,11 @@ pub fn execute_with_caps(
                                 // llamante (el resultado de la tarea), no un
                                 // escalar del frame.
                                 let base = frame.base;
-                                let _ = machine
-                                    .ctx
-                                    .stack
-                                    .unbox_into_reg(base, dest_reg as usize, resolved_nv);
+                                let _ = machine.ctx.stack.unbox_into_reg(
+                                    base,
+                                    dest_reg as usize,
+                                    resolved_nv,
+                                );
                             }
                         }
                         Err(thrown) => {

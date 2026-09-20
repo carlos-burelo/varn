@@ -51,8 +51,9 @@ pub enum StdProvenance {
 
 /// A directory holding `std.json` or `math/mod.vn` is a std source tree.
 pub fn classify(path: &Path) -> Option<StdSource> {
-    (path.is_dir() && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
-        .then(|| StdSource::SourceTree(path.to_path_buf()))
+    (path.is_dir()
+        && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
+    .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 
 /// `"std"` key in the project's varn.toml, resolved relative to the manifest.

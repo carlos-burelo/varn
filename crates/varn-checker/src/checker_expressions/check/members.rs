@@ -85,12 +85,17 @@ impl<'r> Checker<'r> {
                     }
                 }
                 TypeKind::Object(mid) => {
-                    self.ty_table.get_object_members(mid).iter().find_map(|m| match m {
-                        ObjectTypeMember::Index { key_ty, .. } => Some(Type(*key_ty, false)),
-                        _ => None,
-                    })
+                    self.ty_table
+                        .get_object_members(mid)
+                        .iter()
+                        .find_map(|m| match m {
+                            ObjectTypeMember::Index { key_ty, .. } => Some(Type(*key_ty, false)),
+                            _ => None,
+                        })
                 }
-                TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => Some(Type::Int),
+                TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+                    Some(Type::Int)
+                }
                 _ => None,
             };
             if let Some(expected_k) = key_expected {
@@ -98,7 +103,8 @@ impl<'r> Checker<'r> {
                 let actual_k = self.infer_type(property, bind);
                 let is_range_slice = matches!(
                     check_kind,
-                    TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Str | varn_core::TypeTag::Bytes)
+                    TypeKind::Array(_)
+                        | TypeKind::Intrinsic(varn_core::TypeTag::Str | varn_core::TypeTag::Bytes)
                 ) && matches!(
                     self.ty_table.get(actual_k.0),
                     TypeKind::Intrinsic(varn_core::TypeTag::Range)
@@ -230,7 +236,11 @@ impl<'r> Checker<'r> {
                     let n_str = self.resolve_bind_atom(bind, n);
                     bind.interner
                         .get(&n_str)
-                        .and_then(|atom| bind.scopes.get(bind.global_scope).resolve(atom, &bind.scopes))
+                        .and_then(|atom| {
+                            bind.scopes
+                                .get(bind.global_scope)
+                                .resolve(atom, &bind.scopes)
+                        })
                         .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
                         .unwrap_or(false)
                 } else {
@@ -265,7 +275,7 @@ impl<'r> Checker<'r> {
                 TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
                     orig.map(|o| self.resolve_bind_atom(bind, o))
                 }
-                TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(match tag {
+                TypeKind::Intrinsic(tag) => Some(std::sync::Arc::from(match tag {
                     varn_core::TypeTag::Map => "core:map",
                     varn_core::TypeTag::Set => "core:set",
                     varn_core::TypeTag::Range => "core:range",
@@ -282,7 +292,7 @@ impl<'r> Checker<'r> {
                 property_range.start.offset,
                 crate::semantic_info::MemberResolution {
                     receiver_ty: check_ty,
-                    member_name: std::rc::Rc::from(prop_name),
+                    member_name: std::sync::Arc::from(prop_name),
                     member_kind,
                     member_ty: final_mem_ty,
                     origin_module,
@@ -357,12 +367,12 @@ pub(crate) fn extension_type_name(
     ty: &Type,
     table: &crate::types::CheckerTyTable,
     bind: &BindResult,
-) -> Option<std::rc::Rc<str>> {
+) -> Option<std::sync::Arc<str>> {
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             Some(checker.resolve_bind_atom(bind, n))
         }
-        TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(tag.name())),
+        TypeKind::Intrinsic(tag) => Some(std::sync::Arc::from(tag.name())),
         _ => None,
     }
 }

@@ -58,9 +58,7 @@ fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTa
         (TypeKind::Intrinsic(varn_core::TypeTag::U64), TypeKind::Intrinsic(inf_tag)) => {
             matches!(
                 inf_tag,
-                varn_core::TypeTag::U8
-                    | varn_core::TypeTag::U16
-                    | varn_core::TypeTag::U32
+                varn_core::TypeTag::U8 | varn_core::TypeTag::U16 | varn_core::TypeTag::U32
             )
         }
         (TypeKind::Intrinsic(varn_core::TypeTag::U32), TypeKind::Intrinsic(inf_tag)) => {
@@ -110,16 +108,24 @@ fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTa
 
 pub(crate) fn literal_fits_type(target: &Type, int_val: i64, table: &CheckerTyTable) -> bool {
     match table.get(target.0) {
-        TypeKind::Intrinsic(varn_core::TypeTag::I8) => (i8::MIN as i64..=i8::MAX as i64).contains(&int_val),
-        TypeKind::Intrinsic(varn_core::TypeTag::I16) => (i16::MIN as i64..=i16::MAX as i64).contains(&int_val),
-        TypeKind::Intrinsic(varn_core::TypeTag::I32) => (i32::MIN as i64..=i32::MAX as i64).contains(&int_val),
+        TypeKind::Intrinsic(varn_core::TypeTag::I8) => {
+            (i8::MIN as i64..=i8::MAX as i64).contains(&int_val)
+        }
+        TypeKind::Intrinsic(varn_core::TypeTag::I16) => {
+            (i16::MIN as i64..=i16::MAX as i64).contains(&int_val)
+        }
+        TypeKind::Intrinsic(varn_core::TypeTag::I32) => {
+            (i32::MIN as i64..=i32::MAX as i64).contains(&int_val)
+        }
         TypeKind::Intrinsic(varn_core::TypeTag::U8) => (0..=u8::MAX as i64).contains(&int_val),
         TypeKind::Intrinsic(varn_core::TypeTag::U16) => (0..=u16::MAX as i64).contains(&int_val),
         TypeKind::Intrinsic(varn_core::TypeTag::U32) => (0..=u32::MAX as i64).contains(&int_val),
         TypeKind::Intrinsic(varn_core::TypeTag::U64) => int_val >= 0,
         TypeKind::Intrinsic(varn_core::TypeTag::Int) => true,
         TypeKind::Intrinsic(varn_core::TypeTag::Float | varn_core::TypeTag::F32) => true,
-        TypeKind::Intrinsic(varn_core::TypeTag::Decimal | varn_core::TypeTag::BigInt | varn_core::TypeTag::Dynamic) => true,
+        TypeKind::Intrinsic(
+            varn_core::TypeTag::Decimal | varn_core::TypeTag::BigInt | varn_core::TypeTag::Dynamic,
+        ) => true,
         _ => false,
     }
 }
@@ -134,7 +140,10 @@ fn const_int_value(arena: &varn_core::ast::AstArena, expr: varn_core::ast::ExprI
         ExprKind::IntLiteral { value, .. } => Some(*value),
         ExprKind::Paren { expression } => const_int_value(arena, *expression),
         ExprKind::Unary {
-            op, prefix: true, operand, ..
+            op,
+            prefix: true,
+            operand,
+            ..
         } => match op {
             UnaryOp::Minus => const_int_value(arena, *operand).and_then(|v| v.checked_neg()),
             UnaryOp::Plus => const_int_value(arena, *operand),
@@ -144,14 +153,20 @@ fn const_int_value(arena: &varn_core::ast::AstArena, expr: varn_core::ast::ExprI
     }
 }
 
-fn const_float_value(arena: &varn_core::ast::AstArena, expr: varn_core::ast::ExprId) -> Option<f64> {
+fn const_float_value(
+    arena: &varn_core::ast::AstArena,
+    expr: varn_core::ast::ExprId,
+) -> Option<f64> {
     use varn_core::ast::{ExprKind, UnaryOp};
     match &arena.expr(expr).kind {
         ExprKind::FloatLiteral { value, .. } => Some(*value),
         ExprKind::IntLiteral { value, .. } => Some(*value as f64),
         ExprKind::Paren { expression } => const_float_value(arena, *expression),
         ExprKind::Unary {
-            op, prefix: true, operand, ..
+            op,
+            prefix: true,
+            operand,
+            ..
         } => match op {
             UnaryOp::Minus => const_float_value(arena, *operand).map(|v| -v),
             UnaryOp::Plus => const_float_value(arena, *operand),
@@ -263,7 +278,10 @@ pub(crate) fn expr_satisfies_target_type(
             return literal_fits_type(target_ty, value, table);
         }
     }
-    if matches!(table.get(target_ty.0), TypeKind::Intrinsic(varn_core::TypeTag::F32)) {
+    if matches!(
+        table.get(target_ty.0),
+        TypeKind::Intrinsic(varn_core::TypeTag::F32)
+    ) {
         if let Some(value) = const_float_value(arena, expr) {
             return float_literal_fits_f32(value);
         }
@@ -274,7 +292,10 @@ pub(crate) fn expr_satisfies_target_type(
         // `Array<Array<i8>>` recurses: the gate asks whether the element type is
         // narrow *or another array*, so nesting does not bail out one level in.
         let narrow_elem = elem_ty.is_granular_int()
-            || matches!(table.get(elem_ty.0), TypeKind::Intrinsic(varn_core::TypeTag::F32))
+            || matches!(
+                table.get(elem_ty.0),
+                TypeKind::Intrinsic(varn_core::TypeTag::F32)
+            )
             || array_element_type(&elem_ty, table, interner).is_some();
         if narrow_elem && !elements.is_empty() {
             return elements.iter().all(|el| match el {
@@ -467,11 +488,9 @@ pub(super) fn types_compatible_impl(
                 types_compatible_impl(&t(l1[0]), &t(l2[0]), bind, cache, in_progress, table)
             } else if n1 == n2 {
                 l1.len() == l2.len()
-                    && l1
-                        .to_vec()
-                        .iter()
-                        .zip(l2.to_vec().iter())
-                        .all(|(x, y)| types_compatible_impl(&t(*x), &t(*y), bind, cache, in_progress, table))
+                    && l1.to_vec().iter().zip(l2.to_vec().iter()).all(|(x, y)| {
+                        types_compatible_impl(&t(*x), &t(*y), bind, cache, in_progress, table)
+                    })
             } else {
                 false
             }
@@ -481,17 +500,21 @@ pub(super) fn types_compatible_impl(
             let decl_ids = table.get_list(decl_members).to_vec();
             let inf_ids = table.get_list(inf_members).to_vec();
             inf_ids.iter().all(|im| {
-                decl_ids
-                    .iter()
-                    .any(|dm| types_compatible_impl(&t(*dm), &t(*im), bind, cache, in_progress, table))
+                decl_ids.iter().any(|dm| {
+                    types_compatible_impl(&t(*dm), &t(*im), bind, cache, in_progress, table)
+                })
             })
         }
-        (TypeKind::Union(members), _) => table.get_list(members).to_vec().iter().any(|m| {
-            types_compatible_impl(&t(*m), inferred, bind, cache, in_progress, table)
-        }),
-        (_, TypeKind::Union(inf_members)) => table.get_list(inf_members).to_vec().iter().all(|m| {
-            types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)
-        }),
+        (TypeKind::Union(members), _) => table
+            .get_list(members)
+            .to_vec()
+            .iter()
+            .any(|m| types_compatible_impl(&t(*m), inferred, bind, cache, in_progress, table)),
+        (_, TypeKind::Union(inf_members)) => table
+            .get_list(inf_members)
+            .to_vec()
+            .iter()
+            .all(|m| types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)),
         (_, TypeKind::Intrinsic(varn_core::TypeTag::Never)) => true,
 
         // Some intrinsics (`str`, `Error`, …) are also nameable declarations, so
@@ -517,13 +540,9 @@ pub(super) fn types_compatible_impl(
             match (resolve_atom(bind, dn), resolve_atom(bind, in_)) {
                 (Some(dn_s), Some(in_s)) => compatible_named(
                     &dn_s,
-                    origin_d
-                        .and_then(|o| resolve_atom(bind, o))
-                        .as_deref(),
+                    origin_d.and_then(|o| resolve_atom(bind, o)).as_deref(),
                     &in_s,
-                    origin_i
-                        .and_then(|o| resolve_atom(bind, o))
-                        .as_deref(),
+                    origin_i.and_then(|o| resolve_atom(bind, o)).as_deref(),
                     bind,
                     cache,
                     in_progress,
@@ -558,7 +577,9 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Generic(dn, args, _), TypeKind::Object(inf_fields)) => {
             let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, dn, IntrinsicType::Map) || !(arg_ids.len() == 1 || arg_ids.len() == 2) {
+            if !is_intrinsic(bind, dn, IntrinsicType::Map)
+                || !(arg_ids.len() == 1 || arg_ids.len() == 2)
+            {
                 false
             } else {
                 let (key_ty, val_ty) = if arg_ids.len() == 2 {
@@ -566,24 +587,46 @@ pub(super) fn types_compatible_impl(
                 } else {
                     (Type::Str, t(arg_ids[0]))
                 };
-                let key_compat = types_compatible_impl(&key_ty, &Type::Str, bind, cache, in_progress, table);
+                let key_compat =
+                    types_compatible_impl(&key_ty, &Type::Str, bind, cache, in_progress, table);
                 if !key_compat {
                     false
                 } else {
-                    table.get_object_members(inf_fields).iter().all(|im| match im {
-                        ObjectTypeMember::Property { ty, .. } => {
-                            types_compatible_impl(&val_ty, &t(*ty), bind, cache, in_progress, table)
-                        }
-                        ObjectTypeMember::Index {
-                            key_ty: ik,
-                            value_ty: iv,
-                            ..
-                        } => {
-                            types_compatible_impl(&key_ty, &t(*ik), bind, cache, in_progress, table)
-                                && types_compatible_impl(&val_ty, &t(*iv), bind, cache, in_progress, table)
-                        }
-                        _ => false,
-                    })
+                    table
+                        .get_object_members(inf_fields)
+                        .iter()
+                        .all(|im| match im {
+                            ObjectTypeMember::Property { ty, .. } => types_compatible_impl(
+                                &val_ty,
+                                &t(*ty),
+                                bind,
+                                cache,
+                                in_progress,
+                                table,
+                            ),
+                            ObjectTypeMember::Index {
+                                key_ty: ik,
+                                value_ty: iv,
+                                ..
+                            } => {
+                                types_compatible_impl(
+                                    &key_ty,
+                                    &t(*ik),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                ) && types_compatible_impl(
+                                    &val_ty,
+                                    &t(*iv),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                )
+                            }
+                            _ => false,
+                        })
                 }
             }
         }
@@ -613,7 +656,9 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Object(decl_fields), TypeKind::Generic(in_, args, _)) => {
             let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, in_, IntrinsicType::Map) || !(arg_ids.len() == 1 || arg_ids.len() == 2) {
+            if !is_intrinsic(bind, in_, IntrinsicType::Map)
+                || !(arg_ids.len() == 1 || arg_ids.len() == 2)
+            {
                 false
             } else {
                 let (key_ty, val_ty) = if arg_ids.len() == 2 {
@@ -621,18 +666,28 @@ pub(super) fn types_compatible_impl(
                 } else {
                     (Type::Str, t(arg_ids[0]))
                 };
-                table.get_object_members(decl_fields).iter().all(|dm| match dm {
-                    ObjectTypeMember::Index {
-                        key_ty: dk,
-                        value_ty: dv,
-                        ..
-                    } => {
-                        types_compatible_impl(&t(*dk), &key_ty, bind, cache, in_progress, table)
-                            && types_compatible_impl(&t(*dv), &val_ty, bind, cache, in_progress, table)
-                    }
-                    ObjectTypeMember::Property { optional: true, .. } => true,
-                    _ => false,
-                })
+                table
+                    .get_object_members(decl_fields)
+                    .iter()
+                    .all(|dm| match dm {
+                        ObjectTypeMember::Index {
+                            key_ty: dk,
+                            value_ty: dv,
+                            ..
+                        } => {
+                            types_compatible_impl(&t(*dk), &key_ty, bind, cache, in_progress, table)
+                                && types_compatible_impl(
+                                    &t(*dv),
+                                    &val_ty,
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                )
+                        }
+                        ObjectTypeMember::Property { optional: true, .. } => true,
+                        _ => false,
+                    })
             }
         }
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i))
@@ -703,7 +758,10 @@ pub(super) fn types_compatible_impl(
             let ft1 = table.get_function(fid1).clone();
             let ft2 = table.get_function(fid2).clone();
             let return_ok = t(ft2.return_type).is_dynamic()
-                || matches!(table.get(ft1.return_type), TypeKind::Intrinsic(varn_core::TypeTag::Void))
+                || matches!(
+                    table.get(ft1.return_type),
+                    TypeKind::Intrinsic(varn_core::TypeTag::Void)
+                )
                 || types_compatible_impl(
                     &t(ft1.return_type),
                     &t(ft2.return_type),
@@ -717,8 +775,14 @@ pub(super) fn types_compatible_impl(
                 && ft1.params.iter().zip(ft2.params.iter()).all(|(t1, t2)| {
                     t(t2.ty).is_dynamic()
                         || matches!(table.get(t2.ty), TypeKind::Named(_, _))
-                        || (types_compatible_impl(&t(t2.ty), &t(t1.ty), bind, cache, in_progress, table)
-                            && t1.optional == t2.optional)
+                        || (types_compatible_impl(
+                            &t(t2.ty),
+                            &t(t1.ty),
+                            bind,
+                            cache,
+                            in_progress,
+                            table,
+                        ) && t1.optional == t2.optional)
                 })
         }
 
@@ -741,7 +805,14 @@ pub(super) fn types_compatible_impl(
                         });
                         match found {
                             Some(inf_ty) => {
-                                if !types_compatible_impl(&t(*ty), &t(inf_ty), bind, cache, in_progress, table) {
+                                if !types_compatible_impl(
+                                    &t(*ty),
+                                    &t(inf_ty),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                ) {
                                     ok = false;
                                     break 'outer;
                                 }
@@ -776,7 +847,14 @@ pub(super) fn types_compatible_impl(
                         match found {
                             Some((p2, r2, o2)) => {
                                 if *optional != o2
-                                    || !types_compatible_impl(&t(*r1), &t(r2), bind, cache, in_progress, table)
+                                    || !types_compatible_impl(
+                                        &t(*r1),
+                                        &t(r2),
+                                        bind,
+                                        cache,
+                                        in_progress,
+                                        table,
+                                    )
                                     || p1.len() != p2.len()
                                     || p1.iter().zip(p2.iter()).any(|(t1, t2)| {
                                         !types_compatible_impl(
@@ -808,15 +886,21 @@ pub(super) fn types_compatible_impl(
                                 value_ty: ivalue,
                                 ..
                             } => {
-                                types_compatible_impl(&t(*key_ty), &t(*ikey), bind, cache, in_progress, table)
-                                    && types_compatible_impl(
-                                        &t(*value_ty),
-                                        &t(*ivalue),
-                                        bind,
-                                        cache,
-                                        in_progress,
-                                        table,
-                                    )
+                                types_compatible_impl(
+                                    &t(*key_ty),
+                                    &t(*ikey),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                ) && types_compatible_impl(
+                                    &t(*value_ty),
+                                    &t(*ivalue),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                )
                             }
                             _ => false,
                         });
@@ -825,9 +909,14 @@ pub(super) fn types_compatible_impl(
                         }
 
                         let explicit_members_compatible = inf_fields.iter().all(|im| match im {
-                            ObjectTypeMember::Property { ty, .. } => {
-                                types_compatible_impl(&t(*value_ty), &t(*ty), bind, cache, in_progress, table)
-                            }
+                            ObjectTypeMember::Property { ty, .. } => types_compatible_impl(
+                                &t(*value_ty),
+                                &t(*ty),
+                                bind,
+                                cache,
+                                in_progress,
+                                table,
+                            ),
                             ObjectTypeMember::Method {
                                 params,
                                 return_type,
@@ -877,29 +966,32 @@ pub(super) fn types_compatible_impl(
             ok
         }
 
-        (TypeKind::Tuple(decl_elems), TypeKind::Array(inf_elem)) => table
-            .get_list(decl_elems)
-            .to_vec()
-            .iter()
-            .all(|d| types_compatible_impl(&t(*d), &t(inf_elem), bind, cache, in_progress, table)),
+        (TypeKind::Tuple(decl_elems), TypeKind::Array(inf_elem)) => {
+            table.get_list(decl_elems).to_vec().iter().all(|d| {
+                types_compatible_impl(&t(*d), &t(inf_elem), bind, cache, in_progress, table)
+            })
+        }
 
         (TypeKind::Tuple(decl_elems), TypeKind::Tuple(inf_elems)) => {
             let decl_ids = table.get_list(decl_elems).to_vec();
             let inf_ids = table.get_list(inf_elems).to_vec();
             decl_ids.len() == inf_ids.len()
-                && decl_ids
-                    .iter()
-                    .zip(inf_ids.iter())
-                    .all(|(d, i)| types_compatible_impl(&t(*d), &t(*i), bind, cache, in_progress, table))
+                && decl_ids.iter().zip(inf_ids.iter()).all(|(d, i)| {
+                    types_compatible_impl(&t(*d), &t(*i), bind, cache, in_progress, table)
+                })
         }
 
-        (TypeKind::Intersection(decl_members), _) => table.get_list(decl_members).to_vec().iter().all(|m| {
-            types_compatible_impl(&t(*m), inferred, bind, cache, in_progress, table)
-        }),
+        (TypeKind::Intersection(decl_members), _) => table
+            .get_list(decl_members)
+            .to_vec()
+            .iter()
+            .all(|m| types_compatible_impl(&t(*m), inferred, bind, cache, in_progress, table)),
 
-        (_, TypeKind::Intersection(inf_members)) => table.get_list(inf_members).to_vec().iter().any(|m| {
-            types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)
-        }),
+        (_, TypeKind::Intersection(inf_members)) => table
+            .get_list(inf_members)
+            .to_vec()
+            .iter()
+            .any(|m| types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)),
 
         _ => false,
     };
@@ -930,14 +1022,19 @@ fn named_fallback(
         return false;
     };
     let origin_s = origin.and_then(|o| resolve_atom(Some(bind), o));
-    let Some(expanded) =
-        bind.resolve_type_alias(&name_s, origin_s.as_deref())
-    else {
+    let Some(expanded) = bind.resolve_type_alias(&name_s, origin_s.as_deref()) else {
         return false;
     };
     if is_declared {
         if expanded.0 != declared.0 {
-            return types_compatible_impl(&expanded, inferred, Some(bind), cache, in_progress, table);
+            return types_compatible_impl(
+                &expanded,
+                inferred,
+                Some(bind),
+                cache,
+                in_progress,
+                table,
+            );
         }
     } else if expanded.0 != inferred.0 {
         return types_compatible_impl(declared, &expanded, Some(bind), cache, in_progress, table);
@@ -973,11 +1070,7 @@ fn resolve_atom(bind: Option<&BindView>, atom: varn_core::Atom) -> Option<String
 /// `true` when `atom` names the intrinsic `intrinsic`, without resolving
 /// `atom` itself: a non-panicking lookup of the *known* side, so a foreign
 /// (or not-yet-published) atom simply doesn't match instead of crashing.
-fn is_intrinsic(
-    bind: Option<&BindView>,
-    atom: varn_core::Atom,
-    intrinsic: IntrinsicType,
-) -> bool {
+fn is_intrinsic(bind: Option<&BindView>, atom: varn_core::Atom, intrinsic: IntrinsicType) -> bool {
     ctx_interner(bind).is_some_and(|i| i.get(intrinsic.as_str()) == Some(atom))
 }
 
@@ -1083,7 +1176,7 @@ mod tests {
 
     fn prop(name: &str, ty: Type, optional: bool) -> ObjectTypeMember {
         ObjectTypeMember::Property {
-            name: std::rc::Rc::from(name),
+            name: std::sync::Arc::from(name),
             ty: ty.0,
             optional,
             readonly: false,

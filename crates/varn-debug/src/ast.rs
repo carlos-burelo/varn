@@ -24,7 +24,13 @@ pub fn debug_ast(program: &Program, arena: &AstArena, interner: &AtomInterner) {
         .close();
 }
 
-fn print_stmt(stmt_id: StmtId, arena: &AstArena, indent: &str, is_last: bool, interner: &AtomInterner) {
+fn print_stmt(
+    stmt_id: StmtId,
+    arena: &AstArena,
+    indent: &str,
+    is_last: bool,
+    interner: &AtomInterner,
+) {
     let stmt = arena.stmt(stmt_id);
     let marker = if is_last { "└── " } else { "├── " };
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });
@@ -63,7 +69,13 @@ fn print_stmt(stmt_id: StmtId, arena: &AstArena, indent: &str, is_last: bool, in
             let (test, consequent, alternate) = (*test, *consequent, *alternate);
             terminal::log(format!("{indent}{marker}{}", chalk("IfStmt").bold()));
             print_expr(test, arena, &child_indent, false, interner);
-            print_stmt(consequent, arena, &child_indent, alternate.is_none(), interner);
+            print_stmt(
+                consequent,
+                arena,
+                &child_indent,
+                alternate.is_none(),
+                interner,
+            );
             if let Some(alt) = alternate {
                 print_stmt(alt, arena, &child_indent, true, interner);
             }
@@ -158,7 +170,13 @@ fn print_stmt(stmt_id: StmtId, arena: &AstArena, indent: &str, is_last: bool, in
         } => {
             let discriminant = *discriminant;
             terminal::log(format!("{indent}{marker}{}", chalk("SwitchStmt").bold()));
-            print_expr(discriminant, arena, &child_indent, cases.is_empty(), interner);
+            print_expr(
+                discriminant,
+                arena,
+                &child_indent,
+                cases.is_empty(),
+                interner,
+            );
             for (i, case) in cases.iter().enumerate() {
                 let is_l = i == cases.len() - 1;
                 let m = if is_l { "└── " } else { "├── " };
@@ -250,7 +268,13 @@ fn print_stmt(stmt_id: StmtId, arena: &AstArena, indent: &str, is_last: bool, in
             ));
             for (i, d) in declarations.iter().enumerate() {
                 if let Some(init) = d.init {
-                    print_expr(init, arena, &child_indent, i == declarations.len() - 1, interner);
+                    print_expr(
+                        init,
+                        arena,
+                        &child_indent,
+                        i == declarations.len() - 1,
+                        interner,
+                    );
                 }
             }
         }
@@ -311,10 +335,7 @@ fn print_decl(decl: &Decl, arena: &AstArena, indent: &str, is_last: bool, intern
             print_stmt(f.body, arena, &child_indent, true, interner);
         }
         Decl::Class(c) => {
-            let name = c
-                .id
-                .map(|a| interner.resolve(a))
-                .unwrap_or("<anonymous>");
+            let name = c.id.map(|a| interner.resolve(a)).unwrap_or("<anonymous>");
             terminal::log(format!(
                 "{indent}{marker}{} {}",
                 chalk("ClassDecl").bold(),
@@ -457,10 +478,7 @@ fn print_decl(decl: &Decl, arena: &AstArena, indent: &str, is_last: bool, intern
             }
         },
         Decl::Extension(e) => {
-            let name = e
-                .id
-                .map(|a| interner.resolve(a))
-                .unwrap_or("<anonymous>");
+            let name = e.id.map(|a| interner.resolve(a)).unwrap_or("<anonymous>");
             terminal::log(format!(
                 "{indent}{marker}{} {}",
                 chalk("ExtensionDecl").bold(),
@@ -506,7 +524,13 @@ fn print_decl(decl: &Decl, arena: &AstArena, indent: &str, is_last: bool, intern
     }
 }
 
-fn print_expr(expr_id: ExprId, arena: &AstArena, indent: &str, is_last: bool, interner: &AtomInterner) {
+fn print_expr(
+    expr_id: ExprId,
+    arena: &AstArena,
+    indent: &str,
+    is_last: bool,
+    interner: &AtomInterner,
+) {
     let expr = arena.expr(expr_id);
     let marker = if is_last { "└── " } else { "├── " };
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });
@@ -803,9 +827,7 @@ fn print_expr(expr_id: ExprId, arena: &AstArena, indent: &str, is_last: bool, in
         }
         ExprKind::Function { fn_id, body, .. } => {
             let body = *body;
-            let name = fn_id
-                .map(|a| interner.resolve(a))
-                .unwrap_or("<anonymous>");
+            let name = fn_id.map(|a| interner.resolve(a)).unwrap_or("<anonymous>");
             terminal::log(format!(
                 "{indent}{marker}{} {}",
                 chalk("FunctionExpr").bold(),
@@ -928,7 +950,13 @@ fn print_expr(expr_id: ExprId, arena: &AstArena, indent: &str, is_last: bool, in
         ExprKind::Sequence { expressions } => {
             terminal::log(format!("{indent}{marker}{}", chalk("Sequence").bold()));
             for (i, &e) in expressions.iter().enumerate() {
-                print_expr(e, arena, &child_indent, i == expressions.len() - 1, interner);
+                print_expr(
+                    e,
+                    arena,
+                    &child_indent,
+                    i == expressions.len() - 1,
+                    interner,
+                );
             }
         }
         ExprKind::Paren { expression } => {

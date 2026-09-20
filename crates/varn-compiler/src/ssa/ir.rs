@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use rust_decimal::Decimal;
 
@@ -23,7 +23,7 @@ pub struct ValueDef {
 
 #[derive(Debug)]
 pub struct SsaFunc {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
 
     pub entry: BlockId,
     pub blocks: Vec<Block>,
@@ -124,7 +124,7 @@ pub enum InstKind {
     ConstInt(i64),
     ConstFloat(f64),
     ConstBool(bool),
-    ConstStr(Rc<str>),
+    ConstStr(Arc<str>),
     ConstChar(char),
     ConstDecimal(Decimal),
     ConstBigInt(i128),
@@ -141,7 +141,7 @@ pub enum InstKind {
         ty: HirType,
     },
 
-    LoadGlobal(Rc<str>),
+    LoadGlobal(Arc<str>),
 
     /// Module-global read at a region-relative slot the checker numbered.
     LoadGlobalIdx(u32),
@@ -152,7 +152,7 @@ pub enum InstKind {
     LoadUpvalue(u32),
 
     StoreGlobal {
-        name: Rc<str>,
+        name: Arc<str>,
         value: Value,
     },
 
@@ -178,7 +178,7 @@ pub enum InstKind {
 
     GetProperty {
         object: Value,
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     GetFixedField {
@@ -203,7 +203,7 @@ pub enum InstKind {
 
     SetProperty {
         object: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         value: Value,
     },
 
@@ -246,7 +246,7 @@ pub enum InstKind {
 
     MethodCall {
         recv: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<Value>,
     },
 
@@ -288,11 +288,11 @@ pub enum InstKind {
     },
 
     BuildObject {
-        pairs: Vec<(Rc<str>, Value)>,
+        pairs: Vec<(Arc<str>, Value)>,
     },
 
     BuildRecord {
-        pairs: Vec<(Rc<str>, Value)>,
+        pairs: Vec<(Arc<str>, Value)>,
     },
 
     BuildMap {
@@ -301,7 +301,7 @@ pub enum InstKind {
 
     ObjectRest {
         object: Value,
-        skip_keys: Vec<Rc<str>>,
+        skip_keys: Vec<Arc<str>>,
     },
 
     ToString {
@@ -330,36 +330,36 @@ pub enum InstKind {
         value: Value,
     },
     MakeClass {
-        name: Rc<str>,
+        name: Arc<str>,
         super_class: Option<Value>,
     },
     DeclareField {
         class: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         /// Static type the runtime lays this field out by.
         tag: varn_core::TypeTag,
     },
     DefineStatic {
         class: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         value: Value,
     },
     DefineMethod {
         class: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         method: Value,
         is_static: bool,
     },
     DefineAccessor {
         class: Value,
-        name: Rc<str>,
+        name: Arc<str>,
         accessor: Value,
         is_getter: bool,
         is_static: bool,
     },
     MakeEnumVariant {
         tag: i64,
-        meta: Rc<str>,
+        meta: Arc<str>,
     },
     Try {
         handler: BlockId,
@@ -376,7 +376,7 @@ pub enum InstKind {
         is_await: bool,
     },
     LoadModule {
-        source: Rc<str>,
+        source: Arc<str>,
     },
     StoreModuleSlot {
         value: Value,
@@ -410,7 +410,7 @@ pub enum InstKind {
 
     GetPropertyMaybe {
         object: Value,
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     ModuleSlot {
@@ -449,7 +449,7 @@ pub enum InstKind {
     },
 
     GetSuper {
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     SuperCall {
@@ -457,12 +457,12 @@ pub enum InstKind {
     },
 
     SuperMethodCall {
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<Value>,
     },
 
     ExtensionCall {
-        func: Rc<str>,
+        func: Arc<str>,
         /// Module-global slot of the mangled function, when it was numbered
         /// (always, for a well-formed module). `None` falls back to a name load.
         slot: Option<u32>,
@@ -480,7 +480,7 @@ pub enum InstKind {
     },
 
     BuildObjectSpread {
-        parts: Vec<(Option<Rc<str>>, Value)>,
+        parts: Vec<(Option<Arc<str>>, Value)>,
     },
 }
 

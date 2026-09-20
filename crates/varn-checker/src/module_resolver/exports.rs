@@ -208,10 +208,8 @@ pub(super) fn collect_exports(
                 // (`set_ty_table` merges, it does not adopt indices).
                 let name_atom = resolver.intern("*");
                 let origin_atom = resolver.intern(src_abs.as_str());
-                let ns_ty = resolver.intern_ty(varn_core::TypeKind::Named(
-                    name_atom,
-                    Some(origin_atom),
-                ));
+                let ns_ty =
+                    resolver.intern_ty(varn_core::TypeKind::Named(name_atom, Some(origin_atom)));
                 ns_sym.ty = Some(Type(ns_ty, false));
                 ns_sym.origin_module = Some(intern_origin(resolver, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {

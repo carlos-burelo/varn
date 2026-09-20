@@ -15,6 +15,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use varn_tir::{Resolution, TirExpr, TirExprKind, TirModule, TirStmt};
 
@@ -30,7 +31,7 @@ pub enum SlotInit {
 }
 
 /// Qualified or bare class global -> per-slot initializer, in declared field order.
-pub type CtorSummaries = FxHashMap<Rc<str>, Vec<SlotInit>>;
+pub type CtorSummaries = FxHashMap<Arc<str>, Vec<SlotInit>>;
 
 thread_local! {
     static CURRENT: RefCell<Rc<CtorSummaries>> = RefCell::new(Rc::new(CtorSummaries::default()));
@@ -204,8 +205,8 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
 }
 
 pub fn collect(tir: &TirModule) -> CtorSummaries {
-    let mut reassigned: FxHashSet<Rc<str>> = FxHashSet::default();
-    let mut note_reassign = |name: &Rc<str>| {
+    let mut reassigned: FxHashSet<Arc<str>> = FxHashSet::default();
+    let mut note_reassign = |name: &Arc<str>| {
         reassigned.insert(name.clone());
     };
     for f in std::iter::once(&tir.top_level).chain(&tir.functions) {
@@ -217,7 +218,7 @@ pub fn collect(tir: &TirModule) -> CtorSummaries {
         if reassigned.contains(&ci.name) || ci.parent.is_some() {
             continue;
         }
-        let ctor_name: Rc<str> = Rc::from(format!("{}.constructor", ci.name));
+        let ctor_name: Arc<str> = Arc::from(format!("{}.constructor", ci.name));
         let Some(ctor) = tir.functions.iter().find(|f| f.name == ctor_name) else {
             continue;
         };
@@ -225,7 +226,7 @@ pub fn collect(tir: &TirModule) -> CtorSummaries {
             continue;
         }
         if let Some(slots) = summarize(ctor, ci.fields.len()) {
-            let qualified: Rc<str> = Rc::from(format!(
+            let qualified: Arc<str> = Arc::from(format!(
                 "{}::{}",
                 tir.source_file.replace('\\', "/"),
                 ci.name
@@ -273,7 +274,7 @@ fn summarize(ctor: &varn_tir::TirFunction, field_count: usize) -> Option<Vec<Slo
     Some(slots)
 }
 
-fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Rc<str>)) {
+fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Arc<str>)) {
     for stmt in body {
         match stmt {
             TirStmt::Expr(e) | TirStmt::Throw(e) => scan_expr(e, tir, note),
@@ -308,7 +309,7 @@ fn scan_body(body: &[TirStmt], tir: &TirModule, note: &mut impl FnMut(&Rc<str>))
     }
 }
 
-fn scan_expr(e: &TirExpr, tir: &TirModule, note: &mut impl FnMut(&Rc<str>)) {
+fn scan_expr(e: &TirExpr, tir: &TirModule, note: &mut impl FnMut(&Arc<str>)) {
     if let TirExprKind::Assign { target, .. } = &e.kind {
         if matches!(target.kind, TirExprKind::Var) {
             match &target.res {

@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use varn_core::OpCode;
 
@@ -54,10 +55,10 @@ pub struct ExceptionRange {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
-    pub name: Option<Rc<str>>,
+    pub name: Option<Arc<str>>,
     pub arity: usize,
 
-    pub export_names: Vec<Rc<str>>,
+    pub export_names: Vec<Arc<str>>,
 
     pub register_count: u16,
     pub has_rest: bool,
@@ -69,7 +70,7 @@ pub struct FunctionProto {
     pub chunk: Chunk,
 
     #[serde(default)]
-    pub required_caps: Vec<std::rc::Rc<str>>,
+    pub required_caps: Vec<std::sync::Arc<str>>,
 
     /// Palabras que ocupa el objeto de estado de esta función si es una
     /// máquina de estados; `0` si no lo es.
@@ -479,7 +480,7 @@ impl FunctionProto {
         };
         let mut shape = crate::root_shape();
         for k in keys {
-            shape = shape.transition(Rc::clone(k));
+            shape = shape.transition(Arc::clone(k));
         }
         self.resolved_shapes
             .borrow_mut()

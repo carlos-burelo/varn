@@ -1,6 +1,8 @@
 use super::types_compatible_impl;
 use crate::binder::BindView;
-use crate::types::{CheckerTyId, CheckerTyTable, ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type};
+use crate::types::{
+    CheckerTyId, CheckerTyTable, ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type,
+};
 use crate::types::{FunctionParam, FunctionType};
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_core::TypeKind;
@@ -104,10 +106,20 @@ fn class_members_compatible(
     for dm in decl_members {
         match dm.kind {
             ClassMemberKind::Property | ClassMemberKind::Getter | ClassMemberKind::Setter => {
-                let found = inf_members.iter().find(|im| im.name == dm.name).map(|m| m.ty);
+                let found = inf_members
+                    .iter()
+                    .find(|im| im.name == dm.name)
+                    .map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(&dm.ty, &inf_ty, Some(bind), cache, in_progress, table) {
+                        if !types_compatible_impl(
+                            &dm.ty,
+                            &inf_ty,
+                            Some(bind),
+                            cache,
+                            in_progress,
+                            table,
+                        ) {
                             return false;
                         }
                     }
@@ -125,7 +137,8 @@ fn class_members_compatible(
                 if inf_m.kind != ClassMemberKind::Method {
                     return false;
                 }
-                if !types_compatible_impl(&dm.ty, &inf_m.ty, Some(bind), cache, in_progress, table) {
+                if !types_compatible_impl(&dm.ty, &inf_m.ty, Some(bind), cache, in_progress, table)
+                {
                     return false;
                 }
             }
@@ -152,7 +165,14 @@ pub(super) fn class_members_match_object(
                 });
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(&dm.ty, &t(inf_ty), Some(bind), cache, in_progress, table) {
+                        if !types_compatible_impl(
+                            &dm.ty,
+                            &t(inf_ty),
+                            Some(bind),
+                            cache,
+                            in_progress,
+                            table,
+                        ) {
                             return false;
                         }
                     }
@@ -212,7 +232,14 @@ pub(super) fn object_matches_class_members(
                 let found = inf_members.iter().find(|im| &im.name == name).map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(&t(*ty), &inf_ty, Some(bind), cache, in_progress, table) {
+                        if !types_compatible_impl(
+                            &t(*ty),
+                            &inf_ty,
+                            Some(bind),
+                            cache,
+                            in_progress,
+                            table,
+                        ) {
                             return false;
                         }
                     }
@@ -266,8 +293,17 @@ fn fn_signature_compatible_type(
     match table.get(inferred.0) {
         TypeKind::Fn(fid2) => {
             let ft2 = table.get_function(fid2).clone();
-            let return_ok = matches!(table.get(return_type), TypeKind::Intrinsic(varn_core::TypeTag::Void))
-                || types_compatible_impl(&t(return_type), &t(ft2.return_type), bind, cache, in_progress, table);
+            let return_ok = matches!(
+                table.get(return_type),
+                TypeKind::Intrinsic(varn_core::TypeTag::Void)
+            ) || types_compatible_impl(
+                &t(return_type),
+                &t(ft2.return_type),
+                bind,
+                cache,
+                in_progress,
+                table,
+            );
             ft2.params.len() <= params.len()
                 && return_ok
                 && params.iter().zip(ft2.params.iter()).all(|(t1, t2)| {
@@ -306,7 +342,14 @@ pub(super) fn types_compatible_with_fn_signature(
         TypeKind::Fn(fid1) => {
             let ft1 = table.get_function(fid1).clone();
             params.len() <= ft1.params.len()
-                && types_compatible_impl(&t(ft1.return_type), &t(return_type), bind, cache, in_progress, table)
+                && types_compatible_impl(
+                    &t(ft1.return_type),
+                    &t(return_type),
+                    bind,
+                    cache,
+                    in_progress,
+                    table,
+                )
                 && ft1.params.iter().zip(params.iter()).all(|(t1, t2)| {
                     types_compatible_impl(&t(t2.ty), &t(t1.ty), bind, cache, in_progress, table)
                         && t1.optional == t2.optional

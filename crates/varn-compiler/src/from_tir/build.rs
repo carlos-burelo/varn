@@ -11,7 +11,7 @@
 #![allow(dead_code)]
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
 use crate::ssa::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, ValueDef, VarId};
@@ -143,8 +143,8 @@ impl<'m> Builder<'m> {
     /// `let`) by its declaring file, matching what `build_top_level` and the
     /// HIR path both store. Imported / host names stay bare — they arrive as
     /// `Resolution::ByName`, which never reaches this.
-    fn gname(&self, name: &str) -> Rc<str> {
-        Rc::from(format!(
+    fn gname(&self, name: &str) -> Arc<str> {
+        Arc::from(format!(
             "{}::{}",
             self.tir.source_file.replace('\\', "/"),
             name
@@ -758,7 +758,10 @@ impl<'m> Builder<'m> {
                         if matches!(op, TirUnOp::Neg) {
                             if let Some(tag) = narrow_tag_of(e.ty) {
                                 return Ok(self.emit(
-                                    InstKind::NarrowRangeCheck { operand: result, tag },
+                                    InstKind::NarrowRangeCheck {
+                                        operand: result,
+                                        tag,
+                                    },
                                     ty,
                                 ));
                             }
@@ -1016,12 +1019,16 @@ impl<'m> Builder<'m> {
                         }
                     }
                     let narrow_elem = match e.ty {
-                        BackendTy::Array(elem_id) => {
-                            narrow_tag_of(self.tir.types.get(elem_id))
-                        }
+                        BackendTy::Array(elem_id) => narrow_tag_of(self.tir.types.get(elem_id)),
                         _ => None,
                     };
-                    Ok(self.emit(InstKind::BuildArray { elements: vals, narrow_elem }, ty))
+                    Ok(self.emit(
+                        InstKind::BuildArray {
+                            elements: vals,
+                            narrow_elem,
+                        },
+                        ty,
+                    ))
                 }
             }
             TirExprKind::TupleLit(xs) => {
@@ -1045,7 +1052,8 @@ impl<'m> Builder<'m> {
                     for entry in entries {
                         match entry {
                             varn_tir::TirObjectEntry::Field { name, value } => {
-                                let key_val = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                                let key_val =
+                                    self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
                                 let v = self.lower_expr(value)?;
                                 pairs.push((key_val, v));
                             }
@@ -1060,7 +1068,7 @@ impl<'m> Builder<'m> {
                     .iter()
                     .any(|e| matches!(e, varn_tir::TirObjectEntry::Spread(_)));
                 if any_spread {
-                    let mut parts: Vec<(Option<Rc<str>>, Value)> =
+                    let mut parts: Vec<(Option<Arc<str>>, Value)> =
                         Vec::with_capacity(entries.len());
                     for entry in entries {
                         match entry {
@@ -1125,7 +1133,7 @@ impl<'m> Builder<'m> {
                     .tir
                     .class(*class)
                     .map(|ci| ci.name.clone())
-                    .unwrap_or_else(|| Rc::from("?"));
+                    .unwrap_or_else(|| Arc::from("?"));
                 let cls = self.emit(self.global_load(&cname), HirType::Ref);
                 Ok(self.emit(
                     InstKind::Binary {
@@ -1601,7 +1609,7 @@ impl<'m> Builder<'m> {
     /// Fill this module's export slots. Slot `n` is the position of the name
     /// in the sorted `export_slots` list (the same order the VM builds
     /// `export_map` from `proto.export_names`).
-    fn build_exports(&mut self, export_slots: &[Rc<str>]) {
+    fn build_exports(&mut self, export_slots: &[Arc<str>]) {
         let slot_of = |name: &str| export_slots.iter().position(|n| n.as_ref() == name);
         for exp in &self.tir.exports {
             let Some(slot) = slot_of(&exp.exported) else {
@@ -1655,7 +1663,7 @@ impl<'m> Builder<'m> {
                     TirImportKind::Default => self.emit(
                         InstKind::GetProperty {
                             object: mod_v,
-                            name: Rc::from("default"),
+                            name: Arc::from("default"),
                         },
                         HirType::Dynamic,
                     ),
@@ -1725,7 +1733,7 @@ impl<'m> Builder<'m> {
             // prepended the 3-field `Error` prefix, which the runtime supplies.
             .or_else(|| (def.super_class.is_some() && def.parent.is_none()).then_some(3))
             .unwrap_or(0);
-        let fields: Vec<(Rc<str>, BackendTy)> = def
+        let fields: Vec<(Arc<str>, BackendTy)> = def
             .class_id
             .and_then(|cid| self.tir.class(cid))
             .map(|ci| {
@@ -1770,16 +1778,16 @@ impl<'m> Builder<'m> {
             for deco in m.decorators.iter().rev() {
                 let deco_v = self.lower_expr(deco)?;
                 let n = self.emit(InstKind::ConstStr(m.key.clone()), HirType::Str);
-                let k = self.emit(InstKind::ConstStr(Rc::from("method")), HirType::Str);
+                let k = self.emit(InstKind::ConstStr(Arc::from("method")), HirType::Str);
                 let st = self.emit(InstKind::ConstBool(m.is_static), HirType::Bool);
                 let pv = self.emit(InstKind::ConstBool(m.is_private), HirType::Bool);
                 let ctx = self.emit(
                     InstKind::BuildObject {
                         pairs: vec![
-                            (Rc::from("name"), n),
-                            (Rc::from("kind"), k),
-                            (Rc::from("isStatic"), st),
-                            (Rc::from("isPrivate"), pv),
+                            (Arc::from("name"), n),
+                            (Arc::from("kind"), k),
+                            (Arc::from("isStatic"), st),
+                            (Arc::from("isPrivate"), pv),
                         ],
                     },
                     HirType::Ref,
@@ -1870,7 +1878,7 @@ impl<'m> Builder<'m> {
             self.emit(
                 InstKind::MethodCall {
                     recv,
-                    name: Rc::from("constructor"),
+                    name: Arc::from("constructor"),
                     args,
                 },
                 HirType::Dynamic,
@@ -1968,7 +1976,7 @@ pub fn build_function(
     build_inner(tir, func, false, &[], self_fn)
 }
 
-pub fn build_top_level(tir: &TirModule, export_slots: &[Rc<str>]) -> Result<SsaFunc> {
+pub fn build_top_level(tir: &TirModule, export_slots: &[Arc<str>]) -> Result<SsaFunc> {
     build_inner(tir, &tir.top_level, true, export_slots, None)
 }
 
@@ -1976,7 +1984,7 @@ fn build_inner(
     tir: &TirModule,
     func: &TirFunction,
     register_module_fns: bool,
-    export_slots: &[Rc<str>],
+    export_slots: &[Arc<str>],
     self_fn: Option<varn_tir::FnId>,
 ) -> Result<SsaFunc> {
     let mut pinned = super::ctor_summary::captured_vars(func);
@@ -2064,7 +2072,7 @@ pub fn build_module(tir: &TirModule) -> Result<Vec<SsaFunc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::rc::Rc;
+    use std::sync::Arc;
     use varn_tir::{
         BackendTy as B, ClassInfo, Resolution as R, Signature, Span, TirExpr, TirExprKind as K,
         TirModule, TyTable,
@@ -2074,11 +2082,11 @@ mod tests {
         let mut types = TyTable::default();
         let _ = types.intern(B::Never);
         TirModule {
-            source_file: Rc::from("t.vn"),
+            source_file: Arc::from("t.vn"),
             imports: vec![],
             exports: vec![],
             types,
-            classes: vec![ClassInfo::new(Rc::from("C"), None, vec![])],
+            classes: vec![ClassInfo::new(Arc::from("C"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature {
                 params: vec![],
@@ -2089,7 +2097,7 @@ mod tests {
             global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
-                name: Rc::from("<module>"),
+                name: Arc::from("<module>"),
                 sig: varn_tir::SigId(0),
                 params,
                 return_ty: B::Void,
@@ -2138,10 +2146,11 @@ mod tests {
             vec![],
         );
         let f = build_function(&m, &m.top_level, None).unwrap();
-        assert!(f.blocks[0].insts.iter().any(|i| matches!(
-            i.kind,
-            InstKind::ConstChar('a')
-        ) && matches!(f.value_ty(i.dest.unwrap()), HirType::Ref)));
+        assert!(f.blocks[0]
+            .insts
+            .iter()
+            .any(|i| matches!(i.kind, InstKind::ConstChar('a'))
+                && matches!(f.value_ty(i.dest.unwrap()), HirType::Ref)));
         crate::ssa::verify::verify(&f).unwrap();
     }
 

@@ -4,9 +4,10 @@ use crate::module_resolver::graph::ModuleGraph;
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ModuleId;
 
-type CoreExportsMap = rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>;
+type CoreExportsMap = rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>;
 
 /// How the checker reaches other modules.
 ///
@@ -48,7 +49,7 @@ pub trait ImportResolver {
     /// The prelude's global symbols (`core:*`), as this resolver's stdlib
     /// defines them. Part of the trait because which prelude is in force is a
     /// property of which stdlib you resolve against.
-    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>>;
+    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>>;
 
     /// A clone of this resolver's single, whole-compilation `Atom` table.
     ///
@@ -428,8 +429,7 @@ impl DiskResolver {
             return ExportMap::default();
         };
         let source = source.text;
-        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(&source, abs_path)
-        else {
+        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(&source, abs_path) else {
             return ExportMap::default();
         };
         let bind = self.cached_bind(abs_path).unwrap_or_else(|| {
@@ -472,8 +472,7 @@ impl DiskResolver {
             return Rc::new(cached.exports);
         }
 
-        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(source, virtual_id)
-        else {
+        let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
             visiting.pop();
             return Rc::new(ExportMap::default());
         };
@@ -700,7 +699,7 @@ impl ImportResolver for DiskResolver {
         self.graph.borrow_mut().record_dep(importer, imported);
     }
 
-    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>> {
+    fn core_exports(&self) -> Rc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>> {
         if let Some(hit) = self.core_exports.borrow().as_ref() {
             return Rc::clone(hit);
         }

@@ -1,5 +1,5 @@
 use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
@@ -44,7 +44,7 @@ pub(super) fn resolve_mapped(
             };
             let value_ty = resolve_type_node(value_node, Some(&mapped_ctx), table);
             let member = ObjectTypeMember::Index {
-                param_name: Rc::from(key_var),
+                param_name: Arc::from(key_var),
                 key_ty: key_ty.0,
                 value_ty: value_ty.0,
             };

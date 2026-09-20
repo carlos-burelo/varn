@@ -2,7 +2,7 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::TypeContext;
 use crate::types::{CheckerTyId, ObjectTypeMember, Type};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind, TypeTag};
 
@@ -39,7 +39,11 @@ impl<'r> Checker<'r> {
                     Some(it) if it.is_scalar_primitive() => {
                         Type::intrinsic(it.0, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
-                    _ => Type::named(cn.to_string(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                    _ => Type::named(
+                        cn.to_string(),
+                        self.resolver,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    ),
                 })
                 .unwrap_or(Type::Dynamic),
 
@@ -47,7 +51,13 @@ impl<'r> Checker<'r> {
                 .current_class
                 .as_ref()
                 .and_then(|cn| bind.class_parents.get(cn))
-                .map(|parent| Type::named(parent.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table)))
+                .map(|parent| {
+                    Type::named(
+                        parent.clone(),
+                        self.resolver,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    )
+                })
                 .unwrap_or(Type::Dynamic),
             ExprKind::New {
                 callee, type_args, ..
@@ -61,8 +71,7 @@ impl<'r> Checker<'r> {
                 match callee_kind {
                     TypeKind::Named(name, origin) => {
                         let name_str = bind.interner.resolve(name).to_string();
-                        let origin_str =
-                            origin.map(|o| Rc::from(bind.interner.resolve(o)));
+                        let origin_str = origin.map(|o| Arc::from(bind.interner.resolve(o)));
                         if !type_args.is_empty() {
                             let args: Vec<Type> = type_args
                                 .iter()
@@ -94,8 +103,7 @@ impl<'r> Checker<'r> {
                     }
                     TypeKind::Generic(name, args, origin) => {
                         let name_str = bind.interner.resolve(name).to_string();
-                        let origin_str =
-                            origin.map(|o| Rc::from(bind.interner.resolve(o)));
+                        let origin_str = origin.map(|o| Arc::from(bind.interner.resolve(o)));
                         let arg_ids = self.ty_table.get_list(args).to_vec();
                         let args: Vec<Type> =
                             arg_ids.into_iter().map(|id| Type(id, false)).collect();
@@ -115,7 +123,12 @@ impl<'r> Checker<'r> {
                                     .iter()
                                     .map(|a| self.resolve_type_node_cached(a, bind))
                                     .collect();
-                                Type::generic(name_str, args, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                                Type::generic(
+                                    name_str,
+                                    args,
+                                    self.resolver,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                )
                             } else if name_str == IntrinsicType::Map.as_str() {
                                 Type::generic(
                                     name_str,
@@ -124,7 +137,11 @@ impl<'r> Checker<'r> {
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 )
                             } else {
-                                Type::named(name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                                Type::named(
+                                    name_str,
+                                    self.resolver,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                )
                             }
                         } else {
                             Type::Dynamic
@@ -135,7 +152,8 @@ impl<'r> Checker<'r> {
             ExprKind::Call { .. } => self.infer_call_type(expr, bind),
             ExprKind::TaggedTemplate { tag, .. } => {
                 let tag_ty = self.infer_type(*tag, bind);
-                let tag_ty = tag_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let tag_ty =
+                    tag_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
                     let ret = self.ty_table.get_function(fid).return_type;
                     Type(ret, false)
@@ -159,7 +177,10 @@ impl<'r> Checker<'r> {
                 } else if f_ty.is_dynamic() || t_ty == f_ty {
                     t_ty
                 } else {
-                    Type::union(vec![t_ty, f_ty], &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                    Type::union(
+                        vec![t_ty, f_ty],
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    )
                 }
             }
             ExprKind::Member {
@@ -181,8 +202,12 @@ impl<'r> Checker<'r> {
                 body,
                 is_async,
             } => {
-                let (params, return_type, body, is_async) =
-                    (params.clone(), return_type.clone(), (**body).clone(), *is_async);
+                let (params, return_type, body, is_async) = (
+                    params.clone(),
+                    return_type.clone(),
+                    (**body).clone(),
+                    *is_async,
+                );
                 self.infer_arrow_type(expr, &params, &return_type, body, is_async, bind)
             }
             ExprKind::Function {
@@ -198,26 +223,29 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Tuple { elements } => {
                 let elements = elements.clone();
-                let elem_tys: Vec<Type> = elements
-                    .iter()
-                    .map(|e| self.infer_type(*e, bind))
-                    .collect();
+                let elem_tys: Vec<Type> =
+                    elements.iter().map(|e| self.infer_type(*e, bind)).collect();
                 let ids: Vec<CheckerTyId> = elem_tys.iter().map(|t| t.0).collect();
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
-                Type(std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)), false)
+                Type(
+                    std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)),
+                    false,
+                )
             }
             ExprKind::Record { properties } => {
                 let mut members = Vec::new();
                 for prop in properties.clone() {
                     if let varn_core::ast::ObjectProp::Property { key, value, .. } = prop {
                         let ty = self.infer_type(value, bind);
-                        let name: std::rc::Rc<str> = match &key {
+                        let name: std::sync::Arc<str> = match &key {
                             varn_core::ast::PropKey::Identifier(s)
-                            | varn_core::ast::PropKey::Str(s) => std::rc::Rc::from(s.as_str()),
+                            | varn_core::ast::PropKey::Str(s) => std::sync::Arc::from(s.as_str()),
                             varn_core::ast::PropKey::Int(n) => {
-                                std::rc::Rc::from(n.to_string().as_str())
+                                std::sync::Arc::from(n.to_string().as_str())
                             }
-                            varn_core::ast::PropKey::Computed(_) => std::rc::Rc::from("<computed>"),
+                            varn_core::ast::PropKey::Computed(_) => {
+                                std::sync::Arc::from("<computed>")
+                            }
                         };
                         members.push(crate::types::ObjectTypeMember::Property {
                             name,
@@ -271,10 +299,16 @@ impl<'r> Checker<'r> {
                     }
                     Some(varn_core::MemberKey::Class) => Type::Dynamic,
                     Some(varn_core::MemberKey::Fields) | Some(varn_core::MemberKey::Methods) => {
-                        Type::array(Type::Str, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                        Type::array(
+                            Type::Str,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
                     }
                     Some(varn_core::MemberKey::Keys) => {
-                        let ret = Type::array(Type::Str, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let ret = Type::array(
+                            Type::Str,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        );
                         Type::fn_(
                             crate::types::FunctionType {
                                 params: vec![],
@@ -286,7 +320,10 @@ impl<'r> Checker<'r> {
                         )
                     }
                     Some(varn_core::MemberKey::Values) => {
-                        let ret = Type::array(Type::Dynamic, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let ret = Type::array(
+                            Type::Dynamic,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        );
                         Type::fn_(
                             crate::types::FunctionType {
                                 params: vec![],
@@ -300,8 +337,13 @@ impl<'r> Checker<'r> {
                     Some(varn_core::MemberKey::Entries) => {
                         let ids: Vec<CheckerTyId> = vec![Type::Str.0, Type::Dynamic.0];
                         let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
-                        let entry = Type(std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)), false);
-                        let ret = Type::array(entry, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let entry = Type(
+                            std::sync::Arc::make_mut(&mut self.ty_table)
+                                .intern(TypeKind::Tuple(list)),
+                            false,
+                        );
+                        let ret =
+                            Type::array(entry, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         Type::fn_(
                             crate::types::FunctionType {
                                 params: vec![],
@@ -315,7 +357,7 @@ impl<'r> Checker<'r> {
                     Some(varn_core::MemberKey::HasOwn) => Type::fn_(
                         crate::types::FunctionType {
                             params: vec![crate::types::FunctionParam {
-                                name: Some(std::rc::Rc::from("key")),
+                                name: Some(std::sync::Arc::from("key")),
                                 ty: Type::Str.0,
                                 optional: false,
                                 is_rest: false,
@@ -351,7 +393,10 @@ impl<'r> Checker<'r> {
                     if filtered.len() == 1 {
                         return filtered[0];
                     }
-                    return Type::union(filtered, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    return Type::union(
+                        filtered,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
                 }
                 ty
             }
@@ -368,7 +413,9 @@ impl<'r> Checker<'r> {
                             None => Type::Dynamic,
                         }
                     }
-                    _ if ty.is_nullable(&self.ty_table) => ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                    _ if ty.is_nullable(&self.ty_table) => {
+                        ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                    }
                     _ => Type::Dynamic,
                 }
             }
@@ -381,22 +428,32 @@ impl<'r> Checker<'r> {
                         if l_ty == r_ty {
                             l_ty
                         } else {
-                            Type::union(vec![l_ty, r_ty], &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::union(
+                                vec![l_ty, r_ty],
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         }
                     }
                     varn_core::ast::LogicalOp::Nullish => {
-                        let l_non_null = l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let l_non_null =
+                            l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         if l_non_null == r_ty {
                             r_ty
                         } else {
-                            Type::union(vec![l_non_null, r_ty], &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::union(
+                                vec![l_non_null, r_ty],
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         }
                     }
                     varn_core::ast::LogicalOp::Or => {
                         if l_ty == r_ty {
                             l_ty
                         } else {
-                            Type::union(vec![l_ty, r_ty], &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::union(
+                                vec![l_ty, r_ty],
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         }
                     }
                 }
@@ -415,7 +472,10 @@ impl<'r> Checker<'r> {
                     varn_core::ast::operators::UnaryOp::BitNot => {
                         let inner = self.infer_type(operand, bind);
                         if inner.is_int() {
-                            Type::intrinsic(TypeTag::Int, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::intrinsic(
+                                TypeTag::Int,
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         } else {
                             Type::Dynamic
                         }
@@ -446,14 +506,24 @@ impl<'r> Checker<'r> {
                 }
                 if elem_tys.is_empty() {
                     if let Some(expected) = self.expected_type {
-                        let non_null = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let non_null = expected
+                            .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         if let TypeKind::Array(inner) = self.ty_table.get(non_null.0) {
-                            Type::array(Type(inner, false), &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::array(
+                                Type(inner, false),
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         } else {
-                            Type::array(Type::Dynamic, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                            Type::array(
+                                Type::Dynamic,
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
                         }
                     } else {
-                        Type::array(Type::Dynamic, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                        Type::array(
+                            Type::Dynamic,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
                     }
                 } else {
                     let first = elem_tys[0];
@@ -461,7 +531,10 @@ impl<'r> Checker<'r> {
                         let widened = widen_literal(first);
                         Type::array(widened, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     } else {
-                        let unioned = Type::union(elem_tys, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        let unioned = Type::union(
+                            elem_tys,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        );
                         let widened = widen_literal(unioned);
                         Type::array(widened, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
@@ -477,7 +550,10 @@ impl<'r> Checker<'r> {
             ExprKind::CharLiteral { .. } => Type::Char,
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,
-            ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+            ExprKind::Range { .. } => Type::intrinsic(
+                varn_core::TypeTag::Range,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            ),
             ExprKind::Match { cases, .. } => {
                 let cases = cases.clone();
                 let mut tys = Vec::new();
@@ -506,7 +582,10 @@ impl<'r> Checker<'r> {
                 } else if non_never.len() == 1 {
                     non_never.into_iter().next().unwrap()
                 } else {
-                    Type::union(non_never, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                    Type::union(
+                        non_never,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    )
                 }
             }
             ExprKind::Pipeline { left, right } => {
@@ -559,7 +638,8 @@ impl<'r> Checker<'r> {
                 Type::Str
             }
             TypeKind::Named(name, _)
-                if bind.interner.get(IntrinsicType::Bytes.as_str()) == Some(name) && prop_ty.is_int() =>
+                if bind.interner.get(IntrinsicType::Bytes.as_str()) == Some(name)
+                    && prop_ty.is_int() =>
             {
                 Type::Int
             }
@@ -605,15 +685,15 @@ impl<'r> Checker<'r> {
         });
         if !has_methods {
             if let Some(expected) = self.expected_type {
-                let exp = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let exp =
+                    expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 let exp_kind = self.ty_table.get(exp.0);
                 let is_map = match exp_kind {
                     TypeKind::Generic(name, args, _) => {
-                        bind.interner.get(IntrinsicType::Map.as_str()) == Some(name)
-                            && {
-                                let n = self.ty_table.get_list(args).len();
-                                n == 1 || n == 2
-                            }
+                        bind.interner.get(IntrinsicType::Map.as_str()) == Some(name) && {
+                            let n = self.ty_table.get_list(args).len();
+                            n == 1 || n == 2
+                        }
                     }
                     TypeKind::Intrinsic(TypeTag::Map) => true,
                     TypeKind::Object(mid) => {
@@ -712,8 +792,7 @@ impl<'r> Checker<'r> {
                         let name_str = bind.interner.resolve(name).to_string();
                         let origin_str = origin.map(|o| bind.interner.resolve(o).to_string());
                         let view = crate::binder::BindView::new(bind, self.resolver);
-                        if let Some(cms) =
-                            view.get_class_members(&name_str, origin_str.as_deref())
+                        if let Some(cms) = view.get_class_members(&name_str, origin_str.as_deref())
                         {
                             for cm in cms {
                                 if !cm.is_static {
@@ -808,7 +887,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 crate::types::FunctionParam {
-                    name: Some(Rc::from(crate::binder::pattern_lead_name(
+                    name: Some(Arc::from(crate::binder::pattern_lead_name(
                         &p.pattern,
                         &bind.interner,
                     ))),
@@ -827,10 +906,10 @@ fn widen_literal(ty: Type) -> Type {
 
 /// The member name a property key contributes to an object type. Computed keys
 /// (`{ [k]: v }`) name no single member, so they contribute none.
-fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Rc<str>> {
+fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Arc<str>> {
     match key {
         varn_core::ast::expr::PropKey::Identifier(n) | varn_core::ast::expr::PropKey::Str(n) => {
-            Some(Rc::from(n.as_str()))
+            Some(Arc::from(n.as_str()))
         }
         _ => None,
     }

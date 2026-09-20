@@ -25,7 +25,8 @@ impl<'r> Checker<'r> {
         self.record_extension_call(callee, range, bind);
 
         let callee_ty_raw = self.infer_type(callee, bind);
-        let callee_ty = callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        let callee_ty =
+            callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
         if !matches!(
@@ -80,11 +81,11 @@ impl<'r> Checker<'r> {
                 let ft = self.ty_table.get_function(fid).clone();
                 let callee_name = match &arena.expr(callee).kind {
                     ExprKind::Identifier { name } => {
-                        Some(std::rc::Rc::from(bind.interner.resolve(*name)))
+                        Some(std::sync::Arc::from(bind.interner.resolve(*name)))
                     }
                     ExprKind::Member { property, .. } => {
                         if let ExprKind::Identifier { name } = &arena.expr(*property).kind {
-                            Some(std::rc::Rc::from(bind.interner.resolve(*name)))
+                            Some(std::sync::Arc::from(bind.interner.resolve(*name)))
                         } else {
                             None
                         }
@@ -425,9 +426,15 @@ impl<'r> Checker<'r> {
                     Arg::Named { value, .. } => *value,
                 };
                 if !is_empty_array_arg
-                    && !self.value_assignable_to(&param_ty, &effective_arg_ty, Some(expr), Some(bind))
+                    && !self.value_assignable_to(
+                        &param_ty,
+                        &effective_arg_ty,
+                        Some(expr),
+                        Some(bind),
+                    )
                 {
-                    let effective_arg_ty_s = effective_arg_ty.display(&self.ty_table, &bind.interner);
+                    let effective_arg_ty_s =
+                        effective_arg_ty.display(&self.ty_table, &bind.interner);
                     let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);
                     self.emit(
                         Diagnostic::error(ErrorCode::TypeMismatch, format!(
@@ -480,11 +487,9 @@ impl<'r> Checker<'r> {
         let ExprKind::Identifier { name: fn_name } = &self.ast_arena.expr(callee).kind else {
             return;
         };
-        let Some(fn_sym) = resolve_function_symbol(
-            bind.interner.resolve(*fn_name),
-            self.current_scope,
-            bind,
-        ) else {
+        let Some(fn_sym) =
+            resolve_function_symbol(bind.interner.resolve(*fn_name), self.current_scope, bind)
+        else {
             return;
         };
 

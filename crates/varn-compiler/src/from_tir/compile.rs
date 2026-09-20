@@ -5,7 +5,7 @@
 //! their body by TIR index (`ClosureBody::Tir`); `ssa/emit` calls back here
 //! to compile them.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use varn_tir::{BackendTy, TirFunction, TirModule};
 use varn_types::chunk::FunctionProto;
@@ -43,7 +43,7 @@ fn enter_module(tir: &TirModule) -> ModuleScope {
 /// set by the enclosing `enter_module`. Panics if called outside one — that
 /// only happens if a `from_tir` SSA function reached emission without going
 /// through `compile_module` / `compile_closure`.
-pub(crate) fn emit_tir_closure(idx: u32, source_file: Rc<str>) -> Result<FunctionProto> {
+pub(crate) fn emit_tir_closure(idx: u32, source_file: Arc<str>) -> Result<FunctionProto> {
     let ptr = CUR_TIR.with(|c| c.get());
     assert!(
         !ptr.is_null(),
@@ -95,8 +95,8 @@ fn compile_one(
     tir: &TirModule,
     f: &TirFunction,
     is_top_level: bool,
-    source_file: Rc<str>,
-    export_slots: &[Rc<str>],
+    source_file: Arc<str>,
+    export_slots: &[Arc<str>],
     self_fn: Option<varn_tir::FnId>,
 ) -> Result<FunctionProto> {
     let mut ssa = if is_top_level {
@@ -126,7 +126,7 @@ fn compile_one(
 pub(crate) fn compile_closure(
     tir: &TirModule,
     idx: u32,
-    source_file: Rc<str>,
+    source_file: Arc<str>,
 ) -> Result<FunctionProto> {
     let f = tir
         .functions
@@ -139,13 +139,16 @@ pub(crate) fn compile_closure(
 
 /// Compile a whole module: the top-level proto, with every free function and
 /// method stored as a global by name (the HIR path's convention).
-pub fn compile_module(tir: &TirModule, export_names: Vec<Rc<str>>) -> Result<FunctionProto> {
+pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<FunctionProto> {
     let _scope = enter_module(tir);
     let summaries = super::ctor_summary::collect(tir);
     let _ctor_scope = super::ctor_summary::Scope::enter(summaries);
     let source_file = tir.source_file.clone();
     let mut proto = compile_one(tir, &tir.top_level, true, source_file, &export_names, None)?;
-    proto.export_names = export_names;
+    proto.export_names = export_names
+        .into_iter()
+        .map(|s| Arc::from(s.as_ref()))
+        .collect();
     // Coalescing + register-count validation, recursing into nested protos.
     crate::regalloc::run_post_passes(&mut proto);
     Ok(proto)

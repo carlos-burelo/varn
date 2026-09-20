@@ -161,17 +161,17 @@ pub struct CallEntry {
 
 #[derive(Debug, Clone, Default)]
 pub struct HotspotCounters {
-    pub fn_calls: FxHashMap<Rc<str>, CallEntry>,
-    pub method_calls: FxHashMap<Rc<str>, CallEntry>,
-    pub native_calls: FxHashMap<Rc<str>, u64>,
+    pub fn_calls: FxHashMap<Arc<str>, CallEntry>,
+    pub method_calls: FxHashMap<Arc<str>, CallEntry>,
+    pub native_calls: FxHashMap<Arc<str>, u64>,
     /// Wall time actually spent inside each native op, by name — `rdtsc`,
     /// calibrated once (see `ExecCtx::invoke_native`). Split by name, not
     /// just summed, because a count alone can't tell a cheap-and-frequent op
     /// from an expensive-and-frequent one: `charCodeAt` and `.length` can
     /// both show a million calls, and only the time breaks the tie. Keyed by
     /// the same resolved name as `native_calls`, so the two line up.
-    pub native_ns: FxHashMap<Rc<str>, u64>,
-    pub global_accesses: FxHashMap<Rc<str>, u64>,
+    pub native_ns: FxHashMap<Arc<str>, u64>,
+    pub global_accesses: FxHashMap<Arc<str>, u64>,
     pub alloc_types: FxHashMap<&'static str, u64>,
 }
 
@@ -181,7 +181,7 @@ impl HotspotCounters {
     }
 
     pub(crate) fn record_fn_call(&mut self, name: &str, jit: bool) {
-        let e = self.fn_calls.entry(Rc::from(name)).or_default();
+        let e = self.fn_calls.entry(Arc::from(name)).or_default();
         e.calls += 1;
         if jit {
             e.jit_calls += 1;
@@ -191,7 +191,7 @@ impl HotspotCounters {
     }
 
     pub(crate) fn record_method_call(&mut self, name: &str, jit: bool) {
-        let e = self.method_calls.entry(Rc::from(name)).or_default();
+        let e = self.method_calls.entry(Arc::from(name)).or_default();
         e.calls += 1;
         if jit {
             e.jit_calls += 1;
@@ -201,14 +201,14 @@ impl HotspotCounters {
     }
 
     pub(crate) fn record_native_call(&mut self, name: &str) {
-        *self.native_calls.entry(Rc::from(name)).or_default() += 1;
+        *self.native_calls.entry(Arc::from(name)).or_default() += 1;
     }
 
     pub(crate) fn record_native_ns(&mut self, name: &str, ns: u64) {
-        *self.native_ns.entry(Rc::from(name)).or_default() += ns;
+        *self.native_ns.entry(Arc::from(name)).or_default() += ns;
     }
 
-    pub(crate) fn record_global_access(&mut self, name: Rc<str>) {
+    pub(crate) fn record_global_access(&mut self, name: Arc<str>) {
         *self.global_accesses.entry(name).or_default() += 1;
     }
 

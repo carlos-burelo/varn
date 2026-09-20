@@ -2,6 +2,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::IntrinsicType;
 use varn_types::{
     value::{find_method_with_owner, BoundMethod, ClassObj},
@@ -117,13 +118,13 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             )))
         }
         Some(HeapObj::Object(o)) => {
-            o.set_field_nv(Rc::from(key), val);
+            o.set_field_nv(Arc::from(key), val);
             heap.write_barrier(idx, val);
             Ok(())
         }
         Some(HeapObj::EnumVariant(ev)) => {
             if let Value::Object(o) = &ev.payload {
-                o.set_field_nv(Rc::from(key), val);
+                o.set_field_nv(Arc::from(key), val);
                 heap.write_barrier(idx, val);
             }
             Ok(())
@@ -296,9 +297,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         {
             Some(VmValue::from_int(a.len() as i64))
         }
-        Some(HeapObj::Buffer(b))
-            if key == varn_core::MemberKey::Length.as_str() =>
-        {
+        Some(HeapObj::Buffer(b)) if key == varn_core::MemberKey::Length.as_str() => {
             Some(VmValue::from_int(b.len() as i64))
         }
         Some(HeapObj::Range(r)) => {
@@ -377,7 +376,7 @@ fn resolve_intrinsic_method_property(obj: &Value, key: &str, heap: &mut Heap) ->
     }
 
     if key == varn_core::MemberKey::Name.as_str() {
-        return Some(Value::Str(Rc::from(cls.name.as_str())));
+        return Some(Value::Str(Arc::from(cls.name.as_str())));
     }
 
     None
@@ -570,7 +569,7 @@ fn resolve_instance_meta_property(
     use varn_core::MemberKey;
     match key_enum {
         Some(MemberKey::Type) | Some(MemberKey::Name) => {
-            ResolvedProperty::Built(Value::Str(Rc::from(cls.name.as_str())))
+            ResolvedProperty::Built(Value::Str(Arc::from(cls.name.as_str())))
         }
         Some(MemberKey::Class) => ResolvedProperty::Built(Value::Class(Rc::clone(cls))),
         Some(MemberKey::Fields) => {
@@ -579,7 +578,7 @@ fn resolve_instance_meta_property(
                     .borrow()
                     .ordered_names()
                     .iter()
-                    .map(|k| Value::Str(Rc::clone(k)))
+                    .map(|k| Value::Str(Arc::clone(k)))
                     .collect(),
             )))
         }
@@ -588,7 +587,7 @@ fn resolve_instance_meta_property(
                 cls.method_map
                     .borrow()
                     .keys()
-                    .map(|k| Value::Str(Rc::clone(k)))
+                    .map(|k| Value::Str(Arc::clone(k)))
                     .collect(),
             )))
         }
@@ -599,7 +598,7 @@ fn resolve_instance_meta_property(
                 cls.get_or_compute_layout()
                     .fields
                     .iter()
-                    .filter_map(|f| inst.read_field(f).map(|v| (Rc::clone(&f.name), v))),
+                    .filter_map(|f| inst.read_field(f).map(|v| (Arc::clone(&f.name), v))),
             ));
             let native = match key {
                 MemberKey::Keys => meta_keys_native,
@@ -659,17 +658,17 @@ pub(crate) fn resolve_meta_property(
                 Value::NativeFn(_) | Value::BoundMethod(_) | Value::VmValue(_) => "Function",
                 _ => IntrinsicType::Dynamic.as_str(),
             };
-            Ok(ResolvedProperty::Built(Value::Str(Rc::from(type_str))))
+            Ok(ResolvedProperty::Built(Value::Str(Arc::from(type_str))))
         }
         Some(MemberKey::Name) => {
             let name_val = match &val {
-                Value::Class(cls) => Value::Str(Rc::from(cls.name.as_str())),
+                Value::Class(cls) => Value::Str(Arc::from(cls.name.as_str())),
                 Value::EnumVariant(ev) => Value::Str(ev.variant_name.clone()),
                 Value::Object(o) => {
                     if let Some(c) = o.0.class() {
-                        Value::Str(Rc::from(c.name.as_str()))
+                        Value::Str(Arc::from(c.name.as_str()))
                     } else {
-                        Value::Str(Rc::from("Object"))
+                        Value::Str(Arc::from("Object"))
                     }
                 }
                 _ => Value::Null,
@@ -690,10 +689,10 @@ pub(crate) fn resolve_meta_property(
             let fields: Vec<Value> = match &val {
                 Value::Class(cls) => {
                     let shape = cls.root_shape.borrow();
-                    let mut pairs: Vec<(Rc<str>, usize)> = shape
+                    let mut pairs: Vec<(Arc<str>, usize)> = shape
                         .property_names
                         .iter()
-                        .map(|(k, &idx)| (Rc::clone(k), idx))
+                        .map(|(k, &idx)| (Arc::clone(k), idx))
                         .collect();
                     pairs.sort_unstable_by_key(|(_, idx)| *idx);
                     pairs.into_iter().map(|(k, _)| Value::Str(k)).collect()
@@ -711,7 +710,7 @@ pub(crate) fn resolve_meta_property(
                     .method_map
                     .borrow()
                     .keys()
-                    .map(|k| Value::Str(Rc::clone(k)))
+                    .map(|k| Value::Str(Arc::clone(k)))
                     .collect(),
                 Value::Object(o) => {
                     o.0.class()
@@ -719,7 +718,7 @@ pub(crate) fn resolve_meta_property(
                             c.method_map
                                 .borrow()
                                 .keys()
-                                .map(|k| Value::Str(Rc::clone(k)))
+                                .map(|k| Value::Str(Arc::clone(k)))
                                 .collect()
                         })
                         .unwrap_or_default()
@@ -761,10 +760,10 @@ fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue
         Value::Object(o) => o.0.keys().map(Value::Str).collect(),
         Value::Class(cls) => {
             let shape = cls.root_shape.borrow();
-            let mut pairs: Vec<(Rc<str>, usize)> = shape
+            let mut pairs: Vec<(Arc<str>, usize)> = shape
                 .property_names
                 .iter()
-                .map(|(k, &idx)| (Rc::clone(k), idx))
+                .map(|(k, &idx)| (Arc::clone(k), idx))
                 .collect();
             pairs.sort_unstable_by_key(|(_, idx)| *idx);
             pairs.into_iter().map(|(k, _)| Value::Str(k)).collect()

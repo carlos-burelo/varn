@@ -1,7 +1,7 @@
 use crate::checker::ExprInfo;
 use crate::types::Type;
 use crate::{checker::Checker, SymbolId};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;
 
 pub(super) fn levenshtein(a: &str, b: &str) -> usize {
@@ -32,7 +32,7 @@ pub(super) fn levenshtein(a: &str, b: &str) -> usize {
     row[m]
 }
 
-pub(super) fn closest_in_list<'a>(name: &str, candidates: &'a [Rc<str>]) -> Option<&'a str> {
+pub(super) fn closest_in_list<'a>(name: &str, candidates: &'a [Arc<str>]) -> Option<&'a str> {
     let threshold = (name.len().max(1) / 3).max(1);
     candidates
         .iter()

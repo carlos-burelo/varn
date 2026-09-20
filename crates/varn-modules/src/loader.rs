@@ -18,7 +18,7 @@
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use varn_core::ModuleId;
 
@@ -43,31 +43,31 @@ pub enum Provenance {
 #[derive(Clone)]
 pub struct ModuleSource {
     pub id: ModuleId,
-    pub text: Rc<str>,
+    pub text: Arc<str>,
     pub provenance: Provenance,
     /// Precompiled checker interface (postcard), if the carrier ships one.
-    pub interface: Option<Rc<[u8]>>,
+    pub interface: Option<Arc<[u8]>>,
     /// Precompiled `FunctionProto` (postcard), if the carrier ships one.
-    pub bytecode: Option<Rc<[u8]>>,
+    pub bytecode: Option<Arc<[u8]>>,
 }
 
 impl ModuleSource {
     pub fn from_text(id: ModuleId, text: impl Into<Box<str>>, provenance: Provenance) -> Self {
         Self {
             id,
-            text: Rc::from(text.into()),
+            text: Arc::from(text.into()),
             provenance,
             interface: None,
             bytecode: None,
         }
     }
 
-    pub fn with_interface(mut self, interface: Rc<[u8]>) -> Self {
+    pub fn with_interface(mut self, interface: Arc<[u8]>) -> Self {
         self.interface = Some(interface);
         self
     }
 
-    pub fn with_bytecode(mut self, bytecode: Rc<[u8]>) -> Self {
+    pub fn with_bytecode(mut self, bytecode: Arc<[u8]>) -> Self {
         self.bytecode = Some(bytecode);
         self
     }
@@ -104,10 +104,9 @@ impl Display for LoadError {
             LoadError::Io { path, message } => {
                 write!(f, "cannot read '{}': {message}", path.display())
             }
-            LoadError::Resolve {
-                specifier,
-                message,
-            } => write!(f, "cannot resolve '{specifier}': {message}"),
+            LoadError::Resolve { specifier, message } => {
+                write!(f, "cannot resolve '{specifier}': {message}")
+            }
             LoadError::Invalid { id, message } => {
                 write!(f, "invalid module {id:?}: {message}")
             }
@@ -163,8 +162,10 @@ impl ModuleLoader for ProviderLoader {
 
         let interface = provider
             .interface_blob(spec)
-            .map(|b| Rc::from(b) as Rc<[u8]>);
-        let bytecode = provider.bytecode_blob(spec).map(|b| Rc::from(b) as Rc<[u8]>);
+            .map(|b| Arc::from(b) as Arc<[u8]>);
+        let bytecode = provider
+            .bytecode_blob(spec)
+            .map(|b| Arc::from(b) as Arc<[u8]>);
 
         if let Some(text) = provider
             .embedded_source(spec)
@@ -308,7 +309,7 @@ impl ModuleLoader for FilesystemLoader {
 /// the same loader every other consumer uses.
 #[derive(Default)]
 pub struct MemoryLoader {
-    files: HashMap<ModuleId, Rc<str>>,
+    files: HashMap<ModuleId, Arc<str>>,
 }
 
 impl MemoryLoader {
@@ -317,10 +318,10 @@ impl MemoryLoader {
     }
 
     pub fn insert(&mut self, id: ModuleId, text: impl Into<Box<str>>) {
-        self.files.insert(id, Rc::from(text.into()));
+        self.files.insert(id, Arc::from(text.into()));
     }
 
-    pub fn remove(&mut self, id: &ModuleId) -> Option<Rc<str>> {
+    pub fn remove(&mut self, id: &ModuleId) -> Option<Arc<str>> {
         self.files.remove(id)
     }
 }

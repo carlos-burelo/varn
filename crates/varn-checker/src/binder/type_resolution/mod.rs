@@ -6,7 +6,7 @@ mod mapped;
 mod template;
 
 use crate::types::{CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
@@ -38,13 +38,13 @@ pub fn resolve_type_node(
     // them yet (a nested bind grew the live table after this snapshot). Fall
     // back to the resolver's live table by TEXT rather than degrading the name
     // to "" — an empty name silently resolves nothing downstream.
-    let resolve_name = |a: varn_core::Atom| -> Rc<str> {
+    let resolve_name = |a: varn_core::Atom| -> Arc<str> {
         if let Some(s) = interner.try_resolve(a) {
-            return Rc::from(s);
+            return Arc::from(s);
         }
         ctx.and_then(|c| c.resolver())
             .and_then(|r| r.interner_snapshot().try_resolve(a).map(|s| s.to_owned()))
-            .map(Rc::from)
+            .map(Arc::from)
             .unwrap_or_default()
     };
     match &node.kind {
@@ -68,13 +68,18 @@ pub fn resolve_type_node(
             Type::array(inner_ty, table)
         }
         TypeKind::Union(members) => {
-            let resolved: Vec<Type> = members.iter().map(|m| resolve_type_node(m, ctx, table)).collect();
+            let resolved: Vec<Type> = members
+                .iter()
+                .map(|m| resolve_type_node(m, ctx, table))
+                .collect();
             Type::union(resolved, table)
         }
         TypeKind::Generic(name, args, _origin) => {
             let name_str = resolve_name(*name);
-            let resolved_args: Vec<Type> =
-                args.iter().map(|m| resolve_type_node(m, ctx, table)).collect();
+            let resolved_args: Vec<Type> = args
+                .iter()
+                .map(|m| resolve_type_node(m, ctx, table))
+                .collect();
 
             if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
                 if !params.is_empty() && params.len() == resolved_args.len() {
@@ -224,9 +229,8 @@ pub fn resolve_type_node(
                                     ty = Type::array(ty, table);
                                 }
                                 crate::types::FunctionParam {
-                                    name: Some(Rc::from(crate::binder::pattern_lead_name(
-                                        &p.pattern,
-                                        interner,
+                                    name: Some(Arc::from(crate::binder::pattern_lead_name(
+                                        &p.pattern, interner,
                                     ))),
                                     ty: ty.0,
                                     optional: p.is_optional || p.default.is_some(),
@@ -270,7 +274,7 @@ pub fn resolve_type_node(
                             .unwrap_or(Type::Str);
                         let value_ty = resolve_type_node(return_type, ctx, table);
                         ObjectTypeMember::Index {
-                            param_name: Rc::from(crate::binder::pattern_lead_name(
+                            param_name: Arc::from(crate::binder::pattern_lead_name(
                                 &param.pattern,
                                 interner,
                             )),
@@ -301,9 +305,8 @@ pub fn resolve_type_node(
                                     ty = Type::array(ty, table);
                                 }
                                 crate::types::FunctionParam {
-                                    name: Some(Rc::from(crate::binder::pattern_lead_name(
-                                        &p.pattern,
-                                        interner,
+                                    name: Some(Arc::from(crate::binder::pattern_lead_name(
+                                        &p.pattern, interner,
                                     ))),
                                     ty: ty.0,
                                     optional: p.is_optional || p.default.is_some(),
@@ -330,8 +333,10 @@ pub fn resolve_type_node(
         },
 
         TypeKind::Intersection(members) => {
-            let resolved: Vec<Type> =
-                members.iter().map(|m| resolve_type_node(m, ctx, table)).collect();
+            let resolved: Vec<Type> = members
+                .iter()
+                .map(|m| resolve_type_node(m, ctx, table))
+                .collect();
 
             let primitives: Vec<Type> = resolved
                 .iter()
@@ -341,9 +346,9 @@ pub fn resolve_type_node(
             if primitives.len() > 1 {
                 let first = primitives[0];
                 let first_kind = table.get(first.0).clone();
-                let incompatible = primitives
-                    .iter()
-                    .any(|m| std::mem::discriminant(&table.get(m.0)) != std::mem::discriminant(&first_kind));
+                let incompatible = primitives.iter().any(|m| {
+                    std::mem::discriminant(&table.get(m.0)) != std::mem::discriminant(&first_kind)
+                });
                 if incompatible {
                     return Type::Never;
                 }

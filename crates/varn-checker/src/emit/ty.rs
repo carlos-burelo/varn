@@ -235,9 +235,11 @@ fn lower_union(
     names: &dyn NameResolver,
 ) -> BackendTy {
     let member_ids = table.get_list(members);
-    let is_null =
-        |id: &crate::types::CheckerTyId| matches!(table.get(*id), TypeKind::Intrinsic(TypeTag::Null));
-    let non_null: Vec<&crate::types::CheckerTyId> = member_ids.iter().filter(|id| !is_null(id)).collect();
+    let is_null = |id: &crate::types::CheckerTyId| {
+        matches!(table.get(*id), TypeKind::Intrinsic(TypeTag::Null))
+    };
+    let non_null: Vec<&crate::types::CheckerTyId> =
+        member_ids.iter().filter(|id| !is_null(id)).collect();
 
     if non_null.len() == member_ids.len() {
         // No null in the union — non-discriminated.

@@ -2,7 +2,7 @@ pub(crate) mod entry;
 
 pub use entry::DispatchEntry;
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::OnceLock;
 use varn_core::op_meta::OpMeta;
 use varn_types::{NativeCtx, NativeOpEntry, VmValue};
@@ -308,15 +308,15 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
     Some(ctx.finalize(root))
 }
 
-pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Rc<str>, VmValue> {
+pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc<str>, VmValue> {
     let mut out = rustc_hash::FxHashMap::default();
-    out.insert(Rc::from("isIsolate"), VmValue::from_bool(false));
+    out.insert(Arc::from("isIsolate"), VmValue::from_bool(false));
 
     if let Some(globals_nv) = build_module("globals", ctx) {
         collect_module_fields("globals", globals_nv, ctx, &mut out);
     }
     if let Some(core_nv) = build_module("core", ctx) {
-        out.insert(Rc::from("core"), core_nv);
+        out.insert(Arc::from("core"), core_nv);
     }
     out
 }
@@ -380,7 +380,7 @@ fn collect_module_fields(
     module_id: &str,
     module_nv: VmValue,
     ctx: &dyn NativeCtx,
-    out: &mut rustc_hash::FxHashMap<Rc<str>, VmValue>,
+    out: &mut rustc_hash::FxHashMap<Arc<str>, VmValue>,
 ) {
     for entry in all_native_ops() {
         if entry.module_id() != module_id {
@@ -391,7 +391,7 @@ fn collect_module_fields(
         }
         let symbol = entry.symbol_name();
         if let Some(v) = ctx.get_field(module_nv, symbol) {
-            out.insert(Rc::from(symbol), v);
+            out.insert(Arc::from(symbol), v);
         }
     }
 }

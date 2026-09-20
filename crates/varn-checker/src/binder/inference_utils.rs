@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{Param, Pattern, TypeNode};
 
 use super::type_resolution::resolve_type_node;
@@ -113,11 +113,11 @@ pub fn infer_object_member_type(
 /// parameter names / diagnostics). `interner` is `None` only for the rare
 /// caller with no `TypeContext` on hand; identifiers then fall back to `_`
 /// rather than panicking on an unresolved `Atom`.
-pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>) -> Rc<str> {
+pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>) -> Arc<str> {
     match p {
         Pattern::Identifier { name, .. } => match interner {
-            Some(i) => Rc::from(i.resolve(*name)),
-            None => Rc::from("_"),
+            Some(i) => Arc::from(i.resolve(*name)),
+            None => Arc::from("_"),
         },
         Pattern::Array { elements, rest, .. } => {
             let mut s = "[".to_owned();
@@ -137,7 +137,7 @@ pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>
                 s.push_str(&pattern_to_rc_str(r, interner));
             }
             s.push(']');
-            Rc::from(s)
+            Arc::from(s)
         }
         Pattern::Object {
             properties, rest, ..
@@ -169,11 +169,11 @@ pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>
                 s.push_str(&pattern_to_rc_str(r, interner));
             }
             s.push('}');
-            Rc::from(s)
+            Arc::from(s)
         }
         Pattern::Assignment { left, .. } => pattern_to_rc_str(left, interner),
         Pattern::Rest { argument, .. } => {
-            Rc::from(format!("...{}", pattern_to_rc_str(argument, interner)))
+            Arc::from(format!("...{}", pattern_to_rc_str(argument, interner)))
         }
     }
 }

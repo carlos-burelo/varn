@@ -19,7 +19,7 @@ pub use pool::PoolEntry;
 pub use proto::{ExceptionRange, FunctionProto, FIRST_RESUME, STATE_DONE, STATE_YIELDED};
 
 use literal::rc_str_serde;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::OpCode;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -35,7 +35,7 @@ pub struct Chunk {
     pub constants_map: rustc_hash::FxHashMap<PoolEntry, u16>,
 
     #[serde(with = "rc_str_serde")]
-    pub source_file: Rc<str>,
+    pub source_file: Arc<str>,
 
     #[serde(skip)]
     pub module_id: Option<varn_core::ModuleId>,
@@ -64,7 +64,7 @@ impl Default for Chunk {
             lines: LineMapping::default(),
             constants: Vec::new(),
             constants_map: rustc_hash::FxHashMap::default(),
-            source_file: Rc::from(""),
+            source_file: Arc::from(""),
             module_id: None,
         }
     }
@@ -181,10 +181,10 @@ impl Chunk {
     }
 
     pub fn add_str(&mut self, s: impl AsRef<str>) -> u16 {
-        self.add_constant(PoolEntry::Literal(Literal::Str(Rc::from(s.as_ref()))))
+        self.add_constant(PoolEntry::Literal(Literal::Str(Arc::from(s.as_ref()))))
     }
 
-    pub fn add_shape(&mut self, keys: Vec<Rc<str>>) -> u16 {
+    pub fn add_shape(&mut self, keys: Vec<Arc<str>>) -> u16 {
         self.add_constant(PoolEntry::Shape(keys))
     }
 

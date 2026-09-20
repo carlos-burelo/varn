@@ -1,5 +1,5 @@
-use std::cell::Cell;
 use rustc_hash::FxHashMap as HashMap;
+use std::cell::Cell;
 use std::time::{Duration, Instant};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;

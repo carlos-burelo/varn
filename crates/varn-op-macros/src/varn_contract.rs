@@ -476,7 +476,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         if m.kind == Kind::Property {
             let tag = mapped_tag_path(&m.ret);
             setup_calls.push(quote! {
-                cls.declare_field(::std::rc::Rc::from(#sym), #tag);
+                cls.declare_field(::std::sync::Arc::from(#sym), #tag);
             });
             continue;
         }

@@ -3,6 +3,7 @@ use crate::native::NativeFn;
 use std::fmt;
 use std::hash::Hasher;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::TypeTag;
 
 impl Value {
@@ -99,7 +100,7 @@ impl Value {
         }
     }
 
-    pub fn as_str(&self) -> Option<Rc<str>> {
+    pub fn as_str(&self) -> Option<Arc<str>> {
         match self {
             Value::Str(s) => Some(s.clone()),
             _ => None,

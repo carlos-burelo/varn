@@ -63,9 +63,7 @@ pub(crate) fn probe() -> varn_jit::JitFrameLayout {
     let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
     let closure_tag = bytes[0] as usize;
     let closure_payload_off = (0..=size - 8)
-        .find(|&off| {
-            usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == closure_rcbox
-        })
+        .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == closure_rcbox)
         .expect("closure payload probe failed");
     let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
     assert_ne!(

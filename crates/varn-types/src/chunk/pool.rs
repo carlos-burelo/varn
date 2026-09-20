@@ -1,6 +1,7 @@
 //! Constant-pool entries: literals, nested function protos, class definitions.
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use super::literal::Literal;
 use crate::FunctionProto;
@@ -9,7 +10,7 @@ use crate::FunctionProto;
 pub enum PoolEntry {
     Literal(Literal),
     Function(std::rc::Rc<FunctionProto>),
-    Shape(Vec<std::rc::Rc<str>>),
+    Shape(Vec<std::sync::Arc<str>>),
 }
 
 impl std::fmt::Debug for PoolEntry {
@@ -88,7 +89,7 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
                     ))),
                     2 => {
                         let strs = variant.newtype_variant::<Vec<String>>()?;
-                        Ok(PoolEntry::Shape(strs.into_iter().map(Rc::from).collect()))
+                        Ok(PoolEntry::Shape(strs.into_iter().map(Arc::from).collect()))
                     }
                     _ => Err(de::Error::unknown_variant(
                         &idx.to_string(),

@@ -6,12 +6,12 @@
 //! misaligned read.
 
 use crate::ty::{BackendTy, ClassId, SigId};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// One field of a class instance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldInfo {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub ty: BackendTy,
     /// Dense index, counting the parent's fields first.
     pub slot: u16,
@@ -25,13 +25,13 @@ pub struct FieldInfo {
 /// is what a call through that slot will actually reach.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VtableEntry {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub sig: SigId,
 }
 
 #[derive(Debug, Clone)]
 pub struct ClassInfo {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub parent: Option<ClassId>,
     pub fields: Vec<FieldInfo>,
     pub vtable: Vec<VtableEntry>,
@@ -51,19 +51,19 @@ impl ClassInfo {
     /// supplies the prefix. Taking only one of the two is what leaves a
     /// `parent` field that never gets filled.
     pub fn new(
-        name: Rc<str>,
+        name: Arc<str>,
         parent: Option<(ClassId, &ClassInfo)>,
-        fields: Vec<(Rc<str>, BackendTy)>,
+        fields: Vec<(Arc<str>, BackendTy)>,
     ) -> Self {
         Self::new_with_methods(name, parent, fields, Vec::new())
     }
 
     /// A class with fields and methods, laid out against its parent.
     pub fn new_with_methods(
-        name: Rc<str>,
+        name: Arc<str>,
         parent: Option<(ClassId, &ClassInfo)>,
-        fields: Vec<(Rc<str>, BackendTy)>,
-        methods: Vec<(Rc<str>, SigId)>,
+        fields: Vec<(Arc<str>, BackendTy)>,
+        methods: Vec<(Arc<str>, SigId)>,
     ) -> Self {
         let parent_info = parent.map(|(_, info)| info);
 
@@ -132,14 +132,14 @@ impl ClassInfo {
 
 #[derive(Debug, Clone)]
 pub struct VariantInfo {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub tag: u16,
     pub payload: Vec<BackendTy>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EnumInfo {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub variants: Vec<VariantInfo>,
 }
 

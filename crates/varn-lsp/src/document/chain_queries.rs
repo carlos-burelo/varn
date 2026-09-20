@@ -61,7 +61,7 @@ fn summary_from_class_member(
 /// A summary for a member the checker typed but recorded no *access* for — a
 /// member read off a `dynamic` value, or named at its own declaration.
 fn summary_of(
-    name: std::rc::Rc<str>,
+    name: std::sync::Arc<str>,
     ty: varn_checker::Type,
     kind: varn_checker::ResolvedMemberKind,
     line: u32,
@@ -208,7 +208,7 @@ impl DocumentState {
                         let parent_name = self.resolve_receiver_type_name_at(tok);
                         return Some(ChainResult::Member {
                             member: summary_of(
-                                std::rc::Rc::from(tok.lexeme.as_str()),
+                                std::sync::Arc::from(tok.lexeme.as_str()),
                                 entry.ty.clone(),
                                 if is_fn {
                                     varn_checker::ResolvedMemberKind::Method
@@ -243,7 +243,7 @@ impl DocumentState {
                 }
                 return Some(ChainResult::Member {
                     member: summary_of(
-                        std::rc::Rc::from(tok.lexeme.as_str()),
+                        std::sync::Arc::from(tok.lexeme.as_str()),
                         entry.ty.clone(),
                         if is_fn {
                             varn_checker::ResolvedMemberKind::Method

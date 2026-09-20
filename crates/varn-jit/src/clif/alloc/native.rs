@@ -3,7 +3,9 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::chunk::{Literal, PoolEntry};
 use varn_types::register_meta::RegisterMeta;
 
-use super::super::emit::{box_bool, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
+use super::super::emit::{
+    box_bool, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce,
+};
 use super::super::kinds::K;
 use super::safepoints::{
     box_or_load_home, def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed,
@@ -39,7 +41,13 @@ pub(crate) fn emit_call_native_op(
             b,
             actx.cc,
             actx.helpers.str_starts_with_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_bool(b, res);
         def_result(b, actx, dest, boxed);
@@ -58,7 +66,13 @@ pub(crate) fn emit_call_native_op(
             b,
             actx.cc,
             actx.helpers.str_ends_with_intrinsic,
-            &[actx.exec_ctx, recv_tag, recv_payload, search_tag, search_payload],
+            &[
+                actx.exec_ctx,
+                recv_tag,
+                recv_payload,
+                search_tag,
+                search_payload,
+            ],
         );
         let boxed = box_bool(b, res);
         def_result(b, actx, dest, boxed);

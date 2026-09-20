@@ -4,7 +4,7 @@
 //! execution, and the method dispatcher strcmps against `push` and `pop`.
 //! None of that is information the runtime has and the checker lacks.
 
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_tir::{DynReason, FnId, LocalId, Resolution};
 
 /// A resolution is in exactly one of three states: it resolves to nothing, it
@@ -13,7 +13,7 @@ use varn_tir::{DynReason, FnId, LocalId, Resolution};
 #[test]
 fn the_three_dispatch_states_are_distinguishable() {
     let by_name = Resolution::ByName {
-        name: Rc::from("x"),
+        name: Arc::from("x"),
         why: DynReason::IndexSignature,
     };
 
@@ -49,7 +49,7 @@ fn the_three_dispatch_states_are_distinguishable() {
 #[test]
 fn by_name_carries_its_reason() {
     let r = Resolution::ByName {
-        name: Rc::from("length"),
+        name: Arc::from("length"),
         why: DynReason::HostBoundary,
     };
     assert_eq!(r.dyn_reason(), Some(DynReason::HostBoundary));

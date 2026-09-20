@@ -18,7 +18,7 @@ pub use portable::{
 
 use rustc_hash::FxHashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::Visibility;
 use varn_core::{TypeKind, TypeTag};
 
@@ -62,16 +62,15 @@ impl Default for Type {
 /// directly rather than `Type` — the `tainted` bool is a property of a
 /// specific expression occurrence, not of a function signature or object
 /// shape's declared members, so it has nothing to attach to here (matches
-/// the plan's Task 21 Step 2 example). `name` fields stay `Rc<str>` rather
-/// than migrating to `Atom`: the plan's interned-form docs only mandate
-/// `Atom` for `TypeKind::Named`/`Generic`'s own name slot (already done in
-/// Task 19/20's `InternedTypeKind`), and threading an interner through every
-/// `FunctionParam`/`ObjectTypeMember` construction site for no dedup benefit
-/// `Rc<str>` doesn't already give is scope this task doesn't need — documented
-/// deviation from the plan's illustrative (not prescriptive) `Option<Atom>`.
+/// the plan's Task 21 Step 2 example). `name` fields use `Arc<str>` (not
+/// `Rc<str>`): these names live inside `CheckerTyTable`, so `Rc` would make
+/// the whole table `!Send + !Sync` and block parallel module checking.
+/// `Arc<str>` keeps the `.as_ref()` / `PartialEq<str>` ergonomics that
+/// `Atom` would have forced the interner through every comparison to
+/// provide (ADR-0012).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FunctionParam {
-    pub name: Option<Rc<str>>,
+    pub name: Option<Arc<str>>,
     pub ty: CheckerTyId,
     pub optional: bool,
     pub is_rest: bool,
@@ -82,26 +81,26 @@ pub struct FunctionType {
     pub params: Vec<FunctionParam>,
     pub return_type: CheckerTyId,
     pub is_arrow: bool,
-    pub type_params: Vec<Rc<str>>,
+    pub type_params: Vec<Arc<str>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ObjectTypeMember {
     Property {
-        name: Rc<str>,
+        name: Arc<str>,
         ty: CheckerTyId,
         optional: bool,
         readonly: bool,
     },
     Method {
-        name: Rc<str>,
+        name: Arc<str>,
         params: Vec<FunctionParam>,
         return_type: CheckerTyId,
         optional: bool,
         is_arrow: bool,
     },
     Index {
-        param_name: Rc<str>,
+        param_name: Arc<str>,
         key_ty: CheckerTyId,
         value_ty: CheckerTyId,
     },
@@ -133,7 +132,7 @@ pub enum ClassMemberKind {
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ClassMemberInfo {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub kind: ClassMemberKind,
     pub is_async: bool,
     pub is_generator: bool,

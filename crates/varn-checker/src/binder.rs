@@ -2,14 +2,14 @@ use crate::scope::{CheckerScope, ScopeArena, ScopeId, ScopeKind};
 use crate::symbol::{Symbol, SymbolArena, SymbolKind};
 use crate::types::Type;
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprKind, ForInit, Program, StmtId, StmtKind, VarDeclarator};
 
 mod array_evolve;
 mod class;
 mod decl_values;
-mod definite_field_assignment;
 mod decls;
+mod definite_field_assignment;
 mod imports;
 mod inference_utils;
 mod interface;
@@ -39,9 +39,9 @@ pub struct Binder<'r> {
     pub(crate) arena: SymbolArena,
     pub(crate) scopes: ScopeArena,
     pub(crate) current: ScopeId,
-    pub(crate) class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
+    pub(crate) class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub(crate) type_members: TypeMembers,
-    pub(crate) class_parents: FxHashMap<Rc<str>, Rc<str>>,
+    pub(crate) class_parents: FxHashMap<Arc<str>, Arc<str>>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     /// The real per-parse `AtomInterner`, threaded in from `Binder::bind`'s
     /// caller (see the doc comment on `BindResult::interner`).
@@ -54,10 +54,10 @@ pub struct Binder<'r> {
     /// carried out to `BindResult::ty_table` so later checking/emit stages
     /// read the same ids this bind minted.
     pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
-    pub(crate) source_file: Rc<str>,
-    pub(crate) sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
-    pub(crate) sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
-    pub(crate) sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
+    pub(crate) source_file: Arc<str>,
+    pub(crate) sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    pub(crate) sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
+    pub(crate) sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,
     pub(crate) extensions: Extensions,
     pub(crate) pending_enrich: Vec<PendingEnrich>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
@@ -269,7 +269,7 @@ impl<'r> Binder<'r> {
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn ImportResolver,
-        globals: &FxHashMap<Rc<str>, Symbol>,
+        globals: &FxHashMap<Arc<str>, Symbol>,
     ) -> BindResult {
         Self::bind_with_globals_iter(
             program,
@@ -290,7 +290,7 @@ impl<'r> Binder<'r> {
         globals: I,
     ) -> BindResult
     where
-        I: IntoIterator<Item = (Rc<str>, Symbol)>,
+        I: IntoIterator<Item = (Arc<str>, Symbol)>,
     {
         let mut b = Binder {
             resolver,
@@ -304,7 +304,7 @@ impl<'r> Binder<'r> {
             diagnostics: varn_core::DiagnosticBag::new(),
             interner,
             ty_table: resolver.ty_table_snapshot(),
-            source_file: Rc::from(program.filename.as_ref()),
+            source_file: Arc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
             sum_variant_parent: FxHashMap::default(),
             sum_variant_fields: FxHashMap::default(),
@@ -411,7 +411,7 @@ impl<'r> Binder<'r> {
         &mut self,
         declarators: &[VarDeclarator],
         kind: VarKind,
-        doc: Option<&Rc<str>>,
+        doc: Option<&Arc<str>>,
     ) {
         let sym_kind = match kind {
             VarKind::Const => SymbolKind::Const,
@@ -445,7 +445,8 @@ impl<'r> Binder<'r> {
 
             if let Pattern::Identifier { name, .. } = &declarator.id {
                 if let Some(init_expr) = declarator.init {
-                    if let ExprKind::Object { properties, .. } = &self.ast_arena.expr(init_expr).kind
+                    if let ExprKind::Object { properties, .. } =
+                        &self.ast_arena.expr(init_expr).kind
                     {
                         let fields = self.collect_object_members(properties);
                         if !fields.is_empty() {
@@ -562,10 +563,7 @@ impl<'r> Binder<'r> {
                     let saved = self.current;
                     self.current = child;
                     if let Some(p) = &clause.param {
-                        let ty = clause
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann));
+                        let ty = clause.type_ann.as_ref().map(|ann| self.resolve_type(ann));
                         let block_line = arena.stmt(block).range.start.line;
                         self.bind_pattern(p, SymbolKind::Let, block_line, None, ty);
                     }

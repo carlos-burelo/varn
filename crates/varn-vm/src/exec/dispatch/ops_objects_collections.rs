@@ -300,7 +300,8 @@ impl ExecCtx {
                 let (dest, start_reg) = (hi(w1), lo(w1));
                 let count = hi(w2);
                 if count == 0 {
-                    self.stack.unbox_into_reg(base, dest, self.heap.alloc_empty_map_vm())?;
+                    self.stack
+                        .unbox_into_reg(base, dest, self.heap.alloc_empty_map_vm())?;
                     return Ok(Some(ObjectFlow::ContinueInstruction));
                 }
                 let mut map = varn_types::value::ValueMap::default();
@@ -310,7 +311,8 @@ impl ExecCtx {
                     let key = self.heap.canonical_map_key(k_nv);
                     map.insert(key, v_nv);
                 }
-                self.stack.unbox_into_reg(base, dest, self.heap.alloc_map_vm(map))?;
+                self.stack
+                    .unbox_into_reg(base, dest, self.heap.alloc_map_vm(map))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildObject => {
@@ -354,11 +356,15 @@ impl ExecCtx {
                     .expect("invalid shape");
                 let count = shape.property_names.len();
                 let boxed: Vec<VmValue> = self.stack.box_range(base, start_reg, count);
-                self.stack.unbox_into_reg(base, dest, if is_record {
-                    self.heap.alloc_record_with_shape_slice(&shape, &boxed)
-                } else {
-                    self.heap.alloc_object_with_shape_slice(&shape, &boxed)
-                })?;
+                self.stack.unbox_into_reg(
+                    base,
+                    dest,
+                    if is_record {
+                        self.heap.alloc_record_with_shape_slice(&shape, &boxed)
+                    } else {
+                        self.heap.alloc_object_with_shape_slice(&shape, &boxed)
+                    },
+                )?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ObjectRest => {
@@ -455,7 +461,8 @@ impl ExecCtx {
                 let a = self.stack.box_reg(base, src1);
                 let b = self.stack.box_reg(base, src2);
                 let r = crate::exec::advanced::op_in(a, b, &self.heap);
-                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
+                self.stack
+                    .unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::Instanceof => {
@@ -465,7 +472,8 @@ impl ExecCtx {
                 let a = self.stack.box_reg(base, src1);
                 let b = self.stack.box_reg(base, src2);
                 let r = crate::exec::advanced::instanceof(a, b, &self.heap);
-                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
+                self.stack
+                    .unbox_into_reg(base, first_reg, VmValue::from_bool(r))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::Typeof => {
@@ -473,7 +481,8 @@ impl ExecCtx {
                 *ip += 1;
                 let v = self.stack.box_reg(base, src);
                 let s = self.exec_typeof(v);
-                self.stack.unbox_into_reg(base, first_reg, self.heap.alloc_str(s))?;
+                self.stack
+                    .unbox_into_reg(base, first_reg, self.heap.alloc_str(s))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::IsNull => {
@@ -496,7 +505,8 @@ impl ExecCtx {
                 } else {
                     false
                 };
-                self.stack.unbox_into_reg(base, first_reg, VmValue::from_bool(is_arr))?;
+                self.stack
+                    .unbox_into_reg(base, first_reg, VmValue::from_bool(is_arr))?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             _ => Ok(None),

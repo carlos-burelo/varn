@@ -1,8 +1,9 @@
 use super::{RuntimeString, Value};
-use std::cell::RefCell;
 use rustc_hash::FxHashMap as HashMap;
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 static NEXT_CLASS_ID: AtomicU32 = AtomicU32::new(1);
 
@@ -153,19 +154,19 @@ impl ClassObj {
         let mut ordered: Vec<(usize, RuntimeString)> = shape
             .property_names
             .iter()
-            .map(|(k, &slot)| (slot, Rc::clone(k)))
+            .map(|(k, &slot)| (slot, Arc::clone(k)))
             .collect();
         ordered.sort_unstable_by_key(|(slot, _)| *slot);
 
         let tags = self.field_tags.borrow();
-        let fields_in: Vec<(Rc<str>, varn_core::TypeTag)> = ordered
+        let fields_in: Vec<(Arc<str>, varn_core::TypeTag)> = ordered
             .into_iter()
             .map(|(slot, name)| {
                 let tag = tags
                     .get(slot)
                     .copied()
                     .unwrap_or(varn_core::TypeTag::Dynamic);
-                (Rc::from(name.as_ref()), tag)
+                (Arc::from(name.as_ref()), tag)
             })
             .collect();
 
@@ -178,17 +179,17 @@ impl ClassObj {
         layout
     }
 
-    pub fn add_method(&self, name: impl Into<Rc<str>>, value: Value) {
+    pub fn add_method(&self, name: impl Into<Arc<str>>, value: Value) {
         self.add_method_with_owner(name, value, None);
     }
 
     pub fn add_method_with_owner(
         &self,
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         value: Value,
         owner: Option<Rc<ClassObj>>,
     ) {
-        let name: Rc<str> = name.into();
+        let name: Arc<str> = name.into();
         let mut method_map = self.method_map.borrow_mut();
         let mut vtable = self.vtable.borrow_mut();
         let mut vtable_owners = self.vtable_owners.borrow_mut();
@@ -205,17 +206,17 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_getter(&self, name: impl Into<Rc<str>>, value: Value) {
+    pub fn add_getter(&self, name: impl Into<Arc<str>>, value: Value) {
         self.add_getter_with_owner(name, value, None);
     }
 
     pub fn add_getter_with_owner(
         &self,
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         value: Value,
         owner: Option<Rc<ClassObj>>,
     ) {
-        let name: Rc<str> = name.into();
+        let name: Arc<str> = name.into();
         let mut getter_map = self.getter_map.borrow_mut();
         let mut getter_vtable = self.getter_vtable.borrow_mut();
         let mut getter_vtable_owners = self.getter_vtable_owners.borrow_mut();
@@ -234,11 +235,11 @@ impl ClassObj {
 
     pub fn add_setter_with_owner(
         &self,
-        name: impl Into<Rc<str>>,
+        name: impl Into<Arc<str>>,
         value: Value,
         owner: Option<Rc<ClassObj>>,
     ) {
-        let name: Rc<str> = name.into();
+        let name: Arc<str> = name.into();
         let mut setter_map = self.setter_map.borrow_mut();
         let mut setter_vtable = self.setter_vtable.borrow_mut();
         let mut setter_vtable_owners = self.setter_vtable_owners.borrow_mut();
@@ -255,7 +256,7 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_static_getter(&self, name: impl Into<Rc<str>>, value: Value) {
+    pub fn add_static_getter(&self, name: impl Into<Arc<str>>, value: Value) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {
@@ -264,7 +265,7 @@ impl ClassObj {
         self.static_getter_map.borrow_mut().insert(name_rc, value);
     }
 
-    pub fn add_static_setter(&self, name: impl Into<Rc<str>>, value: Value) {
+    pub fn add_static_setter(&self, name: impl Into<Arc<str>>, value: Value) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {
@@ -273,7 +274,7 @@ impl ClassObj {
         self.static_setter_map.borrow_mut().insert(name_rc, value);
     }
 
-    pub fn add_static(&self, name: impl Into<Rc<str>>, value: Value) {
+    pub fn add_static(&self, name: impl Into<Arc<str>>, value: Value) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {

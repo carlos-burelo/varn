@@ -1,15 +1,15 @@
 use crate::ParseProfile;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, AstTypeKind, ExprId, ExprKind, StmtId, StmtKind, TypeNode};
 use varn_core::{ErrorCode, ParsedNumber, SourceRange, Token, TokenKind};
 
 pub struct TokenStream {
     tokens: Vec<Token>,
-    lexeme_buf: Rc<[u8]>,
+    lexeme_buf: Arc<[u8]>,
     pos: usize,
-    pub filename: Rc<str>,
+    pub filename: Arc<str>,
 
-    pending_doc: Option<Rc<str>>,
+    pending_doc: Option<Arc<str>>,
 
     pub errors: varn_core::DiagnosticBag,
     pub profile: ParseProfile,
@@ -41,8 +41,8 @@ impl TokenStream {
     /// mints its own — doing that per file is exactly the bug this replaced.
     pub fn new(
         tokens: Vec<Token>,
-        lexeme_buf: Rc<[u8]>,
-        filename: Rc<str>,
+        lexeme_buf: Arc<[u8]>,
+        filename: Arc<str>,
         interner: varn_core::AtomInterner,
     ) -> Self {
         TokenStream {
@@ -349,11 +349,11 @@ impl TokenStream {
         ))
     }
 
-    pub fn store_pending_doc(&mut self, doc: Rc<str>) {
+    pub fn store_pending_doc(&mut self, doc: Arc<str>) {
         self.pending_doc = Some(doc);
     }
 
-    pub fn take_pending_doc(&mut self) -> Option<Rc<str>> {
+    pub fn take_pending_doc(&mut self) -> Option<Arc<str>> {
         self.pending_doc.take()
     }
 

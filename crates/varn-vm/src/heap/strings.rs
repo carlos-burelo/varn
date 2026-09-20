@@ -12,7 +12,7 @@ use super::str::{ascii_flag, HeapStr, INLINE_STR_CAP};
 use super::structs::HeapInner;
 use crate::nursery::{old_idx_raw, pack_old_idx};
 use crate::value::VmValue;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::RuntimeString;
 
 const SLICE_LEN_MASK: u32 = 0x3FFF_FFFF;
@@ -24,7 +24,7 @@ impl HeapInner {
             return sso;
         }
 
-        let rs: RuntimeString = Rc::from(s_ref);
+        let rs: RuntimeString = Arc::from(s_ref);
         if let Some(&packed) = self.string_interner.get(&rs) {
             let raw = old_idx_raw(packed);
             if self
@@ -76,7 +76,7 @@ impl HeapInner {
             }
             self.string_interner.remove(s_ref);
         }
-        let rs: RuntimeString = Rc::from(s_ref);
+        let rs: RuntimeString = Arc::from(s_ref);
         let oi = alloc_into(
             &mut self.objects,
             &mut self.free,
@@ -98,7 +98,7 @@ impl HeapInner {
             return self.alloc_str_view(HeapStr::inline(s_ref));
         }
 
-        let rs: RuntimeString = Rc::from(s_ref);
+        let rs: RuntimeString = Arc::from(s_ref);
         let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::shared(rs))) {
             Ok(ni) => ni,
             Err(obj) => pack_old_idx(alloc_into(
@@ -126,11 +126,11 @@ impl HeapInner {
         if len as u64 <= SLICE_LEN_MASK as u64 {
             match handle {
                 HeapStr::Shared(rc, _) => {
-                    let hs = HeapStr::slice_of(Rc::clone(rc), bs, len, flag);
+                    let hs = HeapStr::slice_of(Arc::clone(rc), bs, len, flag);
                     return self.alloc_str_view(hs);
                 }
                 HeapStr::Slice { src, off, .. } => {
-                    let hs = HeapStr::slice_of(Rc::clone(src), *off as usize + bs, len, flag);
+                    let hs = HeapStr::slice_of(Arc::clone(src), *off as usize + bs, len, flag);
                     return self.alloc_str_view(hs);
                 }
                 HeapStr::Ext { .. } | HeapStr::Inline { .. } => {}
@@ -157,7 +157,7 @@ impl HeapInner {
         if nv.is_sso() {
             let mut buf = [0u8; 5];
             let s = nv.sso_as_str(&mut buf);
-            return Some(Rc::from(s));
+            return Some(Arc::from(s));
         }
         if !nv.is_heap() {
             return None;

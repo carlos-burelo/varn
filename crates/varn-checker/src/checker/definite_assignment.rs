@@ -10,7 +10,9 @@
 use super::Checker;
 use crate::binder::BindResult;
 use rustc_hash::FxHashSet;
-use varn_core::ast::{ArrowBody, AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind};
+use varn_core::ast::{
+    ArrowBody, AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind,
+};
 use varn_core::{Atom, Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]
@@ -35,8 +37,7 @@ impl Flow {
             (true, false) => *self = b,
             (false, true) => *self = a,
             (false, false) => {
-                let both: FxHashSet<Atom> =
-                    a.assigned.intersection(&b.assigned).cloned().collect();
+                let both: FxHashSet<Atom> = a.assigned.intersection(&b.assigned).cloned().collect();
                 self.assigned.extend(both);
             }
         }

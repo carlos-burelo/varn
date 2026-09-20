@@ -475,7 +475,9 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         BuildObjectSpread { .. } => "build_object_spread {...}".to_string(),
         ObjectRest { .. } => "object_rest".to_string(),
         Cast { operand, ty } => format!("cast v{} as {:?}", operand.0, ty),
-        NarrowRangeCheck { operand, tag } => format!("narrow_range_check v{} as {tag:?}", operand.0),
+        NarrowRangeCheck { operand, tag } => {
+            format!("narrow_range_check v{} as {tag:?}", operand.0)
+        }
     }
 }
 

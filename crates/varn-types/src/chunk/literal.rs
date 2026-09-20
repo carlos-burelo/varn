@@ -1,7 +1,7 @@
 //! Constant-pool literals and the serde plumbing for the interned strings they
 //! hold.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use varn_core::IntrinsicType;
 
@@ -22,26 +22,26 @@ static LITERAL_VARIANTS: [&str; 9] = [
 
 pub(super) mod rc_str_serde {
     use serde::{Deserialize, Deserializer, Serializer};
-    use std::rc::Rc;
-    pub fn serialize<S: Serializer>(s: &Rc<str>, ser: S) -> Result<S::Ok, S::Error> {
+    use std::sync::Arc;
+    pub fn serialize<S: Serializer>(s: &Arc<str>, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(s)
     }
-    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Rc<str>, D::Error> {
-        Ok(Rc::from(String::deserialize(de)?))
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Arc<str>, D::Error> {
+        Ok(Arc::from(String::deserialize(de)?))
     }
 }
 
 pub(super) mod opt_rc_str_serde {
     use serde::{Deserialize, Deserializer, Serializer};
-    use std::rc::Rc;
-    pub fn serialize<S: Serializer>(s: &Option<Rc<str>>, ser: S) -> Result<S::Ok, S::Error> {
+    use std::sync::Arc;
+    pub fn serialize<S: Serializer>(s: &Option<Arc<str>>, ser: S) -> Result<S::Ok, S::Error> {
         match s {
             Some(v) => ser.serialize_some(v.as_ref()),
             None => ser.serialize_none(),
         }
     }
-    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Option<Rc<str>>, D::Error> {
-        Ok(Option::<String>::deserialize(de)?.map(Rc::from))
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Option<Arc<str>>, D::Error> {
+        Ok(Option::<String>::deserialize(de)?.map(Arc::from))
     }
 }
 
@@ -51,7 +51,7 @@ pub enum Literal {
     Bool(bool),
     Int(i64),
     Float(f64),
-    Str(Rc<str>),
+    Str(Arc<str>),
     BigInt(i128),
     Decimal(rust_decimal::Decimal),
     Symbol(crate::value::RuntimeSymbol),
@@ -130,7 +130,9 @@ impl<'de> serde::Deserialize<'de> for Literal {
                     1 => Ok(Literal::Bool(variant.newtype_variant()?)),
                     2 => Ok(Literal::Int(variant.newtype_variant()?)),
                     3 => Ok(Literal::Float(variant.newtype_variant()?)),
-                    4 => Ok(Literal::Str(Rc::from(variant.newtype_variant::<String>()?))),
+                    4 => Ok(Literal::Str(Arc::from(
+                        variant.newtype_variant::<String>()?,
+                    ))),
                     5 => Ok(Literal::BigInt(variant.newtype_variant()?)),
                     6 => {
                         let bits: [u8; 16] = variant.newtype_variant()?;

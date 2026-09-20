@@ -8,6 +8,7 @@ use crate::hir::{HirUnOp, HirUpvalueSrc};
 use crate::lower::bin_opcode;
 use crate::OptError;
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::OpCode;
 use varn_types::chunk::{Chunk, Literal, PoolEntry};
 use varn_types::value::RuntimeSymbol;
@@ -24,7 +25,7 @@ pub(super) fn emit_value(
     scratch: u8,
     call_base: u8,
     cache_count: &mut u16,
-    source_file: &Rc<str>,
+    source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
 ) -> Result<()> {
@@ -243,7 +244,10 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack(d, *tag as u8), line);
         }
 
-        InstKind::BuildArray { elements, narrow_elem } => {
+        InstKind::BuildArray {
+            elements,
+            narrow_elem,
+        } => {
             for (i, e) in elements.iter().enumerate() {
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], line);
             }
@@ -282,7 +286,7 @@ pub(super) fn emit_value(
                     }
                 }
             }
-            let keys = pairs.iter().map(|(k, _)| k.clone()).collect();
+            let keys = pairs.iter().map(|(k, _)| Arc::from(k.as_ref())).collect();
             let shape_idx = chunk.add_shape(keys);
             chunk.emit(OpCode::BuildObjectWithShape, line);
             chunk.write(Chunk::pack(d, start_reg), line);
@@ -309,7 +313,7 @@ pub(super) fn emit_value(
                     }
                 }
             }
-            let keys = pairs.iter().map(|(k, _)| k.clone()).collect();
+            let keys = pairs.iter().map(|(k, _)| Arc::from(k.as_ref())).collect();
             let shape_idx = chunk.add_shape(keys);
             chunk.emit(OpCode::BuildRecord, line);
             chunk.write(Chunk::pack(d, start_reg), line);
@@ -317,7 +321,12 @@ pub(super) fn emit_value(
         }
         InstKind::BuildMap { pairs } => {
             for (i, (k, v)) in pairs.iter().enumerate() {
-                chunk.emit_rr(OpCode::Move, call_base + (i * 2) as u8, reg[k.0 as usize], line);
+                chunk.emit_rr(
+                    OpCode::Move,
+                    call_base + (i * 2) as u8,
+                    reg[k.0 as usize],
+                    line,
+                );
                 chunk.emit_rr(
                     OpCode::Move,
                     call_base + (i * 2 + 1) as u8,

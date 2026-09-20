@@ -10,6 +10,7 @@ use crate::hir::HirFunction;
 use crate::OptError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::OpCode;
 use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, PolyICSlot};
 
@@ -27,7 +28,7 @@ type Result<T> = std::result::Result<T, OptError>;
 /// What `emit_function` needs about a function beyond its SSA body. Built from
 /// a `HirFunction` (current path) or a `varn_tir::TirFunction` (`from_tir`).
 pub struct FnMeta {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub start_line: u32,
     pub nparams: usize,
     pub param_kinds: Vec<varn_types::register_meta::SlotKind>,
@@ -56,14 +57,18 @@ impl FnMeta {
     }
 }
 
-pub fn emit_function(ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) -> Result<FunctionProto> {
+pub fn emit_function(
+    ssa: SsaFunc,
+    f: &HirFunction,
+    source_file: Arc<str>,
+) -> Result<FunctionProto> {
     emit_function_meta(ssa, &FnMeta::from_hir(f), source_file)
 }
 
 pub fn emit_function_meta(
     mut ssa: SsaFunc,
     f: &FnMeta,
-    source_file: Rc<str>,
+    source_file: Arc<str>,
 ) -> Result<FunctionProto> {
     phi_edges::split_phi_edges(&mut ssa);
 
@@ -77,7 +82,7 @@ pub fn emit_function_meta(
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
-    chunk.source_file = source_file.clone();
+    chunk.source_file = Arc::from(source_file.as_ref());
     let mut block_offset = vec![usize::MAX; n];
 
     let mut fixups: Vec<(usize, BlockId)> = Vec::new();
@@ -150,7 +155,7 @@ pub fn emit_function_meta(
     }
 
     Ok(FunctionProto {
-        name: Some(f.name.clone()),
+        name: Some(Arc::from(f.name.as_ref())),
         arity: 1 + nparams,
         export_names: Vec::new(),
         register_count,
@@ -343,7 +348,7 @@ fn emit_inst(
     scratch: u8,
     call_base: u8,
     cache_count: &mut u16,
-    source_file: &Rc<str>,
+    source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     imms: &Immediates,

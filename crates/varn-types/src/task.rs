@@ -128,7 +128,7 @@ impl AsyncTask {
 
     pub fn rejected_msg(msg: impl Into<String>) -> Self {
         let s: String = msg.into();
-        Self::rejected(Value::Str(std::rc::Rc::from(s.as_str())))
+        Self::rejected(Value::Str(std::sync::Arc::from(s.as_str())))
     }
 
     pub fn peek_state(&self) -> TaskState {
@@ -166,7 +166,7 @@ impl AsyncTask {
     #[inline]
     pub fn reject_msg(&self, msg: impl Into<String>) {
         let s: String = msg.into();
-        self.reject(Value::Str(std::rc::Rc::from(s.as_str())));
+        self.reject(Value::Str(std::sync::Arc::from(s.as_str())));
     }
 
     pub fn on_settle<F>(&self, cb: F)

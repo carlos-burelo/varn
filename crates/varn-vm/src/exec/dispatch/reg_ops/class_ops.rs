@@ -2,16 +2,16 @@ use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::OpCode;
 use varn_types::Value;
 
 /// See [`ExecCtx::enum_variant_template`].
 pub(crate) struct EnumVariantTemplate {
-    pub enum_name: Rc<str>,
-    pub variant_name: Rc<str>,
+    pub enum_name: Arc<str>,
+    pub variant_name: Arc<str>,
     pub variant_tag: i64,
-    pub fields: Vec<Rc<str>>,
+    pub fields: Vec<Arc<str>>,
 }
 
 impl ExecCtx {
@@ -232,16 +232,16 @@ impl ExecCtx {
             Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
             None => ("", name_part),
         };
-        let fields: Vec<Rc<str>> = if fields_part.is_empty() {
+        let fields: Vec<Arc<str>> = if fields_part.is_empty() {
             vec![]
         } else {
-            fields_part.split(',').map(Rc::from).collect()
+            fields_part.split(',').map(Arc::from).collect()
         };
 
         let variant =
             varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
-                enum_name: Rc::from(enum_name_str),
-                variant_name: Rc::from(variant_name_str),
+                enum_name: Arc::from(enum_name_str),
+                variant_name: Arc::from(variant_name_str),
                 variant_tag: tag,
                 fields,
                 payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
@@ -277,7 +277,7 @@ impl ExecCtx {
     /// the payload, which is rebuilt from the arguments anyway.
     ///
     /// Lifted out from under the heap borrow so the build below can take
-    /// `&mut self`. All three fields are cheap to copy — two `Rc<str>` bumps and
+    /// `&mut self`. All three fields are cheap to copy — two `Arc<str>` bumps and
     /// a field-name list that is empty for tuple-shaped variants.
     pub(crate) fn enum_variant_template(
         &self,

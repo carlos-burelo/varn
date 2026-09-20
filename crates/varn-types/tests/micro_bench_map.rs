@@ -153,18 +153,47 @@ fn bench_phase0_map_representations() {
     assert_eq!(sum_shape, sum_heap8);
 
     println!("\n=======================================================");
-    println!("FASE 0: RESULTADOS DEL MICRO-BENCHMARK ({} iters, 3 claves)", ITERS);
+    println!(
+        "FASE 0: RESULTADOS DEL MICRO-BENCHMARK ({} iters, 3 claves)",
+        ITERS
+    );
     println!("-------------------------------------------------------");
-    println!("1. Shape + ObjData (actual)    : {:>8.2?} ({:.1} ns/op)", elapsed_shape, (elapsed_shape.as_nanos() as f64) / (ITERS as f64));
-    println!("2. FxHashMap<MapKey, VmVal>    : {:>8.2?} ({:.1} ns/op)", elapsed_fx, (elapsed_fx.as_nanos() as f64) / (ITERS as f64));
-    println!("3. InlineMap<4> (stack puro)   : {:>8.2?} ({:.1} ns/op)", elapsed_inline, (elapsed_inline.as_nanos() as f64) / (ITERS as f64));
-    println!("4. Rc<RefCell<InlineMap<4>>>   : {:>8.2?} ({:.1} ns/op)", elapsed_heap, (elapsed_heap.as_nanos() as f64) / (ITERS as f64));
-    println!("5. Rc<RefCell<InlineMap<8>>>   : {:>8.2?} ({:.1} ns/op)", elapsed_heap8, (elapsed_heap8.as_nanos() as f64) / (ITERS as f64));
+    println!(
+        "1. Shape + ObjData (actual)    : {:>8.2?} ({:.1} ns/op)",
+        elapsed_shape,
+        (elapsed_shape.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "2. FxHashMap<MapKey, VmVal>    : {:>8.2?} ({:.1} ns/op)",
+        elapsed_fx,
+        (elapsed_fx.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "3. InlineMap<4> (stack puro)   : {:>8.2?} ({:.1} ns/op)",
+        elapsed_inline,
+        (elapsed_inline.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "4. Rc<RefCell<InlineMap<4>>>   : {:>8.2?} ({:.1} ns/op)",
+        elapsed_heap,
+        (elapsed_heap.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "5. Rc<RefCell<InlineMap<8>>>   : {:>8.2?} ({:.1} ns/op)",
+        elapsed_heap8,
+        (elapsed_heap8.as_nanos() as f64) / (ITERS as f64)
+    );
     println!("-------------------------------------------------------");
     let speedup_heap = elapsed_shape.as_secs_f64() / elapsed_heap.as_secs_f64();
-    println!("Speedup Rc<InlineMap<4>> vs Shape: {:.2}x más rápido", speedup_heap);
+    println!(
+        "Speedup Rc<InlineMap<4>> vs Shape: {:.2}x más rápido",
+        speedup_heap
+    );
     let speedup_heap8 = elapsed_shape.as_secs_f64() / elapsed_heap8.as_secs_f64();
-    println!("Speedup Rc<InlineMap<8>> vs Shape: {:.2}x más rápido", speedup_heap8);
+    println!(
+        "Speedup Rc<InlineMap<8>> vs Shape: {:.2}x más rápido",
+        speedup_heap8
+    );
     println!("=======================================================\n");
 
     // 7 keys benchmark (mimicking CSV ETL row: id, cust, cat, amt, tax, stat, date)
@@ -206,8 +235,19 @@ fn bench_phase0_map_representations() {
     let el_inline8_7 = t0.elapsed();
 
     println!("7 CLAVES (CSV ETL ROW):");
-    println!("FxHashMap (7 keys)          : {:>8.2?} ({:.1} ns/op)", el_fx_7, (el_fx_7.as_nanos() as f64) / (ITERS as f64));
-    println!("Rc<InlineMap<8>> (7 keys)   : {:>8.2?} ({:.1} ns/op)", el_inline8_7, (el_inline8_7.as_nanos() as f64) / (ITERS as f64));
-    println!("Speedup Rc<InlineMap<8>> (7k): {:.2}x más rápido", el_fx_7.as_secs_f64() / el_inline8_7.as_secs_f64());
+    println!(
+        "FxHashMap (7 keys)          : {:>8.2?} ({:.1} ns/op)",
+        el_fx_7,
+        (el_fx_7.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "Rc<InlineMap<8>> (7 keys)   : {:>8.2?} ({:.1} ns/op)",
+        el_inline8_7,
+        (el_inline8_7.as_nanos() as f64) / (ITERS as f64)
+    );
+    println!(
+        "Speedup Rc<InlineMap<8>> (7k): {:.2}x más rápido",
+        el_fx_7.as_secs_f64() / el_inline8_7.as_secs_f64()
+    );
     println!("=======================================================\n");
 }

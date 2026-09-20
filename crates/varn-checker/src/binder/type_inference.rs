@@ -1,6 +1,8 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::operators::{BinaryOp, LogicalOp, UnaryOp};
-use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, ObjectProp, PropKey};
+use varn_core::ast::{
+    ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, ObjectProp, PropKey,
+};
 
 use super::inference_utils::{build_fn_type, build_method_params, infer_object_member_type};
 pub use super::inference_utils::{pattern_lead_name, pattern_to_string, widen_literal};
@@ -52,7 +54,9 @@ fn reintern_member_type(
     if ctx.source_file().is_some_and(|s| s == origin) {
         return ty;
     }
-    let Some(resolver) = ctx.resolver() else { return ty };
+    let Some(resolver) = ctx.resolver() else {
+        return ty;
+    };
     let Some(b) = resolver
         .stdlib_bind(origin)
         .or_else(|| resolver.module_bind(origin))
@@ -99,10 +103,9 @@ pub fn infer_expr_type(
             let inner = infer_expr_type(*argument, arena, ctx, table);
             match table.get(inner.0) {
                 TypeKind::Generic(name, args, _)
-                    if ctx
-                        .and_then(|c| c.interner())
-                        .is_some_and(|i| i.get(varn_core::IntrinsicType::Task.as_str()) == Some(name))
-                        && table.get_list(args).len() == 1 =>
+                    if ctx.and_then(|c| c.interner()).is_some_and(|i| {
+                        i.get(varn_core::IntrinsicType::Task.as_str()) == Some(name)
+                    }) && table.get_list(args).len() == 1 =>
                 {
                     Type(table.get_list(args)[0], false)
                 }
@@ -266,16 +269,16 @@ fn infer_member(
             TypeKind::Array(inner) => Type(inner, false),
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => Type::Str,
             TypeKind::Named(name, _)
-                if ctx
-                    .and_then(|c| c.interner())
-                    .is_some_and(|i| i.get(varn_core::IntrinsicType::Str.as_str()) == Some(name)) =>
+                if ctx.and_then(|c| c.interner()).is_some_and(|i| {
+                    i.get(varn_core::IntrinsicType::Str.as_str()) == Some(name)
+                }) =>
             {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
-                if ctx
-                    .and_then(|c| c.interner())
-                    .is_some_and(|i| i.get(varn_core::IntrinsicType::Map.as_str()) == Some(name)) =>
+                if ctx.and_then(|c| c.interner()).is_some_and(|i| {
+                    i.get(varn_core::IntrinsicType::Map.as_str()) == Some(name)
+                }) =>
             {
                 let arg_ids = table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
@@ -314,9 +317,7 @@ fn infer_member(
                     return Type::Dynamic;
                 };
                 let origin_str = origin.and_then(|o| ctx_resolve_text(Some(ctx), o));
-                if let Some(variants) =
-                    ctx.get_enum_members(&name_str, origin_str.as_deref())
-                {
+                if let Some(variants) = ctx.get_enum_members(&name_str, origin_str.as_deref()) {
                     if prop_name == varn_core::MemberKey::RawValue.as_str()
                         || prop_name == varn_core::MemberKey::Tag.as_str()
                     {
@@ -329,14 +330,12 @@ fn infer_member(
                     }
                     let mut found_tys = Vec::new();
                     for v in &variants {
-                        let vty = reintern_member_type(Some(ctx), origin_str.as_deref(), v.ty, table);
+                        let vty =
+                            reintern_member_type(Some(ctx), origin_str.as_deref(), v.ty, table);
                         if let TypeKind::Fn(fid) = table.get(vty.0) {
-                            if let Some(p) = table
-                                .get_function(fid)
-                                .params
-                                .iter()
-                                .find(|p| p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name))
-                            {
+                            if let Some(p) = table.get_function(fid).params.iter().find(|p| {
+                                p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name)
+                            }) {
                                 found_tys.push(Type(p.ty, false));
                             }
                         }
@@ -371,7 +370,7 @@ fn infer_member(
                     return Type::fn_(
                         FunctionType {
                             params: vec![crate::types::FunctionParam {
-                                name: Some(Rc::from("item")),
+                                name: Some(Arc::from("item")),
                                 ty: inner,
                                 optional: false,
                                 is_rest: false,
@@ -393,18 +392,23 @@ fn infer_member(
 /// Numeric result type of a binary op, from the shared rules in
 /// `varn_core::numeric`. `None` when the operands have no common numeric
 /// class — the caller picks its own fallback.
-pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
+pub(crate) fn numeric_binary_type(
+    op: BinaryOp,
+    l: &Type,
+    r: &Type,
+    table: &CheckerTyTable,
+) -> Option<Type> {
     use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
     let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
             TypeTag::Int
-                | TypeTag::I8
-                | TypeTag::I16
-                | TypeTag::I32
-                | TypeTag::U8
-                | TypeTag::U16
-                | TypeTag::U32
-                | TypeTag::U64,
+            | TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::U8
+            | TypeTag::U16
+            | TypeTag::U32
+            | TypeTag::U64,
         ) => Some(NumericOperand::Int),
         TypeKind::Intrinsic(TypeTag::Float | TypeTag::F32) => Some(NumericOperand::Float),
         TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
@@ -481,7 +485,9 @@ fn infer_new(
             .map(|i| i.resolve(*name).to_owned())
             .unwrap_or_default();
         let resolver = ctx.and_then(|c| c.resolver());
-        let origin = ctx.and_then(|c| c.source_file()).and_then(|s| resolver.map(|r| r.intern(s)));
+        let origin = ctx
+            .and_then(|c| c.source_file())
+            .and_then(|s| resolver.map(|r| r.intern(s)));
         if type_args.is_empty() {
             if name_str == varn_core::IntrinsicType::Map.as_str() {
                 return Type::generic_atom(*name, vec![Type::Dynamic], origin, table);
@@ -525,14 +531,14 @@ fn infer_object(
                 if matches!(key, PropKey::Computed(_)) {
                     let val_ty = infer_expr_type(value, arena, ctx, table);
                     members.push(ObjectTypeMember::Index {
-                        param_name: Rc::from("_key"),
+                        param_name: Arc::from("_key"),
                         key_ty: Type::Str.0,
                         value_ty: val_ty.0,
                     });
                     continue;
                 }
                 let name = match key {
-                    PropKey::Identifier(n) | PropKey::Str(n) => Rc::from(n.as_str()),
+                    PropKey::Identifier(n) | PropKey::Str(n) => Arc::from(n.as_str()),
                     _ => continue,
                 };
                 let ty = infer_expr_type(value, arena, ctx, table);
@@ -561,7 +567,7 @@ fn infer_object(
                 ..
             } => {
                 let name = match key {
-                    PropKey::Identifier(n) | PropKey::Str(n) => Rc::from(n.as_str()),
+                    PropKey::Identifier(n) | PropKey::Str(n) => Arc::from(n.as_str()),
                     _ => continue,
                 };
                 let ps = build_method_params(params, ctx, table);

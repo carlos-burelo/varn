@@ -3,7 +3,7 @@ mod parser;
 mod profile;
 mod stream;
 mod types;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[cfg(test)]
 use varn_lexer as _;
@@ -28,11 +28,11 @@ use varn_core::{
 /// parse is done owning it.
 pub fn parse(
     tokens: Vec<Token>,
-    lexeme_buf: Rc<[u8]>,
+    lexeme_buf: Arc<[u8]>,
     filename: &str,
     interner: varn_core::AtomInterner,
 ) -> Result<(Program, varn_core::AtomInterner, AstArena), varn_core::DiagnosticBag> {
-    let mut parser = Parser::new(tokens, lexeme_buf, Rc::from(filename), interner);
+    let mut parser = Parser::new(tokens, lexeme_buf, Arc::from(filename), interner);
     let program = parser.parse_program()?;
     let arena = std::mem::take(&mut parser.stream.arena);
     Ok((program, parser.stream.interner, arena))
@@ -40,11 +40,11 @@ pub fn parse(
 
 pub fn parse_with_profile(
     tokens: Vec<Token>,
-    lexeme_buf: Rc<[u8]>,
+    lexeme_buf: Arc<[u8]>,
     filename: &str,
     interner: varn_core::AtomInterner,
 ) -> Result<(Program, ParseProfile, varn_core::AtomInterner, AstArena), varn_core::DiagnosticBag> {
-    let mut parser = Parser::new(tokens, lexeme_buf, Rc::from(filename), interner);
+    let mut parser = Parser::new(tokens, lexeme_buf, Arc::from(filename), interner);
     let (program, profile) = parser.parse_program_with_profile()?;
     let arena = std::mem::take(&mut parser.stream.arena);
     Ok((program, profile, parser.stream.interner, arena))
@@ -55,13 +55,13 @@ pub fn parse_with_profile(
 /// between edits.
 pub fn parse_partial(
     tokens: Vec<Token>,
-    lexeme_buf: Rc<[u8]>,
+    lexeme_buf: Arc<[u8]>,
     filename: &str,
 ) -> (Program, varn_core::DiagnosticBag, AstArena) {
     let mut parser = Parser::new(
         tokens,
         lexeme_buf,
-        Rc::from(filename),
+        Arc::from(filename),
         varn_core::AtomInterner::new(),
     );
     let (program, diagnostics) = parser.parse_program_partial();

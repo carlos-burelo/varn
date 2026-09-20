@@ -3,7 +3,7 @@ use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
 use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionType, Type};
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{
     ClassMember, EnumDecl, ExprKind, FunctionDecl, Pattern, TypeAliasDecl, VarKind, VariableDecl,
 };
@@ -33,15 +33,13 @@ impl<'r> super::super::Binder<'r> {
                 })
                 .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
-                    d.init
-                        .map(|e| self.infer_expr_type_self(e))
-                        .map(|t| {
-                            if sym_kind == SymbolKind::Let && !has_explicit_ann {
-                                widen_literal(t)
-                            } else {
-                                t
-                            }
-                        })
+                    d.init.map(|e| self.infer_expr_type_self(e)).map(|t| {
+                        if sym_kind == SymbolKind::Let && !has_explicit_ann {
+                            widen_literal(t)
+                        } else {
+                            t
+                        }
+                    })
                 });
 
             let needs_enrich =
@@ -110,7 +108,7 @@ impl<'r> super::super::Binder<'r> {
             .params
             .iter()
             .map(|p| {
-                let name = Some(Rc::from(crate::binder::pattern_lead_name(
+                let name = Some(Arc::from(crate::binder::pattern_lead_name(
                     &p.pattern,
                     &self.interner,
                 )));
@@ -144,10 +142,7 @@ impl<'r> super::super::Binder<'r> {
             })
             .collect();
 
-        let declared_ret = f
-            .return_type
-            .as_ref()
-            .map(|ann| self.resolve_type(ann));
+        let declared_ret = f.return_type.as_ref().map(|ann| self.resolve_type(ann));
 
         let ret = if f.modifiers.is_generator {
             crate::types::generator_of(
@@ -173,7 +168,7 @@ impl<'r> super::super::Binder<'r> {
                 type_params: f
                     .type_params
                     .iter()
-                    .map(|t| Rc::from(self.interner.resolve(t.name)))
+                    .map(|t| Arc::from(self.interner.resolve(t.name)))
                     .collect(),
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -190,11 +185,7 @@ impl<'r> super::super::Binder<'r> {
         sym.type_param_constraints = f
             .type_params
             .iter()
-            .map(|t| {
-                t.constraint
-                    .as_ref()
-                    .map(|c| self.resolve_type(c))
-            })
+            .map(|t| t.constraint.as_ref().map(|c| self.resolve_type(c)))
             .collect();
 
         let sym_id = self.define(f.id, sym);
@@ -260,8 +251,7 @@ impl<'r> super::super::Binder<'r> {
         } else {
             self.resolve_type(&t.alias)
         };
-        let mut sym =
-            Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(ty);
+        let mut sym = Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(ty);
         sym.offset = t.range.start.offset;
         sym.col = t.range.start.column;
         sym.doc = t.doc.as_ref().map(|s| self.intern_local(s.as_str()));
@@ -274,10 +264,10 @@ impl<'r> super::super::Binder<'r> {
 
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
         let line = e.range.start.line;
-        let id_rc: Rc<str> = Rc::from(self.interner.resolve(e.id));
+        let id_rc: Arc<str> = Arc::from(self.interner.resolve(e.id));
         let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(Type::named_with_origin(
             id_rc.clone(),
-            Some(Rc::from(self.source_file.as_ref())),
+            Some(Arc::from(self.source_file.as_ref())),
             self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         ));
@@ -286,32 +276,28 @@ impl<'r> super::super::Binder<'r> {
         sym.type_param_constraints = e
             .type_params
             .iter()
-            .map(|t| {
-                t.constraint
-                    .as_ref()
-                    .map(|con| self.resolve_type(con))
-            })
+            .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
         self.define(e.id, sym);
 
         self.sum_type_variants.insert(
-            Rc::from(self.interner.resolve(e.id)),
+            Arc::from(self.interner.resolve(e.id)),
             e.members
                 .iter()
-                .map(|m| Rc::from(self.interner.resolve(m.id)))
+                .map(|m| Arc::from(self.interner.resolve(m.id)))
                 .collect(),
         );
 
         let mut variants_info = Vec::new();
 
         for member in e.members.iter() {
-            let member_id_rc: Rc<str> = Rc::from(self.interner.resolve(member.id));
-            let fields: Vec<(Rc<str>, Type)> = member
+            let member_id_rc: Arc<str> = Arc::from(self.interner.resolve(member.id));
+            let fields: Vec<(Arc<str>, Type)> = member
                 .payload_fields
                 .iter()
                 .map(|f| {
                     let ty = self.resolve_type(&f.ty);
-                    (Rc::from(self.interner.resolve(f.name)), ty)
+                    (Arc::from(self.interner.resolve(f.name)), ty)
                 })
                 .collect();
 
@@ -321,7 +307,11 @@ impl<'r> super::super::Binder<'r> {
                 .insert(member_id_rc.clone(), fields.clone());
 
             let variant_sym_id = if member.payload_fields.is_empty() {
-                let variant_ty = Type::named(id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let variant_ty = Type::named(
+                    id_rc.clone(),
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(variant_ty);
                 self.define(member.id, v_sym)
@@ -337,7 +327,7 @@ impl<'r> super::super::Binder<'r> {
                     .collect();
                 let ret_ty = Type::named_with_origin(
                     id_rc.clone(),
-                    Some(Rc::from(self.source_file.as_ref())),
+                    Some(Arc::from(self.source_file.as_ref())),
                     self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
@@ -365,7 +355,11 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named(id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                ty: Type::named(
+                    id_rc.clone(),
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ),
                 members: Vec::new(),
                 visibility: None,
                 is_abstract: false,
@@ -384,7 +378,7 @@ impl<'r> super::super::Binder<'r> {
 
         self.bind_type_params(&e.type_params, line);
 
-        let mut methods: rustc_hash::FxHashMap<Rc<str>, Type> = rustc_hash::FxHashMap::default();
+        let mut methods: rustc_hash::FxHashMap<Arc<str>, Type> = rustc_hash::FxHashMap::default();
         let mut members: Vec<ClassMemberInfo> = Vec::new();
 
         for member in &e.body {
@@ -492,7 +486,7 @@ impl<'r> super::super::Binder<'r> {
             offset: e.range.start.offset,
             ty: Type::named_with_origin(
                 id_rc.clone(),
-                Some(Rc::from(self.source_file.as_ref())),
+                Some(Arc::from(self.source_file.as_ref())),
                 self.resolver,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),

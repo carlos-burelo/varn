@@ -87,16 +87,16 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
             Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
             None => ("", name_part),
         };
-        let fields: Vec<std::rc::Rc<str>> = if fields_part.is_empty() {
+        let fields: Vec<std::sync::Arc<str>> = if fields_part.is_empty() {
             vec![]
         } else {
-            fields_part.split(',').map(std::rc::Rc::from).collect()
+            fields_part.split(',').map(std::sync::Arc::from).collect()
         };
 
         let variant =
             varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
-                enum_name: std::rc::Rc::from(enum_name_str),
-                variant_name: std::rc::Rc::from(variant_name_str),
+                enum_name: std::sync::Arc::from(enum_name_str),
+                variant_name: std::sync::Arc::from(variant_name_str),
                 variant_tag: tag,
                 fields,
                 payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),

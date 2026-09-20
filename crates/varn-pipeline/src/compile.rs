@@ -30,9 +30,9 @@ pub fn compile(
 
     let exports =
         crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]));
-    let mut export_names: Vec<std::rc::Rc<str>> = exports
+    let mut export_names: Vec<std::sync::Arc<str>> = exports
         .keys()
-        .map(|k| std::rc::Rc::from(k.as_str()))
+        .map(|k| std::sync::Arc::from(k.as_str()))
         .collect();
     export_names.sort();
 

@@ -3,7 +3,7 @@ use crate::checker::Checker;
 use crate::symbol::SymbolKind;
 use crate::types::{CheckerTyTable, FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ast::{Arg, ArrowBody, ExprId, ExprKind, Param, StmtId, StmtKind, TypeNode};
 use varn_core::TypeKind;
 
@@ -14,8 +14,8 @@ pub(crate) fn build_call_mapping(
     ft: &FunctionType,
     checker: &mut Checker,
     bind: &BindResult,
-) -> FxHashMap<Rc<str>, Type> {
-    let fn_type_params: Vec<Rc<str>> = if !ft.type_params.is_empty() {
+) -> FxHashMap<Arc<str>, Type> {
+    let fn_type_params: Vec<Arc<str>> = if !ft.type_params.is_empty() {
         ft.type_params.clone()
     } else if let ExprKind::Identifier { name } = &checker.ast_arena.expr(callee).kind {
         checker.symbol_type_params(bind.interner.resolve(*name), SymbolKind::Function, bind)
@@ -49,12 +49,12 @@ pub(crate) fn build_call_mapping(
 }
 
 pub(crate) fn infer_mapping_from_args(
-    type_params: &[Rc<str>],
+    type_params: &[Arc<str>],
     param_types: &[FunctionParam],
     args: &[Arg],
     checker: &mut Checker,
     bind: &BindResult,
-) -> FxHashMap<Rc<str>, Type> {
+) -> FxHashMap<Arc<str>, Type> {
     let mut mapping = FxHashMap::default();
 
     for (param, arg) in param_types.iter().zip(args.iter()) {
@@ -101,7 +101,9 @@ pub(crate) fn infer_mapping_from_args(
                 let mapped_kind = checker.ty_table.get(mapped_param_ty.0);
                 if let TypeKind::Fn(fid) = mapped_kind {
                     let expected_fn = checker.ty_table.get_function(fid).clone();
-                    if let Some(concrete) = infer_arrow_with_context(*e, &expected_fn, checker, bind) {
+                    if let Some(concrete) =
+                        infer_arrow_with_context(*e, &expected_fn, checker, bind)
+                    {
                         collect_type_inferences(
                             &Type(param.ty, false),
                             &concrete,
@@ -155,7 +157,7 @@ fn infer_arrow_with_context(
             .map(|m| checker.resolve_type_node_cached(m, bind));
 
         actual_params.push(FunctionParam {
-            name: Some(Rc::from(pattern_lead_name(&ap.pattern, &bind.interner))),
+            name: Some(Arc::from(pattern_lead_name(&ap.pattern, &bind.interner))),
             ty: explicit_ty.map(|t| t.0).unwrap_or(ep.ty),
             optional: ap.is_optional,
             is_rest: ap.is_rest,
@@ -215,7 +217,10 @@ fn infer_arrow_with_context(
             } else if returns.len() == 1 {
                 returns.pop().expect("returns len==1 but pop failed")
             } else {
-                Type::union(returns, &mut *std::sync::Arc::make_mut(&mut checker.ty_table))
+                Type::union(
+                    returns,
+                    &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
+                )
             }
         }
     };
@@ -308,15 +313,17 @@ fn collect_returns(stmt: StmtId, out: &mut Vec<Type>, checker: &mut Checker, bin
 pub(crate) fn collect_type_inferences(
     expected: &Type,
     actual: &Type,
-    params: &[Rc<str>],
-    out: &mut FxHashMap<Rc<str>, Type>,
+    params: &[Arc<str>],
+    out: &mut FxHashMap<Arc<str>, Type>,
     table: &mut CheckerTyTable,
     interner: &varn_core::AtomInterner,
 ) {
     let expected_kind = table.get(expected.0);
     match expected_kind {
-        TypeKind::Named(name, _origin) if params.iter().any(|p| p.as_ref() == interner.resolve(name)) => {
-            let name_rc: Rc<str> = Rc::from(interner.resolve(name));
+        TypeKind::Named(name, _origin)
+            if params.iter().any(|p| p.as_ref() == interner.resolve(name)) =>
+        {
+            let name_rc: Arc<str> = Arc::from(interner.resolve(name));
             let entry = out.entry(name_rc).or_insert(*actual);
             if entry != actual {
                 *entry = Type::union(vec![*entry, *actual], table);
@@ -401,7 +408,7 @@ fn is_generic_possible(ty: &Type, table: &CheckerTyTable) -> bool {
 pub(crate) fn map_generics_cached(
     checker: &mut Checker,
     base: &Type,
-    mapping: &FxHashMap<Rc<str>, Type>,
+    mapping: &FxHashMap<Arc<str>, Type>,
 ) -> Type {
     if mapping.is_empty() || !is_generic_possible(base, &checker.ty_table) {
         return *base;
@@ -423,7 +430,7 @@ pub(crate) fn map_generics_cached(
     }
 
     let sorted_args: Vec<Type> = {
-        let mut pairs: Vec<(&Rc<str>, &Type)> = mapping.iter().collect();
+        let mut pairs: Vec<(&Arc<str>, &Type)> = mapping.iter().collect();
         pairs.sort_by_key(|(a, _)| a.clone());
         pairs.into_iter().map(|(_, v)| *v).collect()
     };
@@ -431,7 +438,10 @@ pub(crate) fn map_generics_cached(
     if let Some(cached) = checker.map_generics_cache.get(&key) {
         return *cached;
     }
-    let result = base.map_generics(&atom_mapping, &mut *std::sync::Arc::make_mut(&mut checker.ty_table));
+    let result = base.map_generics(
+        &atom_mapping,
+        &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
+    );
     checker.map_generics_cache.insert(key, result);
     result
 }

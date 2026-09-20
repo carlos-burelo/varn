@@ -3,6 +3,7 @@ use super::structs::Heap;
 use crate::value::VmValue;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::sync::Arc;
 use varn_types::{value::MapKey, ClassObj, NativeCtx, NativeFn, ResourceStore, Value};
 
 impl NativeCtx for Heap {
@@ -78,10 +79,10 @@ impl NativeCtx for Heap {
         self.deref().str_owned(v)
     }
 
-    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
+    fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
         if v.is_sso() {
             let mut buf = [0u8; 5];
-            return Some(std::rc::Rc::from(v.sso_as_str(&mut buf)));
+            return Some(std::sync::Arc::from(v.sso_as_str(&mut buf)));
         }
         if v.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get_by_idx(v.as_heap_idx()) {
@@ -175,7 +176,7 @@ impl NativeCtx for Heap {
         if obj.is_heap() {
             let raw_idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
-                o.set_field_nv(Rc::from(key), val);
+                o.set_field_nv(Arc::from(key), val);
                 self.write_barrier(raw_idx, val);
             } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
                 if let Some(s) = m.export_map.get(key).copied() {
@@ -184,7 +185,7 @@ impl NativeCtx for Heap {
                     let m = Rc::make_mut(m);
                     let slot = m.exports.len();
                     m.exports.push(val);
-                    m.export_map.insert(Rc::from(key), slot);
+                    m.export_map.insert(Arc::from(key), slot);
                 }
                 self.write_barrier(raw_idx, val);
             }

@@ -47,8 +47,7 @@ fn imported_symbol_origin_module_resolves_to_the_real_module_path() {
     let lib_path = dir.join("lib.vn");
     let main_path = dir.join("main.vn");
 
-    fs::write(&lib_path, "export function greet(): int {\n  return 1\n}\n")
-        .expect("write lib.vn");
+    fs::write(&lib_path, "export function greet(): int {\n  return 1\n}\n").expect("write lib.vn");
     // A namespace import (`* as lib`), not a named import: `binder/imports.rs`
     // sets a namespace symbol's `origin_module` straight from
     // `self.interner.intern(module_path)` on the *importer's* own binder — no

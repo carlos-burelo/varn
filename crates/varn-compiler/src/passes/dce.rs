@@ -1,7 +1,7 @@
+use super::cfg::{dominates, dominators};
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
-use super::cfg::{dominates, dominators};
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -365,7 +365,10 @@ fn get_incoming_args(func: &SsaFunc, block: BlockId, pos: usize) -> Option<Vec<V
     preds.dedup();
     for pred in preds {
         match &func.blocks[pred.0 as usize].term {
-            Terminator::Jump { target, args: j_args } => {
+            Terminator::Jump {
+                target,
+                args: j_args,
+            } => {
                 if *target == block {
                     if let Some(&arg) = j_args.get(pos) {
                         args.push(arg);
@@ -432,7 +435,6 @@ fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
         }
     }
 }
-
 
 fn add_inst_uses(kind: &InstKind, used: &mut FxHashSet<Value>) {
     used.extend(crate::ssa::verify::inst_uses(kind));

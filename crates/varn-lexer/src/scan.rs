@@ -5,7 +5,7 @@ pub fn scan(
     filename: &str,
 ) -> (
     Vec<varn_core::Token>,
-    std::rc::Rc<[u8]>,
+    std::sync::Arc<[u8]>,
     Vec<varn_core::Diagnostic>,
 ) {
     let (tokens, buf, diags, _) =
@@ -23,7 +23,7 @@ pub fn scan_with_trivia(
     filename: &str,
 ) -> (
     Vec<varn_core::Token>,
-    std::rc::Rc<[u8]>,
+    std::sync::Arc<[u8]>,
     Vec<varn_core::Diagnostic>,
     Vec<varn_core::Trivia>,
 ) {
@@ -71,7 +71,7 @@ pub fn scan_with_config(
     config: crate::scanner::LexerConfig,
 ) -> (
     Vec<varn_core::Token>,
-    std::rc::Rc<[u8]>,
+    std::sync::Arc<[u8]>,
     Vec<varn_core::Diagnostic>,
 ) {
     let (tokens, buf, diags, _) = scan_inner(source, filename, config);
@@ -84,7 +84,7 @@ fn scan_inner(
     config: crate::scanner::LexerConfig,
 ) -> (
     Vec<varn_core::Token>,
-    std::rc::Rc<[u8]>,
+    std::sync::Arc<[u8]>,
     Vec<varn_core::Diagnostic>,
     Vec<varn_core::Trivia>,
 ) {
@@ -130,6 +130,6 @@ fn scan_inner(
         })
         .collect();
 
-    let rc_buf: std::rc::Rc<[u8]> = lexeme_buf.into();
+    let rc_buf: std::sync::Arc<[u8]> = lexeme_buf.into();
     (tokens, rc_buf, diagnostics, trivia)
 }

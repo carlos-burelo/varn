@@ -358,4 +358,3 @@ fn set_bit(bits: &mut [u64], i: usize) {
 pub(crate) fn dominates(dom: &[Vec<u64>], a: usize, b: usize) -> bool {
     (dom[b][a / 64] >> (a % 64)) & 1 == 1
 }
-

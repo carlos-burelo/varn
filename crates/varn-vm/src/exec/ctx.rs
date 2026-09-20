@@ -424,10 +424,12 @@ impl ExecCtx {
         // pero desaparecía del heap: el primer `heap.get` posterior a un
         // minor GC con ese índice devolvía `None` — "invalid heap index" en
         // la siguiente llamada a una función de nivel de módulo.
-        self.heap.minor_gc(&mut all_vals[..], &mut self.stack.refs, &[]);
+        self.heap
+            .minor_gc(&mut all_vals[..], &mut self.stack.refs, &[]);
 
         self.stack.dyn_.copy_from_slice(&all_vals[..dyn_len]);
-        self.stage.copy_from_slice(&all_vals[stage_start..globals_start]);
+        self.stage
+            .copy_from_slice(&all_vals[stage_start..globals_start]);
 
         let globals_slice = &all_vals[globals_start..modules_start];
         self.globals.values.copy_from_slice(globals_slice);

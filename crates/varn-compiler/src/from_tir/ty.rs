@@ -87,7 +87,7 @@ fn resolve(id: varn_tir::TyId, tir: &TirModule, out: &mut SsaTyTable) -> HirType
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::rc::Rc;
+    use std::sync::Arc;
     use varn_tir::{
         BackendTy as B, ClassInfo, DynReason, Signature, TirFunction, TirModule, TyTable,
     };
@@ -96,11 +96,11 @@ mod tests {
         let mut types = TyTable::default();
         let _ = types.intern(B::Never);
         TirModule {
-            source_file: Rc::from("t.vn"),
+            source_file: Arc::from("t.vn"),
             imports: vec![],
             exports: vec![],
             types,
-            classes: vec![ClassInfo::new(Rc::from("Point"), None, vec![])],
+            classes: vec![ClassInfo::new(Arc::from("Point"), None, vec![])],
             enums: vec![],
             signatures: vec![Signature {
                 params: vec![],
@@ -111,7 +111,7 @@ mod tests {
             global_names: vec![],
             class_defs: vec![],
             top_level: TirFunction {
-                name: Rc::from("<module>"),
+                name: Arc::from("<module>"),
                 sig: varn_tir::SigId(0),
                 params: vec![],
                 return_ty: B::Void,

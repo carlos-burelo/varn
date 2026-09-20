@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
@@ -30,7 +30,12 @@ impl<'r> Checker<'r> {
                             let init_ty = self.infer_type(init_expr, bind);
                             let is_empty_array = init_ty.is_dynamic()
                                 && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
-                            let is_compatible = self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind));
+                            let is_compatible = self.value_assignable_to(
+                                ann_ty,
+                                &init_ty,
+                                Some(init_expr),
+                                Some(bind),
+                            );
                             if !is_empty_array && !is_compatible {
                                 let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                                 let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
@@ -69,17 +74,14 @@ impl<'r> Checker<'r> {
 
             Decl::Function(f) => {
                 let saved_expected = self.expected_return_type.take();
-                self.expected_return_type = f
-                    .return_type
-                    .as_ref()
-                    .map(|rt| {
-                        let ty = self.resolve_type_node_cached(rt, bind);
-                        if f.modifiers.is_async {
-                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
-                        } else {
-                            ty
-                        }
-                    });
+                self.expected_return_type = f.return_type.as_ref().map(|rt| {
+                    let ty = self.resolve_type_node_cached(rt, bind);
+                    if f.modifiers.is_async {
+                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                    } else {
+                        ty
+                    }
+                });
 
                 let saved_scope = self.current_scope;
                 let next_scope = self.next_child_scope(bind);
@@ -89,7 +91,7 @@ impl<'r> Checker<'r> {
                 }
                 let mut injected_tps = Vec::new();
                 for tp in &f.type_params {
-                    let tp_name: Rc<str> = Rc::from(bind.interner.resolve(tp.name));
+                    let tp_name: Arc<str> = Arc::from(bind.interner.resolve(tp.name));
                     self.active_type_params.insert(tp_name.clone());
                     injected_tps.push(tp_name);
                 }
@@ -139,7 +141,10 @@ impl<'r> Checker<'r> {
                                     );
                                     let mut ft = self.ty_table.get_function(fid).clone();
                                     ft.return_type = new_ret.0;
-                                    let new_fn_ty = Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                                    let new_fn_ty = Type::fn_(
+                                        ft,
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                    );
                                     self.symbol_types.insert(sym_id, new_fn_ty);
                                     self.record_type_with_symbol(f.id_offset, new_fn_ty, sym_id);
                                 }
@@ -160,13 +165,12 @@ impl<'r> Checker<'r> {
                 if c.modifiers.is_abstract {
                     if let Some(id) = &c.id {
                         self.abstract_classes
-                            .insert(Rc::from(bind.interner.resolve(*id)));
+                            .insert(Arc::from(bind.interner.resolve(*id)));
                     }
                 }
-                let name = c
-                    .id
-                    .map(|id| Rc::from(bind.interner.resolve(id)))
-                    .unwrap_or_else(|| Rc::from("<anon>"));
+                let name =
+                    c.id.map(|id| Arc::from(bind.interner.resolve(id)))
+                        .unwrap_or_else(|| Arc::from("<anon>"));
                 let saved_class = self.current_class.replace(name);
                 let saved_scope = self.current_scope;
                 if let Some(cls_scope) = self.next_child_scope(bind) {
@@ -174,10 +178,9 @@ impl<'r> Checker<'r> {
                 }
 
                 let mut superclass_members = Vec::new();
-                let mut parent = c
-                    .id
-                    .as_ref()
-                    .and_then(|cls_id| bind.class_parents.get(bind.interner.resolve(*cls_id)));
+                let mut parent =
+                    c.id.as_ref()
+                        .and_then(|cls_id| bind.class_parents.get(bind.interner.resolve(*cls_id)));
                 while let Some(parent_name) = parent {
                     if let Some(m) = bind.get_class_entry(parent_name).map(|e| e.members.clone()) {
                         superclass_members.extend(m);
@@ -208,8 +211,7 @@ impl<'r> Checker<'r> {
                             let is_override = modifiers.is_override;
                             let key_str = bind.interner.resolve(*key);
                             let exists_in_superclass = superclass_members.iter().any(|m| {
-                                m.name.as_ref() == key_str
-                                    && m.kind != ClassMemberKind::Constructor
+                                m.name.as_ref() == key_str && m.kind != ClassMemberKind::Constructor
                             });
                             if exists_in_superclass {
                                 if !is_override {
@@ -292,16 +294,14 @@ impl<'r> Checker<'r> {
                         } => {
                             let body = *body;
                             let saved_expected = self.expected_return_type.take();
-                            self.expected_return_type = return_type
-                                .as_ref()
-                                .map(|rt| {
-                                    let ty = self.resolve_type_node_cached(rt, bind);
-                                    if modifiers.is_async {
-                                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
-                                    } else {
-                                        ty
-                                    }
-                                });
+                            self.expected_return_type = return_type.as_ref().map(|rt| {
+                                let ty = self.resolve_type_node_cached(rt, bind);
+                                if modifiers.is_async {
+                                    crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                                } else {
+                                    ty
+                                }
+                            });
 
                             let saved_in_function = self.in_function;
                             self.in_function = true;
@@ -385,7 +385,7 @@ impl<'r> Checker<'r> {
             Decl::Enum(e) => {
                 let saved_class = self
                     .current_class
-                    .replace(Rc::from(bind.interner.resolve(e.id)));
+                    .replace(Arc::from(bind.interner.resolve(e.id)));
                 let saved_scope = self.current_scope;
                 if let Some(enum_scope) = self.next_child_scope(bind) {
                     self.current_scope = enum_scope;
@@ -443,7 +443,7 @@ impl<'r> Checker<'r> {
 
                                 for tp in type_params {
                                     self.active_type_params
-                                        .insert(Rc::from(bind.interner.resolve(tp.name)));
+                                        .insert(Arc::from(bind.interner.resolve(tp.name)));
                                 }
 
                                 let saved_in_function = self.in_function;
@@ -454,7 +454,8 @@ impl<'r> Checker<'r> {
                                 self.in_function = saved_in_function;
 
                                 for tp in type_params {
-                                    self.active_type_params.remove(bind.interner.resolve(tp.name));
+                                    self.active_type_params
+                                        .remove(bind.interner.resolve(tp.name));
                                 }
 
                                 self.expected_return_type = saved_expected;
@@ -517,9 +518,8 @@ impl<'r> Checker<'r> {
                                             .map(|e| e.members.clone())
                                         {
                                             let key_str = bind.interner.resolve(*key);
-                                            if let Some(m) = members
-                                                .iter()
-                                                .find(|m| m.name.as_ref() == key_str)
+                                            if let Some(m) =
+                                                members.iter().find(|m| m.name.as_ref() == key_str)
                                             {
                                                 param_ty = m.ty.clone();
                                             }
@@ -578,7 +578,7 @@ impl<'r> Checker<'r> {
                 let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
                 let ext_class_name = match self.ty_table.get(ext_self_ty.0) {
                     TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
-                        Some(Rc::from(bind.interner.resolve(n)))
+                        Some(Arc::from(bind.interner.resolve(n)))
                     }
 
                     TypeKind::Intrinsic(tag)
@@ -590,29 +590,28 @@ impl<'r> Checker<'r> {
                 };
                 let saved_class = self
                     .current_class
-                    .replace(ext_class_name.unwrap_or_else(|| Rc::from("_")));
+                    .replace(ext_class_name.unwrap_or_else(|| Arc::from("_")));
 
                 for member in &ext.members {
                     let saved_expected = self.expected_return_type.take();
                     match member {
                         ExtensionMember::Method(method) => {
-                            self.expected_return_type = method
-                                .return_type
-                                .as_ref()
-                                .map(|rt| {
-                                    let ty = self.resolve_type_node_cached(rt, bind);
-                                    if method.modifiers.is_async {
-                                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
-                                    } else {
-                                        ty
-                                    }
-                                });
+                            self.expected_return_type = method.return_type.as_ref().map(|rt| {
+                                let ty = self.resolve_type_node_cached(rt, bind);
+                                if method.modifiers.is_async {
+                                    crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                                } else {
+                                    ty
+                                }
+                            });
                             let saved_in_function = self.in_function;
                             self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope(self.ast_arena.stmt(method.body).range.start.offset);
+                                self.record_scope(
+                                    self.ast_arena.stmt(method.body).range.start.offset,
+                                );
                             }
                             self.check_stmt(method.body, bind);
                             self.current_scope = saved_scope;

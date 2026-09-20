@@ -4,8 +4,8 @@ use crate::types::Type;
 use varn_core::TypeKind;
 
 type VariantSubst = (
-    Vec<(std::rc::Rc<str>, Type)>,
-    rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
+    Vec<(std::sync::Arc<str>, Type)>,
+    rustc_hash::FxHashMap<std::sync::Arc<str>, Type>,
 );
 
 impl<'r> Checker<'r> {
@@ -155,20 +155,27 @@ impl<'r> Checker<'r> {
         value_ty: &Type,
         bind: &BindResult,
     ) -> Option<VariantSubst> {
-        let (parent, args, origin): (Option<std::rc::Rc<str>>, Vec<Type>, Option<std::rc::Rc<str>>) =
-            match self.ty_table.get(value_ty.0) {
-                TypeKind::Generic(n, a, o) => (
-                    Some(std::rc::Rc::from(bind.interner.resolve(n))),
-                    self.ty_table.get_list(a).iter().map(|id| Type(*id, false)).collect(),
-                    o.map(|o| std::rc::Rc::from(bind.interner.resolve(o))),
-                ),
-                TypeKind::Named(n, o) => (
-                    Some(std::rc::Rc::from(bind.interner.resolve(n))),
-                    Vec::new(),
-                    o.map(|o| std::rc::Rc::from(bind.interner.resolve(o))),
-                ),
-                _ => (None, Vec::new(), None),
-            };
+        let (parent, args, origin): (
+            Option<std::sync::Arc<str>>,
+            Vec<Type>,
+            Option<std::sync::Arc<str>>,
+        ) = match self.ty_table.get(value_ty.0) {
+            TypeKind::Generic(n, a, o) => (
+                Some(std::sync::Arc::from(bind.interner.resolve(n))),
+                self.ty_table
+                    .get_list(a)
+                    .iter()
+                    .map(|id| Type(*id, false))
+                    .collect(),
+                o.map(|o| std::sync::Arc::from(bind.interner.resolve(o))),
+            ),
+            TypeKind::Named(n, o) => (
+                Some(std::sync::Arc::from(bind.interner.resolve(n))),
+                Vec::new(),
+                o.map(|o| std::sync::Arc::from(bind.interner.resolve(o))),
+            ),
+            _ => (None, Vec::new(), None),
+        };
 
         // Fields: this module first, then the module that defines the type.
         let mut fields = bind.sum_variant_fields.get(variant).cloned();
@@ -197,13 +204,15 @@ impl<'r> Checker<'r> {
                         params = db
                             .interner
                             .get(p.as_ref())
-                            .and_then(|atom| db.scopes.get(db.global_scope).resolve(atom, &db.scopes))
+                            .and_then(|atom| {
+                                db.scopes.get(db.global_scope).resolve(atom, &db.scopes)
+                            })
                             .map(|sid| {
                                 db.arena
                                     .get(sid)
                                     .type_params
                                     .iter()
-                                    .map(|a| std::rc::Rc::from(db.interner.resolve(*a)))
+                                    .map(|a| std::sync::Arc::from(db.interner.resolve(*a)))
                                     .collect()
                             })
                             .unwrap_or_default();

@@ -475,7 +475,10 @@ impl ExecCtx {
                     let b = self.stack.box_reg(base, r2);
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => w!(first_reg, VmValue::from_f64(av + bv)),
-                        None => { let r = arith::add(a, b, &mut self.heap)?; w!(first_reg, r); }
+                        None => {
+                            let r = arith::add(a, b, &mut self.heap)?;
+                            w!(first_reg, r);
+                        }
                     };
                 }
             }
@@ -490,7 +493,10 @@ impl ExecCtx {
                     let b = self.stack.box_reg(base, r2);
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => w!(first_reg, VmValue::from_f64(av - bv)),
-                        None => { let r = arith::sub(a, b, &mut self.heap)?; w!(first_reg, r); }
+                        None => {
+                            let r = arith::sub(a, b, &mut self.heap)?;
+                            w!(first_reg, r);
+                        }
                     };
                 }
             }
@@ -505,7 +511,10 @@ impl ExecCtx {
                     let b = self.stack.box_reg(base, r2);
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => w!(first_reg, VmValue::from_f64(av * bv)),
-                        None => { let r = arith::mul(a, b, &mut self.heap)?; w!(first_reg, r); }
+                        None => {
+                            let r = arith::mul(a, b, &mut self.heap)?;
+                            w!(first_reg, r);
+                        }
                     };
                 }
             }
@@ -528,7 +537,10 @@ impl ExecCtx {
                             }
                             w!(first_reg, VmValue::from_f64(av / bv));
                         }
-                        None => { let r = arith::div(a, b, &mut self.heap)?; w!(first_reg, r); }
+                        None => {
+                            let r = arith::div(a, b, &mut self.heap)?;
+                            w!(first_reg, r);
+                        }
                     };
                 }
             }
@@ -551,7 +563,10 @@ impl ExecCtx {
                             }
                             w!(first_reg, VmValue::from_f64(av % bv));
                         }
-                        None => { let r = arith::modulo(a, b, &mut self.heap)?; w!(first_reg, r); }
+                        None => {
+                            let r = arith::modulo(a, b, &mut self.heap)?;
+                            w!(first_reg, r);
+                        }
                     };
                 }
             }
@@ -721,23 +736,38 @@ impl ExecCtx {
             }
             OpCode::Neq => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack, base);
-                w!(first_reg, VmValue::from_bool(compare::neq(a, b, &self.heap)));
+                w!(
+                    first_reg,
+                    VmValue::from_bool(compare::neq(a, b, &self.heap))
+                );
             }
             OpCode::Lt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack, base);
-                w!(first_reg, VmValue::from_bool(compare::lt_heap(a, b, &self.heap)));
+                w!(
+                    first_reg,
+                    VmValue::from_bool(compare::lt_heap(a, b, &self.heap))
+                );
             }
             OpCode::Lte => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack, base);
-                w!(first_reg, VmValue::from_bool(compare::lte_heap(a, b, &self.heap)));
+                w!(
+                    first_reg,
+                    VmValue::from_bool(compare::lte_heap(a, b, &self.heap))
+                );
             }
             OpCode::Gt => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack, base);
-                w!(first_reg, VmValue::from_bool(compare::gt_heap(a, b, &self.heap)));
+                w!(
+                    first_reg,
+                    VmValue::from_bool(compare::gt_heap(a, b, &self.heap))
+                );
             }
             OpCode::Gte => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack, base);
-                w!(first_reg, VmValue::from_bool(compare::gte_heap(a, b, &self.heap)));
+                w!(
+                    first_reg,
+                    VmValue::from_bool(compare::gte_heap(a, b, &self.heap))
+                );
             }
 
             // String operations

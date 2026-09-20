@@ -97,7 +97,8 @@ impl ExecCtx {
                     None
                 };
                 if let (Some(s), Some(p)) = (s_opt, p_opt) {
-                    self.stack.unbox_into_reg(base, dest, VmValue::from_bool(s.starts_with(p)))?;
+                    self.stack
+                        .unbox_into_reg(base, dest, VmValue::from_bool(s.starts_with(p)))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
@@ -128,7 +129,8 @@ impl ExecCtx {
                     None
                 };
                 if let (Some(s), Some(p)) = (s_opt, p_opt) {
-                    self.stack.unbox_into_reg(base, dest, VmValue::from_bool(s.ends_with(p)))?;
+                    self.stack
+                        .unbox_into_reg(base, dest, VmValue::from_bool(s.ends_with(p)))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
@@ -170,7 +172,8 @@ impl ExecCtx {
                     } else {
                         -1
                     };
-                    self.stack.unbox_into_reg(base, dest, VmValue::from_int(idx))?;
+                    self.stack
+                        .unbox_into_reg(base, dest, VmValue::from_int(idx))?;
                     self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
@@ -618,9 +621,10 @@ impl ExecCtx {
                 } else {
                     vec![]
                 };
-                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
-                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                ));
+                let rest_nv = VmValue::from_heap_idx(
+                    self.heap
+                        .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+                );
                 if let Err(e) = self.stack.unbox_into_reg(alloc, 1 + rest_idx, rest_nv) {
                     failed = Some(e);
                 }

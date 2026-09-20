@@ -10,10 +10,8 @@
 //! módulos) y Ley 3 (una tabla, un dueño).
 
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
-use varn_checker::types::{
-    CheckerTyId, CheckerTyTable, ObjectTypeMember, Type,
-};
+use std::sync::Arc;
+use varn_checker::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
 use varn_core::{AtomInterner, TypeKind, TypeTag};
 
 // ── Seeding intrínseco ────────────────────────────────────────────────────
@@ -26,7 +24,10 @@ fn intrinsic_ids_are_fixed_and_portable() {
     assert_eq!(t.get(CheckerTyId::INT), TypeKind::Intrinsic(TypeTag::Int));
     assert_eq!(t.get(CheckerTyId::STR), TypeKind::Intrinsic(TypeTag::Str));
     assert_eq!(t.get(CheckerTyId::BOOL), TypeKind::Intrinsic(TypeTag::Bool));
-    assert_eq!(t.get(CheckerTyId::FLOAT), TypeKind::Intrinsic(TypeTag::Float));
+    assert_eq!(
+        t.get(CheckerTyId::FLOAT),
+        TypeKind::Intrinsic(TypeTag::Float)
+    );
     assert_eq!(
         t.get(CheckerTyId::DYNAMIC),
         TypeKind::Intrinsic(TypeTag::Dynamic)
@@ -43,7 +44,11 @@ fn non_intrinsic_ids_are_not_portable() {
     let mut t = CheckerTyTable::new();
     let seeded = t.len();
     let id = t.intern(TypeKind::Array(CheckerTyId::INT));
-    assert_eq!(id.index() as usize, seeded, "el primer id de usuario va justo después del seeding");
+    assert_eq!(
+        id.index() as usize,
+        seeded,
+        "el primer id de usuario va justo después del seeding"
+    );
     assert!(!id.is_portable());
 }
 
@@ -51,7 +56,10 @@ fn non_intrinsic_ids_are_not_portable() {
 #[test]
 fn sanitize_foreign_keeps_intrinsics_and_degrades_the_rest() {
     assert_eq!(CheckerTyId::STR.sanitize_foreign(), CheckerTyId::STR);
-    assert_eq!(CheckerTyId::DYNAMIC.sanitize_foreign(), CheckerTyId::DYNAMIC);
+    assert_eq!(
+        CheckerTyId::DYNAMIC.sanitize_foreign(),
+        CheckerTyId::DYNAMIC
+    );
 
     let mut t = CheckerTyTable::new();
     let foreign = t.intern(TypeKind::Array(CheckerTyId::INT));
@@ -98,8 +106,14 @@ fn divergent_tables_share_an_index_but_not_its_meaning() {
     assert_eq!(a.len(), b.len(), "misma longitud...");
     assert_eq!(named.index(), union.index(), "...y mismo índice...");
 
-    assert!(matches!(a.get(named), TypeKind::Named(_, _)), "...pero A dice Named");
-    assert!(matches!(b.get(union), TypeKind::Union(_)), "...y B dice Union");
+    assert!(
+        matches!(a.get(named), TypeKind::Named(_, _)),
+        "...pero A dice Named"
+    );
+    assert!(
+        matches!(b.get(union), TypeKind::Union(_)),
+        "...y B dice Union"
+    );
 }
 
 // ── reintern: traducir una forma foránea a la tabla propia ────────────────
@@ -149,7 +163,10 @@ fn reintern_does_not_touch_the_source_table() {
     let translated = local.reintern(&foreign, array, &mut cache);
 
     assert_eq!(foreign.len(), before, "la tabla foránea queda intacta");
-    assert!(local.len() > local_before, "la forma se internó en la local");
+    assert!(
+        local.len() > local_before,
+        "la forma se internó en la local"
+    );
     assert!(matches!(local.get(translated), TypeKind::Array(_)));
 }
 
@@ -159,13 +176,13 @@ fn reintern_translates_object_members() {
     let mut foreign = CheckerTyTable::new();
     let members = foreign.intern_object_members(vec![
         ObjectTypeMember::Property {
-            name: Rc::from("ok"),
+            name: Arc::from("ok"),
             ty: CheckerTyId::BOOL,
             optional: false,
             readonly: false,
         },
         ObjectTypeMember::Index {
-            param_name: Rc::from("k"),
+            param_name: Arc::from("k"),
             key_ty: CheckerTyId::STR,
             value_ty: CheckerTyId::INT,
         },
@@ -185,7 +202,10 @@ fn reintern_translates_object_members() {
     };
     assert_eq!(name.as_ref(), "ok");
     assert_eq!(*ty, CheckerTyId::BOOL);
-    let ObjectTypeMember::Index { key_ty, value_ty, .. } = &local_members[1] else {
+    let ObjectTypeMember::Index {
+        key_ty, value_ty, ..
+    } = &local_members[1]
+    else {
         panic!("segundo miembro es Index");
     };
     assert_eq!(*key_ty, CheckerTyId::STR);
@@ -249,7 +269,10 @@ fn cloned_tables_keep_the_live_table_as_prefix_until_they_diverge() {
     // `live` crece: sigue teniendo al snapshot como prefijo.
     let b = live.intern(TypeKind::Array(CheckerTyId::STR));
     assert!(live.has_prefix(&snapshot));
-    assert!(!snapshot.has_prefix(&live), "el snapshot NO ve el crecimiento");
+    assert!(
+        !snapshot.has_prefix(&live),
+        "el snapshot NO ve el crecimiento"
+    );
 
     // `absorb` restaura la relación: el snapshot aprende lo que le faltaba sin
     // repuntar sus propios ids.

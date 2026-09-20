@@ -109,7 +109,10 @@ impl FrameLayout {
 
     #[inline(always)]
     pub fn class_of(&self, reg: usize) -> SlotClass {
-        self.slots.get(reg).map(|(c, _)| *c).unwrap_or(SlotClass::Dyn)
+        self.slots
+            .get(reg)
+            .map(|(c, _)| *c)
+            .unwrap_or(SlotClass::Dyn)
     }
 
     #[inline(always)]
@@ -198,8 +201,7 @@ impl FrameStore {
             std::iter::repeat(REF_UNINIT).take(layout.counts[SlotClass::Ref.index()] as usize),
         );
         self.dyn_.extend(
-            std::iter::repeat(VmValue::null())
-                .take(layout.counts[SlotClass::Dyn.index()] as usize),
+            std::iter::repeat(VmValue::null()).take(layout.counts[SlotClass::Dyn.index()] as usize),
         );
         self.allocs.push(FrameAlloc { bases, layout });
         id
@@ -208,9 +210,12 @@ impl FrameStore {
     /// Libera la activación superior (disciplina LIFO, como antes).
     pub fn pop_frame(&mut self) {
         if let Some(alloc) = self.allocs.pop() {
-            self.gpr.truncate(alloc.bases[SlotClass::Gpr.index()] as usize);
-            self.fpr.truncate(alloc.bases[SlotClass::Fpr.index()] as usize);
-            self.refs.truncate(alloc.bases[SlotClass::Ref.index()] as usize);
+            self.gpr
+                .truncate(alloc.bases[SlotClass::Gpr.index()] as usize);
+            self.fpr
+                .truncate(alloc.bases[SlotClass::Fpr.index()] as usize);
+            self.refs
+                .truncate(alloc.bases[SlotClass::Ref.index()] as usize);
             self.dyn_
                 .truncate(alloc.bases[SlotClass::Dyn.index()] as usize);
         }
@@ -235,20 +240,15 @@ impl FrameStore {
             self.gpr.resize(bases[0] as usize + counts[0] as usize, 0);
         }
         if need(bases[1], counts[1], self.fpr.len()) {
-            self.fpr
-                .resize(bases[1] as usize + counts[1] as usize, 0.0);
+            self.fpr.resize(bases[1] as usize + counts[1] as usize, 0.0);
         }
         if need(bases[2], counts[2], self.refs.len()) {
-            self.refs.resize(
-                bases[2] as usize + counts[2] as usize,
-                REF_UNINIT,
-            );
+            self.refs
+                .resize(bases[2] as usize + counts[2] as usize, REF_UNINIT);
         }
         if need(bases[3], counts[3], self.dyn_.len()) {
-            self.dyn_.resize(
-                bases[3] as usize + counts[3] as usize,
-                VmValue::null(),
-            );
+            self.dyn_
+                .resize(bases[3] as usize + counts[3] as usize, VmValue::null());
         }
         let _ = register_count;
     }
@@ -432,7 +432,13 @@ impl FrameStore {
 
     /// Mueve entre activaciones (retornos, throws, staging de llamadas).
     #[inline(always)]
-    pub fn mov_cross(&mut self, dst_id: usize, dst: usize, src_id: usize, src: usize) -> VmResult<()> {
+    pub fn mov_cross(
+        &mut self,
+        dst_id: usize,
+        dst: usize,
+        src_id: usize,
+        src: usize,
+    ) -> VmResult<()> {
         let (sc, si) = self.slot(src_id, src);
         let (dc, di) = self.slot(dst_id, dst);
         if sc == dc {
@@ -561,7 +567,11 @@ impl FrameStore {
                 SlotClass::Gpr => self.gpr[i] = if v.is_int() { v.as_int() } else { 0 },
                 SlotClass::Fpr => self.fpr[i] = if v.is_f64() { v.as_f64() } else { 0.0 },
                 SlotClass::Ref => {
-                    self.refs[i] = if v.is_heap() { v.as_heap_idx() } else { REF_UNINIT }
+                    self.refs[i] = if v.is_heap() {
+                        v.as_heap_idx()
+                    } else {
+                        REF_UNINIT
+                    }
                 }
                 SlotClass::Dyn => self.dyn_[i] = v,
             }

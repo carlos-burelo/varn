@@ -259,9 +259,13 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
             }
         }
 
-        OpCode::GetIndex | OpCode::ArrayGetIndex | OpCode::MapGetIndex => s(2, Some(dest0), vec![hi1, lo1]),
+        OpCode::GetIndex | OpCode::ArrayGetIndex | OpCode::MapGetIndex => {
+            s(2, Some(dest0), vec![hi1, lo1])
+        }
 
-        OpCode::SetIndex | OpCode::ArraySetIndex | OpCode::MapSetIndex => s(2, None, vec![dest0, hi1, lo1]),
+        OpCode::SetIndex | OpCode::ArraySetIndex | OpCode::MapSetIndex => {
+            s(2, None, vec![dest0, hi1, lo1])
+        }
 
         OpCode::ObjectMerge => s(2, Some(dest0), vec![hi1]),
 

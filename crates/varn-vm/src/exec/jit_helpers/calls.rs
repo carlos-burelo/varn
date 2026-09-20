@@ -67,7 +67,16 @@ pub(crate) extern "C" fn jit_call_method_flat(
     ip: usize,
 ) {
     let _ = (
-        ctx, closure, base, this_tag, this_payload, name_idx, cs, arg_start, arg_count, dest,
+        ctx,
+        closure,
+        base,
+        this_tag,
+        this_payload,
+        name_idx,
+        cs,
+        arg_start,
+        arg_count,
+        dest,
         ip,
     );
     bailed!()

@@ -32,9 +32,9 @@
 //! The pass-manager fixpoint reruns this pass, so invariants cascade
 //! outward through nested loops without inner/outer ordering logic here.
 
+use super::cfg::{dominates, dominators};
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
-use super::cfg::{dominates, dominators};
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let n = func.blocks.len();

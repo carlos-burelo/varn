@@ -71,7 +71,6 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
-
     pub(crate) fn alloc_record_with_shape_slice(
         &mut self,
         shape: &Rc<varn_types::Shape>,

@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use std::rc::Rc;
-
+use std::sync::Arc;
 
 /// Interned handle to a nested `HirType` in the module's [`TyTable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,8 +35,8 @@ pub enum HirType {
 pub struct TyTable {
     entries: Vec<HirType>,
     dedup: rustc_hash::FxHashMap<HirType, u32>,
-    class_names: Vec<Rc<str>>,
-    class_dedup: rustc_hash::FxHashMap<Rc<str>, u32>,
+    class_names: Vec<Arc<str>>,
+    class_dedup: rustc_hash::FxHashMap<Arc<str>, u32>,
 }
 
 impl TyTable {
@@ -54,7 +54,7 @@ impl TyTable {
         self.entries[id.0 as usize]
     }
 
-    pub fn class_id(&mut self, name: &Rc<str>) -> ClassId {
+    pub fn class_id(&mut self, name: &Arc<str>) -> ClassId {
         if let Some(&i) = self.class_dedup.get(name) {
             return ClassId(i);
         }
@@ -64,7 +64,7 @@ impl TyTable {
         ClassId(i)
     }
 
-    pub fn class_name(&self, id: ClassId) -> &Rc<str> {
+    pub fn class_name(&self, id: ClassId) -> &Arc<str> {
         &self.class_names[id.0 as usize]
     }
 
@@ -136,7 +136,7 @@ pub enum HirBinding {
     ///
     /// On an assignment TARGET the type is the declared type of the global,
     /// and consumers of the store path ignore it.
-    Global(Rc<str>, HirType),
+    Global(Arc<str>, HirType),
     Upvalue(u32, HirType),
 }
 
@@ -246,9 +246,9 @@ pub enum HirTypeTest {
 
     IsArray,
 
-    TypeofEq(Rc<str>),
+    TypeofEq(Arc<str>),
 
-    Instanceof(Rc<str>),
+    Instanceof(Arc<str>),
 
     AlwaysFalse,
 }
@@ -257,14 +257,14 @@ pub enum HirTypeTest {
 pub enum HirExpr {
     Int(i64),
     Float(f64),
-    Str(Rc<str>),
+    Str(Arc<str>),
     Bool(bool),
     Char(char),
     Decimal(Decimal),
     BigInt(i128),
     Regex {
-        pattern: Rc<str>,
-        flags: Rc<str>,
+        pattern: Arc<str>,
+        flags: Arc<str>,
     },
     Null,
 
@@ -322,7 +322,7 @@ pub enum HirExpr {
 
     Member {
         object: Box<HirExpr>,
-        name: Rc<str>,
+        name: Arc<str>,
         ty: HirType,
     },
 
@@ -342,7 +342,7 @@ pub enum HirExpr {
 
     MethodCall {
         recv: Box<HirExpr>,
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<HirExpr>,
         ty: HirType,
     },
@@ -373,13 +373,13 @@ pub enum HirExpr {
 
     MemberMaybe {
         object: Box<HirExpr>,
-        name: Rc<str>,
+        name: Arc<str>,
         ty: HirType,
     },
 
     ObjectRest {
         object: Box<HirExpr>,
-        skip_keys: Vec<Rc<str>>,
+        skip_keys: Vec<Arc<str>>,
     },
 
     OptionalChain {
@@ -408,16 +408,16 @@ pub enum HirExpr {
     },
 
     SuperMethodCall {
-        name: Rc<str>,
+        name: Arc<str>,
         args: Vec<HirExpr>,
     },
 
     SuperMember {
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     ExtensionCall {
-        func: Rc<str>,
+        func: Arc<str>,
         recv: Box<HirExpr>,
         args: Vec<HirExpr>,
     },
@@ -486,24 +486,24 @@ pub enum HirObjectProp {
 
 #[derive(Debug, Clone)]
 pub enum HirPropKey {
-    Static(Rc<str>),
+    Static(Arc<str>),
     Computed(HirExpr),
 }
 
 #[derive(Debug, Clone)]
 pub enum HirOptionalProperty {
-    Member(Rc<str>),
+    Member(Arc<str>),
     Index(Box<HirExpr>),
     ModuleSlot(u16),
-    Extension(Rc<str>),
+    Extension(Arc<str>),
     Call(Vec<HirExpr>),
-    MethodCall(Rc<str>, Vec<HirExpr>),
-    ExtensionCall(Rc<str>, Vec<HirExpr>),
+    MethodCall(Arc<str>, Vec<HirExpr>),
+    ExtensionCall(Arc<str>, Vec<HirExpr>),
 }
 
 #[derive(Debug, Clone)]
 pub enum HirTemplatePart {
-    Str(Rc<str>),
+    Str(Arc<str>),
     Expr(HirExpr),
 }
 
@@ -513,7 +513,7 @@ pub enum HirAssignTarget {
 
     Member {
         object: HirExpr,
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     SetFixedField {
@@ -533,7 +533,7 @@ pub enum HirAssignTarget {
     },
 
     SuperMember {
-        name: Rc<str>,
+        name: Arc<str>,
     },
 
     SuperIndex {
@@ -543,9 +543,9 @@ pub enum HirAssignTarget {
 
 #[derive(Debug, Clone)]
 pub struct HirEnumVariant {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub tag: i64,
-    pub meta: Rc<str>,
+    pub meta: Arc<str>,
     pub const_args: Vec<HirExpr>,
 }
 
@@ -554,16 +554,16 @@ pub struct HirEnumVariant {
 /// because nothing downstream of the checker can re-derive it.
 #[derive(Debug, Clone)]
 pub struct HirField {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub tag: varn_core::TypeTag,
 }
 
 #[derive(Debug, Clone)]
 pub struct HirEnum {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub variants: Vec<HirEnumVariant>,
     pub fields: Vec<HirField>,
-    pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
+    pub static_fields: Vec<(Arc<str>, Option<HirExpr>)>,
     pub ctor: HirMethod,
     pub methods: Vec<HirMethod>,
     pub static_methods: Vec<HirMethod>,
@@ -591,18 +591,18 @@ pub enum HirCaseTest {
     Bind(LocalId),
 
     EnumVariant {
-        name: Rc<str>,
+        name: Arc<str>,
         binds: Vec<Option<LocalId>>,
     },
 
     Record {
-        fields: Vec<(Rc<str>, Option<LocalId>)>,
+        fields: Vec<(Arc<str>, Option<LocalId>)>,
     },
 }
 
 #[derive(Debug, Clone)]
 pub struct HirMethod {
-    pub key: Rc<str>,
+    pub key: Arc<str>,
     pub func: HirFunction,
     pub upvalues: Vec<HirUpvalueSrc>,
     pub decorators: Vec<HirExpr>,
@@ -611,7 +611,7 @@ pub struct HirMethod {
 
 #[derive(Debug, Clone)]
 pub struct HirAccessor {
-    pub key: Rc<str>,
+    pub key: Arc<str>,
     pub func: HirFunction,
     pub upvalues: Vec<HirUpvalueSrc>,
     pub is_static: bool,
@@ -619,13 +619,13 @@ pub struct HirAccessor {
 
 #[derive(Debug, Clone)]
 pub struct HirClass {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
 
     pub super_class: Option<HirExpr>,
 
     pub fields: Vec<HirField>,
 
-    pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
+    pub static_fields: Vec<(Arc<str>, Option<HirExpr>)>,
 
     pub ctor: HirMethod,
 
@@ -659,7 +659,7 @@ pub enum HirStmt {
 
     SetMember {
         object: HirExpr,
-        name: Rc<str>,
+        name: Arc<str>,
         value: HirExpr,
     },
 
@@ -732,24 +732,24 @@ pub enum HirStmt {
     CloseUpvalues(Vec<CaptureTarget>),
 
     Import {
-        source: Rc<str>,
+        source: Arc<str>,
         is_type: bool,
         specs: Vec<HirImportSpec>,
     },
 
     StoreExport {
-        name: Rc<str>,
+        name: Arc<str>,
         slot: u16,
     },
 
     ExportNamed {
         specifiers: Vec<HirExportSpec>,
-        source: Option<Rc<str>>,
+        source: Option<Arc<str>>,
     },
 
     ExportAll {
-        source: Rc<str>,
-        alias: Option<Rc<str>>,
+        source: Arc<str>,
+        alias: Option<Arc<str>>,
         slot: Option<u16>,
     },
 
@@ -767,8 +767,8 @@ pub enum HirStmt {
 #[derive(Debug, Clone)]
 pub struct HirExportSpec {
     pub binding: HirBinding,
-    pub local: Rc<str>,
-    pub exported: Rc<str>,
+    pub local: Arc<str>,
+    pub exported: Arc<str>,
     pub local_slot: Option<u16>,
     pub exported_slot: Option<u16>,
 }
@@ -788,7 +788,7 @@ pub struct HirCatch {
 
 #[derive(Debug, Clone)]
 pub struct HirImportSpec {
-    pub local: Rc<str>,
+    pub local: Arc<str>,
     pub kind: HirImportKind,
 
     pub slot: Option<u16>,
@@ -802,14 +802,14 @@ pub struct HirImportSpec {
 pub enum HirImportKind {
     Default,
 
-    Named(Rc<str>),
+    Named(Arc<str>),
 
     Namespace,
 }
 
 #[derive(Debug, Clone)]
 pub struct HirParam {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub ty: HirType,
 
     pub default: Option<HirExpr>,
@@ -817,7 +817,7 @@ pub struct HirParam {
 
 #[derive(Debug, Clone)]
 pub struct HirFunction {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub start_line: u32,
     pub params: Vec<HirParam>,
     pub locals: u32,
@@ -842,7 +842,7 @@ pub struct HirModule {
     /// that need to match a call site's global name against a function in
     /// `functions` must rebuild the qualified form from this; the bare
     /// `HirFunction::name` never appears at a call site.
-    pub source_file: Rc<str>,
+    pub source_file: Arc<str>,
     /// Resolves the `TyId`/`ClassId` handles inside this module's
     /// structured `HirType`s. Frozen after lowering.
     pub ty_table: Rc<TyTable>,

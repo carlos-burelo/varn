@@ -39,9 +39,7 @@ impl ExecCtx {
                         // cuando las clases coinciden).
                         let alloc = self.stack.push_frame(&nc.proto);
                         for i in 0..arg_count {
-                            if let Err(e) =
-                                self.stack.mov_cross(alloc, i, base, arg_start + i)
-                            {
+                            if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
                                 self.stack.pop_frame();
                                 return Err(e);
                             }
@@ -73,7 +71,9 @@ impl ExecCtx {
                         } else {
                             args.push(receiver);
                         }
-                        let result = self.invoke_native(f, &args).map_err(crate::error::RuntimeError::new)?;
+                        let result = self
+                            .invoke_native(f, &args)
+                            .map_err(crate::error::RuntimeError::new)?;
                         self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }
@@ -164,8 +164,7 @@ impl ExecCtx {
                             }
                             let alloc = self.stack.push_frame(&nc.proto);
                             for i in 0..arg_count {
-                                if let Err(e) =
-                                    self.stack.mov_cross(alloc, i, base, arg_start + i)
+                                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i)
                                 {
                                     self.stack.pop_frame();
                                     return Err(e);
@@ -191,8 +190,7 @@ impl ExecCtx {
                             let regular_count = arg_count.min(rest_idx);
                             let mut failed: Option<crate::error::RuntimeError> = None;
                             for i in 0..regular_count {
-                                if let Err(e) =
-                                    self.stack.mov_cross(alloc, i, base, arg_start + i)
+                                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i)
                                 {
                                     failed = Some(e);
                                     break;
@@ -201,11 +199,9 @@ impl ExecCtx {
                             if failed.is_none() {
                                 for i in regular_count..rest_idx {
                                     // `null` de relleno (igual que antes).
-                                    if let Err(e) = self.stack.unbox_into_reg(
-                                        alloc,
-                                        i,
-                                        VmValue::null(),
-                                    ) {
+                                    if let Err(e) =
+                                        self.stack.unbox_into_reg(alloc, i, VmValue::null())
+                                    {
                                         failed = Some(e);
                                         break;
                                     }
@@ -219,11 +215,11 @@ impl ExecCtx {
                                 } else {
                                     vec![]
                                 };
-                                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
-                                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                                ));
-                                if let Err(e) =
-                                    self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
+                                let rest_nv =
+                                    VmValue::from_heap_idx(self.heap.alloc(
+                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                                    ));
+                                if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
                                 {
                                     failed = Some(e);
                                 }
@@ -351,9 +347,7 @@ impl ExecCtx {
                 }
                 if failed.is_none() {
                     for i in regular_count..rest_idx {
-                        if let Err(e) =
-                            self.stack.unbox_into_reg(alloc, i, VmValue::null())
-                        {
+                        if let Err(e) = self.stack.unbox_into_reg(alloc, i, VmValue::null()) {
                             failed = Some(e);
                             break;
                         }
@@ -367,9 +361,10 @@ impl ExecCtx {
                     } else {
                         vec![]
                     };
-                    let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
-                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                    ));
+                    let rest_nv = VmValue::from_heap_idx(
+                        self.heap
+                            .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+                    );
                     if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
                         failed = Some(e);
                     }
