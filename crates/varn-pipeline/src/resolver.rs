@@ -8,8 +8,10 @@
 //! `thread_local!` here is not the defect this replaced. The defect was a
 //! *cache* living in `varn-checker`, invisible in its signatures and invalidated
 //! by side effect, which a multi-threaded host silently shared per worker. Here
-//! it is one owner, in the crate whose single-threadedness makes it true, and
-//! `DiskResolver` is `Rc`-based precisely because it never crosses a thread.
+//! it is one owner, in the crate whose single-threadedness makes it true.
+//! `DiskResolver` is now `Send + Sync` (interior mutability is `parking_lot`
+//! locks, the graph and tables are `Arc`-based — ADR-0012/0013), so a future
+//! multi-threaded pipeline can share one instead of one per thread.
 //!
 //! The language server does not use this: it owns its own resolver, scoped to
 //! the workspace whose files can change.

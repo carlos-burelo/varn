@@ -140,3 +140,33 @@ fn disk_resolver_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<varn_checker::module_resolver::DiskResolver>();
 }
+
+/// Internar las mismas formas en hilos distintos y en órdenes distintos debe
+/// dar los mismos ids: es la propiedad que hace segura la unión entre workers
+/// (no hay un punto de serialización ni un remapeo que pueda desincronizarse).
+#[test]
+fn ids_agree_across_threads_and_interning_order() {
+    fn build(union_first: bool) -> (CheckerTyId, CheckerTyId, CheckerTyId) {
+        let mut t = CheckerTyTable::new();
+        if union_first {
+            let l = t.intern_list(&[CheckerTyId::INT, CheckerTyId::STR]);
+            let _u = t.intern(TypeKind::Union(l));
+            let a = t.intern(TypeKind::Array(CheckerTyId::INT));
+            let l2 = t.intern_list(&[CheckerTyId::INT, CheckerTyId::STR]);
+            (a, t.intern(TypeKind::Union(l2)), t.intern(TypeKind::Array(a)))
+        } else {
+            let a = t.intern(TypeKind::Array(CheckerTyId::INT));
+            let l = t.intern_list(&[CheckerTyId::INT, CheckerTyId::STR]);
+            let u = t.intern(TypeKind::Union(l));
+            let a2 = t.intern(TypeKind::Array(CheckerTyId::INT));
+            (a2, u, t.intern(TypeKind::Array(a)))
+        }
+    }
+
+    let (left, right) = std::thread::scope(|s| {
+        let h1 = s.spawn(|| build(true));
+        let h2 = s.spawn(|| build(false));
+        (h1.join().unwrap(), h2.join().unwrap())
+    });
+    assert_eq!(left, right, "mismos ids en hilos y órdenes distintos");
+}
