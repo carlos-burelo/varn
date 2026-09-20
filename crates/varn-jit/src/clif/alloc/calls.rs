@@ -735,14 +735,27 @@ pub(crate) fn emit_call_self(
     arg_start: usize,
     total: usize,
 ) -> cranelift_codegen::ir::Value {
-    emit_helper_call_window(
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    // Every register home current: a throw caught below resumes this frame
+    // interpreted out of its homes.
+    for r in 0..actx.nregs {
+        store_home(b, actx, state, r);
+    }
+    let start_v = b.ins().iconst(types::I64, arg_start as i64);
+    let n = b.ins().iconst(types::I64, total as i64);
+    call_helper_void(
         b,
-        actx,
-        state,
+        actx.cc,
         actx.helpers.clif_call_self,
-        &[],
-        arg_start,
-        total,
+        &[actx.exec_ctx, actx.base, start_v, n],
+    );
+    reload_boxed(b, actx, state, &regs);
+    b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.jit_native_result_offset as i32,
     )
 }
 

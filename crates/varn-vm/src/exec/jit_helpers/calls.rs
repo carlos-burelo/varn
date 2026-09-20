@@ -193,9 +193,44 @@ pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_base: 
     bailed!()
 }
 
-pub(crate) extern "C" fn clif_call_self(ctx: *mut ExecCtx, src: usize, argc: usize) {
-    let _ = (ctx, src, argc);
-    bailed!()
+/// Direct self-recursion out of a frame-aware lowering: the caller pushes a
+/// fresh activation for its OWN closure and copies the `argc` argument
+/// registers from its homes into the callee's, then runs it to completion.
+/// `act_id` is the caller's activation.
+pub(crate) extern "C" fn clif_call_self(
+    ctx: *mut ExecCtx,
+    act_id: usize,
+    arg_start: usize,
+    argc: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let Some(closure) = ctx_ref.frames[frame_idx]._owned_closure.clone() else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("clif_call_self: frame has no owned closure"),
+            );
+        };
+        let callee_alloc = ctx_ref.stack.push_frame(&closure.proto);
+        for i in 0..argc {
+            if let Err(e) = ctx_ref
+                .stack
+                .mov_cross(callee_alloc, i, act_id, arg_start + i)
+            {
+                ctx_ref.stack.pop_frame();
+                jit_propagate_error(ctx_ref, e);
+            }
+        }
+        ctx_ref
+            .frames
+            .push(crate::frame::CallFrame::new_owned(closure, callee_alloc));
+        match ctx_ref.run_until(caller_depth) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
 }
 
 pub(crate) extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) {
