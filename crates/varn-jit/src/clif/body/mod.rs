@@ -202,6 +202,7 @@ pub(super) fn lower_raw(
         narrow_roots,
         cur_ip: std::cell::Cell::new(0),
         safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
+        layout: varn_types::register_meta::FrameLayout::for_proto(proto),
     });
 
     let reg_offset = 1;

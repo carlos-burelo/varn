@@ -168,6 +168,9 @@ pub(crate) struct AllocCtx<'a> {
     pub narrow_roots: bool,
     pub cur_ip: Cell<usize>,
     pub safepoints: Option<RefCell<Vec<SafepointRecord>>>,
+    /// Register → `(class, index)` for this proto, so home slots are addressed
+    /// inline (`vec[base[class] + idx]`) without a runtime helper.
+    pub layout: varn_types::register_meta::FrameLayout,
 }
 
 /// Store a boxed `VmValue` (`I128`; a bare `I64` is treated as an int
@@ -185,29 +188,120 @@ pub(crate) fn store_boxed_home(
     store_boxed_home_at(b, actx, reg, boxed, site);
 }
 
+/// Byte offset (from `ExecCtx`) of the `FrameStore` data-pointer word for a
+/// class vector.
+#[inline]
+fn class_ptr_offset(actx: &AllocCtx, class: varn_types::register_meta::SlotClass) -> usize {
+    use varn_types::register_meta::SlotClass;
+    let fl = &actx.helpers.frame_layout;
+    match class {
+        SlotClass::Gpr => fl.gpr_ptr_offset,
+        SlotClass::Fpr => fl.fpr_ptr_offset,
+        SlotClass::Ref => fl.refs_ptr_offset,
+        SlotClass::Dyn => fl.dyn_ptr_offset,
+    }
+}
+
+/// Element size of a class vector.
+#[inline]
+fn class_elem_size(class: varn_types::register_meta::SlotClass) -> i64 {
+    use varn_types::register_meta::SlotClass;
+    match class {
+        SlotClass::Gpr | SlotClass::Fpr => 8,
+        SlotClass::Ref => 4,
+        SlotClass::Dyn => 16,
+    }
+}
+
+/// Inline machine address of register `reg`'s home slot:
+/// `class_vec_ptr + (base[class] + idx) * elem_size`. Re-reads the vector data
+/// pointer from `ExecCtx` on every access, so a `Vec` reallocation during a
+/// call can never leave a stale base.
+pub(crate) fn home_addr(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    reg: usize,
+) -> cranelift_codegen::ir::Value {
+    let class = actx.layout.class_of(reg);
+    let idx = actx.layout.idx_of(reg);
+    let fl = &actx.helpers.frame_layout;
+    let m = MemFlags::trusted();
+    let ptr = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, class_ptr_offset(actx, class) as i32);
+    let allocs = b
+        .ins()
+        .load(types::I64, m, actx.exec_ctx, fl.allocs_ptr_offset as i32);
+    let byte = b.ins().imul_imm(actx.base, fl.alloc_size as i64);
+    let fap = b.ins().iadd(allocs, byte);
+    let base_off = (fl.alloc_bases_offset + class.index() * 4) as i32;
+    let base = b.ins().uload32(m, fap, base_off);
+    let elem = class_elem_size(class);
+    let off = b.ins().imul_imm(base, elem);
+    let off = b.ins().iadd_imm(off, idx as i64 * elem);
+    b.ins().iadd(ptr, off)
+}
+
 pub(crate) fn store_boxed_home_at(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     reg: usize,
     boxed: cranelift_codegen::ir::Value,
-    site: u32,
+    _site: u32,
 ) {
-    let (tag, payload) = if b.func.dfg.value_type(boxed) == types::I128 {
-        b.ins().isplit(boxed)
-    } else {
-        let tag = b
-            .ins()
-            .iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
-        (tag, boxed)
-    };
-    let reg_v = b.ins().iconst(types::I64, reg as i64);
-    let site_v = b.ins().iconst(types::I64, site as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.home_store,
-        &[actx.exec_ctx, actx.base, reg_v, tag, payload, site_v],
-    );
+    use varn_types::register_meta::SlotClass;
+    let class = actx.layout.class_of(reg);
+    let home = home_addr(b, actx, reg);
+    let m = MemFlags::trusted();
+    match class {
+        SlotClass::Gpr => {
+            let payload = if b.func.dfg.value_type(boxed) == types::I128 {
+                b.ins().isplit(boxed).1
+            } else {
+                boxed
+            };
+            b.ins().store(m, payload, home, 0);
+        }
+        SlotClass::Fpr => {
+            let payload = if b.func.dfg.value_type(boxed) == types::I128 {
+                b.ins().isplit(boxed).1
+            } else {
+                boxed
+            };
+            let f = b.ins().bitcast(types::F64, MemFlags::new(), payload);
+            b.ins().store(m, f, home, 0);
+        }
+        SlotClass::Dyn => {
+            let v = if b.func.dfg.value_type(boxed) == types::I128 {
+                boxed
+            } else {
+                let tag = b
+                    .ins()
+                    .iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
+                b.ins().iconcat(tag, boxed)
+            };
+            b.ins().store(m, v, home, 0);
+        }
+        SlotClass::Ref => {
+            let (tag, payload) = if b.func.dfg.value_type(boxed) == types::I128 {
+                b.ins().isplit(boxed)
+            } else {
+                let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+                (tag, boxed)
+            };
+            let is_null = b.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                tag,
+                varn_types::vm_value::KIND_NULL as i64,
+            );
+            let low = b.ins().band_imm(payload, 0xFFFF_FFFF);
+            let uninit = b
+                .ins()
+                .iconst(types::I64, varn_types::register_meta::REF_UNINIT as i64);
+            let v = b.ins().select(is_null, uninit, low);
+            b.ins().store(m, v, home, 0);
+        }
+    }
 }
 
 pub(crate) fn load_receiver(
@@ -217,30 +311,45 @@ pub(crate) fn load_receiver(
     load_home(b, actx, 0)
 }
 
-/// Read register `reg`'s home slot as a boxed `VmValue` (`I128`), through the
-/// `home_load` runtime helper writing into a 16-byte stack slot.
+/// Read register `reg`'s home slot as a boxed `VmValue` (`I128`), inline.
 pub(crate) fn load_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     r: usize,
 ) -> cranelift_codegen::ir::Value {
-    let slot = b
-        .create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-            16,
-            3,
-        ));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
-    let reg_v = b.ins().iconst(types::I64, r as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.home_load,
-        &[actx.exec_ctx, actx.base, reg_v, addr],
-    );
-    // Plain (not `trusted`): the slot is written by the call above, and a
-    // `trusted` load here was being reordered/speculated ahead of it.
-    b.ins().load(types::I128, MemFlags::new(), addr, 0)
+    use varn_types::register_meta::SlotClass;
+    let class = actx.layout.class_of(r);
+    let home = home_addr(b, actx, r);
+    let m = MemFlags::trusted();
+    match class {
+        SlotClass::Gpr => {
+            let i = b.ins().load(types::I64, m, home, 0);
+            super::super::emit::box_int(b, i)
+        }
+        SlotClass::Fpr => {
+            let f = b.ins().load(types::F64, m, home, 0);
+            super::super::emit::box_f64(b, f)
+        }
+        SlotClass::Dyn => b.ins().load(types::I128, m, home, 0),
+        SlotClass::Ref => {
+            let idx = b.ins().uload32(m, home, 0);
+            let is_uninit = b.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                idx,
+                varn_types::register_meta::REF_UNINIT as i64,
+            );
+            let null_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let heap_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_HEAP as i64);
+            let zero = b.ins().iconst(types::I64, 0);
+            let tag = b.ins().select(is_uninit, null_tag, heap_tag);
+            let payload = b.ins().select(is_uninit, zero, idx);
+            b.ins().iconcat(tag, payload)
+        }
+    }
 }
 
 pub(crate) fn box_or_load_home(
