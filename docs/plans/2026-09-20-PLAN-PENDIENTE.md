@@ -451,6 +451,75 @@ Rust (`emit_vm_call`). Y todo acceso a campo de instancia (`GetFixedField`/IC)
 va por helper porque el layout compacto (`FieldRepr`) no está inlineado. Es el
 mismo bloque: hacer el lowering de campo/instancia compact-aware.
 
+---
+
+## 16. Scoreboard release (cierre de sesión)
+
+| benchmark | Varn | Bun | ratio |
+|---|---|---|---|
+| fib | 87.2 ms | 72.7 ms | 1.20x |
+| matrix | 33.0 ms | 16.1 ms | 2.04x |
+| str_ops | 361.7 ms | 127.6 ms | 3.57x |
+| json_native | 57.1 ms | 40.9 ms | 1.39x |
+| json_pure | 507.6 ms | 433.4 ms | 1.18x |
+| csv_pipeline | 163.1 ms | 130.5 ms | 1.25x |
+| csv_etl | 24.9 ms | 24.9 ms | ~tied |
+| json_api_payloads | 45.2 ms | 18.9 ms | 2.38x |
+| gc_alloc | 176.4 ms | 61.8 ms | 2.86x |
+| dto | 288.0 ms | 31.6 ms | 9.09x |
+| collection_pipeline | 363.6 ms | 33.1 ms | 11.11x |
+| http_routing | 3819.6 ms | 154.3 ms | 25x |
+
+0 wins, 1 tied, 11 rivals; arranque 3.0x más rápido. (Los tiempos varían entre
+corridas — dto midió 6.25x en una corrida enfocada; la máquina es ruidosa.)
+
+Punto de partida del plan: `fib` 100x, `str_ops` 33x, `matrix` 33x (debug). Los
+outliers restantes (`dto`, `collection_pipeline`, `http_routing`) comparten la
+misma causa: **layout compacto de instancia no inlineado** (§15). Es el
+siguiente proyecto, no un parche.
+
+---
+
+## 17. Constructor compacto inline — HECHO
+
+Commit `626b4192`. `ClifClassTarget` lleva por campo su `(offset, size, tag,
+is_gc_ref)` desde `layout.get_field_by_index(slot)` (`clif_link.rs`), y el fast
+path de `emit_call` escribe cada campo compacto inline espejando
+`InstanceData::write_field` (stores angostos por anchura, `F32` con `fdemote`,
+int→float, ref compacta con `null → COMPACT_REF_UNINIT`, `str`/`char`/Dynamic
+de 16B). `alloc_instance_fast` ya zero-fillea → paridad.
+
+`bench dto` (release): **288 → 123 ms**. Cuatro cuadrantes release 1223/0.
+
+**Principio (aplicado):** una clase NO tiene `Shape`; el layout es estático y
+`slot` indexa `ClassLayout::fields` 1:1. Nada de IC/shape/helper para clases.
+
+---
+
+## 18. Siguiente pecado dinámico: acceso a campo de clase vía helper
+
+`GetFixedField`/`SetFixedField` para instancias siguen yendo al helper
+`get_fixed_field`/`set_fixed_field` (Rust), que hace **lookup de layout en
+runtime** (`ClassObj::find_by_id` + `get_or_compute_layout`) por acceso. Es el
+pecado dinámico que queda.
+
+El compilador conoce la clase (`Resolution::FieldSlot(slot)`), así que puede
+**bake-ar** el `(offset, size, tag)` compacto en la instrucción (como
+`from_tir/build.rs:828` ya resuelve el slot). Plan:
+
+1. Extender `InstKind::GetFixedField/SetFixedField` con el `FieldRepr` resuelto
+   (el compilador computa el mismo `ClassLayout` que `class_layout.rs`).
+2. Codificarlo en el bytecode (hoy `w2 = slot`; hay bits libres en el byte
+   bajo de `w1`) o un 4º word; actualizar el decoder.
+3. En `clif/fields.rs`, inline: `emit_object_data_base` + load/store compacto
+   en `offset` (sin helper, sin lookup). Mantener el helper como slow path
+   para receptores no-clase / null (igual que hoy `narrow`).
+4. Tests: `tests/53`, `tests/107`, `tests/116`, `tests/63` + un DTO con
+   campos angostos.
+
+
+
+
 
 
 
