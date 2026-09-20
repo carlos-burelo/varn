@@ -1,8 +1,9 @@
-//! Hash-consed type table for the checker (Fase 1, Componente 3).
+//! Hash-consed, **content-addressed** type table for the checker (Fase 1,
+//! Componente 3 + ADR-0012).
 //!
 //! `varn_core::TypeKind<T, N, C, F, O, E>` is generic over how recursion,
 //! names and collections are represented. This module fixes those
-//! parameters to interned handles instead of owned/boxed data:
+//! parameters to interned handles:
 //!
 //! - `T` (recursion, e.g. `Array(T)`, `KeyOf(T)`)      -> `CheckerTyId`
 //! - `N` (name, e.g. `Named(N, Option<N>)`)              -> `varn_core::Atom`
@@ -11,56 +12,70 @@
 //! - `O` (object members)                                -> `ObjectMembersId`
 //! - `E` (today `()` in `SemanticTypeKind`)              -> `()`
 //!
-//! `FunctionTypeId`/`ObjectMembersId` are reserved here (Task 19/20) and
-//! populated once `types/mod.rs` migrates `FunctionType`/`ObjectTypeMember`
-//! to reference `CheckerTyId` (Task 21) — this table does not intern their
-//! contents yet, only allocates the id space so `InternedTypeKind` can
-//! mention them today without a second breaking change later.
+//! ## Content-addressed identity (the Ley 2/3 root-cause fix)
+//!
+//! A `CheckerTyId` is the **128-bit hash of the shape it names**, not a
+//! positional index into a table. Two tables that intern the same shape in any
+//! order — or in parallel — produce the **same id** for it, so ids are portable
+//! by construction and no `absorb`/`reintern` remap is needed: merging tables is
+//! a commutative, idempotent union. The ~21 intrinsic shapes keep a reserved
+//! id range (`0..=THIS`) because `Type::Int`/`Type::Str`/... are `const`.
+//! Non-intrinsic ids set the top bit, so they can never collide with that range.
+//!
+//! The hash is computed with `rustc_hash::FxHasher` (fixed seed, no
+//! `RandomState`), hashed twice with different salts into 128 bits. 128 bits is
+//! the engineering standard for collision resistance (rustc uses the same width
+//! for its stable hashes): the birthday bound for 2^32 shapes is ~2^-64.
+//!
+//! `FunctionTypeId`/`ObjectMembersId` are content hashes of the function shape
+//! and the member vector, so a shape's id is a Merkle hash over its children.
 
 use crate::types::{FunctionType, ObjectTypeMember};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHasher};
+use std::hash::{Hash, Hasher};
 use varn_core::{Atom, TypeKind, TypeTag};
 
-// `serde` derives here are a KNOWN CAVEAT, not an endorsement: like `Atom`, a
-// bare interned index is meaningless without the matching `CheckerTyTable` —
-// serializing one (e.g. through `module_resolver::cache`'s on-disk `BindResult`
-// cache, which stores `Type`-bearing `TypeMembers`/`ClassMemberInfo` today)
-// round-trips a number, not a type, unless the table that produced it is
-// reconstructed identically before deserializing. `Atom` solved this by NOT
-// deriving `serde` and pushing every carrier to `#[serde(skip)]`; doing the
-// same for `CheckerTyId` is out of this task's scope (Task 21 migrates
-// `types/{mod,type_impl,object_member_impl,class_member_impl}.rs`, not the
-// module cache) — deriving `serde` here keeps today's cache code compiling
-// and defers the correctness fix to whichever task next touches
-// `module_resolver::cache`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct CheckerTyId(u32);
+/// Content-addressed id of a shape. `Copy`, so cloning a `Type` is trivial and
+/// comparing two types is comparing two `u128`.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct CheckerTyId(u128);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct TyListId(u32);
+/// Content hash of a `Vec<CheckerTyId>` (union/tuple/intersection members,
+/// generic args, ...).
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct TyListId(u128);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct FunctionTypeId(u32);
+/// Content hash of a `FunctionType`.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct FunctionTypeId(u128);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct ObjectMembersId(u32);
+/// Content hash of a `Vec<ObjectTypeMember>`.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct ObjectMembersId(u128);
 
-/// Interned form of `checker::types::SemanticTypeKind`. Same 19 variants as
-/// `varn_core::TypeKind` (confirmed by reading `kinds.rs` in full — the plan
-/// draft omitted `TypePredicate`), parameters substituted per the module doc
-/// above. `Copy` because every substituted parameter is `Copy`.
+/// Interned form of `checker::types::SemanticTypeKind`. Same variants as
+/// `varn_core::TypeKind`, parameters substituted per the module doc above.
+/// `Copy` because every substituted parameter is `Copy`.
 pub type InternedTypeKind =
     TypeKind<CheckerTyId, Atom, TyListId, FunctionTypeId, ObjectMembersId, ()>;
 
+/// Top bit of a non-intrinsic content id. Reserved intrinsic ids are `0..=THIS`
+/// (all far below this bit), so content ids can never collide with them.
+const CONTENT_FLAG: u128 = 1u128 << 127;
+
 /// Fixed ids for the ~21 zero-argument/intrinsic shapes every checker session
 /// needs (the `Type::Int`/`Type::Str`/... constants `type_impl.rs` exposes).
-/// `CheckerTyTable::new` interns them in EXACTLY this order — first call to
-/// `intern` gets id 0, second gets id 1, etc — so these constants are valid
-/// the instant a fresh table exists, with no `&mut CheckerTyTable` required
-/// at every use site. Keeping the two lists (these consts, and the seeding
-/// order in `new`) in sync is enforced by a `debug_assert_eq!` per entry in
-/// `new`, so drift panics loudly in debug builds instead of silently handing
-/// out the wrong constant.
+/// Unlike the rest of the table, these are NOT content hashes: they are small
+/// constants so `Type::INT` can be a `const`. `CheckerTyTable::new` seeds
+/// EXACTLY these, and `intern` special-cases them back to the same ids.
 impl CheckerTyId {
     pub const INT: CheckerTyId = CheckerTyId(0);
     pub const FLOAT: CheckerTyId = CheckerTyId(1);
@@ -83,57 +98,77 @@ impl CheckerTyId {
     pub const U64: CheckerTyId = CheckerTyId(18);
     pub const F32: CheckerTyId = CheckerTyId(19);
     pub const THIS: CheckerTyId = CheckerTyId(20);
+}
 
-    /// The highest id `CheckerTyTable::new()`'s fixed seeding ever assigns —
-    /// everything `<= THIS.0` names the same intrinsic shape in *any* table,
-    /// since seeding order is fixed and `debug_assert!`-enforced. Anything
-    /// past it is table-relative and portable only within the table that
-    /// interned it.
-    const MAX_PORTABLE: u32 = Self::THIS.0;
-
-    /// `true` for exactly the ~21 fixed intrinsic ids every `CheckerTyTable`
-    /// seeds identically — the only `CheckerTyId`s that mean the same thing
-    /// in a table other than the one that produced them.
-    pub fn is_portable(self) -> bool {
-        self.0 <= Self::MAX_PORTABLE
-    }
-
-    /// This id's index in the table that interned it. Exposed for callers
-    /// that must decide *which* table an id is meaningful in — e.g. decoding
-    /// an imported symbol against its exporter's table only when the id is in
-    /// range there, and against the live table otherwise.
-    pub fn index(self) -> u32 {
-        self.0
-    }
-
-    /// `self` if it's one of the ~21 ids valid in any table, else
-    /// [`Self::DYNAMIC`] — the honest degradation for a `CheckerTyId` that
-    /// crossed into a table it wasn't interned in (the on-disk module cache,
-    /// `module_resolver::cache.rs`, is the one place this happens today: see
-    /// its own doc for why a non-intrinsic cached type can't be reconstructed
-    /// without a portable encoding this crate doesn't have yet). Matches the
-    /// rest of the checker's own philosophy for a type it genuinely doesn't
-    /// know (`BackendTy::Dynamic(DynReason::Unannotated)` in `emit/ty.rs`) —
-    /// wrong-but-plausible would be worse than honestly unknown.
-    pub fn sanitize_foreign(self) -> CheckerTyId {
-        if self.is_portable() {
-            self
-        } else {
-            Self::DYNAMIC
-        }
+/// `CheckerTyId` of the seeded intrinsic `tag`, or `None` for the tags that
+/// have no reserved id (e.g. `Bytes`): those are content-addressed like any
+/// other shape.
+fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
+    match kind {
+        TypeKind::Intrinsic(tag) => Some(match tag {
+            TypeTag::Int => CheckerTyId::INT,
+            TypeTag::Float => CheckerTyId::FLOAT,
+            TypeTag::Decimal => CheckerTyId::DECIMAL,
+            TypeTag::BigInt => CheckerTyId::BIGINT,
+            TypeTag::Str => CheckerTyId::STR,
+            TypeTag::Char => CheckerTyId::CHAR,
+            TypeTag::Bool => CheckerTyId::BOOL,
+            TypeTag::Symbol => CheckerTyId::SYMBOL,
+            TypeTag::Void => CheckerTyId::VOID,
+            TypeTag::Null => CheckerTyId::NULL,
+            TypeTag::Never => CheckerTyId::NEVER,
+            TypeTag::Dynamic => CheckerTyId::DYNAMIC,
+            TypeTag::I8 => CheckerTyId::I8,
+            TypeTag::I16 => CheckerTyId::I16,
+            TypeTag::I32 => CheckerTyId::I32,
+            TypeTag::U8 => CheckerTyId::U8,
+            TypeTag::U16 => CheckerTyId::U16,
+            TypeTag::U32 => CheckerTyId::U32,
+            TypeTag::U64 => CheckerTyId::U64,
+            TypeTag::F32 => CheckerTyId::F32,
+            _ => return None,
+        }),
+        TypeKind::This => Some(CheckerTyId::THIS),
+        _ => None,
     }
 }
 
+/// 128-bit content hash: `FxHasher` (fixed seed) run twice with different
+/// salts. Deterministic across processes and platforms.
+fn hash128<T: Hash + ?Sized>(value: &T) -> u128 {
+    let mut lo = FxHasher::default();
+    value.hash(&mut lo);
+    let mut hi = FxHasher::default();
+    0x9E37_79B9_7F4A_7C15u64.hash(&mut hi);
+    value.hash(&mut hi);
+    ((hi.finish() as u128) << 64) | (lo.finish() as u128)
+}
+
+fn content_id(kind: &InternedTypeKind) -> CheckerTyId {
+    CheckerTyId(hash128(kind) | CONTENT_FLAG)
+}
+
+fn content_list_id(tys: &[CheckerTyId]) -> TyListId {
+    TyListId(hash128(tys) | CONTENT_FLAG)
+}
+
+fn content_function_id(f: &FunctionType) -> FunctionTypeId {
+    FunctionTypeId(hash128(f) | CONTENT_FLAG)
+}
+
+fn content_object_id(members: &[ObjectTypeMember]) -> ObjectMembersId {
+    ObjectMembersId(hash128(members) | CONTENT_FLAG)
+}
+
+/// Content-addressed store: a memo `id -> shape`. Identity never depends on
+/// insertion order, so this is a pure cache — two tables with the same shapes
+/// agree on every id, and merging them is a set union.
 #[derive(Debug, Clone)]
 pub struct CheckerTyTable {
-    entries: Vec<InternedTypeKind>,
-    dedup: FxHashMap<InternedTypeKind, u32>,
-    lists: Vec<Vec<CheckerTyId>>,
-    list_dedup: FxHashMap<Vec<CheckerTyId>, u32>,
-    functions: Vec<FunctionType>,
-    function_dedup: FxHashMap<FunctionType, u32>,
-    object_members: Vec<Vec<ObjectTypeMember>>,
-    object_dedup: FxHashMap<Vec<ObjectTypeMember>, u32>,
+    entries: FxHashMap<CheckerTyId, InternedTypeKind>,
+    lists: FxHashMap<TyListId, Vec<CheckerTyId>>,
+    functions: FxHashMap<FunctionTypeId, FunctionType>,
+    object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
 }
 
 impl Default for CheckerTyTable {
@@ -145,16 +180,14 @@ impl Default for CheckerTyTable {
 impl CheckerTyTable {
     pub fn new() -> Self {
         let mut t = Self {
-            entries: Vec::new(),
-            dedup: FxHashMap::default(),
-            lists: Vec::new(),
-            list_dedup: FxHashMap::default(),
-            functions: Vec::new(),
-            function_dedup: FxHashMap::default(),
-            object_members: Vec::new(),
-            object_dedup: FxHashMap::default(),
+            entries: FxHashMap::default(),
+            lists: FxHashMap::default(),
+            functions: FxHashMap::default(),
+            object_members: FxHashMap::default(),
         };
-        let seed = [
+        // Seed the reserved intrinsic ids. `intern` maps these shapes back to
+        // the same ids, so the seed is only so `get` is total over them.
+        for (id, kind) in [
             (CheckerTyId::INT, TypeKind::Intrinsic(TypeTag::Int)),
             (CheckerTyId::FLOAT, TypeKind::Intrinsic(TypeTag::Float)),
             (CheckerTyId::DECIMAL, TypeKind::Intrinsic(TypeTag::Decimal)),
@@ -176,95 +209,93 @@ impl CheckerTyTable {
             (CheckerTyId::U64, TypeKind::Intrinsic(TypeTag::U64)),
             (CheckerTyId::F32, TypeKind::Intrinsic(TypeTag::F32)),
             (CheckerTyId::THIS, TypeKind::This),
-        ];
-        for (expected, kind) in seed {
-            let got = t.intern(kind);
-            debug_assert_eq!(
-                got, expected,
-                "CheckerTyTable::new: intrinsic seeding order drifted from the CheckerTyId consts"
-            );
+        ] {
+            t.entries.insert(id, kind);
         }
         t
     }
 
+    /// Intern `kind`, returning its content-addressed id. Idempotent and
+    /// order-independent: the same shape always yields the same id.
     pub fn intern(&mut self, kind: InternedTypeKind) -> CheckerTyId {
-        if let Some(&i) = self.dedup.get(&kind) {
-            return CheckerTyId(i);
+        if let Some(id) = seeded_id(&kind) {
+            return id;
         }
-        let i = self.entries.len() as u32;
-        self.entries.push(kind);
-        self.dedup.insert(kind, i);
-        CheckerTyId(i)
+        let id = content_id(&kind);
+        if let Some(existing) = self.entries.get(&id) {
+            debug_assert_eq!(existing, &kind, "CheckerTyId content hash collision");
+            return id;
+        }
+        self.entries.insert(id, kind);
+        id
     }
 
-    /// True when `prefix`'s entries are the same shapes, in the same order, at
-    /// the same indices as the start of `self`.
-    ///
-    /// This is the invariant the whole snapshot model rests on: a `Binder`/
-    /// `Checker` table is safe to share ids with the live table exactly while
-    /// it keeps the live table as a prefix. `set_ty_table`/`absorb` preserve it
-    /// by construction (they only append), and this predicate is how a test —
-    /// or a future single-owner store — checks it instead of assuming it.
-    pub fn has_prefix(&self, prefix: &CheckerTyTable) -> bool {
-        let n = prefix.entries.len();
-        n <= self.entries.len() && self.entries[..n] == prefix.entries[..n]
-    }
-
-    /// Returns the shape by VALUE (`InternedTypeKind` is `Copy`).
-    ///
-    /// Ley 3: a single-owner table lives behind `Arc<RefCell<..>>`, and a `Ref`
-    /// guard cannot hand out a `&` that outlives the call, so the accessor
-    /// returns the shape instead of borrowing it.
+    /// The shape `id` names. Panics if `id` was never interned into this table
+    /// (the same invariant the old positional `Vec` index enforced).
     pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {
-        self.entries[id.0 as usize]
+        *self
+            .entries
+            .get(&id)
+            .unwrap_or_else(|| panic!("CheckerTyId {id:?} is not present in this table"))
+    }
+
+    /// True when this table can resolve `id` to a shape.
+    pub fn contains(&self, id: CheckerTyId) -> bool {
+        self.entries.contains_key(&id)
     }
 
     pub fn intern_list(&mut self, tys: &[CheckerTyId]) -> TyListId {
-        if let Some(&i) = self.list_dedup.get(tys) {
-            return TyListId(i);
+        let id = content_list_id(tys);
+        if let Some(existing) = self.lists.get(&id) {
+            debug_assert_eq!(existing.as_slice(), tys, "TyListId content hash collision");
+            return id;
         }
-        let i = self.lists.len() as u32;
-        self.lists.push(tys.to_vec());
-        self.list_dedup.insert(tys.to_vec(), i);
-        TyListId(i)
+        self.lists.insert(id, tys.to_vec());
+        id
     }
 
     pub fn get_list(&self, id: TyListId) -> &[CheckerTyId] {
-        &self.lists[id.0 as usize]
+        self.lists
+            .get(&id)
+            .map(Vec::as_slice)
+            .unwrap_or_else(|| panic!("TyListId {id:?} is not present in this table"))
     }
 
     pub fn intern_function(&mut self, f: FunctionType) -> FunctionTypeId {
-        if let Some(&i) = self.function_dedup.get(&f) {
-            return FunctionTypeId(i);
+        let id = content_function_id(&f);
+        if let Some(existing) = self.functions.get(&id) {
+            debug_assert_eq!(existing, &f, "FunctionTypeId content hash collision");
+            return id;
         }
-        let i = self.functions.len() as u32;
-        self.functions.push(f.clone());
-        self.function_dedup.insert(f, i);
-        FunctionTypeId(i)
+        self.functions.insert(id, f);
+        id
     }
 
     pub fn get_function(&self, id: FunctionTypeId) -> &FunctionType {
-        &self.functions[id.0 as usize]
+        self.functions
+            .get(&id)
+            .unwrap_or_else(|| panic!("FunctionTypeId {id:?} is not present in this table"))
     }
 
     pub fn intern_object_members(&mut self, members: Vec<ObjectTypeMember>) -> ObjectMembersId {
-        if let Some(&i) = self.object_dedup.get(&members) {
-            return ObjectMembersId(i);
+        let id = content_object_id(&members);
+        if let Some(existing) = self.object_members.get(&id) {
+            debug_assert_eq!(existing, &members, "ObjectMembersId content hash collision");
+            return id;
         }
-        let i = self.object_members.len() as u32;
-        self.object_members.push(members.clone());
-        self.object_dedup.insert(members, i);
-        ObjectMembersId(i)
+        self.object_members.insert(id, members);
+        id
     }
 
     pub fn get_object_members(&self, id: ObjectMembersId) -> &[ObjectTypeMember] {
-        &self.object_members[id.0 as usize]
+        self.object_members
+            .get(&id)
+            .map(Vec::as_slice)
+            .unwrap_or_else(|| panic!("ObjectMembersId {id:?} is not present in this table"))
     }
 
-    /// Number of distinct interned shapes — used the same way
-    /// `AtomInterner::len` is used by `DiskResolver::set_interner`: to decide
-    /// whether an incoming table is a superset-by-prefix of the live one
-    /// (grew from it) rather than a stale, smaller snapshot.
+    /// Number of distinct interned shapes. Used as a cheap "did the live table
+    /// grow past this snapshot" heuristic by `Binder::sync_ty_table`.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -273,236 +304,23 @@ impl CheckerTyTable {
         self.entries.is_empty()
     }
 
-    /// Merge every shape in `other` into `self` without disturbing `self`'s
-    /// existing indices: shared shapes dedup to the ids `self` already has,
-    /// `other`-only shapes append. Used where two tables grew independently
-    /// from a common prefix (nested binds during an outer bind/check) and the
-    /// local table must learn the live table's shapes *without* invalidating
-    /// the ids local `Symbol`s/`Type`s already captured — a wholesale
-    /// replacement would repoint those ids at `other`'s kinds at the same
-    /// indices (same failure mode as copying a raw `Atom` across divergent
-    /// interners, and just as silent).
+    /// Union every shape in `other` into `self`. Commutative and idempotent:
+    /// content-addressed ids mean a shape present in both tables has the same
+    /// id, so this is a set union with no remap. This replaces the old
+    /// `reintern`-based `absorb` (ADR-0012).
     pub fn absorb(&mut self, other: &CheckerTyTable) {
-        let mut cache = FxHashMap::default();
-        for i in 0..other.entries.len() {
-            self.reintern(other, CheckerTyId(i as u32), &mut cache);
+        for (k, v) in &other.entries {
+            self.entries.entry(*k).or_insert(*v);
         }
-    }
-
-    /// Copy `id`'s shape from `other` into `self`, recursively, returning the
-    /// id it now has *in `self`*. `Atom`/`TypeTag` payloads pass through
-    /// unchanged (they're already `self`-relative — see the reintern helpers
-    /// that call this) but a `CheckerTyId` embedded inside a shape (an array's
-    /// element, a union's members, a function's params/return, ...) is only
-    /// meaningful relative to the table it was interned in — copying the raw
-    /// id across tables the way `Symbol::name`/`origin_module` copy an `Atom`
-    /// would silently point at whatever shape happens to sit at that index in
-    /// `self`. Needed anywhere a `Type` crosses from one table's lineage into
-    /// another's, e.g. reconstructing an imported `Symbol` whose `ty` was
-    /// interned by the module that exports it (`binder/imports.rs`).
-    ///
-    /// `cache` carries entries across sibling calls within one reintern (not
-    /// just recursive ones) so a shape referenced twice — a diamond, or the
-    /// same member type repeated in a union — is translated once.
-    pub fn reintern(
-        &mut self,
-        other: &CheckerTyTable,
-        id: CheckerTyId,
-        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
-    ) -> CheckerTyId {
-        if let Some(&done) = cache.get(&id) {
-            return done;
+        for (k, v) in &other.lists {
+            self.lists.entry(*k).or_insert_with(|| v.clone());
         }
-        let kind = other.get(id);
-        let translated = match kind {
-            TypeKind::Intrinsic(tag) => TypeKind::Intrinsic(tag),
-            TypeKind::This => TypeKind::This,
-            TypeKind::Array(inner) => TypeKind::Array(self.reintern(other, inner, cache)),
-            TypeKind::Union(list) => TypeKind::Union(self.reintern_list(other, list, cache)),
-            TypeKind::Intersection(list) => {
-                TypeKind::Intersection(self.reintern_list(other, list, cache))
-            }
-            TypeKind::Tuple(list) => TypeKind::Tuple(self.reintern_list(other, list, cache)),
-            TypeKind::Named(n, o) => TypeKind::Named(n, o),
-            TypeKind::Generic(n, list, o) => {
-                TypeKind::Generic(n, self.reintern_list(other, list, cache), o)
-            }
-            TypeKind::TemplateLiteral(list) => {
-                TypeKind::TemplateLiteral(self.reintern_list(other, list, cache))
-            }
-            TypeKind::Fn(fid) => TypeKind::Fn(self.reintern_function(other, fid, cache)),
-            TypeKind::Object(oid) => {
-                TypeKind::Object(self.reintern_object_members(other, oid, cache))
-            }
-            TypeKind::Typeof(e) => TypeKind::Typeof(e),
-            TypeKind::KeyOf(inner) => TypeKind::KeyOf(self.reintern(other, inner, cache)),
-            TypeKind::IndexedAccess { object, index } => TypeKind::IndexedAccess {
-                object: self.reintern(other, object, cache),
-                index: self.reintern(other, index, cache),
-            },
-            TypeKind::Mapped {
-                key_var,
-                source,
-                value,
-                optional,
-                readonly,
-            } => TypeKind::Mapped {
-                key_var,
-                source: self.reintern(other, source, cache),
-                value: self.reintern(other, value, cache),
-                optional,
-                readonly,
-            },
-            TypeKind::Conditional {
-                check,
-                extends,
-                true_type,
-                false_type,
-            } => TypeKind::Conditional {
-                check: self.reintern(other, check, cache),
-                extends: self.reintern(other, extends, cache),
-                true_type: self.reintern(other, true_type, cache),
-                false_type: self.reintern(other, false_type, cache),
-            },
-            TypeKind::Infer(n) => TypeKind::Infer(n),
-            TypeKind::EnumVariant {
-                enum_name,
-                variant_name,
-                type_args,
-                payload_ty,
-            } => TypeKind::EnumVariant {
-                enum_name,
-                variant_name,
-                type_args: self.reintern_list(other, type_args, cache),
-                payload_ty: self.reintern(other, payload_ty, cache),
-            },
-            TypeKind::TypePredicate {
-                parameter_name,
-                target_type,
-            } => TypeKind::TypePredicate {
-                parameter_name,
-                target_type: self.reintern(other, target_type, cache),
-            },
-        };
-        let new_id = self.intern(translated);
-        cache.insert(id, new_id);
-        new_id
-    }
-
-    fn reintern_list(
-        &mut self,
-        other: &CheckerTyTable,
-        id: TyListId,
-        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
-    ) -> TyListId {
-        let translated: Vec<CheckerTyId> = other
-            .get_list(id)
-            .to_vec()
-            .into_iter()
-            .map(|t| self.reintern(other, t, cache))
-            .collect();
-        self.intern_list(&translated)
-    }
-
-    fn reintern_function(
-        &mut self,
-        other: &CheckerTyTable,
-        id: FunctionTypeId,
-        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
-    ) -> FunctionTypeId {
-        let f = other.get_function(id).clone();
-        let params = f
-            .params
-            .into_iter()
-            .map(|p| crate::types::FunctionParam {
-                name: p.name,
-                ty: self.reintern(other, p.ty, cache),
-                optional: p.optional,
-                is_rest: p.is_rest,
-            })
-            .collect();
-        let return_type = self.reintern(other, f.return_type, cache);
-        self.intern_function(crate::types::FunctionType {
-            params,
-            return_type,
-            is_arrow: f.is_arrow,
-            type_params: f.type_params,
-        })
-    }
-
-    fn reintern_object_members(
-        &mut self,
-        other: &CheckerTyTable,
-        id: ObjectMembersId,
-        cache: &mut FxHashMap<CheckerTyId, CheckerTyId>,
-    ) -> ObjectMembersId {
-        use crate::types::ObjectTypeMember as M;
-        let members: Vec<M> = other
-            .get_object_members(id)
-            .to_vec()
-            .into_iter()
-            .map(|m| match m {
-                M::Property {
-                    name,
-                    ty,
-                    optional,
-                    readonly,
-                } => M::Property {
-                    name,
-                    ty: self.reintern(other, ty, cache),
-                    optional,
-                    readonly,
-                },
-                M::Method {
-                    name,
-                    params,
-                    return_type,
-                    optional,
-                    is_arrow,
-                } => M::Method {
-                    name,
-                    params: params
-                        .into_iter()
-                        .map(|p| crate::types::FunctionParam {
-                            name: p.name,
-                            ty: self.reintern(other, p.ty, cache),
-                            optional: p.optional,
-                            is_rest: p.is_rest,
-                        })
-                        .collect(),
-                    return_type: self.reintern(other, return_type, cache),
-                    optional,
-                    is_arrow,
-                },
-                M::Index {
-                    param_name,
-                    key_ty,
-                    value_ty,
-                } => M::Index {
-                    param_name,
-                    key_ty: self.reintern(other, key_ty, cache),
-                    value_ty: self.reintern(other, value_ty, cache),
-                },
-                M::Callable {
-                    params,
-                    return_type,
-                    is_arrow,
-                } => M::Callable {
-                    params: params
-                        .into_iter()
-                        .map(|p| crate::types::FunctionParam {
-                            name: p.name,
-                            ty: self.reintern(other, p.ty, cache),
-                            optional: p.optional,
-                            is_rest: p.is_rest,
-                        })
-                        .collect(),
-                    return_type: self.reintern(other, return_type, cache),
-                    is_arrow,
-                },
-            })
-            .collect();
-        self.intern_object_members(members)
+        for (k, v) in &other.functions {
+            self.functions.entry(*k).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.object_members {
+            self.object_members.entry(*k).or_insert_with(|| v.clone());
+        }
     }
 }
 
@@ -545,5 +363,22 @@ mod tests {
         let union1 = t.intern(TypeKind::Union(list1));
         let union2 = t.intern(TypeKind::Union(list2));
         assert_eq!(union1, union2);
+    }
+
+    /// The whole point of content addressing: two tables that grew in any
+    /// order agree on every shape's id, so `absorb` is a plain union.
+    #[test]
+    fn ids_are_order_independent_across_tables() {
+        let mut left = CheckerTyTable::default();
+        let mut right = CheckerTyTable::default();
+
+        // Same shapes, opposite insertion order.
+        let l_int = left.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let l_arr = left.intern(TypeKind::Array(l_int));
+        let r_int = right.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let r_arr = right.intern(TypeKind::Array(r_int));
+
+        assert_eq!(l_int, CheckerTyId::INT);
+        assert_eq!(l_arr, r_arr, "same shape -> same id regardless of order");
     }
 }

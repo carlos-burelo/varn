@@ -81,12 +81,12 @@ fn encode_with_owner(
             .stdlib_bind(module)
             .or_else(|| resolver.module_bind(module))
         {
-            if (ty.0.index() as usize) < b.ty_table.len() {
+            if b.ty_table.contains(ty.0) {
                 return encode_portable_type(ty, &b.ty_table, interner);
             }
         }
     }
-    if (ty.0.index() as usize) < fallback_table.len() {
+    if fallback_table.contains(ty.0) {
         return encode_portable_type(ty, fallback_table, interner);
     }
     PortableType::Intrinsic(TypeTag::Dynamic)

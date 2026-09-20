@@ -781,20 +781,19 @@ impl<'r> Checker<'r> {
     /// no translation, and an id past the exporter's table has no shape to
     /// decode — both degrade honestly instead of indexing out of bounds.
     pub(crate) fn reintern_foreign_ty(&mut self, bind: &BindResult, ty: Type) -> Type {
-        if ty.0.is_portable() || bind.ty_table.len() <= ty.0.index() as usize {
-            return ty;
+        // Content-addressed ids are portable: the id already names the right
+        // shape. Union the exporter's shapes in (only when this table cannot
+        // resolve the id) so `get` is total, then the id needs no translation.
+        if !self.ty_table.contains(ty.0) {
+            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&bind.ty_table);
         }
-        let mut cache = FxHashMap::default();
-        let id =
-            std::sync::Arc::make_mut(&mut self.ty_table).reintern(&bind.ty_table, ty.0, &mut cache);
-        let ty = Type(id, ty.1);
         // A member type written inside a class body (`tx: Sender<T>`) often
         // carries no origin of its own; without one, later member lookups
         // scan only the `std:` modules and miss the declaring `runtime:`
         // module. The bind we are decoding from IS the declaring module, so
         // stamp it as the origin when the shape has none.
         if matches!(
-            self.ty_table.get(id),
+            self.ty_table.get(ty.0),
             varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
         ) {
             let origin = self.resolver.intern(bind.source_file.as_ref());

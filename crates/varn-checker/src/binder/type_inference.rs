@@ -47,7 +47,7 @@ fn reintern_member_type(
     table: &mut CheckerTyTable,
 ) -> Type {
     let Some(ctx) = ctx else { return ty };
-    if ty.0.is_portable() {
+    if table.contains(ty.0) {
         return ty;
     }
     let Some(origin) = origin else { return ty };
@@ -63,14 +63,14 @@ fn reintern_member_type(
     else {
         return ty;
     };
-    if b.ty_table.len() <= ty.0.index() as usize {
+    if !b.ty_table.contains(ty.0) {
         return ty;
     }
-    let mut cache = rustc_hash::FxHashMap::default();
-    let id = table.reintern(&b.ty_table, ty.0, &mut cache);
-    let ty = Type(id, ty.1);
+    // Content-addressed ids need no translation: union the foreign shapes in
+    // so `table` can resolve `ty`, then the id is already correct.
+    table.absorb(&b.ty_table);
     if matches!(
-        table.get(id),
+        table.get(ty.0),
         varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
     ) {
         let origin = resolver.intern(b.source_file.as_ref());

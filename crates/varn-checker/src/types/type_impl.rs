@@ -42,10 +42,11 @@ impl Type {
         Type(table.intern(TypeKind::Intrinsic(tag)), false)
     }
 
-    /// See `CheckerTyId::sanitize_foreign` — same degrade-to-`Dynamic` rule,
-    /// applied to the wrapper.
+    /// Content-addressed ids are portable, so there is nothing to sanitize:
+    /// a foreign id names the same shape here as there (ADR-0012). Kept as a
+    /// no-op so callers that still express the old intent keep compiling.
     pub fn sanitize_foreign(self) -> Type {
-        Type(self.0.sanitize_foreign(), self.1)
+        self
     }
 
     // ── Constructors that build a new shape (need `&mut CheckerTyTable`) ──

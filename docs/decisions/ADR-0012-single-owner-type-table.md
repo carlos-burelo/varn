@@ -83,5 +83,7 @@ if publish cost shows up (Ley 10: no pre-optimisation without data).
 `DiskResolver` are `Send + Sync` (compile-time assertions in
 `checker_ty_table_invariants.rs`); the resolver's interior mutability moved from
 `RefCell` to `parking_lot::Mutex` and `ModuleLoader` now requires `Send + Sync`.
-Still pending: a deterministic parallel merge (the shared `absorb`/`set_ty_table`
-publish order is sequential today) and the parallel test.
+Steps 4–5 (the `absorb`/`reintern` dataflow) were **superseded by ADR-0013**,
+which makes `CheckerTyId` content-addressed so `absorb` is a plain union and
+`reintern` is deleted. Still pending: a work-stealing scheduler over the module
+DAG and the parallel checking test.
