@@ -366,6 +366,32 @@ Scoreboard: 0 wins, 1 tied, 11 rivals. Arranque 2.9x más rápido que Bun.
 - `http_routing`/`collection_pipeline`/`dto`: probablemente clases/generadores
   gated o closure-heavy; sin investigar.
 
+---
+
+## 13. `fib` arreglado; raíz de los outliers top-level
+
+Commit `bf062962`: `has_boxed_slots` mira solo la FIRMA; un local boxed no
+fuerza frame; `JumpIfFalse` sobre un bool estático rama por payload; `Move` y
+`CallSelf` leaf escriben por clase. `fib` pasa de frame-aware a **leaf**:
+
+| | antes | después |
+|---|---|---|
+| `fib` (release) | 5841 ms (100x) | **89.2 ms (~tied** con Bun 85.8) |
+
+Suite 1223/0 en JIT y `VARN_NO_JIT=1`; cobertura JIT igual (clif=1123,
+bail=416).
+
+**Causa raíz del resto de outliers (no arreglada):** `varn-checker/src/emit/
+mod.rs:278` marca el proto `<module>` con `is_async: true` **siempre** ("Module
+top level permits top-level `await`"). `try_compile` rechaza async en fase B,
+así que **todo el código top-level de todo módulo se interpreta**. Los
+benchmarks cuyo trabajo pesado está en el top-level (`collection_pipeline`
+9.09x, `dto` 8.33x, `http_routing` 20x) quedan bloqueados por eso. Arreglarlo
+= JIT de async/generadores (B6, suspensión/reanudación), o marcar el módulo
+`is_async` solo si de verdad usa `await` (cambio de semántica de top-level
+await a validar).
+
+
 
 
 
