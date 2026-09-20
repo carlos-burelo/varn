@@ -91,7 +91,6 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     h.jit_prepare_call = 0;
     h.jit_push_self_frame = 0;
     h.jit_post_call = 0;
-    h.load_static_fn = 0;
     h.jit_ensure_stack_capacity = 0;
     h.invoke_virtual = 0;
     h.get_property_ic_fast = 0;

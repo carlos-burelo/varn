@@ -243,7 +243,6 @@ fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
             Some(OpCode::LoadModuleSlot) => "LoadModuleSlot",
             Some(OpCode::StoreModuleSlot) => "StoreModuleSlot",
             Some(OpCode::InvokeRuntimeStatic) => "InvokeRuntimeStatic",
-            Some(OpCode::LoadStaticFn) => "LoadStaticFn",
             _ => {
                 ip += info.len;
                 continue;
