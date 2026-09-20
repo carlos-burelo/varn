@@ -177,7 +177,13 @@ pub(super) fn emit_get_fixed_field(
 
     let obj_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
-    let obj = use_boxed(b, c.vars, state, obj_r)?;
+    // Prefer the home slot (authoritative for a nullable `Ref` receiver, which
+    // the variable cannot distinguish from a heap ref).
+    let obj = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, obj_r)
+    } else {
+        use_boxed(b, c.vars, state, obj_r)?
+    };
 
     // ── Narrow-load decision ────────────────────────────────────────────
     // When the register meta statically proves the field is a primitive,
@@ -350,7 +356,11 @@ pub(super) fn emit_set_fixed_field(
 ) -> Result<(), String> {
     let val_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
-    let obj = use_boxed(b, c.vars, state, first_reg)?;
+    let obj = if let Some(actx) = actx {
+        super::alloc::box_or_load_home(b, actx, state, first_reg)
+    } else {
+        use_boxed(b, c.vars, state, first_reg)?
+    };
     let val = if let Some(actx) = actx {
         super::alloc::box_or_load_home(b, actx, state, val_r)
     } else {

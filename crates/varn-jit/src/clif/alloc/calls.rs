@@ -1010,9 +1010,11 @@ pub(crate) fn emit_get_property(
     b.append_block_param(cont, types::I128);
     let slow = b.create_block();
 
-    let (field_addr, _is_nursery) = emit_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
-    let v = b.ins().load(types::I128, m, field_addr, 0);
-    b.ins().jump(cont, &[v.into()]);
+    // Fase B: the field inline-cache path resolves a byte offset that assumes
+    // 16-byte instance fields; `InstanceData` is compact. Route every property
+    // access through the runtime helper until the IC is compact-aware.
+    let _ = emit_field_ic;
+    b.ins().jump(slow, &[]);
 
     // ── Slow path: the runtime property helper ──
     b.switch_to_block(slow);
@@ -1075,16 +1077,10 @@ pub(crate) fn emit_set_property(
     let cont = b.create_block();
     let slow = b.create_block();
 
-    // A nursery instance field the checker did not pin: store the VmValue
-    // directly. An old-gen receiver falls to the helper, which carries the
-    // old←young write barrier.
-    let (field_addr, is_nursery) = emit_field_ic(b, actx, obj_tag, obj_payload, cs_idx, slow);
-    let inline_store = b.create_block();
-    b.ins().brif(is_nursery, inline_store, &[], slow, &[]);
-    b.switch_to_block(inline_store);
-    let val128 = b.ins().iconcat(val_tag, val_payload);
-    b.ins().store(m, val128, field_addr, 0);
-    b.ins().jump(cont, &[]);
+    // Fase B: same as `emit_get_property` — the IC byte offset assumes 16-byte
+    // instance fields; route through the compact-aware helper.
+    let _ = emit_field_ic;
+    b.ins().jump(slow, &[]);
 
     // ── Slow path: the runtime property helper ──
     b.switch_to_block(slow);

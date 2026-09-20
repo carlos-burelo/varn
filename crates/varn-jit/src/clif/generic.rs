@@ -110,6 +110,13 @@ pub(super) fn emit_is_null(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!(
+            "ISNULL ip={ip} dest={dest} src={src} state_src={:?} meta_src={:?}",
+            state.get(src).copied(),
+            g.register_meta.get(src).map(|m| m.kind)
+        );
+    }
     let is_null = match state[src] {
         K::Int | K::Float | K::Bool => b.ins().iconst(types::I64, 0),
         _ => {

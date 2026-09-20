@@ -256,13 +256,13 @@ pub(crate) extern "C" fn clif_call_self(
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
-        let Some(closure) = ctx_ref.frames[frame_idx]._owned_closure.clone() else {
-            jit_propagate_error(
-                ctx_ref,
-                crate::error::RuntimeError::new("clif_call_self: frame has no owned closure"),
-            );
-        };
-        let callee_alloc = ctx_ref.stack.push_frame(&closure.proto);
+        // The running closure is borrowed, not owned: `CallFrame::new` keeps it
+        // alive through the caller's frame (frames form a chain). Avoids
+        // requiring `_owned_closure`, which the entry frame may not carry.
+        let closure_ptr = ctx_ref.frames[frame_idx].closure_ptr;
+        let closure_ref = &*closure_ptr;
+        let proto = closure_ref.proto.clone();
+        let callee_alloc = ctx_ref.stack.push_frame(&proto);
         for i in 0..argc {
             if let Err(e) = ctx_ref
                 .stack
@@ -274,7 +274,7 @@ pub(crate) extern "C" fn clif_call_self(
         }
         ctx_ref
             .frames
-            .push(crate::frame::CallFrame::new_owned(closure, callee_alloc));
+            .push(crate::frame::CallFrame::new(closure_ref, callee_alloc));
         match ctx_ref.run_until(caller_depth) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
