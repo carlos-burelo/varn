@@ -374,14 +374,8 @@ pub(crate) fn box_or_load_home(
     match class {
         SlotClass::Gpr => super::super::emit::box_int(b, raw),
         SlotClass::Fpr => super::super::emit::box_f64(b, raw),
-        // A `Ref` variable holds the whole `VmValue` (tag+payload) — no home
-        // round-trip needed.
-        SlotClass::Ref => b.use_var(var),
-        SlotClass::Dyn => match state.get(r).copied().unwrap_or(K::Unset) {
-            K::Int => super::super::emit::box_int(b, raw),
-            K::Bool => super::super::emit::box_bool(b, raw),
-            _ => load_home(b, actx, r),
-        },
+        // Heap-classed variables already hold the whole VmValue pair.
+        SlotClass::Ref | SlotClass::Dyn => b.use_var(var),
     }
 }
 
@@ -410,7 +404,8 @@ pub(crate) fn store_home(
     );
     use varn_types::register_meta::SlotClass;
     match class {
-        SlotClass::Ref => {}
+        // Heap-classed homes are kept current by def_result/Move/entry.
+        SlotClass::Ref | SlotClass::Dyn => {}
         SlotClass::Gpr => {
             let v = super::super::emit::box_int(b, raw);
             store_boxed_home(b, actx, reg, v);
@@ -419,18 +414,8 @@ pub(crate) fn store_home(
             let v = super::super::emit::box_f64(b, raw);
             store_boxed_home(b, actx, reg, v);
         }
-        SlotClass::Dyn => match state.get(reg).copied().unwrap_or(K::Unset) {
-            K::Int => {
-                let v = super::super::emit::box_int(b, raw);
-                store_boxed_home(b, actx, reg, v);
-            }
-            K::Bool => {
-                let v = super::super::emit::box_bool(b, raw);
-                store_boxed_home(b, actx, reg, v);
-            }
-            _ => {}
-        },
     }
+    let _ = state;
 }
 
 #[track_caller]
@@ -454,8 +439,11 @@ pub(crate) fn def_result(
             .map(|m| m.kind)
             .unwrap_or(varn_types::register_meta::SlotKind::Dynamic),
     );
-    if dest_class == varn_types::register_meta::SlotClass::Ref {
-        // The Ref variable carries the whole VmValue.
+    if matches!(
+        dest_class,
+        varn_types::register_meta::SlotClass::Ref | varn_types::register_meta::SlotClass::Dyn
+    ) {
+        // A heap-classed variable carries the whole VmValue.
         let pair = if b.func.dfg.value_type(res) == types::I128 {
             res
         } else {
@@ -571,8 +559,11 @@ pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]
                 .map(|m| m.kind)
                 .unwrap_or(varn_types::register_meta::SlotKind::Dynamic),
         );
-        if class == varn_types::register_meta::SlotClass::Ref {
-            // Ref variables hold the whole VmValue.
+        if matches!(
+            class,
+            varn_types::register_meta::SlotClass::Ref | varn_types::register_meta::SlotClass::Dyn
+        ) {
+            // Heap-classed variables hold the whole VmValue.
             b.def_var(actx.vars[r], v);
         } else if meta_is_float(actx.register_meta, r) {
             let f = unbox_f64_coerce(b, v);

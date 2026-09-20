@@ -32,12 +32,14 @@ pub(super) fn meta_is_int(meta: &[varn_types::register_meta::RegisterMeta], r: u
     meta.get(r).is_some_and(|m| m.kind == SlotKind::Int)
 }
 
-/// Whether register `r`'s physical class is `Ref` (its variable is an I128
-/// tag+payload pair).
+/// Whether register `r`'s physical class is heap-classed (`Ref` or `Dyn`),
+/// i.e. its variable is an I128 tag+payload pair rather than a scalar word.
 pub(super) fn dest_is_ref(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
-    meta.get(r)
-        .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind))
-        == Some(varn_types::register_meta::SlotClass::Ref)
+    matches!(
+        meta.get(r)
+            .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind)),
+        Some(varn_types::register_meta::SlotClass::Ref | varn_types::register_meta::SlotClass::Dyn)
+    )
 }
 
 pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
@@ -80,14 +82,19 @@ pub(super) fn def_const_int(
 pub(super) fn def_const_bool(
     b: &mut FunctionBuilder,
     actx: Option<&AllocCtx>,
+    meta: &[varn_types::register_meta::RegisterMeta],
     vars: &[Variable],
     reg: usize,
     v: bool,
 ) {
     let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
-    b.def_var(vars[reg], c);
+    let boxed = box_bool(b, c);
+    if dest_is_ref(meta, reg) {
+        b.def_var(vars[reg], boxed);
+    } else {
+        b.def_var(vars[reg], c);
+    }
     if let Some(actx) = actx {
-        let boxed = box_bool(b, c);
         super::alloc::store_boxed_home(b, actx, reg, boxed);
     }
 }
@@ -102,7 +109,15 @@ pub(super) fn use_int(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
         K::Int => Ok(b.use_var(vars[r])),
-        k if is_boxed_kind(k) => Ok(b.use_var(vars[r])),
+        k if is_boxed_kind(k) => {
+            let v = b.use_var(vars[r]);
+            // A paired (heap-classed) variable: the payload word is the int.
+            if b.func.dfg.value_type(v) == types::I128 {
+                Ok(b.ins().isplit(v).1)
+            } else {
+                Ok(v)
+            }
+        }
         k => Err(format!("clif: int use of {k:?} register")),
     }
 }

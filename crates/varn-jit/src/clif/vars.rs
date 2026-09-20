@@ -113,10 +113,15 @@ pub(super) fn declare(
                 .unwrap_or(varn_types::register_meta::SlotClass::Dyn);
             let ty = if is_param_float || meta_is_float(&proto.register_meta, r) {
                 types::F64
-            } else if class == varn_types::register_meta::SlotClass::Ref {
-                // A `Ref` register carries the whole `VmValue` (tag+payload) in
-                // its variable, so `null` stays distinguishable from a heap
-                // index and consumers read it without a home round-trip.
+            } else if matches!(
+                class,
+                varn_types::register_meta::SlotClass::Ref
+                    | varn_types::register_meta::SlotClass::Dyn
+            ) {
+                // Every heap-classed register (`Ref` and `Dyn` — str/bool/
+                // dynamic) carries the whole `VmValue` (tag+payload) in its
+                // variable, so `null`/`str`/`heap` are never confused and
+                // consumers read it without a home round-trip.
                 types::I128
             } else {
                 types::I64

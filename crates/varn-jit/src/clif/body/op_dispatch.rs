@@ -11,8 +11,8 @@ use varn_types::{FunctionProto, VmValue};
 use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
-    box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool, def_const_int,
-    dest_is_ref,
+    box_bool, box_f64, box_int, box_or_pass, call_helper_void, def_const, def_const_bool,
+    def_const_int, dest_is_ref,
     emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
     use_boxed, use_f64, use_int,
 };
@@ -60,8 +60,8 @@ pub(crate) fn dispatch_opcode(
         OpCode::LoadIntMinusOne => {
             def_const_int(b, actx, &proto.register_meta, vars, first_reg, -1)
         }
-        OpCode::LoadTrue => def_const_bool(b, actx, vars, first_reg, true),
-        OpCode::LoadFalse => def_const_bool(b, actx, vars, first_reg, false),
+        OpCode::LoadTrue => def_const_bool(b, actx, &proto.register_meta, vars, first_reg, true),
+        OpCode::LoadFalse => def_const_bool(b, actx, &proto.register_meta, vars, first_reg, false),
         OpCode::LoadInt => {
             let v = code[ip + 1] as i16 as i64;
             def_const_int(b, actx, &proto.register_meta, vars, first_reg, v);
@@ -278,6 +278,13 @@ pub(crate) fn dispatch_opcode(
             };
             if state_meta_int(&proto.register_meta, first_reg) {
                 b.def_var(vars[first_reg], r);
+            } else if dest_is_ref(&proto.register_meta, first_reg) {
+                let boxed = box_int(b, r);
+                if let Some(actx) = actx {
+                    alloc::def_result(b, actx, first_reg, boxed);
+                } else {
+                    b.def_var(vars[first_reg], boxed);
+                }
             } else {
                 let boxed = box_int(b, r);
                 let (_tag, payload) = b.ins().isplit(boxed);
@@ -378,8 +385,18 @@ pub(crate) fn dispatch_opcode(
                     _ => unreachable!(),
                 };
                 let c = b.ins().icmp(int_cc, s1, s2);
-                let ext = b.ins().uextend(types::I64, c);
-                b.def_var(vars[first_reg], ext);
+                if dest_is_ref(&proto.register_meta, first_reg) {
+                    // A heap-classed (paired) destination holds a boxed bool.
+                    let boxed = box_bool(b, c);
+                    if let Some(actx) = actx {
+                        alloc::def_result(b, actx, first_reg, boxed);
+                    } else {
+                        b.def_var(vars[first_reg], boxed);
+                    }
+                } else {
+                    let ext = b.ins().uextend(types::I64, c);
+                    b.def_var(vars[first_reg], ext);
+                }
             } else {
                 let h_fn = match op {
                     OpCode::LtInt => helpers.lt,

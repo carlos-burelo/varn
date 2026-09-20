@@ -168,6 +168,9 @@ pub(super) fn lower_raw(
     for &var in local_obj_bases.values() {
         b.def_var(var, zero);
     }
+    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        eprintln!("ENTRYINIT done frame_aware={frame_aware}");
+    }
 
     let mut leaf_ctx = None;
     let mut entry_base = None;
@@ -218,11 +221,7 @@ pub(super) fn lower_raw(
         let p = b.block_params(entry)[param_idx];
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
             || meta_is_float(&proto.register_meta, r);
-        let is_ref = proto
-            .register_meta
-            .get(r)
-            .map(|m| varn_types::register_meta::SlotClass::of_kind(m.kind))
-            == Some(varn_types::register_meta::SlotClass::Ref);
+        let is_ref = dest_is_ref(&proto.register_meta, r);
         if is_ref {
             // A `Ref` register carries the whole VmValue; the home slot already
             // holds it (written by `materialize_frame`/`jit_prepare_static_call`
@@ -259,8 +258,12 @@ pub(super) fn lower_raw(
     if proto.has_this && !osr {
         if let Some(actx) = actx.as_ref() {
             let this = alloc::load_receiver(&mut b, actx);
-            let (_tag, payload) = b.ins().isplit(this);
-            b.def_var(vars[0], payload);
+            if dest_is_ref(&proto.register_meta, 0) {
+                b.def_var(vars[0], this);
+            } else {
+                let (_tag, payload) = b.ins().isplit(this);
+                b.def_var(vars[0], payload);
+            }
         }
     }
 
