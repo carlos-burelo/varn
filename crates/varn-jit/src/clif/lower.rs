@@ -240,18 +240,10 @@ fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
             break;
         };
         let name = match OpCode::from_u8(code[ip] as u8) {
+            // Class setup ops now have native lowerings + registered helpers,
+            // and (since fields are inline-compact) a class-heavy MODULE can
+            // JIT its hot top-level loops.
             Some(OpCode::CallSpread) => "CallSpread",
-            Some(OpCode::MakeClass) => "MakeClass",
-            Some(OpCode::Inherit) => "Inherit",
-            Some(OpCode::Method) => "Method",
-            Some(OpCode::DefineStatic) => "DefineStatic",
-            Some(OpCode::DefineGetter) => "DefineGetter",
-            Some(OpCode::DefineSetter) => "DefineSetter",
-            Some(OpCode::DefineStaticGetter) => "DefineStaticGetter",
-            Some(OpCode::DefineStaticSetter) => "DefineStaticSetter",
-            Some(OpCode::DeclareField) => "DeclareField",
-            Some(OpCode::BindMethod) => "BindMethod",
-            Some(OpCode::GetSuper) => "GetSuper",
             Some(OpCode::GetSymbol) => "GetSymbol",
             Some(OpCode::Yield) => "Yield",
             Some(OpCode::Await) => "Await",
