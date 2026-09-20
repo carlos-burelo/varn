@@ -153,7 +153,11 @@ fn ids_agree_across_threads_and_interning_order() {
             let _u = t.intern(TypeKind::Union(l));
             let a = t.intern(TypeKind::Array(CheckerTyId::INT));
             let l2 = t.intern_list(&[CheckerTyId::INT, CheckerTyId::STR]);
-            (a, t.intern(TypeKind::Union(l2)), t.intern(TypeKind::Array(a)))
+            (
+                a,
+                t.intern(TypeKind::Union(l2)),
+                t.intern(TypeKind::Array(a)),
+            )
         } else {
             let a = t.intern(TypeKind::Array(CheckerTyId::INT));
             let l = t.intern_list(&[CheckerTyId::INT, CheckerTyId::STR]);

@@ -37,13 +37,7 @@ const PHASES: &[&str] = &[
 #[cfg(target_arch = "x86_64")]
 const JIT_PHASES: &[&str] = &["tiers", "bails", "roots", "clif:route", "clif:kinds"];
 
-const FIXTURES: &[&str] = &[
-    "arith",
-    "loop_array",
-    "class_fields",
-    "generics",
-    "closure",
-];
+const FIXTURES: &[&str] = &["arith", "loop_array", "class_fields", "generics", "closure"];
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../varn-pipeline/tests/fixtures/debug")
