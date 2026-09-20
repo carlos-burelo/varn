@@ -3,7 +3,6 @@ use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern};
 use varn_core::{Atom, TypeKind};
@@ -308,8 +307,8 @@ impl<'r> super::Binder<'r> {
         });
         let extends = extends.map(|(n, o)| {
             (
-                Rc::<str>::from(self.interner.resolve(n)),
-                o.map(|o| Rc::<str>::from(self.interner.resolve(o))),
+                Arc::<str>::from(self.interner.resolve(n)),
+                o.map(|o| Arc::<str>::from(self.interner.resolve(o))),
             )
         });
 

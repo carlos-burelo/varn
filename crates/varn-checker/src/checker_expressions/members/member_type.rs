@@ -2,7 +2,6 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::{CheckerTyTable, ObjectTypeMember, Type};
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::TypeKind;
 
@@ -369,7 +368,7 @@ impl<'r> Checker<'r> {
                 }
 
                 let ext_bind_opt = self.resolver.find_bind_for_type(&name, &origin_modules);
-                let candidates: Box<dyn Iterator<Item = Rc<crate::binder::BindResult>>> =
+                let candidates: Box<dyn Iterator<Item = Arc<crate::binder::BindResult>>> =
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
                     } else if origin.is_none() {

@@ -3,7 +3,6 @@ use crate::scope::{ScopeArena, ScopeId};
 use crate::symbol::{Symbol, SymbolArena, SymbolId};
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::ast::{ExprId, StmtId, TypeNode};
 use varn_core::Atom;
@@ -255,7 +254,7 @@ impl BindResult {
 
 /// A bound module paired with the capability to follow its imports.
 ///
-/// [`BindResult`] is **data**: cached as `Rc<BindResult>`, serialized to the
+/// [`BindResult`] is **data**: cached as `Arc<BindResult>`, serialized to the
 /// interface blobs on disk, shared between modules. Reaching another module is
 /// a **capability**. Fusing the two — which is what `impl TypeContext for
 /// BindResult` used to do — meant a serializable data structure carried the
@@ -278,7 +277,7 @@ impl<'r> BindView<'r> {
     }
 
     /// The bind for `origin`, when it names a module other than this one.
-    fn foreign(&self, origin: Option<&str>) -> Option<Rc<BindResult>> {
+    fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {
             return None;

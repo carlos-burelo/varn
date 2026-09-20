@@ -3,7 +3,6 @@ use crate::module_resolver::cache::ExportMap;
 use crate::module_resolver::graph::ModuleGraph;
 use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::ModuleId;
 
@@ -27,17 +26,17 @@ type CoreExportsMap = rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>;
 /// because export resolution is mutually recursive through imports.
 pub trait ImportResolver {
     /// Bind a workspace module identified by canonical absolute path.
-    fn module_bind(&self, abs_path: &str) -> Option<Rc<BindResult>>;
+    fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
 
     /// Exports of a workspace module. `visiting` carries the in-progress cycle
     /// set; import cycles resolve to an empty map rather than recursing.
-    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Rc<ExportMap>;
+    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap>;
 
     /// Bind a `std:` / `core:` / `runtime:` module.
-    fn stdlib_bind(&self, specifier: &str) -> Option<Rc<BindResult>>;
+    fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>>;
 
     /// Exports of a `std:` / `core:` / `runtime:` module.
-    fn stdlib_exports(&self, specifier: &str) -> Rc<ExportMap>;
+    fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap>;
 
     /// Turn an import specifier into an absolute path, relative to `base_dir`.
     fn resolve_specifier(&self, base_dir: &Path, specifier: &str) -> Option<String>;
@@ -119,7 +118,7 @@ pub trait ImportResolver {
         &self,
         type_name: &str,
         origin_modules: &[String],
-    ) -> Option<Rc<BindResult>> {
+    ) -> Option<Arc<BindResult>> {
         for path in origin_modules {
             let Some(bind) = self.module_bind(path).or_else(|| self.stdlib_bind(path)) else {
                 continue;
@@ -281,35 +280,35 @@ impl DiskResolver {
     // mutually recursive through imports, so a borrow held across a nested
     // resolve would panic at runtime.
 
-    pub(super) fn cached_bind(&self, key: &str) -> Option<Rc<BindResult>> {
+    pub(super) fn cached_bind(&self, key: &str) -> Option<Arc<BindResult>> {
         self.graph.borrow().bind(key)
     }
 
-    pub(super) fn store_bind(&self, key: String, bind: Rc<BindResult>) {
+    pub(super) fn store_bind(&self, key: String, bind: Arc<BindResult>) {
         self.graph.borrow_mut().insert_bind(key, bind);
     }
 
-    pub(super) fn cached_exports(&self, key: &str) -> Option<Rc<ExportMap>> {
+    pub(super) fn cached_exports(&self, key: &str) -> Option<Arc<ExportMap>> {
         self.graph.borrow().exports(key)
     }
 
-    pub(super) fn store_exports(&self, key: String, exports: Rc<ExportMap>) {
+    pub(super) fn store_exports(&self, key: String, exports: Arc<ExportMap>) {
         self.graph.borrow_mut().insert_exports(key, exports);
     }
 
-    pub(super) fn cached_program(&self, key: &str) -> Option<Rc<varn_core::ast::Program>> {
+    pub(super) fn cached_program(&self, key: &str) -> Option<Arc<varn_core::ast::Program>> {
         self.graph.borrow().program(key)
     }
 
-    pub(super) fn store_program(&self, key: String, program: Rc<varn_core::ast::Program>) {
+    pub(super) fn store_program(&self, key: String, program: Arc<varn_core::ast::Program>) {
         self.graph.borrow_mut().insert_program(key, program);
     }
 
-    pub(super) fn cached_arena(&self, key: &str) -> Option<Rc<varn_core::ast::AstArena>> {
+    pub(super) fn cached_arena(&self, key: &str) -> Option<Arc<varn_core::ast::AstArena>> {
         self.graph.borrow().arena(key)
     }
 
-    pub(super) fn store_arena(&self, key: String, arena: Rc<varn_core::ast::AstArena>) {
+    pub(super) fn store_arena(&self, key: String, arena: Arc<varn_core::ast::AstArena>) {
         self.graph.borrow_mut().insert_arena(key, arena);
     }
 
@@ -330,8 +329,8 @@ impl DiskResolver {
         source: &str,
         key: &str,
     ) -> Option<(
-        Rc<varn_core::ast::Program>,
-        Rc<varn_core::ast::AstArena>,
+        Arc<varn_core::ast::Program>,
+        Arc<varn_core::ast::AstArena>,
         Vec<varn_core::Diagnostic>,
     )> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
@@ -343,10 +342,10 @@ impl DiskResolver {
         let (program, interner, arena) =
             varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
         self.set_interner(interner);
-        let program = Rc::new(program);
-        let arena = Rc::new(arena);
-        self.store_program(key.to_owned(), Rc::clone(&program));
-        self.store_arena(key.to_owned(), Rc::clone(&arena));
+        let program = Arc::new(program);
+        let arena = Arc::new(arena);
+        self.store_program(key.to_owned(), Arc::clone(&program));
+        self.store_arena(key.to_owned(), Arc::clone(&arena));
         Some((program, arena, lex_errs))
     }
 
@@ -362,7 +361,7 @@ impl DiskResolver {
         interner: varn_core::AtomInterner,
         lex_errs: Vec<varn_core::Diagnostic>,
         key: &str,
-    ) -> Rc<BindResult> {
+    ) -> Arc<BindResult> {
         self.in_flight.borrow_mut().insert(key.to_owned());
         let mut bind = crate::binder::Binder::bind(program, ast_arena, interner, self);
         self.in_flight.borrow_mut().remove(key);
@@ -376,8 +375,8 @@ impl DiskResolver {
         // panics out of bounds — same fix as `parse_and_cache`.
         self.set_interner(bind.interner.clone());
         self.set_ty_table(bind.ty_table.clone());
-        let bind = Rc::new(bind);
-        self.store_bind(key.to_owned(), Rc::clone(&bind));
+        let bind = Arc::new(bind);
+        self.store_bind(key.to_owned(), Arc::clone(&bind));
         bind
     }
 
@@ -460,21 +459,21 @@ impl DiskResolver {
         source: &str,
         carrier: super::CarrierKind,
         visiting: &mut Vec<String>,
-    ) -> Rc<ExportMap> {
+    ) -> Arc<ExportMap> {
         if visiting.iter().any(|v| v == virtual_id) {
-            return Rc::new(ExportMap::default());
+            return Arc::new(ExportMap::default());
         }
         visiting.push(virtual_id.to_owned());
 
         if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
-            self.store_bind(virtual_id.to_owned(), Rc::new(cached.bind));
+            self.store_bind(virtual_id.to_owned(), Arc::new(cached.bind));
             visiting.pop();
-            return Rc::new(cached.exports);
+            return Arc::new(cached.exports);
         }
 
         let Some((program, ast_arena, _lex_errs)) = self.parse_and_cache(source, virtual_id) else {
             visiting.pop();
-            return Rc::new(ExportMap::default());
+            return Arc::new(ExportMap::default());
         };
         let bind = self.bind_and_cache(
             &program,
@@ -494,7 +493,7 @@ impl DiskResolver {
 
         super::cache::save_to_cache(self, virtual_id, source, &exports, bind.as_ref(), carrier);
         visiting.pop();
-        Rc::new(exports)
+        Arc::new(exports)
     }
 
     fn bind_from_embedded(
@@ -502,16 +501,16 @@ impl DiskResolver {
         virtual_id: &str,
         source: &str,
         carrier: super::CarrierKind,
-    ) -> Option<Rc<BindResult>> {
+    ) -> Option<Arc<BindResult>> {
         if let Some(cached) = self.cached_bind(virtual_id) {
             return Some(cached);
         }
         if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
-            let bind_rc = Rc::new(cached.bind);
-            self.store_bind(virtual_id.to_owned(), Rc::clone(&bind_rc));
+            let bind_rc = Arc::new(cached.bind);
+            self.store_bind(virtual_id.to_owned(), Arc::clone(&bind_rc));
             self.store_exports(
                 ModuleId::stdlib(virtual_id).as_str().to_owned(),
-                Rc::new(cached.exports),
+                Arc::new(cached.exports),
             );
             return Some(bind_rc);
         }
@@ -557,7 +556,7 @@ impl ImportResolver for DiskResolver {
         self.interner.borrow_mut().intern(s)
     }
 
-    fn module_bind(&self, abs_path: &str) -> Option<Rc<BindResult>> {
+    fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
         if let Some(cached) = self.cached_bind(abs_path) {
             return Some(cached);
         }
@@ -584,9 +583,9 @@ impl ImportResolver for DiskResolver {
         let source = source.as_ref();
 
         if let Some(cached) = super::cache::try_load_cache(self, &canonical, source, carrier) {
-            let bind_rc = Rc::new(cached.bind);
-            self.store_bind(canonical.clone(), Rc::clone(&bind_rc));
-            self.store_exports(canonical, Rc::new(cached.exports));
+            let bind_rc = Arc::new(cached.bind);
+            self.store_bind(canonical.clone(), Arc::clone(&bind_rc));
+            self.store_exports(canonical, Arc::new(cached.exports));
             return Some(bind_rc);
         }
 
@@ -613,7 +612,7 @@ impl ImportResolver for DiskResolver {
         Some(bind)
     }
 
-    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Rc<ExportMap> {
+    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap> {
         if let Some(cached) = self.cached_exports(abs_path) {
             return cached;
         }
@@ -626,22 +625,22 @@ impl ImportResolver for DiskResolver {
         }
 
         if visiting.iter().any(|v| v == &canonical) {
-            return Rc::new(ExportMap::default());
+            return Arc::new(ExportMap::default());
         }
 
         // Publish an empty map before recursing: a cycle that reaches this
         // module again finds the sentinel instead of recursing forever.
-        self.store_exports(canonical.clone(), Rc::new(ExportMap::default()));
+        self.store_exports(canonical.clone(), Arc::new(ExportMap::default()));
 
         visiting.push(canonical.clone());
-        let result = Rc::new(self.module_exports_uncached(&canonical, visiting));
+        let result = Arc::new(self.module_exports_uncached(&canonical, visiting));
         visiting.pop();
 
-        self.store_exports(canonical, Rc::clone(&result));
+        self.store_exports(canonical, Arc::clone(&result));
         result
     }
 
-    fn stdlib_bind(&self, specifier: &str) -> Option<Rc<BindResult>> {
+    fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>> {
         let key = ModuleId::stdlib(specifier).as_str();
         if let Some(cached) = self.cached_bind(&key) {
             return Some(cached);
@@ -658,7 +657,7 @@ impl ImportResolver for DiskResolver {
         self.bind_from_embedded(specifier, source.text.as_ref(), carrier)
     }
 
-    fn stdlib_exports(&self, specifier: &str) -> Rc<ExportMap> {
+    fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap> {
         let key = ModuleId::stdlib(specifier).as_str();
         if let Some(cached) = self.cached_exports(&key) {
             return cached;
@@ -678,10 +677,10 @@ impl ImportResolver for DiskResolver {
 
         match result {
             Some(exports) => {
-                self.store_exports(key, Rc::clone(&exports));
+                self.store_exports(key, Arc::clone(&exports));
                 exports
             }
-            None => Rc::new(ExportMap::default()),
+            None => Arc::new(ExportMap::default()),
         }
     }
 

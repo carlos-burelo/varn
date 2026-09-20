@@ -63,7 +63,7 @@ impl Default for Type {
 /// specific expression occurrence, not of a function signature or object
 /// shape's declared members, so it has nothing to attach to here (matches
 /// the plan's Task 21 Step 2 example). `name` fields use `Arc<str>` (not
-/// `Rc<str>`): these names live inside `CheckerTyTable`, so `Rc` would make
+/// `Arc<str>`): these names live inside `CheckerTyTable`, so `Rc` would make
 /// the whole table `!Send + !Sync` and block parallel module checking.
 /// `Arc<str>` keeps the `.as_ref()` / `PartialEq<str>` ergonomics that
 /// `Atom` would have forced the interner through every comparison to

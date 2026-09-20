@@ -179,7 +179,7 @@ impl<'r> Checker<'r> {
 
         // Fields: this module first, then the module that defines the type.
         let mut fields = bind.sum_variant_fields.get(variant).cloned();
-        let mut def_bind: Option<std::rc::Rc<BindResult>> = None;
+        let mut def_bind: Option<std::sync::Arc<BindResult>> = None;
         if fields.is_none() {
             if let Some(o) = &origin {
                 let mb = self

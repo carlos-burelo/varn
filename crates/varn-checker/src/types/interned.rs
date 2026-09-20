@@ -212,7 +212,7 @@ impl CheckerTyTable {
 
     /// Returns the shape by VALUE (`InternedTypeKind` is `Copy`).
     ///
-    /// Ley 3: a single-owner table lives behind `Rc<RefCell<..>>`, and a `Ref`
+    /// Ley 3: a single-owner table lives behind `Arc<RefCell<..>>`, and a `Ref`
     /// guard cannot hand out a `&` that outlives the call, so the accessor
     /// returns the shape instead of borrowing it.
     pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {

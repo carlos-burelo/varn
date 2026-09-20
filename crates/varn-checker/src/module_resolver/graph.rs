@@ -2,7 +2,7 @@ use crate::binder::BindResult;
 use crate::module_resolver::cache::ExportMap;
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 use varn_core::ModuleId;
 
 /// Everything the checker memoizes about *other* modules, in one owned place.
@@ -25,13 +25,13 @@ use varn_core::ModuleId;
 #[derive(Default)]
 pub struct ModuleGraph {
     /// Bound modules, keyed by canonical absolute path (or `std:`-style id).
-    binds: FxHashMap<String, Rc<BindResult>>,
-    exports: FxHashMap<String, Rc<ExportMap>>,
-    programs: FxHashMap<String, Rc<varn_core::ast::Program>>,
+    binds: FxHashMap<String, Arc<BindResult>>,
+    exports: FxHashMap<String, Arc<ExportMap>>,
+    programs: FxHashMap<String, Arc<varn_core::ast::Program>>,
     /// The `AstArena` each cached `program` was parsed into — same key, same
     /// lifetime, stored alongside it since an `ExprId`/`StmtId` in `program`
     /// resolves only against the arena it was allocated from.
-    arenas: FxHashMap<String, Rc<varn_core::ast::AstArena>>,
+    arenas: FxHashMap<String, Arc<varn_core::ast::AstArena>>,
     /// `(base_dir, specifier)` → resolved absolute path.
     resolved_paths: FxHashMap<(String, String), String>,
     /// imported module → modules that import it. Drives transitive eviction.
@@ -46,44 +46,44 @@ impl ModuleGraph {
 
     // ── binds ────────────────────────────────────────────────────────────
 
-    pub fn bind(&self, key: &str) -> Option<Rc<BindResult>> {
-        self.binds.get(key).map(Rc::clone)
+    pub fn bind(&self, key: &str) -> Option<Arc<BindResult>> {
+        self.binds.get(key).map(Arc::clone)
     }
 
     /// First write wins: a module already bound in this graph must keep its
     /// identity, or callers holding an `Rc` to the old one would silently
     /// disagree with callers that fetch it later.
-    pub fn insert_bind(&mut self, key: String, bind: Rc<BindResult>) {
+    pub fn insert_bind(&mut self, key: String, bind: Arc<BindResult>) {
         self.binds.entry(key).or_insert(bind);
     }
 
     // ── exports ──────────────────────────────────────────────────────────
 
-    pub fn exports(&self, key: &str) -> Option<Rc<ExportMap>> {
-        self.exports.get(key).map(Rc::clone)
+    pub fn exports(&self, key: &str) -> Option<Arc<ExportMap>> {
+        self.exports.get(key).map(Arc::clone)
     }
 
-    pub fn insert_exports(&mut self, key: String, exports: Rc<ExportMap>) {
+    pub fn insert_exports(&mut self, key: String, exports: Arc<ExportMap>) {
         self.exports.insert(key, exports);
     }
 
     // ── parsed programs ──────────────────────────────────────────────────
 
-    pub fn program(&self, key: &str) -> Option<Rc<varn_core::ast::Program>> {
-        self.programs.get(key).map(Rc::clone)
+    pub fn program(&self, key: &str) -> Option<Arc<varn_core::ast::Program>> {
+        self.programs.get(key).map(Arc::clone)
     }
 
-    pub fn insert_program(&mut self, key: String, program: Rc<varn_core::ast::Program>) {
+    pub fn insert_program(&mut self, key: String, program: Arc<varn_core::ast::Program>) {
         self.programs.entry(key).or_insert(program);
     }
 
     // ── AST arenas ───────────────────────────────────────────────────────
 
-    pub fn arena(&self, key: &str) -> Option<Rc<varn_core::ast::AstArena>> {
-        self.arenas.get(key).map(Rc::clone)
+    pub fn arena(&self, key: &str) -> Option<Arc<varn_core::ast::AstArena>> {
+        self.arenas.get(key).map(Arc::clone)
     }
 
-    pub fn insert_arena(&mut self, key: String, arena: Rc<varn_core::ast::AstArena>) {
+    pub fn insert_arena(&mut self, key: String, arena: Arc<varn_core::ast::AstArena>) {
         self.arenas.entry(key).or_insert(arena);
     }
 
@@ -154,5 +154,18 @@ impl ModuleGraph {
         self.arenas.clear();
         self.resolved_paths.clear();
         self.reverse_deps.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The graph caches `BindResult`/`ExportMap`/`Program`/`AstArena`. With the
+    /// last `Rc` (this file) moved to `Arc`, the cache itself must be
+    /// `Send + Sync` so it can back a resolver shared across checker workers
+    /// (Ley 3, ADR-0012). A reintroduced `Rc` here fails the suite.
+    #[test]
+    fn module_graph_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<super::ModuleGraph>();
     }
 }
