@@ -214,7 +214,6 @@ fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
         let name = match OpCode::from_u8(code[ip] as u8) {
             Some(OpCode::CallSpread) => "CallSpread",
             Some(OpCode::CallSelf) => "CallSelf",
-            Some(OpCode::MakeClosure) => "MakeClosure",
             Some(OpCode::MakeClass) => "MakeClass",
             Some(OpCode::Inherit) => "Inherit",
             Some(OpCode::Method) => "Method",
