@@ -23,11 +23,18 @@ Pendiente (fase B completa):
   `register_meta`**: la lattice `K` (flujo) y `register_meta` (meet por SSA)
   pueden discrepar en un registro — `Cons.length`'s `Move r2 = r6` acaba
   boxeando el payload de un campo `Ref` como `bool` y `set_addr` lo rechaza.
-  Arreglar eso (que un registro `Ref` sostenga siempre un ref, y `typed()`/los
-  emisores coincidan) desbloquea clases/objetos/arrays/mapas/métodos.
-- **Llamada nativa directa** compiled→compiled: hoy `Call` cruza a Rust
-  (`call_vm_window` + `run_until`). Restaurar el frame push inline + wrapper, o
-  bajar de SSA con ABI por clase, es lo que lleva la ejecución a máquina nativa.
+  Trazas (`VARN_HOME_TRACE`) muestran que en la iteración que falla un store a
+  `r2 (Ref)` recibe `tag=bool` con payload basura, y que `r6` (la lectura del
+  campo) no pasa por el helper compacto (toma el inline/Objeto). Es value-flow
+  del JIT: la variable de un registro y/o el camino del acceso de campo
+  divergen. Arreglarlo desbloquea clases/objetos/arrays/mapas/métodos.
+- **Llamada nativa directa** compiled→compiled: **HECHO**. `emit_vm_call` pide a
+  `jit_prepare_static_call` que empuje la activación del callee por `FrameStore`
+  (`mov_cross` de los argumentos) y devuelva la entrada del wrapper compilado;
+  el call site invoca el wrapper directamente y `jit_finish_static_call` hace el
+  pop. Solo cae a la ventana VM (`clif_call_fallback`) para no-closure,
+  async/generator/rest o callee sin código. Cobertura JIT del bench 97.6%
+  (83/85).
 - **Homes inline** `(clase, base+idx)` en vez de `home_store`/`home_load`.
 - **generator/async**: suspensión/reanudación por clases.
 - `CallSpread`, `InvokeRuntimeStatic`: sin migrar.
