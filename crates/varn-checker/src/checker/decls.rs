@@ -120,7 +120,7 @@ impl<'r> Checker<'r> {
                         let inferred_yield = if yields.is_empty() {
                             Type::Void
                         } else {
-                            Type::union(yields, &mut self.ty_table)
+                            Type::union(yields, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                         };
                         let scope = bind.scopes.get(saved_scope);
                         if let Some(sym_id) = scope.resolve(f.id, &bind.scopes) {
@@ -134,12 +134,12 @@ impl<'r> Checker<'r> {
                                     let new_ret = crate::types::generator_of(
                                         inferred_yield,
                                         f.modifiers.is_async,
-                                        &mut self.ty_table,
+                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                         Some(self.resolver),
                                     );
                                     let mut ft = self.ty_table.get_function(fid).clone();
                                     ft.return_type = new_ret.0;
-                                    let new_fn_ty = Type::fn_(ft, &mut self.ty_table);
+                                    let new_fn_ty = Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                                     self.symbol_types.insert(sym_id, new_fn_ty);
                                     self.record_type_with_symbol(f.id_offset, new_fn_ty, sym_id);
                                 }

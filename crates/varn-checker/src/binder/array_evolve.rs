@@ -214,7 +214,7 @@ impl<'r> Binder<'r> {
                 if !c.escaped && !c.conflict {
                     if let Some(elem) = c.elem_ty {
                         let offset = self.arena.get(c.sym_id).offset;
-                        let array_ty = Type::array(elem, &mut self.ty_table);
+                        let array_ty = Type::array(elem, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         self.evolved_array_types.insert(offset, array_ty);
                     }
                 }

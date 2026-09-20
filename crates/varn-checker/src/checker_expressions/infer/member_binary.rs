@@ -16,7 +16,7 @@ pub(super) fn infer_member_type(
 ) -> Type {
     let arena = checker.ast_arena;
     let obj_ty_raw = checker.infer_type(object, bind);
-    let obj_ty = obj_ty_raw.non_nullified(&mut checker.ty_table);
+    let obj_ty = obj_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut checker.ty_table));
     let obj_ty = if matches!(
         checker.ty_table.get(obj_ty.0),
         varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Never)
@@ -31,7 +31,7 @@ pub(super) fn infer_member_type(
             expr,
             arena,
             Some(&crate::binder::BindView::new(bind, checker.resolver)),
-            &mut checker.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
         );
     };
 
@@ -40,7 +40,7 @@ pub(super) fn infer_member_type(
     match obj_kind {
         TypeKind::Array(_elem) => {
             if prop_name_str == varn_core::MemberKey::Length.as_str() {
-                return Type::intrinsic(TypeTag::Int, &mut checker.ty_table);
+                return Type::intrinsic(TypeTag::Int, &mut *std::sync::Arc::make_mut(&mut checker.ty_table));
             }
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
@@ -63,7 +63,7 @@ pub(super) fn infer_member_type(
         expr,
         arena,
         Some(&crate::binder::BindView::new(bind, checker.resolver)),
-        &mut checker.ty_table,
+        &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
     )
 }
 
@@ -128,7 +128,7 @@ pub(super) fn infer_binary_type(
                 | BinaryOp::Shr
                 | BinaryOp::UShr => {
                     if l.is_int() && r.is_int() {
-                        return Type::intrinsic(TypeTag::Int, &mut checker.ty_table);
+                        return Type::intrinsic(TypeTag::Int, &mut *std::sync::Arc::make_mut(&mut checker.ty_table));
                     }
                     Type::Dynamic.tainted()
                 }

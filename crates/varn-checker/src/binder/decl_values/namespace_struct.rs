@@ -13,7 +13,7 @@ impl<'r> super::super::Binder<'r> {
             id_rc.clone(),
             Some(Rc::from(self.source_file.as_ref())),
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym =
             Symbol::new(SymbolKind::Namespace, n.id, n.range.start.line).with_type(namespace_ty);
@@ -50,7 +50,7 @@ impl<'r> super::super::Binder<'r> {
                     let ret = crate::types::async_fn_return(
                         declared,
                         f.modifiers.is_async,
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         &self.interner,
                         Some(self.resolver),
                     );
@@ -73,7 +73,7 @@ impl<'r> super::super::Binder<'r> {
                                 let is_array =
                                     matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                                 if !is_array {
-                                    ty = Type::array(ty, &mut self.ty_table);
+                                    ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                                 }
                             }
                             crate::types::FunctionParam {
@@ -95,7 +95,7 @@ impl<'r> super::super::Binder<'r> {
                                 .map(|t| Rc::from(self.interner.resolve(t.name)))
                                 .collect(),
                         },
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(f.id, &self.scopes);
@@ -136,7 +136,7 @@ impl<'r> super::super::Binder<'r> {
                         name.clone(),
                         Some(Rc::from(self.source_file.as_ref())),
                         self.resolver,
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
                         name,
@@ -203,7 +203,7 @@ impl<'r> super::super::Binder<'r> {
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(n.id, &self.scopes);
                     let n_id_rc: Rc<str> = Rc::from(self.interner.resolve(n.id));
-                    let ns_ty = Type::named(n_id_rc.clone(), self.resolver, &mut self.ty_table);
+                    let ns_ty = Type::named(n_id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     members.push(ClassMemberInfo {
                         name: n_id_rc,
                         kind: ClassMemberKind::Namespace,
@@ -232,7 +232,7 @@ impl<'r> super::super::Binder<'r> {
                         t_id_rc.clone(),
                         Some(Rc::from(self.source_file.as_ref())),
                         self.resolver,
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
                         name: t_id_rc,
@@ -264,7 +264,7 @@ impl<'r> super::super::Binder<'r> {
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(e.id, &self.scopes);
-                    let enum_ty = Type::named(e_id_rc.clone(), self.resolver, &mut self.ty_table);
+                    let enum_ty = Type::named(e_id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     members.push(ClassMemberInfo {
                         name: e_id_rc,
                         kind: ClassMemberKind::Enum,
@@ -295,7 +295,7 @@ impl<'r> super::super::Binder<'r> {
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(s.id, &self.scopes);
                     let s_id_rc: Rc<str> = Rc::from(self.interner.resolve(s.id));
-                    let struct_ty = Type::named(s_id_rc.clone(), self.resolver, &mut self.ty_table);
+                    let struct_ty = Type::named(s_id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     members.push(ClassMemberInfo {
                         name: s_id_rc,
                         kind: ClassMemberKind::Struct,
@@ -326,7 +326,7 @@ impl<'r> super::super::Binder<'r> {
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(i.id, &self.scopes);
-                    let iface_ty = Type::named(i_id_rc.clone(), self.resolver, &mut self.ty_table);
+                    let iface_ty = Type::named(i_id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     members.push(ClassMemberInfo {
                         name: i_id_rc,
                         kind: ClassMemberKind::Interface,
@@ -367,7 +367,7 @@ impl<'r> super::super::Binder<'r> {
             id_rc.clone(),
             Some(Rc::from(self.source_file.as_ref())),
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym =
             Symbol::new(SymbolKind::Struct, s.id, s.range.start.line).with_type(struct_ty);
@@ -421,7 +421,7 @@ impl<'r> super::super::Binder<'r> {
                 id_rc.clone(),
                 Some(Rc::from(self.source_file.as_ref())),
                 self.resolver,
-                &mut self.ty_table,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
             members,
             visibility: None,

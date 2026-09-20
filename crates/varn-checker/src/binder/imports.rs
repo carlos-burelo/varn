@@ -127,7 +127,7 @@ impl<'r> super::Binder<'r> {
                         Rc::from("*"),
                         module_path.clone(),
                         self.resolver,
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     ));
                     s.origin_module = module_path_atom;
                     s
@@ -159,7 +159,7 @@ impl<'r> super::Binder<'r> {
                             );
                             let mut s = crate::module_resolver::cache::decode_symbol(
                                 portable,
-                                &mut self.ty_table,
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 &mut self.interner,
                             );
                             self.publish_interner_tail();
@@ -181,7 +181,7 @@ impl<'r> super::Binder<'r> {
                             {
                                 let origin_rc: Rc<str> = Rc::from(self.interner.resolve(*origin));
                                 let origin_atom = self.resolver.intern(&origin_rc);
-                                *ty = ty.with_origin(origin_atom, &mut self.ty_table);
+                                *ty = ty.with_origin(origin_atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                             // Free-function intrinsic import (e.g. `abs` from
                             // `std:math`): stamp the wire byte now, while the

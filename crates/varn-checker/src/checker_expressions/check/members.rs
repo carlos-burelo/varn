@@ -27,7 +27,7 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(object, bind);
-        let non_null = obj_ty.non_nullified(&mut self.ty_table);
+        let non_null = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
@@ -69,7 +69,7 @@ impl<'r> Checker<'r> {
                 return;
             }
             let obj_ty = self.infer_type(object, bind);
-            let check_ty = obj_ty.non_nullified(&mut self.ty_table);
+            let check_ty = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             let check_kind = self.ty_table.get(check_ty.0);
             let key_expected = match check_kind {
                 TypeKind::Generic(name, args, _)
@@ -150,7 +150,7 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let check_ty = obj_ty.non_nullified(&mut self.ty_table);
+        let check_ty = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name, bind) {
             if let Some(sid) = maybe_sid {

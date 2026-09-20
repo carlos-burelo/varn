@@ -66,7 +66,7 @@ pub trait ImportResolver {
     /// `CheckerTyId`s must be comparable — which only holds if every
     /// `Binder` grows the SAME numbering from a prefix-compatible snapshot
     /// of it, never a table of its own.
-    fn ty_table_snapshot(&self) -> crate::types::CheckerTyTable;
+    fn ty_table_snapshot(&self) -> std::sync::Arc<crate::types::CheckerTyTable>;
 
     /// Publish `table`'s shapes into the compilation's live `CheckerTyId`
     /// table. Merging, not replacing: `table` is one module's locally-grown
@@ -75,7 +75,7 @@ pub trait ImportResolver {
     /// wholesale swap would repoint every id the live table already handed
     /// out. `CheckerTyTable::absorb` keeps live's own indices stable and only
     /// learns shapes it is missing.
-    fn set_ty_table(&self, table: crate::types::CheckerTyTable);
+    fn set_ty_table(&self, table: std::sync::Arc<crate::types::CheckerTyTable>);
 
     /// Intern `kind` into the live `CheckerTyId` table itself, publishing
     /// immediately, and return the id it now has *there*.
@@ -169,7 +169,7 @@ pub struct DiskResolver {
     interner: RefCell<varn_core::AtomInterner>,
     /// The single `CheckerTyId` table for this compilation — same reasoning
     /// and lifecycle as `interner` above (see `ImportResolver::ty_table_snapshot`).
-    ty_table: RefCell<crate::types::CheckerTyTable>,
+    ty_table: RefCell<std::sync::Arc<crate::types::CheckerTyTable>>,
 }
 
 impl Default for DiskResolver {
@@ -205,7 +205,8 @@ impl DiskResolver {
         &self,
         f: impl FnOnce(&mut crate::types::CheckerTyTable) -> R,
     ) -> R {
-        f(&mut self.ty_table.borrow_mut())
+        let mut live = self.ty_table.borrow_mut();
+        f(std::sync::Arc::make_mut(&mut live))
     }
 
     /// A clone of the compilation's `Atom` table as of now. Cheap relative to
@@ -531,26 +532,22 @@ impl ImportResolver for DiskResolver {
         self.interner.borrow().clone()
     }
 
-    fn ty_table_snapshot(&self) -> crate::types::CheckerTyTable {
+    fn ty_table_snapshot(&self) -> std::sync::Arc<crate::types::CheckerTyTable> {
         self.ty_table.borrow().clone()
     }
 
-    fn set_ty_table(&self, table: crate::types::CheckerTyTable) {
-        // Merge, never replace: `table` is the table of ONE module's
-        // bind/check, which grew locally from a snapshot of this live table
-        // and can disagree with it past the common prefix (nested binds grow
-        // live behind any single module's back). Replacing wholesale would
-        // repoint every id the live table already handed out — a later
-        // module's reintern would then read a different shape at the same
-        // index (observed as e.g. a `str` parameter reading as `int`).
+    fn set_ty_table(&self, table: std::sync::Arc<crate::types::CheckerTyTable>) {
+        // Merge, never replace: `table` is one module's locally-grown view,
+        // which can disagree with the live table past their common prefix.
         // `absorb` keeps live's own indices stable and only learns shapes it
         // is missing.
         let mut live = self.ty_table.borrow_mut();
-        live.absorb(&table);
+        std::sync::Arc::make_mut(&mut live).absorb(&table);
     }
 
     fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId {
-        self.ty_table.borrow_mut().intern(kind)
+        let mut live = self.ty_table.borrow_mut();
+        std::sync::Arc::make_mut(&mut live).intern(kind)
     }
 
     fn interner_len(&self) -> usize {

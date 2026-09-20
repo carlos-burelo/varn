@@ -209,7 +209,7 @@ pub struct Checker<'r> {
     /// beyond what binding produced (unions from narrowing, instantiated
     /// generics, etc). Same snapshot/publish discipline as `AtomInterner`:
     /// see `ImportResolver::ty_table_snapshot`/`set_ty_table`.
-    pub(crate) ty_table: crate::types::CheckerTyTable,
+    pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
 }
 
 /// What a caller wants from a check, beyond the diagnostics.
@@ -356,7 +356,7 @@ impl<'r> Checker<'r> {
         bind.interner = resolver.interner_snapshot();
         let live_ty_table = resolver.ty_table_snapshot();
         if live_ty_table.len() > bind.ty_table.len() {
-            bind.ty_table.absorb(&live_ty_table);
+            std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
         }
 
         let started = Instant::now();
@@ -372,7 +372,7 @@ impl<'r> Checker<'r> {
         // interner refresh is lossless for the same reason.
         let live_ty_table = resolver.ty_table_snapshot();
         if live_ty_table.len() > bind.ty_table.len() {
-            bind.ty_table.absorb(&live_ty_table);
+            std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
         }
         bind.interner = resolver.interner_snapshot();
         let started = Instant::now();
@@ -789,7 +789,7 @@ impl<'r> Checker<'r> {
             return ty;
         }
         let mut cache = FxHashMap::default();
-        let id = self.ty_table.reintern(&bind.ty_table, ty.0, &mut cache);
+        let id = std::sync::Arc::make_mut(&mut self.ty_table).reintern(&bind.ty_table, ty.0, &mut cache);
         let ty = Type(id, ty.1);
         // A member type written inside a class body (`tx: Sender<T>`) often
         // carries no origin of its own; without one, later member lookups
@@ -801,7 +801,7 @@ impl<'r> Checker<'r> {
             varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
         ) {
             let origin = self.resolver.intern(bind.source_file.as_ref());
-            return ty.with_origin(origin, &mut self.ty_table);
+            return ty.with_origin(origin, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
         }
         ty
     }
@@ -823,7 +823,7 @@ impl<'r> Checker<'r> {
             return cached.clone();
         }
         let view = crate::binder::BindView::new(bind, self.resolver);
-        let resolved = crate::binder::resolve_type_node(node, Some(&view), &mut self.ty_table);
+        let resolved = crate::binder::resolve_type_node(node, Some(&view), &mut *std::sync::Arc::make_mut(&mut self.ty_table));
         self.type_node_cache.insert(key, resolved.clone());
         resolved
     }

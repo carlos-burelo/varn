@@ -708,7 +708,7 @@ impl<'r> Checker<'r> {
                             match matched.len() {
                                 0 => vec![],
                                 1 => vec![(id, matched.into_iter().next().unwrap())],
-                                _ => vec![(id, crate::types::Type::union(matched, &mut self.ty_table))],
+                                _ => vec![(id, crate::types::Type::union(matched, &mut *std::sync::Arc::make_mut(&mut self.ty_table)))],
                             }
                         } else {
                             vec![]
@@ -773,7 +773,7 @@ impl<'r> Checker<'r> {
                 self.check_expr(tag, bind);
                 self.check_expr(template, bind);
                 let tag_ty_raw = self.infer_type(tag, bind);
-                let tag_ty = tag_ty_raw.non_nullified(&mut self.ty_table);
+                let tag_ty = tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
                     let ret = self.ty_table.get_function(fid).return_type;
                     self.record_type(range.start.offset, Type(ret, false));

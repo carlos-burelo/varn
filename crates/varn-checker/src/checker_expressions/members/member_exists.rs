@@ -142,7 +142,7 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
-                let named = Type::named(enum_name_str, self.resolver, &mut self.ty_table);
+                let named = Type::named(enum_name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 self.member_exists(&named, key, bind)
             }
             TypeKind::Named(name_atom, origin_atom) => {
@@ -255,7 +255,7 @@ impl<'r> Checker<'r> {
                 }
                 if let Some(parent) = bind.class_parents.get(&name) {
                     let parent = parent.clone();
-                    let named = Type::named(parent, self.resolver, &mut self.ty_table);
+                    let named = Type::named(parent, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     return self.member_exists(&named, key, bind);
                 }
 
@@ -268,7 +268,7 @@ impl<'r> Checker<'r> {
                 let name = self.resolve_bind_atom(bind, name_atom).to_string();
                 let origin: Option<Rc<str>> =
                     origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                let ty = Type::named_with_origin(name, origin, self.resolver, &mut self.ty_table);
+                let ty = Type::named_with_origin(name, origin, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 self.member_exists(&ty, key, bind)
             }
             TypeKind::Object(mid) => self

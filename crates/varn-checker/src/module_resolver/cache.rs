@@ -463,8 +463,9 @@ impl PortableModule {
     fn into_live(
         self,
         interner: &mut AtomInterner,
-        table: &mut CheckerTyTable,
+        mut table_arc: std::sync::Arc<CheckerTyTable>,
     ) -> (ExportMap, BindResult) {
+        let table = std::sync::Arc::make_mut(&mut table_arc);
         let exports = self
             .exports
             .into_iter()
@@ -505,7 +506,7 @@ impl PortableModule {
             global_scope: self.global_scope,
             diagnostics: varn_core::DiagnosticBag::default(),
             interner: interner.clone(),
-            ty_table: table.clone(),
+            ty_table: table_arc.clone(),
             class_methods,
             type_members,
             class_parents: self.class_parents,
@@ -553,7 +554,7 @@ pub fn serialize_module_interface(
 pub fn deserialize_module_interface(
     bytes: &[u8],
     interner: &mut AtomInterner,
-    table: &mut CheckerTyTable,
+    table: std::sync::Arc<CheckerTyTable>,
 ) -> Result<(ExportMap, BindResult), String> {
     let cached: PortableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
     let (mut exports, bind) = cached.into_live(interner, table);
@@ -609,11 +610,10 @@ pub(super) fn try_load_cache(
         fingerprint,
     )?;
     // Decode into the LIVE table so the ids every consumer reads are valid
-    // (see `into_live`'s doc); publish the grown interner back.
+    // (see `into_live`'s doc); publish the grown interner and table back.
+    let table = resolver.ty_table_snapshot();
     let mut interner = resolver.interner_snapshot();
-    let result = resolver.with_ty_table_mut(|table| {
-        deserialize_module_interface(&payload, &mut interner, table)
-    });
+    let result = deserialize_module_interface(&payload, &mut interner, table);
     resolver.set_interner(interner);
     match result {
         Ok((exports, bind)) => {
@@ -625,6 +625,7 @@ pub(super) fn try_load_cache(
             if got != virtual_id && got != expected {
                 return None;
             }
+            resolver.set_ty_table(bind.ty_table.clone());
             Some(CachedModule { exports, bind })
         }
         Err(_) => None,

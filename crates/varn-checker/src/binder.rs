@@ -53,7 +53,7 @@ pub struct Binder<'r> {
     /// (mirrors `DiskResolver::bind_and_cache`'s `set_interner` call), and
     /// carried out to `BindResult::ty_table` so later checking/emit stages
     /// read the same ids this bind minted.
-    pub(crate) ty_table: crate::types::CheckerTyTable,
+    pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
     pub(crate) source_file: Rc<str>,
     pub(crate) sum_type_variants: FxHashMap<Rc<str>, Vec<Rc<str>>>,
     pub(crate) sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
@@ -355,9 +355,9 @@ impl<'r> Binder<'r> {
         }
     }
 
-    /// `resolve_type_node(node, Some(self), &mut self.ty_table)` doesn't
+    /// `resolve_type_node(node, Some(self), &mut *std::sync::Arc::make_mut(&mut self.ty_table))` doesn't
     /// borrow-check: `Some(self)` takes `&Binder` (the whole struct, through
-    /// the `dyn TypeContext` object) while `&mut self.ty_table` needs a
+    /// the `dyn TypeContext` object) while `&mut *std::sync::Arc::make_mut(&mut self.ty_table)` needs a
     /// disjoint mutable borrow of one field, and a trait object erases the
     /// field-level information NLL would otherwise use to see they don't
     /// overlap. `resolve_type_node` only ever reads `table` through the
@@ -367,19 +367,25 @@ impl<'r> Binder<'r> {
     /// call's duration is sound: nothing observes the gap.
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
         self.sync_ty_table();
-        let mut table = std::mem::take(&mut self.ty_table);
+        let mut table = std::mem::replace(
+            std::sync::Arc::make_mut(&mut self.ty_table),
+            crate::types::CheckerTyTable::default(),
+        );
         let result = resolve_type_node(node, Some(self), &mut table);
-        self.ty_table = table;
+        self.ty_table = std::sync::Arc::new(table);
         result
     }
 
     /// Same rationale as [`Self::resolve_type`], for `infer_expr_type`.
     pub(crate) fn infer_expr_type_self(&mut self, expr: varn_core::ast::ExprId) -> Type {
         self.sync_ty_table();
-        let mut table = std::mem::take(&mut self.ty_table);
+        let mut table = std::mem::replace(
+            std::sync::Arc::make_mut(&mut self.ty_table),
+            crate::types::CheckerTyTable::default(),
+        );
         let arena = self.ast_arena;
         let result = infer_expr_type(expr, arena, Some(self), &mut table);
-        self.ty_table = table;
+        self.ty_table = std::sync::Arc::new(table);
         result
     }
 
@@ -397,7 +403,7 @@ impl<'r> Binder<'r> {
     fn sync_ty_table(&mut self) {
         let live = self.resolver.ty_table_snapshot();
         if live.len() > self.ty_table.len() {
-            self.ty_table.absorb(&live);
+            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&live);
         }
     }
 

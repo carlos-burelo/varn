@@ -78,7 +78,7 @@ pub(crate) fn infer_mapping_from_args(
             &arg_ty,
             type_params,
             &mut mapping,
-            &mut checker.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
             &bind.interner,
         );
     }
@@ -107,7 +107,7 @@ pub(crate) fn infer_mapping_from_args(
                             &concrete,
                             type_params,
                             &mut mapping,
-                            &mut checker.ty_table,
+                            &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                             &bind.interner,
                         );
                         continue;
@@ -123,7 +123,7 @@ pub(crate) fn infer_mapping_from_args(
             &arg_ty,
             type_params,
             &mut mapping,
-            &mut checker.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
             &bind.interner,
         );
     }
@@ -215,7 +215,7 @@ fn infer_arrow_with_context(
             } else if returns.len() == 1 {
                 returns.pop().expect("returns len==1 but pop failed")
             } else {
-                Type::union(returns, &mut checker.ty_table)
+                Type::union(returns, &mut *std::sync::Arc::make_mut(&mut checker.ty_table))
             }
         }
     };
@@ -231,7 +231,7 @@ fn infer_arrow_with_context(
             is_arrow: true,
             type_params: Vec::new(),
         },
-        &mut checker.ty_table,
+        &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
     ))
 }
 
@@ -431,7 +431,7 @@ pub(crate) fn map_generics_cached(
     if let Some(cached) = checker.map_generics_cache.get(&key) {
         return *cached;
     }
-    let result = base.map_generics(&atom_mapping, &mut checker.ty_table);
+    let result = base.map_generics(&atom_mapping, &mut *std::sync::Arc::make_mut(&mut checker.ty_table));
     checker.map_generics_cache.insert(key, result);
     result
 }

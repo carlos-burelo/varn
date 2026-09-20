@@ -86,7 +86,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let expected_members: Vec<ObjectTypeMember> = if let Some(t) = self.expected_type {
-            let ty = t.non_nullified(&mut self.ty_table);
+            let ty = t.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             if let Some(cached) = self.expected_object_members_cache.get(&ty) {
                 cached.clone()
             } else {

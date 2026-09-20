@@ -131,7 +131,7 @@ impl<'r> super::super::Binder<'r> {
                 if p.is_rest {
                     let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                     if !is_array {
-                        ty = Type::array(ty, &mut self.ty_table);
+                        ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     }
                 }
 
@@ -153,14 +153,14 @@ impl<'r> super::super::Binder<'r> {
             crate::types::generator_of(
                 declared_ret.unwrap_or(Type::Dynamic),
                 f.modifiers.is_async,
-                &mut self.ty_table,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 Some(self.resolver),
             )
         } else {
             crate::types::async_fn_return(
                 declared_ret.unwrap_or(Type::Void),
                 f.modifiers.is_async,
-                &mut self.ty_table,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 &self.interner,
                 Some(self.resolver),
             )
@@ -176,7 +176,7 @@ impl<'r> super::super::Binder<'r> {
                     .map(|t| Rc::from(self.interner.resolve(t.name)))
                     .collect(),
             },
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
 
         let mut sym = Symbol::new(SymbolKind::Function, f.id, line).with_type(fn_type);
@@ -231,7 +231,7 @@ impl<'r> super::super::Binder<'r> {
             if p.is_rest {
                 let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                 if !is_array {
-                    ty = Type::array(ty, &mut self.ty_table);
+                    ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 }
             }
 
@@ -279,7 +279,7 @@ impl<'r> super::super::Binder<'r> {
             id_rc.clone(),
             Some(Rc::from(self.source_file.as_ref())),
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         ));
         sym.doc = e.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = e.type_params.iter().map(|t| t.name).collect();
@@ -321,7 +321,7 @@ impl<'r> super::super::Binder<'r> {
                 .insert(member_id_rc.clone(), fields.clone());
 
             let variant_sym_id = if member.payload_fields.is_empty() {
-                let variant_ty = Type::named(id_rc.clone(), self.resolver, &mut self.ty_table);
+                let variant_ty = Type::named(id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(variant_ty);
                 self.define(member.id, v_sym)
@@ -339,7 +339,7 @@ impl<'r> super::super::Binder<'r> {
                     id_rc.clone(),
                     Some(Rc::from(self.source_file.as_ref())),
                     self.resolver,
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let fn_ty = Type::fn_(
                     crate::types::FunctionType {
@@ -348,7 +348,7 @@ impl<'r> super::super::Binder<'r> {
                         is_arrow: false,
                         type_params: vec![],
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(fn_ty);
@@ -365,7 +365,7 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named(id_rc.clone(), self.resolver, &mut self.ty_table),
+                ty: Type::named(id_rc.clone(), self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
                 members: Vec::new(),
                 visibility: None,
                 is_abstract: false,
@@ -494,7 +494,7 @@ impl<'r> super::super::Binder<'r> {
                 id_rc.clone(),
                 Some(Rc::from(self.source_file.as_ref())),
                 self.resolver,
-                &mut self.ty_table,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
             members: members.clone(),
             visibility: None,

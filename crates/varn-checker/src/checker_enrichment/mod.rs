@@ -54,7 +54,7 @@ pub fn enrich_call_returns(
                 {
                     continue;
                 }
-                let mut table = std::mem::take(&mut bind.ty_table);
+                let mut table = std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                 let ty = crate::checker_call_types::infer_call_type(
                     &ctx.fn_map,
                     &ctx.fn_type_params,
@@ -67,7 +67,7 @@ pub fn enrich_call_returns(
                     &bind.interner,
                     &mut table,
                 );
-                bind.ty_table = table;
+                bind.ty_table = std::sync::Arc::new(table);
                 if let Some(t) = ty {
                     let name_atom = bind.arena.get(*sym_id).name;
                     let name: Rc<str> = Rc::from(bind.interner.resolve(name_atom));
@@ -82,7 +82,7 @@ pub fn enrich_call_returns(
                 is_async,
             } => {
                 let stmt: varn_core::ast::StmtId = *body;
-                let mut table = std::mem::take(&mut bind.ty_table);
+                let mut table = std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -101,13 +101,13 @@ pub fn enrich_call_returns(
                         &bind.interner,
                         Some(resolver),
                     );
-                    bind.ty_table = table;
+                    bind.ty_table = std::sync::Arc::new(table);
                     if let Some(old_ty) = bind.arena.get(*sym_id).ty {
-                        let new_ty = with_new_return_type(old_ty, final_ret, &mut bind.ty_table);
+                        let new_ty = with_new_return_type(old_ty, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                         bind.arena.get_mut(*sym_id).ty = Some(new_ty);
                     }
                 } else {
-                    bind.ty_table = table;
+                    bind.ty_table = std::sync::Arc::new(table);
                 }
                 enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, ast_arena, bind, resolver, None);
             }
@@ -128,7 +128,7 @@ pub fn enrich_call_returns(
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
-                let mut table = std::mem::take(&mut bind.ty_table);
+                let mut table = std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -139,12 +139,12 @@ pub fn enrich_call_returns(
                     &mut table,
                 );
                 let ret = types::join_types(inferred, &mut table);
-                bind.ty_table = table;
+                bind.ty_table = std::sync::Arc::new(table);
                 if !ret.is_dynamic() {
                     let final_ret = crate::types::async_fn_return(
                         ret,
                         *is_async,
-                        &mut bind.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
                         &bind.interner,
                         Some(resolver),
                     );
@@ -154,7 +154,7 @@ pub fn enrich_call_returns(
                         .and_then(|m| m.get(key_str.as_str()))
                         .copied()
                     {
-                        let new_ty = with_new_return_type(old, final_ret, &mut bind.ty_table);
+                        let new_ty = with_new_return_type(old, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                         if let Some(ft_map) = bind.class_methods.get_mut(class_name_str.as_str()) {
                             ft_map.insert(Rc::from(key_str.as_str()), new_ty);
                         }
@@ -167,12 +167,12 @@ pub fn enrich_call_returns(
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
                         {
-                            let new_ty = with_new_return_type(m.ty, final_ret, &mut bind.ty_table);
+                            let new_ty = with_new_return_type(m.ty, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                             m.ty = new_ty;
                             if let Some(symbol_id) = m.symbol_id {
                                 if let Some(old) = bind.arena.get(symbol_id).ty {
                                     let new_ty =
-                                        with_new_return_type(old, final_ret, &mut bind.ty_table);
+                                        with_new_return_type(old, final_ret, &mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                                     bind.arena.get_mut(symbol_id).ty = Some(new_ty);
                                 }
                             }
@@ -198,7 +198,7 @@ pub fn enrich_call_returns(
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
-                let mut table = std::mem::take(&mut bind.ty_table);
+                let mut table = std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                 let inferred = collect_inferred_return_types_raw(
                     &ctx,
                     &sym_map,
@@ -209,7 +209,7 @@ pub fn enrich_call_returns(
                     &mut table,
                 );
                 let ret = types::join_types(inferred, &mut table);
-                bind.ty_table = table;
+                bind.ty_table = std::sync::Arc::new(table);
                 if !ret.is_dynamic() {
                     if let Some(ft_map) = bind
                         .type_members

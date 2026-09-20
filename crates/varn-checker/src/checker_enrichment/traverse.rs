@@ -151,7 +151,7 @@ fn enrich_vars_recursive(
                         Some(e) => *e,
                         None => continue,
                     };
-                    let mut table = std::mem::take(&mut bind.ty_table);
+                    let mut table = std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
                     let ty = infer_call_type(
                         &ctx.fn_map,
                         &ctx.fn_type_params,
@@ -164,7 +164,7 @@ fn enrich_vars_recursive(
                         &bind.interner,
                         &mut table,
                     );
-                    bind.ty_table = table;
+                    bind.ty_table = std::sync::Arc::new(table);
                     if let Some(t) = ty {
                         bind.arena.get_mut(sym_id).ty = Some(t.clone());
                         sym_map.insert(Rc::from(name), t);

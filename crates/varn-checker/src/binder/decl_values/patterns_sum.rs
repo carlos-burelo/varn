@@ -78,7 +78,7 @@ impl<'r> super::super::Binder<'r> {
                                                 is_arrow: *is_arrow,
                                                 type_params: vec![],
                                             },
-                                            &mut self.ty_table,
+                                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                         ))
                                     }
                                     _ => None,
@@ -124,7 +124,7 @@ impl<'r> super::super::Binder<'r> {
                                                 key_str.clone(),
                                                 Some(Rc::from(origin_path)),
                                                 self.resolver,
-                                                &mut self.ty_table,
+                                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                             ))
                                         } else {
                                             None
@@ -173,7 +173,7 @@ impl<'r> super::super::Binder<'r> {
             id_rc.clone(),
             Some(Rc::from(self.source_file.as_ref())),
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut pe_sym =
             Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(alias_ty);
@@ -213,7 +213,7 @@ impl<'r> super::super::Binder<'r> {
                     id_rc.clone(),
                     Some(Rc::from(self.source_file.as_ref())),
                     self.resolver,
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let sym = Symbol::new(SymbolKind::Const, v.name, v.range.start.line)
                     .with_type(variant_ty);
@@ -232,7 +232,7 @@ impl<'r> super::super::Binder<'r> {
                     id_rc.clone(),
                     Some(Rc::from(self.source_file.as_ref())),
                     self.resolver,
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let fn_ty = Type::fn_(
                     crate::types::FunctionType {
@@ -245,7 +245,7 @@ impl<'r> super::super::Binder<'r> {
                             .map(|tp| Rc::from(self.interner.resolve(tp.name)))
                             .collect(),
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let sym =
                     Symbol::new(SymbolKind::Function, v.name, v.range.start.line).with_type(fn_ty);

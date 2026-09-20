@@ -22,7 +22,7 @@ impl<'r> Checker<'r> {
         };
 
         let callee_ty_raw = self.infer_type(callee, bind);
-        let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
+        let callee_ty = callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
         if let TypeKind::Named(class_name, _) = callee_kind {
@@ -32,9 +32,9 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|a| self.resolve_type_node_cached(a, bind))
                     .collect();
-                return Type::generic(class_name_str, resolved, self.resolver, &mut self.ty_table);
+                return Type::generic(class_name_str, resolved, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
             }
-            return Type::named(class_name_str, self.resolver, &mut self.ty_table);
+            return Type::named(class_name_str, self.resolver, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
         }
         let TypeKind::Fn(fid) = callee_kind else {
             return Type::Dynamic;
@@ -116,7 +116,7 @@ impl<'r> Checker<'r> {
                 if p.is_rest {
                     let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                     if !is_array {
-                        ty = Type::array(ty, &mut self.ty_table);
+                        ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     }
                 }
                 FunctionParam {
@@ -164,7 +164,7 @@ impl<'r> Checker<'r> {
                     match return_tys.len() {
                         0 => Type::Void,
                         1 => return_tys.into_iter().next().unwrap(),
-                        _ => Type::union(return_tys, &mut self.ty_table),
+                        _ => Type::union(return_tys, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
                     }
                 }
             }
@@ -177,7 +177,7 @@ impl<'r> Checker<'r> {
         let ret_ty = crate::types::async_fn_return(
             ret_ty,
             is_async,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             &bind.interner,
             Some(self.resolver),
         );
@@ -188,7 +188,7 @@ impl<'r> Checker<'r> {
                 is_arrow: true,
                 type_params: vec![],
             },
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         )
     }
 }

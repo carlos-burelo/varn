@@ -262,8 +262,8 @@ impl<'r> Checker<'r> {
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();
-                        let list = self.ty_table.intern_list(&arg_ids);
-                        Type(self.ty_table.intern(TypeKind::Tuple(list)), false)
+                        let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
+                        Type(std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)), false)
                     }
                     TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
                         Type(self.ty_table.get_list(args)[0], false)
@@ -336,7 +336,7 @@ impl<'r> Checker<'r> {
                                 let catch_ty = if let Some(ann) = &clause.type_ann {
                                     checker.resolve_type_node_cached(ann, bind)
                                 } else {
-                                    Type::named("Error", checker.resolver, &mut checker.ty_table)
+                                    Type::named("Error", checker.resolver, &mut *std::sync::Arc::make_mut(&mut checker.ty_table))
                                 };
                                 checker.check_pattern(param, &catch_ty, bind);
                             }

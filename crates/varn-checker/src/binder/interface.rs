@@ -19,7 +19,7 @@ impl<'r> super::Binder<'r> {
             id_rc.clone(),
             origin_rc,
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         ));
         sym.col = i.range.start.column;
         sym.offset = i.range.start.offset;
@@ -118,7 +118,7 @@ impl<'r> super::Binder<'r> {
                 let ret = crate::types::async_fn_return(
                     declared,
                     *is_async,
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     &self.interner,
                     Some(self.resolver),
                 );
@@ -137,7 +137,7 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut self.ty_table);
+                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                         }
                         FunctionParam {
@@ -161,7 +161,7 @@ impl<'r> super::Binder<'r> {
                         is_arrow: false,
                         type_params: fn_tps,
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
                 let key_rc: Rc<str> = Rc::from(self.interner.resolve(*key));
@@ -249,7 +249,7 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut self.ty_table);
+                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                         }
                         FunctionParam {
@@ -267,7 +267,7 @@ impl<'r> super::Binder<'r> {
                         is_arrow: false,
                         type_params: vec![],
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 members.push(ClassMemberInfo {
                     name: Rc::from(varn_core::MemberKey::Callable.as_str()),

@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
         self.record_extension_call(callee, range, bind);
 
         let callee_ty_raw = self.infer_type(callee, bind);
-        let callee_ty = callee_ty_raw.non_nullified(&mut self.ty_table);
+        let callee_ty = callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
         if !matches!(
@@ -154,7 +154,7 @@ impl<'r> Checker<'r> {
             return;
         };
         let obj_ty_raw = self.infer_type(object, bind);
-        let obj_ty = obj_ty_raw.non_nullified(&mut self.ty_table);
+        let obj_ty = obj_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let Some(tn) = extension_type_name(self, &obj_ty, &self.ty_table, bind) else {
             return;
         };

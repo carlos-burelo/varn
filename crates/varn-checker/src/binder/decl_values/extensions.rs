@@ -45,7 +45,7 @@ impl<'r> super::super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut self.ty_table);
+                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                         }
                         param_types.push(crate::types::FunctionParam {
@@ -66,7 +66,7 @@ impl<'r> super::super::Binder<'r> {
                     let ret_ty = crate::types::async_fn_return(
                         declared_ret,
                         method.modifiers.is_async,
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         &self.interner,
                         Some(self.resolver),
                     );
@@ -81,7 +81,7 @@ impl<'r> super::super::Binder<'r> {
                                 .map(|t| Rc::from(self.interner.resolve(t.name)))
                                 .collect(),
                         },
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     let line = method.range.start.line;
                     let mangled_atom = self.intern_local(&mangled);
@@ -133,7 +133,7 @@ impl<'r> super::super::Binder<'r> {
                             is_arrow: false,
                             type_params: vec![],
                         },
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     let mangled_atom = self.intern_local(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
@@ -195,7 +195,7 @@ impl<'r> super::super::Binder<'r> {
                             is_arrow: false,
                             type_params: vec![],
                         },
-                        &mut self.ty_table,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     let mangled_atom = self.intern_local(&mangled);
                     let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
@@ -248,7 +248,7 @@ impl<'r> super::super::Binder<'r> {
             if p.is_rest {
                 let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
                 if !is_array {
-                    ty = Type::array(ty, &mut self.ty_table);
+                    ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 }
             }
             self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));

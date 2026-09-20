@@ -102,7 +102,7 @@ pub struct BindResult {
     /// (de)serialize too. See `ImportResolver::ty_table_snapshot`/
     /// `set_ty_table` for how it stays comparable across modules.
     #[serde(skip, default)]
-    pub ty_table: crate::types::CheckerTyTable,
+    pub ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
     pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     pub type_members: TypeMembers,
     pub class_parents: FxHashMap<Rc<str>, Rc<str>>,

@@ -20,7 +20,7 @@ impl<'r> super::Binder<'r> {
             name.clone(),
             Some(Rc::from(self.source_file.as_ref())),
             self.resolver,
-            &mut self.ty_table,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym =
             Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
@@ -66,7 +66,7 @@ impl<'r> super::Binder<'r> {
                     if p.is_rest {
                         let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                         if !is_array {
-                            ty = Type::array(ty, &mut self.ty_table);
+                            ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                         }
                     }
                     FunctionParam {
@@ -85,7 +85,7 @@ impl<'r> super::Binder<'r> {
                     is_arrow: false,
                     type_params: vec![],
                 },
-                &mut self.ty_table,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             );
 
             let ctor_atom = self.intern_local("constructor");
@@ -379,7 +379,7 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut self.ty_table);
+                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                         }
                         FunctionParam {
@@ -398,7 +398,7 @@ impl<'r> super::Binder<'r> {
                         is_arrow: false,
                         type_params: vec![],
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
                 let ctor_atom = self.intern_local("constructor");
@@ -535,7 +535,7 @@ impl<'r> super::Binder<'r> {
                 let ret = crate::types::async_fn_return(
                     declared_ret,
                     modifiers.is_async,
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     &self.interner,
                     Some(self.resolver),
                 );
@@ -555,7 +555,7 @@ impl<'r> super::Binder<'r> {
                         if p.is_rest {
                             let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
                             if !is_array {
-                                ty = Type::array(ty, &mut self.ty_table);
+                                ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             }
                         }
                         FunctionParam {
@@ -579,7 +579,7 @@ impl<'r> super::Binder<'r> {
                         is_arrow: false,
                         type_params: fn_tps,
                     },
-                    &mut self.ty_table,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
                 let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)

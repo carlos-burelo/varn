@@ -91,7 +91,7 @@ impl<'r> super::super::Binder<'r> {
                                 is_arrow: false,
                                 type_params: Vec::new(),
                             },
-                            &mut self.ty_table,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         );
 
                         Some(ClassMemberInfo {
