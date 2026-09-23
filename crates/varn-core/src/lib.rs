@@ -4,6 +4,7 @@ pub mod atom;
 pub mod cg_ty;
 pub mod diagnostics;
 pub mod doc;
+pub mod errors;
 pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
@@ -24,6 +25,7 @@ pub mod well_known;
 pub use ast::AstId;
 pub use atom::{Atom, AtomInterner};
 pub use doc::DocComment;
+pub use errors::RuntimeErrorKind;
 
 pub use diagnostics::{
     Diagnostic, DiagnosticBag, DiagnosticKind, ErrorCode, RelatedInformation, Suggestion,

@@ -13,14 +13,28 @@ pub struct RuntimeError {
     pub frames: Vec<FrameInfo>,
 
     pub thrown: Option<crate::value::VmValue>,
+    pub kind: varn_core::RuntimeErrorKind,
 }
 
 impl RuntimeError {
     pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self::of_kind(varn_core::RuntimeErrorKind::Error, message)
+    }
+
+    pub(crate) fn integer_overflow(message: impl Into<String>) -> Self {
+        Self::of_kind(varn_core::RuntimeErrorKind::IntegerOverflow, message)
+    }
+
+    pub(crate) fn division_by_zero(message: impl Into<String>) -> Self {
+        Self::of_kind(varn_core::RuntimeErrorKind::DivisionByZero, message)
+    }
+
+    fn of_kind(kind: varn_core::RuntimeErrorKind, message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             frames: Vec::new(),
             thrown: None,
+            kind,
         }
     }
 }

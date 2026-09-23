@@ -275,6 +275,8 @@ impl ExecCtx {
             IntrinsicType::Error.as_str(),
             IntrinsicType::TypeError.as_str(),
             IntrinsicType::RangeError.as_str(),
+            varn_core::RuntimeErrorKind::IntegerOverflow.class_name(),
+            varn_core::RuntimeErrorKind::DivisionByZero.class_name(),
         ];
         for name in names {
             if let Some(nv) = self.globals.get_by_name(name) {

@@ -149,3 +149,33 @@ varn_contract! {
         }
     }
 }
+
+pub struct IntegerOverflowClass;
+
+varn_contract! {
+    module: "globals",
+    class: "IntegerOverflow",
+    extends: "Error",
+    contract: "src/modules/globals/globals.vn",
+    impl IntegerOverflowClass {
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, "IntegerOverflow");
+            this
+        }
+    }
+}
+
+pub struct DivisionByZeroClass;
+
+varn_contract! {
+    module: "globals",
+    class: "DivisionByZero",
+    extends: "Error",
+    contract: "src/modules/globals/globals.vn",
+    impl DivisionByZeroClass {
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, "DivisionByZero");
+            this
+        }
+    }
+}

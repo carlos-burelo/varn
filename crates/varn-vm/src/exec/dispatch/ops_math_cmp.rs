@@ -14,7 +14,7 @@ use super::{hi, lo};
 #[cold]
 #[inline(never)]
 fn int_overflow(op: &str, a: i64, b: i64) -> crate::error::RuntimeError {
-    crate::error::RuntimeError::new(format!(
+    crate::error::RuntimeError::integer_overflow(format!(
         "integer overflow: {a} {op} {b} is outside int ({}..={})",
         varn_core::INT_MIN,
         varn_core::INT_MAX
@@ -265,7 +265,7 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.int_pair(base, r1, r2) {
                     if b_val == 0 {
-                        return Err(crate::error::RuntimeError::new("division by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
                     }
                     w!(first_reg, VmValue::from_f64(a_val as f64 / b_val as f64));
                 } else {
@@ -275,7 +275,7 @@ impl ExecCtx {
                         let a_val = a.as_int();
                         let b_val = b.as_int();
                         if b_val == 0 {
-                            return Err(crate::error::RuntimeError::new("division by zero"));
+                            return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
                         }
                         w!(first_reg, VmValue::from_f64(a_val as f64 / b_val as f64));
                     } else {
@@ -290,7 +290,7 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.int_pair(base, r1, r2) {
                     if b_val == 0 {
-                        return Err(crate::error::RuntimeError::new("modulo by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
                     }
                     w!(first_reg, VmValue::from_int(a_val % b_val));
                 } else {
@@ -300,7 +300,7 @@ impl ExecCtx {
                         let a_val = a.as_int();
                         let b_val = b.as_int();
                         if b_val == 0 {
-                            return Err(crate::error::RuntimeError::new("modulo by zero"));
+                            return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
                         }
                         w!(first_reg, VmValue::from_int(a_val % b_val));
                     } else {
@@ -524,7 +524,7 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
                     if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::new("division by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
                     }
                     w!(first_reg, VmValue::from_f64(a_val / b_val));
                 } else {
@@ -533,7 +533,7 @@ impl ExecCtx {
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
                             if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::new("division by zero"));
+                                return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
                             }
                             w!(first_reg, VmValue::from_f64(av / bv));
                         }
@@ -550,7 +550,7 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
                     if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::new("modulo by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
                     }
                     w!(first_reg, VmValue::from_f64(a_val % b_val));
                 } else {
@@ -559,7 +559,7 @@ impl ExecCtx {
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
                             if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::new("modulo by zero"));
+                                return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
                             }
                             w!(first_reg, VmValue::from_f64(av % bv));
                         }

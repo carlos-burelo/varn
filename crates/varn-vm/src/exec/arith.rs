@@ -12,7 +12,7 @@ use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
 #[cold]
 #[inline(never)]
 fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
-    RuntimeError::new(format!(
+    RuntimeError::integer_overflow(format!(
         "integer overflow: {a} {op} {b} is outside int ({INT_MIN}..={INT_MAX})"
     ))
 }
@@ -20,7 +20,7 @@ fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
 #[cold]
 #[inline(never)]
 fn overflow_neg(a: i64) -> RuntimeError {
-    RuntimeError::new(format!(
+    RuntimeError::integer_overflow(format!(
         "integer overflow: -({a}) is outside int ({INT_MIN}..={INT_MAX})"
     ))
 }
@@ -143,14 +143,14 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
     if a.is_heap() || b.is_heap() {
         if let Some((x, y)) = decimal_pair(a, b, heap) {
             if y.is_zero() {
-                return Err(RuntimeError::new("division by zero"));
+                return Err(RuntimeError::division_by_zero("division by zero"));
             }
             return Ok(heap.alloc_decimal(x / y));
         }
     }
     let bv = heap.to_f64_val(b);
     if bv == 0.0 {
-        return Err(RuntimeError::new("division by zero"));
+        return Err(RuntimeError::division_by_zero("division by zero"));
     }
     Ok(VmValue::from_f64(heap.to_f64_val(a) / bv))
 }
@@ -160,7 +160,7 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
     if heap.is_int(a) && heap.is_int(b) {
         let bi = heap.as_int(b);
         if bi == 0 {
-            return Err(RuntimeError::new("modulo by zero"));
+            return Err(RuntimeError::division_by_zero("modulo by zero"));
         }
         let r = heap.as_int(a) % bi;
         return Ok(heap.make_int(r));
@@ -171,14 +171,14 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
             // it. `Decimal % 0` panics inside rust_decimal, so the omission
             // turned a Varn-level error into a process abort.
             if y.is_zero() {
-                return Err(RuntimeError::new("modulo by zero"));
+                return Err(RuntimeError::division_by_zero("modulo by zero"));
             }
             return Ok(heap.alloc_decimal(x % y));
         }
     }
     let bv = heap.to_f64_val(b);
     if bv == 0.0 {
-        return Err(RuntimeError::new("modulo by zero"));
+        return Err(RuntimeError::division_by_zero("modulo by zero"));
     }
     Ok(VmValue::from_f64(heap.to_f64_val(a) % bv))
 }

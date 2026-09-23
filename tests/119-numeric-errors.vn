@@ -1,0 +1,26 @@
+function mul(a: int, b: int): int { return a * b }
+function quo(a: int, b: int): int { return a % b }
+
+function kindOf(f: () => int): str {
+    try {
+        f()
+        return "none"
+    } catch (e) {
+        if (e instanceof IntegerOverflow) { return "IntegerOverflow" }
+        if (e instanceof DivisionByZero) { return "DivisionByZero" }
+        return "Error"
+    }
+}
+
+assert("mul overflow is IntegerOverflow", kindOf(() => mul(4000000000, 4000000000)) === "IntegerOverflow")
+assert("mod zero is DivisionByZero", kindOf(() => quo(1, 0)) === "DivisionByZero")
+
+let caught: bool = false
+try {
+    mul(9223372036854775807, 2)
+} catch (e) {
+    caught = e instanceof Error && e.name === "IntegerOverflow"
+}
+assert("IntegerOverflow extends Error and has name", caught)
+
+print("[PASSED] 119. Numeric errors")

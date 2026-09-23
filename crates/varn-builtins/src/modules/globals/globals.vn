@@ -20,6 +20,14 @@ export declare class RangeError extends Error {
     constructor(message?: str);
 }
 
+export declare class IntegerOverflow extends Error {
+    constructor(message?: str);
+}
+
+export declare class DivisionByZero extends Error {
+    constructor(message?: str);
+}
+
 export declare const NaN: float;
 export declare const Infinity: float;
 export declare const isIsolate: bool;

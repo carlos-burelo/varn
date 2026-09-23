@@ -86,6 +86,7 @@ pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> Ru
         message: msg,
         frames: frame_infos,
         thrown: Some(val),
+        kind: varn_core::RuntimeErrorKind::Error,
     }
 }
 
@@ -102,13 +103,16 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return v;
     }
     let msg = heap.alloc_str_dynamic(&err.message);
-    let Some(cls) = heap.get_intrinsic_class(IntrinsicType::Error.as_str()) else {
-        // Sin la clase `Error` registrada (arranque temprano, isolate sin
-        // globals): el mensaje suelto sigue siendo capturable e imprimible.
+    let class_name = err.kind.class_name();
+    let Some(cls) = heap.get_intrinsic_class(class_name) else {
+        // Sin la clase registrada (arranque temprano, isolate sin globals):
+        // el mensaje suelto sigue siendo capturable e imprimible.
         return msg;
     };
     let oref = varn_types::value::ObjRef::instance(&cls);
     oref.set_field_nv(std::sync::Arc::from("message"), msg);
+    let name = heap.alloc_str_dynamic(class_name);
+    oref.set_field_nv(std::sync::Arc::from("name"), name);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
