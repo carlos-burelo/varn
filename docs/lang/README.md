@@ -24,6 +24,7 @@ Especificación completa del lenguaje Varn, generada a partir de la suite de pru
 | 14 | [runtime_behavior.md](runtime_behavior.md) | Runtime: intérprete, JIT, GC generacional, modelo de memoria, isIsolate |
 | 15 | [examples.md](examples.md) | Ejemplos integrados por tema, extraídos directamente de los tests |
 | 16 | [glossary.md](glossary.md) | Glosario de términos del lenguaje |
+| 17 | [SPEC_NUCLEO_Y_PLATAFORMA.md](SPEC_NUCLEO_Y_PLATAFORMA.md) | Spec normativo: modelo de tipos, representación y plataforma estándar (manda sobre el resto) |
 
 ---
 

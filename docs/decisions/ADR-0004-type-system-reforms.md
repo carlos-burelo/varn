@@ -2,6 +2,7 @@
 
 ## Estado
 Aprobado e Implementado.
+Sección 2 ("Prohibición de Narrowing Implícito en Numéricos") reemplazada por ADR-0015: los anchos angostos dejan de existir.
 
 ## Contexto
 Durante la auditoría integral del sistema de tipos de Varn, se detectaron rezagos de diseño de tipado dinámico/estructural heredados de TypeScript que entraban en conflicto con la directiva primaria de Varn como lenguaje estáticamente tipado:
