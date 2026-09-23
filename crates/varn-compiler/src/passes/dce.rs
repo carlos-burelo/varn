@@ -104,7 +104,7 @@ pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
 /// cannot throw. Allocation alone is fine — an unobserved allocation is
 /// exactly what we want gone. Trap behaviour was measured, not assumed: an
 /// out-of-bounds array read yields `null`, while `/ 0`, `% 0` and a negative
-/// integer exponent all raise, so those three operators stay.
+/// integer exponent all raise, and `int` `+ - *` and `-x` overflow, so they stay.
 pub(crate) fn is_pure(kind: &InstKind) -> bool {
     use InstKind::*;
     match kind {
@@ -152,8 +152,10 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         Binary { op, ty, .. } => {
             let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
+            let int_can_overflow = *ty == HirType::Int
+                && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
             // Div/Mod/Pow raise on zero divisor and negative exponent.
-            let total = matches!(
+            let never_traps = matches!(
                 op,
                 HirBinOp::Add
                     | HirBinOp::Sub
@@ -171,11 +173,12 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
                     | HirBinOp::Shr
                     | HirBinOp::Ushr
             );
-            typed && total
+            typed && never_traps && !int_can_overflow
         }
         Unary { op, ty, .. } => match op {
             HirUnOp::Typeof => true,
-            HirUnOp::Neg | HirUnOp::Not | HirUnOp::BitNot => {
+            HirUnOp::Neg => matches!(ty, HirType::Float),
+            HirUnOp::Not | HirUnOp::BitNot => {
                 matches!(ty, HirType::Int | HirType::Float | HirType::Bool)
             }
         },
@@ -470,3 +473,7 @@ fn add_term_uses(term: &Terminator, used: &mut FxHashSet<Value>) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+#[path = "dce_purity_tests.rs"]
+mod purity_tests;

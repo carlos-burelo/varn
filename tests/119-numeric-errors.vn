@@ -28,4 +28,22 @@ const MIN: int = 0 - 9223372036854775807 - 1
 assert("MIN % -1 is 0", rem(MIN, 0 - 1) === 0)
 assert("rem sign follows dividend", rem(0 - 7, 2) === 0 - 1)
 
+function mulDiscard(a: int, b: int): int { return a * b }
+let discardedCaught: bool = false
+try {
+    mulDiscard(4000000000, 4000000000)
+} catch (e) {
+    discardedCaught = e instanceof IntegerOverflow
+}
+assert("overflow is observable even when the result is unused", discardedCaught)
+
+function negDiscard(a: int): int { return -a }
+let negCaught: bool = false
+try {
+    negDiscard(0 - 9223372036854775807 - 1)
+} catch (e) {
+    negCaught = e instanceof IntegerOverflow
+}
+assert("negation overflow is observable", negCaught)
+
 print("[PASSED] 119. Numeric errors")
