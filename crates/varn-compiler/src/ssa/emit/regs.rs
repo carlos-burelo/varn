@@ -51,10 +51,13 @@ pub(super) fn assign_registers(
                 InstKind::MethodCall { args, .. } => args.len() as u32,
 
                 InstKind::BuildArray { elements, .. } => elements.len() as u32,
+                InstKind::BuildTuple { elements } => elements.len() as u32,
                 InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
-                // Object literals stage non-contiguous values into the call
-                // area before BuildObjectWithShape.
-                InstKind::BuildObject { pairs } => pairs.len() as u32,
+                // Object and record literals stage non-contiguous values into
+                // the call area before building with a shape.
+                InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
+                    pairs.len() as u32
+                }
 
                 // Reserved unconditionally, including for calls that end up on
                 // the windowless `IntrinsicDirect` form. The reservation must
@@ -71,7 +74,74 @@ pub(super) fn assign_registers(
 
                 InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
                 InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
-                _ => 0,
+
+                // `BuildArraySpread` names `call_base` only as an empty window.
+                InstKind::BuildArraySpread { .. }
+                | InstKind::ConstInt(_)
+                | InstKind::ConstFloat(_)
+                | InstKind::ConstBool(_)
+                | InstKind::ConstStr(_)
+                | InstKind::ConstChar(_)
+                | InstKind::ConstDecimal(_)
+                | InstKind::ConstBigInt(_)
+                | InstKind::ConstNull
+                | InstKind::Binary { .. }
+                | InstKind::Unary { .. }
+                | InstKind::LoadGlobal(_)
+                | InstKind::LoadGlobalIdx(_)
+                | InstKind::LoadNativeGlobalIdx(_)
+                | InstKind::LoadUpvalue(_)
+                | InstKind::StoreGlobal { .. }
+                | InstKind::StoreGlobalIdx { .. }
+                | InstKind::StoreUpvalue { .. }
+                | InstKind::GetProperty { .. }
+                | InstKind::GetFixedField { .. }
+                | InstKind::GetIndex { .. }
+                | InstKind::ArrayGetIndex { .. }
+                | InstKind::MapGetIndex { .. }
+                | InstKind::SetProperty { .. }
+                | InstKind::SetFixedField { .. }
+                | InstKind::SetIndex { .. }
+                | InstKind::ArraySetIndex { .. }
+                | InstKind::MapSetIndex { .. }
+                | InstKind::ArrayPush { .. }
+                | InstKind::ObjectMerge { .. }
+                | InstKind::IsNull { .. }
+                | InstKind::Cast { .. }
+                | InstKind::NarrowRangeCheck { .. }
+                | InstKind::ObjectRest { .. }
+                | InstKind::ToString { .. }
+                | InstKind::BuildStr { .. }
+                | InstKind::MakeClosure { .. }
+                | InstKind::LoadCaptured { .. }
+                | InstKind::StoreCaptured { .. }
+                | InstKind::MakeClass { .. }
+                | InstKind::DeclareField { .. }
+                | InstKind::DefineStatic { .. }
+                | InstKind::DefineMethod { .. }
+                | InstKind::DefineAccessor { .. }
+                | InstKind::MakeEnumVariant { .. }
+                | InstKind::Try { .. }
+                | InstKind::PopTry
+                | InstKind::CatchParam { .. }
+                | InstKind::CloseUpvalues { .. }
+                | InstKind::Dispose { .. }
+                | InstKind::LoadModule { .. }
+                | InstKind::StoreModuleSlot { .. }
+                | InstKind::Await { .. }
+                | InstKind::Spawn { .. }
+                | InstKind::Yield { .. }
+                | InstKind::AssertNotNull { .. }
+                | InstKind::GetPropertyMaybe { .. }
+                | InstKind::ModuleSlot { .. }
+                | InstKind::GetEnumTag { .. }
+                | InstKind::IsArray { .. }
+                | InstKind::This
+                | InstKind::Range { .. }
+                | InstKind::ObjectKeys { .. }
+                | InstKind::GetSymbol { .. }
+                | InstKind::GetSuper { .. }
+                | InstKind::BuildObjectSpread { .. } => 0,
             };
             max_call = max_call.max(t);
         }

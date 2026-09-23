@@ -1,0 +1,17 @@
+const t = #[1, "a", true]
+assert("tuple index 0", t[0] === 1)
+assert("tuple index 1", t[1] === "a")
+assert("tuple index 2", t[2] === true)
+
+function pair() { return #[7, "x"] }
+const p = pair()
+assert("tuple from fn", p[0] === 7 && p[1] === "x")
+
+const u = #[1, 2]
+const v = #[1, 2]
+assert("tuple structural eq", u == v)
+
+const r = #{ name: "x", age: 3, ok: true }
+assert("record with window", r.age === 3 && r.ok)
+
+print("[PASSED] 117. Tuples")
