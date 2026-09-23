@@ -1,5 +1,5 @@
 import { parseIsoDuration$ } from "runtime:time";
-import { int_div, DurationParts } from "std:time/core";
+import { DurationParts } from "std:time/core";
 
 export type DurationLike = Duration | str | int | DurationParts;
 
@@ -12,12 +12,12 @@ export class Duration {
     milliseconds: int;
 
     constructor(ms: int) {
-        let total_s = int_div(ms, 1000);
+        let total_s = ms / 1000;
         this.totalMilliseconds = ms;
-        this.hours = int_div(total_s, 3600);
-        this.minutes = int_div(total_s % 3600, 60);
+        this.hours = total_s / 3600;
+        this.minutes = total_s % 3600 / 60;
         this.seconds = total_s;
-        this.days = int_div(total_s, 86400);
+        this.days = total_s / 86400;
         this.milliseconds = ms % 1000;
     }
 

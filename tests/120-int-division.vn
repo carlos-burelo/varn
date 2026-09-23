@@ -1,0 +1,23 @@
+function d(a: int, b: int): int { return a / b }
+
+assert("5 / 2 is 2", d(5, 2) === 2)
+assert("-7 / 2 truncates to -3", d(0 - 7, 2) === 0 - 3)
+assert("7 / -2 truncates to -3", d(7, 0 - 2) === 0 - 3)
+const literalDiv: int = 9 / 4
+assert("literal int division is int", literalDiv === 2)
+
+let dz: str = "none"
+try { d(1, 0) } catch (e) { if (e instanceof DivisionByZero) { dz = "zero" } }
+assert("int / 0 raises DivisionByZero", dz === "zero")
+
+let ov: str = "none"
+try { d(0 - 9223372036854775807 - 1, 0 - 1) } catch (e) { if (e instanceof IntegerOverflow) { ov = "ovf" } }
+assert("MIN / -1 raises IntegerOverflow", ov === "ovf")
+
+const dyn: dynamic = 7
+assert("dynamic int / int stays int", dyn / 2 === 3)
+
+const f: float = 5.0 / 2.0
+assert("float division unchanged", f === 2.5)
+
+print("[PASSED] 120. Int division")

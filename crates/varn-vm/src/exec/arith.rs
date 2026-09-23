@@ -28,7 +28,12 @@ fn overflow_neg(a: i64) -> RuntimeError {
 /// The fault of an integer `/` or `%`, as the platform error it raises.
 #[cold]
 #[inline(never)]
-pub(crate) fn int_div_fault(fault: varn_core::IntDivFault, op: &str, a: i64, b: i64) -> RuntimeError {
+pub(crate) fn int_div_fault(
+    fault: varn_core::IntDivFault,
+    op: &str,
+    a: i64,
+    b: i64,
+) -> RuntimeError {
     match fault {
         varn_core::IntDivFault::DivisionByZero => RuntimeError::division_by_zero(if op == "%" {
             "modulo by zero"
@@ -151,9 +156,12 @@ pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 
 #[inline(always)]
 pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    // `int / int` is float division by contract (varn_core::numeric), so there
-    // is deliberately no integer fast path returning an int here — only the
-    // decimal detour to skip.
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return varn_core::div_int(x, y)
+            .map(VmValue::from_int)
+            .map_err(|f| int_div_fault(f, "/", x, y));
+    }
     if a.is_heap() || b.is_heap() {
         if let Some((x, y)) = decimal_pair(a, b, heap) {
             if y.is_zero() {

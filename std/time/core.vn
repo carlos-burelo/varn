@@ -28,10 +28,6 @@ export type DurationParts = {
     sign?: int;
 };
 
-export function int_div(a: int, b: int): int {
-    return ((a - (a % b)) / b).toInt();
-}
-
 export function pad2(n: int): str {
     if (n < 10) return "0" + n;
     return "" + n;
@@ -89,20 +85,20 @@ export function durationToString(ms: int): str {
 }
 
 export function durationParts(ms: int): DurationParts {
-    let total_s = int_div(ms, 1000);
+    let total_s = ms / 1000;
     return {
-        days: int_div(total_s, 86400),
-        hours: int_div(total_s % 86400, 3600),
-        minutes: int_div(total_s % 3600, 60),
+        days: total_s / 86400,
+        hours: total_s % 86400 / 3600,
+        minutes: total_s % 3600 / 60,
         seconds: (total_s % 60),
         milliseconds: (ms % 1000)
     };
 }
 
 export function formatDurationMs(ms: int): str {
-    let seconds = int_div(ms, 1000);
-    let minutes = int_div(seconds, 60);
-    let hours = int_div(minutes, 60);
+    let seconds = ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
     let remSec = seconds % 60;
     let remMin = minutes % 60;
     if (hours > 0) {

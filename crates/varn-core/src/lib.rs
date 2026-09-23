@@ -38,8 +38,8 @@ pub use cg_ty::CgTy;
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{
-    add_int, binary_operand_kind, binary_result_kind, checked_int, div_int, mul_int, neg_int, pow_int,
-    rem_int, sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
+    add_int, binary_operand_kind, checked_int, div_int, mul_int, neg_int, pow_int, rem_int,
+    sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
 };
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};

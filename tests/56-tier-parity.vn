@@ -20,7 +20,7 @@
 import { Duration } from "std:time";
 
 function halve(n: int): int {
-    return ((n - (n % 2)) / 2).toInt()
+    return n / 2
 }
 
 class TierBox {
@@ -29,7 +29,7 @@ class TierBox {
 
     constructor(n: int) {
         this.a = halve(n)
-        this.b = n / 2
+        this.b = (n as float) / 2.0
     }
 }
 

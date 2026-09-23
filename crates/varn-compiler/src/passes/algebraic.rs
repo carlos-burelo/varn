@@ -55,8 +55,8 @@ pub fn run(func: &mut SsaFunc) -> bool {
             match simplify(inst, &int_const, &float_const) {
                 Some(Simplified::Use(v)) => {
                     // `ty` on a `Binary` is the *result* type, and it need not
-                    // match its operands': `int / int` is Float, and so is
-                    // `1.0 * n` for an integer `n`. Forwarding the surviving
+                    // match its operands': `1.0 * n` for an integer `n` is
+                    // Float. Forwarding the surviving
                     // operand is only valid when it already has the type the
                     // result had, or every consumer downstream — including
                     // `register_meta` and the JIT's unboxing — would be

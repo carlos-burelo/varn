@@ -131,14 +131,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             Add => add_int(*x, *y).map(InstKind::ConstInt),
             Sub => sub_int(*x, *y).map(InstKind::ConstInt),
             Mul => mul_int(*x, *y).map(InstKind::ConstInt),
-            // `int / int` always yields float.
-            Div => {
-                if *y != 0 {
-                    Some(InstKind::ConstFloat(*x as f64 / *y as f64))
-                } else {
-                    None
-                }
-            }
+            Div => varn_core::div_int(*x, *y).ok().map(InstKind::ConstInt),
             Mod => varn_core::rem_int(*x, *y).ok().map(InstKind::ConstInt),
             // Negative exponents raise at runtime; never fold them.
             Pow => {

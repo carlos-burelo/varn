@@ -124,7 +124,7 @@ impl<'r> Checker<'r> {
                 }
                 let l = l_ref.unwrap_or_else(|| self.checked_ty(left));
                 let r = r_ref.unwrap_or_else(|| self.checked_ty(right));
-                numeric_result(&op, &l, &r, &self.ty_table)
+                numeric_result(&l, &r, &self.ty_table)
             }
 
             _ => None,
@@ -157,15 +157,9 @@ impl<'r> Checker<'r> {
 }
 
 /// Result type of an arithmetic operator over two operand types, following the
-/// language's numeric rules (`int / int` is a float; `int` op `int` is an
-/// `int`). Anything not both-numeric yields no refinement.
-fn numeric_result(
-    op: &BinaryOp,
-    l: &Type,
-    r: &Type,
-    table: &crate::types::CheckerTyTable,
-) -> Option<Type> {
-    use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
+/// language's numeric rules (every operator keeps its operands' domain). Anything not both-numeric yields no refinement.
+fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> Option<Type> {
+    use varn_core::{binary_operand_kind, NumericOperand, TypeTag};
 
     let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
@@ -183,7 +177,7 @@ fn numeric_result(
         _ => None,
     };
     let combined = binary_operand_kind(operand(l), operand(r))?;
-    match binary_result_kind(*op, combined) {
+    match combined {
         NumericOperand::Int => Some(Type::Int),
         NumericOperand::Float => Some(Type::Float),
         // No refinement for decimal: the annotation pass records no numeric

@@ -188,33 +188,12 @@ pub enum HirBinOp {
 }
 
 /// Result type of a `Binary` node whose `ty` field holds the OPERAND class.
-/// Comparisons produce `Bool`; arithmetic keeps the operand class except
-/// `int / int → float`, which is defined once in `varn_core::numeric`.
+/// Comparisons produce `Bool`; arithmetic keeps the operand class
+/// (`varn_core::numeric`).
 pub(crate) fn binary_result_ty(op: HirBinOp, operand_ty: HirType) -> HirType {
     use HirBinOp::*;
     match op {
         Eq | Ne | Lt | Le | Gt | Ge | Instanceof | In => HirType::Bool,
-        Add | Sub | Mul | Div | Mod | Pow => {
-            let k = match operand_ty {
-                HirType::Int => varn_core::NumericOperand::Int,
-                HirType::Float => varn_core::NumericOperand::Float,
-                _ => return operand_ty,
-            };
-            let ast_op = match op {
-                Div => varn_core::ast::operators::BinaryOp::Div,
-                Add => varn_core::ast::operators::BinaryOp::Add,
-                Sub => varn_core::ast::operators::BinaryOp::Sub,
-                Mul => varn_core::ast::operators::BinaryOp::Mul,
-                Mod => varn_core::ast::operators::BinaryOp::Mod,
-                Pow => varn_core::ast::operators::BinaryOp::Pow,
-                _ => unreachable!(),
-            };
-            match varn_core::binary_result_kind(ast_op, k) {
-                varn_core::NumericOperand::Int => HirType::Int,
-                varn_core::NumericOperand::Float => HirType::Float,
-                varn_core::NumericOperand::Decimal => HirType::Dynamic,
-            }
-        }
         _ => operand_ty,
     }
 }

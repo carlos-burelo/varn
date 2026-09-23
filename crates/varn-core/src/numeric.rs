@@ -14,19 +14,16 @@
 //!   and the constant folder. It does not wrap, does not saturate and does
 //!   not promote to float. Overflow the folder can prove is a compile error
 //!   rather than a runtime one.
-//! - `int / int` always produces a `float`. Integer division that
-//!   sometimes returned `int` (when exact) made a value's runtime type
-//!   depend on the values themselves, which poisons every typed fast
-//!   path downstream.
-//! - `int % int` produces an `int` (truncated remainder). Zero divisor
-//!   raises a runtime error, as does `int / 0`.
+//! - Every arithmetic operator keeps its operands' domain (spec §10): there
+//!   is no operator whose result class differs from its operands.
+//! - `int / int` is an `int` truncated toward zero; a zero divisor raises
+//!   `DivisionByZero` and `INT_MIN / -1` raises `IntegerOverflow`.
+//! - `int % int` has the dividend's sign; `INT_MIN % -1 == 0`.
 //! - `int ** int` produces an `int` (wrapping). A negative exponent
 //!   raises a runtime error instead of silently producing a float.
 //! - Mixed `int`/`float` operands promote to `float`; `decimal` absorbs
 //!   `int`. `decimal`/`float` mixes are a checker error and have no
 //!   numeric class.
-
-use crate::ast::operators::BinaryOp;
 
 /// The largest and smallest values Varn's `int` can hold.
 pub const INT_MAX: i64 = i64::MAX;
@@ -113,16 +110,6 @@ pub fn binary_operand_kind(
         (Decimal, Decimal) | (Decimal, Int) | (Int, Decimal) => Some(Decimal),
         (Float, Float) | (Float, Int) | (Int, Float) => Some(Float),
         (Decimal, Float) | (Float, Decimal) => None,
-    }
-}
-
-/// Result class of an arithmetic op whose operands share class `operands`.
-/// `int / int → float` is the one place where the result class differs
-/// from the operand class.
-pub fn binary_result_kind(op: BinaryOp, operands: NumericOperand) -> NumericOperand {
-    match (op, operands) {
-        (BinaryOp::Div, NumericOperand::Int) => NumericOperand::Float,
-        (_, k) => k,
     }
 }
 

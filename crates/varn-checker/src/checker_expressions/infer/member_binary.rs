@@ -121,22 +121,12 @@ pub(super) fn infer_binary_type(
                     {
                         return Type::Str;
                     }
-                    crate::binder::type_inference::numeric_binary_type(
-                        op,
-                        &l,
-                        &r,
-                        &checker.ty_table,
-                    )
-                    .unwrap_or_else(|| Type::Dynamic.tainted())
+                    crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                        .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    crate::binder::type_inference::numeric_binary_type(
-                        op,
-                        &l,
-                        &r,
-                        &checker.ty_table,
-                    )
-                    .unwrap_or_else(|| Type::Dynamic.tainted())
+                    crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                        .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::BitAnd
                 | BinaryOp::BitOr

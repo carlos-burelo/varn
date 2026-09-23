@@ -3030,13 +3030,7 @@ impl<'a> FnEmitter<'a> {
             .unwrap_or(r);
 
         if l == r {
-            let ty = if is_cmp {
-                BackendTy::Bool
-            } else if op == TirBinOp::Div && l == BackendTy::Int {
-                BackendTy::Float
-            } else {
-                l
-            };
+            let ty = if is_cmp { BackendTy::Bool } else { l };
             return (lhs, rhs, ty);
         }
 

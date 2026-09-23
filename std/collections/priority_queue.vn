@@ -59,7 +59,7 @@ export class PriorityQueue<T> {
     private _siftUp(index: int): void {
         let current = index;
         while (current > 0) {
-            let parent: int = ((current - 1) / 2) as int;
+            let parent: int = (current - 1) / 2;
             if (this._comparator(this._heap[current], this._heap[parent]) < 0) {
                 let temp = this._heap[current];
                 this._heap[current] = this._heap[parent];

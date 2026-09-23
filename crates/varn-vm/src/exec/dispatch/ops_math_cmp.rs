@@ -264,20 +264,18 @@ impl ExecCtx {
                 *ip += 1;
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.int_pair(base, r1, r2) {
-                    if b_val == 0 {
-                        return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
-                    }
-                    w!(first_reg, VmValue::from_f64(a_val as f64 / b_val as f64));
+                    let r = varn_core::div_int(a_val, b_val)
+                        .map_err(|f| arith::int_div_fault(f, "/", a_val, b_val))?;
+                    w!(first_reg, VmValue::from_int(r));
                 } else {
                     let a = self.stack.box_reg(base, r1);
                     let b = self.stack.box_reg(base, r2);
                     if a.is_int() && b.is_int() {
                         let a_val = a.as_int();
                         let b_val = b.as_int();
-                        if b_val == 0 {
-                            return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
-                        }
-                        w!(first_reg, VmValue::from_f64(a_val as f64 / b_val as f64));
+                        let r = varn_core::div_int(a_val, b_val)
+                            .map_err(|f| arith::int_div_fault(f, "/", a_val, b_val))?;
+                        w!(first_reg, VmValue::from_int(r));
                     } else {
                         let r = arith::div(a, b, &mut self.heap)?;
                         w!(first_reg, r);
@@ -522,7 +520,9 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
                     if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero(
+                            "division by zero",
+                        ));
                     }
                     w!(first_reg, VmValue::from_f64(a_val / b_val));
                 } else {
@@ -531,7 +531,9 @@ impl ExecCtx {
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
                             if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::division_by_zero("division by zero"));
+                                return Err(crate::error::RuntimeError::division_by_zero(
+                                    "division by zero",
+                                ));
                             }
                             w!(first_reg, VmValue::from_f64(av / bv));
                         }
@@ -548,7 +550,9 @@ impl ExecCtx {
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
                     if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
+                        return Err(crate::error::RuntimeError::division_by_zero(
+                            "modulo by zero",
+                        ));
                     }
                     w!(first_reg, VmValue::from_f64(a_val % b_val));
                 } else {
@@ -557,7 +561,9 @@ impl ExecCtx {
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
                             if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::division_by_zero("modulo by zero"));
+                                return Err(crate::error::RuntimeError::division_by_zero(
+                                    "modulo by zero",
+                                ));
                             }
                             w!(first_reg, VmValue::from_f64(av % bv));
                         }

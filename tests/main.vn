@@ -108,6 +108,7 @@ import "./class_field_layout.vn"
 import "./117-tuples.vn"
 import "./118-intersections.vn"
 import "./119-numeric-errors.vn"
+import "./120-int-division.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

@@ -383,13 +383,8 @@ fn infer_member(
 /// Numeric result type of a binary op, from the shared rules in
 /// `varn_core::numeric`. `None` when the operands have no common numeric
 /// class — the caller picks its own fallback.
-pub(crate) fn numeric_binary_type(
-    op: BinaryOp,
-    l: &Type,
-    r: &Type,
-    table: &CheckerTyTable,
-) -> Option<Type> {
-    use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
+pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
+    use varn_core::{binary_operand_kind, NumericOperand, TypeTag};
     let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
             TypeTag::Int
@@ -406,7 +401,7 @@ pub(crate) fn numeric_binary_type(
         _ => None,
     };
     let kind = binary_operand_kind(operand(l), operand(r))?;
-    Some(match binary_result_kind(op, kind) {
+    Some(match kind {
         NumericOperand::Int => Type::Int,
         NumericOperand::Float => Type::Float,
         NumericOperand::Decimal => Type::Decimal,
@@ -428,13 +423,13 @@ fn infer_binary(
             match (table.get(l.0), table.get(r.0)) {
                 (TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
                 | (_, TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
-                _ => numeric_binary_type(*op, &l, &r, table).unwrap_or(Type::Dynamic),
+                _ => numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic),
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
             let l = infer_expr_type(left, arena, ctx, table);
             let r = infer_expr_type(right, arena, ctx, table);
-            numeric_binary_type(*op, &l, &r, table).unwrap_or(Type::Dynamic)
+            numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic)
         }
         BinaryOp::Eq
         | BinaryOp::NotEq

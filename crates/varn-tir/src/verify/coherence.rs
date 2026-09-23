@@ -429,13 +429,8 @@ fn check_binary(
         return;
     }
 
-    // int / int is the one arithmetic case whose result leaves the operand
-    // class, and `varn_core::numeric` is where that rule lives.
-    let expected = if op == TirBinOp::Div && l == BackendTy::Int {
-        BackendTy::Float
-    } else {
-        l
-    };
+    // Arithmetic keeps the operand class (`varn_core::numeric`, spec §10).
+    let expected = l;
 
     if e.ty != expected {
         errors.push(VerifyError::new(

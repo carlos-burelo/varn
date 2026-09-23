@@ -21,9 +21,7 @@ use super::{boxed, call, def_heap, heapvalue, is_heap, load_value, Ctx};
 /// CLIF value of its own.
 ///
 /// `dest` is the defined value id; its static kind decides whether the result
-/// lands in a CLIF register (scalar) or in its VM home (heap), and is needed
-/// because a typed opcode does not always determine its own result class —
-/// `int / int` has the `DivInt` opcode but a `float` result.
+/// lands in a CLIF register (scalar) or in its VM home (heap).
 pub(super) fn emit_inst(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -46,9 +44,7 @@ pub(super) fn emit_inst(
         SsaOp::Cast { operand } => {
             let a = load_value(b, ctx, values, *operand)?;
             match (ctx.ssa.value_ty(*operand), dest_ty) {
-                (SlotKind::Int, Some(SlotKind::Float)) => {
-                    b.ins().fcvt_from_sint(types::F64, a)
-                }
+                (SlotKind::Int, Some(SlotKind::Float)) => b.ins().fcvt_from_sint(types::F64, a),
                 (SlotKind::Int, Some(SlotKind::Int))
                 | (SlotKind::Float, Some(SlotKind::Float))
                 | (SlotKind::Bool, Some(SlotKind::Bool)) => a,
@@ -65,7 +61,7 @@ pub(super) fn emit_inst(
         SsaOp::Binary { op, lhs, rhs } => {
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
-            emit_bin(b, ctx, *op, a, c, dest_ty)?
+            emit_bin(b, ctx, *op, a, c)?
         }
         SsaOp::Unary { op, operand } => {
             let a = load_value(b, ctx, values, *operand)?;
@@ -135,15 +131,12 @@ fn emit_bin(
     op: SsaBinOp,
     a: Value,
     c: Value,
-    dest_ty: Option<SlotKind>,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
     // Integer division/mod/power and float mod/power keep the VM's exact
-    // semantics through a runtime helper; the boxed domain owns that. `Div`
-    // is the one op whose result class differs from its operands
-    // (`int / int → float`), so the destination kind is passed through.
+    // semantics, faults included, through a runtime helper.
     if matches!(op, IntDiv | IntMod | IntPow | FloatMod | FloatPow) {
-        let dest_float = matches!(dest_ty, Some(SlotKind::Float));
+        let dest_float = matches!(op, FloatMod | FloatPow);
         return boxed::emit_bin(b, ctx, op, a, c, dest_float);
     }
     Ok(match op {
@@ -186,13 +179,7 @@ fn emit_bin(
     })
 }
 
-fn checked_int(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    op: SsaBinOp,
-    a: Value,
-    c: Value,
-) -> Value {
+fn checked_int(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaBinOp, a: Value, c: Value) -> Value {
     use super::super::emit::guard_overflow;
     let helpers = ctx.helpers;
     let (r, ovf, helper) = match op {
@@ -227,12 +214,7 @@ fn checked_int(
     )
 }
 
-fn emit_un(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    op: SsaUnOp,
-    a: Value,
-) -> Result<Value, String> {
+fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Result<Value, String> {
     use super::super::emit::{box_int, call_helper, call_helper_void};
     Ok(match op {
         SsaUnOp::NegInt => {
