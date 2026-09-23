@@ -72,38 +72,18 @@ pub(super) fn emit_inst(
             emit_un(b, ctx, *op, a)?
         }
         SsaOp::SelfCall { args } => {
-            for v in args {
-                if is_heap(ctx.ssa.value_ty(*v)) {
-                    return Err("from_ssa: heap self-call argument".into());
-                }
+            // A frame-aware callee needs its own frame pushed (the raw ABI
+            // prepends `stack, closure, base, exec_ctx`); this lowering does not
+            // model that, so it declines and the bytecode lowering takes it.
+            if ctx.frame.is_some() {
+                return Err("from_ssa: frame-aware self-call".into());
             }
             let a: Vec<Value> = args
                 .iter()
                 .map(|v| load_value(b, ctx, values, *v))
                 .collect::<Result<_, _>>()?;
             let call = b.ins().call(ctx.self_ref, &a);
-            if matches!(
-                ctx.proto.return_kind,
-                SlotKind::Int | SlotKind::Float | SlotKind::Bool
-            ) {
-                b.inst_results(call)[0]
-            } else {
-                // Non-scalar return: the raw returns void and the boxed result
-                // lands in `jit_native_result`; store it in the dest home.
-                let frame = ctx
-                    .frame
-                    .as_ref()
-                    .ok_or("from_ssa: self-call return without a frame")?;
-                let res = b.ins().load(
-                    types::I128,
-                    cranelift_codegen::ir::MemFlags::trusted(),
-                    frame.exec_ctx,
-                    ctx.helpers.jit_native_result_offset as i32,
-                );
-                let d = dest.ok_or("from_ssa: self-call without dest")?;
-                def_heap(b, ctx, ctx.ssa.reg(d), res)?;
-                res
-            }
+            b.inst_results(call)[0]
         }
         SsaOp::Call {
             callee,
