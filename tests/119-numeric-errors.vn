@@ -23,4 +23,9 @@ try {
 }
 assert("IntegerOverflow extends Error and has name", caught)
 
+function rem(a: int, b: int): int { return a % b }
+const MIN: int = 0 - 9223372036854775807 - 1
+assert("MIN % -1 is 0", rem(MIN, 0 - 1) === 0)
+assert("rem sign follows dividend", rem(0 - 7, 2) === 0 - 1)
+
 print("[PASSED] 119. Numeric errors")

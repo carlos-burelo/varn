@@ -69,6 +69,31 @@ pub fn neg_int(a: i64) -> Option<i64> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntDivFault {
+    DivisionByZero,
+    Overflow,
+}
+
+/// `a / b` truncated toward zero.
+#[inline(always)]
+pub fn div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
+    if b == 0 {
+        return Err(IntDivFault::DivisionByZero);
+    }
+    a.checked_div(b).ok_or(IntDivFault::Overflow)
+}
+
+/// Remainder with the dividend's sign. `MIN % -1` is exactly 0: the quotient
+/// overflows, the remainder does not.
+#[inline(always)]
+pub fn rem_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
+    if b == 0 {
+        return Err(IntDivFault::DivisionByZero);
+    }
+    Ok(a.wrapping_rem(b))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumericOperand {
     Int,
     Float,
@@ -98,5 +123,31 @@ pub fn binary_result_kind(op: BinaryOp, operands: NumericOperand) -> NumericOper
     match (op, operands) {
         (BinaryOp::Div, NumericOperand::Int) => NumericOperand::Float,
         (_, k) => k,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn div_int_truncates_toward_zero() {
+        assert_eq!(div_int(7, 2), Ok(3));
+        assert_eq!(div_int(-7, 2), Ok(-3));
+        assert_eq!(div_int(7, -2), Ok(-3));
+    }
+
+    #[test]
+    fn div_int_faults() {
+        assert_eq!(div_int(1, 0), Err(IntDivFault::DivisionByZero));
+        assert_eq!(div_int(i64::MIN, -1), Err(IntDivFault::Overflow));
+    }
+
+    #[test]
+    fn rem_int_follows_dividend_sign_and_never_overflows() {
+        assert_eq!(rem_int(-7, 2), Ok(-1));
+        assert_eq!(rem_int(7, -2), Ok(1));
+        assert_eq!(rem_int(i64::MIN, -1), Ok(0));
+        assert_eq!(rem_int(1, 0), Err(IntDivFault::DivisionByZero));
     }
 }

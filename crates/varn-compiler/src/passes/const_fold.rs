@@ -139,13 +139,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
                     None
                 }
             }
-            Mod => {
-                if *y != 0 {
-                    Some(InstKind::ConstInt(x % y))
-                } else {
-                    None
-                }
-            }
+            Mod => varn_core::rem_int(*x, *y).ok().map(InstKind::ConstInt),
             // Negative exponents raise at runtime; never fold them.
             Pow => {
                 if *y >= 0 && *y <= 30 {

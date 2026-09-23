@@ -25,6 +25,20 @@ fn overflow_neg(a: i64) -> RuntimeError {
     ))
 }
 
+/// The fault of an integer `/` or `%`, as the platform error it raises.
+#[cold]
+#[inline(never)]
+pub(crate) fn int_div_fault(fault: varn_core::IntDivFault, op: &str, a: i64, b: i64) -> RuntimeError {
+    match fault {
+        varn_core::IntDivFault::DivisionByZero => RuntimeError::division_by_zero(if op == "%" {
+            "modulo by zero"
+        } else {
+            "division by zero"
+        }),
+        varn_core::IntDivFault::Overflow => overflow(op, a, b),
+    }
+}
+
 /// The `decimal` payload of `v`, or `None`.
 ///
 /// A decimal lives ONLY as a `HeapObj::Decimal`, so the heap tag test alone
@@ -158,12 +172,10 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 #[inline(always)]
 pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
-        let bi = heap.as_int(b);
-        if bi == 0 {
-            return Err(RuntimeError::division_by_zero("modulo by zero"));
-        }
-        let r = heap.as_int(a) % bi;
-        return Ok(heap.make_int(r));
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return varn_core::rem_int(x, y)
+            .map(|r| heap.make_int(r))
+            .map_err(|f| int_div_fault(f, "%", x, y));
     }
     if a.is_heap() || b.is_heap() {
         if let Some((x, y)) = decimal_pair(a, b, heap) {
