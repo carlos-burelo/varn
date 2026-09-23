@@ -1,2 +1,2 @@
-// expect: error[emit]
+// expect: error[VN3021]
 const x = 100000000000000000000000000000000000000000n

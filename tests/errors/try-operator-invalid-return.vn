@@ -1,3 +1,4 @@
+// expect: error[VN3001]
 enum Result<T, E> {
     Ok(val: T),
     Err(err: E)

@@ -2,8 +2,6 @@
 //
 // `int` is a native i64 and raises rather than wrapping.
 //
-// Fatal by design: a VM arithmetic error is not catchable by `try`/`catch`,
-// the same as `division by zero`, so this cannot be asserted from inside the
-// main suite (see `tests/53-int-overflow.vn`).
+// Uncaught, it aborts the run; caught, it is an `Error` (see `tests/53-int-overflow.vn`).
 function mul(a: int, b: int): int { return a * b }
 print(mul(4000000000, 4000000000))
