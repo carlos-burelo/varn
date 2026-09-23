@@ -82,4 +82,17 @@ pub trait TypeContext {
     fn ty_table(&self) -> Option<&CheckerTyTable> {
         None
     }
+
+    /// Text of `atom`. This context's interner is a snapshot whose contents
+    /// are a prefix of the resolver's live table, so an atom minted after the
+    /// snapshot (an `origin` interned mid-resolution) is found in the live one.
+    fn atom_text(&self, atom: varn_core::Atom) -> Option<String> {
+        if let Some(s) = self.interner().and_then(|i| i.try_resolve(atom)) {
+            return Some(s.to_owned());
+        }
+        self.resolver()?
+            .interner_snapshot()
+            .try_resolve(atom)
+            .map(str::to_owned)
+    }
 }

@@ -305,6 +305,9 @@ impl<'r> super::Binder<'r> {
                 _ => None,
             }
         });
+        // The super-class type may carry an origin minted in the live table
+        // after this binder's snapshot was taken.
+        self.resync_interner();
         let extends = extends.map(|(n, o)| {
             (
                 Arc::<str>::from(self.interner.resolve(n)),

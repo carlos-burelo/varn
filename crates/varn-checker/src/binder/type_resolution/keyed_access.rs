@@ -52,14 +52,13 @@ pub(super) fn collect_type_keys(
             })
             .collect(),
         TypeKind::Named(name, origin) => {
-            let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
-            let origin_str =
-                origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
+            let name_str = ctx.and_then(|c| c.atom_text(name));
+            let origin_str = origin.and_then(|o| ctx.and_then(|c| c.atom_text(o)));
             name_str
                 .and_then(|name_str| {
                     ctx.and_then(|c| {
-                        c.get_interface_members(name_str, origin_str)
-                            .or_else(|| c.get_class_members(name_str, origin_str))
+                        c.get_interface_members(&name_str, origin_str.as_deref())
+                            .or_else(|| c.get_class_members(&name_str, origin_str.as_deref()))
                     })
                 })
                 .map(|members| members.iter().map(|m| m.name.clone()).collect())
@@ -177,13 +176,12 @@ pub(super) fn resolve_indexed_access(
         let name = name;
         let origin = origin;
         if let Some(key_name) = key_name {
-            let name_str = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
-            let origin_str =
-                origin.and_then(|o| ctx.and_then(|c| c.interner()).map(|i| i.resolve(o)));
+            let name_str = ctx.and_then(|c| c.atom_text(name));
+            let origin_str = origin.and_then(|o| ctx.and_then(|c| c.atom_text(o)));
             if let Some(name_str) = name_str {
                 if let Some(members) = ctx.and_then(|c| {
-                    c.get_interface_members(name_str, origin_str)
-                        .or_else(|| c.get_class_members(name_str, origin_str))
+                    c.get_interface_members(&name_str, origin_str.as_deref())
+                        .or_else(|| c.get_class_members(&name_str, origin_str.as_deref()))
                 }) {
                     for m in members {
                         if m.name.as_ref() == key_name {

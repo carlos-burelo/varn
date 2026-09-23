@@ -360,12 +360,11 @@ pub fn resolve_type_node(
                     TypeKind::Object(mid) => Some(table.get_object_members(mid).to_vec()),
                     TypeKind::Named(name, origin) => {
                         let ctx = ctx?;
-                        let interner = ctx.interner()?;
-                        let name_str = interner.resolve(name);
-                        let origin_str = origin.map(|o| interner.resolve(o));
+                        let name_str = ctx.atom_text(name)?;
+                        let origin_str = origin.and_then(|o| ctx.atom_text(o));
                         let members = ctx
-                            .get_class_members(name_str, origin_str)
-                            .or_else(|| ctx.get_interface_members(name_str, origin_str))?;
+                            .get_class_members(&name_str, origin_str.as_deref())
+                            .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))?;
                         Some(
                             members
                                 .iter()

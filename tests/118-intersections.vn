@@ -1,0 +1,29 @@
+interface Named { name(): str }
+interface Aged { age(): int }
+
+class Person {
+    n: str
+    a: int
+    constructor(n: str, a: int) {
+        this.n = n
+        this.a = a
+    }
+    name(): str { return this.n }
+    age(): int { return this.a }
+}
+
+function describe(x: Named & Aged): str {
+    return x.name() + ":" + x.age().toString()
+}
+
+assert("intersection param", describe(new Person("ana", 30)) === "ana:30")
+
+class Base {
+    greet(): str { return "hi" }
+}
+class Child extends Base {
+    extra(): int { return 1 }
+}
+assert("extends in the same module binds", new Child().greet() === "hi")
+
+print("[PASSED] 118. Intersections")

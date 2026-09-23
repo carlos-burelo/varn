@@ -18,16 +18,7 @@ fn ctx_resolve_text(
     ctx: Option<&dyn crate::types::TypeContext>,
     atom: varn_core::Atom,
 ) -> Option<String> {
-    let c = ctx?;
-    if let Some(i) = c.interner() {
-        if let Some(s) = i.try_resolve(atom) {
-            return Some(s.to_string());
-        }
-    }
-    c.resolver()?
-        .interner_snapshot()
-        .try_resolve(atom)
-        .map(|s| s.to_string())
+    ctx?.atom_text(atom)
 }
 
 /// Decode a member type returned by `TypeContext::get_class_members` (and
