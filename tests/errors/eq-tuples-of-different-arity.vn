@@ -1,0 +1,2 @@
+// expect: error[VN3010]
+const same = #[1, 2] == #[1, 2, 3]

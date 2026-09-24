@@ -67,7 +67,18 @@ impl<'r> Checker<'r> {
                 BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => {
                     same_numeric || (l_base == Type::Str && r_base == Type::Str)
                 }
-                BinaryOp::Eq | BinaryOp::NotEq => !both_numeric || same_numeric,
+                BinaryOp::Eq | BinaryOp::NotEq => {
+                    if both_numeric {
+                        same_numeric
+                    } else {
+                        // Values of types with nothing in common are never
+                        // equal: comparing them is a type error, not `false`.
+                        l_ty == Type::Null
+                            || r_ty == Type::Null
+                            || self.value_assignable_to(&l_ty, &r_ty, Some(right), Some(bind))
+                            || self.value_assignable_to(&r_ty, &l_ty, Some(left), Some(bind))
+                    }
+                }
                 _ => true,
             };
             if !valid {

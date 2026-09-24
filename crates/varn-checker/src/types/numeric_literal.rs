@@ -34,6 +34,10 @@ pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTab
     match table.get(target.0) {
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value),
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal | varn_core::LangPrimitive::BigInt) => true,
+        TypeKind::Union(list) => table
+            .get_list(list)
+            .iter()
+            .any(|m| int_literal_adopts(&Type(*m, false), value, table)),
         _ => false,
     }
 }

@@ -1,0 +1,4 @@
+// expect: error[VN3010]
+enum Color { Red, Green }
+const c: Color = Color.Red
+const same = c == 0
