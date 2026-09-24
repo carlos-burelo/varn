@@ -50,7 +50,8 @@ fn golden_name(case: &str, phase: &str) -> String {
 /// Replace environment-dependent text with stable placeholders:
 /// - `\\?\` verbatim prefix stripped,
 /// - the fixtures directory (canonical and relative, both slash styles) and the
-///   absolute fixture file path folded to `<fixtures>` / basename,
+///   absolute fixture file path folded to `<fixtures>` / basename, followed
+///   by `/` whatever the platform,
 /// - CRLF → LF.
 fn normalize(raw: &str, fixtures: &Path) -> String {
     let mut s = raw.replace("\r\n", "\n");
@@ -60,8 +61,13 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
     let canon_verbatim = canon_s.replace("\\\\?\\", "");
     let canon_fwd = canon_s.replace('\\', "/");
     let canon_verbatim_fwd = canon_verbatim.replace('\\', "/");
+    // As a `{:?}` dump prints them (the TIR's `source_file`): backslashes doubled.
+    let canon_escaped = canon_s.replace('\\', "\\\\");
+    let canon_verbatim_escaped = canon_verbatim.replace('\\', "\\\\");
 
     for p in [
+        canon_escaped.as_str(),
+        canon_verbatim_escaped.as_str(),
         canon_s.as_str(),
         canon_verbatim.as_str(),
         canon_fwd.as_str(),
@@ -75,7 +81,10 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
             s = s.replace(p, "<fixtures>");
         }
     }
-    s
+    // One separator after the placeholder, so a golden reads the same on
+    // every platform.
+    s.replace("<fixtures>\\\\", "<fixtures>/")
+        .replace("<fixtures>\\", "<fixtures>/")
 }
 
 fn run_phase(vn: &str, fixture: &Path, phase: &str) -> String {

@@ -1,5 +1,5 @@
 
-  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>\arith.vn[0m
+  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>/arith.vn[0m
 ├── [1mFunctionDecl[0m [34madd[0m
 │   └── [1mBlockStmt[0m
 │       └── [1mReturnStmt[0m

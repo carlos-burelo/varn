@@ -1,5 +1,5 @@
 
-=== TIR CHECK: <fixtures>\class_fields.vn ===
+=== TIR CHECK: <fixtures>/class_fields.vn ===
 nodes 48   static 19   by name 4   static 83%
   unannotated        dynamic     4   by name     4
   from_tir(ssa): OK (5 ssa fn(s))

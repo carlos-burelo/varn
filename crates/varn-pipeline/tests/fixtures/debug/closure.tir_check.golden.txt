@@ -1,5 +1,5 @@
 
-=== TIR CHECK: <fixtures>\closure.vn ===
+=== TIR CHECK: <fixtures>/closure.vn ===
 nodes 46   static 22   by name 3   static 88%
   unannotated        dynamic    15   by name     3
   from_tir(ssa): OK (5 ssa fn(s))

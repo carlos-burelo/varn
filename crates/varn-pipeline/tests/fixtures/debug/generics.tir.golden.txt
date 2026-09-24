@@ -1,7 +1,7 @@
 
-=== TIR: <fixtures>\generics.vn ===
+=== TIR: <fixtures>/generics.vn ===
 TirModule {
-    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\generics.vn",
+    source_file: "<fixtures>/generics.vn",
     imports: [],
     exports: [],
     types: TyTable {

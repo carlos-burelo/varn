@@ -1,7 +1,7 @@
 
-=== TIR: <fixtures>\loop_array.vn ===
+=== TIR: <fixtures>/loop_array.vn ===
 TirModule {
-    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\loop_array.vn",
+    source_file: "<fixtures>/loop_array.vn",
     imports: [],
     exports: [],
     types: TyTable {

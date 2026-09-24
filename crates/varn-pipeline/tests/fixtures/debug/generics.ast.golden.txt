@@ -1,5 +1,5 @@
 
-  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>\generics.vn[0m
+  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>/generics.vn[0m
 ├── [1mClassDecl[0m [34mBox[0m
 │   ├── [1mProperty[0m [36mvalue[0m
 │   ├── [1mConstructor[0m
