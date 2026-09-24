@@ -28,7 +28,7 @@ impl<'r> Checker<'r> {
         let r_base_raw = base_type(&r_ty);
         let l_base = normalize_for_binary(&l_base_raw, &self.ty_table, &bind.interner);
         let r_base = normalize_for_binary(&r_base_raw, &self.ty_table, &bind.interner);
-        let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.resolve(n)));
+        let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
         if !l_base.is_dynamic()
             && !r_base.is_dynamic()
             && !is_type_param_b(&l_base, self)
@@ -36,7 +36,7 @@ impl<'r> Checker<'r> {
         {
             let is_numeric = |t: &Type, checker: &Checker| {
                 t.is_numeric()
-                    || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(n) == varn_core::LangPrimitive::Decimal.name())
+                    || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.try_resolve(n).unwrap_or_default() == varn_core::LangPrimitive::Decimal.name())
             };
             let both_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
             let (l_eff, r_eff) = crate::binder::type_inference::adopt_literal_operands(

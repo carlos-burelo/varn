@@ -195,15 +195,12 @@ fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_type
         .first()
         .copied()
         .ok_or("range_symbol_iterator: missing receiver")?;
-    let range_val = ctx.extract(range_nv);
-    let (cur, end_excl, step) = match range_val {
-        Value::Range(r) => (r.start, if r.inclusive { r.end + 1 } else { r.end }, r.step),
-        _ => return Err("range_symbol_iterator: invalid receiver".into()),
-    };
+    if !matches!(ctx.extract(range_nv), Value::Range(_)) {
+        return Err("range_symbol_iterator: invalid receiver".into());
+    }
     let iter_nv = ctx.alloc_object();
-    ctx.set_field(iter_nv, "__cur", VmValue::from_int(cur));
-    ctx.set_field(iter_nv, "__end", VmValue::from_int(end_excl));
-    ctx.set_field(iter_nv, "__step", VmValue::from_int(step));
+    ctx.set_field(iter_nv, "__range", range_nv);
+    ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
     let res_nv = ctx.alloc_object();
     ctx.set_field(iter_nv, "__res", res_nv);
     let next_nv = ctx.intern(Value::native_bound(
@@ -220,24 +217,23 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nat
         .first()
         .copied()
         .ok_or("range_iter_next: missing receiver")?;
-    let cur = ctx.as_int(ctx.get_field(obj_nv, "__cur").unwrap_or(VmValue::null()));
-    let end = ctx.as_int(ctx.get_field(obj_nv, "__end").unwrap_or(VmValue::null()));
-    let step = ctx
-        .get_field(obj_nv, "__step")
-        .map(|v| ctx.as_int(v))
-        .unwrap_or(1);
+    let range_nv = ctx.get_field(obj_nv, "__range").unwrap_or(VmValue::null());
+    let Value::Range(range) = ctx.extract(range_nv) else {
+        return Err("range_iter_next: invalid range".into());
+    };
+    let idx = ctx.as_int(ctx.get_field(obj_nv, "__idx").unwrap_or(VmValue::null()));
     let result_nv = ctx
         .get_field(obj_nv, "__res")
         .unwrap_or_else(|| ctx.alloc_object());
-    if cur >= end {
+    let Some(raw) = range.nth(idx) else {
         ctx.set_field(result_nv, "value", VmValue::null());
         ctx.set_field(result_nv, "done", VmValue::from_bool(true));
         return Ok(result_nv);
-    }
-    let cur_next = ctx.int_val(cur + step);
-    ctx.set_field(obj_nv, "__cur", cur_next);
-    let cur_val = ctx.int_val(cur);
-    ctx.set_field(result_nv, "value", cur_val);
+    };
+    let next_idx = ctx.int_val(idx + 1);
+    ctx.set_field(obj_nv, "__idx", next_idx);
+    let item = ctx.intern(range.element(raw));
+    ctx.set_field(result_nv, "value", item);
     ctx.set_field(result_nv, "done", VmValue::from_bool(false));
     Ok(result_nv)
 }
@@ -272,18 +268,23 @@ pub(crate) fn invoke_runtime_static(
     flag: u16,
 ) -> VmResult<VmValue> {
     match name {
-        "__range__" => {
+        varn_core::well_known::RUNTIME_RANGE => {
             let end = stack
                 .pop()
                 .ok_or_else(|| RuntimeError::new("range: stack empty"))?;
             let start = stack
                 .pop()
                 .ok_or_else(|| RuntimeError::new("range: stack empty"))?;
-            let r = varn_types::value::RangeData {
-                start: heap.as_int(start),
-                end: heap.as_int(end),
-                inclusive: flag != 0,
-                step: 1,
+            let r = match (heap.extract(start), heap.extract(end)) {
+                (Value::Char(a), Value::Char(b)) => varn_types::value::RangeData {
+                    elem: varn_types::value::RangeElem::Char,
+                    ..varn_types::value::RangeData::int(a as i64, b as i64, flag != 0)
+                },
+                _ => varn_types::value::RangeData::int(
+                    heap.as_int(start),
+                    heap.as_int(end),
+                    flag != 0,
+                ),
             };
             Ok(heap.intern(Value::Range(Box::new(r))))
         }

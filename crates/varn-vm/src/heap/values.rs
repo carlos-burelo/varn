@@ -40,13 +40,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
-        let r = RangeData {
-            start,
-            end,
-            inclusive,
-            step: 1,
-        };
-        VmValue::from_heap_idx(self.alloc(HeapObj::Range(r)))
+        VmValue::from_heap_idx(self.alloc(HeapObj::Range(RangeData::int(start, end, inclusive))))
     }
 
     pub(crate) fn alloc_decimal(&mut self, d: bigdecimal::BigDecimal) -> VmValue {

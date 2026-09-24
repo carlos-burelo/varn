@@ -321,19 +321,10 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             }
         }
         Some(HeapObj::Range(r)) => {
-            let idx = heap.as_int(key);
-            let (start, end, step, inclusive) = (r.start, r.end, r.step, r.inclusive);
-            let diff = end - start;
-            let count = if inclusive {
-                (diff / step) + 1
-            } else {
-                (diff + step - 1) / step
-            };
-            if idx >= 0 && idx < count {
-                let r = start + idx * step;
-                Ok(heap.make_int(r))
-            } else {
-                Ok(VmValue::null())
+            let r = r.clone();
+            match r.nth(heap.as_int(key)) {
+                Some(raw) => Ok(heap.intern(r.element(raw))),
+                None => Ok(VmValue::null()),
             }
         }
         Some(HeapObj::Map(m)) => {

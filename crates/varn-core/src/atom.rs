@@ -42,6 +42,9 @@ impl AtomInterner {
         self.map.get(s).copied()
     }
 
+    /// Panics on an atom this table never minted; the panic names the
+    /// caller, which is the site that should have used `try_resolve`.
+    #[track_caller]
     pub fn resolve(&self, atom: Atom) -> &str {
         &self.strings[atom.0 as usize]
     }

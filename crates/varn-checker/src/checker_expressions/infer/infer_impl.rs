@@ -550,10 +550,14 @@ impl<'r> Checker<'r> {
             ExprKind::CharLiteral { .. } => Type::Char,
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,
-            ExprKind::Range { .. } => Type::builtin(
-                varn_core::BuiltinType::Range,
-                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-            ),
+            ExprKind::Range { start, .. } => {
+                let bound = self.infer_type(*start, bind);
+                Type::range_over(
+                    &bound,
+                    self.resolver,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                )
+            }
             ExprKind::Match { cases, .. } => {
                 let cases = cases.clone();
                 let mut tys = Vec::new();

@@ -68,6 +68,24 @@ impl Type {
         }
     }
 
+    /// `Range<T>` over the domain of a range bound: `char` bounds make a
+    /// `Range<char>`, every other bound a `Range<int>`.
+    pub fn range_over(bound: &Type, resolver: &dyn ImportResolver, table: &mut CheckerTyTable) -> Self {
+        let elem = if bound.apparent(table) == Type::Char { Type::Char } else { Type::Int };
+        Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], resolver, table)
+    }
+
+    /// `Range` or `Range<T>`.
+    pub fn is_range(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> bool {
+        match table.get(self.0) {
+            TypeKind::Builtin(varn_core::BuiltinType::Range) => true,
+            TypeKind::Generic(name, _, _) => {
+                interner.try_resolve(name) == Some(varn_core::BuiltinType::Range.name())
+            }
+            _ => false,
+        }
+    }
+
     pub fn literal(l: varn_core::TypeLiteral<varn_core::Atom>, table: &mut CheckerTyTable) -> Self {
         Type(table.intern(TypeKind::Literal(l)), false)
     }

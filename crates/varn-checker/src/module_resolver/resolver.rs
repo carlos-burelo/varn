@@ -177,6 +177,17 @@ impl Default for DiskResolver {
     }
 }
 
+/// The shared `Atom` table starts with the builtin type names: the checker
+/// synthesizes types such as `Range<char>` for source text that never spells
+/// the name, and every module's snapshot must already resolve that atom.
+fn seeded_interner() -> varn_core::AtomInterner {
+    let mut interner = varn_core::AtomInterner::default();
+    for builtin in varn_core::BuiltinType::ALL {
+        interner.intern(builtin.name());
+    }
+    interner
+}
+
 impl DiskResolver {
     pub fn new() -> Self {
         Self {
@@ -185,7 +196,7 @@ impl DiskResolver {
             in_flight: parking_lot::Mutex::default(),
             core_exports: parking_lot::Mutex::default(),
             core_members: parking_lot::Mutex::default(),
-            interner: parking_lot::Mutex::default(),
+            interner: parking_lot::Mutex::new(seeded_interner()),
             ty_table: parking_lot::Mutex::default(),
         }
     }

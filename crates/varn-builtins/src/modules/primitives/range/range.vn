@@ -1,16 +1,16 @@
-export declare class Range {
-    readonly start: int;
-    readonly end: int;
+export declare class Range<T> {
+    readonly start: T;
+    readonly end: T;
     readonly inclusive: bool;
     readonly length: int;
 
     toString(): str;
-    contains(val: int): bool;
-    toArray(): int[];
-    step(n: int): int[];
-    forEach(callback: (val: int) => void): void;
-    map<T>(callback: (val: int) => T): T[];
+    contains(val: T): bool;
+    toArray(): T[];
+    @fallible step(n: int): Range<T>;
+    forEach(callback: (val: T) => void): void;
+    map<U>(callback: (val: T) => U): U[];
 
-    static from(start: int, end: int): Range;
-    static fromInclusive(start: int, end: int): Range;
+    static from(start: int, end: int): Range<int>;
+    static fromInclusive(start: int, end: int): Range<int>;
 }

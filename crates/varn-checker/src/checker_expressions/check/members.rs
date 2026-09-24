@@ -104,10 +104,7 @@ impl<'r> Checker<'r> {
                     TypeKind::Array(_)
                         | TypeKind::Primitive(varn_core::LangPrimitive::Str)
                         | TypeKind::Builtin(varn_core::BuiltinType::Bytes)
-                ) && matches!(
-                    self.ty_table.get(actual_k.0),
-                    TypeKind::Builtin(varn_core::BuiltinType::Range)
-                );
+                ) && actual_k.is_range(&self.ty_table, &bind.interner);
                 if !actual_k.is_dynamic()
                     && !is_range_slice
                     && !self.types_compatible_cached(&expected_k, &actual_k, Some(bind))

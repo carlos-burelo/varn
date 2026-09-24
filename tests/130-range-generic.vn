@@ -1,0 +1,28 @@
+const ints: Range<int> = 0..5
+assert("Range<int> annotation", ints.length === 5 && ints.end === 5)
+
+const letters: Range<char> = 'a'..='e'
+assert("char range length", letters.length === 5)
+assert("char range bounds", letters.start === 'a' && letters.end === 'e')
+assert("char range contains", letters.contains('c') && !letters.contains('z'))
+assert("char range toArray", letters.toArray().join("") === "abcde")
+
+let word = ""
+for (const c of 'x'..='z') { word = word + c }
+assert("for-of over char range", word === "xyz")
+
+const evens = (0..10).step(2)
+assert("step stays lazy", evens.length === 5 && evens[4] === 8)
+assert("step contains", evens.contains(4) && !evens.contains(5))
+assert("step of step", evens.step(2).toArray().join(",") === "0,4,8")
+
+let total = 0
+for (const i of (1..=9).step(4)) { total = total + i }
+assert("for-of over stepped range", total === 1 + 5 + 9)
+
+function badStep(): bool {
+    try { (0..3).step(0); return false } catch (e) { return true }
+}
+assert("non-positive step raises", badStep())
+
+print("[PASSED] 130. Range<T>")

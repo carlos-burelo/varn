@@ -1,6 +1,6 @@
 use varn_op_macros::varn_contract;
-use varn_types::value::RangeData;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::value::{RangeData, RangeElem};
+use varn_types::{NativeCtx, NativeError, Value, VmValue};
 
 pub struct Range;
 
@@ -12,11 +12,20 @@ fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
     }
 }
 
-fn range_end_exclusive(r: &RangeData) -> i64 {
-    if r.inclusive {
-        r.end + 1
-    } else {
-        r.end
+/// Every element of `r`, in order.
+fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
+    (0..r.len())
+        .filter_map(|i| r.nth(i))
+        .map(|raw| ctx.intern(r.element(raw)))
+        .collect()
+}
+
+/// The raw bound `val` stands for in `r`'s domain, if it belongs to it.
+fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
+    match (r.elem, ctx.extract(val)) {
+        (RangeElem::Int, Value::Int(n)) => Some(n),
+        (RangeElem::Char, Value::Char(c)) => Some(c as i64),
+        _ => None,
     }
 }
 
@@ -26,102 +35,62 @@ varn_contract! {
     contract: "src/modules/primitives/range/range.vn",
     impl Range {
 
-        fn start(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            get_range(ctx, this).map(|r| r.start).unwrap_or(0)
+        fn start(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            match get_range(ctx, this) {
+                Some(r) => ctx.intern(r.element(r.start)),
+                None => VmValue::null(),
+            }
         }
-        fn end(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            get_range(ctx, this).map(|r| r.end).unwrap_or(0)
+        fn end(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            match get_range(ctx, this) {
+                Some(r) => ctx.intern(r.element(r.end)),
+                None => VmValue::null(),
+            }
         }
         fn inclusive(ctx: &mut dyn NativeCtx, this: VmValue) -> bool {
             get_range(ctx, this).map(|r| r.inclusive).unwrap_or(false)
         }
         fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            match get_range(ctx, this) {
-                Some(r) => {
-                    if r.inclusive {
-                        ((r.end - r.start) / r.step + 1).max(0)
-                    } else {
-                        ((r.end - r.start + r.step - 1) / r.step).max(0)
-                    }
-                }
-                None => 0,
-            }
+            get_range(ctx, this).map(|r| r.len()).unwrap_or(0)
         }
-
-
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
-            match get_range(ctx, this) {
-                Some(r) if r.inclusive => format!("{}..={}", r.start, r.end),
-                Some(r) => format!("{}..{}", r.start, r.end),
-                None => "0..0".to_string(),
-            }
+            get_range(ctx, this).map(|r| r.to_string()).unwrap_or_default()
         }
-        fn contains(ctx: &mut dyn NativeCtx, this: VmValue, val: i64) -> bool {
+        fn contains(ctx: &mut dyn NativeCtx, this: VmValue, val: VmValue) -> bool {
             match get_range(ctx, this) {
-                Some(r) => {
-                    let in_range = if r.inclusive {
-                        val >= r.start && val <= r.end
-                    } else {
-                        val >= r.start && val < r.end
-                    };
-                    let aligned = r.step == 1 || (val - r.start) % r.step == 0;
-                    in_range && aligned
-                }
+                Some(r) => raw_of(ctx, &r, val).is_some_and(|raw| r.contains(raw)),
                 None => false,
             }
         }
         fn toArray(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
-            let mut vals = Vec::new();
-            if let Some(r) = get_range(ctx, this) {
-                let end = range_end_exclusive(&r);
-                let mut i = r.start;
-                while i < end {
-                    vals.push(ctx.intern(Value::Int(i)));
-                    i += r.step;
-                }
+            match get_range(ctx, this) {
+                Some(r) => elements(ctx, &r),
+                None => Vec::new(),
             }
-            vals
         }
-        fn step(ctx: &mut dyn NativeCtx, this: VmValue, n: i64) -> Vec<VmValue> {
-            let mut vals = Vec::new();
-            if let Some(r) = get_range(ctx, this) {
-                let step = n.max(1);
-                let end = range_end_exclusive(&r);
-                let mut i = r.start;
-                while i < end {
-                    vals.push(ctx.intern(Value::Int(i)));
-                    i += step;
-                }
+        fn step(ctx: &mut dyn NativeCtx, this: VmValue, n: i64) -> Result<VmValue, NativeError> {
+            if n <= 0 {
+                return Err(NativeError::from(format!("range step must be positive, got {n}")));
             }
-            vals
+            let r = get_range(ctx, this).ok_or_else(|| NativeError::from("range.step: not a range"))?;
+            Ok(ctx.intern(Value::Range(Box::new(r.with_step(r.step * n)))))
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
             if let Some(r) = get_range(ctx, this) {
-                let end = range_end_exclusive(&r);
-                let mut i = r.start;
-                while i < end {
-                    let arg = ctx.intern(Value::Int(i));
-                    let _ = ctx.call_vm(callback, &[arg]);
-                    i += r.step;
+                for item in elements(ctx, &r) {
+                    let _ = ctx.call_vm(callback, &[item]);
                 }
             }
         }
         fn map(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Vec<VmValue> {
-            let mut out = Vec::new();
-            if let Some(r) = get_range(ctx, this) {
-                let end = range_end_exclusive(&r);
-                let mut i = r.start;
-                while i < end {
-                    let arg = ctx.intern(Value::Int(i));
-                    if let Ok(v) = ctx.call_vm(callback, &[arg]) {
-                        out.push(v);
-                    }
-                    i += r.step;
-                }
-            }
-            out
+            let Some(r) = get_range(ctx, this) else {
+                return Vec::new();
+            };
+            elements(ctx, &r)
+                .into_iter()
+                .filter_map(|item| ctx.call_vm(callback, &[item]).ok())
+                .collect()
         }
-
 
         fn from(ctx: &mut dyn NativeCtx, start: i64, end: i64) -> VmValue {
             ctx.alloc_range(start, end, false)

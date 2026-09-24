@@ -341,17 +341,15 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
             Some(VmValue::from_int(b.len() as i64))
         }
         Some(HeapObj::Range(r)) => {
-            if key == varn_core::MemberKey::Start.as_str() {
+            // A `char` bound needs a heap allocation: the native getter
+            // (`range.rs`) answers it.
+            let int_bounds = r.elem == varn_types::value::RangeElem::Int;
+            if int_bounds && key == varn_core::MemberKey::Start.as_str() {
                 Some(VmValue::from_int(r.start))
-            } else if key == varn_core::MemberKey::End.as_str() {
+            } else if int_bounds && key == varn_core::MemberKey::End.as_str() {
                 Some(VmValue::from_int(r.end))
             } else if key == varn_core::MemberKey::Length.as_str() {
-                let len = if r.inclusive {
-                    (r.end - r.start + 1).max(0)
-                } else {
-                    (r.end - r.start).max(0)
-                };
-                Some(VmValue::from_int(len))
+                Some(VmValue::from_int(r.len()))
             } else {
                 None
             }

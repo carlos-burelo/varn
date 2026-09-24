@@ -248,7 +248,13 @@ pub fn infer_expr_type(
             expr_arm_ty.unwrap_or(Type::Dynamic)
         }
         ExprKind::Object { properties } => infer_object(properties, arena, ctx, table),
-        ExprKind::Range { .. } => Type::builtin(varn_core::BuiltinType::Range, table),
+        ExprKind::Range { start, .. } => {
+            let bound = infer_expr_type(*start, arena, ctx, table);
+            match ctx.and_then(|c| c.resolver()) {
+                Some(resolver) => Type::range_over(&bound, resolver, table),
+                None => Type::builtin(varn_core::BuiltinType::Range, table),
+            }
+        }
         ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
         _ => Type::Dynamic,
     }

@@ -922,7 +922,17 @@ impl<'a> FnEmitter<'a> {
         body: StmtId,
         is_await: bool,
     ) -> Vec<TirStmt> {
-        if !is_await {
+        // Only an `int` range counts in registers; a `char` range goes
+        // through its iterator, which yields `char` values.
+        let arena = self.ast_arena;
+        let int_range = match &arena.expr(right).kind {
+            ExprKind::Range { start, end, .. } => {
+                matches!(self.expr_ty(*start), BackendTy::Int)
+                    && matches!(self.expr_ty(*end), BackendTy::Int)
+            }
+            _ => false,
+        };
+        if !is_await && int_range {
             if let (
                 ExprKind::Range {
                     start,

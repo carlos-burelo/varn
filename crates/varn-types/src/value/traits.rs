@@ -269,7 +269,7 @@ impl fmt::Display for Value {
                 crate::task::TaskState::Resolved(v) => write!(f, "Task({v})"),
                 crate::task::TaskState::Rejected(v) => write!(f, "Task(<rejected:{v}>)"),
             },
-            Value::Range(r) => write!(f, "{}..{}", r.start, r.end),
+            Value::Range(r) => write!(f, "{r}"),
             Value::Map(map_ref) => {
                 let m = map_ref.read();
                 write!(f, "Map({})", m.len())

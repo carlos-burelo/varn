@@ -41,20 +41,94 @@ pub struct LazyTask {
     pub current_class: Option<Rc<crate::value::class::ClassObj>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The element domain of a `Range<T>`: bounds are stored as `i64` either
+/// way (a `char` as its code point).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RangeElem {
+    Int,
+    Char,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RangeData {
     pub start: i64,
     pub end: i64,
     pub inclusive: bool,
     pub step: i64,
+    pub elem: RangeElem,
 }
 
-impl std::hash::Hash for RangeData {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.start.hash(state);
-        self.end.hash(state);
-        self.inclusive.hash(state);
-        self.step.hash(state);
+impl RangeData {
+    pub fn int(start: i64, end: i64, inclusive: bool) -> Self {
+        Self {
+            start,
+            end,
+            inclusive,
+            step: 1,
+            elem: RangeElem::Int,
+        }
+    }
+
+    pub fn end_exclusive(&self) -> i64 {
+        if self.inclusive {
+            self.end.saturating_add(1)
+        } else {
+            self.end
+        }
+    }
+
+    /// Number of elements, `step` included.
+    pub fn len(&self) -> i64 {
+        let span = self.end_exclusive() - self.start;
+        if span <= 0 {
+            0
+        } else {
+            (span + self.step - 1) / self.step
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The raw bound of element `i`, or `None` past the end.
+    pub fn nth(&self, i: i64) -> Option<i64> {
+        (0..self.len()).contains(&i).then(|| self.start + i * self.step)
+    }
+
+    pub fn contains(&self, raw: i64) -> bool {
+        raw >= self.start && raw < self.end_exclusive() && (raw - self.start) % self.step == 0
+    }
+
+    /// The element `raw` stands for.
+    pub fn element(&self, raw: i64) -> crate::Value {
+        match self.elem {
+            RangeElem::Int => crate::Value::Int(raw),
+            RangeElem::Char => crate::Value::Char(
+                u32::try_from(raw).ok().and_then(char::from_u32).unwrap_or('\0'),
+            ),
+        }
+    }
+
+    pub fn with_step(&self, step: i64) -> Self {
+        Self {
+            step,
+            ..self.clone()
+        }
+    }
+}
+
+impl std::fmt::Display for RangeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dots = if self.inclusive { "..=" } else { ".." };
+        match self.elem {
+            RangeElem::Int => write!(f, "{}{dots}{}", self.start, self.end)?,
+            RangeElem::Char => write!(f, "{}{dots}{}", self.element(self.start), self.element(self.end))?,
+        }
+        if self.step != 1 {
+            write!(f, " step {}", self.step)?;
+        }
+        Ok(())
     }
 }
 

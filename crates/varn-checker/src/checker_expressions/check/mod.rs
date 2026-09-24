@@ -138,7 +138,7 @@ impl<'r> Checker<'r> {
                 if let Some(expected_fn) = self.expected_fn_type() {
                     for ep in &expected_fn.params {
                         if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
-                            let n_str = bind.interner.resolve(n);
+                            let n_str = bind.interner.try_resolve(n).unwrap_or_default();
                             if !varn_core::is_lang_type_name(n_str) {
                                 injected_type_params.push(Arc::from(n_str));
                             }
@@ -147,7 +147,7 @@ impl<'r> Checker<'r> {
                     if let varn_core::TypeKind::Named(n, _) =
                         self.ty_table.get(expected_fn.return_type)
                     {
-                        let n_str = bind.interner.resolve(n);
+                        let n_str = bind.interner.try_resolve(n).unwrap_or_default();
                         if !varn_core::is_lang_type_name(n_str) {
                             injected_type_params.push(Arc::from(n_str));
                         }
@@ -173,7 +173,7 @@ impl<'r> Checker<'r> {
                         let actual = self.infer_type(e, bind);
                         if let Some(expected) = self.expected_return_type {
                             let expected_kind = self.ty_table.get(expected.0);
-                            let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
+                            let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
                             let is_void = matches!(
                                 expected_kind,
                                 varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
@@ -282,8 +282,8 @@ impl<'r> Checker<'r> {
                 self.check_expr(expression, bind);
                 let expr_ty = self.infer_type(expression, bind);
 
-                let is_result = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Result");
-                let is_option = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Option");
+                let is_result = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Result");
+                let is_option = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Option");
                 let is_nullable = expr_ty.is_nullable(&self.ty_table);
 
                 if !expr_ty.is_dynamic() && !is_result && !is_option && !is_nullable {
@@ -314,7 +314,7 @@ impl<'r> Checker<'r> {
                 }
 
                 if is_result {
-                    let ret_is_result = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Result");
+                    let ret_is_result = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Result");
                     if !ret_is_result {
                         let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
                         self.emit(
@@ -350,7 +350,7 @@ impl<'r> Checker<'r> {
                         }
                     }
                 } else if is_option {
-                    let ret_is_option = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.resolve(n) == "Option");
+                    let ret_is_option = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Option");
                     if !ret_is_option {
                         let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
                         self.emit(
@@ -724,8 +724,26 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Range { start, end, .. } => {
-                self.check_expr(*start, bind);
-                self.check_expr(*end, bind);
+                let (start, end) = (*start, *end);
+                self.check_expr(start, bind);
+                self.check_expr(end, bind);
+                let lo = self.infer_type(start, bind).apparent(&self.ty_table);
+                let hi = self.infer_type(end, bind).apparent(&self.ty_table);
+                let domain_ok = |t: &Type| t.is_dynamic() || *t == Type::Int || *t == Type::Char;
+                let same = lo.is_dynamic() || hi.is_dynamic() || lo == hi;
+                if !(domain_ok(&lo) && domain_ok(&hi) && same) {
+                    let lo_s = lo.display(&self.ty_table, &bind.interner);
+                    let hi_s = hi.display(&self.ty_table, &bind.interner);
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TypeMismatch,
+                            format!(
+                                "range bounds must be both `int` or both `char`, found '{lo_s}' and '{hi_s}'"
+                            ),
+                        )
+                        .with_range(range),
+                    );
+                }
             }
 
             ExprKind::TaggedTemplate { tag, template, .. } => {
