@@ -230,7 +230,7 @@ pub enum BackendTy {
     // escalares — viajan en registro, sin tag
     Int, Float, Bool, Char,
     // referencias con tipo conocido
-    Str, Decimal, BigInt,
+    Str, Bytes, Decimal, BigInt,
     Array(TyId), Map(TyId, TyId), Set(TyId), Tuple(TyListId),
     Class(ClassId),
     Enum(EnumId),
@@ -246,6 +246,11 @@ tabla de interning por módulo, como hace hoy `TyTable`. `TyId` indexa un
 `BackendTy`; `TyListId` indexa una secuencia de ellos, para tuplas y firmas.
 `ClassId`, `EnumId`, `SigId` y `FnId` indexan las tablas del módulo descritas
 en §5.4 y §6.
+
+**Escalares numéricos: solo `Int` (i64) y `Float` (f64).** No hay
+`BackendTy` para anchos angostos (spec §11–§12, ADR-0015): un almacenamiento
+más estrecho es decisión del optimizador sobre un `Int`/`Float` probado, no un
+tipo. `Decimal` y `BigInt` son referencias.
 
 **`BackendTy` no implementa `Default`.** Deliberadamente: no debe existir "el
 tipo que sale cuando no pusiste ninguno". Es la contrapartida directa de
@@ -356,7 +361,8 @@ Es lo que hoy no existe en ninguna parte. `ssa/verify.rs` comprueba forma SSA
 
 ```
 Binary{Add} con lhs:Int rhs:Int      → ty debe ser Int
-Binary{Add} con lhs:Int rhs:Float    → error: falta un Cast explícito
+Binary{Add} con lhs:Int rhs:Float    → error: falta un `as` explícito (Convert)
+Binary{Div} con lhs:Int rhs:Int      → ty debe ser Int (la división no cambia de dominio)
 Field{res:FieldSlot(3)}              → receptor Class(id);
                                        layout[id][3] existe;
                                        ty del nodo == tipo declarado del campo
@@ -365,6 +371,14 @@ MethodCall{res:VtableSlot(7)}        → receptor Class(id) con método en slot 
 Call{res:DirectFn(f)}                → aridad y tipos contra sig(f)
 Index sobre Array(el)                → ty del nodo == el
 ```
+
+**`Cast` vs `Convert`.** `Cast` es neutral en representación (clase →
+interfaz, `T?` → `T` tras un guard); nunca cambia bits. Todo `as` entre
+dominios numéricos baja a `InstKind::Convert { conv: NumConv }` →
+`OpCode::Convert`, con la tabla única de `varn_core::numeric_conv`
+(`IntToFloat`, `FloatToInt`, `BigIntToInt`, `DecimalToInt`, `IntToBigInt`,
+`IntToDecimal`, `DynToInt`, `DynToFloat`). Las que pueden fallar lanzan
+`IntegerOverflow` y no son puras para DCE.
 
 Un `FieldSlot` sobre receptor `Dynamic` no compila. Un `AddInt` con un
 operando `Str` no compila. La clase entera de miscompiles deja de ser posible
