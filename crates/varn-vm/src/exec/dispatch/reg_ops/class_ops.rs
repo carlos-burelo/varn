@@ -8,6 +8,7 @@ use varn_types::Value;
 
 /// See [`ExecCtx::enum_variant_template`].
 pub(crate) struct EnumVariantTemplate {
+    pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
     pub variant_name: Arc<str>,
     pub variant_tag: i64,
@@ -240,6 +241,7 @@ impl ExecCtx {
 
         let variant =
             varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
+                enum_class_id: None,
                 enum_name: Arc::from(enum_name_str),
                 variant_name: Arc::from(variant_name_str),
                 variant_tag: tag,
@@ -295,6 +297,7 @@ impl ExecCtx {
             return None;
         };
         Some(EnumVariantTemplate {
+            enum_class_id: t.enum_class_id,
             enum_name: t.enum_name.clone(),
             variant_name: t.variant_name.clone(),
             variant_tag: t.variant_tag,
@@ -341,6 +344,7 @@ impl ExecCtx {
         };
 
         let data = varn_types::value::EnumVariantData {
+            enum_class_id: template.enum_class_id,
             enum_name: template.enum_name.clone(),
             variant_name: template.variant_name.clone(),
             variant_tag: template.variant_tag,

@@ -1,0 +1,8 @@
+export enum Shade {
+    Light,
+    Dark;
+
+    label(): str {
+        return "a";
+    }
+}

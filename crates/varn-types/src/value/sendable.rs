@@ -223,6 +223,7 @@ impl SendValue {
             SendValue::ChannelReceiver(id) => endpoint_marker("rx", *id),
             SendValue::EnumVariant(ev) => {
                 Value::EnumVariant(Box::new(crate::value::EnumVariantData {
+                    enum_class_id: None,
                     enum_name: Arc::from(ev.enum_name.as_str()),
                     variant_name: Arc::from(ev.variant_name.as_str()),
                     variant_tag: ev.variant_tag,
@@ -289,6 +290,7 @@ impl SendValue {
                 let payload_nv = ev.payload.to_value_ctx(ctx);
                 ctx.intern(Value::EnumVariant(Box::new(
                     crate::value::EnumVariantData {
+                        enum_class_id: None,
                         enum_name: Arc::from(ev.enum_name.as_str()),
                         variant_name: Arc::from(ev.variant_name.as_str()),
                         variant_tag: ev.variant_tag,

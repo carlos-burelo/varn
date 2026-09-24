@@ -1,0 +1,26 @@
+// An enum value belongs to the enum that declared it, not to its name: two
+// modules declaring `Shade`, and a local `Result`, never trade methods or
+// compare equal.
+import { Shade as ShadeA } from "./helpers/shade-a.vn";
+import { Shade as ShadeB } from "./helpers/shade-b.vn";
+
+enum Result<T, E> {
+    Good(value: T),
+    Bad(error: E)
+}
+
+const a = ShadeA.Light;
+const b = ShadeB.Light;
+assert("enum methods come from the declaring enum (a)", a.label() == "a");
+assert("enum methods come from the declaring enum (b)", b.label() == "b");
+assert("same-named enums from different modules differ", (a as dynamic) != (b as dynamic));
+assert("same enum and variant are equal", a == ShadeA.Light);
+
+const local = Result.Good(1);
+const matched = match (local) {
+    Good(v) => v,
+    Bad(_) => 0
+};
+assert("a local Result shadows the core one", matched == 1);
+
+print("[PASSED] 136. Enum identity");

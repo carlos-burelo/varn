@@ -360,7 +360,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
 
 fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
     match val {
-        Value::EnumVariant(ev) => heap.get_intrinsic_class(&ev.enum_name),
+        Value::EnumVariant(ev) => ev.enum_class_id.and_then(ClassObj::find_by_id),
         Value::Object(o) => o.borrow().class(),
         Value::Class(cls) => Some(cls.clone()),
         // An `Instance` extracts to an opaque handle onto its own heap slot;
@@ -535,7 +535,7 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Str.name()),
             Some(HeapObj::Map(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Map.name()),
             Some(HeapObj::Set(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Set.name()),
-            Some(HeapObj::EnumVariant(ev)) => return heap.get_intrinsic_class(&ev.enum_name),
+            Some(HeapObj::EnumVariant(ev)) => return ev.enum_class_id.and_then(ClassObj::find_by_id),
             Some(HeapObj::Range(_)) => {
                 return heap.get_intrinsic_class(varn_core::RuntimeKind::Range.name())
             }

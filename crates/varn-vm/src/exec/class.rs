@@ -8,7 +8,6 @@ use varn_types::{ClassObj, Shape};
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
-    heap.set_intrinsic_class(name, cls.clone());
     VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls)))
 }
 
@@ -30,8 +29,13 @@ pub(crate) fn op_define_static(
     val_nv: VmValue,
     heap: &mut Heap,
 ) -> VmResult<()> {
-    let val = heap.extract(val_nv);
+    let mut val = heap.extract(val_nv);
     let cls = get_class_arc(class_nv, heap)?;
+    // A variant template joins its enum here: every value built from it
+    // finds its methods through this id, not through its name.
+    if let varn_types::Value::EnumVariant(ev) = &mut val {
+        ev.enum_class_id = Some(cls.id);
+    }
     cls.add_static(name, val);
     Ok(())
 }

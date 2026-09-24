@@ -155,6 +155,10 @@ impl std::fmt::Display for RuntimeSymbol {
 
 #[derive(Debug, Clone)]
 pub struct EnumVariantData {
+    /// The enum's class (`ClassObj::id`), set when the variant is attached to
+    /// it; methods and identity come from here, never from `enum_name`. `None`
+    /// only for a value rebuilt on the far side of an isolate channel.
+    pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
     pub variant_name: Arc<str>,
     pub variant_tag: i64,

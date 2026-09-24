@@ -95,6 +95,7 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
 
         let variant =
             varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
+                enum_class_id: None,
                 enum_name: std::sync::Arc::from(enum_name_str),
                 variant_name: std::sync::Arc::from(variant_name_str),
                 variant_tag: tag,

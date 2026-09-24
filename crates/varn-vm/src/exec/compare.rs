@@ -153,7 +153,12 @@ fn variant_eq(
     b: &varn_types::value::EnumVariantData,
     heap: &Heap,
 ) -> bool {
-    a.enum_name == b.enum_name && a.variant_tag == b.variant_tag && payload_eq(&a.payload, &b.payload, heap)
+    let same_enum = match (a.enum_class_id, b.enum_class_id) {
+        (Some(x), Some(y)) => x == y,
+        // A value that crossed an isolate channel carries only the name.
+        _ => a.enum_name == b.enum_name,
+    };
+    same_enum && a.variant_tag == b.variant_tag && payload_eq(&a.payload, &b.payload, heap)
 }
 
 fn payload_eq(a: &varn_types::Value, b: &varn_types::Value, heap: &Heap) -> bool {
