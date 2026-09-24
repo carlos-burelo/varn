@@ -1,0 +1,17 @@
+const u = ()
+assert("unit prints as ()", `${u}` === "()")
+assert("unit equals unit", u == ())
+assert("unit typeof", typeof u === "Tuple")
+
+function nothing(): Unit { return () }
+function alsoNothing(): () { return () }
+assert("Unit-returning fn", nothing() == alsoNothing())
+
+const pair: #[int, str] = #[1, "a"]
+assert("tuple type spelled #[..]", pair[0] === 1 && pair[1] === "a")
+assert("tuple prints", `${pair}` === "#[1, a]")
+
+const results: Unit[] = [nothing(), ()]
+assert("Unit is a real value type", results.length === 2)
+
+print("[PASSED] 126. Unit")

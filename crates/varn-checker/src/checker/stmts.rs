@@ -496,6 +496,7 @@ impl<'r> Checker<'r> {
                     self.check_pattern(&declarator.id, ann_ty, bind);
                 } else {
                     let init_ty = self.infer_type(init_expr, bind);
+                    self.reject_void_value(&init_ty, declarator.range);
                     self.check_pattern(&declarator.id, &init_ty, bind);
                 }
             }

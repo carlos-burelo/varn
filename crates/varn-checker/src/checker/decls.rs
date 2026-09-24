@@ -13,6 +13,19 @@ impl<'r> Checker<'r> {
         }
     }
 
+    /// `void` means "no usable value": binding it is an error (spec §42).
+    pub(crate) fn reject_void_value(&mut self, ty: &Type, range: varn_core::SourceRange) {
+        if *ty == Type::Void {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::VoidValueUsed,
+                    "a 'void' call produces no value; use `()` (Unit) for an empty result",
+                )
+                .with_range(range),
+            );
+        }
+    }
+
     pub(crate) fn check_decl(&mut self, decl: &Decl, bind: &BindResult) {
         match decl {
             Decl::Variable(v) => {
@@ -61,6 +74,7 @@ impl<'r> Checker<'r> {
                             // The evolved type is overlaid only in
                             // `collect_type_annotations`.
                             let init_ty = self.infer_type(init_expr, bind);
+                            self.reject_void_value(&init_ty, *decl.range());
                             let final_ty = if v.kind == varn_core::ast::VarKind::Let {
                                 crate::binder::widen_literal(init_ty)
                             } else {

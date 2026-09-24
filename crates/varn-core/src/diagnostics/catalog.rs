@@ -52,6 +52,7 @@ pub enum ErrorCode {
     InvalidConstAssertion = 3019,
     InfiniteTypeExpansion = 3020,
     IntegerOverflow = 3021,
+    VoidValueUsed = 3022,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -242,6 +243,7 @@ impl ErrorCode {
             ErrorCode::UnsupportedTypeNode => "unsupported-type-node",
             ErrorCode::CompilationInternalError => "compilation-internal-error",
             ErrorCode::IntegerOverflow => "integer-overflow",
+            ErrorCode::VoidValueUsed => "void-value-used",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

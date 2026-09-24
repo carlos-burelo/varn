@@ -112,11 +112,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
 
         TokenKind::LParen => {
             let start_range = s.range();
-            let pos_before_lparen = s.save();
             s.advance();
-            if s.check(TokenKind::RParen) {
-                s.restore(pos_before_lparen);
-                return Err("unit paren — should be handled by arrow parser".to_owned());
+            if s.eat(TokenKind::RParen) {
+                let full_range = s.span_from(start_range);
+                return Ok(s.expr(full_range, ExprKind::Tuple { elements: vec![] }));
             }
             let expr = parse_seq_expr(s)?;
             s.expect(TokenKind::RParen)?;

@@ -225,6 +225,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 Ok(())
             }
+            TypeKind::Tuple(list) if table.get_list(list).is_empty() => write!(f, "()"),
             TypeKind::Tuple(list) => {
                 write!(f, "#[")?;
                 for (i, m) in table.get_list(list).iter().enumerate() {

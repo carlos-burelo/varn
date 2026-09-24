@@ -143,6 +143,20 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     Ok(ty)
 }
 
+fn parse_tuple_type(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<TypeNode, String> {
+    s.expect(TokenKind::LBracket)?;
+    let mut elements = vec![];
+    while !s.check(TokenKind::RBracket) && !s.is_eof() {
+        elements.push(parse_type(s)?);
+        if !s.eat(TokenKind::Comma) {
+            break;
+        }
+    }
+    s.expect(TokenKind::RBracket)?;
+    let full_range = s.span_from(range);
+    Ok(s.type_node(full_range, TypeKind::Tuple(elements)))
+}
+
 fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let range = s.range();
 
@@ -176,6 +190,10 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 } else {
                     break;
                 }
+            }
+            if name_buf == "Unit" && !s.check(TokenKind::LAngle) {
+                let full_range = s.span_from(range);
+                return Ok(s.type_node(full_range, TypeKind::Tuple(vec![])));
             }
             let name = s.interner.intern(&name_buf);
 
@@ -215,11 +233,8 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     let full_range = s.span_from(range);
                     return Ok(s.type_node(full_range, TypeKind::Fn((vec![], Box::new(ret)))));
                 }
-                return Err(format!(
-                    "expected '=>' after '()' in type position at {}:{}",
-                    s.range().start.line,
-                    s.range().start.column
-                ));
+                let full_range = s.span_from(range);
+                return Ok(s.type_node(full_range, TypeKind::Tuple(vec![])));
             }
 
             if (s.kind() == TokenKind::Identifier && s.peek_kind(1) == TokenKind::Colon)
@@ -284,19 +299,12 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             Ok(first)
         }
 
-        TokenKind::LBracket => {
+        // `#[T1, T2]` is the spec spelling; `[T1, T2]` stays accepted.
+        TokenKind::Hash if s.peek_kind(1) == TokenKind::LBracket => {
             s.advance();
-            let mut elements = vec![];
-            while !s.check(TokenKind::RBracket) && !s.is_eof() {
-                elements.push(parse_type(s)?);
-                if !s.eat(TokenKind::Comma) {
-                    break;
-                }
-            }
-            s.expect(TokenKind::RBracket)?;
-            let full_range = s.span_from(range);
-            Ok(s.type_node(full_range, TypeKind::Tuple(elements)))
+            parse_tuple_type(s, range)
         }
+        TokenKind::LBracket => parse_tuple_type(s, range),
 
         TokenKind::LBrace => {
             s.advance();

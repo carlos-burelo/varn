@@ -164,6 +164,14 @@ pub fn infer_expr_type(
         ExprKind::Binary {
             op, left, right, ..
         } => infer_binary(op, *left, *right, arena, ctx, table),
+        ExprKind::Tuple { elements } => {
+            let ids: Vec<_> = elements
+                .iter()
+                .map(|e| infer_expr_type(*e, arena, ctx, table).0)
+                .collect();
+            let list = table.intern_list(&ids);
+            Type(table.intern(TypeKind::Tuple(list)), false)
+        }
         ExprKind::Array { elements } => {
             for el in elements {
                 if let ArrayEl::Expr(first) = el {

@@ -92,8 +92,9 @@ pub fn enrich_call_returns(
                     None,
                     &mut table,
                 );
+                let returns_value = !inferred.is_empty();
                 let ret_ty = types::join_types(inferred, &mut table);
-                if !ret_ty.is_dynamic() {
+                if returns_value {
                     let final_ret = crate::types::async_fn_return(
                         ret_ty,
                         *is_async,
@@ -142,9 +143,10 @@ pub fn enrich_call_returns(
                     Some(&class_name_str),
                     &mut table,
                 );
+                let returns_value = !inferred.is_empty();
                 let ret = types::join_types(inferred, &mut table);
                 bind.ty_table = std::sync::Arc::new(table);
-                if !ret.is_dynamic() {
+                if returns_value {
                     let final_ret = crate::types::async_fn_return(
                         ret,
                         *is_async,

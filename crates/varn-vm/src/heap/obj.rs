@@ -57,7 +57,8 @@ impl HeapObj {
         use varn_core::RuntimeKind;
         match self {
             HeapObj::Str(_) => RuntimeKind::Str,
-            HeapObj::Array(_) | HeapObj::Tuple(_) => RuntimeKind::Array,
+            HeapObj::Array(_) => RuntimeKind::Array,
+            HeapObj::Tuple(_) => RuntimeKind::Tuple,
             HeapObj::Object(_)
             | HeapObj::Instance(_)
             | HeapObj::Record(_)

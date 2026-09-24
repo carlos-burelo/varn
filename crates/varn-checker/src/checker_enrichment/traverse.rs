@@ -56,6 +56,11 @@ fn collect_returns_recursive(
                     table,
                 ) {
                     results.push(ty);
+                } else {
+                    // A value is returned even if its type is unknown here;
+                    // dropping it would read as "no value" and type the
+                    // function `void`.
+                    results.push(Type::Dynamic);
                 }
             } else {
                 results.push(Type::Void);

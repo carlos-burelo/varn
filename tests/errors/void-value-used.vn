@@ -1,0 +1,3 @@
+// expect: error[VN3022]
+function h(): void { }
+let v = h()

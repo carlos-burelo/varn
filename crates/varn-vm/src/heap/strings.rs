@@ -263,6 +263,13 @@ impl HeapInner {
                         .collect();
                     format!("[{}]", parts.join(", "))
                 }
+                Some(HeapObj::Tuple(a)) if a.len() == 0 => "()".into(),
+                Some(HeapObj::Tuple(a)) => {
+                    let parts: Vec<_> = (0..a.len())
+                        .map(|i| self.str_repr(a.get_vm(i).unwrap()))
+                        .collect();
+                    format!("#[{}]", parts.join(", "))
+                }
                 Some(HeapObj::Object(_)) => "[object Object]".into(),
                 Some(HeapObj::VmClosure(nc)) => format!(
                     "[Function {}]",
