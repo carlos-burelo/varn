@@ -131,6 +131,10 @@ d.trunc()       // decimal
 d.isZero()      // bool
 d.isPositive()  // bool
 d.isNegative()  // bool
+d.pow(2)        // decimal; exponente negativo divide (34 dígitos)
+d.toInt()       // int; trunca, lanza IntegerOverflow fuera de rango
+decimal.parse(" 2.50 ")  // decimal; lanza si no es un decimal
+decimal.tryParse("x")    // decimal?, null si no es un decimal
 d.toString()    // str
 ```
 
@@ -141,7 +145,7 @@ d.toString()    // str
 ```varn
 bi.toString()   // str
 bi.toStr()      // str (alias)
-bi.toInt()      // int
+bi.toInt()      // int; lanza IntegerOverflow si no cabe
 bi.toFloat()    // float
 ```
 

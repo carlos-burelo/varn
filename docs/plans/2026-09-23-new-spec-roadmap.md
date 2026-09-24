@@ -59,6 +59,17 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
 
+**Fase 0, Fase A y Fase B cerradas** (Fase B: ADR-0016,
+`docs/plans/2026-09-23-fase-B-precision-arbitraria.md`).
+
+Hallazgos de Fase B, corregidos: la aritmética `bigint` no existía (`10n + 5n`
+daba `0`); el widening implícito `int → bigint/decimal` no convertía el valor;
+`dynamic as float` sobre `bigint`/`decimal` daba `0.0`; el AST HIR muerto se
+borró. Pendiente anotado: el contrato `Map<V>` fija las claves en `str`
+(`Map<int, str>.set(1, …)` no compila) — Fase D; un campo de clase `bigint`
+asignado desde `int` no pasa por el widening (solo locales, globales,
+retornos, parámetros).
+
 **Fase 0 y Fase A cerradas.** `tests/main.vn` 1274/0 en JIT y `VARN_NO_JIT=1`;
 `cargo test -p varn-cli --test error_corpus` verde.
 

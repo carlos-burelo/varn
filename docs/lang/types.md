@@ -10,8 +10,8 @@
 |------|-------------|----------------|
 | `int` | Entero con signo de 64 bits; `+ - * / % **` y `-x` lanzan `IntegerOverflow` fuera de rango | `42`, `-7`, `0` |
 | `float` | IEEE 754 binary64 (`-0`, `NaN`, `±Infinity`) | `3.14`, `1.0`, `-0.5` |
-| `decimal` | Decimal de precisión arbitraria | `1.5d`, `99.25d` |
-| `bigint` | Entero de precisión arbitraria | `100n`, `1n` |
+| `decimal` | Decimal de precisión arbitraria; `+ - *` exactos, `/` a 34 dígitos significativos (half-even) | `1.5d`, `99.25d` |
+| `bigint` | Entero de precisión arbitraria; `/` trunca y `%` toma el signo del dividendo, como `int` | `100n`, `0xffn` |
 | `bool` | Booleano | `true`, `false` |
 | `char` | Carácter Unicode | `'a'`, `'Z'`, `'!'` |
 | `str` | Cadena de texto inmutable | `"hello"`, `"""raw"""` |
@@ -384,6 +384,10 @@ const h = 2.5 * 2             // literal: float * float
 | `int as float` | redondeo al `float` más cercano |
 | `float as int` | trunca hacia cero; `NaN`, `±Infinity` o fuera de rango lanzan `IntegerOverflow` |
 | `bigint as int`, `decimal as int` | exacto / trunca; fuera de rango lanza `IntegerOverflow` |
+| `bigint as float`, `decimal as float` | el `float` más cercano |
+| `float as bigint` | trunca; `NaN`/`±Infinity` lanzan `IntegerOverflow` |
+| `float as decimal` | valor binario exacto del `float` (`0.1 as decimal` no es `0.1d`) |
+| `bigint as decimal`, `decimal as bigint` | exacto / trunca |
 | `dynamic as int`, `dynamic as float` | convierte según el valor en runtime |
 
 Con `dynamic` la aritmética mezclada `int ⊕ float` se resuelve en runtime a
