@@ -59,7 +59,7 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
 
-**Fase 0, A, B, C, D y E cerradas** (Fase D: `docs/plans/2026-09-23-fase-D-superficie-tipos.md`; Fase E: `docs/plans/2026-09-24-fase-E-capacidades.md`; cada una con su deuda) (Fase B: ADR-0016,
+**Fase 0, A, B, C, D, E y F cerradas** (Fase D: `docs/plans/2026-09-23-fase-D-superficie-tipos.md`; Fase E: `docs/plans/2026-09-24-fase-E-capacidades.md`; Fase F: `docs/plans/2026-09-24-fase-F-layout.md`; cada una con su deuda) (Fase B: ADR-0016,
 `docs/plans/2026-09-23-fase-B-precision-arbitraria.md`; Fase C:
 `docs/plans/2026-09-23-fase-C-runtimekind.md`).
 
@@ -215,9 +215,9 @@ Evidencia verificada el 2026-09-23 contra `target/release/vn.exe` de `3dbe44cb`.
 | 38, 100 | `TypeTag` → `RuntimeKind` | ❌ | `TypeTag` es a la vez tipo del lenguaje (`TypeKind::Intrinsic(TypeTag)`), clave de clases intrínsecas y tag runtime | C |
 | 40, 103 | `Error/DateTime/Duration/UUID/Regex/VmRef/TaskHandle/NativeFn` fuera de `TypeTag` | ❌ | presentes (`type_tag.rs:28-37`); casi sin referencias (1–4 c/u) | C |
 | 41 | Jerarquía de errores de plataforma | ⚠️ | `Error/TypeError/RangeError` ya son clases (`globals.vn:7-21`); faltan `IntegerOverflow`, `DivisionByZero` | A |
-| 47, 101 | `TypeLayout` | ❌ | `FieldRepr {size, align, is_gc_ref}` (`type_tag.rs:183-188`) | F |
-| 48, 96 | `GCLayout` | ❌ | `is_gc_ref: bool` | F |
-| 49–50 | Nichos / layout de uniones | ❌ | `T?` escalar = `Dynamic` hoy (PLAN-PENDIENTE §5.3) | F |
+| 47, 101 | `TypeLayout` | ✅ | `varn_types::layout::TypeLayout` (F.1) | F |
+| 48, 96 | `GCLayout` | ✅ | instancias trazadas por `GcLayout` (F.2); arrays por `ArrayRepr` | F |
+| 49–50 | Nichos / layout de uniones | ⚠️ | `T?` sobre referencia = nicho (F.3); `T?` escalar sigue (valor, tag) en `Dynamic` (Fase G); uniones sin layout propio | F/G |
 | 97–98 | Opcodes tipados sin fallback por tag | ❌ | `DivInt`/`ModInt` caen a `box_reg` + `is_int()` (`ops_math_cmp.rs:271-284`) | G |
 | 102 | `VmValuePayload` fuera de rutas calientes | ⚠️ | 9 archivos; auditar en G | G |
 
