@@ -57,8 +57,11 @@ pub fn emit_function_meta(
     // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
     // phi-split, register-assigned SSA here so it shares the exact value graph
     // the bytecode was emitted from; `None` outside the projected family.
-    let ssa_proto = super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name)
-        .map(std::sync::Arc::new);
+    let order = emission_order(&ssa);
+    let ic = super::ic::IcSlots::number(&ssa, &order)?;
+    let ssa_proto =
+        super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name, &ic)
+            .map(std::sync::Arc::new);
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -67,13 +70,10 @@ pub fn emit_function_meta(
 
     let mut fixups: Vec<(usize, BlockId)> = Vec::new();
 
-    let mut cache_count: u16 = 0;
-
     let imms = immediates::plan_immediates(&ssa);
 
     let value_tys: Vec<crate::hir::HirType> = ssa.values.iter().map(|v| v.ty).collect();
 
-    let order = emission_order(&ssa);
     let mut pos_of = vec![usize::MAX; n];
     for (i, &b) in order.iter().enumerate() {
         pos_of[b] = i;
@@ -82,7 +82,7 @@ pub fn emit_function_meta(
     for (i, &b) in order.iter().enumerate() {
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
-        for inst in &insts {
+        for (idx, inst) in insts.iter().enumerate() {
             emit_inst(
                 &mut chunk,
                 inst,
@@ -90,7 +90,7 @@ pub fn emit_function_meta(
                 &reg,
                 scratch,
                 call_base,
-                &mut cache_count,
+                ic.of(b, idx),
                 &source_file,
                 nparams,
                 &mut fixups,
@@ -144,7 +144,7 @@ pub fn emit_function_meta(
         is_generator: f.is_generator,
         has_this: f.has_this,
         upvalue_count: f.upvalue_count as usize,
-        cache_count: cache_count as usize,
+        cache_count: ic.count() as usize,
         chunk,
         required_caps: Vec::new(),
         state_size: 0,
@@ -163,9 +163,9 @@ pub fn emit_function_meta(
         jit_serial: Cell::new(0),
         backedge_memo: Cell::new(0),
         ic_cache: Rc::new(RefCell::new(
-            (0..cache_count).map(|_| PolyICSlot::new()).collect(),
+            (0..ic.count()).map(|_| PolyICSlot::new()).collect(),
         )),
-        feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count as usize))),
+        feedback: Rc::new(RefCell::new(FeedbackVector::new(ic.count() as usize))),
         static_closure_val: Cell::new(0),
         jit_entry_count: Cell::new(0),
         backedge_count: Cell::new(0),
@@ -328,7 +328,8 @@ fn emit_inst(
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    cache_count: &mut u16,
+    // The inline-cache slot this instruction owns (`ic::IcSlots`).
+    ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
@@ -358,7 +359,7 @@ fn emit_inst(
         return Ok(());
     }
 
-    if effects::emit_effect(chunk, inst, reg, cache_count, nparams)? {
+    if effects::emit_effect(chunk, inst, reg, ic_slot, nparams)? {
         return Ok(());
     }
 
@@ -381,7 +382,7 @@ fn emit_inst(
         reg,
         scratch,
         call_base,
-        cache_count,
+        ic_slot,
         source_file,
         nparams,
         fixups,

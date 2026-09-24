@@ -24,7 +24,7 @@ pub(super) fn emit_value(
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    cache_count: &mut u16,
+    ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
@@ -135,13 +135,7 @@ pub(super) fn emit_value(
         }
         InstKind::GetProperty { object, name } => {
             let idx = chunk.add_str(name);
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             chunk.emit_rrc_ic(
                 OpCode::GetProperty,
                 d,
@@ -202,13 +196,7 @@ pub(super) fn emit_value(
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], line);
             }
             let argc = args.len() as u8;
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             // `InvokeVirtual` when the checker knew the receiver's class — the
             // call site is then guaranteed monomorphic on the vtable. It shares
             // `CallMethod`'s call-site cache slot (packed into the opcode word)
@@ -618,17 +606,14 @@ pub(super) fn emit_value(
         InstKind::BuildObjectSpread { parts } => {
             chunk.emit(OpCode::BuildObject, line);
             chunk.write(Chunk::pack(d, 0), line);
+            let mut next_slot = ic_slot;
             for (key, v) in parts {
                 match key {
                     Some(k) => {
                         let idx = chunk.add_str(k);
-                        if *cache_count > 255 {
-                            return Err(OptError::Unsupported(
-                                "ssa-emit: too many inline-cache sites",
-                            ));
-                        }
-                        let cs = *cache_count as u8;
-                        *cache_count += 1;
+                        let cs = next_slot
+                            .ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
+                        next_slot = cs.checked_add(1);
                         chunk.emit_rrc_ic(OpCode::SetProperty, d, reg[v.0 as usize], idx, cs, line);
                     }
                     None => chunk.emit_rr(OpCode::ObjectMerge, d, reg[v.0 as usize], line),

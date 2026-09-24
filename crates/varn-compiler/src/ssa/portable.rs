@@ -20,12 +20,13 @@ use varn_types::ssa::{SsaBinOp, SsaBlock, SsaInst, SsaOp, SsaProto, SsaTerm, Ssa
 /// Build the portable SSA for `ssa` (already phi-split and register-assigned).
 /// Returns `None` when any instruction or value type is outside the projected
 /// family.
-pub fn project(
+pub(crate) fn project(
     ssa: &SsaFunc,
     reg: &[u8],
     register_count: u16,
     has_this: bool,
     name: &Arc<str>,
+    ic: &crate::ssa::ic::IcSlots,
 ) -> Option<SsaProto> {
     let value_tys: Vec<HirType> = ssa.values.iter().map(|v| v.ty).collect();
 
@@ -42,11 +43,10 @@ pub fn project(
     }
 
     let mut blocks = Vec::with_capacity(ssa.blocks.len());
-    let mut cs: u16 = 0;
-    for block in &ssa.blocks {
+    for (b, block) in ssa.blocks.iter().enumerate() {
         let mut insts = Vec::with_capacity(block.insts.len());
-        for inst in &block.insts {
-            insts.push(project_inst(inst, &value_tys, &global_of, &mut cs)?);
+        for (i, inst) in block.insts.iter().enumerate() {
+            insts.push(project_inst(inst, &value_tys, &global_of, ic.of(b, i))?);
         }
         blocks.push(SsaBlock {
             params: block.params.iter().map(|v| v.0).collect(),
@@ -83,7 +83,8 @@ fn project_inst(
     inst: &Inst,
     value_tys: &[HirType],
     global_of: &[Option<u32>],
-    cs: &mut u16,
+    // The inline-cache slot the bytecode baked for this site (`ssa::ic`).
+    ic_slot: Option<u8>,
 ) -> Option<SsaInst> {
     let op = match &inst.kind {
         InstKind::ConstInt(n) => SsaOp::ConstInt(*n),
@@ -227,29 +228,21 @@ fn project_inst(
         },
         InstKind::ArrayLength { operand } => SsaOp::ArrayLength { operand: operand.0 },
         InstKind::StrLength { operand } => SsaOp::StrLength { operand: operand.0 },
-        InstKind::GetProperty { object, name } => {
-            let slot = *cs;
-            *cs = cs.saturating_add(1);
-            SsaOp::GetProperty {
-                object: object.0,
-                name: name.as_ref().into(),
-                cs: slot,
-            }
-        }
+        InstKind::GetProperty { object, name } => SsaOp::GetProperty {
+            object: object.0,
+            name: name.as_ref().into(),
+            cs: u16::from(ic_slot?),
+        },
         InstKind::SetProperty {
             object,
             name,
             value,
-        } => {
-            let slot = *cs;
-            *cs = cs.saturating_add(1);
-            SsaOp::SetProperty {
-                object: object.0,
-                value: value.0,
-                name: name.as_ref().into(),
-                cs: slot,
-            }
-        }
+        } => SsaOp::SetProperty {
+            object: object.0,
+            value: value.0,
+            name: name.as_ref().into(),
+            cs: u16::from(ic_slot?),
+        },
         InstKind::SelfCall { args } => SsaOp::SelfCall {
             args: args.iter().map(|v| v.0).collect(),
         },
