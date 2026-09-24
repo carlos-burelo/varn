@@ -804,36 +804,10 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            // The backend stores a `bigint` literal in an `i128`; a wider one
-            // has no representation yet.
-            ExprKind::BigIntLiteral { raw } => {
-                let raw = bind.interner.resolve(*raw);
-                let s = raw.trim_end_matches('n').replace('_', "");
-                let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X"))
-                {
-                    i128::from_str_radix(r, 16)
-                } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
-                    i128::from_str_radix(r, 8)
-                } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
-                    i128::from_str_radix(r, 2)
-                } else {
-                    s.parse::<i128>()
-                };
-                if parsed.is_err() {
-                    self.diagnostics.push(
-                        Diagnostic::error(
-                            ErrorCode::IntegerOverflow,
-                            "this `bigint` literal does not fit in 128 bits".to_string(),
-                        )
-                        .with_file(self.source_file.clone())
-                        .with_range(range),
-                    );
-                }
-            }
-
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
             | ExprKind::DecimalLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
             | ExprKind::StrLiteral { .. }
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }

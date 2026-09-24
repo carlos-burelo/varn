@@ -25,7 +25,7 @@ fn heap_to_int(v: VmValue, heap: &Heap) -> VmResult<VmValue> {
         None
     };
     match obj {
-        Some(HeapObj::BigInt(b)) => i64::try_from(*b)
+        Some(HeapObj::BigInt(b)) => i64::try_from(&**b)
             .map(VmValue::from_int)
             .map_err(|_| out_of_int_range(b)),
         Some(HeapObj::Decimal(d)) => {
@@ -44,8 +44,8 @@ pub(crate) fn convert(conv: NumConv, v: VmValue, heap: &mut Heap) -> VmResult<Vm
         NumConv::IntToFloat => Ok(VmValue::from_f64(heap.as_int(v) as f64)),
         NumConv::FloatToInt => float_to_int(v.as_f64()),
         NumConv::IntToBigInt => {
-            let n = heap.as_int(v) as i128;
-            Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::BigInt(n))))
+            let n = num_bigint::BigInt::from(heap.as_int(v));
+            Ok(heap.intern(varn_types::Value::BigInt(Box::new(n))))
         }
         NumConv::IntToDecimal => {
             let n = heap.as_int(v);

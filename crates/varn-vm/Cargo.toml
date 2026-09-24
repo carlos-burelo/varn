@@ -13,6 +13,8 @@ varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-runtime  = { path = "../varn-runtime" }
 varn-modules  = { path = "../varn-modules" }
 rust_decimal  = { workspace = true }
+num-bigint    = { workspace = true }
+num-traits    = { workspace = true }
 rustc-hash    = { workspace = true }
 varn-jit      = { path = "../varn-jit" }
 serde         = { workspace = true }

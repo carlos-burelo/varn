@@ -12,7 +12,7 @@ pub enum SendValue {
     Int(i64),
     Float(u64),
     Str(String),
-    BigInt(i128),
+    BigInt(num_bigint::BigInt),
     Decimal(Decimal),
     Char(char),
     Array(Vec<SendValue>),
@@ -68,7 +68,7 @@ impl Value {
             Value::Int(n) => Ok(SendValue::Int(*n)),
             Value::Float(f) => Ok(SendValue::Float(f.to_bits())),
             Value::Str(s) => Ok(SendValue::Str(s.to_string())),
-            Value::BigInt(b) => Ok(SendValue::BigInt(**b)),
+            Value::BigInt(b) => Ok(SendValue::BigInt((**b).clone())),
             Value::Decimal(d) => Ok(SendValue::Decimal(**d)),
             Value::Char(c) => Ok(SendValue::Char(*c)),
             Value::Array(arr) => {
@@ -179,7 +179,7 @@ impl SendValue {
             SendValue::Int(n) => Value::Int(*n),
             SendValue::Float(bits) => Value::Float(f64::from_bits(*bits)),
             SendValue::Str(s) => Value::Str(Arc::from(s.as_str())),
-            SendValue::BigInt(b) => Value::BigInt(Box::new(*b)),
+            SendValue::BigInt(b) => Value::BigInt(Box::new(b.clone())),
             SendValue::Decimal(d) => Value::Decimal(Box::new(*d)),
             SendValue::Char(c) => Value::Char(*c),
             SendValue::Array(items) => {
@@ -240,7 +240,7 @@ impl SendValue {
             SendValue::Int(n) => ctx.int_val(*n),
             SendValue::Float(bits) => ctx.intern(Value::Float(f64::from_bits(*bits))),
             SendValue::Str(s) => ctx.alloc_str(s),
-            SendValue::BigInt(b) => ctx.intern(Value::BigInt(Box::new(*b))),
+            SendValue::BigInt(b) => ctx.intern(Value::BigInt(Box::new(b.clone()))),
             SendValue::Decimal(d) => ctx.intern(Value::Decimal(Box::new(*d))),
             SendValue::Char(c) => ctx.intern(Value::Char(*c)),
             SendValue::Array(items) => {

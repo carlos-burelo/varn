@@ -13,6 +13,7 @@ varn-tir   = { path = "../varn-tir" }
 varn-types = { path = "../varn-types" }
 rustc-hash = { workspace = true }
 rust_decimal = { workspace = true }
+num-bigint   = { workspace = true }
 
 [lints]
 workspace = true

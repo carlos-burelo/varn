@@ -108,7 +108,10 @@ fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind
     match (conv, operand) {
         (IntToFloat, InstKind::ConstInt(n)) => Some(InstKind::ConstFloat(*n as f64)),
         (FloatToInt, InstKind::ConstFloat(f)) => varn_core::float_to_int(*f).map(InstKind::ConstInt),
-        (BigIntToInt, InstKind::ConstBigInt(b)) => i64::try_from(*b).ok().map(InstKind::ConstInt),
+        (BigIntToInt, InstKind::ConstBigInt(b)) => {
+            let b: num_bigint::BigInt = b.parse().ok()?;
+            i64::try_from(&b).ok().map(InstKind::ConstInt)
+        }
         _ => None,
     }
 }
@@ -213,32 +216,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             Ge => Some(InstKind::ConstBool(x >= y)),
             _ => None,
         },
-        (InstKind::ConstBigInt(x), InstKind::ConstBigInt(y)) => match op {
-            Add => Some(InstKind::ConstBigInt(x.wrapping_add(*y))),
-            Sub => Some(InstKind::ConstBigInt(x.wrapping_sub(*y))),
-            Mul => Some(InstKind::ConstBigInt(x.wrapping_mul(*y))),
-            Div => {
-                if *y != 0 {
-                    Some(InstKind::ConstBigInt(x / y))
-                } else {
-                    None
-                }
-            }
-            Mod => {
-                if *y != 0 {
-                    Some(InstKind::ConstBigInt(x % y))
-                } else {
-                    None
-                }
-            }
-            Eq => Some(InstKind::ConstBool(x == y)),
-            Ne => Some(InstKind::ConstBool(x != y)),
-            Lt => Some(InstKind::ConstBool(x < y)),
-            Le => Some(InstKind::ConstBool(x <= y)),
-            Gt => Some(InstKind::ConstBool(x > y)),
-            Ge => Some(InstKind::ConstBool(x >= y)),
-            _ => None,
-        },
+        (InstKind::ConstBigInt(x), InstKind::ConstBigInt(y)) => fold_bigint(op, x, y),
         (InstKind::ConstNull, InstKind::ConstNull) => match op {
             Eq => Some(InstKind::ConstBool(true)),
             Ne => Some(InstKind::ConstBool(false)),
@@ -270,6 +248,28 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         InstKind::ConstChar(_) => Some(HirType::Ref),
         InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
         InstKind::ConstNull => Some(HirType::Dynamic),
+        _ => None,
+    }
+}
+
+/// Folds `bigint ⊕ bigint` exactly; a fault (`/ 0`, `% 0`) stays in the IR so
+/// the runtime raises it with a line.
+fn fold_bigint(op: HirBinOp, x: &str, y: &str) -> Option<InstKind> {
+    use HirBinOp::*;
+    let (a, b): (num_bigint::BigInt, num_bigint::BigInt) = (x.parse().ok()?, y.parse().ok()?);
+    let big = |v: num_bigint::BigInt| Some(InstKind::ConstBigInt(v.to_string().into()));
+    match op {
+        Add => big(a + b),
+        Sub => big(a - b),
+        Mul => big(a * b),
+        Div => varn_core::numeric_big::div_big(&a, &b).ok().and_then(big),
+        Mod => varn_core::numeric_big::rem_big(&a, &b).ok().and_then(big),
+        Eq => Some(InstKind::ConstBool(a == b)),
+        Ne => Some(InstKind::ConstBool(a != b)),
+        Lt => Some(InstKind::ConstBool(a < b)),
+        Le => Some(InstKind::ConstBool(a <= b)),
+        Gt => Some(InstKind::ConstBool(a > b)),
+        Ge => Some(InstKind::ConstBool(a >= b)),
         _ => None,
     }
 }

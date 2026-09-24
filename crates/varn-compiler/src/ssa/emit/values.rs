@@ -57,7 +57,10 @@ pub(super) fn emit_value(
             chunk.emit_rc(OpCode::LoadConst, d, idx, line);
         }
         InstKind::ConstBigInt(n) => {
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::BigInt(*n)));
+            let value: num_bigint::BigInt = n
+                .parse()
+                .map_err(|_| OptError::Unsupported("malformed bigint literal"))?;
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::BigInt(value)));
             chunk.emit_rc(OpCode::LoadConst, d, idx, line);
         }
         InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, line),

@@ -2448,23 +2448,9 @@ impl<'a> FnEmitter<'a> {
                 Some(TirExprKind::DecimalLit(text))
             }
             ExprKind::BigIntLiteral { raw } => {
-                let s = self
-                    .m
-                    .interner
-                    .resolve(*raw)
-                    .trim_end_matches('n')
-                    .replace('_', "");
-                let n = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
-                    i128::from_str_radix(r, 16)
-                } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
-                    i128::from_str_radix(r, 8)
-                } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
-                    i128::from_str_radix(r, 2)
-                } else {
-                    s.parse()
-                }
-                .unwrap_or(0);
-                Some(TirExprKind::BigIntLit(n))
+                let text = self.m.interner.resolve(*raw).trim_end_matches('n');
+                let n = varn_core::numeric_big::parse_bigint_literal(text).unwrap_or_default();
+                Some(TirExprKind::BigIntLit(Arc::from(n.to_string())))
             }
             ExprKind::RegexLiteral { pattern, flags } => {
                 let s = TirExpr {

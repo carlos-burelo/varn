@@ -252,8 +252,9 @@ pub enum TirExprKind {
     /// A `decimal` literal, carried as its source text (minus the `d` suffix)
     /// — the backend parses it, keeping this crate free of `rust_decimal`.
     DecimalLit(Arc<str>),
-    /// A `bigint` literal, already parsed to `i128` by the checker.
-    BigIntLit(i128),
+    /// A `bigint` literal as canonical base-10 digits (arbitrary precision;
+    /// the TIR carries no bignum dependency).
+    BigIntLit(Arc<str>),
     /// `a..b` / `a..=b`.
     RangeLit {
         start: Box<TirExpr>,

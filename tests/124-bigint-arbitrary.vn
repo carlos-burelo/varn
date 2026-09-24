@@ -1,0 +1,38 @@
+const a: bigint = 10n
+const b: bigint = 5n
+assert("bigint add", a + b === 15n)
+assert("bigint sub", a - 20n === -10n)
+assert("bigint mul", a * b === 50n)
+assert("bigint div truncates", 7n / 2n === 3n)
+assert("bigint div negative truncates", -7n / 2n === -3n)
+assert("bigint rem sign of dividend", -7n % 2n === -1n)
+assert("bigint pow", 2n ** 100n === 1267650600228229401496703205376n)
+assert("bigint neg", -a === -10n)
+assert("bigint compare", a > b && b < a && a >= 10n)
+
+const huge: bigint = 170141183460469231731687303715884105728n
+assert("bigint beyond i128", (huge - 1n).toString() === "170141183460469231731687303715884105727")
+const big40: bigint = 1000000000000000000000000000000000000000n
+assert("bigint 40 digits", (big40 * big40).toString() === "1000000000000000000000000000000000000000000000000000000000000000000000000000000")
+assert("bigint hex literal", 0xffn === 255n)
+
+const i: int = 7
+assert("bigint with int operand", a + i === 17n)
+assert("int widens to bigint", (i as bigint) === 7n)
+assert("bigint as int in range", (b as int) === 5)
+
+function kind(f: () => bigint): str {
+    try { f(); return "none" } catch (e) {
+        if (e instanceof DivisionByZero) { return "zero" }
+        return "other"
+    }
+}
+assert("bigint / 0 raises", kind(() => a / 0n) === "zero")
+assert("bigint % 0 raises", kind(() => a % 0n) === "zero")
+
+assert("bigint equality by value", huge === 170141183460469231731687303715884105728n)
+const s: Set<bigint> = new Set<bigint>()
+s.add(huge)
+assert("bigint set member by value", s.has(170141183460469231731687303715884105728n))
+
+print("[PASSED] 124. Arbitrary-precision bigint")

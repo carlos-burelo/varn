@@ -660,7 +660,7 @@ impl<'m> Builder<'m> {
                 let d = s.parse().unwrap_or_default();
                 Ok(self.emit(InstKind::ConstDecimal(d), HirType::Dynamic))
             }
-            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Dynamic)),
+            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(n.clone()), HirType::Dynamic)),
             TirExprKind::RangeLit {
                 start,
                 end,

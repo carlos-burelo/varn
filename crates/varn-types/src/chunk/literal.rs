@@ -52,7 +52,7 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     Str(Arc<str>),
-    BigInt(i128),
+    BigInt(num_bigint::BigInt),
     Decimal(rust_decimal::Decimal),
     Symbol(crate::value::RuntimeSymbol),
     Char(char),

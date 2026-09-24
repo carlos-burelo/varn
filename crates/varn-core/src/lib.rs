@@ -10,6 +10,7 @@ pub mod intrinsics;
 pub mod kinds;
 pub mod module_id;
 pub mod numeric;
+pub mod numeric_big;
 pub mod numeric_conv;
 pub mod op_id;
 pub mod op_meta;

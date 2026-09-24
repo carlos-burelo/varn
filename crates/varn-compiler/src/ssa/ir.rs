@@ -127,7 +127,8 @@ pub enum InstKind {
     ConstStr(Arc<str>),
     ConstChar(char),
     ConstDecimal(Decimal),
-    ConstBigInt(i128),
+    /// Canonical base-10 digits of a `bigint` constant.
+    ConstBigInt(Arc<str>),
     ConstNull,
     Binary {
         op: HirBinOp,

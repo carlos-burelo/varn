@@ -1244,6 +1244,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
+dependencies = [
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2307,6 +2327,8 @@ dependencies = [
  "httparse",
  "libloading",
  "mio",
+ "num-bigint",
+ "num-traits",
  "parking_lot",
  "rand",
  "regex",
@@ -2374,6 +2396,7 @@ dependencies = [
 name = "varn-compiler"
 version = "0.1.0"
 dependencies = [
+ "num-bigint",
  "rust_decimal",
  "rustc-hash 1.1.0",
  "varn-core",
@@ -2385,6 +2408,8 @@ dependencies = [
 name = "varn-core"
 version = "0.1.0"
 dependencies = [
+ "num-bigint",
+ "num-traits",
  "rustc-hash 1.1.0",
  "serde",
 ]
@@ -2536,6 +2561,8 @@ name = "varn-types"
 version = "0.1.0"
 dependencies = [
  "memchr",
+ "num-bigint",
+ "num-traits",
  "postcard",
  "rust_decimal",
  "rustc-hash 1.1.0",
@@ -2548,6 +2575,8 @@ name = "varn-vm"
 version = "0.1.0"
 dependencies = [
  "memchr",
+ "num-bigint",
+ "num-traits",
  "rust_decimal",
  "rustc-hash 1.1.0",
  "ryu",

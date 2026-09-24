@@ -39,14 +39,14 @@ impl HeapInner {
             Value::Str(s) => self.alloc_str(s),
             Value::BigInt(n) => {
                 let n_val = *n;
-                let packed = match self.bigint_interner.entry(n_val) {
+                let packed = match self.bigint_interner.entry(n_val.clone()) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => *e.insert(pack_old_idx(alloc_into(
                         &mut self.objects,
                         &mut self.free,
                         &mut self.alloc_count,
                         &mut self.gc_alloc_since_collect,
-                        HeapObj::BigInt(n_val),
+                        HeapObj::BigInt(Box::new(n_val)),
                     ))),
                 };
                 VmValue::from_heap_idx(packed)
@@ -194,7 +194,7 @@ impl HeapInner {
                 HeapObj::Range(r) => Value::Range(Box::new(r.clone())),
                 HeapObj::Symbol(s) => Value::Symbol(s.clone()),
                 HeapObj::EnumVariant(data) => Value::EnumVariant(data.clone()),
-                HeapObj::BigInt(n) => Value::BigInt(Box::new(*n)),
+                HeapObj::BigInt(n) => Value::BigInt(n.clone()),
                 HeapObj::Decimal(d) => Value::Decimal(d.clone()),
                 HeapObj::Char(c) => Value::Char(*c),
                 HeapObj::Generator(g) => Value::Generator(g.clone()),

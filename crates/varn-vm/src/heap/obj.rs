@@ -40,7 +40,7 @@ pub enum HeapObj {
     Range(RangeData),
     Symbol(RuntimeSymbol),
     EnumVariant(Box<EnumVariantData>),
-    BigInt(i128),
+    BigInt(Box<num_bigint::BigInt>),
     Decimal(Box<rust_decimal::Decimal>),
     Char(char),
     Generator(GeneratorObj),

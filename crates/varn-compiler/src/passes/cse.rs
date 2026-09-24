@@ -44,7 +44,7 @@ enum Key {
     Bool(bool),
     Str(Arc<str>),
     Char(char),
-    BigInt(i128),
+    BigInt(Arc<str>),
     Null,
     Binary(HirBinOp, HirType, u32, u32),
     Unary(HirUnOp, HirType, u32),
@@ -134,7 +134,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::ConstBool(b) => Key::Bool(*b),
         InstKind::ConstStr(s) => Key::Str(s.clone()),
         InstKind::ConstChar(c) => Key::Char(*c),
-        InstKind::ConstBigInt(i) => Key::BigInt(*i),
+        InstKind::ConstBigInt(i) => Key::BigInt(i.clone()),
         InstKind::ConstNull => Key::Null,
 
         InstKind::Binary { op, lhs, rhs, ty } => Key::Binary(*op, *ty, id(*lhs), id(*rhs)),

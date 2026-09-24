@@ -104,7 +104,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 
     if a.is_heap() && heap.is_int(b) {
         match heap.get(a.as_heap_idx()) {
-            Some(HeapObj::BigInt(av)) => return *av == heap.as_int(b) as i128,
+            Some(HeapObj::BigInt(av)) => return **av == num_bigint::BigInt::from(heap.as_int(b)),
             Some(HeapObj::Decimal(da)) => {
                 return **da == rust_decimal::Decimal::from(heap.as_int(b))
             }
@@ -114,7 +114,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
     if heap.is_int(a) && b.is_heap() {
         match heap.get(b.as_heap_idx()) {
-            Some(HeapObj::BigInt(bv)) => return *bv == heap.as_int(a) as i128,
+            Some(HeapObj::BigInt(bv)) => return **bv == num_bigint::BigInt::from(heap.as_int(a)),
             Some(HeapObj::Decimal(db)) => {
                 return rust_decimal::Decimal::from(heap.as_int(a)) == **db
             }

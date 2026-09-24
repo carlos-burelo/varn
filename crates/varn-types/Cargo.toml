@@ -18,6 +18,8 @@ varn-core    = { path = "../varn-core" }
 
 memchr       = { workspace = true }
 rust_decimal = { workspace = true }
+num-bigint   = { workspace = true }
+num-traits   = { workspace = true }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }
 

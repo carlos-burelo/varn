@@ -43,7 +43,7 @@ pub struct HeapInner {
     pub(super) map_interner: FxHashMap<MapRef, u32>,
     pub(super) empty_map: Option<MapRef>,
     pub(super) set_interner: FxHashMap<SetRef, u32>,
-    pub(super) bigint_interner: FxHashMap<i128, u32>,
+    pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, u32>,
     pub(super) decimal_interner: FxHashMap<rust_decimal::Decimal, u32>,
     pub(super) char_interner: FxHashMap<char, u32>,
     pub(super) gc_collector: Option<GcCollector>,

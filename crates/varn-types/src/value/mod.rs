@@ -113,7 +113,7 @@ pub enum Value {
     Int(i64),
     Float(f64),
     Str(RuntimeString),
-    BigInt(Box<i128>),
+    BigInt(Box<num_bigint::BigInt>),
     Decimal(Box<Decimal>),
     Array(ArrayRef),
     Object(ObjRef),
