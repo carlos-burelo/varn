@@ -308,9 +308,16 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
     Some(ctx.finalize(root))
 }
 
+/// `globals.vn` declares these as `const`; the contract macro binds only
+/// functions and classes, so their values are supplied here.
+const FLOAT_CONSTANTS: &[(&str, f64)] = &[("Infinity", f64::INFINITY), ("NaN", f64::NAN)];
+
 pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc<str>, VmValue> {
     let mut out = rustc_hash::FxHashMap::default();
     out.insert(Arc::from("isIsolate"), VmValue::from_bool(false));
+    for (name, value) in FLOAT_CONSTANTS {
+        out.insert(Arc::from(*name), VmValue::from_f64(*value));
+    }
 
     if let Some(globals_nv) = build_module("globals", ctx) {
         collect_module_fields("globals", globals_nv, ctx, &mut out);
@@ -338,6 +345,7 @@ pub fn native_global_layout() -> &'static [&'static str] {
         const SKIP_KINDS: &[u8] = &[0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15];
 
         let mut names: Vec<&'static str> = vec!["isIsolate"];
+        names.extend(FLOAT_CONSTANTS.iter().map(|(name, _)| *name));
         let mut has_core = false;
         for e in all_native_ops() {
             if e.module_id() == "core" {
