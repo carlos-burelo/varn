@@ -184,13 +184,9 @@ fn combined_specs() -> &'static [ModuleSpec] {
             let mut combined: Vec<ModuleSpec> = MODULE_REGISTRY
                 .iter()
                 .filter(|m| !std.specs.iter().any(|s| s.id == m.id))
-                .map(|m| {
-                    ModuleSpec::leaked(m.id.to_owned(), m.kind, m.vn_source.to_owned(), m.pure)
-                })
+                .copied()
                 .collect();
-            combined.extend(std.specs.iter().map(|s| {
-                ModuleSpec::leaked(s.id.to_owned(), s.kind, s.vn_source.to_owned(), s.pure)
-            }));
+            combined.extend(std.specs.iter().copied());
             Box::leak(combined.into_boxed_slice())
         }
     })

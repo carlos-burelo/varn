@@ -8,6 +8,7 @@ pub enum ModuleKind {
     Runtime,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct ModuleSpec {
     pub id: &'static str,
     pub kind: ModuleKind,
