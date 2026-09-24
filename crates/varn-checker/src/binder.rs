@@ -163,6 +163,13 @@ impl TypeContext for Binder<'_> {
         self.arena.get(id).ty.clone()
     }
 
+    fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
+        let scope = self.scopes.get(self.current);
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
+        self.arena.get(id).origin_module
+    }
+
     fn source_file(&self) -> Option<&str> {
         Some(self.source_file.as_ref())
     }

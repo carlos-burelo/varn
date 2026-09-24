@@ -38,6 +38,10 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
 
+    fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
+        self.inner.and_then(|c| c.symbol_origin(name))
+    }
+
     fn get_interface_members(
         &self,
         name: &str,
@@ -136,6 +140,10 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
 
+    fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
+        self.inner.and_then(|c| c.symbol_origin(name))
+    }
+
     fn get_interface_members(
         &self,
         name: &str,
@@ -207,6 +215,10 @@ impl TypeContext for AliasSubstitutionContext<'_> {
             return Some(self.args[pos]);
         }
         self.inner.and_then(|c| c.resolve_symbol(name))
+    }
+
+    fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
+        self.inner.and_then(|c| c.symbol_origin(name))
     }
 
     fn get_interface_members(

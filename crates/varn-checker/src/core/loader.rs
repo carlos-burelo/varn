@@ -22,6 +22,16 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
+/// The core globals a module binds against: every module but the core ones
+/// themselves, whichever path binds it (the checker, or the resolver reading
+/// an import's interface) — one environment per module.
+pub(crate) fn module_globals(
+    filename: &str,
+    resolver: &dyn ImportResolver,
+) -> Option<Arc<FxHashMap<Arc<str>, Symbol>>> {
+    (!is_core_file(filename)).then(|| resolver.core_exports())
+}
+
 pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) {
     bind.core = Some(resolver.core_members());
 }
@@ -33,8 +43,11 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
 pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> FxHashMap<Arc<str>, Symbol> {
     let mut globals = FxHashMap::default();
     for spec in varn_modules::core_module_ids() {
+        let origin = resolver.intern(spec);
         for (k, v) in resolver.stdlib_exports(spec).as_ref() {
-            globals.insert(Arc::from(k.as_str()), v.clone());
+            let mut symbol = v.clone();
+            symbol.origin_module = symbol.origin_module.or(Some(origin));
+            globals.insert(Arc::from(k.as_str()), symbol);
         }
     }
     globals

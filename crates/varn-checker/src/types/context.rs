@@ -16,6 +16,11 @@ pub trait TypeContext {
         None
     }
     fn resolve_symbol(&self, name: &str) -> Option<Type>;
+    /// The module that declares the symbol `name` resolves to, when it is not
+    /// the current one (an import, a core global).
+    fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
+        None
+    }
     fn source_file(&self) -> Option<&str>;
 
     fn get_alias_node(&self, _name: &str) -> Option<(Vec<String>, varn_core::ast::TypeNode)> {

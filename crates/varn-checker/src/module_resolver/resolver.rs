@@ -362,7 +362,18 @@ impl DiskResolver {
         key: &str,
     ) -> Arc<BindResult> {
         self.in_flight.lock().insert(key.to_owned());
-        let mut bind = crate::binder::Binder::bind(program, ast_arena, interner, self);
+        let mut bind = match crate::core::loader::module_globals(key, self) {
+            // Building the core globals may have minted atoms `interner`
+            // never saw; the live snapshot is a superset of it.
+            Some(globals) => crate::binder::Binder::bind_with_global_refs(
+                program,
+                ast_arena,
+                self.interner_snapshot(),
+                self,
+                &globals,
+            ),
+            None => crate::binder::Binder::bind(program, ast_arena, interner, self),
+        };
         self.in_flight.lock().remove(key);
         for e in lex_errs {
             bind.diagnostics.emit(e);

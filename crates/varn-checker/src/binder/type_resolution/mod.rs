@@ -143,6 +143,7 @@ pub fn resolve_type_node(
                     TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o,
                     _ => None,
                 })
+                .or_else(|| ctx.and_then(|c| c.symbol_origin(&name_str)))
                 .or_else(|| {
                     ctx.and_then(|c| c.source_file())
                         .and_then(|s| resolver.map(|r| r.intern(s)))
@@ -167,6 +168,15 @@ pub fn resolve_type_node(
             }
 
             if let Some(resolved) = ctx.and_then(|c| c.resolve_symbol(&name_str)) {
+                // A declaration imported (or a core global) carries its
+                // declaring module, so the type is told apart from a local
+                // one of the same name.
+                if let (TypeKind::Named(_, None), Some(origin)) = (
+                    table.get(resolved.0),
+                    ctx.and_then(|c| c.symbol_origin(&name_str)),
+                ) {
+                    return resolved.with_origin(origin, table);
+                }
                 return resolved;
             }
 

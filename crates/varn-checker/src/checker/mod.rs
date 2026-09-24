@@ -310,15 +310,9 @@ impl<'r> Checker<'r> {
     ) -> CheckResult {
         let mut profile = CheckProfile::default();
 
-        let is_builtin = crate::core::is_core_file(&program.filename);
-        let globals_ref = if !is_builtin {
-            let started = Instant::now();
-            let globals = resolver.core_exports();
-            profile.load_globals = started.elapsed();
-            Some(globals)
-        } else {
-            None
-        };
+        let started = Instant::now();
+        let globals_ref = crate::core::loader::module_globals(&program.filename, resolver);
+        profile.load_globals = started.elapsed();
 
         // `core_exports()` may have just bound the core stdlib modules for the
         // first time, minting `Atom`s into the resolver's shared table that

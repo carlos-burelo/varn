@@ -340,6 +340,13 @@ impl TypeContext for BindView<'_> {
         self.bind.arena.get(id).ty.clone()
     }
 
+    fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
+        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
+        self.bind.arena.get(id).origin_module
+    }
+
     fn source_file(&self) -> Option<&str> {
         Some(self.bind.source_file.as_ref())
     }
