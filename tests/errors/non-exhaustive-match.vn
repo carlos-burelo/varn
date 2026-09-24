@@ -1,4 +1,4 @@
-// expect: warning[VN4001]
+// expect: error[VN4001]
 enum Color {
     Red,
     Green,

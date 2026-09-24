@@ -10,11 +10,7 @@ assert("bool match", sign(true) + sign(false) === 0)
 function orZero(x: int?): int { return match (x) { null => 0, n => n } }
 assert("nullable match", orZero(null) === 0 && orZero(5) === 5)
 
-function partial(b: bool): int { return match (b) { true => 1 } }
-function raisesMatchError(f: () => int): bool {
-    try { f(); return false } catch (e) { return e instanceof MatchError }
-}
-assert("no arm raises MatchError", raisesMatchError(() => partial(false)))
-assert("covered arm still matches", partial(true) === 1)
+function describe(n: int): str { return match (n) { 0 => "zero", _ => "many" } }
+assert("open type with a catch-all", describe(0) === "zero" && describe(5) === "many")
 
 print("[PASSED] 128. Match exhaustiveness")

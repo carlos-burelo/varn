@@ -7,6 +7,31 @@ use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
 
 impl<'r> Checker<'r> {
+    /// An open type (`int`, `str`, a class, `dynamic`) has no finite set of
+    /// values to cover: only a catch-all arm makes the match exhaustive.
+    fn require_catch_all(
+        &mut self,
+        subject_ty: &Type,
+        cases: &[MatchCase],
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
+        let catch_all = cases.iter().any(|c| {
+            c.guard.is_none()
+                && matches!(c.pattern, MatchPattern::Wildcard | MatchPattern::Identifier(_))
+        });
+        if !catch_all {
+            let ty = subject_ty.display(&self.ty_table, &bind.interner);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::NonExhaustiveMatch,
+                    format!("non-exhaustive match: a match on '{ty}' needs a `_` arm"),
+                )
+                .with_range(*range),
+            );
+        }
+    }
+
     pub(super) fn check_match_exhaustiveness(
         &mut self,
         subject_ty: &Type,
@@ -36,7 +61,7 @@ impl<'r> Checker<'r> {
                 .collect();
             if !uncovered.is_empty() {
                 self.emit(
-                    Diagnostic::warning(
+                    Diagnostic::error(
                         ErrorCode::NonExhaustiveMatch,
                         format!(
                             "non-exhaustive match: missing cases for {}",
@@ -49,13 +74,24 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        let TypeKind::Named(type_name_atom, _) = self.ty_table.get(subject_ty.0) else {
+        let (TypeKind::Named(type_name_atom, origin_atom)
+        | TypeKind::Generic(type_name_atom, _, origin_atom)) = self.ty_table.get(subject_ty.0)
+        else {
+            self.require_catch_all(subject_ty, cases, range, bind);
             return;
         };
-        let type_name: std::sync::Arc<str> =
-            std::sync::Arc::from(bind.interner.resolve(type_name_atom));
+        let type_name: std::sync::Arc<str> = self.resolve_bind_atom(bind, type_name_atom);
+        // An enum declared in another module lists its variants in that
+        // module's bind.
+        let foreign = origin_atom.and_then(|o| {
+            let origin = self.resolve_bind_atom(bind, o);
+            self.resolver
+                .module_bind(&origin)
+                .or_else(|| self.resolver.stdlib_bind(&origin))
+        });
+        let owner: &BindResult = foreign.as_deref().unwrap_or(bind);
 
-        if let Some(variants) = bind.sum_type_variants.get(type_name.as_ref()) {
+        if let Some(variants) = owner.sum_type_variants.get(type_name.as_ref()) {
             let uncovered: Vec<String> = variants
                 .iter()
                 .filter(|vname| {
@@ -105,7 +141,7 @@ impl<'r> Checker<'r> {
                 .collect();
             if !uncovered.is_empty() {
                 self.emit(
-                    Diagnostic::warning(
+                    Diagnostic::error(
                         ErrorCode::NonExhaustiveMatch,
                         format!(
                             "non-exhaustive match: missing cases for {}",
@@ -118,11 +154,11 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        if let Some(variants) = bind.get_enum_members_local(type_name.as_ref()) {
+        if let Some(variants) = owner.get_enum_members_local(type_name.as_ref()) {
             let uncovered: Vec<String> = variants
                 .iter()
                 .filter(|v| {
-                    let is_variant = bind
+                    let is_variant = owner
                         .sum_variant_parent
                         .get(v.name.as_ref())
                         .is_some_and(|parent| parent.as_ref() == type_name.as_ref());
@@ -168,7 +204,7 @@ impl<'r> Checker<'r> {
                 .collect();
             if !uncovered.is_empty() {
                 self.emit(
-                    Diagnostic::warning(
+                    Diagnostic::error(
                         ErrorCode::NonExhaustiveMatch,
                         format!(
                             "non-exhaustive match: missing cases for {}",
@@ -178,7 +214,9 @@ impl<'r> Checker<'r> {
                     .with_range(*range),
                 );
             }
+            return;
         }
+        self.require_catch_all(subject_ty, cases, range, bind);
     }
 }
 

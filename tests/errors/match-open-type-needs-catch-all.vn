@@ -1,0 +1,2 @@
+// expect: error[VN4001]
+function f(n: int): str { return match (n) { 0 => "zero", 1 => "one" } }

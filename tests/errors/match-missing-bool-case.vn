@@ -1,0 +1,2 @@
+// expect: error[VN4001]
+function partial(b: bool): int { return match (b) { true => 1 } }
