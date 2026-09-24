@@ -22,10 +22,16 @@ pub enum NumConv {
     DynToInt = 6,
     /// `dynamic as float`.
     DynToFloat = 7,
+    BigIntToFloat = 8,
+    FloatToBigInt = 9,
+    DecimalToFloat = 10,
+    FloatToDecimal = 11,
+    BigIntToDecimal = 12,
+    DecimalToBigInt = 13,
 }
 
 impl NumConv {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 14] = [
         Self::IntToFloat,
         Self::FloatToInt,
         Self::IntToBigInt,
@@ -34,6 +40,12 @@ impl NumConv {
         Self::DecimalToInt,
         Self::DynToInt,
         Self::DynToFloat,
+        Self::BigIntToFloat,
+        Self::FloatToBigInt,
+        Self::DecimalToFloat,
+        Self::FloatToDecimal,
+        Self::BigIntToDecimal,
+        Self::DecimalToBigInt,
     ];
 
     pub const fn from_u8(raw: u8) -> Option<Self> {
@@ -53,6 +65,12 @@ impl NumConv {
             (BigInt, Int) => Self::BigIntToInt,
             (Int, Decimal) => Self::IntToDecimal,
             (Decimal, Int) => Self::DecimalToInt,
+            (BigInt, Float) => Self::BigIntToFloat,
+            (Float, BigInt) => Self::FloatToBigInt,
+            (Decimal, Float) => Self::DecimalToFloat,
+            (Float, Decimal) => Self::FloatToDecimal,
+            (BigInt, Decimal) => Self::BigIntToDecimal,
+            (Decimal, BigInt) => Self::DecimalToBigInt,
             _ => return None,
         })
     }
@@ -61,7 +79,12 @@ impl NumConv {
     pub const fn can_fault(self) -> bool {
         matches!(
             self,
-            Self::FloatToInt | Self::BigIntToInt | Self::DecimalToInt | Self::DynToInt
+            Self::FloatToInt
+                | Self::BigIntToInt
+                | Self::DecimalToInt
+                | Self::DynToInt
+                | Self::FloatToBigInt
+                | Self::FloatToDecimal
         )
     }
 }

@@ -492,9 +492,10 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
 pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
     use varn_core::NumConv::*;
     match conv {
-        IntToFloat | DynToFloat => HirType::Float,
+        IntToFloat | DynToFloat | BigIntToFloat | DecimalToFloat => HirType::Float,
         FloatToInt | BigIntToInt | DecimalToInt | DynToInt => HirType::Int,
-        IntToBigInt | IntToDecimal => HirType::Dynamic,
+        IntToBigInt | IntToDecimal | FloatToBigInt | FloatToDecimal | BigIntToDecimal
+        | DecimalToBigInt => HirType::Dynamic,
     }
 }
 
@@ -502,8 +503,10 @@ pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
 fn convert_operand_ty(conv: varn_core::NumConv) -> Option<HirType> {
     use varn_core::NumConv::*;
     match conv {
-        IntToFloat | IntToBigInt | IntToDecimal => Some(HirType::Int),
-        FloatToInt => Some(HirType::Float),
-        BigIntToInt | DecimalToInt | DynToInt | DynToFloat => None,
+        // Widening into bigint/decimal also normalises a value already there.
+        IntToFloat => Some(HirType::Int),
+        FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
+        IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
+        | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt => None,
     }
 }

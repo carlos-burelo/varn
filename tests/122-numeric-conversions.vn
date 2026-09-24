@@ -34,4 +34,21 @@ let acc = 0
 while (i < 500) { acc = acc + f2i(2.5); i = i + 1 }
 assert("hot float as int", acc === 1000)
 
+const bigF: bigint = 12345678901234567890n
+assert("bigint as float", (bigF as float) === 12345678901234567000.0)
+assert("float as bigint truncates", ((2.9e20) as bigint) === 290000000000000000000n)
+assert("decimal as float", (2.5d as float) === 2.5)
+assert("float as decimal is exact binary value", ((0.5) as decimal) === 0.5d)
+assert("bigint as decimal", ((10n) as decimal) === 10.0d)
+assert("decimal as bigint truncates", ((7.9d) as bigint) === 7n)
+function bigKind(f: () => bigint): str {
+    try { f(); return "none" } catch (e) {
+        if (e instanceof IntegerOverflow) { return "ovf" }
+        return "other"
+    }
+}
+assert("NaN as bigint raises", bigKind(() => (0.0 / 0.0) as bigint) === "ovf")
+const dynBig: dynamic = 5n
+assert("dynamic bigint as float", (dynBig as float) === 5.0)
+
 print("[PASSED] 122. Numeric conversions")
