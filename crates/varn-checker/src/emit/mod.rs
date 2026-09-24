@@ -14,6 +14,7 @@
 //! real nodes typed `Dynamic(Unannotated)` — never a bare hole.
 
 mod body;
+mod prelude;
 mod tables;
 mod ty;
 
@@ -71,6 +72,10 @@ pub fn emit_module(
     // (`InstKind::ExtensionCall`). Number them like any other module global so
     // the call site is `LoadGlobalIdx`, not a name lookup the JIT bails on.
     collect_extension_names(program, ast_arena, &mut declared, interner);
+    let prelude = prelude::prelude_imports(&program.filename, &declared, ast_arena, interner);
+    for import in &prelude {
+        declared.extend(import.specs.iter().map(|spec| spec.local.clone()));
+    }
 
     let mut global_slots: FxHashMap<Arc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
@@ -337,7 +342,8 @@ pub fn emit_module(
         &mut functions,
     );
 
-    let imports = collect_imports(program, ast_arena, interner);
+    let mut imports = prelude;
+    imports.extend(collect_imports(program, ast_arena, interner));
     let exports = collect_exports(program, ast_arena, interner);
 
     TirModule {

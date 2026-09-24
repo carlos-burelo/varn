@@ -106,17 +106,11 @@ pub fn infer_expr_type(
         ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx, table),
         ExprKind::Try { expression } => {
             let inner = infer_expr_type(*expression, arena, ctx, table);
-            let ok_first = match table.get(inner.0) {
-                TypeKind::Generic(name, args, _)
-                    if ctx_resolve_text(ctx, name)
-                        .is_some_and(|n| n == "Result" || n == "Option") =>
-                {
-                    table.get_list(args).first().copied()
-                }
-                _ => None,
-            };
-            if let Some(id) = ok_first {
-                Type(id, false)
+            let ok_first = inner
+                .core_sum(table, |a| ctx_resolve_text(ctx, a))
+                .and_then(|(_, args)| args.first().copied());
+            if let Some(ok) = ok_first {
+                ok
             } else if inner.is_nullable(table) {
                 inner.non_nullified(table)
             } else {

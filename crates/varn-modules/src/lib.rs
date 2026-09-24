@@ -66,6 +66,19 @@ pub fn core_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Core)
 }
 
+/// The core modules holding Varn code, in registry order: the prelude every
+/// module links (ADR-0018).
+pub fn prelude_modules() -> Vec<&'static ModuleSpec> {
+    provider::get()
+        .map(|p| {
+            p.all_specs()
+                .iter()
+                .filter(|m| m.kind == ModuleKind::Core && m.has_code)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 pub fn std_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Stdlib)
 }

@@ -34,7 +34,7 @@ pub use diagnostics::{
 };
 pub use kinds::TypeKind;
 pub use kinds::TypeLiteral;
-pub use lang_type::{is_lang_type_name, BuiltinType, LangPrimitive};
+pub use lang_type::{is_lang_type_name, BuiltinType, CoreSum, LangPrimitive};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 

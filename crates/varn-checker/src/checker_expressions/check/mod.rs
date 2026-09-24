@@ -283,16 +283,25 @@ impl<'r> Checker<'r> {
                 self.check_expr(expression, bind);
                 let expr_ty = self.infer_type(expression, bind);
 
-                let is_result = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Result");
-                let is_option = matches!(self.ty_table.get(expr_ty.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Option");
+                let resolve = |a| bind.interner.try_resolve(a);
+                let operand = expr_ty.core_sum(&self.ty_table, resolve);
                 let is_nullable = expr_ty.is_nullable(&self.ty_table);
 
-                if !expr_ty.is_dynamic() && !is_result && !is_option && !is_nullable {
+                if !expr_ty.is_dynamic() && operand.is_none() && !is_nullable {
                     let expr_ty_s = expr_ty.display(&self.ty_table, &bind.interner);
+                    let shadowed = matches!(
+                        self.ty_table.get(expr_ty.0),
+                        TypeKind::Generic(name, _, _) if matches!(resolve(name), Some("Result" | "Option"))
+                    );
+                    let note = if shadowed {
+                        " (a user declaration shadows the core type here)"
+                    } else {
+                        ""
+                    };
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
-                            format!("operator 'try' can only be applied to 'Result', 'Option', or nullable types, found '{expr_ty_s}'"),
+                            format!("operator 'try' can only be applied to 'Result', 'Option', or nullable types, found '{expr_ty_s}'{note}"),
                         )
                         .with_range(range),
                     );
@@ -314,63 +323,47 @@ impl<'r> Checker<'r> {
                     return;
                 }
 
-                if is_result {
-                    let ret_is_result = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Result");
-                    if !ret_is_result {
-                        let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::TypeMismatch,
-                                format!("operator 'try' on 'Result' requires enclosing function to return 'Result', found '{expected_s}'"),
-                            )
-                            .with_range(range),
-                        );
-                    } else if let (
-                        TypeKind::Generic(_, args_e, _),
-                        TypeKind::Generic(_, args_r, _),
-                    ) = (
-                        self.ty_table.get(expr_ty.0),
-                        self.ty_table.get(expected_ret.0),
-                    ) {
-                        let e_ids = self.ty_table.get_list(args_e).to_vec();
-                        let r_ids = self.ty_table.get_list(args_r).to_vec();
-                        if e_ids.len() >= 2 && r_ids.len() >= 2 {
-                            let err_e = Type(e_ids[1], false);
-                            let err_r = Type(r_ids[1], false);
-                            if !self.types_compatible_cached(&err_r, &err_e, Some(bind)) {
-                                let err_e_s = err_e.display(&self.ty_table, &bind.interner);
-                                let err_r_s = err_r.display(&self.ty_table, &bind.interner);
-                                self.emit(
-                                    Diagnostic::error(
-                                        ErrorCode::TypeMismatch,
-                                        format!("cannot propagate error type '{err_e_s}' into return type '{err_r_s}'"),
-                                    )
-                                    .with_range(range),
-                                );
+                let enclosing = expected_ret.core_sum(&self.ty_table, resolve);
+                match (operand, enclosing) {
+                    (Some((sum, args)), Some((ret_sum, ret_args))) if sum == ret_sum => {
+                        if sum == varn_core::CoreSum::Result {
+                            if let (Some(err_e), Some(err_r)) = (args.get(1), ret_args.get(1)) {
+                                if !self.types_compatible_cached(err_r, err_e, Some(bind)) {
+                                    let err_e_s = err_e.display(&self.ty_table, &bind.interner);
+                                    let err_r_s = err_r.display(&self.ty_table, &bind.interner);
+                                    self.emit(
+                                        Diagnostic::error(
+                                            ErrorCode::TypeMismatch,
+                                            format!("cannot propagate error type '{err_e_s}' into return type '{err_r_s}'"),
+                                        )
+                                        .with_range(range),
+                                    );
+                                }
                             }
                         }
                     }
-                } else if is_option {
-                    let ret_is_option = matches!(self.ty_table.get(expected_ret.0), TypeKind::Generic(n, _, _) if bind.interner.try_resolve(n).unwrap_or_default() == "Option");
-                    if !ret_is_option {
+                    (Some((sum, _)), _) => {
                         let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
+                        let name = sum.name();
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::TypeMismatch,
-                                format!("operator 'try' on 'Option' requires enclosing function to return 'Option', found '{expected_s}'"),
+                                format!("operator 'try' on '{name}' requires enclosing function to return '{name}', found '{expected_s}'"),
                             )
                             .with_range(range),
                         );
                     }
-                } else if is_nullable && !expected_ret.is_nullable(&self.ty_table) {
-                    let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::TypeMismatch,
-                            format!("operator 'try' on nullable type requires enclosing function to return a nullable type, found '{expected_s}'"),
-                        )
-                        .with_range(range),
-                    );
+                    (None, _) if !expected_ret.is_nullable(&self.ty_table) => {
+                        let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TypeMismatch,
+                                format!("operator 'try' on nullable type requires enclosing function to return a nullable type, found '{expected_s}'"),
+                            )
+                            .with_range(range),
+                        );
+                    }
+                    (None, _) => {}
                 }
             }
             ExprKind::Yield { argument, .. } => {

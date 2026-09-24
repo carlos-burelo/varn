@@ -16,6 +16,10 @@ pub struct ModuleSpec {
     pub embedded: Option<&'static str>,
     pub exports: &'static [&'static str],
     pub pure: bool,
+    /// A core module holding Varn code (not only native declarations): it is
+    /// compiled and evaluated, and the prelude links its exports into every
+    /// module (ADR-0018).
+    pub has_code: bool,
 }
 
 impl ModuleSpec {
@@ -27,11 +31,17 @@ impl ModuleSpec {
             embedded: None,
             exports: &[],
             pure: false,
+            has_code: false,
         }
     }
 
     pub const fn with_source(mut self, src: &'static str) -> Self {
         self.embedded = Some(src);
+        self
+    }
+
+    pub const fn with_code(mut self) -> Self {
+        self.has_code = true;
         self
     }
 
@@ -55,6 +65,7 @@ impl ModuleSpec {
             embedded: None,
             exports: &[],
             pure,
+            has_code: false,
         }
     }
 }

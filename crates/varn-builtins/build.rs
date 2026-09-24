@@ -57,11 +57,24 @@ fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &P
         .iter()
         .map(|e| format!(r#""{e}","#))
         .collect();
+    let code = if has_code(&source) { ".with_code()" } else { "" };
     writeln!(
         out,
-        r#"    ModuleSpec::new("{id}", {kind_expr}, "crates/varn-builtins/{include_path}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{include_path}"))).with_exports(&[{exports}]),"#,
+        r#"    ModuleSpec::new("{id}", {kind_expr}, "crates/varn-builtins/{include_path}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{include_path}"))).with_exports(&[{exports}]){code},"#,
     )
     .unwrap();
+}
+
+/// A contract exporting anything but native declarations, types and
+/// interfaces carries Varn code that must be compiled and run.
+fn has_code(source: &str) -> bool {
+    source.lines().any(|line| {
+        line.strip_prefix("export ").is_some_and(|rest| {
+            !["declare ", "type ", "interface "]
+                .iter()
+                .any(|k| rest.trim_start().starts_with(k))
+        })
+    })
 }
 
 fn extract_exports_from_source(source: &str) -> Vec<String> {

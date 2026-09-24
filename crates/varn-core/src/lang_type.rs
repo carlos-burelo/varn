@@ -148,6 +148,38 @@ impl std::fmt::Display for BuiltinType {
     }
 }
 
+/// The closed sums the language itself gives meaning to (`try`, iteration).
+/// Identified by the core module declaring them, never by a name a user may
+/// reuse: a user's own `enum Result` is not one of these.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CoreSum {
+    Option,
+    Result,
+}
+
+impl CoreSum {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Option => "Option",
+            Self::Result => "Result",
+        }
+    }
+
+    pub const fn module(self) -> &'static str {
+        match self {
+            Self::Option => "core:types/option",
+            Self::Result => "core:types/result",
+        }
+    }
+
+    /// The core sum a type named `name`, declared in `origin`, is.
+    pub fn identify(name: &str, origin: Option<&str>) -> Option<Self> {
+        [Self::Option, Self::Result]
+            .into_iter()
+            .find(|s| s.name() == name && origin == Some(s.module()))
+    }
+}
+
 /// `true` when `name` is part of the language's type vocabulary rather than a
 /// user or platform declaration.
 pub fn is_lang_type_name(name: &str) -> bool {
@@ -167,5 +199,12 @@ mod tests {
             assert_eq!(BuiltinType::from_str(b.name()), Some(b));
         }
         assert_eq!(LangPrimitive::from_str("symbol"), None);
+    }
+
+    #[test]
+    fn core_sums_are_known_by_origin() {
+        assert_eq!(CoreSum::identify("Result", Some("core:types/result")), Some(CoreSum::Result));
+        assert_eq!(CoreSum::identify("Result", Some("/app/result.vn")), None);
+        assert_eq!(CoreSum::identify("Result", None), None);
     }
 }

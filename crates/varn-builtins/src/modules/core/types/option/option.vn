@@ -1,0 +1,42 @@
+// A value that may be absent, as a closed sum: absence is matched, never
+// compared against a sentinel.
+export enum Option<T> {
+    Some(value: T),
+    None;
+
+    isSome(): bool {
+        return match (this) {
+            Some(_) => true,
+            None => false
+        };
+    }
+
+    isNone(): bool {
+        return match (this) {
+            Some(_) => false,
+            None => true
+        };
+    }
+
+    unwrap(): T {
+        return match (this) {
+            Some(value) => value,
+            None => {
+                throw new Error("called unwrap on None");
+            }
+        };
+    }
+
+    unwrapOr(fallback: T): T {
+        return match (this) {
+            Some(value) => value,
+            None => fallback
+        };
+    }
+}
+
+export function Some<T>(value: T): Option<T> {
+    return Option.Some(value);
+}
+
+export const None = Option.None;

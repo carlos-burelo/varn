@@ -40,9 +40,13 @@ es `<capa>:<ruta>`. No hay manifiesto (`module.json`) que lo repita. Todo
 `core:*` está en scope; que `core:types` agrupe varios módulos es
 organización, no una fachada que reexporta.
 
-`core:*` puede contener código Varn además de declaraciones: se compila en el
-bundle y el VM lo ejecuta al arrancar, antes que el programa, poblando los
-globals del núcleo. `Option`/`Result` son el primer caso.
+`core:*` puede contener código Varn además de declaraciones nativas
+(`ModuleSpec::has_code`, derivado del contrato). Esos módulos forman el
+**prelude**: la bajada a TIR de todo módulo fuera de `core:` añade, como
+imports que ningún texto escribe, los nombres del prelude que el módulo usa
+como valor (una declaración local los sombrea). Llegan a slots de módulo: un
+uso es una carga de slot, nunca una búsqueda por nombre; un módulo que no
+nombra ninguno no carga nada. `Option`/`Result` son el primer caso.
 
 `Symbol` se borra del lenguaje: sin iteración por símbolos (ADR-0017) no
 tiene uso en el núcleo.
@@ -55,6 +59,10 @@ texto: un `Result` declarado por el usuario no es el del núcleo.
    (`varn_modules::layer::check_import`).
 2. Borrar `Symbol`.
 3. Reorganizar `core:*` y `runtime:*` por ruta; sin `module.json`.
-4. `core:*` con código Varn compilado; `Option`/`Result` a `core:types`;
-   `std:result` desaparece; las comprobaciones del checker por texto
-   `"Result"`/`"Option"` pasan a origen.
+4. `core:*` con código Varn compilado; `Option`/`Result` a
+   `core:types/{option,result}` con métodos (`isSome`, `unwrap`, …,
+   `Result.catching`); `std:result` desaparece; `try` reconoce el
+   `Option`/`Result` del núcleo por origen (`varn_core::CoreSum`), nunca por
+   texto.
+
+Los cuatro pasos están hechos.

@@ -1,13 +1,4 @@
-enum Result<T, E> {
-    Ok(val: T),
-    Err(err: E)
-}
-
-enum Option<T> {
-    Some(val: T),
-    None
-}
-
+// `try` works on the core Result and Option.
 function parse_positive(n: int): Result<int, str> {
     if (n <= 0) {
         return Result.Err("must be positive");

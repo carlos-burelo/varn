@@ -2746,15 +2746,22 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Try { expression } => {
+                let (table, interner) = (self.m.checker_table, self.m.interner);
+                let sum = self
+                    .expr_table
+                    .get(&expression.index())
+                    .and_then(|entry| entry.ty.core_sum(table, |a| interner.try_resolve(a)))
+                    .map(|(sum, _)| sum);
                 let inner = self.lower_expr(*expression);
                 let hoisted = self.hoist(inner);
                 let span = hoisted.span;
 
-                // Case 1: Enum (Result or Option)
-                if let BackendTy::Enum(eid) = hoisted.ty.non_nullable(self.tt) {
+                // Case 1: the core Result or Option (the checker admits no other enum).
+                if let (Some(sum), BackendTy::Enum(eid)) = (sum, hoisted.ty.non_nullable(self.tt)) {
                     if let Some(info) = self.m.enums.get(eid.0 as usize) {
-                        let is_err_res = info.variants.iter().find(|v| v.name.as_ref() == "Err");
-                        let is_ok_res = info.variants.iter().find(|v| v.name.as_ref() == "Ok");
+                        let variant = |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
+                        let is_err_res = variant("Err").filter(|_| sum == varn_core::CoreSum::Result);
+                        let is_ok_res = variant("Ok").filter(|_| sum == varn_core::CoreSum::Result);
                         if let (Some(err_var), Some(ok_var)) = (is_err_res, is_ok_res) {
                             let disc = TirExpr {
                                 kind: TirExprKind::Discriminant {
@@ -2799,8 +2806,8 @@ impl<'a> FnEmitter<'a> {
                             };
                         }
 
-                        let is_none_opt = info.variants.iter().find(|v| v.name.as_ref() == "None");
-                        let is_some_opt = info.variants.iter().find(|v| v.name.as_ref() == "Some");
+                        let is_none_opt = variant("None").filter(|_| sum == varn_core::CoreSum::Option);
+                        let is_some_opt = variant("Some").filter(|_| sum == varn_core::CoreSum::Option);
                         if let (Some(none_var), Some(some_var)) = (is_none_opt, is_some_opt) {
                             let disc = TirExpr {
                                 kind: TirExprKind::Discriminant {

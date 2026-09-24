@@ -64,6 +64,10 @@ impl AstArena {
         &self.exprs[id.0 as usize]
     }
 
+    pub fn exprs(&self) -> impl Iterator<Item = &ExprNode> {
+        self.exprs.iter()
+    }
+
     pub fn expr_mut(&mut self, id: ExprId) -> &mut ExprNode {
         &mut self.exprs[id.0 as usize]
     }

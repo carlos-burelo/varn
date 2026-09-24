@@ -33,4 +33,7 @@ const matched = match (local) {
 };
 assert("a local Result shadows the core one", matched == 1);
 
+const core: Option<int> = Some(2);
+assert("the core Option keeps its methods beside a local Result", core.unwrapOr(0) == 2);
+
 print("[PASSED] 136. Enum identity");

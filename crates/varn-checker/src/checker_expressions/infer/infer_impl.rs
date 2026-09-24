@@ -402,18 +402,9 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Try { expression } => {
                 let ty = self.infer_type(*expression, bind);
-                match self.ty_table.get(ty.0) {
-                    TypeKind::Generic(name, args_list, _)
-                        if (bind.interner.resolve(name) == "Result"
-                            || bind.interner.resolve(name) == "Option") =>
-                    {
-                        let ids = self.ty_table.get_list(args_list).to_vec();
-                        match ids.first() {
-                            Some(first) => Type(*first, false),
-                            None => Type::Dynamic,
-                        }
-                    }
-                    _ if ty.is_nullable(&self.ty_table) => {
+                match ty.core_sum(&self.ty_table, |a| bind.interner.try_resolve(a)) {
+                    Some((_, args)) => args.first().copied().unwrap_or(Type::Dynamic),
+                    None if ty.is_nullable(&self.ty_table) => {
                         ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
                     _ => Type::Dynamic,

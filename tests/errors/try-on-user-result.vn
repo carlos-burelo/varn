@@ -1,0 +1,14 @@
+// expect: error[VN3001]
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+
+function half(n: int): Result<int, str> {
+    return n % 2 == 0 ? Result.Ok(n / 2) : Result.Err("odd");
+}
+
+function quarter(n: int): Result<int, str> {
+    const h = try half(n);
+    return half(h);
+}

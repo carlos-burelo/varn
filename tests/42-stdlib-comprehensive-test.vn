@@ -15,10 +15,7 @@ import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 // Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable, Record
 // are now globally available (prelude) — no import needed.
 import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
-// Option/Result come from std:result, which is the only module that declares
-// them. `std:types` used to declare a second, incompatible pair; see the note
-// at the end of std/types.vn.
-import { Some, None, isSome, isNone, unwrapOpt, unwrapOptOr, Ok, Err, tryRun } from 'std:result';
+// Option/Result are core types: in scope with no import.
 
 class ResourceImpl implements Disposable {
     disposed: bool = false;
@@ -170,12 +167,12 @@ async function runComprehensiveTest(): Task<void> {
     // variants can be matched on, not a nullable in disguise.
     let optSome = Some<int>(99);
     let optNone = None;
-    assert("Option some isSome", isSome(optSome));
-    assert("Option none isSome", !isSome(optNone));
-    assert("Option none isNone", isNone(optNone));
-    assert("Option unwrap", unwrapOpt(optSome) === 99);
-    assert("Option unwrapOr some", unwrapOptOr(optSome, 50) === 99);
-    assert("Option unwrapOr none", unwrapOptOr(optNone, 50) === 50);
+    assert("Option some isSome", optSome.isSome());
+    assert("Option none isSome", !optNone.isSome());
+    assert("Option none isNone", optNone.isNone());
+    assert("Option unwrap", optSome.unwrap() === 99);
+    assert("Option unwrapOr some", optSome.unwrapOr(50) === 99);
+    assert("Option unwrapOr none", optNone.unwrapOr(50) === 50);
     match (optSome) {
         Some(v) => assert("Option Some matched", v === 99),
         None => assert("Option Some mis-match", false),
@@ -192,7 +189,7 @@ async function runComprehensiveTest(): Task<void> {
         Ok(_) => assert("Result Err mis-match", false),
         Err(e) => assert("Result Err matched", e === 500),
     }
-    let resTry = tryRun<int>(() => {
+    let resTry = Result.catching<int>(() => {
         return 888;
     });
     match (resTry) {

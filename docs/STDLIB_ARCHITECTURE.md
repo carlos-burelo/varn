@@ -51,7 +51,6 @@ flowchart TD
 | `std:sys` | Información del entorno de ejecución, OS, CPU y memoria. | `varn-builtins::sys` |
 | `std:math` | Operaciones matemáticas y funciones trigonométricas. | `varn-core::numeric` |
 | `std:test` | Framework de pruebas unitarias y aserciones ricas. | `varn-builtins::testing` |
-| `std:result` | Tipos algebraicos monádicos `Option<T>` y `Result<T, E>`. | — |
 | `std:collections` | Estructuras de datos avanzadas (`List`, `Stack`, `Queue`, `PriorityQueue`, `LRUCache`). | — |
 | `std:cli` | Parser de argumentos CLI, formateo de tablas y colores ANSI terminal (`Color`, `Table`). | — |
 | `std:log` | Logger estructurado configurable con niveles (Debug, Info, Warn, Error). | — |

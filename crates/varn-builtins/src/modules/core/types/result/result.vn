@@ -1,0 +1,56 @@
+// The outcome of an operation that can fail, as a closed sum: `try` unwraps
+// an `Ok` or returns the `Err` to the caller.
+export enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E);
+
+    isOk(): bool {
+        return match (this) {
+            Ok(_) => true,
+            Err(_) => false
+        };
+    }
+
+    isErr(): bool {
+        return match (this) {
+            Ok(_) => false,
+            Err(_) => true
+        };
+    }
+
+    unwrap(): T {
+        return match (this) {
+            Ok(value) => value,
+            Err(_) => {
+                throw new Error("called unwrap on Err");
+            }
+        };
+    }
+
+    unwrapOr(fallback: T): T {
+        return match (this) {
+            Ok(value) => value,
+            Err(_) => fallback
+        };
+    }
+
+    // Runs `run`, turning a thrown exception into an `Err`.
+    static catching<V>(run: () => V): Result<V, Error> {
+        try {
+            return Result.Ok(run());
+        } catch (e) {
+            if (e instanceof Error) {
+                return Result.Err(e);
+            }
+            return Result.Err(new Error(e.toString()));
+        }
+    }
+}
+
+export function Ok<T, E>(value: T): Result<T, E> {
+    return Result.Ok(value);
+}
+
+export function Err<T, E>(error: E): Result<T, E> {
+    return Result.Err(error);
+}
