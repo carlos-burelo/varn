@@ -19,7 +19,11 @@ fn float_to_int(f: f64) -> VmResult<VmValue> {
 }
 
 fn heap_to_int(v: VmValue, heap: &Heap) -> VmResult<VmValue> {
-    let obj = if v.is_heap() { heap.get(v.as_heap_idx()) } else { None };
+    let obj = if v.is_heap() {
+        heap.get(v.as_heap_idx())
+    } else {
+        None
+    };
     match obj {
         Some(HeapObj::BigInt(b)) => i64::try_from(*b)
             .map(VmValue::from_int)

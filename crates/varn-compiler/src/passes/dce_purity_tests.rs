@@ -14,7 +14,10 @@ fn bin(op: HirBinOp, ty: HirType) -> InstKind {
 #[test]
 fn checked_int_arithmetic_is_not_pure() {
     for op in [HirBinOp::Add, HirBinOp::Sub, HirBinOp::Mul] {
-        assert!(!is_pure(&bin(op, HirType::Int)), "{op:?} on int can overflow");
+        assert!(
+            !is_pure(&bin(op, HirType::Int)),
+            "{op:?} on int can overflow"
+        );
     }
     assert!(!is_pure(&InstKind::Unary {
         op: HirUnOp::Neg,

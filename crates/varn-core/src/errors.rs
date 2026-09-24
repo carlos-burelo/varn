@@ -27,7 +27,10 @@ mod tests {
 
     #[test]
     fn class_names_are_distinct() {
-        let mut names: Vec<_> = RuntimeErrorKind::ALL.iter().map(|k| k.class_name()).collect();
+        let mut names: Vec<_> = RuntimeErrorKind::ALL
+            .iter()
+            .map(|k| k.class_name())
+            .collect();
         names.sort_unstable();
         names.dedup();
         assert_eq!(names.len(), RuntimeErrorKind::ALL.len());
