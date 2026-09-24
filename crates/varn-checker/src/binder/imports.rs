@@ -20,7 +20,7 @@ impl<'r> super::Binder<'r> {
             } else {
                 "a private runtime"
             };
-            self.diagnostics.push(
+            self.emit(
                 Diagnostic::error(
                     ErrorCode::InvalidImportPath,
                     format!(
@@ -66,7 +66,7 @@ impl<'r> super::Binder<'r> {
 
         if is_relative || is_package {
             if resolved_target.is_none() {
-                self.diagnostics.push(
+                self.emit(
                     Diagnostic::error(
                         ErrorCode::InvalidImportPath,
                         format!("cannot resolve module '{}'", source_str),
@@ -75,7 +75,7 @@ impl<'r> super::Binder<'r> {
                 );
             }
         } else if !is_stdlib {
-            self.diagnostics.push(
+            self.emit(
                 Diagnostic::error(
                     ErrorCode::InvalidImportPath,
                     format!("cannot resolve module '{}'", source_str),
@@ -199,7 +199,7 @@ impl<'r> super::Binder<'r> {
                             s
                         }
                         None => {
-                            self.diagnostics.push(
+                            self.emit(
                                 Diagnostic::error(
                                     ErrorCode::UnknownSymbol,
                                     format!(

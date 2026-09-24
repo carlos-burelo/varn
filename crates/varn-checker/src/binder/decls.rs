@@ -97,7 +97,7 @@ impl<'r> super::Binder<'r> {
                     self.source_file.clone(),
                     existing_range,
                 );
-            self.diagnostics.push(diag);
+            self.emit(diag);
         }
 
         let id = self.arena.push(sym);

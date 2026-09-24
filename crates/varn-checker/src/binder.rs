@@ -10,6 +10,7 @@ mod class;
 mod decl_values;
 mod decls;
 mod definite_field_assignment;
+mod diagnostics;
 mod imports;
 mod inference_utils;
 mod interface;
@@ -390,7 +391,7 @@ impl<'r> Binder<'r> {
                 if self.interner.try_resolve(*name) == Some(varn_core::well_known::RECORD)
                     && self.reported_type_forms.insert(node.range.start.offset)
                 {
-                    self.diagnostics.push(
+                    self.emit(
                         varn_core::Diagnostic::error(
                             varn_core::ErrorCode::ForbiddenRecordGeneric,
                             "`Record<K, V>` is not a type: use `Map<K, V>` for a keyed collection or `{ [key: K]: V }` for an indexable object",
