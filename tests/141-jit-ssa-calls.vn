@@ -1,0 +1,64 @@
+// Calls and storage classes in the JIT's lowering from typed SSA. Each
+// function below runs well past the tiering threshold, so it executes
+// compiled; every assertion compares against what the interpreter computes.
+//
+// Pinned here:
+// - a call whose result is a heap value (a `str`) lands in its home, so a
+//   later read of it sees the call's result;
+// - a scalar that flows into a `dynamic` value is boxed, not stored raw;
+// - heap values pass as call arguments and arrive as heap parameters;
+// - a call whose result nobody reads still runs.
+
+function sscLabel(n: int): str {
+    return "label-long-enough-for-the-heap-" + n
+}
+
+// Heap result of a call, read after the call.
+function sscDecorated(n: int): str {
+    const s = sscLabel(n)
+    const t = s + "!"
+    return t
+}
+
+// An `int` entering a `dynamic`.
+function sscBoxed(n: int): dynamic {
+    const d: dynamic = n
+    return d
+}
+
+// Heap arguments and heap parameters.
+function sscJoin(a: str, b: str): str {
+    return a + "|" + b
+}
+function sscJoinCaller(n: int): str {
+    const left = sscLabel(n)
+    return sscJoin(left, "right")
+}
+
+// A call whose result is discarded.
+let sscHits = 0
+function sscCount(n: int): int {
+    sscHits = sscHits + n
+    return sscHits
+}
+function sscIgnore(n: int): int {
+    sscCount(n)
+    return n
+}
+
+let sscLastDecorated = ""
+let sscBoxedSum = 0
+let sscLastJoined = ""
+for (let i = 0; i < 3000; i = i + 1) {
+    sscLastDecorated = sscDecorated(i)
+    sscBoxedSum = sscBoxedSum + (sscBoxed(i) as int)
+    sscLastJoined = sscJoinCaller(i)
+    sscIgnore(1)
+}
+
+assert("a heap call result lands in its home", sscLastDecorated == "label-long-enough-for-the-heap-2999!")
+assert("a scalar entering a dynamic is boxed", sscBoxedSum === 4498500)
+assert("heap arguments reach heap parameters", sscLastJoined == "label-long-enough-for-the-heap-2999|right")
+assert("a call whose result is discarded still runs", sscHits === 3000)
+
+print("[PASSED] 141. JIT calls from SSA")

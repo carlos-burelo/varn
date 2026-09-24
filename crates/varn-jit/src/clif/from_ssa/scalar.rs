@@ -15,22 +15,19 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
-use super::{boxed, call, def_heap, heapvalue, is_heap, load_value, Ctx};
+use super::{boxed, call, heap, heapvalue, is_heap, load_value, Ctx, Out};
 
-/// Emit one defining instruction; `Ok(None)` means the instruction defines no
-/// CLIF value of its own.
-///
-/// `dest` is the defined value id; its static kind decides whether the result
-/// lands in a CLIF register (scalar) or in its VM home (heap).
+/// Emit one instruction; `Ok(None)` means it produces no result. The driver
+/// lands a result where `dest`'s class says it lives ([`super::store::land`]).
 pub(super) fn emit_inst(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &mut [Option<Value>],
     op: &SsaOp,
     dest: Option<u32>,
-) -> Result<Option<Value>, String> {
-    if let Some(v) = heapvalue::emit(b, ctx, values, op, dest)? {
-        return Ok(v);
+) -> Result<Option<Out>, String> {
+    if let Some(out) = heapvalue::emit(b, ctx, values, op, dest)? {
+        return Ok(out);
     }
 
     let dest_ty = dest.map(|d| ctx.ssa.value_ty(d));
@@ -45,22 +42,25 @@ pub(super) fn emit_inst(
             }
             _ => return Err(format!("from_ssa: convert {conv:?}")),
         },
-        // Representation-neutral: every real conversion is a `Convert`.
+        // Representation-neutral: every real conversion is a `Convert`. What a
+        // cast may change is the storage class — a scalar entering a heap
+        // (`Dynamic`) value is boxed, a heap value entering a scalar one is
+        // unboxed, heap to heap is the same `VmValue`.
         SsaOp::Cast { operand } => {
+            let from = ctx.ssa.value_ty(*operand);
+            let to = dest_ty.ok_or("from_ssa: cast without dest")?;
             let a = load_value(b, ctx, values, *operand)?;
-            match (ctx.ssa.value_ty(*operand), dest_ty) {
-                (SlotKind::Int, Some(SlotKind::Float)) => b.ins().fcvt_from_sint(types::F64, a),
-                (SlotKind::Int, Some(SlotKind::Int))
-                | (SlotKind::Float, Some(SlotKind::Float))
-                | (SlotKind::Bool, Some(SlotKind::Bool)) => a,
-                // A heap-to-heap cast is an alias too: land it in the dest home.
-                (_, Some(k)) if is_heap(k) => {
-                    let d = dest.ok_or("from_ssa: cast without dest")?;
-                    def_heap(b, ctx, ctx.ssa.reg(d), a)?;
-                    return Ok(Some(a));
+            return Ok(Some(match (from, to) {
+                (SlotKind::Int, SlotKind::Float) => Out::Native(b.ins().fcvt_from_sint(types::F64, a)),
+                (SlotKind::Int, SlotKind::Int)
+                | (SlotKind::Float, SlotKind::Float)
+                | (SlotKind::Bool, SlotKind::Bool) => Out::Native(a),
+                (SlotKind::Int | SlotKind::Float | SlotKind::Bool, to) if is_heap(to) => {
+                    Out::Boxed(heap::boxed_value(b, ctx, values, *operand)?)
                 }
-                _ => return Err("from_ssa: unsupported cast".into()),
-            }
+                (from, _) if is_heap(from) => Out::Boxed(a),
+                (from, to) => return Err(format!("from_ssa: cast {from:?} -> {to:?}")),
+            }));
         }
 
         SsaOp::Binary { op, lhs, rhs } => {
@@ -91,8 +91,15 @@ pub(super) fn emit_inst(
             callee_global,
             args,
         } => {
-            let d = dest.ok_or("from_ssa: call without dest")?;
-            call::emit_call(b, ctx, values, *callee, *callee_global, args, d)?
+            return Ok(Some(call::emit_call(
+                b,
+                ctx,
+                values,
+                *callee,
+                *callee_global,
+                args,
+                dest,
+            )?))
         }
 
 
@@ -126,7 +133,7 @@ pub(super) fn emit_inst(
             unreachable!("heap ops are emitted by heapvalue")
         }
     };
-    Ok(Some(v))
+    Ok(Some(Out::Native(v)))
 }
 
 fn emit_bin(
