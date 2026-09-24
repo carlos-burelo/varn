@@ -31,17 +31,8 @@ impl IntrinsicType {
     pub const Generator: Self = Self(TypeTag::Generator);
     pub const Option: Self = Self(TypeTag::Enum);
     pub const Result: Self = Self(TypeTag::Enum);
-    pub const Error: Self = Self(TypeTag::Error);
-    pub const TypeError: Self = Self(TypeTag::TypeError);
-    pub const RangeError: Self = Self(TypeTag::RangeError);
     pub const Range: Self = Self(TypeTag::Range);
     pub const Bytes: Self = Self(TypeTag::Bytes);
-    pub const Regex: Self = Self(TypeTag::Regex);
-    pub const DateTime: Self = Self(TypeTag::DateTime);
-    pub const Duration: Self = Self(TypeTag::Duration);
-    pub const UUID: Self = Self(TypeTag::UUID);
-    pub const Span: Self = Self(TypeTag::Span);
-    pub const TypedArray: Self = Self(TypeTag::TypedArray);
 
     pub const fn as_str(self) -> &'static str {
         self.0.name()
@@ -71,11 +62,6 @@ impl IntrinsicType {
             "Generator" => Some(Self::Generator),
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
-            "Error" => Some(Self::Error),
-            "TypeError" => Some(Self::TypeError),
-            "RangeError" => Some(Self::RangeError),
-            "Span" => Some(Self::Span),
-            "TypedArray" => Some(Self::TypedArray),
             _ => None,
         }
     }

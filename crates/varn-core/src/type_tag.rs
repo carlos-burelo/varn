@@ -26,19 +26,9 @@ pub enum TypeTag {
     Task,
     Range,
     Enum,
-    NativeFn,
-    Error,
-    TypeError,
-    RangeError,
     VmRef,
     TaskHandle,
     Bytes,
-    Regex,
-    DateTime,
-    Duration,
-    UUID,
-    Span,
-    TypedArray,
 }
 
 impl TypeTag {
@@ -67,19 +57,9 @@ impl TypeTag {
             Self::Task => "Task",
             Self::Range => "Range",
             Self::Enum => "enum",
-            Self::NativeFn => "native_fn",
             Self::VmRef => "vm_ref",
             Self::TaskHandle => "TaskHandle",
             Self::Bytes => "Bytes",
-            Self::Regex => "Regex",
-            Self::DateTime => "DateTime",
-            Self::Duration => "Duration",
-            Self::UUID => "UUID",
-            Self::Error => "Error",
-            Self::TypeError => "TypeError",
-            Self::RangeError => "RangeError",
-            Self::Span => "Span",
-            Self::TypedArray => "TypedArray",
         }
     }
 
@@ -109,8 +89,6 @@ impl TypeTag {
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
             "enum" => Some(Self::Enum),
-            "Span" => Some(Self::Span),
-            "TypedArray" => Some(Self::TypedArray),
             _ => None,
         }
     }
@@ -166,9 +144,9 @@ impl TypeTag {
     /// none — the conservative reading, and the one a truncated or
     /// forward-version operand must get.
     pub const fn from_u8(raw: u8) -> Self {
-        if raw <= Self::TypedArray as u8 {
+        if raw <= Self::Bytes as u8 {
             // SAFETY: `TypeTag` is `#[repr(u8)]` with contiguous discriminants
-            // from `Null = 0` through `TypedArray`, and `raw` is inside that range.
+            // from `Null = 0` through `Bytes`, and `raw` is inside that range.
             unsafe { std::mem::transmute::<u8, Self>(raw) }
         } else {
             Self::Dynamic
@@ -190,7 +168,6 @@ impl TypeTag {
             | TypeTag::Function
             | TypeTag::Task
             | TypeTag::Bytes
-            | TypeTag::TypedArray
             | TypeTag::Generator => (8, 8, true),
             _ => (16, 8, true),
         };

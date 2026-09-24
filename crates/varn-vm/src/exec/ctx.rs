@@ -272,9 +272,9 @@ impl ExecCtx {
             IntrinsicType::Map.as_str(),
             IntrinsicType::Set.as_str(),
             IntrinsicType::Range.as_str(),
-            IntrinsicType::Error.as_str(),
-            IntrinsicType::TypeError.as_str(),
-            IntrinsicType::RangeError.as_str(),
+            varn_core::well_known::ERROR,
+            varn_core::well_known::TYPE_ERROR,
+            varn_core::well_known::RANGE_ERROR,
             varn_core::RuntimeErrorKind::IntegerOverflow.class_name(),
             varn_core::RuntimeErrorKind::DivisionByZero.class_name(),
         ];
