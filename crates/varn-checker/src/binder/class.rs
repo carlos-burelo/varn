@@ -279,7 +279,9 @@ impl<'r> super::Binder<'r> {
                 _ => None,
             })
             .collect();
-        if !candidate_fields.is_empty() {
+        // A `declare` class is native: the runtime sets its fields, there is
+        // no Varn constructor to prove anything about.
+        if !candidate_fields.is_empty() && !c.modifiers.is_declare {
             let guaranteed: FxHashSet<Arc<str>> = match declared_ctor {
                 Some(body) => super::definite_field_assignment::fields_assigned_on_every_path(
                     *body,
