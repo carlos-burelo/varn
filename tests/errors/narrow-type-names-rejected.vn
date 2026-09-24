@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+// `i8` no es un tipo (spec §11). Falta un diagnóstico propio de tipo
+// desconocido (roadmap Fase D); hoy se rechaza como mismatch.
+let b: i8 = 1

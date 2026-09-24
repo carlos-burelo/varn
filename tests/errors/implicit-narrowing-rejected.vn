@@ -1,3 +1,0 @@
-// expect: error[VN3001]
-let x: int = 100
-let b: i8 = x

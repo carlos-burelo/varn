@@ -124,15 +124,7 @@ impl TypeTag {
             "Task" => Some(Self::Task),
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
-            "enum" => Some(Self::Enum),
-            "i8" => Some(Self::I8),
-            "i16" => Some(Self::I16),
-            "i32" => Some(Self::I32),
-            "u8" => Some(Self::U8),
-            "u16" => Some(Self::U16),
-            "u32" => Some(Self::U32),
-            "u64" => Some(Self::U64),
-            "f32" => Some(Self::F32),
+            "enum" => Some(Self::Enum),
             "Span" => Some(Self::Span),
             "TypedArray" => Some(Self::TypedArray),
             _ => None,
