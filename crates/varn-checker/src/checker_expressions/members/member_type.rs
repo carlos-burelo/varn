@@ -565,7 +565,7 @@ impl<'r> Checker<'r> {
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
             }
-            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => {
+            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
                 let name = kind.lang_name().unwrap_or_default();
                 if let Some(info) = intrinsic_member_info(bind, name, key) {
                     Some(info)

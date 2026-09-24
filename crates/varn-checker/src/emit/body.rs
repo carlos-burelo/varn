@@ -2507,7 +2507,9 @@ impl<'a> FnEmitter<'a> {
                 }
 
                 let tag_name: Option<&'static str> = match &type_ann.kind {
-                    k @ (varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_)) => {
+                    k @ (varn_core::TypeKind::Primitive(_)
+                    | varn_core::TypeKind::Builtin(_)
+                    | varn_core::TypeKind::Literal(_)) => {
                         k.lang_name()
                     }
                     varn_core::TypeKind::Named(n, _) => {

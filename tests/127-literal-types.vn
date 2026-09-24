@@ -1,0 +1,23 @@
+type Method = "GET" | "POST"
+
+function send(m: Method): int { return m.length }
+assert("literal arg", send("POST") === 4)
+
+let m: Method = "GET"
+assert("literal var", m === "GET")
+const asStr: str = m
+assert("literal widens to base", asStr === "GET")
+
+const code: 200 | 404 = 404
+assert("int literal arithmetic", code + 1 === 405)
+const neg: -1 | 1 = -1
+assert("negative int literal", neg === -1)
+
+const on: true = true
+const ch: 'x' | 'y' = 'y'
+assert("bool and char literals", on && ch === 'y')
+
+function status(): 200 | 500 { return 200 }
+assert("literal return", status() === 200)
+
+print("[PASSED] 127. Literal types")

@@ -17,7 +17,7 @@
 //! degrada a `Dynamic` (honesto-desconocido, igual que el resto del checker
 //! para un tipo que no puede determinar) en lugar de inventar un índice.
 
-use varn_core::{AtomInterner, BuiltinType, LangPrimitive, TypeKind};
+use varn_core::{AtomInterner, BuiltinType, LangPrimitive, TypeKind, TypeLiteral};
 
 use super::{CheckerTyId, CheckerTyTable, FunctionParam, FunctionType, ObjectTypeMember, Type};
 
@@ -25,6 +25,7 @@ use super::{CheckerTyId, CheckerTyTable, FunctionParam, FunctionType, ObjectType
 pub enum PortableType {
     Primitive(LangPrimitive),
     Builtin(BuiltinType),
+    Literal(TypeLiteral<String>),
     This,
     Array(Box<PortableType>),
     Union(Vec<PortableType>),
@@ -116,6 +117,12 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
     match table.get(ty.0) {
         TypeKind::Primitive(p) => PortableType::Primitive(p),
         TypeKind::Builtin(b) => PortableType::Builtin(b),
+        TypeKind::Literal(l) => PortableType::Literal(match l {
+            TypeLiteral::Int(v) => TypeLiteral::Int(v),
+            TypeLiteral::Str(a) => TypeLiteral::Str(name(a)),
+            TypeLiteral::Bool(v) => TypeLiteral::Bool(v),
+            TypeLiteral::Char(v) => TypeLiteral::Char(v),
+        }),
         TypeKind::This => PortableType::This,
         TypeKind::Array(inner) => {
             PortableType::Array(Box::new(encode(Type(inner, false), table, interner)))
@@ -205,6 +212,12 @@ pub fn decode(p: &PortableType, table: &mut CheckerTyTable, interner: &mut AtomI
     let ty = match p {
         PortableType::Primitive(p) => table.intern(TypeKind::Primitive(*p)),
         PortableType::Builtin(b) => table.intern(TypeKind::Builtin(*b)),
+        PortableType::Literal(l) => table.intern(TypeKind::Literal(match l {
+            TypeLiteral::Int(v) => TypeLiteral::Int(*v),
+            TypeLiteral::Str(s) => TypeLiteral::Str(interner.intern(s)),
+            TypeLiteral::Bool(v) => TypeLiteral::Bool(*v),
+            TypeLiteral::Char(v) => TypeLiteral::Char(*v),
+        })),
         PortableType::This => table.intern(TypeKind::This),
         PortableType::Array(inner) => {
             let inner = decode(inner, table, interner).0;

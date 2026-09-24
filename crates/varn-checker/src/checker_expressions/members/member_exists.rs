@@ -115,10 +115,10 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
-            TypeKind::Primitive(_) | TypeKind::Builtin(_) => {
-                let name = ty.display(&self.ty_table, &bind.interner).to_string();
+            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+                let name = kind.lang_name().unwrap_or_default();
                 if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(name.as_str()) {
+                    if let Some(members) = b.class_members.get(name) {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
                         }

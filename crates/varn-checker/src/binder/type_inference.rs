@@ -394,7 +394,8 @@ fn infer_member(
 pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
     use varn_core::{binary_operand_kind, NumericOperand};
     let operand = |t: &Type| match table.get(t.0) {
-        TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(NumericOperand::Int),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int)
+        | TypeKind::Literal(varn_core::TypeLiteral::Int(_)) => Some(NumericOperand::Int),
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         _ => None,
@@ -441,8 +442,8 @@ fn infer_binary(
 ) -> Type {
     match op {
         BinaryOp::Add => {
-            let l = infer_expr_type(left, arena, ctx, table);
-            let r = infer_expr_type(right, arena, ctx, table);
+            let l = infer_expr_type(left, arena, ctx, table).apparent(table);
+            let r = infer_expr_type(right, arena, ctx, table).apparent(table);
             match (table.get(l.0), table.get(r.0)) {
                 (TypeKind::Primitive(varn_core::LangPrimitive::Str), _)
                 | (_, TypeKind::Primitive(varn_core::LangPrimitive::Str)) => Type::Str,
@@ -453,8 +454,8 @@ fn infer_binary(
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-            let l = infer_expr_type(left, arena, ctx, table);
-            let r = infer_expr_type(right, arena, ctx, table);
+            let l = infer_expr_type(left, arena, ctx, table).apparent(table);
+            let r = infer_expr_type(right, arena, ctx, table).apparent(table);
             let (l, r) = adopt_literal_operands(arena, left, right, l, r, table);
             numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic)
         }
@@ -472,8 +473,8 @@ fn infer_binary(
         | BinaryOp::Shl
         | BinaryOp::Shr
         | BinaryOp::UShr => {
-            let l = infer_expr_type(left, arena, ctx, table);
-            let r = infer_expr_type(right, arena, ctx, table);
+            let l = infer_expr_type(left, arena, ctx, table).apparent(table);
+            let r = infer_expr_type(right, arena, ctx, table).apparent(table);
             match (table.get(l.0), table.get(r.0)) {
                 (
                     TypeKind::Primitive(varn_core::LangPrimitive::Int),

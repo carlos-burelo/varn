@@ -162,7 +162,8 @@ fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> O
     use varn_core::{binary_operand_kind, NumericOperand};
 
     let operand = |t: &Type| match table.get(t.0) {
-        TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(NumericOperand::Int),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int)
+        | TypeKind::Literal(varn_core::TypeLiteral::Int(_)) => Some(NumericOperand::Int),
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         _ => None,

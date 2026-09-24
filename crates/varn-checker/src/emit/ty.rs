@@ -106,6 +106,7 @@ fn lower_kind(
         }
 
         TypeKind::Primitive(p) => lower_primitive(p),
+        TypeKind::Literal(l) => lower_primitive(l.base()),
         TypeKind::Builtin(b) => lower_builtin(b),
 
         TypeKind::Array(el) => {

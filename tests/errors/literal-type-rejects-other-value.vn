@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+type Method = "GET" | "POST"
+let m: Method = "PUT"

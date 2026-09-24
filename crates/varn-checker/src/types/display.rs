@@ -54,6 +54,12 @@ impl fmt::Display for TypeDisplay<'_> {
         let table = self.table;
         match table.get(self.ty.0) {
             TypeKind::Primitive(p) => write!(f, "{}", p.name()),
+            TypeKind::Literal(l) => match l {
+                varn_core::TypeLiteral::Int(v) => write!(f, "{v}"),
+                varn_core::TypeLiteral::Str(a) => write!(f, "{:?}", self.name(a)),
+                varn_core::TypeLiteral::Bool(v) => write!(f, "{v}"),
+                varn_core::TypeLiteral::Char(v) => write!(f, "{v:?}"),
+            },
             TypeKind::Builtin(b) => write!(f, "{}", b.name()),
             TypeKind::This => write!(f, "this"),
             TypeKind::Array(t) => {

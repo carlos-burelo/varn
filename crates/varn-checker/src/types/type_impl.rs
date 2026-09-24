@@ -29,6 +29,45 @@ impl Type {
         Type(table.intern(TypeKind::Primitive(p)), false)
     }
 
+    /// The type operators and member lookup see: a literal type (or a union
+    /// of literals sharing one base) behaves as its base primitive.
+    pub fn apparent(&self, table: &CheckerTyTable) -> Type {
+        fn base(p: varn_core::LangPrimitive) -> Type {
+            use varn_core::LangPrimitive as P;
+            match p {
+                P::Int => Type::Int,
+                P::Str => Type::Str,
+                P::Bool => Type::Bool,
+                P::Char => Type::Char,
+                P::Null
+                | P::Float
+                | P::BigInt
+                | P::Decimal
+                | P::Void
+                | P::Never
+                | P::Dynamic => Type::Dynamic,
+            }
+        }
+        match table.get(self.0) {
+            TypeKind::Literal(l) => base(l.base()),
+            TypeKind::Union(list) => {
+                let mut shared = None;
+                for m in table.get_list(list) {
+                    let TypeKind::Literal(l) = table.get(*m) else {
+                        return *self;
+                    };
+                    match shared {
+                        None => shared = Some(l.base()),
+                        Some(b) if b == l.base() => {}
+                        Some(_) => return *self,
+                    }
+                }
+                shared.map_or(*self, base)
+            }
+            _ => *self,
+        }
+    }
+
     pub fn builtin(b: varn_core::BuiltinType, table: &mut CheckerTyTable) -> Self {
         Type(table.intern(TypeKind::Builtin(b)), false)
     }

@@ -327,7 +327,7 @@ pub fn get_members_of_type(
                 Type::named(varn_core::RuntimeKind::Bytes.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
-        kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => {
+        kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
             let name = kind.lang_name().unwrap_or_default();
             let named_ty = Type::named(name.to_owned(), resolver, table);
             return get_members_of_type(resolver, &named_ty, bind, table);
@@ -467,7 +467,7 @@ fn extension_key(
 ) -> Option<Arc<str>> {
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
-        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(Arc::from),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
         TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         _ => None,
     }

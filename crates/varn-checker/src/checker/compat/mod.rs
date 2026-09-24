@@ -67,6 +67,36 @@ fn plain_literal_matches(
     )
 }
 
+/// Whether the literal expression `expr` is a value of the literal type
+/// `target` — directly or as a member of a union (`"GET" | "POST"`, `200?`).
+fn literal_expr_admitted(
+    target: &Type,
+    arena: &varn_core::ast::AstArena,
+    expr: varn_core::ast::ExprId,
+    table: &CheckerTyTable,
+    interner: Option<&varn_core::AtomInterner>,
+) -> bool {
+    use varn_core::ast::ExprKind;
+    use varn_core::TypeLiteral;
+    let is_value = |lit: TypeLiteral<varn_core::Atom>| match (lit, &arena.expr(expr).kind) {
+        (TypeLiteral::Str(atom), ExprKind::StrLiteral { value }) => {
+            interner.and_then(|i| i.try_resolve(atom)) == Some(value.as_str())
+        }
+        (TypeLiteral::Bool(b), ExprKind::BoolLiteral { value }) => b == *value,
+        (TypeLiteral::Char(c), ExprKind::CharLiteral { value }) => c == *value,
+        (TypeLiteral::Int(v), _) => const_int_value(arena, expr) == Some(v),
+        _ => false,
+    };
+    match table.get(target.0) {
+        TypeKind::Literal(l) => is_value(l),
+        TypeKind::Union(list) => table.get_list(list).iter().any(|m| match table.get(*m) {
+            TypeKind::Literal(l) => is_value(l),
+            _ => false,
+        }),
+        _ => false,
+    }
+}
+
 fn array_element_type(
     ty: &Type,
     table: &CheckerTyTable,
@@ -117,6 +147,9 @@ pub(crate) fn expr_satisfies_target_type(
         if int_literal_adopts(target_ty, value, table) {
             return true;
         }
+    }
+    if literal_expr_admitted(target_ty, arena, expr, table, interner) {
+        return true;
     }
     if let (Some(elem_ty), ExprKind::Array { elements }) =
         (array_element_type(target_ty, table, interner), expr_kind)
@@ -284,6 +317,11 @@ pub(super) fn types_compatible_impl(
             TypeKind::Primitive(_) | TypeKind::Builtin(_),
         ) => {
             simple_types_compatible(declared, inferred, table)
+        }
+        (TypeKind::Primitive(p), TypeKind::Literal(l)) => {
+            use varn_core::LangPrimitive as P;
+            let base = l.base();
+            p == base || (matches!(p, P::Decimal | P::BigInt) && base == P::Int)
         }
         (TypeKind::Primitive(varn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,

@@ -112,6 +112,7 @@ import "./123-int-api.vn"
 import "./124-bigint-arbitrary.vn"
 import "./125-never-bottom.vn"
 import "./126-unit.vn"
+import "./127-literal-types.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+type Method = "GET" | "POST"
+function pick(s: str): Method { return s }

@@ -61,6 +61,19 @@ pub fn resolve_type_node(
         TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
         TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Type::builtin(varn_core::BuiltinType::Bytes, table),
         TypeKind::This => Type::This,
+        TypeKind::Literal(l) => {
+            let l = match *l {
+                // The parser's atom is re-minted through the shared resolver,
+                // like every other name crossing into the checker's table.
+                varn_core::TypeLiteral::Str(a) => {
+                    let text = resolve_name(a);
+                    let atom = ctx.and_then(|c| c.resolver()).map_or(a, |r| r.intern(&text));
+                    varn_core::TypeLiteral::Str(atom)
+                }
+                other => other,
+            };
+            Type(table.intern(TypeKind::Literal(l)), false)
+        }
 
         TypeKind::Array(inner) => {
             let inner_ty = resolve_type_node(inner, ctx, table);

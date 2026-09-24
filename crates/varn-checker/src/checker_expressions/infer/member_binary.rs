@@ -74,6 +74,7 @@ pub(crate) fn normalize_for_binary(
     table: &CheckerTyTable,
     interner: &varn_core::AtomInterner,
 ) -> Type {
+    let ty = &ty.apparent(table);
     if let TypeKind::Named(name, _) = table.get(ty.0) {
         match interner.resolve(name) {
             n if n == varn_core::LangPrimitive::Str.name() => return Type::Str,

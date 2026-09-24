@@ -276,10 +276,13 @@ impl<'r> Checker<'r> {
                 TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
                     orig.map(|o| self.resolve_bind_atom(bind, o))
                 }
-                TypeKind::Primitive(p) => Some(std::sync::Arc::from(match p {
-                    varn_core::LangPrimitive::Str => "core:str",
-                    _ => "core:primitives",
-                })),
+                TypeKind::Primitive(varn_core::LangPrimitive::Str)
+                | TypeKind::Literal(varn_core::TypeLiteral::Str(_)) => {
+                    Some(std::sync::Arc::from("core:str"))
+                }
+                TypeKind::Primitive(_) | TypeKind::Literal(_) => {
+                    Some(std::sync::Arc::from("core:primitives"))
+                }
                 TypeKind::Builtin(b) => Some(std::sync::Arc::from(match b {
                     varn_core::BuiltinType::Map => "core:map",
                     varn_core::BuiltinType::Set => "core:set",
@@ -378,7 +381,7 @@ pub(crate) fn extension_type_name(
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             Some(checker.resolve_bind_atom(bind, n))
         }
-        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(std::sync::Arc::from),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => k.lang_name().map(std::sync::Arc::from),
         _ => None,
     }
 }
