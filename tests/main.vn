@@ -110,6 +110,7 @@ import "./121-float-ieee.vn"
 import "./122-numeric-conversions.vn"
 import "./123-int-api.vn"
 import "./124-bigint-arbitrary.vn"
+import "./125-never-bottom.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

@@ -31,6 +31,7 @@ fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTa
     match (table.get(declared.0), table.get(inferred.0)) {
         (TypeKind::Primitive(P::Dynamic), _) | (_, TypeKind::Primitive(P::Dynamic)) => true,
         (a, b) if a == b => true,
+        (_, TypeKind::Primitive(P::Never)) => true,
         (TypeKind::Primitive(P::Decimal | P::BigInt), TypeKind::Primitive(P::Int)) => true,
         _ => false,
     }

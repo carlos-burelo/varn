@@ -1,0 +1,18 @@
+function fail(msg: str): never { throw new Error(msg) }
+
+function asInt(ok: bool): int { if (ok) { return 1 } return fail("int") }
+function asStr(ok: bool): str { if (ok) { return "s" } return fail("str") }
+function asOpt(ok: bool): int? { if (ok) { return null } return fail("opt") }
+
+class Box { v: int; constructor(v: int) { this.v = v } }
+function asBox(ok: bool): Box { if (ok) { return new Box(1) } return fail("box") }
+
+function raises(f: () => void): bool {
+    try { f(); return false } catch (e) { return true }
+}
+
+assert("never flows into int", asInt(true) === 1)
+assert("never flows into str", asStr(true) === "s")
+assert("never flows into T?", asOpt(true) === null)
+assert("never flows into class", asBox(true).v === 1)
+assert("never-typed call raises", raises(() => { asInt(false) }))

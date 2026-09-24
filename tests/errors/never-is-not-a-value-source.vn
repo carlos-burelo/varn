@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+function one(): int { return 1 }
+function f(): never { return one() }
