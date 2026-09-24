@@ -8,8 +8,8 @@
 
 | Tipo | Descripción | Ejemplo literal |
 |------|-------------|----------------|
-| `int` | Entero canónico de 64 bits con signo | `42`, `-7`, `0` |
-| `float` | Flotante canónico de 64 bits | `3.14`, `1.0`, `-0.5` |
+| `int` | Entero con signo de 64 bits; `+ - * / % **` y `-x` lanzan `IntegerOverflow` fuera de rango | `42`, `-7`, `0` |
+| `float` | IEEE 754 binary64 (`-0`, `NaN`, `±Infinity`) | `3.14`, `1.0`, `-0.5` |
 | `decimal` | Decimal de precisión arbitraria | `1.5d`, `99.25d` |
 | `bigint` | Entero de precisión arbitraria | `100n`, `1n` |
 | `bool` | Booleano | `true`, `false` |
@@ -17,23 +17,19 @@
 | `str` | Cadena de texto inmutable | `"hello"`, `"""raw"""` |
 | `null` | Ausencia de valor | `null` |
 
-### 1.1 Tipos Numéricos Granulares y Widening Estático
+### 1.1 Tipos numéricos
 
-Varn soporta tipos numéricos de precisión granular con semántica de dimensionamiento estático, layout eficiente en memoria e interoperabilidad con los tipos canónicos `int` y `float`:
+Varn tiene exactamente cuatro: `int`, `float`, `bigint`, `decimal`
+(`docs/lang/SPEC_NUCLEO_Y_PLATAFORMA.md` §2–§11, ADR-0015). No existen
+`i8`…`u64`, `f32`, `double` ni `number`: un ancho físico más estrecho es
+decisión del compilador, no un tipo.
 
-| Tipo | Rango / Descripción | Widening Automático Hacia |
-|------|---------------------|---------------------------|
-| `i8` | Con signo, 8 bits (`-128..=127`) | `int`, `float`, `i16`, `i32` |
-| `i16` | Con signo, 16 bits (`-32,768..=32,767`) | `int`, `float`, `i32` |
-| `i32` | Con signo, 32 bits (`-2,147,483,648..=2,147,483,647`) | `int`, `float` |
-| `u8` | Sin signo, 8 bits (`0..=255`) | `int`, `float`, `u16`, `u32`, `u64`, `i16`, `i32` |
-| `u16` | Sin signo, 16 bits (`0..=65,535`) | `int`, `float`, `u32`, `u64`, `i32` |
-| `u32` | Sin signo, 32 bits (`0..=4,294,967,295`) | `int`, `float`, `u64` |
-| `u64` | Sin signo, 64 bits (`0..=18,446,744,073,709,551,615`) | `int` (rango no negativo), `float` |
-| `f32` | Flotante IEEE-754 de precisión simple (32 bits) | `float` |
-
-- **Widening**: Cualquier tipo numérico granular es automáticamente asignable a los tipos canónicos `int` o `float` sin conversiones manuales ni penalizaciones en runtime.
-- **Validación Estática de Rango**: Los literales enteros asignados a tipos granulares se validan estáticamente en tiempo de compilación para garantizar que se encuentren dentro de los límites del tipo (e.g. `let x: i8 = 200` genera un error `TypeMismatch` inmediato en build time).
+- **División**: `int / int` es `int` truncado hacia cero; `x / 0` y `x % 0`
+  lanzan `DivisionByZero`; `int.MIN_VALUE / -1` lanza `IntegerOverflow`;
+  `int.MIN_VALUE % -1` es `0`. `%` toma el signo del dividendo; `x.mod(y)` es
+  euclídeo. `float / 0.0` da `±Infinity` o `NaN` (IEEE), nunca lanza.
+- **API de enteros**: `wrappingAdd/Sub/Mul`, `saturatingAdd/Sub/Mul`,
+  `checkedAdd/Sub/Mul` (→ `int?`), `div`, `floorDiv`, `ceilDiv`, `rem`, `mod`.
 
 Todos son tipos canónicos únicos; **nunca** se aceptan aliases como `string`, `boolean`, `integer`.
 
@@ -366,24 +362,32 @@ interface Comparable<T> {
 
 ---
 
-## 9. Coerción Numérica (Widening implícito)
+## 9. Conversiones numéricas
+
+Implícitas solo `int → bigint` e `int → decimal` (exactas). Un **literal**
+entero adopta `float`/`decimal`/`bigint` del contexto si es exactamente
+representable (`|n| ≤ 2^53` para `float`). Todo lo demás se escribe con `as`.
 
 ```varn
 const i: int = 42
-const f: float = i       // int → float: widening implícito (tests/26-numeric-coercion.vn:6)
-const d: decimal = i     // int → decimal: implícito
-const bi: bigint = i     // int → bigint: implícito
-
-function takesFloat(x: float): float { return x + 1.0 }
-assert("int arg to float param", takesFloat(5) === 6.0)
-
-const a: int = 10
-const b: float = 2.5
-const c: float = a + b    // int se amplía a float para la operación
-assert("int + float = float", c === 12.5)
+const d: decimal = i          // implícito: exacto
+const bi: bigint = i          // implícito: exacto
+const f: float = 5            // literal: adopta float
+const g: float = i as float   // variable: explícito
+const h = 2.5 * 2             // literal: float * float
+// const bad: float = i       // error: int → float no es implícito
+// const mix = i + 2.5        // error: int + float
 ```
 
-**Narrowing (restricción)** requiere cast explícito con `as`.
+| `as` | Comportamiento |
+|---|---|
+| `int as float` | redondeo al `float` más cercano |
+| `float as int` | trunca hacia cero; `NaN`, `±Infinity` o fuera de rango lanzan `IntegerOverflow` |
+| `bigint as int`, `decimal as int` | exacto / trunca; fuera de rango lanza `IntegerOverflow` |
+| `dynamic as int`, `dynamic as float` | convierte según el valor en runtime |
+
+Con `dynamic` la aritmética mezclada `int ⊕ float` se resuelve en runtime a
+`float`; `int / int` sigue siendo `int`.
 
 ---
 

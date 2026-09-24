@@ -57,6 +57,32 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ---
 
+## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
+
+**Fase 0 y Fase A cerradas.** `tests/main.vn` 1274/0 en JIT y `VARN_NO_JIT=1`;
+`cargo test -p varn-cli --test error_corpus` verde.
+
+Hallazgos fuera del plan, corregidos en la rama: `from_ssa` JIT con
+self-call frame-aware rompía `main.vn` en HEAD; `class X extends Y` en el
+módulo de entrada tumbaba el checker (atom de otro interner); `NaN` y
+`Infinity` globales valían `null`; `VmValue::from_f64(NaN)` daba `null`; el
+pool de constantes fusionaba `-0.0` con `0.0`; `check_misc.rs` huérfano.
+
+Brechas nuevas anotadas para fases siguientes:
+- Tipo tupla `#[T1, T2]` no parsea en posición de tipo (Fase D).
+- No existe diagnóstico "tipo desconocido": `let x: Foo = 1` da VN3001
+  (Fase D).
+- `docs/TIR_CONTRATO_TIPADO.md` aún describe anchos angostos; el usuario
+  tiene cambios locales sin commitear en ese archivo — actualizar al
+  integrarlos.
+- LSP (`varn-lsp`) no compila en HEAD (imports `Expr`/`Stmt` obsoletos); fuera
+  de la puerta.
+- Conversiones distintas de `int → float` declinan el JIT desde SSA y el
+  bytecode JIT no conoce `OpCode::Convert`: funciones con `as int` quedan en
+  el intérprete (medir en Fase G).
+
+---
+
 ## 1. Decisiones (se fijan en ADR-0015, Tarea 0.1)
 
 Cerradas con el usuario el 2026-09-23:

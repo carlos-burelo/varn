@@ -24,7 +24,7 @@ throw e    // re-lanzar un error capturado
 function safeDivide(a: int, b: int): float {
     try {
         if (b === 0) throw new RangeError("division by zero")
-        return a / b
+        return (a as float) / (b as float)
     } catch (e) {
         return -1
     }
@@ -83,6 +83,11 @@ assert("try/catch/finally con break ejecuta sus finally", conBreakYFinally() ===
 | `Error` | Clase base de todos los errores. |
 | `TypeError` | Error de tipo incorrecto. |
 | `RangeError` | Error de valor fuera de rango. |
+| `IntegerOverflow` | Aritmética o conversión `int` fuera de `-2^63..2^63-1` (runtime y nativas). |
+| `DivisionByZero` | `int / 0`, `int % 0`, `decimal / 0`. `float / 0.0` no lanza (IEEE). |
+
+Los errores nacidos en el runtime se capturan como instancias de su clase:
+`catch (e) { if (e instanceof IntegerOverflow) … }`.
 
 Propiedades comunes:
 

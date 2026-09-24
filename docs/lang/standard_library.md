@@ -96,9 +96,18 @@ c.toString()            // str: "a"
 
 ```varn
 n.toString()          // str
-n + 1.0               // → float (widening automático)
-(5).isEven()          // extensión: bool (si definida)
-(7).clamp(0, 10)      // extensión: int
+n as float + 1.0      // → float (conversión explícita)
+n.isEven()            // bool
+n.clamp(0, 10)        // int
+n.abs()               // int; lanza IntegerOverflow con int.MIN_VALUE
+n.pow(3)              // int; lanza IntegerOverflow si desborda
+n.wrappingAdd(1)      // int, envuelve (también Sub/Mul)
+n.saturatingAdd(1)    // int, satura (también Sub/Mul)
+n.checkedAdd(1)       // int?, null si desborda (también Sub/Mul)
+n.div(2)              // int, trunca; n.floorDiv / n.ceilDiv redondean
+n.rem(2)              // int, signo del dividendo; n.mod(2) es euclídeo
+int.parse("42")       // int; lanza si no es un entero
+int.tryParse("x")     // int?, null si no es un entero
 ```
 
 ### `float` — Flotante
