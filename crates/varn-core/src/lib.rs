@@ -1,7 +1,6 @@
 // Varn Core Architecture Crate (v2)
 pub mod ast;
 pub mod atom;
-pub mod cg_ty;
 pub mod diagnostics;
 pub mod doc;
 pub mod errors;
@@ -22,7 +21,6 @@ pub mod term;
 pub mod token;
 pub mod trivia;
 pub mod type_tag;
-pub mod typed_ir;
 pub mod well_known;
 
 pub use ast::AstId;
@@ -38,7 +36,6 @@ pub use lang_type::{is_lang_type_name, BuiltinType, LangPrimitive};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
-pub use cg_ty::CgTy;
 pub use intrinsics::MemberKey;
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{
@@ -50,7 +47,6 @@ pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
 pub use type_tag::{FieldRepr, TypeTag, VmValuePayload};
-pub use typed_ir::{AnnKey, ExprAnnotation, NumericKind, TypeAnnotations};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
 /// (signature change, symbol removal). Additive changes do NOT bump — a std

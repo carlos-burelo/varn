@@ -56,24 +56,6 @@ impl LangPrimitive {
         Self::ALL.into_iter().find(|p| p.name() == name)
     }
 
-    /// The runtime classification of this type's values.
-    pub const fn runtime_tag(self) -> crate::TypeTag {
-        use crate::TypeTag as T;
-        match self {
-            Self::Null => T::Null,
-            Self::Bool => T::Bool,
-            Self::Int => T::Int,
-            Self::Float => T::Float,
-            Self::BigInt => T::BigInt,
-            Self::Decimal => T::Decimal,
-            Self::Char => T::Char,
-            Self::Str => T::Str,
-            Self::Void => T::Void,
-            Self::Never => T::Never,
-            Self::Dynamic => T::Dynamic,
-        }
-    }
-
     /// Numeric domains (spec §2).
     pub const fn is_numeric(self) -> bool {
         matches!(self, Self::Int | Self::Float | Self::BigInt | Self::Decimal)
@@ -132,20 +114,6 @@ impl BuiltinType {
         Self::ALL.into_iter().find(|b| b.name() == name)
     }
 
-    /// The runtime classification of this type's values.
-    pub const fn runtime_tag(self) -> crate::TypeTag {
-        use crate::TypeTag as T;
-        match self {
-            Self::Array => T::Array,
-            Self::Map => T::Map,
-            Self::Set => T::Set,
-            Self::Range => T::Range,
-            Self::Bytes => T::Bytes,
-            Self::Task => T::Task,
-            Self::TaskHandle => T::TaskHandle,
-            Self::Generator => T::Generator,
-        }
-    }
 }
 
 impl std::fmt::Display for BuiltinType {

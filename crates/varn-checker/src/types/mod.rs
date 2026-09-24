@@ -21,7 +21,7 @@ use rustc_hash::FxHashMap;
 use std::fmt;
 use std::sync::Arc;
 use varn_core::ast::operators::Visibility;
-use varn_core::{TypeKind, TypeTag};
+use varn_core::TypeKind;
 
 /// The checker's public type handle. Used to be a recursive, heap-allocated
 /// `Type(SemanticTypeKind, bool)` — every distinct shape (`Array<int>` at ten

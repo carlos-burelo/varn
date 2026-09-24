@@ -68,7 +68,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
 /// most of the code: `assert(...)`, `print(...)`. The call has to happen, but
 /// its result is nobody's — and while it kept a destination it kept an SSA
 /// value, a live range, a register the allocator had to colour and, since
-/// `void` has no `CgTy`, a `Dynamic` one at that.
+/// `void` has no value type, a `Dynamic` one at that.
 ///
 /// Restricted to the call family on purpose. Everything else that defines a
 /// value either has its destination read (or the pass above would have

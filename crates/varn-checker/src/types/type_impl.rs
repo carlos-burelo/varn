@@ -23,12 +23,8 @@ impl Type {
     pub const Dynamic: Type = Type(CheckerTyId::DYNAMIC, false);
     pub const This: Type = Type(CheckerTyId::THIS, false);
 
-    /// Non-intrinsic-constant tags (e.g. `Class`, `Array`, `Object` used only
-    /// as a `TypeTag`, not to build a `Type`) still round-trip through the
-    /// table, since only the 20 seeded intrinsics have fixed ids.
-    /// NOTE (merge main): `Bytes` has no fixed id — use
-    /// `Type::builtin(varn_core::BuiltinType::Bytes, table)` instead of a `Type::Bytes`
-    /// const, which cannot exist without resequencing every fixed id.
+    /// Primitives have fixed ids (the constants above); interning goes through
+    /// the table so every spelling of one lands on the same id.
     pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
         Type(table.intern(TypeKind::Primitive(p)), false)
     }
@@ -262,20 +258,6 @@ impl Type {
     /// args must pass the table.
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
         matches!(table.get(self.0), TypeKind::Builtin(varn_core::BuiltinType::Bytes))
-    }
-
-    pub fn to_type_tag(&self, table: &CheckerTyTable) -> TypeTag {
-        match table.get(self.0) {
-            TypeKind::Primitive(p) => p.runtime_tag(),
-            TypeKind::Builtin(b) => b.runtime_tag(),
-            TypeKind::Array(_) => TypeTag::Array,
-            TypeKind::Object(_) => TypeTag::Object,
-            TypeKind::Named(..) => TypeTag::Class,
-            TypeKind::Generic(..) => TypeTag::Class,
-            TypeKind::Fn(_) => TypeTag::Function,
-            TypeKind::Tuple(_) => TypeTag::Tuple,
-            _ => TypeTag::Dynamic,
-        }
     }
 
     pub fn is_nullable(&self, table: &CheckerTyTable) -> bool {

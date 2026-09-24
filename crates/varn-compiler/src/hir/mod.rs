@@ -66,57 +66,6 @@ impl TyTable {
         &self.class_names[id.0 as usize]
     }
 
-    /// Import a checker-side [`varn_core::CgTy`] projection. Kinds the
-    /// backend has no precise representation for yet stay `Dynamic` —
-    /// conservative, never wrong; heap-boxed scalars (char/decimal/bigint)
-    /// project to `Ref`, matching `from_tir::ty::lower`.
-    pub fn from_cg(&mut self, cg: &varn_core::CgTy) -> HirType {
-        use varn_core::CgTy;
-        match cg {
-            CgTy::Int => HirType::Int,
-            CgTy::Float => HirType::Float,
-            CgTy::Bool => HirType::Bool,
-            CgTy::Str => HirType::Str,
-            CgTy::Array(el) => {
-                let e = self.from_cg(el);
-                let id = self.intern(e);
-                HirType::Array(id)
-            }
-            CgTy::Map(k, v) => {
-                let kt = self.from_cg(k);
-                let vt = self.from_cg(v);
-                let ki = self.intern(kt);
-                let vi = self.intern(vt);
-                HirType::Map(ki, vi)
-            }
-            CgTy::Set(el) => {
-                let e = self.from_cg(el);
-                let id = self.intern(e);
-                HirType::Set(id)
-            }
-            CgTy::Class(name) => HirType::Class(self.class_id(name)),
-            CgTy::Nullable(inner) => {
-                let t = self.from_cg(inner);
-                if t == HirType::Dynamic {
-                    HirType::Dynamic
-                } else {
-                    let id = self.intern(t);
-                    HirType::Nullable(id)
-                }
-            }
-            // A function value is a closure or a native — either way a heap
-            // reference, never an immediate. `Ref` is the honest projection
-            // and it is what keeps every read of a module function from
-            // landing in a `Dynamic` register.
-            CgTy::Fn => HirType::Ref,
-            // `char` vive en el heap (`HeapObj::Char`): `Ref` es la proyección
-            // honesta y coincide con `from_tir::ty::lower`. `decimal`/`bigint`
-            // son heap con ensanchado `int` y tolerancia `dynamic`: `Dynamic`
-            // los aloja sin allocar (también como `from_tir::ty::lower`).
-            CgTy::Char => HirType::Ref,
-            CgTy::Decimal | CgTy::BigInt | CgTy::Dynamic => HirType::Dynamic,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
