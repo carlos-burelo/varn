@@ -1,6 +1,6 @@
 
   [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
-[1mfn[0m [34m<module>[0m (arity: 1, regs: 15, upvalues: 0)  [2m[async, state_size=1][0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 15, upvalues: 0)
   [2mconstants (15)[0m
   [2m[000][0m [34mfn identity[0m(arity=2)
   [2m[001][0m [32m"Box"[0m
@@ -87,42 +87,43 @@
     0003 │   1 │ [33mReturn              [0m │ r2
 
   [1mfn[0m [34mBox.constructor[0m (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (11) words[0m
+    [2mcode (12) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r2 = r0
     0002 │   0 │ SetFixedField       [0m │ r2.fixed[0] = r1
-    0005 │   1 │ LoadNull            [0m │ r3
-    0006 │   1 │ [33mReturn              [0m │ r3
-    0008 │   1 │ LoadNull            [0m │ r3
-    0009 │   1 │ [33mReturn              [0m │ r3
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[769]
+    0007 │   1 │ [33mReturn              [0m │ r3
+    0009 │   1 │ LoadNull            [0m │ r3
+    0010 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mBox.get[0m (arity: 1, regs: 3, upvalues: 0)  [2m[has_this][0m
-    [2mcode (10) words[0m
+    [2mcode (11) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r1 = r0
     0002 │   0 │ GetFixedField       [0m │ r2 = r1.fixed[0]
-    0005 │   1 │ [33mReturn              [0m │ r2
-    0007 │   1 │ LoadNull            [0m │ r2
-    0008 │   1 │ [33mReturn              [0m │ r2
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[44]
+    0007 │   1 │ LoadTrue            [0m │ r0
+    0008 │   1 │ LoadNull            [0m │ r2
+    0009 │   1 │ [33mReturn              [0m │ r2
 
   [1mfn[0m [34mBox.map[0m (arity: 2, regs: 10, upvalues: 0)  [2m[has_this][0m
-    [2mcode (24) words[0m
+    [2mcode (25) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global[@0]
     0002 │   0 │ Move                [0m │ r3 = r0
     0004 │   0 │ GetFixedField       [0m │ r4 = r3.fixed[0]
-    0007 │   0 │ LoadNull            [0m │ r8
-    0008 │   0 │ Move                [0m │ r9 = r4
-    0010 │   0 │ [35mCall                [0m │ r5 = call r1(2 args @ r8)
-    0013 │   0 │ LoadNull            [0m │ r8
-    0014 │   0 │ Move                [0m │ r9 = r5
-    0016 │   0 │ [35mCall                [0m │ r3 = call r2(2 args @ r8)
-    0019 │   1 │ [33mReturn              [0m │ r3
-    0021 │   1 │ LoadNull            [0m │ r7
-    0022 │   1 │ [33mReturn              [0m │ r7
+    0007 │   0 │ [36mLoadConst           [0m │ r0 = const[2049]
+    0009 │   0 │ Move                [0m │ r9 = r4
+    0011 │   0 │ [35mCall                [0m │ r5 = call r1(2 args @ r8)
+    0014 │   0 │ LoadNull            [0m │ r8
+    0015 │   0 │ Move                [0m │ r9 = r5
+    0017 │   0 │ [35mCall                [0m │ r3 = call r2(2 args @ r8)
+    0020 │   1 │ [33mReturn              [0m │ r3
+    0022 │   1 │ LoadNull            [0m │ r7
+    0023 │   1 │ [33mReturn              [0m │ r7
 
   [1mfn[0m [34m<closure>[0m (arity: 2, regs: 6, upvalues: 0)
     [2mconstants (2)[0m

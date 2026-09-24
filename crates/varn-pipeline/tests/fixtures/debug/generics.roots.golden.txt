@@ -1,36 +1,30 @@
 
-[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed+async)[0m
+[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed)[0m
   [2m    ip  opcode              home  registro   unboxed   home slots[0m
-       0  LoadStaticFn           2  [33m       1[0m  [2m        [0m   [2mr0 r1[0m
-       5  MakeClass              2  [33m       1[0m  [2m        [0m   [2mr0 r1[0m
-       8  DeclareField           2  [33m       1[0m  [2m        [0m   [2mr0 r1[0m
-      11  LoadStaticFn           3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      13  Method                 3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      16  LoadStaticFn           3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      18  Method                 3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      21  LoadStaticFn           3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      23  Method                 3  [33m       1[0m  [2m        [0m   [2mr0 r1 r2[0m
-      36  Call                   4  [33m       1[0m  [2m  r3 r13[0m   [2mr0 r1 r2 r12[0m
-      48  InvokeVirtual          5  [33m       1[0m  [2m      r3[0m   [2mr0 r1 r2 r4 r5[0m
-      59  Call                   4  [33m       1[0m  [2m     r14[0m   [2mr0 r1 r12 r13[0m
-      72  Call                   4  [33m       2[0m  [2m     r14[0m   [2mr0 r1 r12 r13[0m
+       0  LoadStaticFn           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
+       5  MakeClass              2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
+       8  DeclareField           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
+      11  LoadStaticFn           3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      13  Method                 3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      16  LoadStaticFn           3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      18  Method                 3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      21  LoadStaticFn           3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      23  Method                 3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
+      36  Call                   5  [33m       1[0m  [2m        [0m   [2mr0 r1 r2 r12 r13[0m
+      48  InvokeVirtual          4  [33m       1[0m  [2m        [0m   [2mr0 r1 r2 r4[0m
+      59  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13 r14[0m
+      72  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13 r14[0m
       77  LoadStaticFn           3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
       81  InvokeVirtual          4  [2m       0[0m  [2m        [0m   [2mr0 r1 r7 r12[0m
       94  InvokeVirtual          5  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r4 r8[0m
-     107  Call                   4  [2m       0[0m  [2m     r14[0m   [2mr0 r1 r12 r13[0m
+     107  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13 r14[0m
      117  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13[0m
 
 [1mROOTS[0m[2m ── Box.map  (frame-aware: this+alloc+boxed)[0m
   [2m    ip  opcode              home  registro   unboxed   home slots[0m
-      10  Call                   6  [33m       1[0m  [2m        [0m   [2mr0 r1 r2 r5 r8 r9[0m
-      16  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r2 r3 r8 r9[0m
+      11  Call                   6  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r5 r8 r9[0m
+      17  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r2 r3 r8 r9[0m
 
-[1mROOTS[0m[2m ── <closure>  (frame-aware: alloc+boxed)[0m
-  [2m    ip  opcode              home  registro   unboxed   home slots[0m
-       4  StrConcat              4  [2m       0[0m  [2m        [0m   [2mr0 r2 r3 r4[0m
-       8  StrConcat              4  [2m       0[0m  [2m        [0m   [2mr0 r2 r3 r4[0m
-
-  [32m22 safepoints[0m[2m · 8 cubiertos solo por home slots · 14 con valores vivos en registro[0m
-  [2m6 registros vivos sin flushear por ser Int/Bool — no son raíces, no entran en la cuenta de arriba.[0m
-  [33m15 raíces en registro[0m[2m (máx 2 en un safepoint) — lo que los stack maps tendrían que rootear tras el cutover.[0m
+  [32m20 safepoints[0m[2m · 18 cubiertos solo por home slots · 2 con valores vivos en registro[0m
+  [33m2 raíces en registro[0m[2m (máx 1 en un safepoint) — lo que los stack maps tendrían que rootear tras el cutover.[0m
   [2mHoy es sano porque nada bajo un raw sin frame puede alocar; deja de serlo en cuanto `has_alloc` salga de `frame_aware`.[0m

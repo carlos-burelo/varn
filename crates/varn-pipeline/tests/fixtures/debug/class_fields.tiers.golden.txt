@@ -1,8 +1,8 @@
 
 [1mTIERS[0m[2m ── <module> · 5/5 ruteadas[0m
   [2mfunción                      words  tier   razón[0m
-  <module>                       126  [32mclif [0m  [2m (frame-aware: alloc+boxed+async)[0m
-  Temperature.constructor         11  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
-  Temperature.get celsius         10  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
-  Temperature.set celsius         11  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
-  Temperature.get fahrenheit      18  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  <module>                       126  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
+  Temperature.constructor         12  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  Temperature.get celsius         11  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  Temperature.set celsius         12  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
+  Temperature.get fahrenheit      19  [32mclif [0m  [2m (frame-aware: this+boxed)[0m

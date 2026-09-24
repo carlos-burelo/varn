@@ -1,13 +1,14 @@
 
-[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed+async)[0m
+[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed)[0m
   [2m    ip  opcode              home  registro   unboxed   home slots[0m
        0  LoadStaticFn           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
        5  LoadStaticFn           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
-      44  Call                   6  [2m       0[0m  [2mr2 r3 r4[0m   [2mr0 r1 r6 r7 r12 r13[0m
-      56  Call                   4  [2m       0[0m  [2mr2 r4 r14[0m   [2mr0 r1 r12 r13[0m
-      72  Call                   7  [2m       0[0m  [2m  r4 r14[0m   [2mr0 r1 r3 r6 r7 r12 r13[0m
-      82  Call                   4  [2m       0[0m  [2m     r14[0m   [2mr0 r1 r12 r13[0m
+      44  Call                   6  [33m       2[0m  [2m        [0m   [2mr0 r1 r6 r7 r12 r13[0m
+      56  Call                   5  [33m       2[0m  [2m        [0m   [2mr0 r1 r12 r13 r14[0m
+      72  Call                   7  [33m       1[0m  [2m        [0m   [2mr0 r1 r6 r7 r12 r13 r14[0m
+      82  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13 r14[0m
       92  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r12 r13[0m
 
-  [32m7 safepoints[0m[2m · 7 cubiertos solo por home slots · 0 con valores vivos en registro[0m
-  [2m9 registros vivos sin flushear por ser Int/Bool — no son raíces, no entran en la cuenta de arriba.[0m
+  [32m7 safepoints[0m[2m · 4 cubiertos solo por home slots · 3 con valores vivos en registro[0m
+  [33m5 raíces en registro[0m[2m (máx 2 en un safepoint) — lo que los stack maps tendrían que rootear tras el cutover.[0m
+  [2mHoy es sano porque nada bajo un raw sin frame puede alocar; deja de serlo en cuanto `has_alloc` salga de `frame_aware`.[0m

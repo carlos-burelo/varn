@@ -1,5 +1,5 @@
 
-[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed+async)[0m
+[1mROOTS[0m[2m ── <module>  (frame-aware: alloc+boxed)[0m
   [2m    ip  opcode              home  registro   unboxed   home slots[0m
        0  MakeClass              2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
        3  DeclareField           2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
@@ -13,13 +13,12 @@
       23  DefineGetter           3  [2m       0[0m  [2m        [0m   [2mr0 r1 r2[0m
       36  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r9 r10[0m
       48  GetProperty            4  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r4[0m
-      58  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+      58  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r9 r10 r11[0m
       67  GetProperty            4  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r4[0m
-      79  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+      79  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r9 r10 r11[0m
       86  SetProperty            2  [2m       0[0m  [2m        [0m   [2mr0 r1[0m
       95  GetProperty            4  [2m       0[0m  [2m        [0m   [2mr0 r1 r2 r4[0m
-     107  Call                   4  [2m       0[0m  [2m     r11[0m   [2mr0 r1 r9 r10[0m
+     107  Call                   5  [2m       0[0m  [2m        [0m   [2mr0 r1 r9 r10 r11[0m
      117  Call                   4  [2m       0[0m  [2m        [0m   [2mr0 r1 r9 r10[0m
 
   [32m19 safepoints[0m[2m · 19 cubiertos solo por home slots · 0 con valores vivos en registro[0m
-  [2m3 registros vivos sin flushear por ser Int/Bool — no son raíces, no entran en la cuenta de arriba.[0m

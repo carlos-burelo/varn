@@ -3,25 +3,25 @@
 
   [1m<module>[0m[2m (frame-aware)[0m
     [2mkinds (15 regs):[0m
-      block@0: [Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset]
+      block@0: [Boxed, Boxed, Boxed, Int, Boxed, Int, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed]
 
   [1midentity[0m[2m (frame-aware)[0m
     [2mkinds (3 regs):[0m
-      block@0: [Unset, Boxed, Unset]
+      block@0: [Boxed, Boxed, Boxed]
 
   [1mBox.constructor[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [Boxed, Boxed, Unset, Unset]
+      block@0: [Boxed, Boxed, Boxed, Boxed]
 
   [1mBox.get[0m[2m (frame-aware)[0m
     [2mkinds (3 regs):[0m
-      block@0: [Boxed, Unset, Unset]
+      block@0: [Boxed, Boxed, Boxed]
 
   [1mBox.map[0m[2m (frame-aware)[0m
     [2mkinds (10 regs):[0m
-      block@0: [Boxed, Boxed, Unset, Unset, Unset, Unset, Unset, Unset, Unset, Unset]
+      block@0: [Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed]
 
   [1m<closure>[0m[2m (frame-aware)[0m
     [2mkinds (6 regs):[0m
-      block@0: [Unset, Boxed, Unset, Unset, Unset, Unset]
+      block@0: [Boxed, Boxed, Boxed, Boxed, Boxed, Boxed]
 [2m── end: CLIF ──[0m

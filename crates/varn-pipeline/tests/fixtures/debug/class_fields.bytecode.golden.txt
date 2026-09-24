@@ -1,6 +1,6 @@
 
   [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
-[1mfn[0m [34m<module>[0m (arity: 1, regs: 12, upvalues: 0)  [2m[async, state_size=1][0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 12, upvalues: 0)
   [2mconstants (17)[0m
   [2m[000][0m [32m"Temperature"[0m
   [2m[001][0m [32m"_celsius"[0m
@@ -82,52 +82,54 @@
   0124 │   1 │ [33mReturn              [0m │ r8
 
   [1mfn[0m [34mTemperature.constructor[0m (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (11) words[0m
+    [2mcode (12) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r2 = r0
     0002 │   0 │ SetFixedField       [0m │ r2.fixed[0] = r1
-    0005 │   1 │ LoadNull            [0m │ r3
-    0006 │   1 │ [33mReturn              [0m │ r3
-    0008 │   1 │ LoadNull            [0m │ r3
-    0009 │   1 │ [33mReturn              [0m │ r3
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[769]
+    0007 │   1 │ [33mReturn              [0m │ r3
+    0009 │   1 │ LoadNull            [0m │ r3
+    0010 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.get celsius[0m (arity: 1, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (10) words[0m
+    [2mcode (11) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r1 = r0
     0002 │   0 │ GetFixedField       [0m │ r2 = r1.fixed[0]
-    0005 │   1 │ [33mReturn              [0m │ r2
-    0007 │   1 │ LoadNull            [0m │ r3
-    0008 │   1 │ [33mReturn              [0m │ r3
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[44]
+    0007 │   1 │ LoadTrue            [0m │ r0
+    0008 │   1 │ LoadNull            [0m │ r3
+    0009 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.set celsius[0m (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (11) words[0m
+    [2mcode (12) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r2 = r0
     0002 │   0 │ SetFixedField       [0m │ r2.fixed[0] = r1
-    0005 │   1 │ LoadNull            [0m │ r3
-    0006 │   1 │ [33mReturn              [0m │ r3
-    0008 │   1 │ LoadNull            [0m │ r3
-    0009 │   1 │ [33mReturn              [0m │ r3
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[769]
+    0007 │   1 │ [33mReturn              [0m │ r3
+    0009 │   1 │ LoadNull            [0m │ r3
+    0010 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.get fahrenheit[0m (arity: 1, regs: 6, upvalues: 0)  [2m[has_this][0m
     [2mconstants (2)[0m
     [2m[000][0m [32m1.8[0m
     [2m[001][0m [32m32[0m
-    [2mcode (18) words[0m
+    [2mcode (19) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r1 = r0
     0002 │   0 │ GetFixedField       [0m │ r2 = r1.fixed[0]
-    0005 │   0 │ [36mLoadConst           [0m │ r3 = const[0]  [2m;[0m [32m1.8[0m
-    0007 │   0 │ [32mMulFloat            [0m │ r4 = r2 op r3
-    0009 │   0 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m32[0m
-    0011 │   0 │ [32mAddFloat            [0m │ r3 = r4 op r2
-    0013 │   1 │ [33mReturn              [0m │ r3
-    0015 │   1 │ LoadNull            [0m │ r5
-    0016 │   1 │ [33mReturn              [0m │ r5
+    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[768]
+    0007 │   0 │ [36mLoadConst           [0m │ r0 = const[1141]
+    0009 │   0 │ LoadFalse           [0m │ r2
+    0010 │   0 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m32[0m
+    0012 │   0 │ [32mAddFloat            [0m │ r3 = r4 op r2
+    0014 │   1 │ [33mReturn              [0m │ r3
+    0016 │   1 │ LoadNull            [0m │ r5
+    0017 │   1 │ [33mReturn              [0m │ r5
 
   [2m── end: bytecode ──[0m

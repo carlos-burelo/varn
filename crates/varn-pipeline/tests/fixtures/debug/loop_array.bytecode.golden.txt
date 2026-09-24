@@ -1,6 +1,6 @@
 
   [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
-[1mfn[0m [34m<module>[0m (arity: 1, regs: 17, upvalues: 0)  [2m[async, state_size=1][0m
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 17, upvalues: 0)
   [2mconstants (5)[0m
   [2m[000][0m [34mfn sum[0m(arity=2)
   [2m[001][0m [34mfn firstAbove[0m(arity=3)
