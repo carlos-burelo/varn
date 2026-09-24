@@ -7,7 +7,6 @@ mod execute;
 pub mod fmt;
 pub mod hash;
 pub mod import_collector;
-mod lockfile;
 pub mod module_precompile;
 mod opts;
 mod parse;
@@ -61,9 +60,6 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
             opts.strict,
         )?
     };
-    if opts.eval.is_none() {
-        lockfile::sync_lockfile(&opts.file_path, &compiled.graph_artifact)?;
-    }
     if opts.no_run {
         return Ok(());
     }

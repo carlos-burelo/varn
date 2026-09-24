@@ -22,13 +22,6 @@ pub struct PmLockfile {
 }
 
 impl PmLockfile {
-    pub fn empty() -> Self {
-        Self {
-            version: LOCK_VERSION,
-            packages: vec![],
-        }
-    }
-
     pub fn load(path: &Path) -> Result<Self, String> {
         let raw =
             std::fs::read_to_string(path).map_err(|e| format!("cannot read lockfile: {e}"))?;

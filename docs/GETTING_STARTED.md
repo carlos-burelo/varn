@@ -102,12 +102,16 @@ Esto generará la siguiente jerarquía de archivos:
 
 ```
 mi-proyecto/
-├── main.vn             ← Punto de entrada principal
-├── varn.json          ← Manifiesto del proyecto y dependencias
+├── main.vn            ← Punto de entrada principal
+├── varn.toml          ← Manifiesto del proyecto y dependencias
 └── .vn/
-    ├── varn.lock      ← Versiones bloqueadas de dependencias
-    └── cache/         ← Caché local de bytecode (.bin)
+    ├── .env           ← Variables de entorno (no se commitea)
+    └── .gitignore
 ```
+
+`.vn/varn.lock` y `.vn/packages/` aparecen sólo al instalar dependencias
+(`vn add`, `vn install`); `vn run` nunca escribe en el proyecto. El caché de
+compilación es global (`~/.varn/cache`, o `VARN_CACHE_DIR`).
 
 ---
 

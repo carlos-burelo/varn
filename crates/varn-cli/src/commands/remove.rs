@@ -36,8 +36,11 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
 
     if deps.is_empty() {
-        let empty = varn_pm::PmLockfile::empty();
-        empty.save(&lock_path).map_err(CliError::fatal)?;
+        // No dependencies, no lockfile.
+        if lock_path.exists() {
+            std::fs::remove_file(&lock_path)
+                .map_err(|e| CliError::fatal(format!("cannot remove lockfile: {e}")))?;
+        }
     } else {
         let existing = if lock_path.exists() {
             lockfile::PmLockfile::load(&lock_path).ok()
