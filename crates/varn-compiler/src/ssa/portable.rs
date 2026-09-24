@@ -132,10 +132,7 @@ fn project_inst(
         InstKind::BuildStr { parts } => SsaOp::BuildStr {
             parts: parts.iter().map(|v| v.0).collect(),
         },
-        InstKind::BuildArray {
-            elements,
-            narrow_elem: None,
-        } => SsaOp::BuildArray {
+        InstKind::BuildArray { elements } => SsaOp::BuildArray {
             elements: elements.iter().map(|v| v.0).collect(),
         },
         InstKind::BuildMap { pairs } => SsaOp::BuildMap {
@@ -270,10 +267,6 @@ fn project_inst(
         InstKind::Convert { operand, conv } => SsaOp::Convert {
             operand: operand.0,
             conv: *conv,
-        },
-        InstKind::NarrowRangeCheck { operand, tag } => SsaOp::NarrowRangeCheck {
-            operand: operand.0,
-            tag: *tag,
         },
         InstKind::IsNull { operand } => SsaOp::IsNull {
             operand: operand.0,

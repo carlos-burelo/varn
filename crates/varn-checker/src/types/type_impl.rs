@@ -22,14 +22,6 @@ impl Type {
     pub const Null: Type = Type(CheckerTyId::NULL, false);
     pub const Never: Type = Type(CheckerTyId::NEVER, false);
     pub const Dynamic: Type = Type(CheckerTyId::DYNAMIC, false);
-    pub const I8: Type = Type(CheckerTyId::I8, false);
-    pub const I16: Type = Type(CheckerTyId::I16, false);
-    pub const I32: Type = Type(CheckerTyId::I32, false);
-    pub const U8: Type = Type(CheckerTyId::U8, false);
-    pub const U16: Type = Type(CheckerTyId::U16, false);
-    pub const U32: Type = Type(CheckerTyId::U32, false);
-    pub const U64: Type = Type(CheckerTyId::U64, false);
-    pub const F32: Type = Type(CheckerTyId::F32, false);
     pub const This: Type = Type(CheckerTyId::THIS, false);
 
     /// Non-intrinsic-constant tags (e.g. `Class`, `Array`, `Object` used only
@@ -200,32 +192,10 @@ impl Type {
     }
 
     pub fn is_int(&self) -> bool {
-        matches!(
-            self.0,
-            CheckerTyId::INT
-                | CheckerTyId::I8
-                | CheckerTyId::I16
-                | CheckerTyId::I32
-                | CheckerTyId::U8
-                | CheckerTyId::U16
-                | CheckerTyId::U32
-                | CheckerTyId::U64
-        )
-    }
-    pub fn is_granular_int(&self) -> bool {
-        matches!(
-            self.0,
-            CheckerTyId::I8
-                | CheckerTyId::I16
-                | CheckerTyId::I32
-                | CheckerTyId::U8
-                | CheckerTyId::U16
-                | CheckerTyId::U32
-                | CheckerTyId::U64
-        )
+        self.0 == CheckerTyId::INT
     }
     pub fn is_float(&self) -> bool {
-        matches!(self.0, CheckerTyId::FLOAT | CheckerTyId::F32)
+        self.0 == CheckerTyId::FLOAT
     }
     pub fn is_numeric(&self) -> bool {
         self.is_int()

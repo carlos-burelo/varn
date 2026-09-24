@@ -216,15 +216,6 @@ pub enum OpCode {
     MapGetIndex,
     MapSetIndex,
 
-    /// Verifica que el registro `dest` cabe en el rango de un tipo numérico
-    /// angosto (`i8`/`i16`/`i32`/`u8`/`u16`/`u32`/`f32`), pasándolo sin
-    /// modificar si cabe. Operandos: `[dest: u8][tag: u8]` empacados en una
-    /// palabra — `tag` es `TypeTag as u8` (`TypeTag` ya es `#[repr(u8)]`,
-    /// `TypeTag::from_u8` lo recupera). Emitido tras un cast explícito hacia
-    /// un ancho angosto (`x as i32`) y tras cualquier aritmética cuyo tipo de
-    /// resultado es angosto (`i8 + i8`). Panica en runtime si no cabe, igual
-    /// que `int` ya hace con su propio desbordamiento.
-    CheckNarrowRange,
     /// `dst = convert(src)` per the `NumConv` in the next word (`as`).
     Convert,
 }

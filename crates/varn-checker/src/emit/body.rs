@@ -2995,39 +2995,6 @@ impl<'a> FnEmitter<'a> {
         if is_cmp && (l == BackendTy::Never || r == BackendTy::Never) {
             return (lhs, rhs, BackendTy::Bool);
         }
-        // Los ocho tipos numéricos angostos son, para efectos de qué OPCODE
-        // aritmético usar, la misma categoría que `Int`/`Float`: el checker
-        // ya lo decide así (`numeric_binary_type` en `binder/
-        // type_inference.rs` trata Int/I8/I16/I32/U8/U16/U32/U64 como una
-        // sola cosa, ídem Float/F32) — este lowering DEBE dar el mismo tipo
-        // de resultado, o `i8 + i16` cae en el `else { l }` de más abajo y
-        // castea SILENCIOSAMENTE el operando derecho al ancho del IZQUIERDO
-        // (`i16(1000) as i8` sin que el usuario lo haya pedido), reventando
-        // en runtime con "1000 no cabe en i8" sobre una suma que el checker
-        // ya había tipado como `int` sin restricción de ancho. Angostar el
-        // RESULTADO de vuelta sigue exigiendo el cast explícito de siempre
-        // (`(a + b) as i8`), que es donde el rango se verifica de verdad.
-        fn narrow_int_widened(bt: BackendTy) -> Option<BackendTy> {
-            matches!(
-                bt,
-                BackendTy::Int8
-                    | BackendTy::Int16
-                    | BackendTy::Int32
-                    | BackendTy::UInt8
-                    | BackendTy::UInt16
-                    | BackendTy::UInt32
-            )
-            .then_some(BackendTy::Int)
-        }
-        fn narrow_float_widened(bt: BackendTy) -> Option<BackendTy> {
-            matches!(bt, BackendTy::Float32).then_some(BackendTy::Float)
-        }
-        let l = narrow_int_widened(l)
-            .or_else(|| narrow_float_widened(l))
-            .unwrap_or(l);
-        let r = narrow_int_widened(r)
-            .or_else(|| narrow_float_widened(r))
-            .unwrap_or(r);
 
         if l == r {
             let ty = if is_cmp { BackendTy::Bool } else { l };

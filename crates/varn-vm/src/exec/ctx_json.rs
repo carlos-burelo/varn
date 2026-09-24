@@ -129,67 +129,6 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                             }
                         }
                     }
-                    varn_types::ArrayRepr::I8(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::I16(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::I32(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::U8(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::U16(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::U32(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            write_int(elem as i64, out);
-                        }
-                    }
-                    varn_types::ArrayRepr::F32(items) => {
-                        for (i, &elem) in items.iter().enumerate() {
-                            if i > 0 {
-                                out.push(',');
-                            }
-                            let elem = elem as f64;
-                            if elem.is_finite() {
-                                out.push_str(ryu::Buffer::new().format(elem));
-                            } else {
-                                out.push_str("null");
-                            }
-                        }
-                    }
                 }
                 out.push(']');
                 return;

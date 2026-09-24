@@ -201,44 +201,14 @@ fn emit_get_fixed_field_compact(
     let off = offset as i32;
     let m = MemFlags::trusted();
     let pair = match tag {
-        varn_core::TypeTag::Bool | varn_core::TypeTag::U8 => {
+        varn_core::TypeTag::Bool => {
             let b8 = b.ins().load(types::I8, m, data_base, off);
             let v = b.ins().uextend(types::I64, b8);
             emit::box_bool(b, v)
         }
-        varn_core::TypeTag::I8 => {
-            let b8 = b.ins().load(types::I8, m, data_base, off);
-            let v = b.ins().sextend(types::I64, b8);
-            emit::box_int(b, v)
-        }
-        varn_core::TypeTag::Int | varn_core::TypeTag::U64 => {
+        varn_core::TypeTag::Int => {
             let v = b.ins().load(types::I64, m, data_base, off);
             emit::box_int(b, v)
-        }
-        varn_core::TypeTag::I16 => {
-            let v = b.ins().load(types::I16, m, data_base, off);
-            let v = b.ins().sextend(types::I64, v);
-            emit::box_int(b, v)
-        }
-        varn_core::TypeTag::U16 => {
-            let v = b.ins().load(types::I16, m, data_base, off);
-            let v = b.ins().uextend(types::I64, v);
-            emit::box_int(b, v)
-        }
-        varn_core::TypeTag::I32 => {
-            let v = b.ins().load(types::I32, m, data_base, off);
-            let v = b.ins().sextend(types::I64, v);
-            emit::box_int(b, v)
-        }
-        varn_core::TypeTag::U32 => {
-            let v = b.ins().load(types::I32, m, data_base, off);
-            let v = b.ins().uextend(types::I64, v);
-            emit::box_int(b, v)
-        }
-        varn_core::TypeTag::F32 => {
-            let f32v = b.ins().load(types::F32, m, data_base, off);
-            let f = b.ins().fpromote(types::F64, f32v);
-            emit::box_f64(b, f)
         }
         varn_core::TypeTag::Float => {
             let f = b.ins().load(types::F64, m, data_base, off);
@@ -549,22 +519,8 @@ fn emit_set_fixed_field_compact(
         varn_core::TypeTag::Bool => {
             b.ins().istore8(m, payload, data_base, off);
         }
-        varn_core::TypeTag::Int | varn_core::TypeTag::U64 => {
+        varn_core::TypeTag::Int => {
             b.ins().store(m, payload, data_base, off);
-        }
-        varn_core::TypeTag::I8 | varn_core::TypeTag::U8 => {
-            b.ins().istore8(m, payload, data_base, off);
-        }
-        varn_core::TypeTag::I16 | varn_core::TypeTag::U16 => {
-            b.ins().istore16(m, payload, data_base, off);
-        }
-        varn_core::TypeTag::I32 | varn_core::TypeTag::U32 => {
-            b.ins().istore32(m, payload, data_base, off);
-        }
-        varn_core::TypeTag::F32 => {
-            let f = unbox_f64_coerce(b, val128);
-            let f32v = b.ins().fdemote(types::F32, f);
-            b.ins().store(m, f32v, data_base, off);
         }
         varn_core::TypeTag::Float => {
             let f = unbox_f64_coerce(b, val128);

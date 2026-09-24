@@ -76,9 +76,8 @@ pub struct SsaInst {
 ///
 /// The scalar arithmetic and comparison variants encode the width the checker
 /// proved (`IntAdd` vs `FloatAdd`), so a backend never inspects operand types
-/// to choose an instruction. `Cast` and `NarrowRangeCheck` are representation
-/// facts the checker emitted; both are value-preserving at runtime except the
-/// range check, which panics on overflow exactly as the bytecode opcode does.
+/// to choose an instruction. `Cast` is a representation-neutral fact the
+/// checker emitted; `Convert` is the one op that changes a numeric domain.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SsaOp {
     ConstInt(i64),
@@ -118,14 +117,11 @@ pub enum SsaOp {
     /// a boxed `VmValue` (`Ref`/`Dyn`).
     LoadGlobalIdx(u32),
 
-    /// Checker-proven cast. Width-narrowing casts already carry a
-    /// [`SsaOp::NarrowRangeCheck`]; a `Cast` itself is representation-neutral.
+    /// Checker-proven, representation-neutral cast.
     Cast { operand: u32 },
     /// Numeric conversion (`as`) that changes representation.
     Convert { operand: u32, conv: varn_core::NumConv },
 
-    /// Validate `operand` fits `tag`'s range, passing it through unchanged.
-    NarrowRangeCheck { operand: u32, tag: TypeTag },
 
     IsNull { operand: u32 },
 
@@ -382,14 +378,6 @@ mod tests {
                             op: SsaOp::Unary {
                                 op: SsaUnOp::NegInt,
                                 operand: 6,
-                            },
-                            line: 3,
-                        },
-                        SsaInst {
-                            dest: Some(8),
-                            op: SsaOp::NarrowRangeCheck {
-                                operand: 7,
-                                tag: TypeTag::I32,
                             },
                             line: 3,
                         },

@@ -777,16 +777,7 @@ impl InstanceData {
         unsafe {
             Some(match f.type_tag {
                 TypeTag::Bool => VmValue::from_bool(self.read_bool(offset)),
-                TypeTag::I8 => {
-                    VmValue::from_int(*(self.raw_payload_ptr().add(offset) as *const i8) as i64)
-                }
-                TypeTag::U8 => VmValue::from_int(self.read_u8(offset) as i64),
-                TypeTag::I16 => VmValue::from_int(self.read_i16(offset) as i64),
-                TypeTag::U16 => VmValue::from_int(self.read_u16(offset) as i64),
-                TypeTag::I32 => VmValue::from_int(self.read_i32(offset) as i64),
-                TypeTag::U32 => VmValue::from_int(self.read_u32(offset) as i64),
-                TypeTag::F32 => VmValue::from_f64(self.read_f32(offset) as f64),
-                TypeTag::Int | TypeTag::U64 => VmValue::from_int(self.read_i64(offset)),
+                TypeTag::Int => VmValue::from_int(self.read_i64(offset)),
                 TypeTag::Float => VmValue::from_f64(self.read_f64(offset)),
                 _ if f.is_gc_ref && f.size == 8 => {
                     let raw = self.read_u64(offset);
@@ -823,43 +814,11 @@ impl InstanceData {
                     }
                     self.write_bool(offset, val.as_bool());
                 }
-                TypeTag::I8
-                | TypeTag::U8
-                | TypeTag::I16
-                | TypeTag::U16
-                | TypeTag::I32
-                | TypeTag::U32
-                | TypeTag::Int
-                | TypeTag::U64 => {
+                TypeTag::Int => {
                     if !val.is_int() {
                         return Err("cannot store non-int in an int field");
                     }
-                    let n = val.as_int();
-                    match f.type_tag {
-                        TypeTag::I8 | TypeTag::U8 => self.write_u8(offset, n as u8),
-                        TypeTag::I16 | TypeTag::U16 => {
-                            let ptr = self.raw_payload_ptr().add(offset) as *mut i16;
-                            ptr.write(n as i16);
-                        }
-                        TypeTag::I32 | TypeTag::U32 => {
-                            let ptr = self.raw_payload_ptr().add(offset) as *mut i32;
-                            ptr.write(n as i32);
-                        }
-                        _ => self.write_i64(offset, n),
-                    }
-                }
-                TypeTag::F32 => {
-                    let v = if val.is_f64() {
-                        val.as_f64() as f32
-                    } else if val.is_int() {
-                        val.as_int() as f32
-                    } else if val.is_null() {
-                        f32::NAN
-                    } else {
-                        return Err("cannot store non-numeric in a float field");
-                    };
-                    let ptr = self.raw_payload_ptr().add(offset) as *mut f32;
-                    ptr.write(v);
+                    self.write_i64(offset, val.as_int());
                 }
                 TypeTag::Float => {
                     // Symmetric with `frame_store`'s `Fpr`: `int` widens,

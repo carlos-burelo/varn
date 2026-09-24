@@ -234,11 +234,6 @@ fn print_proto(
                     let conv = varn_core::NumConv::from_u8(lo(w1) as u8);
                     format!("r{} = convert r{} {:?}", hi(op_val), hi(w1), conv)
                 }
-                OpCode::CheckNarrowRange => {
-                    let w1 = w!();
-                    let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
-                    format!("r{} narrow-check {}", hi(w1), tag.name())
-                }
                 OpCode::AssertNotNull => {
                     let w1 = w!();
                     format!("assert r{}", hi(w1))

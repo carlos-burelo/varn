@@ -18,7 +18,7 @@
 //! positional index into a table. Two tables that intern the same shape in any
 //! order — or in parallel — produce the **same id** for it, so ids are portable
 //! by construction and no `absorb`/`reintern` remap is needed: merging tables is
-//! a commutative, idempotent union. The ~21 intrinsic shapes keep a reserved
+//! a commutative, idempotent union. The ~13 intrinsic shapes keep a reserved
 //! id range (`0..=THIS`) because `Type::Int`/`Type::Str`/... are `const`.
 //! Non-intrinsic ids set the top bit, so they can never collide with that range.
 //!
@@ -71,7 +71,7 @@ pub type InternedTypeKind =
 /// (all far below this bit), so content ids can never collide with them.
 const CONTENT_FLAG: u128 = 1u128 << 127;
 
-/// Fixed ids for the ~21 zero-argument/intrinsic shapes every checker session
+/// Fixed ids for the ~13 zero-argument/intrinsic shapes every checker session
 /// needs (the `Type::Int`/`Type::Str`/... constants `type_impl.rs` exposes).
 /// Unlike the rest of the table, these are NOT content hashes: they are small
 /// constants so `Type::INT` can be a `const`. `CheckerTyTable::new` seeds
@@ -89,15 +89,7 @@ impl CheckerTyId {
     pub const NULL: CheckerTyId = CheckerTyId(9);
     pub const NEVER: CheckerTyId = CheckerTyId(10);
     pub const DYNAMIC: CheckerTyId = CheckerTyId(11);
-    pub const I8: CheckerTyId = CheckerTyId(12);
-    pub const I16: CheckerTyId = CheckerTyId(13);
-    pub const I32: CheckerTyId = CheckerTyId(14);
-    pub const U8: CheckerTyId = CheckerTyId(15);
-    pub const U16: CheckerTyId = CheckerTyId(16);
-    pub const U32: CheckerTyId = CheckerTyId(17);
-    pub const U64: CheckerTyId = CheckerTyId(18);
-    pub const F32: CheckerTyId = CheckerTyId(19);
-    pub const THIS: CheckerTyId = CheckerTyId(20);
+    pub const THIS: CheckerTyId = CheckerTyId(12);
 }
 
 /// `CheckerTyId` of the seeded intrinsic `tag`, or `None` for the tags that
@@ -118,14 +110,6 @@ fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
             TypeTag::Null => CheckerTyId::NULL,
             TypeTag::Never => CheckerTyId::NEVER,
             TypeTag::Dynamic => CheckerTyId::DYNAMIC,
-            TypeTag::I8 => CheckerTyId::I8,
-            TypeTag::I16 => CheckerTyId::I16,
-            TypeTag::I32 => CheckerTyId::I32,
-            TypeTag::U8 => CheckerTyId::U8,
-            TypeTag::U16 => CheckerTyId::U16,
-            TypeTag::U32 => CheckerTyId::U32,
-            TypeTag::U64 => CheckerTyId::U64,
-            TypeTag::F32 => CheckerTyId::F32,
             _ => return None,
         }),
         TypeKind::This => Some(CheckerTyId::THIS),
@@ -200,14 +184,6 @@ impl CheckerTyTable {
             (CheckerTyId::NULL, TypeKind::Intrinsic(TypeTag::Null)),
             (CheckerTyId::NEVER, TypeKind::Intrinsic(TypeTag::Never)),
             (CheckerTyId::DYNAMIC, TypeKind::Intrinsic(TypeTag::Dynamic)),
-            (CheckerTyId::I8, TypeKind::Intrinsic(TypeTag::I8)),
-            (CheckerTyId::I16, TypeKind::Intrinsic(TypeTag::I16)),
-            (CheckerTyId::I32, TypeKind::Intrinsic(TypeTag::I32)),
-            (CheckerTyId::U8, TypeKind::Intrinsic(TypeTag::U8)),
-            (CheckerTyId::U16, TypeKind::Intrinsic(TypeTag::U16)),
-            (CheckerTyId::U32, TypeKind::Intrinsic(TypeTag::U32)),
-            (CheckerTyId::U64, TypeKind::Intrinsic(TypeTag::U64)),
-            (CheckerTyId::F32, TypeKind::Intrinsic(TypeTag::F32)),
             (CheckerTyId::THIS, TypeKind::This),
         ] {
             t.entries.insert(id, kind);

@@ -258,27 +258,6 @@ impl ExecCtx {
                         let r = tryv!(r);
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, r));
                     }
-                    OpCode::CheckNarrowRange => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let dest = hi(w1);
-                        // El compilador solo emite este chequeo con un tag
-                        // de los siete que `narrow_range` cubre — el `else`
-                        // (tag no reconocido) deja el valor pasar sin tocar
-                        // en vez de entrar en pánico aquí: un bug del emisor
-                        // debe fallar en la compilación, no corromper la
-                        // ejecución de un programa que ya pasó el checker.
-                        let v = (*ctx).stack.box_reg(base, dest);
-                        let checked = match varn_core::TypeTag::from_u8(lo(w1) as u8) {
-                            varn_core::TypeTag::F32 => {
-                                crate::exec::narrow_range::checked_narrow_f32(v.as_f64())
-                                    .map(crate::value::VmValue::from_f64)
-                            }
-                            tag => crate::exec::narrow_range::checked_narrow_int(tag, v.as_int())
-                                .map(crate::value::VmValue::from_int),
-                        };
-                        tryv!((*ctx).stack.unbox_into_reg(base, dest, tryv!(checked)));
-                    }
                     OpCode::LoadGlobal
                     | OpCode::StoreGlobal
                     | OpCode::DefineGlobal

@@ -270,33 +270,14 @@ pub enum InstKind {
         ty: HirType,
     },
 
-    /// Verifica que `operand` cabe en el rango de `tag` (`i8`, `u32`, `f32`,
-    /// …), pasándolo sin modificar si cabe. Emitido tras un cast explícito
-    /// (`x as i32`) hacia un ancho angosto y tras cualquier aritmética cuyo
-    /// tipo de resultado es angosto (`i8 + i8`) — nunca antes de la
-    /// operación normal, sobre ella: `AddInt`/`SubInt`/... siguen siendo la
-    /// aritmética real, esto solo valida que el resultado sigue cabiendo en
-    /// el ancho declarado. Panica en runtime si no cabe, igual que `int` ya
-    /// hace con su propio desbordamiento (`exec/arith.rs::overflow`).
-    /// `varn_core::TypeTag::U64` nunca aparece aquí — ver la nota de `u64`
-    /// en `varn_tir::BackendTy`.
     /// Explicit numeric conversion (`as`) that changes representation.
     Convert {
         operand: Value,
         conv: varn_core::NumConv,
     },
-    NarrowRangeCheck {
-        operand: Value,
-        tag: varn_core::TypeTag,
-    },
 
     BuildArray {
         elements: Vec<Value>,
-        /// `Some(tag)` cuando el elemento declarado es un ancho angosto
-        /// (`i8..u32/f32`): el runtime construye un `ArrayRepr` tipado en
-        /// vez de inferir la representación por valores. `None` preserva
-        /// el camino existente (`Boxed`/`I64`/`F64` por `from_items`).
-        narrow_elem: Option<varn_core::TypeTag>,
     },
 
     BuildTuple {

@@ -163,16 +163,9 @@ fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> O
 
     let operand = |t: &Type| match table.get(t.0) {
         TypeKind::Intrinsic(
-            TypeTag::Int
-            | TypeTag::I8
-            | TypeTag::I16
-            | TypeTag::I32
-            | TypeTag::U8
-            | TypeTag::U16
-            | TypeTag::U32
-            | TypeTag::U64,
+            TypeTag::Int,
         ) => Some(NumericOperand::Int),
-        TypeKind::Intrinsic(TypeTag::Float | TypeTag::F32) => Some(NumericOperand::Float),
+        TypeKind::Intrinsic(TypeTag::Float) => Some(NumericOperand::Float),
         TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
         _ => None,
     };

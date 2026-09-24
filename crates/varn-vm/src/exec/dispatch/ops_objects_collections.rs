@@ -281,7 +281,6 @@ impl ExecCtx {
                 *ip += 1;
                 let (dest, start_reg) = (hi(w1), lo(w1));
                 let count = hi(w2);
-                let tag_byte = lo(w2);
                 let mut elems = Vec::with_capacity(count);
                 for i in 0..count {
                     let nv = self.stack.box_reg(base, start_reg + i);
@@ -289,9 +288,6 @@ impl ExecCtx {
                 }
                 let built = if is_tuple {
                     self.heap.alloc_tuple_vm(elems)
-                } else if tag_byte != 0 {
-                    self.heap
-                        .alloc_array_vm_narrow(elems, varn_core::TypeTag::from_u8(tag_byte as u8))
                 } else {
                     self.heap.alloc_array_vm(elems)
                 };

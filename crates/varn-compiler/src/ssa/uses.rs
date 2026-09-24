@@ -49,7 +49,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | IsNull { operand }
         | Cast { operand, .. }
         | Convert { operand, .. }
-        | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }
@@ -211,7 +210,6 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | IsNull { operand }
         | Cast { operand, .. }
         | Convert { operand, .. }
-        | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
         | GetEnumTag { operand }

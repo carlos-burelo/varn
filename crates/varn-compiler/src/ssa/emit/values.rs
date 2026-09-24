@@ -247,26 +247,14 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack_op(OpCode::Convert, d), line);
             chunk.write(Chunk::pack(reg[operand.0 as usize], *conv as u8), line);
         }
-        InstKind::NarrowRangeCheck { operand, tag } => {
-            let src = reg[operand.0 as usize];
-            if d != src {
-                chunk.emit_rr(OpCode::Move, d, src, line);
-            }
-            chunk.emit(OpCode::CheckNarrowRange, line);
-            chunk.write(Chunk::pack(d, *tag as u8), line);
-        }
 
-        InstKind::BuildArray {
-            elements,
-            narrow_elem,
-        } => {
+        InstKind::BuildArray { elements } => {
             for (i, e) in elements.iter().enumerate() {
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], line);
             }
             chunk.emit(OpCode::BuildArray, line);
             chunk.write(Chunk::pack(d, call_base), line);
-            let tag_byte = narrow_elem.map_or(0u8, |t| t as u8);
-            chunk.write(Chunk::pack(elements.len() as u8, tag_byte), line);
+            chunk.write(Chunk::pack(elements.len() as u8, 0), line);
         }
 
         InstKind::BuildTuple { elements } => {

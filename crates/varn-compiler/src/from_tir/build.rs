@@ -747,14 +747,6 @@ impl<'m> Builder<'m> {
                 } else {
                     ty
                 };
-                // Nota: la aritmética entre dos enteros angostos ensancha a
-                // `int` en el CHECKER (`numeric_binary_type` trata Int/I8/
-                // I16/I32/U8/U16/U32/U64 como una sola categoría a propósito
-                // — ver `binder/type_inference.rs`), así que `e.ty` nunca es
-                // un ancho angosto aquí: no hace falta un `NarrowRangeCheck`
-                // en este punto. El único lugar donde un valor angosto nace
-                // de verdad es un cast explícito (`(a + b) as i8`), que es
-                // donde `TirExprKind::Cast` arriba ya lo hace.
                 Ok(self.emit(
                     InstKind::Binary {
                         op: bin_op(*op),
@@ -780,25 +772,6 @@ impl<'m> Builder<'m> {
                             },
                             ty,
                         );
-                        // A diferencia de `Binary` (que SIEMPRE ensancha a
-                        // `int`, ver la nota de arriba), `-`/`+` unario
-                        // PRESERVA el tipo del operando en el checker
-                        // (`infer_impl.rs`: `Minus | Plus => infer_type
-                        // (operand)`) — así que `e.ty` SÍ puede ser un ancho
-                        // angosto aquí, y `-i8::MIN` (128) SÍ se sale de
-                        // rango. `Not`/`BitNot` no cambian de magnitud, no
-                        // necesitan el chequeo.
-                        if matches!(op, TirUnOp::Neg) {
-                            if let Some(tag) = narrow_tag_of(e.ty) {
-                                return Ok(self.emit(
-                                    InstKind::NarrowRangeCheck {
-                                        operand: result,
-                                        tag,
-                                    },
-                                    ty,
-                                ));
-                            }
-                        }
                         Ok(result)
                     }
                 }
@@ -824,10 +797,6 @@ impl<'m> Builder<'m> {
                 if let Some(conv) = conv {
                     let result_ty = crate::ssa::verify::convert_result_ty(conv);
                     return Ok(self.emit(InstKind::Convert { operand: v, conv }, result_ty));
-                }
-                if let Some(tag) = narrow_tag_of(e.ty) {
-                    let v = self.emit(InstKind::Cast { operand: v, ty }, ty);
-                    return Ok(self.emit(InstKind::NarrowRangeCheck { operand: v, tag }, ty));
                 }
                 Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
             }
@@ -1045,17 +1014,7 @@ impl<'m> Builder<'m> {
                             varn_tir::TirArrayEl::Spread(_) => unreachable!(),
                         }
                     }
-                    let narrow_elem = match e.ty {
-                        BackendTy::Array(elem_id) => narrow_tag_of(self.tir.types.get(elem_id)),
-                        _ => None,
-                    };
-                    Ok(self.emit(
-                        InstKind::BuildArray {
-                            elements: vals,
-                            narrow_elem,
-                        },
-                        ty,
-                    ))
+                    Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
                 }
             }
             TirExprKind::TupleLit(xs) => {
@@ -1597,11 +1556,6 @@ fn is_free_fn_name(name: &str) -> bool {
         && cs.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
-/// El `TypeTag` de un ancho angosto (`i8/i16/i32/u8/u16/u32/f32`), o `None`
-/// para cualquier otro `BackendTy` — usado para saber cuándo un cast o un
-/// resultado aritmético necesita `InstKind::NarrowRangeCheck` después de
-/// emitirse (ver `narrow_range.rs` en `varn-vm` para el porqué de estos
-/// siete y no `u64`).
 /// The numeric domain an `as` converts between, for the types that have one.
 fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
     use varn_core::NumericDomain as D;
@@ -1614,33 +1568,12 @@ fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
     })
 }
 
-fn narrow_tag_of(bt: BackendTy) -> Option<varn_core::TypeTag> {
-    use varn_core::TypeTag as T;
-    Some(match bt {
-        BackendTy::Int8 => T::I8,
-        BackendTy::Int16 => T::I16,
-        BackendTy::Int32 => T::I32,
-        BackendTy::UInt8 => T::U8,
-        BackendTy::UInt16 => T::U16,
-        BackendTy::UInt32 => T::U32,
-        BackendTy::Float32 => T::F32,
-        _ => return None,
-    })
-}
-
 /// The layout tag the runtime lays a declared field out by.
 fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
     use varn_core::TypeTag as T;
     match bt {
         BackendTy::Int => T::Int,
-        BackendTy::Int8 => T::I8,
-        BackendTy::Int16 => T::I16,
-        BackendTy::Int32 => T::I32,
-        BackendTy::UInt8 => T::U8,
-        BackendTy::UInt16 => T::U16,
-        BackendTy::UInt32 => T::U32,
         BackendTy::Float => T::Float,
-        BackendTy::Float32 => T::F32,
         BackendTy::Bool => T::Bool,
         BackendTy::Str => T::Str,
         BackendTy::Bytes => T::Bytes,

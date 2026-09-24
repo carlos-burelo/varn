@@ -91,33 +91,8 @@ pub(crate) fn emit_call(
                         TypeTag::Bool => {
                             b.ins().istore8(m, payload, base, off);
                         }
-                        TypeTag::Int | TypeTag::U64 => match fi.size {
-                            1 => {
-                                b.ins().istore8(m, payload, base, off);
-                            }
-                            2 => {
-                                b.ins().istore16(m, payload, base, off);
-                            }
-                            4 => {
-                                b.ins().istore32(m, payload, base, off);
-                            }
-                            _ => {
-                                b.ins().store(m, payload, base, off);
-                            }
-                        },
-                        TypeTag::I8 | TypeTag::U8 => {
-                            b.ins().istore8(m, payload, base, off);
-                        }
-                        TypeTag::I16 | TypeTag::U16 => {
-                            b.ins().istore16(m, payload, base, off);
-                        }
-                        TypeTag::I32 | TypeTag::U32 => {
-                            b.ins().istore32(m, payload, base, off);
-                        }
-                        TypeTag::F32 => {
-                            let f = unbox_f64_coerce(b, val);
-                            let f32v = b.ins().fdemote(types::F32, f);
-                            b.ins().store(m, f32v, base, off);
+                        TypeTag::Int => {
+                            b.ins().store(m, payload, base, off);
                         }
                         TypeTag::Float => {
                             let f = unbox_f64_coerce(b, val);

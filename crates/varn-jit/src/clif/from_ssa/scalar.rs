@@ -95,7 +95,6 @@ pub(super) fn emit_inst(
             call::emit_call(b, ctx, values, *callee, *callee_global, args, d)?
         }
 
-        SsaOp::NarrowRangeCheck { .. } => return Err("from_ssa: range check".into()),
 
         // Handled by `heapvalue` above.
         SsaOp::ConstNull

@@ -37,14 +37,6 @@ pub enum TypeTag {
     DateTime,
     Duration,
     UUID,
-    I8,
-    I16,
-    I32,
-    U8,
-    U16,
-    U32,
-    U64,
-    F32,
     Span,
     TypedArray,
 }
@@ -86,14 +78,6 @@ impl TypeTag {
             Self::Error => "Error",
             Self::TypeError => "TypeError",
             Self::RangeError => "RangeError",
-            Self::I8 => "i8",
-            Self::I16 => "i16",
-            Self::I32 => "i32",
-            Self::U8 => "u8",
-            Self::U16 => "u16",
-            Self::U32 => "u32",
-            Self::U64 => "u64",
-            Self::F32 => "f32",
             Self::Span => "Span",
             Self::TypedArray => "TypedArray",
         }
@@ -147,14 +131,6 @@ impl TypeTag {
                 | Self::BigInt
                 | Self::Decimal
                 | Self::Symbol
-                | Self::I8
-                | Self::I16
-                | Self::I32
-                | Self::U8
-                | Self::U16
-                | Self::U32
-                | Self::U64
-                | Self::F32
         )
     }
 }
@@ -202,10 +178,9 @@ impl TypeTag {
     /// A tag with no unboxed representation falls back to a whole `VmValue`.
     pub const fn field_repr(self) -> FieldRepr {
         let (size, align, is_gc_ref) = match self {
-            TypeTag::Bool | TypeTag::I8 | TypeTag::U8 => (1, 1, false),
-            TypeTag::I16 | TypeTag::U16 => (2, 2, false),
-            TypeTag::Char | TypeTag::I32 | TypeTag::U32 | TypeTag::F32 => (4, 4, false),
-            TypeTag::Int | TypeTag::U64 | TypeTag::Float => (8, 8, false),
+            TypeTag::Bool => (1, 1, false),
+            TypeTag::Char => (4, 4, false),
+            TypeTag::Int | TypeTag::Float => (8, 8, false),
             TypeTag::Str
             | TypeTag::Array
             | TypeTag::Map

@@ -476,9 +476,6 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         ObjectRest { .. } => "object_rest".to_string(),
         Cast { operand, ty } => format!("cast v{} as {:?}", operand.0, ty),
         Convert { operand, conv } => format!("convert v{} {conv:?}", operand.0),
-        NarrowRangeCheck { operand, tag } => {
-            format!("narrow_range_check v{} as {tag:?}", operand.0)
-        }
     }
 }
 

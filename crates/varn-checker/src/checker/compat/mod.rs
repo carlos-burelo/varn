@@ -24,142 +24,19 @@ fn is_simple_type(ty: &Type, table: &CheckerTyTable) -> bool {
     matches!(table.get(ty.0), TypeKind::Intrinsic(_))
 }
 
+/// Scalar assignability. Only `int` widens implicitly, and only into the
+/// exact domains `decimal` and `bigint` (spec §9, ADR-0015 D4).
 fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTable) -> bool {
+    use varn_core::TypeTag as T;
     match (table.get(declared.0), table.get(inferred.0)) {
-        (TypeKind::Intrinsic(varn_core::TypeTag::Dynamic), _)
-        | (_, TypeKind::Intrinsic(varn_core::TypeTag::Dynamic)) => true,
-
+        (TypeKind::Intrinsic(T::Dynamic), _) | (_, TypeKind::Intrinsic(T::Dynamic)) => true,
         (a, b) if a == b => true,
-
-        (TypeKind::Intrinsic(varn_core::TypeTag::Int), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(
-                inf_tag,
-                varn_core::TypeTag::I8
-                    | varn_core::TypeTag::I16
-                    | varn_core::TypeTag::I32
-                    | varn_core::TypeTag::U8
-                    | varn_core::TypeTag::U16
-                    | varn_core::TypeTag::U32
-            )
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::I32), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(
-                inf_tag,
-                varn_core::TypeTag::I8
-                    | varn_core::TypeTag::I16
-                    | varn_core::TypeTag::U8
-                    | varn_core::TypeTag::U16
-            )
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::I16), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(inf_tag, varn_core::TypeTag::I8 | varn_core::TypeTag::U8)
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::I8), _) => false,
-        (TypeKind::Intrinsic(varn_core::TypeTag::U64), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(
-                inf_tag,
-                varn_core::TypeTag::U8 | varn_core::TypeTag::U16 | varn_core::TypeTag::U32
-            )
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::U32), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(inf_tag, varn_core::TypeTag::U8 | varn_core::TypeTag::U16)
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::U16), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(inf_tag, varn_core::TypeTag::U8)
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::U8), _) => false,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(
-                inf_tag,
-                varn_core::TypeTag::F32
-                    | varn_core::TypeTag::I8
-                    | varn_core::TypeTag::I16
-                    | varn_core::TypeTag::I32
-                    | varn_core::TypeTag::U8
-                    | varn_core::TypeTag::U16
-                    | varn_core::TypeTag::U32
-            )
-        }
-        (TypeKind::Intrinsic(varn_core::TypeTag::F32), TypeKind::Intrinsic(inf_tag)) => {
-            matches!(
-                inf_tag,
-                varn_core::TypeTag::I8
-                    | varn_core::TypeTag::I16
-                    | varn_core::TypeTag::U8
-                    | varn_core::TypeTag::U16
-            )
-        }
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
-            TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
-        _ => false,
-    }
-}
-
-pub(crate) fn literal_fits_type(target: &Type, int_val: i64, table: &CheckerTyTable) -> bool {
-    match table.get(target.0) {
-        TypeKind::Intrinsic(varn_core::TypeTag::I8) => {
-            (i8::MIN as i64..=i8::MAX as i64).contains(&int_val)
-        }
-        TypeKind::Intrinsic(varn_core::TypeTag::I16) => {
-            (i16::MIN as i64..=i16::MAX as i64).contains(&int_val)
-        }
-        TypeKind::Intrinsic(varn_core::TypeTag::I32) => {
-            (i32::MIN as i64..=i32::MAX as i64).contains(&int_val)
-        }
-        TypeKind::Intrinsic(varn_core::TypeTag::U8) => (0..=u8::MAX as i64).contains(&int_val),
-        TypeKind::Intrinsic(varn_core::TypeTag::U16) => (0..=u16::MAX as i64).contains(&int_val),
-        TypeKind::Intrinsic(varn_core::TypeTag::U32) => (0..=u32::MAX as i64).contains(&int_val),
-        TypeKind::Intrinsic(varn_core::TypeTag::U64) => int_val >= 0,
-        TypeKind::Intrinsic(varn_core::TypeTag::Int) => true,
-        TypeKind::Intrinsic(varn_core::TypeTag::Float | varn_core::TypeTag::F32) => true,
-        TypeKind::Intrinsic(
-            varn_core::TypeTag::Decimal | varn_core::TypeTag::BigInt | varn_core::TypeTag::Dynamic,
-        ) => true,
+        (TypeKind::Intrinsic(T::Decimal | T::BigInt), TypeKind::Intrinsic(T::Int)) => true,
         _ => false,
     }
 }
 
 use crate::types::numeric_literal::{const_int_value, int_literal_adopts};
-
-fn const_float_value(
-    arena: &varn_core::ast::AstArena,
-    expr: varn_core::ast::ExprId,
-) -> Option<f64> {
-    use varn_core::ast::{ExprKind, UnaryOp};
-    match &arena.expr(expr).kind {
-        ExprKind::FloatLiteral { value, .. } => Some(*value),
-        ExprKind::IntLiteral { value, .. } => Some(*value as f64),
-        ExprKind::Paren { expression } => const_float_value(arena, *expression),
-        ExprKind::Unary {
-            op,
-            prefix: true,
-            operand,
-            ..
-        } => match op {
-            UnaryOp::Minus => const_float_value(arena, *operand).map(|v| -v),
-            UnaryOp::Plus => const_float_value(arena, *operand),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// The `f32` bound cannot live in [`literal_fits_type`]: that function takes an
-/// `i64`, and every `i64` is inside `f32`'s exponent range, so it has no way to
-/// express the case that actually loses data. A float literal is parsed as
-/// `f64`, whose exponent range is far wider than `f32`'s — `1e300` narrows to
-/// `inf`. Rejecting that is the float analogue of `300` not fitting an `i8`, and
-/// it has to be rejected here rather than later: a compact `f32` array
-/// representation would turn the overflow into a silent `inf`.
-fn float_literal_fits_f32(value: f64) -> bool {
-    !value.is_finite() || (value as f32).is_finite()
-}
 
 /// A *non*-narrow literal sitting in a recursive position — an object property
 /// next to the narrow one — still has to be answered, and `types_compatible` is
@@ -206,24 +83,12 @@ fn array_element_type(
     }
 }
 
-/// Assignability escape hatch for *literals* written at a narrow target type.
-///
-/// `types_compatible` is a pure type-to-type relation and a narrow type is
-/// deliberately not a supertype of `int` (`simple_types_compatible` answers
-/// `(I8, _) => false`), so `let x: i8 = 42` can only be accepted by looking at
-/// the literal's value rather than at its inferred type. That is what this
-/// function is for, and `value_assignable_to` is the single funnel that pairs
-/// the two.
-///
-/// Array literals need the same treatment one level down. `[1, 2, 3]` infers as
-/// `int[]`, and `Array<i8>` vs `int[]` bottoms out in the very same
-/// `simple_types_compatible(I8, Int) == false`, so before this the *valid*
-/// program `let a: Array<i8> = [1,2,3]` was a type error and there was no path
-/// on which an out-of-range element could ever be range-checked. Recursing into
-/// the literal's elements here — and pointing `check_array_with_context` at
-/// `value_assignable_to` instead of raw `types_compatible` — is what makes
-/// `[1,2,3]` legal and `[300]` a compile error rather than a later silent
-/// truncation into a compact `ArrayRepr`.
+/// Assignability escape hatch for *literals* whose value, not their type,
+/// makes them fit: `int` is not a subtype of `float`, but the literal `42`
+/// adopts `float` because `f64` holds it exactly (spec §5). Array and inline
+/// object literals recurse, so `[1, 2]` fits `float[]` while
+/// `[9007199254740993]` does not. `value_assignable_to` pairs this with
+/// `types_compatible`.
 pub(crate) fn expr_satisfies_target_type(
     target_ty: &Type,
     _init_ty: &Type,
@@ -252,30 +117,15 @@ pub(crate) fn expr_satisfies_target_type(
             return true;
         }
     }
-    if target_ty.is_granular_int() {
-        if let Some(value) = const_int_value(arena, expr) {
-            return literal_fits_type(target_ty, value, table);
-        }
-    }
-    if matches!(
-        table.get(target_ty.0),
-        TypeKind::Intrinsic(varn_core::TypeTag::F32)
-    ) {
-        if let Some(value) = const_float_value(arena, expr) {
-            return float_literal_fits_f32(value);
-        }
-    }
     if let (Some(elem_ty), ExprKind::Array { elements }) =
         (array_element_type(target_ty, table, interner), expr_kind)
     {
         // `Array<Array<i8>>` recurses: the gate asks whether the element type is
         // narrow *or another array*, so nesting does not bail out one level in.
-        let literal_elem = elem_ty.is_granular_int()
-            || matches!(
+        let literal_elem = matches!(
                 table.get(elem_ty.0),
                 TypeKind::Intrinsic(
-                    varn_core::TypeTag::F32
-                        | varn_core::TypeTag::Float
+                    varn_core::TypeTag::Float
                         | varn_core::TypeTag::Decimal
                         | varn_core::TypeTag::BigInt
                 )
@@ -1100,59 +950,33 @@ mod tests {
         Type::array(elem, table)
     }
 
-    /// The safety property a later compact `ArrayRepr` depends on: an element
-    /// that does not fit the declared narrow width must never be accepted, or it
-    /// would be truncated silently at runtime instead.
+    /// An integer literal element adopts `float` only when `f64` holds it
+    /// exactly; otherwise the array literal must not be accepted.
     #[test]
-    fn narrow_array_literal_rejects_out_of_range_element() {
+    fn float_array_literal_accepts_exact_integers_only() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
-        let u8_arr = array_of(TypeTag::U8, &mut table);
-        let u32_arr = array_of(TypeTag::U32, &mut table);
-        assert!(!accepts(&i8_arr, &table, "[300]"));
-        assert!(!accepts(&i8_arr, &table, "[0, 1, -129]"));
-        assert!(!accepts(&u8_arr, &table, "[-1]"));
-        assert!(!accepts(&u32_arr, &table, "[4294967296]"));
+        let f_arr = array_of(TypeTag::Float, &mut table);
+        assert!(accepts(&f_arr, &table, "[1, 2, 3]"));
+        assert!(accepts(&f_arr, &table, "[-1, 9007199254740992]"));
+        assert!(!accepts(&f_arr, &table, "[9007199254740993]"));
     }
 
     #[test]
-    fn narrow_array_literal_accepts_in_range_elements() {
+    fn nested_literal_arrays_recurse() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
-        let u8_arr = array_of(TypeTag::U8, &mut table);
-        let u32_arr = array_of(TypeTag::U32, &mut table);
-        assert!(accepts(&i8_arr, &table, "[-128, 0, 127]"));
-        assert!(accepts(&u8_arr, &table, "[0, 255]"));
-        assert!(accepts(&u32_arr, &table, "[0, 4000000000]"));
-    }
-
-    #[test]
-    fn f32_literal_that_would_narrow_to_infinity_is_rejected() {
-        let mut table = CheckerTyTable::default();
-        let f32_arr = array_of(TypeTag::F32, &mut table);
-        let f32_scalar = Type::intrinsic(TypeTag::F32, &mut table);
-        assert!(!accepts(&f32_arr, &table, "[1e300]"));
-        assert!(!accepts(&f32_scalar, &table, "1e300"));
-        assert!(accepts(&f32_arr, &table, "[1.5, -2.25, 3]"));
-        assert!(accepts(&f32_scalar, &table, "3.14"));
-    }
-
-    #[test]
-    fn nested_narrow_array_literals_recurse() {
-        let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
-        let nested = Type::array(i8_arr, &mut table);
+        let f_arr = array_of(TypeTag::Float, &mut table);
+        let nested = Type::array(f_arr, &mut table);
         assert!(accepts(&nested, &table, "[[1, 2], [3]]"));
-        assert!(!accepts(&nested, &table, "[[1, 2], [300]]"));
+        assert!(!accepts(&nested, &table, "[[1, 2], [9007199254740993]]"));
     }
 
-    /// A spread has no literal value to range-check, so it must fall through to
-    /// the conservative answer rather than wave the whole array through.
+    /// A spread has no literal value to check, so it must fall through to the
+    /// conservative answer rather than wave the whole array through.
     #[test]
     fn spread_element_is_not_waved_through() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
-        assert!(!accepts(&i8_arr, &table, "[...other]"));
+        let f_arr = array_of(TypeTag::Float, &mut table);
+        assert!(!accepts(&f_arr, &table, "[...other]"));
     }
 
     fn prop(name: &str, ty: Type, optional: bool) -> ObjectTypeMember {
@@ -1169,9 +993,9 @@ mod tests {
     #[test]
     fn object_literal_missing_required_property_is_rejected() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
+        let f_arr = array_of(TypeTag::Float, &mut table);
         let members = table.intern_object_members(vec![
-            prop("xs", i8_arr, false),
+            prop("xs", f_arr, false),
             prop("name", Type::Str, false),
         ]);
         let target = Type(table.intern(TypeKind::Object(members)), false);
@@ -1181,30 +1005,30 @@ mod tests {
     #[test]
     fn object_literal_may_omit_an_optional_property() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
+        let f_arr = array_of(TypeTag::Float, &mut table);
         let members = table.intern_object_members(vec![
-            prop("xs", i8_arr, false),
+            prop("xs", f_arr, false),
             prop("name", Type::Str, true),
         ]);
         let target = Type(table.intern(TypeKind::Object(members)), false);
         assert!(accepts(&target, &table, "{ xs: [1, 2] }"));
-        // Still value-checked: an out-of-range element rejects regardless.
-        assert!(!accepts(&target, &table, "{ xs: [300] }"));
+        // Still value-checked: an inexact element rejects regardless.
+        assert!(!accepts(&target, &table, "{ xs: [9007199254740993] }"));
     }
 
-    /// A required non-narrow property next to the narrow one must not sink the
+    /// A required plain property next to the literal-checked one must not sink the
     /// whole literal, and must still be type-checked.
     #[test]
     fn object_literal_checks_plain_properties_too() {
         let mut table = CheckerTyTable::default();
-        let i8_arr = array_of(TypeTag::I8, &mut table);
+        let f_arr = array_of(TypeTag::Float, &mut table);
         let members = table.intern_object_members(vec![
-            prop("xs", i8_arr, false),
+            prop("xs", f_arr, false),
             prop("name", Type::Str, false),
         ]);
         let target = Type(table.intern(TypeKind::Object(members)), false);
         assert!(accepts(&target, &table, "{ xs: [1, 2], name: \"ok\" }"));
         assert!(!accepts(&target, &table, "{ xs: [1, 2], name: 42 }"));
-        assert!(!accepts(&target, &table, "{ xs: [300], name: \"ok\" }"));
+        assert!(!accepts(&target, &table, "{ xs: [9007199254740993], name: \"ok\" }"));
     }
 }

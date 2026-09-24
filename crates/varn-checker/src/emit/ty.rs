@@ -180,24 +180,8 @@ fn lower_kind(
 
 fn lower_tag(tag: TypeTag) -> BackendTy {
     match tag {
-        // `U64` sigue aquí a propósito: necesita aritmética sin signo
-        // dedicada (`u64::checked_*` sobre los mismos bits reinterpretados)
-        // que reusar la de `Int` con signo no puede dar correctamente para
-        // valores por encima de `i64::MAX` — ver Anexo K4 en
-        // docs/AUDIT_RESPONSE.md. Las otras seis anchas SÍ preservan su
-        // ancho: colapsarlas aquí a `Int`/`Float` era precisamente lo que
-        // impedía que `class_field_repr`/`InstanceData::read_field` (que ya
-        // saben empacarlas a su tamaño real) o un chequeo de rango en
-        // aritmética las vieran alguna vez.
-        TypeTag::Int | TypeTag::U64 => BackendTy::Int,
-        TypeTag::I8 => BackendTy::Int8,
-        TypeTag::I16 => BackendTy::Int16,
-        TypeTag::I32 => BackendTy::Int32,
-        TypeTag::U8 => BackendTy::UInt8,
-        TypeTag::U16 => BackendTy::UInt16,
-        TypeTag::U32 => BackendTy::UInt32,
+        TypeTag::Int => BackendTy::Int,
         TypeTag::Float => BackendTy::Float,
-        TypeTag::F32 => BackendTy::Float32,
         TypeTag::Bool => BackendTy::Bool,
         TypeTag::Char => BackendTy::Char,
         TypeTag::Str => BackendTy::Str,
@@ -289,62 +273,6 @@ mod tests {
         assert_eq!(
             lower_type(&decimal_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Decimal
-        );
-        let f32_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::F32));
-        assert_eq!(
-            lower_type(&f32_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Float32
-        );
-        // Anexo K4 (docs/AUDIT_RESPONSE.md): las estrechas preservan su
-        // ancho para el layout compacto (Anexo K3) y el chequeo de rango
-        // (`NarrowRangeCheck`). Solo `U64` sigue colapsando a `Int`:
-        // necesita aritmética sin signo dedicada que reusar la de `Int`
-        // con signo no puede dar correctamente. Portado de main a la
-        // firma con `CheckerTyTable` (`intern` + `lower_type` con tabla).
-        let i8_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::I8));
-        assert_eq!(
-            lower_type(&i8_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Int8
-        );
-        let i16_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::I16));
-        assert_eq!(
-            lower_type(&i16_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Int16
-        );
-        let i32_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::I32));
-        assert_eq!(
-            lower_type(&i32_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Int32
-        );
-        let u8_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::U8));
-        assert_eq!(
-            lower_type(&u8_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::UInt8
-        );
-        let u16_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::U16));
-        assert_eq!(
-            lower_type(&u16_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::UInt16
-        );
-        let u32_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::U32));
-        assert_eq!(
-            lower_type(&u32_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::UInt32
-        );
-        let u64_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::U64));
-        assert_eq!(
-            lower_type(&u64_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Int
-        );
-    }
-
-    #[test]
-    fn dynamic_carries_unannotated_not_a_default() {
-        let (mut tt, mut ct, interner) = table();
-        let dyn_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Dynamic));
-        assert_eq!(
-            lower_type(&dyn_ty, &ct, &interner, &mut tt, &NoNames),
-            BackendTy::Dynamic(DynReason::Unannotated)
         );
     }
 
