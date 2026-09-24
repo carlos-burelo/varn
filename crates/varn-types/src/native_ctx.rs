@@ -137,7 +137,15 @@ pub trait NativeCtx {
         obj
     }
 
-    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String>;
+    /// Run a VM callable. An exception it throws comes back as the error,
+    /// thrown value included: a native propagates it with `?`, never drops it.
+    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, crate::NativeError>;
+
+    /// `recv.name` as a callable bound to `recv`, when `recv` has such a
+    /// method (how a native reaches a capability like `Comparable.compare`).
+    fn method(&mut self, _recv: VmValue, _name: &str) -> Option<VmValue> {
+        None
+    }
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String>;
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue;
@@ -196,8 +204,8 @@ pub trait NativeCtx {
     /// for SSO/int/bool/null/symbol; heap-backed contexts override it to
     /// content-intern heap strings/chars/decimals/bigints and to normalize
     /// `-0.0`.
-    fn map_key(&mut self, v: VmValue) -> crate::value::MapKey {
-        crate::value::MapKey(v)
+    fn map_key(&mut self, v: VmValue) -> Result<crate::value::MapKey, crate::NativeError> {
+        Ok(crate::value::MapKey(v))
     }
 
     /// Canonical map key for a borrowed string: SSO when short-ASCII,

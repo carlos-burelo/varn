@@ -11,7 +11,10 @@ pub(crate) extern "C" fn jit_get_index(ctx: *mut ExecCtx, args: *const varn_jit:
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*args;
-        let key = ctx_ref.hashable_key(args.key);
+        let key = match ctx_ref.hashable_key(args.key) {
+            Ok(key) => key,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        };
         match crate::exec::collections::get_index(args.obj, key, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -23,7 +26,10 @@ pub(crate) extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit:
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*args;
-        let key = ctx_ref.hashable_key(args.key);
+        let key = match ctx_ref.hashable_key(args.key) {
+            Ok(key) => key,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        };
         match crate::exec::collections::set_index(args.obj, key, args.val, &mut ctx_ref.heap) {
             Ok(()) => {}
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -39,7 +45,10 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
     key_payload: u64,
 ) {
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-    let key = (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload));
+    let key = match (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) {
+        Ok(key) => key,
+        Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
+    };
     // Fast path: heap array or object
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
@@ -100,7 +109,10 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     val_payload: u64,
 ) {
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-    let key = (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload));
+    let key = match (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) {
+        Ok(key) => key,
+        Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
+    };
     let val = VmValue::from_raw_parts(val_tag, val_payload);
     // Fast path: heap array or object or map
     if obj.is_heap() {

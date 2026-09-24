@@ -1,7 +1,9 @@
 #![allow(non_upper_case_globals)]
 
+mod ordering;
+
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, VmValue, VnArray};
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Array;
 
@@ -216,129 +218,101 @@ varn_contract! {
         }
 
 
-        fn map(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Vec<VmValue> {
+        fn map(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Result<Vec<VmValue>, NativeError> {
             let arr = this.raw();
             let len = this.len(ctx);
             let mut out = Vec::with_capacity(len);
             for i in 0..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                if let Ok(r) = ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr]) {
+                out.push(ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr])?);
+            }
+            Ok(out)
+        }
+        fn filter(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<Vec<VmValue>, NativeError> {
+            let arr = this.raw();
+            let len = this.len(ctx);
+            let mut out = Vec::new();
+            for i in 0..len {
+                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
+                if ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
+                    out.push(v);
+                }
+            }
+            Ok(out)
+        }
+        fn find(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<Option<VmValue>, NativeError> {
+            let arr = this.raw();
+            let len = this.len(ctx);
+            for i in 0..len {
+                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
+                if ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
+                    return Ok(Some(v));
+                }
+            }
+            Ok(None)
+        }
+        fn findIndex(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<i64, NativeError> {
+            let arr = this.raw();
+            let len = this.len(ctx);
+            for i in 0..len {
+                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
+                if ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
+                    return Ok(i as i64);
+                }
+            }
+            Ok(-1)
+        }
+        fn forEach(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Result<(), NativeError> {
+            let arr = this.raw();
+            let len = this.len(ctx);
+            for i in 0..len {
+                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
+                ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr])?;
+            }
+            Ok(())
+        }
+        fn flatMap(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Result<Vec<VmValue>, NativeError> {
+            let arr = this.raw();
+            let len = this.len(ctx);
+            let mut out = Vec::new();
+            for i in 0..len {
+                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
+                let r = ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr])?;
+                if ctx.is_array(r) {
+                    let rlen = ctx.array_len(r);
+                    for j in 0..rlen {
+                        out.push(ctx.array_get(r, j).unwrap_or_else(VmValue::null));
+                    }
+                } else {
                     out.push(r);
                 }
             }
-            out
+            Ok(out)
         }
-        fn filter(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Vec<VmValue> {
-            let arr = this.raw();
-            let len = this.len(ctx);
-            let mut out = Vec::new();
-            for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                if let Ok(keep) = ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr]) {
-                    if keep.is_truthy() {
-                        out.push(v);
-                    }
-                }
-            }
-            out
-        }
-        fn find(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Option<VmValue> {
-            let arr = this.raw();
-            let len = this.len(ctx);
-            for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                if let Ok(r) = ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr]) {
-                    if r.is_truthy() {
-                        return Some(v);
-                    }
-                }
-            }
-            None
-        }
-        fn findIndex(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> i64 {
-            let arr = this.raw();
-            let len = this.len(ctx);
-            for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                if let Ok(r) = ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr]) {
-                    if r.is_truthy() {
-                        return i as i64;
-                    }
-                }
-            }
-            -1
-        }
-        fn forEach(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) {
-            let arr = this.raw();
-            let len = this.len(ctx);
-            for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                let _ = ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr]);
-            }
-        }
-        fn flatMap(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Vec<VmValue> {
-            let arr = this.raw();
-            let len = this.len(ctx);
-            let mut out = Vec::new();
-            for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                if let Ok(r) = ctx.call_vm(callback, &[v, VmValue::from_int(i as i64), arr]) {
-                    if ctx.is_array(r) {
-                        let rlen = ctx.array_len(r);
-                        for j in 0..rlen {
-                            out.push(ctx.array_get(r, j).unwrap_or_else(VmValue::null));
-                        }
-                    } else {
-                        out.push(r);
-                    }
-                }
-            }
-            out
-        }
-        fn reduce(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue, initial: Option<VmValue>) -> VmValue {
+        fn reduce(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue, initial: Option<VmValue>) -> Result<VmValue, NativeError> {
             let arr = this.raw();
             let len = this.len(ctx);
             let (mut acc, start) = match initial {
                 Some(init) => (init, 0usize),
                 None if len > 0 => (this.get(ctx, 0).unwrap_or_else(VmValue::null), 1usize),
-                None => return VmValue::null(),
+                None => return Err(NativeError::from("reduce of an empty array with no initial value")),
             };
             for i in start..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                match ctx.call_vm(callback, &[acc, v, VmValue::from_int(i as i64), arr]) {
-                    Ok(r) => acc = r,
-                    Err(_) => break,
-                }
+                acc = ctx.call_vm(callback, &[acc, v, VmValue::from_int(i as i64), arr])?;
             }
-            acc
+            Ok(acc)
         }
-        fn sort(ctx: &mut dyn NativeCtx, this: VnArray, compareFn: Option<VmValue>) -> Vec<VmValue> {
-            let len = this.len(ctx);
+        fn sort(ctx: &mut dyn NativeCtx, this: VnArray, compareFn: Option<VmValue>) -> Result<Vec<VmValue>, NativeError> {
             let mut items = this.to_vec(ctx);
             match compareFn.filter(|v| !v.is_null()) {
-                Some(cb) => {
-                    for i in 0..len {
-                        for j in 0..len.saturating_sub(1 + i) {
-                            let a = items[j];
-                            let b = items[j + 1];
-                            let cmp = ctx
-                                .call_vm(cb, &[a, b])
-                                .map(|r| if r.is_int() { r.as_int() } else { 0 })
-                                .unwrap_or(0);
-                            if cmp > 0 {
-                                items.swap(j, j + 1);
-                            }
-                        }
-                    }
-                }
-                None => {
-                    items.sort_by_key(|a| ctx.str_repr(*a));
-                }
+                Some(cb) => ordering::merge_sort(&mut items, &mut |a, b| ordering::sign(ctx, cb, &[a, b]))?,
+                None => ordering::merge_sort(&mut items, &mut |a, b| ordering::natural_cmp(ctx, a, b))?,
             }
             for (i, v) in items.iter().enumerate() {
                 this.set(ctx, i, *v);
             }
-            items
+            Ok(items)
         }
         fn splice(ctx: &mut dyn NativeCtx, this: VnArray, start: i64, deleteCount: Option<i64>, items: &[VmValue]) -> Vec<VmValue> {
             let len = this.len(ctx) as i64;
@@ -364,33 +338,27 @@ varn_contract! {
             }
             removed
         }
-        fn every(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> bool {
+        fn every(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<bool, NativeError> {
             let arr = this.raw();
             let len = this.len(ctx);
             for i in 0..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                let r = ctx
-                    .call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])
-                    .unwrap_or_else(|_| VmValue::bool_false());
-                if !r.is_truthy() {
-                    return false;
+                if !ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
+                    return Ok(false);
                 }
             }
-            true
+            Ok(true)
         }
-        fn some(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> bool {
+        fn some(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<bool, NativeError> {
             let arr = this.raw();
             let len = this.len(ctx);
             for i in 0..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                let r = ctx
-                    .call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])
-                    .unwrap_or_else(|_| VmValue::bool_false());
-                if r.is_truthy() {
-                    return true;
+                if ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
+                    return Ok(true);
                 }
             }
-            false
+            Ok(false)
         }
 
 

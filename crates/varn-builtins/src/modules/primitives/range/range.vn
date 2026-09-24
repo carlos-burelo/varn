@@ -8,8 +8,8 @@ export declare class Range<T> {
     contains(val: T): bool;
     toArray(): T[];
     @fallible step(n: int): Range<T>;
-    forEach(callback: (val: T) => void): void;
-    map<U>(callback: (val: T) => U): U[];
+    @fallible forEach(callback: (val: T) => void): void;
+    @fallible map<U>(callback: (val: T) => U): U[];
 
     static from(start: int, end: int): Range<int>;
     static fromInclusive(start: int, end: int): Range<int>;

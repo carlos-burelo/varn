@@ -1,6 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::value::MapRef;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, Value, VmValue};
 
 pub struct Map;
 
@@ -21,38 +21,41 @@ varn_contract! {
             ctx.intern(Value::Map(MapRef::new(varn_types::value::ValueMap::default())))
         }
 
-        fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Option<VmValue> {
-            let m = get_map(ctx, this)?;
-            let k = ctx.map_key(key);
+        fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Result<Option<VmValue>, NativeError> {
+            let Some(m) = get_map(ctx, this) else {
+                return Ok(None);
+            };
+            let k = ctx.map_key(key)?;
             let found = m.borrow().get(&k).copied();
-            found
+            Ok(found)
         }
-        fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue, value: VmValue) {
+        fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue, value: VmValue) -> Result<(), NativeError> {
             if let Some(m) = get_map(ctx, this) {
-                let k = ctx.map_key(key);
+                let k = ctx.map_key(key)?;
                 m.borrow_mut().insert(k, value);
                 // Interior-mutability store: no opcode barrier sees it. A
                 // non-string key can be a nursery object too.
                 ctx.collection_write_barrier(this, k.0);
                 ctx.collection_write_barrier(this, value);
             }
+            Ok(())
         }
-        fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
+        fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Result<bool, NativeError> {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let k = ctx.map_key(key);
-                    m.borrow().contains_key(&k)
+                    let k = ctx.map_key(key)?;
+                    Ok(m.borrow().contains_key(&k))
                 }
-                None => false,
+                None => Ok(false),
             }
         }
-        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
+        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Result<bool, NativeError> {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let k = ctx.map_key(key);
-                    m.borrow_mut().remove(&k).is_some()
+                    let k = ctx.map_key(key)?;
+                    Ok(m.borrow_mut().remove(&k).is_some())
                 }
-                None => false,
+                None => Ok(false),
             }
         }
         fn clear(ctx: &mut dyn NativeCtx, this: VmValue) {
@@ -85,14 +88,15 @@ varn_contract! {
                 None => Vec::new(),
             }
         }
-        fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
+        fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(m) = get_map(ctx, this) {
                 let pairs: Vec<(VmValue, VmValue)> =
                     m.borrow().iter().map(|(k, v)| (k.0, *v)).collect();
                 for (k, v) in pairs {
-                    let _ = ctx.call_vm(callback, &[v, k, this]);
+                    ctx.call_vm(callback, &[v, k, this])?;
                 }
             }
+            Ok(())
         }
         fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
             get_map(ctx, this).map(|m| m.borrow().len() as i64).unwrap_or(0)

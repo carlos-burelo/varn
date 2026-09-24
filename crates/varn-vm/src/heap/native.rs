@@ -196,7 +196,7 @@ impl NativeCtx for Heap {
         obj
     }
 
-    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
+    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, varn_types::NativeError> {
         Err("call_vm unavailable on bare Heap (use ExecCtx)".into())
     }
 
@@ -220,8 +220,8 @@ impl NativeCtx for Heap {
         self.deref_mut().intern(v)
     }
 
-    fn map_key(&mut self, v: VmValue) -> MapKey {
-        self.deref_mut().canonical_map_key(v)
+    fn map_key(&mut self, v: VmValue) -> Result<MapKey, varn_types::NativeError> {
+        Ok(self.deref_mut().canonical_map_key(v))
     }
 
     fn str_map_key(&mut self, s: &str) -> MapKey {

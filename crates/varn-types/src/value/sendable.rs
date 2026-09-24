@@ -264,7 +264,9 @@ impl SendValue {
                 for (k, v) in entries {
                     let k_nv = k.to_value_ctx(ctx);
                     let v_nv = v.to_value_ctx(ctx);
-                    let key = ctx.map_key(k_nv);
+                    // A sent key is plain data (no methods), so canonicalizing
+                    // it runs no user code and cannot fail.
+                    let key = ctx.map_key(k_nv).unwrap_or(crate::value::MapKey(k_nv));
                     g.insert(key, v_nv);
                 }
                 drop(g);
@@ -275,7 +277,7 @@ impl SendValue {
                 let mut g = set_ref.write();
                 for item in items {
                     let item_nv = item.to_value_ctx(ctx);
-                    let key = ctx.map_key(item_nv);
+                    let key = ctx.map_key(item_nv).unwrap_or(crate::value::MapKey(item_nv));
                     g.insert(key);
                 }
                 drop(g);

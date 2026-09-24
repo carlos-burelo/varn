@@ -1,0 +1,48 @@
+class Boom extends Error { constructor(msg: str) { super(msg) } }
+function boom(x: int): int { if (x === 2) { throw new Boom("boom") } return x }
+
+function raisesBoom(f: () => void): bool {
+    try { f(); return false } catch (e) { return e instanceof Boom && e.message === "boom" }
+}
+
+assert("map propagates", raisesBoom(() => { [1, 2, 3].map(boom) }))
+assert("filter propagates", raisesBoom(() => { [1, 2, 3].filter((x: int) => boom(x) > 0) }))
+assert("forEach propagates", raisesBoom(() => { [1, 2, 3].forEach((x: int) => { boom(x) }) }))
+assert("find propagates", raisesBoom(() => { [1, 2, 3].find((x: int) => boom(x) > 5) }))
+assert("reduce propagates", raisesBoom(() => { [1, 2, 3].reduce((a: int, x: int) => a + boom(x), 0) }))
+assert("sort comparator propagates", raisesBoom(() => { [3, 2, 1].sort((a: int, b: int) => boom(a) - b) }))
+assert("every/some propagate", raisesBoom(() => { [1, 2].every((x: int) => boom(x) > 0) }) && raisesBoom(() => { [1, 2].some((x: int) => boom(x) > 5) }))
+
+const byKey: Map<int, int> = new Map()
+byKey.set(2, 2)
+assert("Map.forEach propagates", raisesBoom(() => { byKey.forEach((v: int, k: int) => { boom(v) }) }))
+const inSet: Set<int> = new Set()
+inSet.add(2)
+assert("Set.forEach propagates", raisesBoom(() => { inSet.forEach((v: int) => { boom(v) }) }))
+assert("Range.map propagates", raisesBoom(() => { (1..4).map(boom) }))
+
+class BadKey {
+    hash(): int { throw new Boom("boom") }
+    equals(o: BadKey): bool { return true }
+}
+const bad: Map<BadKey, int> = new Map()
+assert("a throwing hash() propagates", raisesBoom(() => { bad.set(new BadKey(), 1) }))
+
+assert("sort orders ints numerically", [10, 9, 1, 100].sort().join(",") === "1,9,10,100")
+assert("sort orders floats numerically", [2.5, 10.0, 1.0].sort().join(",") === "1,2.5,10")
+assert("sort orders strings by code point", ["b", "a", "c"].sort().join("") === "abc")
+assert("sort is stable", [#[1, "a"], #[0, "b"], #[1, "c"]].sort((x: #[int, str], y: #[int, str]) => x[0] - y[0]).map((t: #[int, str]) => t[1]).join("") === "bac")
+
+class Ver {
+    n: int
+    constructor(n: int) { this.n = n }
+    compare(o: Ver): int { return this.n - o.n }
+}
+assert("sort uses Comparable", [new Ver(3), new Ver(1), new Ver(2)].sort().map((v: Ver) => v.n).join(",") === "1,2,3")
+
+function unsortable(): bool {
+    try { [{ a: 1 }, { a: 2 }].sort(); return false } catch (e) { return true }
+}
+assert("values with no order raise instead of guessing", unsortable())
+
+print("[PASSED] 135. Callback exceptions and ordering")

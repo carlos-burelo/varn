@@ -24,9 +24,9 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_str_dynamic(s)
     }
 
-    fn map_key(&mut self, v: VmValue) -> varn_types::value::MapKey {
-        let v = self.hashable_key(v);
-        self.heap.canonical_map_key(v)
+    fn map_key(&mut self, v: VmValue) -> Result<varn_types::value::MapKey, varn_types::NativeError> {
+        let v = self.hashable_key(v)?;
+        Ok(self.heap.canonical_map_key(v))
     }
 
     // Map keys MUST canonicalize through the content interner —
@@ -302,14 +302,18 @@ impl NativeCtx for ExecCtx {
         None
     }
 
-    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, varn_types::NativeError> {
         // The window is `[callee, args...]`, the exact shape the interpreter's
         // callee slot + arguments and the compiled caller's flushed staging
         // produce; `invoke` is the single run-to-completion entry.
         let mut window = Vec::with_capacity(args.len() + 1);
         window.push(callee);
         window.extend_from_slice(args);
-        self.invoke(callee, &window).map_err(|e| e.message)
+        Ok(self.invoke(callee, &window)?)
+    }
+
+    fn method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
+        self.bound_method(recv, name)
     }
 
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {

@@ -205,7 +205,7 @@ impl NativeCtx for DummyCtx {
     fn alloc_range(&mut self, _start: i64, _end: i64, _inclusive: bool) -> VmValue {
         VmValue::null()
     }
-    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
+    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, crate::NativeError> {
         Err("DummyCtx".into())
     }
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
@@ -283,7 +283,7 @@ impl<'a> NativeCtx for StaticInitCtx<'a> {
     fn alloc_range(&mut self, _start: i64, _end: i64, _inclusive: bool) -> VmValue {
         VmValue::null()
     }
-    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
+    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, crate::NativeError> {
         Err("call_vm unavailable in static init context".into())
     }
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {

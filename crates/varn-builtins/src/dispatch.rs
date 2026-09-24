@@ -466,7 +466,7 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
         None
     }
     fn set_field(&mut self, _obj: VmValue, _key: &str, _val: VmValue) {}
-    fn call_vm(&mut self, _c: VmValue, _a: &[VmValue]) -> Result<VmValue, String> {
+    fn call_vm(&mut self, _c: VmValue, _a: &[VmValue]) -> Result<VmValue, varn_types::NativeError> {
         Ok(VmValue::null())
     }
     fn spawn_vm(&mut self, _c: VmValue, _a: &[VmValue]) -> Result<VmValue, String> {

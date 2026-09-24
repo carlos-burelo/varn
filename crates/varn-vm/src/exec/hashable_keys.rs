@@ -10,38 +10,38 @@
 use super::ctx::ExecCtx;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
-use varn_types::NativeCtx;
+use crate::error::{RuntimeError, VmResult};
 
 impl ExecCtx {
     /// The representative `key` stands for, or `key` itself when it is not an
-    /// instance declaring both `hash()` and `equals()`. A capability method
-    /// that throws leaves the key as itself.
-    pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmValue {
+    /// instance declaring both `hash()` and `equals()`. An exception either
+    /// method throws propagates to the Map/Set operation's caller.
+    pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmResult<VmValue> {
         let Some(class_id) = self.instance_class_id(key) else {
-            return key;
+            return Ok(key);
         };
         let (Some(hash_fn), Some(equals_fn)) =
             (self.bound_method(key, "hash"), self.bound_method(key, "equals"))
         else {
-            return key;
+            return Ok(key);
         };
-        let Ok(hash) = self.call_vm(hash_fn, &[]) else {
-            return key;
-        };
-        let bucket_key = (class_id, self.heap.as_int(hash));
+        let hash = self.invoke(hash_fn, &[hash_fn])?;
+        if !hash.is_int() {
+            return Err(RuntimeError::new("hash() must return int"));
+        }
+        let bucket_key = (class_id, hash.as_int());
         let candidates = self.hashable_keys.get(&bucket_key).cloned().unwrap_or_default();
         for rep in candidates {
             if rep == key {
-                return rep;
+                return Ok(rep);
             }
-            if let Ok(same) = self.call_vm(equals_fn, &[rep]) {
-                if same.is_bool() && same.as_bool() {
-                    return rep;
-                }
+            let same = self.invoke(equals_fn, &[equals_fn, rep])?;
+            if same.is_bool() && same.as_bool() {
+                return Ok(rep);
             }
         }
         self.hashable_keys.entry(bucket_key).or_default().push(key);
-        key
+        Ok(key)
     }
 
     fn instance_class_id(&self, v: VmValue) -> Option<u32> {
@@ -54,7 +54,7 @@ impl ExecCtx {
         }
     }
 
-    fn bound_method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
+    pub(crate) fn bound_method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
         let method = super::props::get_property(recv, name, &mut self.heap).ok()?;
         let callable = method.is_heap()
             && matches!(

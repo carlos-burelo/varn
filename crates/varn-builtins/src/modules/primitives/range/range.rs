@@ -75,20 +75,21 @@ varn_contract! {
             let r = get_range(ctx, this).ok_or_else(|| NativeError::from("range.step: not a range"))?;
             Ok(ctx.intern(Value::Range(Box::new(r.with_step(r.step * n)))))
         }
-        fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
+        fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(r) = get_range(ctx, this) {
                 for item in elements(ctx, &r) {
-                    let _ = ctx.call_vm(callback, &[item]);
+                    ctx.call_vm(callback, &[item])?;
                 }
             }
+            Ok(())
         }
-        fn map(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Vec<VmValue> {
+        fn map(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<Vec<VmValue>, NativeError> {
             let Some(r) = get_range(ctx, this) else {
-                return Vec::new();
+                return Ok(Vec::new());
             };
             elements(ctx, &r)
                 .into_iter()
-                .filter_map(|item| ctx.call_vm(callback, &[item]).ok())
+                .map(|item| ctx.call_vm(callback, &[item]))
                 .collect()
         }
 

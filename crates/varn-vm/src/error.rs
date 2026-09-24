@@ -41,7 +41,18 @@ impl RuntimeError {
 
 impl From<varn_types::NativeError> for RuntimeError {
     fn from(e: varn_types::NativeError) -> Self {
-        Self::of_kind(e.kind, e.message)
+        Self {
+            thrown: e.thrown,
+            ..Self::of_kind(e.kind, e.message)
+        }
+    }
+}
+
+/// A VM error surfacing through a native keeps its thrown value, so the
+/// exception a callback raised reaches the caller's `catch` unchanged.
+impl From<RuntimeError> for varn_types::NativeError {
+    fn from(e: RuntimeError) -> Self {
+        varn_types::NativeError::rethrow(e.kind, e.message, e.thrown)
     }
 }
 

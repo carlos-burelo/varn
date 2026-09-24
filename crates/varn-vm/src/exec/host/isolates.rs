@@ -195,7 +195,7 @@ impl ExecCtx {
         }
         let callee_nv = self.heap.intern(callee);
         let arg_nvs: Vec<_> = args.iter().cloned().map(|a| self.heap.intern(a)).collect();
-        let result = self.call_vm(callee_nv, &arg_nvs)?;
+        let result = self.call_vm(callee_nv, &arg_nvs).map_err(|e| e.message)?;
         let value = self.heap.extract(result);
         match value {
             varn_types::Value::Task(t) => {

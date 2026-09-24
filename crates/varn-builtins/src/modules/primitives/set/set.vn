@@ -1,10 +1,10 @@
 export declare class Set<T> {
     constructor();
-    add(value: T): void;
-    has(value: T): bool;
-    delete(value: T): bool;
+    @fallible add(value: T): void;
+    @fallible has(value: T): bool;
+    @fallible delete(value: T): bool;
     clear(): void;
     values(): T[];
-    forEach(callback: (value: T, value2: T, s: Set<T>) => void): void;
+    @fallible forEach(callback: (value: T, value2: T, s: Set<T>) => void): void;
     readonly size: int;
 }
