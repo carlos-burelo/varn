@@ -1,0 +1,3 @@
+// expect: error[VN3005]
+const r = #{ x: 1 }
+r.x = 2

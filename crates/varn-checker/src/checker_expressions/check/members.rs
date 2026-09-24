@@ -11,6 +11,24 @@ impl<'r> Checker<'r> {
     pub(super) fn check_extension_assignment(&mut self, target: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
         let target_range = arena.expr(target).range;
+        if let ExprKind::Member {
+            object,
+            computed: true,
+            ..
+        } = &arena.expr(target).kind
+        {
+            let obj_ty = self.infer_type(*object, bind);
+            if matches!(self.ty_table.get(obj_ty.0), TypeKind::Tuple(_)) {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::NotAssignable,
+                        "cannot assign to a tuple element: tuples are immutable",
+                    )
+                    .with_range(target_range),
+                );
+            }
+            return;
+        }
         let ExprKind::Member {
             object,
             property,

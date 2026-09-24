@@ -1,0 +1,21 @@
+class Point { x: int; constructor(x: int) { this.x = x } }
+const p1 = new Point(1)
+const p2 = new Point(1)
+assert("class == is identity", p1 == p1 && !(p1 == p2))
+
+const o1 = { x: 1 }
+const alias = o1
+assert("object == is identity", o1 == alias && !(o1 == { x: 1 }))
+
+const r1 = #{ p: #{ x: 1 }, t: #[1, #[2, 3]] }
+const r2 = #{ p: #{ x: 1 }, t: #[1, #[2, 3]] }
+assert("record == is deep structural", r1 == r2)
+assert("record === has no identity either", r1 === r2)
+assert("record differs by value", !(#{ x: 1 } == #{ x: 2 }))
+assert("tuple == structural", #[1, "a"] == #[1, "a"] && !(#[1, 2] == #[1, 2, 3]))
+
+const shared = [1]
+assert("a mutable member compares by reference", #{ a: shared } == #{ a: shared })
+assert("equal-looking mutable members differ", !(#{ a: [1] } == #{ a: [1] }))
+
+print("[PASSED] 131. Object / Record / Class equality")

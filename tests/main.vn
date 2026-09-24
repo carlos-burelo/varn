@@ -116,6 +116,7 @@ import "./127-literal-types.vn"
 import "./128-match-exhaustiveness.vn"
 import "./129-map-generic-keys.vn"
 import "./130-range-generic.vn"
+import "./131-object-record-class-equality.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()
