@@ -22,8 +22,6 @@ pub mod range;
 pub mod set;
 #[path = "str/str.rs"]
 pub mod string;
-#[path = "symbol/symbol.rs"]
-pub mod symbol;
 
 pub use bool::boolean_to_string;
 pub use float::{float_is_finite, float_is_nan, float_parse};

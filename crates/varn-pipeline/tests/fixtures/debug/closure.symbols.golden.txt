@@ -45,7 +45,6 @@
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mPow                 [0m │ [33mPow[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDiv                 [0m │ [33mDiv[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mIndexable           [0m │ [33mIndexable[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mSymbol              [0m │ [33mSymbol[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mdebug               [0m │ [33m(...args: dynamic[]) => void[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1massert              [0m │ [33m(label: str, cond: bool) => void[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDefault             [0m │ [33mDefault[0m

@@ -14,7 +14,6 @@ pub const CORE_GLOBAL: &str = "core:global";
 pub const CORE_BIGINT: &str = "core:bigint";
 pub const CORE_MAP: &str = "core:map";
 pub const CORE_SET: &str = "core:set";
-pub const CORE_SYMBOL: &str = "core:symbol";
 pub const CORE_TYPES: &str = "core:types";
 
 pub const PKG_PREFIX: &str = "pkg:";

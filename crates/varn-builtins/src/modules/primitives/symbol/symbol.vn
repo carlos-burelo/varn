@@ -1,8 +1,0 @@
-export declare class Symbol {
-    static readonly iterator: Symbol;
-    static readonly asyncIterator: Symbol;
-
-    readonly description: str?;
-
-    constructor(description?: str);
-}

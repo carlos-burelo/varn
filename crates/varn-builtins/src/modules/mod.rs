@@ -102,7 +102,6 @@ pub fn force_link_builtins() -> usize {
     register_marker!(primitives::range, __VARN_LINK_MARKER_RANGE);
     register_marker!(primitives::set, __VARN_LINK_MARKER_SET);
     register_marker!(primitives::string, __VARN_LINK_MARKER_STR);
-    register_marker!(primitives::symbol, __VARN_LINK_MARKER_SYMBOL);
 
     sum + dummy
 }
