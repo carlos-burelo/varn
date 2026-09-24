@@ -309,6 +309,13 @@ impl ClifLinker for CtxLinker {
             class_id: cls.id,
             expected_bits: gv.raw_payload(),
             payload_size: layout.payload_size,
+            ref_slots: layout
+                .gc
+                .slots
+                .iter()
+                .filter(|s| s.repr == varn_types::layout::ScalarRepr::Ref)
+                .map(|s| s.offset)
+                .collect(),
             trivial_plan,
         })
     }

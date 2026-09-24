@@ -76,6 +76,17 @@ pub(crate) fn emit_call(
                     slow_blk,
                 );
 
+                // A zero `Ref` slot is heap index 0: start every one at the
+                // `null` niche, as `InstanceData::alloc` does.
+                if !ct.ref_slots.is_empty() {
+                    let null_ref = b
+                        .ins()
+                        .iconst(types::I64, varn_types::layout::COMPACT_REF_NULL as i64);
+                    for &off in &ct.ref_slots {
+                        b.ins().store(MemFlags::new(), null_ref, data_base, off as i32);
+                    }
+                }
+
                 // Write each field at its own COMPACT `ClassLayout` offset —
                 // the same bytes `InstanceData::write_field` produces. A class
                 // has NO shape: the layout is static and `slot` indexes it 1:1,

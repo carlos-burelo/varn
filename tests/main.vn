@@ -125,6 +125,7 @@ import "./136-enum-identity.vn"
 import "./137-class-build-order.vn"
 import "./138-constructor-signature.vn"
 import "./139-gc-instance-layout.vn"
+import "./140-nullable-ref-fields.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

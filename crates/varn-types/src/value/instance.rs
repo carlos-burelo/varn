@@ -27,13 +27,17 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
 const INSTANCE_HEADER_WORDS: usize = 1;
 
 impl InstanceData {
-    /// Allocates an `InstanceData` on the heap with the specified layout.
+    /// Allocates an instance of `class`: scalars zero, references `null`.
     pub fn alloc(class: Rc<ClassObj>) -> Rc<InstanceData> {
         let layout = class.get_or_compute_layout();
-        Self::alloc_with_layout(class.id, layout.payload_size)
+        let inst = Self::alloc_with_layout(class.id, layout.payload_size);
+        inst.null_references(&layout);
+        inst
     }
 
-    /// Fast allocation of `InstanceData` when `class_id` and `payload_size` are already known.
+    /// Allocates a zero-filled payload. A zero `Ref` slot is heap index 0,
+    /// not `null`: the caller writes the `null` niche into every `Ref` slot
+    /// it does not initialise (the JIT's inline `new` bakes those stores).
     #[inline]
     pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Rc<InstanceData> {
         let payload_bytes = payload_size as usize;
@@ -241,6 +245,15 @@ impl InstanceData {
             }
         }
         Ok(())
+    }
+
+    /// Writes the `null` niche into every `Ref` slot of `layout`.
+    fn null_references(&self, layout: &ClassLayout) {
+        for slot in &layout.gc.slots {
+            if slot.repr == ScalarRepr::Ref {
+                unsafe { self.write_u64(slot.offset as usize, COMPACT_REF_NULL) };
+            }
+        }
     }
 
     // ── Collector access (spec §48) ─────────────────────────────────────

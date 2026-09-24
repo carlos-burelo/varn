@@ -87,13 +87,17 @@ pub struct ClifClassTarget {
     pub class_id: u32,
     pub expected_bits: u64,
     pub payload_size: u32,
+    /// Offsets of the class's `Ref` slots. A fresh payload is zero-filled,
+    /// so the inline `new` writes the `null` niche into each of them before
+    /// the constructor's own stores, as `InstanceData::alloc` does.
+    pub ref_slots: Vec<u32>,
     pub trivial_plan: Option<Vec<ClifFieldInit>>,
 }
 
 /// One field initialised by a trivial constructor, at its COMPACT layout —
 /// `(param, offset, repr)` from the class's `ClassLayout`, so
 /// the inline `new X()` path writes the same bytes `InstanceData::write_field`
-/// would (`varn-types/src/value/object.rs`).
+/// would (`varn-types/src/value/instance.rs`).
 #[derive(Clone, Copy, Debug)]
 pub struct ClifFieldInit {
     /// Argument register is `arg_start + 1 + param_idx` (the callee placeholder

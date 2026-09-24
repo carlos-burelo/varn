@@ -268,7 +268,7 @@ impl<'m> Builder<'m> {
         let fields: Vec<(std::sync::Arc<str>, Option<varn_core::RuntimeKind>)> = ci
             .fields
             .iter()
-            .map(|f| (f.name.clone(), field_kind(f.ty)))
+            .map(|f| (f.name.clone(), field_kind(f.ty, &self.tir.types)))
             .collect();
         let layout = varn_types::class_layout::ClassLayout::from_fields(
             ci.name.as_ref(),
@@ -1615,23 +1615,36 @@ fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
 }
 
 /// The runtime kind a declared field is laid out by; `None` is boxed.
-fn field_kind(bt: BackendTy) -> Option<varn_core::RuntimeKind> {
+///
+/// `T?` over a type that compacts to a reference keeps that layout: `null` is
+/// the reference's niche (spec §49). Over anything else it stays boxed.
+fn field_kind(bt: BackendTy, types: &varn_tir::TyTable) -> Option<varn_core::RuntimeKind> {
     use varn_core::RuntimeKind as T;
-    Some(match bt {
-        BackendTy::Int => T::Int,
-        BackendTy::Float => T::Float,
-        BackendTy::Bool => T::Bool,
-        BackendTy::Str => T::Str,
-        BackendTy::Bytes => T::Bytes,
-        BackendTy::Char => T::Char,
-        BackendTy::Decimal => T::Decimal,
-        BackendTy::BigInt => T::BigInt,
-        BackendTy::Array(_) => T::Array,
-        BackendTy::Set(_) => T::Set,
-        BackendTy::Map(..) => T::Map,
-        BackendTy::Class(_) => T::Class,
-        _ => return None,
-    })
+    match bt {
+        BackendTy::Int => Some(T::Int),
+        BackendTy::Float => Some(T::Float),
+        BackendTy::Bool => Some(T::Bool),
+        BackendTy::Str => Some(T::Str),
+        BackendTy::Bytes => Some(T::Bytes),
+        BackendTy::Char => Some(T::Char),
+        BackendTy::Decimal => Some(T::Decimal),
+        BackendTy::BigInt => Some(T::BigInt),
+        BackendTy::Array(_) => Some(T::Array),
+        BackendTy::Set(_) => Some(T::Set),
+        BackendTy::Map(..) => Some(T::Map),
+        BackendTy::Class(_) => Some(T::Class),
+        BackendTy::Nullable(_) => {
+            let kind = field_kind(bt.non_nullable(types), types)?;
+            let repr = varn_types::layout::TypeLayout::of_field(Some(kind)).repr;
+            (repr == varn_types::layout::ScalarRepr::Ref).then_some(kind)
+        }
+        BackendTy::Tuple(_)
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_)
+        | BackendTy::Void
+        | BackendTy::Never
+        | BackendTy::Dynamic(_) => None,
+    }
 }
 
 impl<'m> Builder<'m> {
@@ -1777,7 +1790,7 @@ impl<'m> Builder<'m> {
             self.emit_effect(InstKind::DeclareField {
                 class: class_v,
                 name: fname,
-                tag: field_kind(fty),
+                tag: field_kind(fty, &self.tir.types),
             });
         }
 
