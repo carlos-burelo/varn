@@ -46,7 +46,7 @@ pub use numeric_conv::{float_to_int, NumConv, NumericDomain};
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
-pub use runtime_kind::{FieldAccess, FieldRepr, RuntimeKind, VmValuePayload};
+pub use runtime_kind::{FieldAccess, RuntimeKind, VmValuePayload};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
 /// (signature change, symbol removal). Additive changes do NOT bump — a std

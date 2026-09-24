@@ -96,22 +96,7 @@ impl Clone for Box<dyn VmValuePayload> {
     }
 }
 
-/// How a value of a given static type occupies a class instance field.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FieldRepr {
-    pub size: u32,
-    pub align: u32,
-    /// Whether the collector must trace this field.
-    pub is_gc_ref: bool,
-}
-
 impl RuntimeKind {
-    /// The single authority on how a statically-typed field is laid out. The
-    /// checker derives instance offsets from it while annotating field
-    /// accesses, and the runtime derives `ClassLayout` from it; two tables
-    /// would let a compiled access address a field the runtime placed
-    /// elsewhere.
-    ///
     /// The kind whose discriminant is `raw`, or `None` (a boxed `VmValue`)
     /// when `raw` names none — the conservative reading, and the one a
     /// truncated or forward-version operand must get.
@@ -130,45 +115,6 @@ impl RuntimeKind {
         match kind {
             Some(k) => k as u8,
             None => u8::MAX,
-        }
-    }
-
-    /// A field with no known kind, or one with no unboxed representation,
-    /// is a whole `VmValue`.
-    pub const fn field_repr(kind: Option<Self>) -> FieldRepr {
-        let (size, align, is_gc_ref) = match kind {
-            Some(RuntimeKind::Bool) => (1, 1, false),
-            Some(RuntimeKind::Char) => (4, 4, false),
-            Some(RuntimeKind::Int | RuntimeKind::Float) => (8, 8, false),
-            Some(
-                RuntimeKind::Str
-                | RuntimeKind::Array
-                | RuntimeKind::Map
-                | RuntimeKind::Set
-                | RuntimeKind::Object
-                | RuntimeKind::Class
-                | RuntimeKind::Function
-                | RuntimeKind::Task
-                | RuntimeKind::Bytes
-                | RuntimeKind::Generator,
-            ) => (8, 8, true),
-            Some(
-                RuntimeKind::Null
-                | RuntimeKind::BigInt
-                | RuntimeKind::Decimal
-                | RuntimeKind::Symbol
-                | RuntimeKind::Tuple
-                | RuntimeKind::Range
-                | RuntimeKind::Enum
-                | RuntimeKind::Opaque
-                | RuntimeKind::TaskHandle,
-            )
-            | None => (16, 8, true),
-        };
-        FieldRepr {
-            size,
-            align,
-            is_gc_ref,
         }
     }
 }

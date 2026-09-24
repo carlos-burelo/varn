@@ -42,31 +42,44 @@ pub struct ClassLayout {
     pub gc_mask: u64,
 }
 
-/// Bytes one field occupies in an instance payload today, and its alignment.
-const SLOT_SIZE: u32 = 16;
-const SLOT_ALIGN: u32 = 8;
-
-/// Per-field physical size/align/gc-ref-ness for CLASS FIELD layout — not the
-/// same table as `RuntimeKind::field_repr` (used for e.g. FFI/array element
-/// sizing), because a class field has one representational constraint that
-/// table doesn't carry: `str` can be `KIND_SSO` (an inline 16-byte `VmValue`
-/// with no heap object at all, `vm_value.rs`'s `try_from_sso`), so a `str`
-/// field cannot be compacted to a bare 8-byte heap index — the value itself
-/// might not live on the heap. `char` is excluded for a different reason: it
-/// is always `HeapObj::Char` (K1), but reading/writing a compact scalar slot
-/// for it would need to intern/deref through the heap, which `InstanceData`
-/// (this crate, no heap access) cannot do. Both fall to the safe universal
-/// 16-byte `VmValue` slot, exactly like today. Everything else `field_repr`
-/// already calls a GC reference (`Array`/`Map`/`Set`/`Class`/`Bytes`/…) is
-/// ALWAYS `KIND_HEAP` in this runtime — no inline fast path exists for them —
-/// so those compact safely to a bare heap index.
-pub fn class_field_repr(kind: Option<RuntimeKind>) -> (u32, u32, bool) {
+/// `(size, align, is_gc_ref)` of a class field laid out by `kind` — the one
+/// table the compiler bakes offsets from and the runtime allocates by.
+///
+/// A boxed field (`None`, or a kind with no unboxed form) is a whole 16-byte
+/// `VmValue`. So are `str` — it can be `KIND_SSO`, an inline `VmValue` with
+/// no heap object (`vm_value.rs`'s `try_from_sso`) — and `char`, which is
+/// always `HeapObj::Char` and would need heap access `InstanceData` does not
+/// have. Every other GC reference is always `KIND_HEAP`, so it compacts to a
+/// bare 8-byte heap index.
+pub const fn class_field_repr(kind: Option<RuntimeKind>) -> (u32, u32, bool) {
     match kind {
-        Some(RuntimeKind::Str | RuntimeKind::Char) => (SLOT_SIZE, SLOT_ALIGN, true),
-        other => {
-            let r = RuntimeKind::field_repr(other);
-            (r.size, r.align, r.is_gc_ref)
-        }
+        Some(RuntimeKind::Bool) => (1, 1, false),
+        Some(RuntimeKind::Int | RuntimeKind::Float) => (8, 8, false),
+        Some(
+            RuntimeKind::Array
+            | RuntimeKind::Map
+            | RuntimeKind::Set
+            | RuntimeKind::Object
+            | RuntimeKind::Class
+            | RuntimeKind::Function
+            | RuntimeKind::Task
+            | RuntimeKind::Bytes
+            | RuntimeKind::Generator,
+        ) => (8, 8, true),
+        Some(
+            RuntimeKind::Null
+            | RuntimeKind::Str
+            | RuntimeKind::Char
+            | RuntimeKind::BigInt
+            | RuntimeKind::Decimal
+            | RuntimeKind::Symbol
+            | RuntimeKind::Tuple
+            | RuntimeKind::Range
+            | RuntimeKind::Enum
+            | RuntimeKind::Opaque
+            | RuntimeKind::TaskHandle,
+        )
+        | None => (16, 8, true),
     }
 }
 

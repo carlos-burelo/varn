@@ -268,7 +268,7 @@ impl<'m> Builder<'m> {
         let fields: Vec<(std::sync::Arc<str>, Option<varn_core::RuntimeKind>)> = ci
             .fields
             .iter()
-            .map(|f| (f.name.clone(), field_tag(f.ty)))
+            .map(|f| (f.name.clone(), field_kind(f.ty)))
             .collect();
         let layout = varn_types::class_layout::ClassLayout::from_fields(
             ci.name.as_ref(),
@@ -1615,7 +1615,7 @@ fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
 }
 
 /// The runtime kind a declared field is laid out by; `None` is boxed.
-fn field_tag(bt: BackendTy) -> Option<varn_core::RuntimeKind> {
+fn field_kind(bt: BackendTy) -> Option<varn_core::RuntimeKind> {
     use varn_core::RuntimeKind as T;
     Some(match bt {
         BackendTy::Int => T::Int,
@@ -1777,7 +1777,7 @@ impl<'m> Builder<'m> {
             self.emit_effect(InstKind::DeclareField {
                 class: class_v,
                 name: fname,
-                tag: field_tag(fty),
+                tag: field_kind(fty),
             });
         }
 
