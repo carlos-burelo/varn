@@ -79,15 +79,11 @@ mod sys {
     }
 
     // Apple Silicon W^X: before writing JIT code, disable execute protection;
-    // after writing, re-enable it. No-op on other platforms.
+    // after writing, re-enable it. Other platforms never call it.
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     extern "C" {
         pub fn pthread_jit_write_protect_np(enabled: i32);
     }
-
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-    #[inline(always)]
-    pub unsafe fn pthread_jit_write_protect_np(_enabled: i32) {}
 }
 
 pub struct JitBuffer {
