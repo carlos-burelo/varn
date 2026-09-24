@@ -2,6 +2,7 @@ mod binary_ops;
 mod calls;
 mod contextual;
 mod exhaustiveness;
+mod operator_capability;
 pub(crate) mod members;
 
 use super::helpers::closest_in_list;
@@ -384,9 +385,10 @@ impl<'r> Checker<'r> {
                     yields.push(ty);
                 }
             }
-            ExprKind::Unary { operand, .. } => {
-                let operand = *operand;
+            ExprKind::Unary { op, operand, .. } => {
+                let (op, operand) = (*op, *operand);
                 self.check_expr(operand, bind);
+                self.check_unary_capability(expr, op, operand, bind);
                 if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
                     self.report_int_overflow(expr);
                 }
@@ -408,7 +410,9 @@ impl<'r> Checker<'r> {
                     self.report_int_overflow(expr);
                 }
 
-                self.check_binary_operands(op, left, right, range, bind);
+                if !self.check_binary_capability(expr, op, left, right, bind) {
+                    self.check_binary_operands(op, left, right, range, bind);
+                }
             }
             ExprKind::Logical { left, right, .. } => {
                 self.check_expr(*left, bind);

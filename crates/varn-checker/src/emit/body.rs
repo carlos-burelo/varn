@@ -28,11 +28,7 @@ pub(super) struct ModuleCtx<'a> {
 
     pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
 
-    pub ext_calls: &'a FxHashMap<u32, Arc<str>>,
-
-    pub ext_members: &'a FxHashMap<u32, Arc<str>>,
-
-    pub ext_set_members: &'a FxHashMap<u32, Arc<str>>,
+    pub desugar: &'a crate::checker::Desugarings,
 
     pub core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
 
@@ -1979,13 +1975,25 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Paren { expression } => return self.lower_expr(*expression),
 
             ExprKind::Binary { op, left, right } => {
-                return self.lower_binary(*op, *left, *right, ty, span)
+                if self.m.desugar.operator_calls.contains(&e.index()) {
+                    if let Some(method) = varn_core::capability::binary_operator_method(*op) {
+                        return self.lower_operator_call(method, *left, Some(*right), ty, span);
+                    }
+                }
+                return self.lower_binary(*op, *left, *right, ty, span);
             }
             ExprKind::Unary {
                 op,
                 operand,
                 prefix: _,
-            } => return self.lower_unary(*op, *operand, ty, span),
+            } => {
+                if self.m.desugar.operator_calls.contains(&e.index()) {
+                    if let Some(method) = varn_core::capability::unary_operator_method(*op) {
+                        return self.lower_operator_call(method, *operand, None, ty, span);
+                    }
+                }
+                return self.lower_unary(*op, *operand, ty, span);
+            }
 
             ExprKind::This => {
                 let this_ty = self
@@ -2342,7 +2350,7 @@ impl<'a> FnEmitter<'a> {
                     && matches!(&self.ast_arena.expr(*target).kind, ExprKind::Member { .. })
                     && self
                         .m
-                        .ext_set_members
+                        .desugar.extension_set_members
                         .contains_key(&self.ast_arena.expr(*target).range.start.offset) =>
             {
                 let (target, value) = (*target, *value);
@@ -2351,7 +2359,7 @@ impl<'a> FnEmitter<'a> {
                 };
                 let object = *object;
                 let mangled =
-                    self.m.ext_set_members[&self.ast_arena.expr(target).range.start.offset].clone();
+                    self.m.desugar.extension_set_members[&self.ast_arena.expr(target).range.start.offset].clone();
                 let recv = self.lower_expr(object);
                 let v = self.lower_expr(value);
                 return TirExpr {
@@ -3262,7 +3270,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Some(mangled) = self
             .m
-            .ext_members
+            .desugar.extension_members
             .get(&self.ast_arena.expr(property).range.start.offset)
             .cloned()
         {
@@ -3634,7 +3642,7 @@ impl<'a> FnEmitter<'a> {
             return self.by_name_call(call_id, callee, args, ty, span);
         };
 
-        if let Some(mangled) = self.m.ext_calls.get(&span.start).cloned() {
+        if let Some(mangled) = self.m.desugar.extension_calls.get(&span.start).cloned() {
             let recv = self.lower_expr(object);
             let targs = self.lower_call_args(call_id, args);
             return TirExpr {
@@ -3687,6 +3695,20 @@ impl<'a> FnEmitter<'a> {
             }
         }
 
+        self.method_call(recv, name, targs, ty, span)
+    }
+
+    /// `recv.name(args)`: by vtable slot when `recv`'s class declares the
+    /// method with this arity, by name otherwise.
+    fn method_call(
+        &mut self,
+        recv: TirExpr,
+        name: Arc<str>,
+        targs: Vec<TirArg>,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
         let res = self
             .class_of(recv.ty)
             .and_then(|ci| ci.method_slot(&name).map(|s| (s, ci)))
@@ -3710,6 +3732,51 @@ impl<'a> FnEmitter<'a> {
             ty,
             res,
             span,
+        }
+    }
+
+    /// An operator the checker resolved to its operand's capability method
+    /// (`varn_core::capability`).
+    fn lower_operator_call(
+        &mut self,
+        method: varn_core::capability::OperatorMethod,
+        recv: ExprId,
+        arg: Option<ExprId>,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        use varn_core::capability::OperatorShape;
+        let recv = self.lower_expr(recv);
+        let args = arg.map(|a| vec![TirArg::Expr(self.lower_expr(a))]).unwrap_or_default();
+        let name: Arc<str> = Arc::from(method.method);
+        match method.shape {
+            OperatorShape::Value => self.method_call(recv, name, args, ty, span),
+            OperatorShape::Equals => self.method_call(recv, name, args, BackendTy::Bool, span),
+            OperatorShape::NotEquals => {
+                let equals = self.method_call(recv, name, args, BackendTy::Bool, span);
+                TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: TirUnOp::Not,
+                        operand: Box::new(equals),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                }
+            }
+            OperatorShape::CompareToZero(op) => {
+                let compared = self.method_call(recv, name, args, BackendTy::Int, span);
+                TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: bin_op(op).expect("comparison operators lower to a TirBinOp"),
+                        lhs: Box::new(compared),
+                        rhs: Box::new(int_lit(0)),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                }
+            }
         }
     }
 

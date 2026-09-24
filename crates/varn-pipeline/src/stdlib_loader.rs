@@ -226,9 +226,7 @@ fn compile_source_inner(
         &check.bind,
         &check.expr_table,
         &check.call_mappings,
-        &check.extension_calls,
-        &check.extension_members,
-        &check.extension_set_members,
+        &check.desugar,
     );
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }

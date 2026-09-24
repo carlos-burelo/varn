@@ -62,6 +62,22 @@ pub struct ScopeSpan {
     pub scope: ScopeId,
 }
 
+/// Source forms the checker resolved to calls; the emitter lowers each as the
+/// call it stands for.
+#[derive(Clone, Debug, Default)]
+pub struct Desugarings {
+    /// `recv.m(..)` call ids resolved to an extension function, mapped to its
+    /// mangled name.
+    pub extension_calls: FxHashMap<u32, Arc<str>>,
+    /// `recv.p` reads resolved to an extension getter.
+    pub extension_members: FxHashMap<u32, Arc<str>>,
+    /// `recv.p = v` writes resolved to an extension setter.
+    pub extension_set_members: FxHashMap<u32, Arc<str>>,
+    /// Operator expressions a user type answers through its capability method
+    /// (`varn_core::capability`).
+    pub operator_calls: FxHashSet<varn_core::ast::AstId>,
+}
+
 pub struct CheckResult {
     pub bind: BindResult,
     pub diagnostics: varn_core::DiagnosticBag,
@@ -89,13 +105,7 @@ pub struct CheckResult {
     /// Named-argument layout, keyed by call-expression id. See the field of the
     /// same name on `Checker`.
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
-    /// `recv.m(..)` call ids resolved to an extension function, mapped to its
-    /// mangled name.
-    pub extension_calls: FxHashMap<u32, Arc<str>>,
-    /// `recv.p` reads resolved to an extension getter.
-    pub extension_members: FxHashMap<u32, Arc<str>>,
-    /// `recv.p = v` writes resolved to an extension setter.
-    pub extension_set_members: FxHashMap<u32, Arc<str>>,
+    pub desugar: Desugarings,
 }
 
 impl CheckResult {
@@ -183,9 +193,7 @@ pub struct Checker<'r> {
     pub(crate) is_assignment_target: bool,
     pub(crate) in_pipeline_rhs: bool,
     pub(crate) pipeline_value_type: Option<Type>,
-    pub(crate) extension_calls: FxHashMap<u32, Arc<str>>,
-    pub(crate) extension_members: FxHashMap<u32, Arc<str>>,
-    pub(crate) extension_set_members: FxHashMap<u32, Arc<str>>,
+    pub(crate) desugar: Desugarings,
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
@@ -405,9 +413,7 @@ impl<'r> Checker<'r> {
             is_assignment_target: false,
             in_pipeline_rhs: false,
             pipeline_value_type: None,
-            extension_calls: FxHashMap::default(),
-            extension_members: FxHashMap::default(),
-            extension_set_members: FxHashMap::default(),
+            desugar: Desugarings::default(),
             member_exists_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
             member_type_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
             warn_implicit_dynamic,
@@ -571,9 +577,7 @@ impl<'r> Checker<'r> {
             call_resolutions: checker.call_resolutions,
             expr_table,
             call_mappings: checker.call_mappings,
-            extension_calls: checker.extension_calls,
-            extension_members: checker.extension_members,
-            extension_set_members: checker.extension_set_members,
+            desugar: checker.desugar,
         }
     }
 

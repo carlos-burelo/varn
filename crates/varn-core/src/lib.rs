@@ -1,6 +1,7 @@
 // Varn Core Architecture Crate (v2)
 pub mod ast;
 pub mod atom;
+pub mod capability;
 pub mod diagnostics;
 pub mod doc;
 pub mod errors;

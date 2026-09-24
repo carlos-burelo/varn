@@ -1,0 +1,3 @@
+// expect: error[VN3010]
+class V { add(o: V): V { return o } }
+const x = new V() + 1

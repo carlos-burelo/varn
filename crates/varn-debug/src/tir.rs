@@ -7,7 +7,7 @@
 
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
-use varn_checker::{BindResult, TypeEntry};
+use varn_checker::{BindResult, Desugarings, TypeEntry};
 use varn_core::ast::{AstArena, AstId, Program};
 
 pub fn debug_tir(
@@ -16,6 +16,7 @@ pub fn debug_tir(
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     call_mappings: &FxHashMap<AstId, Vec<Option<usize>>>,
+    desugar: &Desugarings,
     flags: &DebugFlags,
 ) {
     let module = varn_checker::emit::emit_module(
@@ -24,9 +25,7 @@ pub fn debug_tir(
         bind,
         expr_table,
         call_mappings,
-        &Default::default(),
-        &Default::default(),
-        &Default::default(),
+        desugar,
     );
 
     if flags.tir {

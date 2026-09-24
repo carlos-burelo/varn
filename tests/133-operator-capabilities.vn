@@ -1,0 +1,36 @@
+class Vec2 {
+    x: int
+    y: int
+    constructor(x: int, y: int) { this.x = x; this.y = y }
+    add(o: Vec2): Vec2 { return new Vec2(this.x + o.x, this.y + o.y) }
+    sub(o: Vec2): Vec2 { return new Vec2(this.x - o.x, this.y - o.y) }
+    mul(k: int): Vec2 { return new Vec2(this.x * k, this.y * k) }
+    div(k: int): Vec2 { return new Vec2(this.x / k, this.y / k) }
+    neg(): Vec2 { return new Vec2(-this.x, -this.y) }
+    equals(o: Vec2): bool { return this.x === o.x && this.y === o.y }
+    compare(o: Vec2): int { return (this.x * this.x + this.y * this.y) - (o.x * o.x + o.y * o.y) }
+}
+
+const a = new Vec2(1, 2)
+const b = new Vec2(3, 4)
+const s = a + b
+assert("+ is add", s.x === 4 && s.y === 6)
+assert("- is sub", (b - a).x === 2)
+assert("* is mul with a scalar", (a * 3).y === 6)
+assert("/ is div", (b / 1).x === 3)
+assert("unary - is neg", (-a).x === -1)
+assert("chained", (a + b - a).equals(b))
+assert("== is equals", a + b == new Vec2(4, 6))
+assert("!= is not equals", a != b)
+assert("< via compare", a < b && !(b < a))
+assert("<= / >= via compare", a <= a && b >= a)
+assert("== null stays a null test", !(a == null))
+
+let maybe: Vec2? = null
+assert("nullable operand keeps null test", maybe == null)
+
+class Plain { v: int; constructor(v: int) { this.v = v } }
+const p = new Plain(1)
+assert("no equals: == is identity", p == p && !(p == new Plain(1)))
+
+print("[PASSED] 133. Operator capabilities")

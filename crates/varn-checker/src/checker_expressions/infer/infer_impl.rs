@@ -460,14 +460,26 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Binary { op, left, right } => {
                 let (op, left, right) = (*op, *left, *right);
-                infer_binary_type(self, op, left, right, bind)
+                let capability = varn_core::capability::binary_operator_method(op).and_then(|m| {
+                    let l = self.infer_type(left, bind);
+                    self.resolve_operator(&l, m, bind)
+                });
+                match capability {
+                    Some(resolved) => resolved.result,
+                    None => infer_binary_type(self, op, left, right, bind),
+                }
             }
             ExprKind::Unary { op, operand, .. } => {
                 let (op, operand) = (*op, *operand);
                 match op {
                     varn_core::ast::operators::UnaryOp::Not => Type::Bool,
-                    varn_core::ast::operators::UnaryOp::Minus
-                    | varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
+                    varn_core::ast::operators::UnaryOp::Minus => {
+                        let inner = self.infer_type(operand, bind);
+                        varn_core::capability::unary_operator_method(op)
+                            .and_then(|m| self.resolve_operator(&inner, m, bind))
+                            .map_or(inner, |resolved| resolved.result)
+                    }
+                    varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
                     varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
                     varn_core::ast::operators::UnaryOp::BitNot => {
                         let inner = self.infer_type(operand, bind);
