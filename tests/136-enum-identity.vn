@@ -16,6 +16,16 @@ assert("enum methods come from the declaring enum (b)", b.label() == "b");
 assert("same-named enums from different modules differ", (a as dynamic) != (b as dynamic));
 assert("same enum and variant are equal", a == ShadeA.Light);
 
+// A local enum sharing the name, variants in the other order: a match on
+// the imported value must use the imported enum's tags.
+enum Shade { Dark, Light }
+const which = match (a) {
+    Light => "light",
+    Dark => "dark"
+};
+assert("an imported enum matches with its own tags", which == "light");
+assert("the local enum keeps its own tags", match (Shade.Light) { Dark => 0, Light => 1 } == 1);
+
 const local = Result.Good(1);
 const matched = match (local) {
     Good(v) => v,

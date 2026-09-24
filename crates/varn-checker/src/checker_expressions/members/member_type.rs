@@ -236,6 +236,14 @@ impl<'r> Checker<'r> {
                     return Some((Type::Int, None));
                 }
 
+                // A type declared in another module has its members there,
+                // never in a same-named local declaration.
+                if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
+                    return self
+                        .find_member_info_uncached(ty, key, &owner)
+                        .map(|(t, sym)| (self.reintern_foreign_ty(&owner, t), sym));
+                }
+
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let is_enum = super::is_enum_type(self.resolver, bind, &name, &origin_modules);
 

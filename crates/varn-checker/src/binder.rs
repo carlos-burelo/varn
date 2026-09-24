@@ -11,6 +11,7 @@ mod decl_values;
 mod decls;
 mod definite_field_assignment;
 mod diagnostics;
+mod declared_types;
 mod imports;
 mod inference_utils;
 mod interface;

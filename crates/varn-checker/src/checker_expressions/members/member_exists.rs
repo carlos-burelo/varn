@@ -175,6 +175,10 @@ impl<'r> Checker<'r> {
                     return true;
                 }
 
+                if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
+                    return self.member_exists(ty, key, &owner);
+                }
+
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let is_enum = super::is_enum_type(self.resolver, bind, &name, &origin_modules);
 

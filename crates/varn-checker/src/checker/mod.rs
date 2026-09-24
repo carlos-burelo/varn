@@ -1,5 +1,7 @@
 pub(crate) mod compat;
 pub(crate) mod completion;
+mod foreign_enums;
+pub use foreign_enums::ForeignEnum;
 mod decls;
 mod definite_assignment;
 mod refine;
@@ -77,6 +79,8 @@ pub struct Desugarings {
     /// Operator expressions a user type answers through its capability method
     /// (`varn_core::capability`).
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
+    /// Enums from other modules whose values this module builds or reads.
+    pub foreign_enums: Vec<ForeignEnum>,
 }
 
 pub struct CheckResult {
@@ -508,6 +512,9 @@ impl<'r> Checker<'r> {
         // name atom was minted after the last resync would otherwise index out
         // of bounds in `AtomInterner::resolve`.
         bind.interner = resolver.interner_snapshot();
+
+        checker.desugar.foreign_enums = checker
+            .collect_foreign_enums(&bind, checker.expr_table.values().map(|entry| &entry.ty));
 
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);

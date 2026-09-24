@@ -307,8 +307,9 @@ impl<'r> super::super::Binder<'r> {
                 .insert(member_id_rc.clone(), fields.clone());
 
             let variant_sym_id = if member.payload_fields.is_empty() {
-                let variant_ty = Type::named(
+                let variant_ty = Type::named_with_origin(
                     id_rc.clone(),
+                    Some(Arc::from(self.source_file.as_ref())),
                     self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
@@ -355,8 +356,9 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named(
+                ty: Type::named_with_origin(
                     id_rc.clone(),
+                    Some(Arc::from(self.source_file.as_ref())),
                     self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),

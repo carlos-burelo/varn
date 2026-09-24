@@ -18,8 +18,10 @@ use varn_tir::{BackendTy, ClassId, ClassInfo, EnumId, EnumInfo, Signature, TyTab
 /// and lowers to `Dynamic(NotYetSupported)`.
 #[derive(Default)]
 pub struct NameIndex {
+    module: Arc<str>,
     classes: FxHashMap<Arc<str>, ClassId>,
     enums: FxHashMap<Arc<str>, EnumId>,
+    foreign_enums: FxHashMap<(Arc<str>, Arc<str>), EnumId>,
 }
 
 impl NameResolver for NameIndex {
@@ -28,6 +30,14 @@ impl NameResolver for NameIndex {
     }
     fn enum_id(&self, name: &str) -> Option<EnumId> {
         self.enums.get(name).copied()
+    }
+    fn foreign_enum_id(&self, name: &str, origin: &str) -> Option<EnumId> {
+        self.foreign_enums
+            .get(&(Arc::from(name), Arc::from(origin)))
+            .copied()
+    }
+    fn is_local_origin(&self, origin: &str) -> bool {
+        origin == self.module.as_ref()
     }
 }
 
@@ -50,7 +60,11 @@ fn seed_signatures() -> Vec<Signature> {
     }]
 }
 
-pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
+pub fn build(
+    bind: &BindResult,
+    foreign: &[crate::checker::ForeignEnum],
+    tt: &mut TyTable,
+) -> Tables {
     // Pass 1: assign every local class and enum a stable handle. `classes` and
     // `enums` in `Tables` are filled in this same index order.
     let mut class_names: Vec<Arc<str>> = bind.type_members.classes.keys().cloned().collect();
@@ -73,7 +87,16 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
     enum_names.dedup();
     class_names.retain(|n| !bind.sum_type_variants.contains_key(n));
 
-    let mut names = NameIndex::default();
+    let mut names = NameIndex {
+        module: Arc::from(bind.source_file.as_ref()),
+        ..NameIndex::default()
+    };
+    for (i, f) in foreign.iter().enumerate() {
+        names.foreign_enums.insert(
+            (f.name.clone(), f.origin.clone()),
+            EnumId((enum_names.len() + i) as u32),
+        );
+    }
     for (i, n) in class_names.iter().enumerate() {
         names.classes.insert(n.clone(), ClassId(i as u32));
     }
@@ -93,7 +116,7 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
         &class_names,
         &mut signatures,
     );
-    let enums = build_enums(
+    let mut enums = build_enums(
         bind,
         &bind.ty_table,
         &bind.interner,
@@ -101,6 +124,22 @@ pub fn build(bind: &BindResult, tt: &mut TyTable) -> Tables {
         &names,
         &enum_names,
     );
+    // A foreign enum's payload types live in its own module's table, which
+    // this one cannot read: the fields are erased to `Dynamic`, the tags come
+    // from the declaring module's layout.
+    enums.extend(foreign.iter().map(|f| EnumInfo {
+        name: f.name.clone(),
+        variants: f
+            .variants
+            .iter()
+            .enumerate()
+            .map(|(tag, (name, fields))| VariantInfo {
+                name: name.clone(),
+                tag: tag as u16,
+                payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
+            })
+            .collect(),
+    }));
 
     Tables {
         classes,
@@ -277,77 +316,22 @@ fn build_enums(
 ) -> Vec<EnumInfo> {
     enum_names
         .iter()
-        .map(|name| {
-            // A payload enum: variant names from `sum_type_variants`, fields
-            // from `sum_variant_fields`.
-            if let Some(vnames) = bind.sum_type_variants.get(name) {
-                let variants = vnames
-                    .iter()
-                    .enumerate()
-                    .map(|(tag, vn)| VariantInfo {
-                        name: vn.clone(),
-                        tag: tag as u16,
-                        payload: bind
-                            .sum_variant_fields
-                            .get(vn)
-                            .map(|fs| {
-                                fs.iter()
-                                    .map(|(_, ty)| lower_type(ty, table, interner, tt, names))
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
-                    })
-                    .collect();
-                return EnumInfo {
-                    name: name.clone(),
-                    variants,
-                };
-            }
-
-            // Payload variants of an `enum` decl: names and order from
-            // `type_members.enums`, fields from `sum_variant_fields` (keyed by
-            // the variant's own name).
-            let variants = bind
-                .type_members
-                .enums
-                .get(name)
-                .map(|vs| vs.as_slice())
-                .unwrap_or(&[])
-                .iter()
-                // Methods, accessors and `static` members share the enum body
-                // but are not variants — including them shifts every tag.
-                .filter(|v| {
-                    !v.is_static
-                        && !matches!(
-                            v.kind,
-                            crate::types::ClassMemberKind::Method
-                                | crate::types::ClassMemberKind::Getter
-                                | crate::types::ClassMemberKind::Setter
-                                | crate::types::ClassMemberKind::Constructor
-                        )
-                })
+        .map(|name| EnumInfo {
+            name: name.clone(),
+            variants: bind
+                .enum_layout(name)
+                .unwrap_or_default()
+                .into_iter()
                 .enumerate()
-                .map(|(tag, v)| {
-                    let payload = bind
-                        .sum_variant_fields
-                        .get(&v.name)
-                        .map(|fs| {
-                            fs.iter()
-                                .map(|(_, ty)| lower_type(ty, table, interner, tt, names))
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    VariantInfo {
-                        name: v.name.clone(),
-                        tag: tag as u16,
-                        payload,
-                    }
+                .map(|(tag, (variant, fields))| VariantInfo {
+                    name: variant,
+                    tag: tag as u16,
+                    payload: fields
+                        .iter()
+                        .map(|(_, ty)| lower_type(ty, table, interner, tt, names))
+                        .collect(),
                 })
-                .collect();
-            EnumInfo {
-                name: name.clone(),
-                variants,
-            }
+                .collect(),
         })
         .collect()
 }

@@ -1,4 +1,5 @@
 mod member_exists;
+mod owner;
 pub(crate) mod member_type;
 
 use std::sync::Arc;

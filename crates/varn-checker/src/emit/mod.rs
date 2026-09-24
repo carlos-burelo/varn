@@ -54,7 +54,7 @@ pub fn emit_module(
         enums,
         mut signatures,
         names,
-    } = tables::build(bind, &mut types);
+    } = tables::build(bind, &desugar.foreign_enums, &mut types);
 
     // Module value symbols → global slots, in binder declaration order.
     // Names this file itself declares at the top level — the only ones that

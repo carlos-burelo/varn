@@ -14,8 +14,14 @@ use varn_tir::{BackendTy, ClassId, DynReason, EnumId, TyTable};
 /// [`NoNames`] answers `None`, so every named type falls to
 /// `Dynamic(Unannotated)`.
 pub trait NameResolver {
+    /// A class this module declares.
     fn class_id(&self, name: &str) -> Option<ClassId>;
+    /// An enum this module declares.
     fn enum_id(&self, name: &str) -> Option<EnumId>;
+    /// An enum declared in module `origin` that this module uses.
+    fn foreign_enum_id(&self, name: &str, origin: &str) -> Option<EnumId>;
+    /// Whether a type's `origin` is this module itself.
+    fn is_local_origin(&self, origin: &str) -> bool;
 }
 
 pub struct NoNames;
@@ -26,6 +32,12 @@ impl NameResolver for NoNames {
     }
     fn enum_id(&self, _: &str) -> Option<EnumId> {
         None
+    }
+    fn foreign_enum_id(&self, _: &str, _: &str) -> Option<EnumId> {
+        None
+    }
+    fn is_local_origin(&self, _: &str) -> bool {
+        true
     }
 }
 
@@ -57,6 +69,28 @@ fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
         // An unresolved name is a type parameter (erased) or an imported type
         // — either way the type is genuinely unknown here, not a TIR gap.
         .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
+}
+
+/// A type named `name` with the checker's `origin`: a local declaration by
+/// name, a foreign one by (name, origin) — never a local type that merely
+/// shares the name.
+fn resolve_type_ref(
+    name: varn_core::Atom,
+    origin: Option<varn_core::Atom>,
+    interner: &AtomInterner,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    let name = interner.resolve(name);
+    match origin
+        .and_then(|o| interner.try_resolve(o))
+        .filter(|o| !names.is_local_origin(o))
+    {
+        Some(origin) => names
+            .foreign_enum_id(name, origin)
+            .map(BackendTy::Enum)
+            .unwrap_or_else(opaque),
+        None => resolve_named(name, names),
+    }
 }
 
 fn lower_kind(
@@ -112,21 +146,15 @@ fn lower_kind(
             BackendTy::Tuple(tt.intern_list(&lowered))
         }
 
-        TypeKind::Named(name, _) => resolve_named(interner.resolve(name), names),
+        TypeKind::Named(name, origin) => resolve_type_ref(name, origin, interner, names),
 
         // A generic reference — `Box<T>`, `Result<int, str>` — is the named
         // class / enum with its type arguments erased at the backend level.
         // Only a generic that names neither (a bare type parameter `T`, an
         // alias) stays opaque.
-        TypeKind::Generic(name, _, _)
-            if names.class_id(interner.resolve(name)).is_some()
-                || names.enum_id(interner.resolve(name)).is_some() =>
-        {
-            resolve_named(interner.resolve(name), names)
-        }
-        TypeKind::Generic(name, args, _) if table.get_list(args).is_empty() => {
-            resolve_named(interner.resolve(name), names)
-        }
+        // A generic reference — erased at the backend — resolves like its
+        // bare name; one naming nothing known (a type parameter) stays opaque.
+        TypeKind::Generic(name, _, origin) => resolve_type_ref(name, origin, interner, names),
 
         TypeKind::EnumVariant { enum_name, .. } => names
             .enum_id(interner.resolve(enum_name))
@@ -155,7 +183,6 @@ fn lower_kind(
 
         // Types with no precise TIR representation: opaque dynamic.
         TypeKind::Fn(_)
-        | TypeKind::Generic(..) // with type arguments
         | TypeKind::Intersection(_)
         | TypeKind::This
         | TypeKind::TemplateLiteral(_)
