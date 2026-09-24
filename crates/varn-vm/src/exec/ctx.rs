@@ -499,6 +499,13 @@ impl ExecCtx {
             return;
         }
         self.run_minor_gc();
+        let roots = self.major_roots();
+        let _ = self.heap.collect(&roots);
+    }
+
+    /// Every heap index the context itself holds: the one root set a major
+    /// collection starts from, wherever it is triggered.
+    pub(crate) fn major_roots(&self) -> Vec<u32> {
         let mut roots: Vec<u32> = Vec::with_capacity(256);
         self.stack
             .collect_roots(self.stack.dyn_.len(), self.stack.refs.len(), &mut roots);
@@ -550,7 +557,7 @@ impl ExecCtx {
                 }
             }
         }
-        let _ = self.heap.collect(&roots);
+        roots
     }
 }
 
