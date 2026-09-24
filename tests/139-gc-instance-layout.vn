@@ -1,0 +1,104 @@
+// The collector visits an instance through its class's GcLayout: only the
+// reference slots (compact `Ref` fields and boxed fields), never the scalar
+// ones. Every reference an instance holds must survive minor collections
+// (evacuation rewrites the compact index in place) and major ones, whether
+// the instance was born holding it or had it written later.
+
+class GcLeaf {
+    n: int
+    constructor(n: int) {
+        this.n = n
+    }
+}
+
+// Scalars interleaved with every kind of reference slot.
+class GcMixed {
+    a: int
+    leaf: GcLeaf
+    f: float
+    items: int[]
+    flag: bool
+    label: str
+    any: dynamic
+    b: int
+    constructor(i: int) {
+        this.a = i
+        this.leaf = new GcLeaf(i * 2)
+        this.f = (i as float) * 0.5
+        this.items = [i, i + 1, i + 2]
+        this.flag = i % 2 == 0
+        this.label = "mixed-label-long-enough-for-the-heap-" + i
+        this.any = new GcLeaf(i * 3)
+        this.b = -i
+    }
+}
+
+function gcChurn(n: int): int {
+    let junk: str[] = []
+    for (let i = 0; i < n; i = i + 1) {
+        junk.push("churn-" + i)
+    }
+    return junk.length
+}
+
+// Born holding young references, then churned through several collections.
+let gcMixed: GcMixed[] = []
+for (let i = 0; i < 2000; i = i + 1) {
+    gcMixed.push(new GcMixed(i))
+}
+gcChurn(60000)
+
+function gcMixedChecksum(xs: GcMixed[]): int {
+    let acc = 0
+    for (const m of xs) {
+        acc = acc + m.a + m.leaf.n + m.items[2] + m.b
+        if (m.flag) { acc = acc + 1 }
+        if (m.label == "mixed-label-long-enough-for-the-heap-" + m.a) { acc = acc + 1 }
+        acc = acc + (m.any as GcLeaf).n
+    }
+    return acc
+}
+// Per i: i + 2i + (i + 2) - i + 3i + 1 (label) = 6i + 3, plus 1 when i is even.
+assert("gc layout: instances born with young refs survive", gcMixedChecksum(gcMixed) === 6 * 1999000 + 3 * 2000 + 1000)
+
+// An old instance written with fresh references between collections: the
+// write barrier remembers it, the nursery rewrites its compact slots.
+let gcOld = new GcMixed(7)
+gcChurn(60000)
+for (let round = 0; round < 20; round = round + 1) {
+    gcOld.leaf = new GcLeaf(round)
+    gcOld.items = [round, round, round]
+    gcOld.label = "rewritten-label-long-enough-for-the-heap-" + round
+    gcOld.any = new GcLeaf(round * 10)
+    gcChurn(5000)
+}
+assert("gc layout: rewritten compact ref survives", gcOld.leaf.n === 19)
+assert("gc layout: rewritten array field survives", gcOld.items[1] === 19)
+assert("gc layout: rewritten boxed str survives", gcOld.label == "rewritten-label-long-enough-for-the-heap-19")
+assert("gc layout: rewritten dynamic field survives", (gcOld.any as GcLeaf).n === 190)
+assert("gc layout: scalar fields untouched", gcOld.a === 7 && gcOld.b === -7 && gcOld.f === 3.5 && !gcOld.flag)
+
+// A class with only scalar fields has an empty GcLayout.
+class GcScalars {
+    a: int
+    b: int
+    c: float
+    d: bool
+    constructor(i: int) {
+        this.a = i
+        this.b = i + 1
+        this.c = i as float
+        this.d = true
+    }
+}
+let gcScalars: GcScalars[] = []
+for (let i = 0; i < 5000; i = i + 1) {
+    gcScalars.push(new GcScalars(i))
+}
+gcChurn(60000)
+let gcScalarSum = 0
+for (const s of gcScalars) {
+    gcScalarSum = gcScalarSum + s.a + s.b
+}
+assert("gc layout: scalar-only instances survive", gcScalarSum === 2 * 12497500 + 5000)
+print("[PASSED] 139. GC by instance layout")

@@ -243,6 +243,73 @@ impl InstanceData {
         Ok(())
     }
 
+    // ── Collector access (spec §48) ─────────────────────────────────────
+
+    /// Visits the references this instance holds: the slots of its
+    /// `GcLayout`, nothing else. A `Ref` slot is read as a heap index and its
+    /// `null` niche is skipped; a `Boxed` slot is a whole `VmValue` that may
+    /// or may not be a reference, which the visitor decides.
+    pub fn for_each_reference(&self, mut f: impl FnMut(VmValue)) {
+        let Some(layout) = self.layout() else {
+            return;
+        };
+        for slot in &layout.gc.slots {
+            if let Some(v) = self.read_gc_slot(slot.offset as usize, slot.repr) {
+                f(v);
+            }
+        }
+    }
+
+    /// As [`Self::for_each_reference`], writing back what the visitor leaves
+    /// in the value: the nursery rewrites a promoted reference in place. A
+    /// `Ref` slot keeps its compact form, so the visitor must leave a heap
+    /// reference there.
+    pub fn update_references(&self, mut f: impl FnMut(&mut VmValue)) {
+        let Some(layout) = self.layout() else {
+            return;
+        };
+        for slot in &layout.gc.slots {
+            let offset = slot.offset as usize;
+            let Some(mut v) = self.read_gc_slot(offset, slot.repr) else {
+                continue;
+            };
+            let before = v;
+            f(&mut v);
+            if v.bits_eq(before) {
+                continue;
+            }
+            unsafe {
+                match slot.repr {
+                    ScalarRepr::Ref => {
+                        debug_assert!(v.is_heap(), "a Ref slot holds a heap reference");
+                        self.write_u64(offset, v.as_heap_idx() as u64);
+                    }
+                    ScalarRepr::Boxed => self.write_vm_value(offset, v),
+                    ScalarRepr::Bool | ScalarRepr::I64 | ScalarRepr::F64 => {
+                        unreachable!("GcLayout lists only Ref and Boxed slots")
+                    }
+                }
+            }
+        }
+    }
+
+    /// The value of one `GcLayout` slot; `None` for a `Ref` slot holding the
+    /// `null` niche.
+    fn read_gc_slot(&self, offset: usize, repr: ScalarRepr) -> Option<VmValue> {
+        unsafe {
+            match repr {
+                ScalarRepr::Ref => {
+                    let raw = self.read_u64(offset);
+                    (raw != COMPACT_REF_NULL).then(|| VmValue::from_heap_idx(raw as u32))
+                }
+                ScalarRepr::Boxed => Some(self.read_vm_value(offset)),
+                ScalarRepr::Bool | ScalarRepr::I64 | ScalarRepr::F64 => {
+                    unreachable!("GcLayout lists only Ref and Boxed slots")
+                }
+            }
+        }
+    }
+
     // ── Field Write Methods ─────────────────────────────────────────────
 
     #[inline(always)]

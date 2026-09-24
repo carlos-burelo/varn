@@ -430,15 +430,7 @@ impl Nursery {
                 return;
             }
             Container::Instance(inst) => {
-                for slot in 0..inst.slot_count() {
-                    let Some(mut val) = inst.field_at(slot) else {
-                        break;
-                    };
-                    if val.is_heap() && is_nursery_idx(val.as_heap_idx()) {
-                        self.update_value(&mut val, old_gen, worklist);
-                        inst.set_field_at(slot, val);
-                    }
-                }
+                inst.update_references(|val| self.update_value(val, old_gen, worklist));
                 return;
             }
             Container::Object(o) => {
@@ -598,9 +590,11 @@ impl Nursery {
                 Some(items) => items.iter().any(nursery_val),
                 None => false,
             },
-            HeapObj::Instance(inst) => (0..inst.slot_count())
-                .filter_map(|slot| inst.field_at(slot))
-                .any(|v| nursery_val(&v)),
+            HeapObj::Instance(inst) => {
+                let mut found = false;
+                inst.for_each_reference(|v| found |= nursery_val(&v));
+                found
+            }
             HeapObj::Object(o) | HeapObj::Record(o) => {
                 let mut found = false;
                 o.borrow().for_each_field(|_, v| {
