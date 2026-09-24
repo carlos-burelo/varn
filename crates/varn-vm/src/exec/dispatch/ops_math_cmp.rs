@@ -519,22 +519,12 @@ impl ExecCtx {
                 *ip += 1;
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
-                    if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::division_by_zero(
-                            "division by zero",
-                        ));
-                    }
                     w!(first_reg, VmValue::from_f64(a_val / b_val));
                 } else {
                     let a = self.stack.box_reg(base, r1);
                     let b = self.stack.box_reg(base, r2);
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
-                            if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::division_by_zero(
-                                    "division by zero",
-                                ));
-                            }
                             w!(first_reg, VmValue::from_f64(av / bv));
                         }
                         None => {
@@ -549,22 +539,12 @@ impl ExecCtx {
                 *ip += 1;
                 let (r1, r2) = (hi(w1), lo(w1));
                 if let Some((a_val, b_val)) = self.stack.float_pair(base, r1, r2) {
-                    if b_val == 0.0 {
-                        return Err(crate::error::RuntimeError::division_by_zero(
-                            "modulo by zero",
-                        ));
-                    }
                     w!(first_reg, VmValue::from_f64(a_val % b_val));
                 } else {
                     let a = self.stack.box_reg(base, r1);
                     let b = self.stack.box_reg(base, r2);
                     match float_fast(a, b, &self.heap) {
                         Some((av, bv)) => {
-                            if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::division_by_zero(
-                                    "modulo by zero",
-                                ));
-                            }
                             w!(first_reg, VmValue::from_f64(av % bv));
                         }
                         None => {

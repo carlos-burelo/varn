@@ -64,11 +64,8 @@ impl PartialEq for Literal {
             (Self::Null, Self::Null) => true,
             (Self::Bool(a), Self::Bool(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
-            (Self::Float(a), Self::Float(b)) => {
-                let a = if *a == 0.0 { 0.0f64 } else { *a };
-                let b = if *b == 0.0 { 0.0f64 } else { *b };
-                a.to_bits() == b.to_bits()
-            }
+            // Bit identity: `-0.0` and `0.0` are distinct constants (IEEE 754).
+            (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
             (Self::Str(a), Self::Str(b)) => a == b,
             (Self::BigInt(a), Self::BigInt(b)) => a == b,
             (Self::Decimal(a), Self::Decimal(b)) => a == b,
@@ -159,10 +156,7 @@ impl std::hash::Hash for Literal {
             Self::Null => {}
             Self::Bool(b) => b.hash(state),
             Self::Int(i) => i.hash(state),
-            Self::Float(f) => {
-                let f = if *f == 0.0 { 0.0f64 } else { *f };
-                f.to_bits().hash(state);
-            }
+            Self::Float(f) => f.to_bits().hash(state),
             Self::Str(s) => s.hash(state),
             Self::BigInt(b) => b.hash(state),
             Self::Decimal(d) => d.hash(state),

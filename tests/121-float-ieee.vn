@@ -1,0 +1,24 @@
+function fdiv(a: float, b: float): float { return a / b }
+function fmod(a: float, b: float): float { return a % b }
+
+const inf: float = fdiv(1.0, 0.0)
+assert("1/0 is +Infinity", inf === Infinity)
+assert("-1/0 is -Infinity", fdiv(0.0 - 1.0, 0.0) === 0.0 - Infinity)
+const nan: float = fdiv(0.0, 0.0)
+assert("0/0 is NaN", nan !== nan)
+const modNan: float = fmod(1.0, 0.0)
+assert("1 % 0 is NaN", modNan !== modNan)
+
+const negZero: float = 0.0 * (0.0 - 1.0)
+assert("-0 equals +0", negZero === 0.0)
+assert("1/-0 is -Infinity", fdiv(1.0, negZero) === 0.0 - Infinity)
+
+const tiny: float = 5e-324
+assert("subnormal survives", tiny > 0.0 && tiny / 2.0 === 0.0)
+
+let i = 0
+let hotInf = 0.0
+while (i < 500) { hotInf = fdiv(1.0, 0.0); i = i + 1 }
+assert("compiled 1/0 is +Infinity", hotInf === Infinity)
+
+print("[PASSED] 121. Float IEEE")

@@ -9,9 +9,8 @@
 //! canonicalization so the result is byte-identical to the interpreter — and
 //! unboxes with a pure bitcast on the way back.
 //!
-//! `Add/Sub/Mul/DivFloat` lower to native `fadd/fsub/fmul/fdiv`; `DivFloat`
-//! keeps the interpreter's divide-by-zero trap by diverting `b == 0.0` to the
-//! runtime helper. `Mod/PowFloat` have no native ISA op, so they call the
+//! `Add/Sub/Mul/DivFloat` lower to native `fadd/fsub/fmul/fdiv` (IEEE 754:
+//! `x / 0.0` is `±Infinity` or `NaN`, never a trap). `Mod/PowFloat` have no native ISA op, so they call the
 //! runtime helper on boxed operands and unbox the result back into the `F64`
 //! Variable. Comparisons lower to native `fcmp` and yield an unboxed `0/1`.
 //!
@@ -20,7 +19,7 @@
 //! generic `dispatch_intrinsic` helper (and its register flush/reload).
 
 use cranelift_codegen::ir::{
-    condcodes::FloatCC, types, InstBuilder, InstructionData, MemFlags, Value, ValueDef,
+    condcodes::FloatCC, types, InstBuilder, MemFlags, Value,
 };
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -331,7 +330,7 @@ pub(super) fn emit_float_op(
                     OpCode::AddFloat => b.ins().fadd(a, bb),
                     OpCode::SubFloat => b.ins().fsub(a, bb),
                     OpCode::MulFloat => b.ins().fmul(a, bb),
-                    _ => emit_fdiv(b, cc, exec_ctx, helpers.div, a, bb),
+                    _ => b.ins().fdiv(a, bb),
                 }
             } else {
                 let a = box_or_pass(b, vars, state, a_r);
@@ -461,64 +460,6 @@ pub(super) fn emit_float_op(
         }
         _ => Ok(false),
     }
-}
-
-/// Returns `true` when `v` was produced by an `f64const` instruction whose
-/// value is neither +0.0 nor −0.0. When the divisor in `emit_fdiv` satisfies
-/// this condition the divide-by-zero branch is statically dead and can be
-/// omitted entirely.
-fn f64_const_nonzero(b: &FunctionBuilder, v: Value) -> bool {
-    if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
-        if let InstructionData::UnaryIeee64 { imm, .. } = b.func.dfg.insts[inst] {
-            return f64::from_bits(imm.bits()) != 0.0;
-        }
-    }
-    false
-}
-
-/// Native `fdiv` with the interpreter's divide-by-zero trap: `b == 0.0`
-/// diverts to the runtime `div` helper (which raises the VM error via longjmp
-/// and never returns); the common path is a plain `fdiv`. Leaves the builder
-/// in the continuation block holding the `f64` quotient.
-fn emit_fdiv(
-    b: &mut FunctionBuilder,
-    cc: CallConv,
-    exec_ctx: Value,
-    div_helper: usize,
-    a: Value,
-    bb: Value,
-) -> Value {
-    if f64_const_nonzero(b, bb) {
-        return b.ins().fdiv(a, bb);
-    }
-    let zero = b.ins().f64const(0.0);
-    let is_zero = b.ins().fcmp(FloatCC::Equal, bb, zero);
-    let trap_blk = b.create_block();
-    let div_blk = b.create_block();
-    let cont = b.create_block();
-    b.append_block_param(cont, types::F64);
-    b.ins().brif(is_zero, trap_blk, &[], div_blk, &[]);
-
-    b.switch_to_block(trap_blk);
-    let ba = box_f64(b, a);
-    let bd = box_f64(b, bb);
-    let (a_tag, a_payload) = b.ins().isplit(ba);
-    let (b_tag, b_payload) = b.ins().isplit(bd);
-    call_helper_void(
-        b,
-        cc,
-        div_helper,
-        &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
-    );
-    let dummy = b.ins().f64const(0.0);
-    b.ins().jump(cont, &[dummy.into()]);
-
-    b.switch_to_block(div_blk);
-    let r = b.ins().fdiv(a, bb);
-    b.ins().jump(cont, &[r.into()]);
-
-    b.switch_to_block(cont);
-    b.block_params(cont)[0]
 }
 
 /// Reject a function up front if any `Float`-typed register is written by an

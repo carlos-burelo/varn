@@ -170,11 +170,7 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             return Ok(heap.alloc_decimal(x / y));
         }
     }
-    let bv = heap.to_f64_val(b);
-    if bv == 0.0 {
-        return Err(RuntimeError::division_by_zero("division by zero"));
-    }
-    Ok(VmValue::from_f64(heap.to_f64_val(a) / bv))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) / heap.to_f64_val(b)))
 }
 
 #[inline(always)]
@@ -196,11 +192,7 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
             return Ok(heap.alloc_decimal(x % y));
         }
     }
-    let bv = heap.to_f64_val(b);
-    if bv == 0.0 {
-        return Err(RuntimeError::division_by_zero("modulo by zero"));
-    }
-    Ok(VmValue::from_f64(heap.to_f64_val(a) % bv))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) % heap.to_f64_val(b)))
 }
 
 #[inline(always)]

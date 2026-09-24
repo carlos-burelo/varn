@@ -102,14 +102,15 @@ try {
 }
 assert("runtime mod by zero is catchable", modCaught)
 
-function divideOrDefault(a: int, b: int): float {
+function divideOrDefault(a: int, b: int): int {
     try {
-        return (a as float) / (b as float)
+        return a / b
     } catch (e) {
-        return -1.0
+        return -1
     }
 }
-assert("catchable inside a function", divideOrDefault(10, 0) === -1.0)
+assert("catchable inside a function", divideOrDefault(10, 0) === -1)
+assert("float division by zero is IEEE, not an error", 10.0 / 0.0 === Infinity)
 
 // Un error nacido dentro de una llamada anidada tiene que desenrollar hasta
 // el `try` del llamador.
