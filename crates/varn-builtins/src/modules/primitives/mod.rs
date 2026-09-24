@@ -28,5 +28,4 @@ pub mod symbol;
 pub use bool::boolean_to_string;
 pub use decimal::decimal_parse;
 pub use float::{float_is_finite, float_is_nan, float_parse};
-pub use int::{int_is_integer, int_parse};
 pub use string::{str_from_char_code, str_from_value};

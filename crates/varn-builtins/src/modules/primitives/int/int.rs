@@ -1,5 +1,5 @@
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, NativeFnResult, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Int;
 
@@ -18,8 +18,13 @@ varn_contract! {
         fn MAX_VALUE(_ctx: &mut dyn NativeCtx) -> i64 { INT_MAX }
         fn MIN_VALUE(_ctx: &mut dyn NativeCtx) -> i64 { INT_MIN }
 
-        fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> i64 {
-            s.trim().parse::<i64>().unwrap_or(0)
+        fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, NativeError> {
+            s.trim()
+                .parse::<i64>()
+                .map_err(|e| NativeError::from(format!("int.parse({s:?}): {e}")))
+        }
+        fn tryParse(_ctx: &mut dyn NativeCtx, s: &str) -> Option<i64> {
+            s.trim().parse::<i64>().ok()
         }
         fn isInteger(_ctx: &mut dyn NativeCtx, val: VmValue) -> bool {
             val.is_int()
@@ -38,9 +43,13 @@ varn_contract! {
             format!("{:.*}", d, this as f64)
         }
 
-        fn abs(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { this.abs() }
+        fn abs(_ctx: &mut dyn NativeCtx, this: i64) -> Result<i64, NativeError> {
+            this.checked_abs().ok_or_else(|| overflow_error("abs", this))
+        }
         fn sign(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { this.signum() }
-        fn negate(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { -this }
+        fn negate(_ctx: &mut dyn NativeCtx, this: i64) -> Result<i64, NativeError> {
+            varn_core::neg_int(this).ok_or_else(|| overflow_error("negate", this))
+        }
         fn bitwiseNot(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { !this }
         fn min(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.min(other) }
         fn max(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.max(other) }
@@ -59,26 +68,54 @@ varn_contract! {
         }
 
         fn toFloat(_ctx: &mut dyn NativeCtx, this: i64) -> f64 { this as f64 }
-        fn pow(_ctx: &mut dyn NativeCtx, this: i64, exponent: i64) -> i64 {
-            this.wrapping_pow(exponent.max(0) as u32)
+        fn pow(_ctx: &mut dyn NativeCtx, this: i64, exponent: i64) -> Result<i64, NativeError> {
+            let e = u32::try_from(exponent)
+                .map_err(|_| NativeError::from(format!("pow: exponent {exponent} must be in 0..=4294967295")))?;
+            varn_core::pow_int(this, e).ok_or_else(|| overflow_error("pow", this))
         }
         fn isEven(_ctx: &mut dyn NativeCtx, this: i64) -> bool { this % 2 == 0 }
         fn isOdd(_ctx: &mut dyn NativeCtx, this: i64) -> bool { this % 2 != 0 }
-    }
-}
 
-pub fn int_is_integer(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let Some(&v) = args.first() {
-        return Ok(VmValue::from_bool(v.is_int()));
-    }
-    Ok(VmValue::bool_false())
-}
-
-pub fn int_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let Some(&v) = args.first() {
-        if let Some(s) = ctx.str_owned(v) {
-            return Ok(VmValue::from_int(s.trim().parse::<i64>().unwrap_or(0)));
+        fn wrappingAdd(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.wrapping_add(other) }
+        fn wrappingSub(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.wrapping_sub(other) }
+        fn wrappingMul(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.wrapping_mul(other) }
+        fn saturatingAdd(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.saturating_add(other) }
+        fn saturatingSub(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.saturating_sub(other) }
+        fn saturatingMul(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.saturating_mul(other) }
+        fn checkedAdd(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Option<i64> { varn_core::add_int(this, other) }
+        fn checkedSub(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Option<i64> { varn_core::sub_int(this, other) }
+        fn checkedMul(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Option<i64> { varn_core::mul_int(this, other) }
+        fn div(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Result<i64, NativeError> {
+            varn_core::div_int(this, other).map_err(|f| div_fault(f, "div", this, other))
+        }
+        fn floorDiv(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Result<i64, NativeError> {
+            varn_core::floor_div_int(this, other).map_err(|f| div_fault(f, "floorDiv", this, other))
+        }
+        fn ceilDiv(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Result<i64, NativeError> {
+            varn_core::ceil_div_int(this, other).map_err(|f| div_fault(f, "ceilDiv", this, other))
+        }
+        fn rem(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Result<i64, NativeError> {
+            varn_core::rem_int(this, other).map_err(|f| div_fault(f, "rem", this, other))
+        }
+        fn r#mod(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> Result<i64, NativeError> {
+            varn_core::mod_int(this, other).map_err(|f| div_fault(f, "mod", this, other))
         }
     }
-    Ok(VmValue::from_int(0))
+}
+
+fn overflow_error(op: &str, v: i64) -> NativeError {
+    NativeError::integer_overflow(format!(
+        "integer overflow: {op}({v}) is outside int ({INT_MIN}..={INT_MAX})"
+    ))
+}
+
+fn div_fault(fault: varn_core::IntDivFault, op: &str, a: i64, b: i64) -> NativeError {
+    match fault {
+        varn_core::IntDivFault::DivisionByZero => {
+            NativeError::division_by_zero(format!("{op}: division by zero"))
+        }
+        varn_core::IntDivFault::Overflow => {
+            NativeError::integer_overflow(format!("integer overflow: {a}.{op}({b}) is outside int"))
+        }
+    }
 }

@@ -39,7 +39,7 @@ pub use cg_ty::CgTy;
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{
-    add_int, binary_operand_kind, checked_int, div_int, mul_int, neg_int, pow_int, rem_int,
+    add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, floor_div_int, mod_int, mul_int, neg_int, pow_int, rem_int,
     sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
 };
 pub use numeric_conv::{float_to_int, NumConv, NumericDomain};

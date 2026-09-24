@@ -91,6 +91,28 @@ pub fn rem_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     Ok(a.wrapping_rem(b))
 }
 
+/// `a / b` rounded toward negative infinity.
+pub fn floor_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
+    let q = div_int(a, b)?;
+    let inexact = a.wrapping_rem(b) != 0;
+    Ok(if inexact && ((a < 0) != (b < 0)) { q - 1 } else { q })
+}
+
+/// `a / b` rounded toward positive infinity.
+pub fn ceil_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
+    let q = div_int(a, b)?;
+    let inexact = a.wrapping_rem(b) != 0;
+    Ok(if inexact && ((a < 0) == (b < 0)) { q + 1 } else { q })
+}
+
+/// Euclidean modulo: always in `0..|b|`.
+pub fn mod_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
+    if b == 0 {
+        return Err(IntDivFault::DivisionByZero);
+    }
+    Ok(a.wrapping_rem_euclid(b))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumericOperand {
     Int,
@@ -118,6 +140,19 @@ pub fn binary_operand_kind(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floor_ceil_mod() {
+        assert_eq!(floor_div_int(-7, 2), Ok(-4));
+        assert_eq!(floor_div_int(7, 2), Ok(3));
+        assert_eq!(ceil_div_int(7, 2), Ok(4));
+        assert_eq!(ceil_div_int(-7, 2), Ok(-3));
+        assert_eq!(mod_int(-7, 2), Ok(1));
+        assert_eq!(mod_int(7, -2), Ok(1));
+        assert_eq!(mod_int(i64::MIN, -1), Ok(0));
+        assert_eq!(floor_div_int(i64::MIN, -1), Err(IntDivFault::Overflow));
+        assert_eq!(ceil_div_int(1, 0), Err(IntDivFault::DivisionByZero));
+    }
 
     #[test]
     fn int_float_mix_has_no_common_class() {

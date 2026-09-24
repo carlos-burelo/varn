@@ -1,0 +1,43 @@
+const MAX: int = 9223372036854775807
+const MIN: int = 0 - 9223372036854775807 - 1
+
+assert("wrappingAdd wraps", MAX.wrappingAdd(1) === MIN)
+assert("wrappingSub wraps", MIN.wrappingSub(1) === MAX)
+assert("wrappingMul wraps", MAX.wrappingMul(2) === 0 - 2)
+assert("saturatingAdd clamps", MAX.saturatingAdd(1) === MAX)
+assert("saturatingSub clamps", MIN.saturatingSub(1) === MIN)
+assert("saturatingMul clamps", MIN.saturatingMul(2) === MIN)
+assert("checkedAdd none on overflow", MAX.checkedAdd(1) === null)
+const forty: int = 40
+assert("checkedAdd some", forty.checkedAdd(2) === 42)
+
+const m7: int = 0 - 7
+const p7: int = 7
+assert("div truncates", m7.div(2) === 0 - 3)
+assert("floorDiv floors", m7.floorDiv(2) === 0 - 4)
+assert("ceilDiv ceils", p7.ceilDiv(2) === 4)
+assert("rem follows dividend", m7.rem(2) === 0 - 1)
+assert("mod is euclidean", m7.mod(2) === 1)
+
+function kind(f: () => int): str {
+    try { f(); return "none" } catch (e) {
+        if (e instanceof IntegerOverflow) { return "ovf" }
+        if (e instanceof DivisionByZero) { return "zero" }
+        return "other"
+    }
+}
+const ten: int = 10
+const one: int = 1
+assert("abs(MIN) raises", kind(() => MIN.abs()) === "ovf")
+assert("negate(MIN) raises", kind(() => MIN.negate()) === "ovf")
+assert("pow overflow raises", kind(() => ten.pow(30)) === "ovf")
+assert("pow in range", ten.pow(3) === 1000)
+assert("floorDiv by zero raises", kind(() => one.floorDiv(0)) === "zero")
+assert("parse failure raises", kind(() => int.parse("abc")) === "other")
+assert("parse works", int.parse(" 42 ") === 42)
+assert("tryParse failure is null", int.tryParse("abc") === null)
+
+const dyn: dynamic = MIN
+assert("dynamic receiver raises typed", kind(() => dyn.abs()) === "ovf")
+
+print("[PASSED] 123. Int API")

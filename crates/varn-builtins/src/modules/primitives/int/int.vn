@@ -1,7 +1,8 @@
 export declare class int {
     static MAX_VALUE: int;
     static MIN_VALUE: int;
-    static parse(s: str): int;
+    @fallible static parse(s: str): int;
+    static tryParse(s: str): int?;
     static isInteger(val: dynamic): bool;
     static isSafeInteger(val: int): bool;
 
@@ -9,9 +10,9 @@ export declare class int {
     valueOf(): int;
     toLocaleString(): str;
     toFixed(digits?: int): str;
-    abs(): int;
+    @fallible abs(): int;
     sign(): int;
-    negate(): int;
+    @fallible negate(): int;
     bitwiseNot(): int;
     min(other: int): int;
     max(other: int): int;
@@ -20,7 +21,22 @@ export declare class int {
     toBinary(): str;
     toOctal(): str;
     toFloat(): float;
-    pow(exponent: int): int;
+    @fallible pow(exponent: int): int;
     isEven(): bool;
     isOdd(): bool;
+
+    wrappingAdd(other: int): int;
+    wrappingSub(other: int): int;
+    wrappingMul(other: int): int;
+    saturatingAdd(other: int): int;
+    saturatingSub(other: int): int;
+    saturatingMul(other: int): int;
+    checkedAdd(other: int): int?;
+    checkedSub(other: int): int?;
+    checkedMul(other: int): int?;
+    @fallible div(other: int): int;
+    @fallible floorDiv(other: int): int;
+    @fallible ceilDiv(other: int): int;
+    @fallible rem(other: int): int;
+    @fallible mod(other: int): int;
 }
