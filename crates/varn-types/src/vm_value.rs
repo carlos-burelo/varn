@@ -188,19 +188,10 @@ impl VmValue {
         Self::from_int(n as i64)
     }
 
-    /// Carry an `f64`.
-    ///
-    /// NaN used to be unrepresentable — every QNAN pattern was tag space, so
-    /// `from_f64(NaN)` had to answer `null`. With a tag of its own the payload
-    /// is just the IEEE bits, NaN included. That behaviour change is
-    /// deliberately NOT made here: `Self::null()` for NaN is preserved so the
-    /// representation swap moves no semantics but the width of `int`.
-    /// Removing it is a separate change with its own tests.
+    /// Carry an `f64`, NaN included: the tag is its own word, so the payload
+    /// is just the IEEE bits (spec §4).
     #[inline(always)]
     pub fn from_f64(n: f64) -> Self {
-        if n.is_nan() {
-            return Self::null();
-        }
         Self {
             tag: KIND_FLOAT,
             payload: n.to_bits(),
