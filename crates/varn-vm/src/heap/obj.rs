@@ -49,38 +49,38 @@ pub enum HeapObj {
 }
 
 impl HeapObj {
-    /// The single canonical [`TypeTag`] of this heap object. Callables
+    /// The single canonical [`RuntimeKind`] of this heap object. Callables
     /// (closure / native fn / bound method) coalesce to `Function`; modules
-    /// present as `Object`; spreads as `Array`; opaque host payloads as `VmRef`.
-    /// All value-kind name rendering flows through this — see [`TypeTag::name`].
-    pub(crate) fn tag(&self) -> varn_core::TypeTag {
-        use varn_core::TypeTag;
+    /// present as `Object`; spreads as `Array`; opaque host payloads as `Opaque`.
+    /// All value-kind name rendering flows through this — see [`RuntimeKind::name`].
+    pub(crate) fn tag(&self) -> varn_core::RuntimeKind {
+        use varn_core::RuntimeKind;
         match self {
-            HeapObj::Str(_) => TypeTag::Str,
-            HeapObj::Array(_) | HeapObj::Tuple(_) => TypeTag::Array,
+            HeapObj::Str(_) => RuntimeKind::Str,
+            HeapObj::Array(_) | HeapObj::Tuple(_) => RuntimeKind::Array,
             HeapObj::Object(_)
             | HeapObj::Instance(_)
             | HeapObj::Record(_)
             | HeapObj::Module(_)
-            | HeapObj::FrozenModule(_) => TypeTag::Object,
+            | HeapObj::FrozenModule(_) => RuntimeKind::Object,
             HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) => {
-                TypeTag::Function
+                RuntimeKind::Function
             }
-            HeapObj::Class(_) => TypeTag::Class,
-            HeapObj::Map(_) => TypeTag::Map,
-            HeapObj::Set(_) => TypeTag::Set,
-            HeapObj::Task(_) => TypeTag::Task,
-            HeapObj::TaskHandle(_) => TypeTag::TaskHandle,
-            HeapObj::Range(_) => TypeTag::Range,
-            HeapObj::Symbol(_) => TypeTag::Symbol,
-            HeapObj::EnumVariant(_) => TypeTag::Enum,
-            HeapObj::BigInt(_) => TypeTag::BigInt,
-            HeapObj::Decimal(_) => TypeTag::Decimal,
-            HeapObj::Char(_) => TypeTag::Char,
-            HeapObj::Generator(_) => TypeTag::Generator,
-            HeapObj::Spread(_) => TypeTag::Array,
-            HeapObj::Buffer(_) => TypeTag::Bytes,
-            HeapObj::VmValue(_) => TypeTag::VmRef,
+            HeapObj::Class(_) => RuntimeKind::Class,
+            HeapObj::Map(_) => RuntimeKind::Map,
+            HeapObj::Set(_) => RuntimeKind::Set,
+            HeapObj::Task(_) => RuntimeKind::Task,
+            HeapObj::TaskHandle(_) => RuntimeKind::TaskHandle,
+            HeapObj::Range(_) => RuntimeKind::Range,
+            HeapObj::Symbol(_) => RuntimeKind::Symbol,
+            HeapObj::EnumVariant(_) => RuntimeKind::Enum,
+            HeapObj::BigInt(_) => RuntimeKind::BigInt,
+            HeapObj::Decimal(_) => RuntimeKind::Decimal,
+            HeapObj::Char(_) => RuntimeKind::Char,
+            HeapObj::Generator(_) => RuntimeKind::Generator,
+            HeapObj::Spread(_) => RuntimeKind::Array,
+            HeapObj::Buffer(_) => RuntimeKind::Bytes,
+            HeapObj::VmValue(_) => RuntimeKind::Opaque,
         }
     }
 }

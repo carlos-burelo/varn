@@ -48,7 +48,7 @@ pub struct ClassObj {
     pub layout: RefCell<Option<Rc<crate::class_layout::ClassLayout>>>,
     /// Declared static type of each instance field, by slot. Comes down with
     /// the declaration; the layout is built from it rather than from a guess.
-    pub field_tags: RefCell<Vec<varn_core::TypeTag>>,
+    pub field_tags: RefCell<Vec<Option<varn_core::RuntimeKind>>>,
 }
 
 pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
@@ -128,7 +128,7 @@ impl ClassObj {
         (shape, n)
     }
 
-    pub fn declare_field(&self, name: RuntimeString, tag: varn_core::TypeTag) -> usize {
+    pub fn declare_field(&self, name: RuntimeString, tag: Option<varn_core::RuntimeKind>) -> usize {
         *self.instance_shape_cache.borrow_mut() = None;
         *self.layout.borrow_mut() = None;
         let mut root = self.root_shape.borrow_mut();
@@ -140,7 +140,7 @@ impl ClassObj {
         let slot = new_shape.property_names.len() - 1;
         *root = new_shape;
         let mut tags = self.field_tags.borrow_mut();
-        tags.resize(slot + 1, varn_core::TypeTag::Dynamic);
+        tags.resize(slot + 1, None);
         tags[slot] = tag;
         slot
     }
@@ -159,13 +159,10 @@ impl ClassObj {
         ordered.sort_unstable_by_key(|(slot, _)| *slot);
 
         let tags = self.field_tags.borrow();
-        let fields_in: Vec<(Arc<str>, varn_core::TypeTag)> = ordered
+        let fields_in: Vec<(Arc<str>, Option<varn_core::RuntimeKind>)> = ordered
             .into_iter()
             .map(|(slot, name)| {
-                let tag = tags
-                    .get(slot)
-                    .copied()
-                    .unwrap_or(varn_core::TypeTag::Dynamic);
+                let tag = tags.get(slot).copied().flatten();
                 (Arc::from(name.as_ref()), tag)
             })
             .collect();

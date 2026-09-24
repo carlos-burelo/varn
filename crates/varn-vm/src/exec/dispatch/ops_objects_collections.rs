@@ -203,7 +203,7 @@ impl ExecCtx {
                 *ip += 1;
                 let obj_reg = hi(w1);
                 let obj = self.stack.box_reg(base, obj_reg);
-                let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
+                let tag = varn_core::RuntimeKind::from_u8(lo(w1) as u8);
                 self.exec_declare_field(obj, name_idx, tag, frame_idx, closure)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }

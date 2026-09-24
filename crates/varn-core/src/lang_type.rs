@@ -1,5 +1,5 @@
 //! The language's own type vocabulary (spec §13, §39), separate from
-//! `TypeTag`, which classifies runtime values.
+//! `RuntimeKind`, which classifies runtime values.
 
 /// A primitive type of the language. `Void`, `Never` and `Dynamic` are the
 /// special types: they classify no value of their own.

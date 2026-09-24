@@ -5,15 +5,15 @@
 //! the compile-time and runtime descriptor representing that static memory layout.
 
 use std::sync::Arc;
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 
 /// Layout and representation of a single field within a class instance.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FieldLayout {
     /// Declared name of the field.
     pub name: Arc<str>,
-    /// Static type tag of the field.
-    pub type_tag: TypeTag,
+    /// Runtime kind the field is laid out by; `None` is a boxed `VmValue`.
+    pub kind: Option<RuntimeKind>,
     /// Byte offset relative to the payload start (after instance header).
     pub offset: u32,
     /// Size of this field in bytes (e.g. 1 for bool, 8 for int/float, 16 for VmValue).
@@ -47,7 +47,7 @@ const SLOT_SIZE: u32 = 16;
 const SLOT_ALIGN: u32 = 8;
 
 /// Per-field physical size/align/gc-ref-ness for CLASS FIELD layout — not the
-/// same table as `TypeTag::field_repr` (used for e.g. FFI/array element
+/// same table as `RuntimeKind::field_repr` (used for e.g. FFI/array element
 /// sizing), because a class field has one representational constraint that
 /// table doesn't carry: `str` can be `KIND_SSO` (an inline 16-byte `VmValue`
 /// with no heap object at all, `vm_value.rs`'s `try_from_sso`), so a `str`
@@ -60,11 +60,11 @@ const SLOT_ALIGN: u32 = 8;
 /// already calls a GC reference (`Array`/`Map`/`Set`/`Class`/`Bytes`/…) is
 /// ALWAYS `KIND_HEAP` in this runtime — no inline fast path exists for them —
 /// so those compact safely to a bare heap index.
-pub fn class_field_repr(tag: TypeTag) -> (u32, u32, bool) {
-    match tag {
-        TypeTag::Str | TypeTag::Char => (SLOT_SIZE, SLOT_ALIGN, true),
+pub fn class_field_repr(kind: Option<RuntimeKind>) -> (u32, u32, bool) {
+    match kind {
+        Some(RuntimeKind::Str | RuntimeKind::Char) => (SLOT_SIZE, SLOT_ALIGN, true),
         other => {
-            let r = other.field_repr();
+            let r = RuntimeKind::field_repr(other);
             (r.size, r.align, r.is_gc_ref)
         }
     }
@@ -83,7 +83,7 @@ impl ClassLayout {
         }
     }
 
-    /// Builds a static memory layout from a list of field (name, type_tag) declarations.
+    /// Builds a static memory layout from a list of field (name, kind) declarations.
     ///
     /// Computes aligned byte offsets for all fields according to native static typing rules:
     /// - `int` (i64): size 8, align 8
@@ -95,7 +95,7 @@ impl ClassLayout {
     pub fn from_fields(
         name: impl Into<Arc<str>>,
         class_id: u32,
-        fields_in: &[(Arc<str>, TypeTag)],
+        fields_in: &[(Arc<str>, Option<RuntimeKind>)],
     ) -> Self {
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut cur_offset = 0u32;
@@ -129,7 +129,7 @@ impl ClassLayout {
             cur_offset += size;
             fields.push(FieldLayout {
                 name: field_name.clone(),
-                type_tag: *tag,
+                kind: *tag,
                 offset,
                 size,
                 align,

@@ -5,18 +5,18 @@ use std::sync::Arc;
 
 
 /// Serde variant labels for [`Literal`], one per kind, sourced from the single
-/// canonical `TypeTag` names. Round-trip keys on the numeric index, so
+/// canonical `RuntimeKind` names. Round-trip keys on the numeric index, so
 /// these are identifiers only — but they stay the one canonical representation.
 static LITERAL_VARIANTS: [&str; 9] = [
-    varn_core::TypeTag::Null.name(),
-    varn_core::TypeTag::Bool.name(),
-    varn_core::TypeTag::Int.name(),
-    varn_core::TypeTag::Float.name(),
-    varn_core::TypeTag::Str.name(),
-    varn_core::TypeTag::BigInt.name(),
-    varn_core::TypeTag::Decimal.name(),
-    varn_core::TypeTag::Symbol.name(),
-    varn_core::TypeTag::Char.name(),
+    varn_core::RuntimeKind::Null.name(),
+    varn_core::RuntimeKind::Bool.name(),
+    varn_core::RuntimeKind::Int.name(),
+    varn_core::RuntimeKind::Float.name(),
+    varn_core::RuntimeKind::Str.name(),
+    varn_core::RuntimeKind::BigInt.name(),
+    varn_core::RuntimeKind::Decimal.name(),
+    varn_core::RuntimeKind::Symbol.name(),
+    varn_core::RuntimeKind::Char.name(),
 ];
 
 pub(super) mod rc_str_serde {

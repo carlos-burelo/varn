@@ -103,7 +103,7 @@ pub struct ClifFieldInit {
     pub offset: u32,
     /// Field size in bytes (1/2/4/8/16).
     pub size: u32,
-    pub tag: varn_core::TypeTag,
+    pub tag: Option<varn_core::RuntimeKind>,
     pub is_gc_ref: bool,
 }
 

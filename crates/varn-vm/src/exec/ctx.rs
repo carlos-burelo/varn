@@ -258,20 +258,20 @@ impl ExecCtx {
 
     fn init_intrinsics(&mut self) {
         // Intrinsic classes the VM registers for property/method fallback
-        // dispatch. Names are sourced from the canonical `TypeTag` names
+        // dispatch. Names are sourced from the canonical `RuntimeKind` names
         // (no raw literals). This set is broader than the op-id core classes:
         // it includes the `Error` hierarchy but not `Symbol`/`bigint`.
         let names = [
-            varn_core::TypeTag::Array.name(),
-            varn_core::TypeTag::Str.name(),
-            varn_core::TypeTag::Int.name(),
-            varn_core::TypeTag::Float.name(),
-            varn_core::TypeTag::Decimal.name(),
-            varn_core::TypeTag::Bool.name(),
-            varn_core::TypeTag::Char.name(),
-            varn_core::TypeTag::Map.name(),
-            varn_core::TypeTag::Set.name(),
-            varn_core::TypeTag::Range.name(),
+            varn_core::RuntimeKind::Array.name(),
+            varn_core::RuntimeKind::Str.name(),
+            varn_core::RuntimeKind::Int.name(),
+            varn_core::RuntimeKind::Float.name(),
+            varn_core::RuntimeKind::Decimal.name(),
+            varn_core::RuntimeKind::Bool.name(),
+            varn_core::RuntimeKind::Char.name(),
+            varn_core::RuntimeKind::Map.name(),
+            varn_core::RuntimeKind::Set.name(),
+            varn_core::RuntimeKind::Range.name(),
             varn_core::well_known::ERROR,
             varn_core::well_known::TYPE_ERROR,
             varn_core::well_known::RANGE_ERROR,

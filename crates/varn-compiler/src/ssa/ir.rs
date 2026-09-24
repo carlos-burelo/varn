@@ -186,12 +186,10 @@ pub enum InstKind {
         object: Value,
         slot: u16,
         /// Compact byte offset of the field from the instance payload start
-        /// (`ClassLayout`), baked by the compiler. `0` when `tag` is `Null`
-        /// (a dynamic/enum-payload field, which uses `slot`).
+        /// (`ClassLayout`), baked by the compiler. `0` for a `Slot` access
+        /// (a dynamic/enum-payload field).
         offset: u32,
-        /// The field's `TypeTag`: non-`Null` means a compact class field
-        /// (offset valid); `Null` means a dynamic `slot` access.
-        tag: varn_core::TypeTag,
+        tag: varn_core::FieldAccess,
     },
 
     GetIndex {
@@ -221,8 +219,8 @@ pub enum InstKind {
         slot: u16,
         /// Compact byte offset of the field from the instance payload start.
         offset: u32,
-        /// The field's `TypeTag` (width/kind for codegen). Non-`Null` = compact.
-        tag: varn_core::TypeTag,
+        /// The field's kind (width for codegen); always a compact class field.
+        tag: Option<varn_core::RuntimeKind>,
     },
 
     SetIndex {
@@ -335,7 +333,7 @@ pub enum InstKind {
         class: Value,
         name: Arc<str>,
         /// Static type the runtime lays this field out by.
-        tag: varn_core::TypeTag,
+        tag: Option<varn_core::RuntimeKind>,
     },
     DefineStatic {
         class: Value,

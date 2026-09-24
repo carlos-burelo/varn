@@ -2,7 +2,7 @@
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
@@ -88,13 +88,13 @@ pub(crate) fn emit_call(
                     let off = fi.offset as i32;
                     let m = MemFlags::new();
                     match fi.tag {
-                        TypeTag::Bool => {
+                        Some(RuntimeKind::Bool) => {
                             b.ins().istore8(m, payload, base, off);
                         }
-                        TypeTag::Int => {
+                        Some(RuntimeKind::Int) => {
                             b.ins().store(m, payload, base, off);
                         }
-                        TypeTag::Float => {
+                        Some(RuntimeKind::Float) => {
                             let f = unbox_f64_coerce(b, val);
                             b.ins().store(m, f, base, off);
                         }

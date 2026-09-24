@@ -226,16 +226,16 @@ fn uninitialized_panic(what: &str) -> ! {
     )
 }
 fn uninitialized_obj() -> ObjRef {
-    uninitialized_panic(varn_core::TypeTag::Object.name())
+    uninitialized_panic(varn_core::RuntimeKind::Object.name())
 }
 fn uninitialized_arr() -> ArrayRef {
-    uninitialized_panic(varn_core::TypeTag::Array.name())
+    uninitialized_panic(varn_core::RuntimeKind::Array.name())
 }
 fn uninitialized_map() -> MapRef {
-    uninitialized_panic(varn_core::TypeTag::Map.name())
+    uninitialized_panic(varn_core::RuntimeKind::Map.name())
 }
 fn uninitialized_set() -> SetRef {
-    uninitialized_panic(varn_core::TypeTag::Set.name())
+    uninitialized_panic(varn_core::RuntimeKind::Set.name())
 }
 
 use std::cell::Cell;

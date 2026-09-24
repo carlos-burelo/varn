@@ -7,7 +7,7 @@ use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 
 /// A property object, stored as a single allocation: the header and the
 /// object's fields share one `Rc` block, with the fields as a DST tail sized
@@ -401,7 +401,7 @@ impl ObjData<[Cell<VmValue>]> {
     pub fn class_name(&self) -> String {
         match &self.shape().class {
             Some(c) => c.name.clone(),
-            None => varn_core::TypeTag::Object.name().to_owned(),
+            None => varn_core::RuntimeKind::Object.name().to_owned(),
         }
     }
 
@@ -718,11 +718,11 @@ impl InstanceData {
     /// lookup. Mirrors [`Self::read_field`] with the `FieldLayout` derived from
     /// the tag.
     #[inline]
-    pub fn read_field_at(&self, offset: u32, tag: varn_core::TypeTag) -> Option<VmValue> {
+    pub fn read_field_at(&self, offset: u32, tag: Option<varn_core::RuntimeKind>) -> Option<VmValue> {
         let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
         let f = FieldLayout {
             name: Arc::from(""),
-            type_tag: tag,
+            kind: tag,
             offset,
             size,
             align,
@@ -737,13 +737,13 @@ impl InstanceData {
     pub fn write_field_at(
         &self,
         offset: u32,
-        tag: varn_core::TypeTag,
+        tag: Option<varn_core::RuntimeKind>,
         val: VmValue,
     ) -> Result<(), &'static str> {
         let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
         let f = FieldLayout {
             name: Arc::from(""),
-            type_tag: tag,
+            kind: tag,
             offset,
             size,
             align,
@@ -775,10 +775,10 @@ impl InstanceData {
             return None;
         }
         unsafe {
-            Some(match f.type_tag {
-                TypeTag::Bool => VmValue::from_bool(self.read_bool(offset)),
-                TypeTag::Int => VmValue::from_int(self.read_i64(offset)),
-                TypeTag::Float => VmValue::from_f64(self.read_f64(offset)),
+            Some(match f.kind {
+                Some(RuntimeKind::Bool) => VmValue::from_bool(self.read_bool(offset)),
+                Some(RuntimeKind::Int) => VmValue::from_int(self.read_i64(offset)),
+                Some(RuntimeKind::Float) => VmValue::from_f64(self.read_f64(offset)),
                 _ if f.is_gc_ref && f.size == 8 => {
                     let raw = self.read_u64(offset);
                     if raw == Self::COMPACT_REF_UNINIT {
@@ -807,20 +807,20 @@ impl InstanceData {
             return Err("field offset exceeds instance payload");
         }
         unsafe {
-            match f.type_tag {
-                TypeTag::Bool => {
+            match f.kind {
+                Some(RuntimeKind::Bool) => {
                     if !val.is_bool() {
                         return Err("cannot store non-bool in a bool field");
                     }
                     self.write_bool(offset, val.as_bool());
                 }
-                TypeTag::Int => {
+                Some(RuntimeKind::Int) => {
                     if !val.is_int() {
                         return Err("cannot store non-int in an int field");
                     }
                     self.write_i64(offset, val.as_int());
                 }
-                TypeTag::Float => {
+                Some(RuntimeKind::Float) => {
                     // Symmetric with `frame_store`'s `Fpr`: `int` widens,
                     // `null` (a NaN result — `VmValue::from_f64` already
                     // folds NaN to `null`) round-trips through a real NaN

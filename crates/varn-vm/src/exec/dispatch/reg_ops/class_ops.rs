@@ -154,7 +154,7 @@ impl ExecCtx {
                     .heap
                     .str_val(key_nv)
                     .ok_or_else(|| RuntimeError::new("DeclareField: non-string const"))?;
-                let tag = varn_core::TypeTag::from_u8((w1 & 0xFF) as u8);
+                let tag = varn_core::RuntimeKind::from_u8((w1 & 0xFF) as u8);
                 crate::exec::class::op_declare_field(class_nv, &key, tag, &mut self.heap)?;
             }
             OpCode::BindMethod => {

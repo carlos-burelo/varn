@@ -146,7 +146,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
 pub(crate) fn get_fixed_field_at(
     obj: VmValue,
     offset: u32,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
     heap: &Heap,
 ) -> VmResult<VmValue> {
     if obj.is_heap() {
@@ -166,7 +166,7 @@ pub(crate) fn get_fixed_field_at(
 pub(crate) fn set_fixed_field_at(
     obj: VmValue,
     offset: u32,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
     val: VmValue,
     heap: &Heap,
 ) -> VmResult<()> {
@@ -375,19 +375,19 @@ fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
         }
         _ => {
             let ty = match val {
-                Value::Null => varn_core::TypeTag::Null,
-                Value::Bool(_) => varn_core::TypeTag::Bool,
-                Value::Int(_) => varn_core::TypeTag::Int,
-                Value::Float(_) => varn_core::TypeTag::Float,
-                Value::Str(_) => varn_core::TypeTag::Str,
-                Value::Symbol(_) => varn_core::TypeTag::Symbol,
-                Value::BigInt(_) => varn_core::TypeTag::BigInt,
-                Value::Array(_) => varn_core::TypeTag::Array,
-                Value::Map(_) => varn_core::TypeTag::Map,
-                Value::Set(_) => varn_core::TypeTag::Set,
-                Value::Range(_) => varn_core::TypeTag::Range,
-                Value::Char(_) => varn_core::TypeTag::Char,
-                Value::Decimal(_) => varn_core::TypeTag::Decimal,
+                Value::Null => varn_core::RuntimeKind::Null,
+                Value::Bool(_) => varn_core::RuntimeKind::Bool,
+                Value::Int(_) => varn_core::RuntimeKind::Int,
+                Value::Float(_) => varn_core::RuntimeKind::Float,
+                Value::Str(_) => varn_core::RuntimeKind::Str,
+                Value::Symbol(_) => varn_core::RuntimeKind::Symbol,
+                Value::BigInt(_) => varn_core::RuntimeKind::BigInt,
+                Value::Array(_) => varn_core::RuntimeKind::Array,
+                Value::Map(_) => varn_core::RuntimeKind::Map,
+                Value::Set(_) => varn_core::RuntimeKind::Set,
+                Value::Range(_) => varn_core::RuntimeKind::Range,
+                Value::Char(_) => varn_core::RuntimeKind::Char,
+                Value::Decimal(_) => varn_core::RuntimeKind::Decimal,
                 _ => return None,
             };
             heap.get_intrinsic_class(ty.name())
@@ -532,38 +532,38 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => return o.borrow().class(),
             Some(HeapObj::Class(cls)) => return Some(cls.clone()),
             Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => {
-                return heap.get_intrinsic_class(varn_core::TypeTag::Array.name())
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Array.name())
             }
-            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(varn_core::TypeTag::Str.name()),
-            Some(HeapObj::Map(_)) => return heap.get_intrinsic_class(varn_core::TypeTag::Map.name()),
-            Some(HeapObj::Set(_)) => return heap.get_intrinsic_class(varn_core::TypeTag::Set.name()),
+            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Str.name()),
+            Some(HeapObj::Map(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Map.name()),
+            Some(HeapObj::Set(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Set.name()),
             Some(HeapObj::EnumVariant(ev)) => return heap.get_intrinsic_class(&ev.enum_name),
             Some(HeapObj::Range(_)) => {
-                return heap.get_intrinsic_class(varn_core::TypeTag::Range.name())
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Range.name())
             }
             Some(HeapObj::Buffer(_)) => {
-                return heap.get_intrinsic_class(varn_core::TypeTag::Bytes.name())
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Bytes.name())
             }
             Some(HeapObj::Generator(_)) => {
-                return heap.get_intrinsic_class(varn_core::TypeTag::Generator.name())
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Generator.name())
             }
             _ => return None,
         }
     }
     if val.is_int() {
-        return heap.get_intrinsic_class(varn_core::TypeTag::Int.name());
+        return heap.get_intrinsic_class(varn_core::RuntimeKind::Int.name());
     }
     if val.is_f64() {
-        return heap.get_intrinsic_class(varn_core::TypeTag::Float.name());
+        return heap.get_intrinsic_class(varn_core::RuntimeKind::Float.name());
     }
     if val.is_bool() {
-        return heap.get_intrinsic_class(varn_core::TypeTag::Bool.name());
+        return heap.get_intrinsic_class(varn_core::RuntimeKind::Bool.name());
     }
     if val.is_sso() {
-        return heap.get_intrinsic_class(varn_core::TypeTag::Str.name());
+        return heap.get_intrinsic_class(varn_core::RuntimeKind::Str.name());
     }
     if val.is_null() {
-        return heap.get_intrinsic_class(varn_core::TypeTag::Null.name());
+        return heap.get_intrinsic_class(varn_core::RuntimeKind::Null.name());
     }
     None
 }
@@ -671,15 +671,15 @@ pub(crate) fn resolve_meta_property(
     match key_enum {
         Some(MemberKey::Type) => {
             let type_str: &str = match &val {
-                Value::Int(_) => varn_core::TypeTag::Int.name(),
-                Value::Float(_) => varn_core::TypeTag::Float.name(),
-                Value::Str(_) => varn_core::TypeTag::Str.name(),
-                Value::Bool(_) => varn_core::TypeTag::Bool.name(),
-                Value::Char(_) => varn_core::TypeTag::Char.name(),
-                Value::Null => varn_core::TypeTag::Null.name(),
-                Value::Array(_) => varn_core::TypeTag::Array.name(),
-                Value::Map(_) => varn_core::TypeTag::Map.name(),
-                Value::Set(_) => varn_core::TypeTag::Set.name(),
+                Value::Int(_) => varn_core::RuntimeKind::Int.name(),
+                Value::Float(_) => varn_core::RuntimeKind::Float.name(),
+                Value::Str(_) => varn_core::RuntimeKind::Str.name(),
+                Value::Bool(_) => varn_core::RuntimeKind::Bool.name(),
+                Value::Char(_) => varn_core::RuntimeKind::Char.name(),
+                Value::Null => varn_core::RuntimeKind::Null.name(),
+                Value::Array(_) => varn_core::RuntimeKind::Array.name(),
+                Value::Map(_) => varn_core::RuntimeKind::Map.name(),
+                Value::Set(_) => varn_core::RuntimeKind::Set.name(),
                 Value::Class(cls) => cls.name.as_str(),
                 Value::Object(o) => {
                     if let Some(c) = o.0.class() {
@@ -689,14 +689,14 @@ pub(crate) fn resolve_meta_property(
                     }
                 }
                 Value::EnumVariant(ev) => ev.enum_name.as_ref(),
-                Value::Decimal(_) => varn_core::TypeTag::Decimal.name(),
-                Value::BigInt(_) => varn_core::TypeTag::BigInt.name(),
-                Value::Generator(_) => varn_core::TypeTag::Generator.name(),
-                Value::Task(_) | Value::TaskHandle(_) => varn_core::TypeTag::Task.name(),
-                Value::Range(_) => varn_core::TypeTag::Range.name(),
-                Value::Symbol(_) => varn_core::TypeTag::Symbol.name(),
+                Value::Decimal(_) => varn_core::RuntimeKind::Decimal.name(),
+                Value::BigInt(_) => varn_core::RuntimeKind::BigInt.name(),
+                Value::Generator(_) => varn_core::RuntimeKind::Generator.name(),
+                Value::Task(_) | Value::TaskHandle(_) => varn_core::RuntimeKind::Task.name(),
+                Value::Range(_) => varn_core::RuntimeKind::Range.name(),
+                Value::Symbol(_) => varn_core::RuntimeKind::Symbol.name(),
                 Value::NativeFn(_) | Value::BoundMethod(_) | Value::VmValue(_) => "Function",
-                _ => varn_core::TypeTag::Dynamic.name(),
+                _ => varn_core::LangPrimitive::Dynamic.name(),
             };
             Ok(ResolvedProperty::Built(Value::Str(Arc::from(type_str))))
         }

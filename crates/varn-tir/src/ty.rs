@@ -2,7 +2,7 @@
 //!
 //! It replaces the CgTy → HirType → SlotKind cascade, where each narrowing
 //! silently dropped constructors: `char`, `decimal` and `bigint` died at HIR
-//! despite having a TypeTag and a runtime representation, and `T?` collapsed
+//! despite having a RuntimeKind and a runtime representation, and `T?` collapsed
 //! to Dynamic, which is why a nullable scalar could never be a (value, bit)
 //! pair.
 //!

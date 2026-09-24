@@ -1,7 +1,7 @@
 use crate::document::{DocumentState, SymbolView};
 use varn_checker::SymbolKind;
 use varn_checker::{ResolvedMemberKind, ResolvedMemberSummary};
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 
 pub fn format_type_params(type_params: &[String]) -> String {
     if type_params.is_empty() {
@@ -96,7 +96,7 @@ fn format_enum_member_sym(sym: SymbolView<'_>) -> String {
 }
 
 fn is_primitive_class_name(name: &str) -> bool {
-    TypeTag::from_str(name)
+    RuntimeKind::from_str(name)
         .map(|t| t.is_primitive())
         .unwrap_or(false)
 }

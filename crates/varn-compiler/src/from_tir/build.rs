@@ -256,12 +256,16 @@ impl<'m> Builder<'m> {
     /// `ClassLayout::from_fields` exactly (same `class_field_repr`, same
     /// slot-ordered field list), so the baked offset is byte-identical to the
     /// runtime layout.
-    fn compact_field(&self, obj_ty: BackendTy, slot: u16) -> Option<(u32, varn_core::TypeTag)> {
+    fn compact_field(
+        &self,
+        obj_ty: BackendTy,
+        slot: u16,
+    ) -> Option<(u32, Option<varn_core::RuntimeKind>)> {
         let BackendTy::Class(c) = obj_ty.non_nullable(&self.tir.types) else {
             return None;
         };
         let ci = self.tir.class(c)?;
-        let fields: Vec<(std::sync::Arc<str>, varn_core::TypeTag)> = ci
+        let fields: Vec<(std::sync::Arc<str>, Option<varn_core::RuntimeKind>)> = ci
             .fields
             .iter()
             .map(|f| (f.name.clone(), field_tag(f.ty)))
@@ -272,7 +276,7 @@ impl<'m> Builder<'m> {
             &fields,
         );
         let f = layout.get_field_by_index(slot as usize)?;
-        Some((f.offset, f.type_tag))
+        Some((f.offset, f.kind))
     }
 
     fn block_mut(&mut self, id: BlockId) -> &mut Block {
@@ -838,11 +842,11 @@ impl<'m> Builder<'m> {
                 let obj = self.lower_expr(object)?;
                 let kind = match &e.res {
                     Resolution::FieldSlot(slot) => match self.compact_field(object.ty, *slot) {
-                        Some((offset, tag)) => InstKind::GetFixedField {
+                        Some((offset, kind)) => InstKind::GetFixedField {
                             object: obj,
                             slot: *slot,
                             offset,
-                            tag,
+                            tag: varn_core::FieldAccess::Compact(kind),
                         },
                         // Receiver not statically a class: dynamic lookup.
                         None => InstKind::GetProperty {
@@ -1150,7 +1154,7 @@ impl<'m> Builder<'m> {
                         object: v,
                         slot: *field,
                         offset: 0,
-                        tag: varn_core::TypeTag::Null,
+                        tag: varn_core::FieldAccess::Slot,
                     },
                     ty,
                 ))
@@ -1610,10 +1614,10 @@ fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
     })
 }
 
-/// The layout tag the runtime lays a declared field out by.
-fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
-    use varn_core::TypeTag as T;
-    match bt {
+/// The runtime kind a declared field is laid out by; `None` is boxed.
+fn field_tag(bt: BackendTy) -> Option<varn_core::RuntimeKind> {
+    use varn_core::RuntimeKind as T;
+    Some(match bt {
         BackendTy::Int => T::Int,
         BackendTy::Float => T::Float,
         BackendTy::Bool => T::Bool,
@@ -1626,8 +1630,8 @@ fn field_tag(bt: BackendTy) -> varn_core::TypeTag {
         BackendTy::Set(_) => T::Set,
         BackendTy::Map(..) => T::Map,
         BackendTy::Class(_) => T::Class,
-        _ => T::Dynamic,
-    }
+        _ => return None,
+    })
 }
 
 impl<'m> Builder<'m> {

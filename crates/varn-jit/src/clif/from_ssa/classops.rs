@@ -60,7 +60,7 @@ pub(super) fn emit_declare_field(
     values: &[Option<cranelift_codegen::ir::Value>],
     class: u32,
     name: &str,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
 ) -> Result<(), String> {
     let frame = ctx
         .frame
@@ -70,7 +70,7 @@ pub(super) fn emit_declare_field(
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    let tag_v = b.ins().iconst(types::I64, tag as u8 as i64);
+    let tag_v = b.ins().iconst(types::I64, varn_core::RuntimeKind::encode(tag) as i64);
     call_helper_void(
         b,
         ctx.cc,

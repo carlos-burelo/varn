@@ -173,7 +173,7 @@ fn emit_get_fixed_field_compact(
     first_reg: usize,
     obj_r: usize,
     offset: u32,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
     slot: usize,
 ) -> Result<(), String> {
     use varn_types::class_layout::class_field_repr;
@@ -201,16 +201,16 @@ fn emit_get_fixed_field_compact(
     let off = offset as i32;
     let m = MemFlags::trusted();
     let pair = match tag {
-        varn_core::TypeTag::Bool => {
+        Some(varn_core::RuntimeKind::Bool) => {
             let b8 = b.ins().load(types::I8, m, data_base, off);
             let v = b.ins().uextend(types::I64, b8);
             emit::box_bool(b, v)
         }
-        varn_core::TypeTag::Int => {
+        Some(varn_core::RuntimeKind::Int) => {
             let v = b.ins().load(types::I64, m, data_base, off);
             emit::box_int(b, v)
         }
-        varn_core::TypeTag::Float => {
+        Some(varn_core::RuntimeKind::Float) => {
             let f = b.ins().load(types::F64, m, data_base, off);
             emit::box_f64(b, f)
         }
@@ -279,10 +279,10 @@ pub(super) fn emit_get_fixed_field(
 
     let obj_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
-    // A non-`Null` field tag marks a compact CLASS field (baked offset in
-    // `w3`); `Null` is a dynamic slot access (Object/Record/enum payload).
+    // `FieldAccess::Compact` marks a CLASS field (baked offset in `w3`);
+    // `Slot` is a dynamic slot access (Object/Record/enum payload).
     let tag_byte = (code[ip + 1] & 0xFF) as u8;
-    if tag_byte != 0 {
+    if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag_byte) {
         return emit_get_fixed_field_compact(
             b,
             c,
@@ -291,7 +291,7 @@ pub(super) fn emit_get_fixed_field(
             first_reg,
             obj_r,
             code[ip + 3] as u32,
-            varn_core::TypeTag::from_u8(tag_byte),
+            kind,
             slot,
         );
     }
@@ -460,7 +460,7 @@ fn emit_set_fixed_field_compact(
     first_reg: usize,
     val_r: usize,
     offset: u32,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
     slot: usize,
 ) -> Result<(), String> {
     use varn_types::class_layout::class_field_repr;
@@ -516,13 +516,13 @@ fn emit_set_fixed_field_compact(
     let m = MemFlags::new();
     let (_vt, payload) = b.ins().isplit(val128);
     match tag {
-        varn_core::TypeTag::Bool => {
+        Some(varn_core::RuntimeKind::Bool) => {
             b.ins().istore8(m, payload, data_base, off);
         }
-        varn_core::TypeTag::Int => {
+        Some(varn_core::RuntimeKind::Int) => {
             b.ins().store(m, payload, data_base, off);
         }
-        varn_core::TypeTag::Float => {
+        Some(varn_core::RuntimeKind::Float) => {
             let f = unbox_f64_coerce(b, val128);
             b.ins().store(m, f, data_base, off);
         }
@@ -581,7 +581,7 @@ pub(super) fn emit_set_fixed_field(
     let val_r = (code[ip + 1] >> 8) as usize;
     let slot = code[ip + 2] as usize;
     let tag_byte = (code[ip + 1] & 0xFF) as u8;
-    if tag_byte != 0 {
+    if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag_byte) {
         return emit_set_fixed_field_compact(
             b,
             c,
@@ -590,7 +590,7 @@ pub(super) fn emit_set_fixed_field(
             first_reg,
             val_r,
             code[ip + 3] as u32,
-            varn_core::TypeTag::from_u8(tag_byte),
+            kind,
             slot,
         );
     }

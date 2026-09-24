@@ -1,5 +1,5 @@
 use varn_checker::{SymbolKind, Type};
-use varn_core::{IntrinsicType, TokenKind, TypeKind, TypeTag};
+use varn_core::{IntrinsicType, TokenKind, TypeKind, RuntimeKind};
 
 use super::{
     TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,
@@ -214,7 +214,7 @@ fn is_intrinsic_type_name(name: &str) -> bool {
         || name == IntrinsicType::Char.as_str()
         || name == IntrinsicType::Bool.as_str()
         || name == IntrinsicType::Symbol.as_str()
-        || name == TypeTag::Object.name()
+        || name == RuntimeKind::Object.name()
         || name == IntrinsicType::Void.as_str()
         || name == IntrinsicType::Never.as_str()
         || name == IntrinsicType::Dynamic.as_str()

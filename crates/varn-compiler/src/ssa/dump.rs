@@ -295,7 +295,11 @@ fn inst_kind(kind: &InstKind) -> String {
             format!("makeclass {name} super={:?}", super_class.map(val))
         }
         InstKind::DeclareField { class, name, tag } => {
-            format!("declarefield {}.{name}: {tag}", val(*class))
+            format!(
+                "declarefield {}.{name}: {}",
+                val(*class),
+                tag.map_or("dynamic", |k| k.name())
+            )
         }
         InstKind::DefineStatic { class, name, value } => {
             format!("definestatic {}.{name} = {}", val(*class), val(*value))

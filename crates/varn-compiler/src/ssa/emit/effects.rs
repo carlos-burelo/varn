@@ -52,7 +52,7 @@ pub(super) fn emit_effect(
             offset,
             tag,
         } => {
-            // `w1` low = the field's `TypeTag` (always non-`Null` here — a
+            // `w1` low = the encoded `FieldAccess` (always `Compact` here — a
             // class field); `w2` = the dynamic `slot` (fallback); `w3` = the
             // compact byte offset.
             chunk.write(
@@ -60,7 +60,10 @@ pub(super) fn emit_effect(
                 line,
             );
             chunk.write(
-                Chunk::pack(reg[value.0 as usize], *tag as u8),
+                Chunk::pack(
+                    reg[value.0 as usize],
+                    varn_core::FieldAccess::Compact(*tag).encode(),
+                ),
                 line,
             );
             chunk.write(*slot, line);
@@ -206,7 +209,10 @@ pub(super) fn emit_effect(
             let class_reg = reg[class.0 as usize];
             let key_idx = chunk.add_str(name);
             chunk.emit(OpCode::DeclareField, line);
-            chunk.write(Chunk::pack(class_reg, *tag as u8), line);
+            chunk.write(
+                Chunk::pack(class_reg, varn_core::RuntimeKind::encode(*tag)),
+                line,
+            );
             chunk.write(key_idx, line);
             return Ok(true);
         }

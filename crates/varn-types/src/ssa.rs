@@ -29,7 +29,7 @@
 //! frame (calls, safepoints) reads the same coordinates the interpreter does.
 
 use serde::{Deserialize, Serialize};
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 
 use crate::register_meta::{SlotClass, SlotKind};
 
@@ -203,7 +203,7 @@ pub enum SsaOp {
     DeclareField {
         class: u32,
         name: Box<str>,
-        tag: TypeTag,
+        tag: Option<RuntimeKind>,
     },
 
     /// A class member definition (`Method`/`DefineStatic`/accessors). `kind` is

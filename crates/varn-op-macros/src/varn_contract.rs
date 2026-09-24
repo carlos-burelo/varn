@@ -10,7 +10,7 @@ use crate::contract_members::{
     collect_functions, collect_members, find_class, Kind, Member,
 };
 use varn_core::kinds::TypeKind;
-use varn_core::{AtomInterner, TypeTag};
+use varn_core::{AtomInterner, LangPrimitive};
 
 pub(crate) struct ContractInput {
     module: String,
@@ -93,25 +93,29 @@ pub(crate) enum Mapped {
     Opt(Box<Mapped>),
 }
 
-/// Scalar marshalling shape for a [`TypeTag`]. Deliberately excludes `Array`:
+/// Scalar marshalling shape for a [`RuntimeKind`]. Deliberately excludes `Array`:
 /// `Array` reaches `Mapped::Array` only structurally (a `T[]` node in
 /// [`classify`]) or as an explicit receiver in [`receiver_mapped`], never from
 /// a `Named` value-type position.
-fn scalar_mapped(tag: TypeTag) -> Mapped {
-    match tag {
-        TypeTag::Int => Mapped::Int,
-        TypeTag::Float => Mapped::Float,
-        TypeTag::Bool => Mapped::Bool,
-        TypeTag::Char => Mapped::Char,
-        TypeTag::Str => Mapped::Str,
-        TypeTag::Void => Mapped::Void,
-        _ => Mapped::Dynamic,
+fn scalar_mapped(p: LangPrimitive) -> Mapped {
+    match p {
+        LangPrimitive::Int => Mapped::Int,
+        LangPrimitive::Float => Mapped::Float,
+        LangPrimitive::Bool => Mapped::Bool,
+        LangPrimitive::Char => Mapped::Char,
+        LangPrimitive::Str => Mapped::Str,
+        LangPrimitive::Void => Mapped::Void,
+        LangPrimitive::Null
+        | LangPrimitive::BigInt
+        | LangPrimitive::Decimal
+        | LangPrimitive::Never
+        | LangPrimitive::Dynamic => Mapped::Dynamic,
     }
 }
 
 pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     match &t.kind {
-        TypeKind::Named(n, _) => TypeTag::from_str(interner.resolve(*n))
+        TypeKind::Named(n, _) => LangPrimitive::from_str(interner.resolve(*n))
             .map(scalar_mapped)
             .unwrap_or(Mapped::Dynamic),
         TypeKind::Primitive(varn_core::LangPrimitive::Void) => Mapped::Void,
@@ -130,8 +134,8 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     }
 }
 
-/// The `TypeTag` a contract property is laid out by. `Opt` keeps no unboxed
-/// representation of its own, so it reads as `Dynamic`.
+/// The `RuntimeKind` a contract property is laid out by. `Opt` keeps no unboxed
+/// representation of its own, so it is boxed (`None`).
 fn mapped_tag_path(m: &Mapped) -> TS2 {
     let name = match m {
         Mapped::Int => quote! { Int },
@@ -140,19 +144,19 @@ fn mapped_tag_path(m: &Mapped) -> TS2 {
         Mapped::Char => quote! { Char },
         Mapped::Str | Mapped::StrRecv => quote! { Str },
         Mapped::Array => quote! { Array },
-        Mapped::Dynamic | Mapped::Void | Mapped::Opt(_) => quote! { Dynamic },
+        Mapped::Dynamic | Mapped::Void | Mapped::Opt(_) => return quote! { None },
     };
-    quote! { ::varn_core::TypeTag::#name }
+    quote! { Some(::varn_core::RuntimeKind::#name) }
 }
 
 fn receiver_mapped(class: &str) -> Mapped {
     if class == varn_core::BuiltinType::Array.name() {
         return Mapped::Array;
     }
-    if TypeTag::from_str(class) == Some(TypeTag::Str) {
+    if LangPrimitive::from_str(class) == Some(LangPrimitive::Str) {
         return Mapped::StrRecv;
     }
-    TypeTag::from_str(class)
+    LangPrimitive::from_str(class)
         .map(scalar_mapped)
         .unwrap_or(Mapped::Dynamic)
 }

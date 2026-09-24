@@ -14,7 +14,7 @@ pub fn format_member_sig(
 
     let clean_parent = parent_name.trim().trim_end_matches(['.', ')', '(']);
     let has_parent = !clean_parent.is_empty()
-        && clean_parent != varn_core::TypeTag::Dynamic.name()
+        && clean_parent != varn_core::RuntimeKind::Dynamic.name()
         && clean_parent != member.name.as_ref();
 
     match member.kind {

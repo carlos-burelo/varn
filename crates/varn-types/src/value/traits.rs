@@ -4,7 +4,7 @@ use std::fmt;
 use std::hash::Hasher;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::TypeTag;
+use varn_core::RuntimeKind;
 
 impl Value {
     #[inline(always)]
@@ -58,33 +58,33 @@ impl Value {
     }
 
     /// The single canonical type name of this value. All flavours collapse to
-    /// [`TypeTag::name`]: callables (closure/native/bound) report `"function"`,
+    /// [`RuntimeKind::name`]: callables (closure/native/bound) report `"function"`,
     /// a module reports as an `"object"`, and a spread forwards to its inner
     /// value.
     pub fn type_name(&self) -> &'static str {
         match self {
-            Value::Null => TypeTag::Null,
-            Value::Bool(_) => TypeTag::Bool,
-            Value::Int(_) => TypeTag::Int,
-            Value::Float(_) => TypeTag::Float,
-            Value::Str(_) => TypeTag::Str,
-            Value::BigInt(_) => TypeTag::BigInt,
-            Value::Decimal(_) => TypeTag::Decimal,
-            Value::Array(_) => TypeTag::Array,
-            Value::Object(_) | Value::Module(_) => TypeTag::Object,
-            Value::Class(_) => TypeTag::Class,
-            Value::NativeFn(_) | Value::BoundMethod(_) => TypeTag::Function,
+            Value::Null => RuntimeKind::Null,
+            Value::Bool(_) => RuntimeKind::Bool,
+            Value::Int(_) => RuntimeKind::Int,
+            Value::Float(_) => RuntimeKind::Float,
+            Value::Str(_) => RuntimeKind::Str,
+            Value::BigInt(_) => RuntimeKind::BigInt,
+            Value::Decimal(_) => RuntimeKind::Decimal,
+            Value::Array(_) => RuntimeKind::Array,
+            Value::Object(_) | Value::Module(_) => RuntimeKind::Object,
+            Value::Class(_) => RuntimeKind::Class,
+            Value::NativeFn(_) | Value::BoundMethod(_) => RuntimeKind::Function,
             Value::Spread(v) => return v.type_name(),
-            Value::TaskHandle(_) | Value::Task(_) => TypeTag::TaskHandle,
-            Value::Range(_) => TypeTag::Range,
-            Value::Map(_) => TypeTag::Map,
-            Value::Set(_) => TypeTag::Set,
-            Value::Symbol(_) => TypeTag::Symbol,
-            Value::Generator(_) => TypeTag::Generator,
-            Value::Char(_) => TypeTag::Char,
-            Value::EnumVariant(_) => TypeTag::Enum,
-            Value::Buffer(_) => TypeTag::Bytes,
-            Value::VmValue(_payload) => TypeTag::VmRef,
+            Value::TaskHandle(_) | Value::Task(_) => RuntimeKind::TaskHandle,
+            Value::Range(_) => RuntimeKind::Range,
+            Value::Map(_) => RuntimeKind::Map,
+            Value::Set(_) => RuntimeKind::Set,
+            Value::Symbol(_) => RuntimeKind::Symbol,
+            Value::Generator(_) => RuntimeKind::Generator,
+            Value::Char(_) => RuntimeKind::Char,
+            Value::EnumVariant(_) => RuntimeKind::Enum,
+            Value::Buffer(_) => RuntimeKind::Bytes,
+            Value::VmValue(_payload) => RuntimeKind::Opaque,
         }
         .name()
     }

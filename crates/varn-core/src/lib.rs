@@ -20,7 +20,7 @@ pub mod source;
 pub mod term;
 pub mod token;
 pub mod trivia;
-pub mod type_tag;
+pub mod runtime_kind;
 pub mod well_known;
 
 pub use ast::AstId;
@@ -46,7 +46,7 @@ pub use numeric_conv::{float_to_int, NumConv, NumericDomain};
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
-pub use type_tag::{FieldRepr, TypeTag, VmValuePayload};
+pub use runtime_kind::{FieldAccess, FieldRepr, RuntimeKind, VmValuePayload};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
 /// (signature change, symbol removal). Additive changes do NOT bump — a std

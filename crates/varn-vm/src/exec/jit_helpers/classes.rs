@@ -52,7 +52,7 @@ pub(crate) extern "C" fn jit_declare_field(
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         let class_val = VmValue::from_raw_parts(class_tag, class_payload);
-        let tag = varn_core::TypeTag::from_u8(field_tag as u8);
+        let tag = varn_core::RuntimeKind::from_u8(field_tag as u8);
         if let Err(e) =
             crate::exec::class::op_declare_field(class_val, &key, tag, &mut ctx_ref.heap)
         {

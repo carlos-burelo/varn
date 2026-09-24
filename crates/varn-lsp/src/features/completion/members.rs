@@ -438,7 +438,7 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
                 return Some(ReceiverInfo::Anonymous(recs));
             }
             varn_core::TypeKind::Intrinsic(tag) => {
-                if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
+                if tag.is_primitive() || tag == &varn_core::RuntimeKind::Array {
                     return Some(ReceiverInfo::Named {
                         name: tag.name().to_owned(),
                         is_instance: true,

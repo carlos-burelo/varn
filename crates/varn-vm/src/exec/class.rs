@@ -85,7 +85,7 @@ pub(crate) fn op_inherit(
 pub(crate) fn op_declare_field(
     class_nv: VmValue,
     name: &str,
-    tag: varn_core::TypeTag,
+    tag: Option<varn_core::RuntimeKind>,
     heap: &mut Heap,
 ) -> VmResult<()> {
     if class_nv.is_heap() {

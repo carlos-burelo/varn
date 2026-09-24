@@ -1,30 +1,30 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use varn_core::{TypeTag};
+use varn_core::{RuntimeKind};
 use varn_types::value::RuntimeSymbol;
 use varn_types::{ClassObj, NativeCtx, Value};
 
 pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     if val.is_null() {
-        return TypeTag::Null.name();
+        return RuntimeKind::Null.name();
     }
     if val.is_bool() {
-        return TypeTag::Bool.name();
+        return RuntimeKind::Bool.name();
     }
     if val.is_int() {
-        return TypeTag::Int.name();
+        return RuntimeKind::Int.name();
     }
     if val.is_f64() {
-        return TypeTag::Float.name();
+        return RuntimeKind::Float.name();
     }
     if val.is_sso() {
-        return TypeTag::Str.name();
+        return RuntimeKind::Str.name();
     }
     if val.is_heap() {
         return match heap.get(val.as_heap_idx()) {
             Some(obj) => obj.tag().name(),
-            None => TypeTag::Object.name(),
+            None => RuntimeKind::Object.name(),
         };
     }
     "unknown"
@@ -40,24 +40,24 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     };
 
     match cls.name.as_str() {
-        n if n == varn_core::TypeTag::Str.name() => {
+        n if n == varn_core::RuntimeKind::Str.name() => {
             return obj.is_sso()
                 || (obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Str(_))))
         }
-        n if n == varn_core::TypeTag::Int.name() => {
+        n if n == varn_core::RuntimeKind::Int.name() => {
             return obj.is_int()
                 || (obj.is_f64() && {
                     let f = obj.as_f64();
                     f == f.floor()
                 })
         }
-        n if n == varn_core::TypeTag::Float.name() => return obj.is_f64() || obj.is_int(),
-        n if n == varn_core::TypeTag::Bool.name() => return obj.is_bool(),
-        n if n == varn_core::TypeTag::Null.name() => return obj.is_null(),
-        n if n == varn_core::TypeTag::Char.name() => {
+        n if n == varn_core::RuntimeKind::Float.name() => return obj.is_f64() || obj.is_int(),
+        n if n == varn_core::RuntimeKind::Bool.name() => return obj.is_bool(),
+        n if n == varn_core::RuntimeKind::Null.name() => return obj.is_null(),
+        n if n == varn_core::RuntimeKind::Char.name() => {
             return obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Char(_)))
         }
-        n if n == varn_core::TypeTag::Decimal.name() => {
+        n if n == varn_core::RuntimeKind::Decimal.name() => {
             return obj.is_heap()
                 && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Decimal(_)))
         }

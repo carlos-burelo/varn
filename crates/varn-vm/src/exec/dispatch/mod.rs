@@ -690,21 +690,21 @@ impl ExecCtx {
     }
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
-        use varn_core::TypeTag;
+        use varn_core::RuntimeKind;
         if v.is_null() {
-            return TypeTag::Null.name();
+            return RuntimeKind::Null.name();
         }
         if v.is_int() {
-            return TypeTag::Int.name();
+            return RuntimeKind::Int.name();
         }
         if v.is_f64() {
-            return TypeTag::Float.name();
+            return RuntimeKind::Float.name();
         }
         if v.is_bool() {
-            return TypeTag::Bool.name();
+            return RuntimeKind::Bool.name();
         }
         if v.is_sso() {
-            return TypeTag::Str.name();
+            return RuntimeKind::Str.name();
         }
         if !v.is_heap() {
             return "unknown";

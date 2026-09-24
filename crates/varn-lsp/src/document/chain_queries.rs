@@ -91,7 +91,7 @@ fn type_name_of(ty: &varn_checker::Type) -> Option<String> {
     match &ty.0 {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.to_string()),
         TypeKind::Intrinsic(tag) => {
-            if *tag == varn_core::TypeTag::Dynamic {
+            if *tag == varn_core::RuntimeKind::Dynamic {
                 None
             } else {
                 Some(tag.name().to_owned())
@@ -143,7 +143,7 @@ impl DocumentState {
                 return Some(ChainResult::Member {
                     member: summary_from_resolution(res),
                     parent_name: type_name_of(&res.receiver_ty)
-                        .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string()),
+                        .unwrap_or_else(|| varn_core::RuntimeKind::Dynamic.name().to_string()),
                 });
             }
         }
@@ -172,12 +172,12 @@ impl DocumentState {
 
                         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
                             let clean_parent = if !parent_name.is_empty()
-                                && parent_name != varn_core::TypeTag::Dynamic.name()
+                                && parent_name != varn_core::RuntimeKind::Dynamic.name()
                             {
                                 parent_name
                             } else {
                                 type_name_of(&res.receiver_ty).unwrap_or_else(|| {
-                                    varn_core::TypeTag::Dynamic.name().to_string()
+                                    varn_core::RuntimeKind::Dynamic.name().to_string()
                                 })
                             };
                             return Some(ChainResult::Member {
@@ -278,12 +278,12 @@ impl DocumentState {
         let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
         let tok_idx = match tok_idx_opt {
             Some(i) if i >= 2 => i,
-            _ => return varn_core::TypeTag::Dynamic.name().to_string(),
+            _ => return varn_core::RuntimeKind::Dynamic.name().to_string(),
         };
 
         let dot_tok = &self.tokens[tok_idx - 1];
         if dot_tok.kind != TokenKind::Dot && dot_tok.kind != TokenKind::QuestionDot {
-            return varn_core::TypeTag::Dynamic.name().to_string();
+            return varn_core::RuntimeKind::Dynamic.name().to_string();
         }
 
         let prev_tok = &self.tokens[tok_idx - 2];
@@ -309,7 +309,7 @@ impl DocumentState {
             return prev_tok.lexeme.clone();
         }
 
-        varn_core::TypeTag::Dynamic.name().to_string()
+        varn_core::RuntimeKind::Dynamic.name().to_string()
     }
 
     /// The member the cursor sits on, and the type it belongs to.
@@ -323,7 +323,7 @@ impl DocumentState {
         // A member *access*: the checker recorded the receiver and the member.
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             let parent = type_name_of(&res.receiver_ty)
-                .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string());
+                .unwrap_or_else(|| varn_core::RuntimeKind::Dynamic.name().to_string());
             return Some((parent, summary_from_resolution(res)));
         }
 

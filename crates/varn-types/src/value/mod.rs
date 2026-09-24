@@ -30,7 +30,7 @@ pub use shape::{root_shape, Shape};
 use std::rc::Rc;
 use std::sync::Arc;
 pub use task::{reject_task, reject_value_task, resolve_task, Poll, TaskState};
-pub use varn_core::{TypeTag, VmValuePayload};
+pub use varn_core::{RuntimeKind, VmValuePayload};
 
 pub type RuntimeArray = Vec<Value>;
 

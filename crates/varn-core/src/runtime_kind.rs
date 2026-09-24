@@ -2,7 +2,7 @@
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 #[repr(u8)]
-pub enum TypeTag {
+pub enum RuntimeKind {
     Null = 0,
     Bool,
     Int,
@@ -12,9 +12,6 @@ pub enum TypeTag {
     Decimal,
     Char,
     Symbol,
-    Void,
-    Never,
-    Dynamic,
     Array,
     Map,
     Set,
@@ -26,12 +23,12 @@ pub enum TypeTag {
     Task,
     Range,
     Enum,
-    VmRef,
+    Opaque,
     TaskHandle,
     Bytes,
 }
 
-impl TypeTag {
+impl RuntimeKind {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Null => "null",
@@ -43,9 +40,6 @@ impl TypeTag {
             Self::Decimal => "decimal",
             Self::Char => "char",
             Self::Symbol => "Symbol",
-            Self::Void => "void",
-            Self::Never => "never",
-            Self::Dynamic => "dynamic",
             Self::Array => "Array",
             Self::Map => "Map",
             Self::Set => "Set",
@@ -57,7 +51,7 @@ impl TypeTag {
             Self::Task => "Task",
             Self::Range => "Range",
             Self::Enum => "enum",
-            Self::VmRef => "vm_ref",
+            Self::Opaque => "opaque",
             Self::TaskHandle => "TaskHandle",
             Self::Bytes => "Bytes",
         }
@@ -73,9 +67,6 @@ impl TypeTag {
             "bigint" => Some(Self::BigInt),
             "decimal" => Some(Self::Decimal),
             "char" => Some(Self::Char),
-            "void" => Some(Self::Void),
-            "never" => Some(Self::Never),
-            "dynamic" => Some(Self::Dynamic),
             "Array" => Some(Self::Array),
             "Map" => Some(Self::Map),
             "Set" => Some(Self::Set),
@@ -87,28 +78,11 @@ impl TypeTag {
             "Task" => Some(Self::Task),
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
-            "enum" => Some(Self::Enum),
+            "enum" => Some(Self::Enum),
             _ => None,
         }
     }
 
-    /// A tag whose values live inline in a `VmValue` word, with no heap
-    /// identity: everything the checker treats as a scalar type.
-    pub const fn is_primitive(self) -> bool {
-        matches!(
-            self,
-            Self::Null
-                | Self::Bool
-                | Self::Int
-                | Self::Float
-                | Self::Char
-                | Self::Void
-                | Self::Never
-                | Self::Str
-                | Self::BigInt
-                | Self::Decimal
-        )
-    }
 }
 
 pub trait VmValuePayload: std::fmt::Debug + std::any::Any {
@@ -131,43 +105,65 @@ pub struct FieldRepr {
     pub is_gc_ref: bool,
 }
 
-impl TypeTag {
+impl RuntimeKind {
     /// The single authority on how a statically-typed field is laid out. The
     /// checker derives instance offsets from it while annotating field
     /// accesses, and the runtime derives `ClassLayout` from it; two tables
     /// would let a compiled access address a field the runtime placed
     /// elsewhere.
     ///
-    /// The tag whose discriminant is `raw`, or `Dynamic` when `raw` names
-    /// none — the conservative reading, and the one a truncated or
-    /// forward-version operand must get.
-    pub const fn from_u8(raw: u8) -> Self {
+    /// The kind whose discriminant is `raw`, or `None` (a boxed `VmValue`)
+    /// when `raw` names none — the conservative reading, and the one a
+    /// truncated or forward-version operand must get.
+    pub const fn from_u8(raw: u8) -> Option<Self> {
         if raw <= Self::Bytes as u8 {
-            // SAFETY: `TypeTag` is `#[repr(u8)]` with contiguous discriminants
+            // SAFETY: `RuntimeKind` is `#[repr(u8)]` with contiguous discriminants
             // from `Null = 0` through `Bytes`, and `raw` is inside that range.
-            unsafe { std::mem::transmute::<u8, Self>(raw) }
+            Some(unsafe { std::mem::transmute::<u8, Self>(raw) })
         } else {
-            Self::Dynamic
+            None
         }
     }
 
-    /// A tag with no unboxed representation falls back to a whole `VmValue`.
-    pub const fn field_repr(self) -> FieldRepr {
-        let (size, align, is_gc_ref) = match self {
-            TypeTag::Bool => (1, 1, false),
-            TypeTag::Char => (4, 4, false),
-            TypeTag::Int | TypeTag::Float => (8, 8, false),
-            TypeTag::Str
-            | TypeTag::Array
-            | TypeTag::Map
-            | TypeTag::Set
-            | TypeTag::Object
-            | TypeTag::Class
-            | TypeTag::Function
-            | TypeTag::Task
-            | TypeTag::Bytes
-            | TypeTag::Generator => (8, 8, true),
-            _ => (16, 8, true),
+    /// Operand byte for a field kind; `None` (boxed) encodes out of range.
+    pub const fn encode(kind: Option<Self>) -> u8 {
+        match kind {
+            Some(k) => k as u8,
+            None => u8::MAX,
+        }
+    }
+
+    /// A field with no known kind, or one with no unboxed representation,
+    /// is a whole `VmValue`.
+    pub const fn field_repr(kind: Option<Self>) -> FieldRepr {
+        let (size, align, is_gc_ref) = match kind {
+            Some(RuntimeKind::Bool) => (1, 1, false),
+            Some(RuntimeKind::Char) => (4, 4, false),
+            Some(RuntimeKind::Int | RuntimeKind::Float) => (8, 8, false),
+            Some(
+                RuntimeKind::Str
+                | RuntimeKind::Array
+                | RuntimeKind::Map
+                | RuntimeKind::Set
+                | RuntimeKind::Object
+                | RuntimeKind::Class
+                | RuntimeKind::Function
+                | RuntimeKind::Task
+                | RuntimeKind::Bytes
+                | RuntimeKind::Generator,
+            ) => (8, 8, true),
+            Some(
+                RuntimeKind::Null
+                | RuntimeKind::BigInt
+                | RuntimeKind::Decimal
+                | RuntimeKind::Symbol
+                | RuntimeKind::Tuple
+                | RuntimeKind::Range
+                | RuntimeKind::Enum
+                | RuntimeKind::Opaque
+                | RuntimeKind::TaskHandle,
+            )
+            | None => (16, 8, true),
         };
         FieldRepr {
             size,
@@ -177,7 +173,37 @@ impl TypeTag {
     }
 }
 
-impl std::fmt::Display for TypeTag {
+/// How a fixed-field access addresses its field: by dynamic `slot` (enum
+/// payloads, records), or at a compact offset laid out by the field's kind
+/// (`None` = a boxed `VmValue`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FieldAccess {
+    Slot,
+    Compact(Option<RuntimeKind>),
+}
+
+impl FieldAccess {
+    /// Operand byte: `0` is `Slot` — no class field is laid out as `Null`.
+    pub fn encode(self) -> u8 {
+        match self {
+            Self::Slot => 0,
+            Self::Compact(kind) => {
+                debug_assert_ne!(kind, Some(RuntimeKind::Null), "a field is never laid out as null");
+                RuntimeKind::encode(kind)
+            }
+        }
+    }
+
+    pub const fn decode(raw: u8) -> Self {
+        if raw == 0 {
+            Self::Slot
+        } else {
+            Self::Compact(RuntimeKind::from_u8(raw))
+        }
+    }
+}
+
+impl std::fmt::Display for RuntimeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())
     }

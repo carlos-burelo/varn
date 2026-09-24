@@ -309,7 +309,7 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned(), resolver, table);
+            let str_ty = Type::named(varn_core::RuntimeKind::Str.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
         TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
@@ -324,7 +324,7 @@ pub fn get_members_of_type(
                 true,
             );
             let bytes_ty =
-                Type::named(varn_core::TypeTag::Bytes.name().to_owned(), resolver, table);
+                Type::named(varn_core::RuntimeKind::Bytes.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
         kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => {

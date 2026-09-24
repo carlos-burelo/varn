@@ -167,12 +167,12 @@ pub(super) fn emit_value(
             offset,
             tag,
         } => {
-            // `w1` low = the field's `TypeTag` (non-`Null` = compact class
+            // `w1` low = the encoded `FieldAccess` (`Compact` = a class
             // field); `w2` = the dynamic `slot` (for the Object/Record
             // fallback); `w3` = the compact byte offset. A class has NO shape,
             // so the offset is baked; a dynamic object ignores it and uses the
             // slot.
-            let tag_byte = *tag as u8;
+            let tag_byte = tag.encode();
             chunk.write(Chunk::pack_op(OpCode::GetFixedField, d), line);
             chunk.write(Chunk::pack(reg[object.0 as usize], tag_byte), line);
             chunk.write(*slot, line);

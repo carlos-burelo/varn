@@ -651,8 +651,13 @@ fn print_proto(
                     if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                         hint = const_hint(c);
                     }
-                    let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);
-                    format!("r{} field[{}]: {}", hi(w1), name_idx, tag)
+                    let tag = varn_core::RuntimeKind::from_u8(lo(w1) as u8);
+                    format!(
+                        "r{} field[{}]: {}",
+                        hi(w1),
+                        name_idx,
+                        tag.map_or("dynamic", |k| k.name())
+                    )
                 }
 
                 OpCode::MakeEnumVariant => {

@@ -291,7 +291,7 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub trivial_init_memo:
-        std::cell::RefCell<Option<Option<Rc<[(usize, u32, varn_core::TypeTag)]>>>>,
+        std::cell::RefCell<Option<Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>>>>,
 
     /// Portable typed SSA for the scalar/arith family, attached after
     /// regalloc. `None` when the body is outside that family (or the artifact
@@ -374,7 +374,7 @@ impl FunctionProto {
     /// Checks if this constructor proto is a trivial field-initializer:
     /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
     /// instructions ending in Return.
-    pub fn trivial_field_init_plan(&self) -> Option<Rc<[(usize, u32, varn_core::TypeTag)]>> {
+    pub fn trivial_field_init_plan(&self) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
         if let Some(ref cached) = *self.trivial_init_memo.borrow() {
             return cached.clone();
         }
@@ -383,7 +383,7 @@ impl FunctionProto {
         plan
     }
 
-    fn compute_trivial_field_init_plan(&self) -> Option<Vec<(usize, u32, varn_core::TypeTag)>> {
+    fn compute_trivial_field_init_plan(&self) -> Option<Vec<(usize, u32, Option<varn_core::RuntimeKind>)>> {
         if self.is_async || self.is_generator || self.has_rest || self.upvalue_count > 0 {
             return None;
         }
@@ -429,11 +429,11 @@ impl FunctionProto {
                     }
                     let val_r = (code[ip + 1] >> 8) as usize;
                     let tag = (code[ip + 1] & 0xFF) as u8;
-                    // Non-`Null` tag = a compact class field; `w3` is its
-                    // baked byte offset.
-                    if tag == 0 {
+                    // A compact class field; `w3` is its baked byte offset.
+                    let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag)
+                    else {
                         return None;
-                    }
+                    };
                     let offset = code[ip + 3] as u32;
                     if val_r >= sources.len() {
                         return None;
@@ -441,7 +441,7 @@ impl FunctionProto {
                     let Some(RegSource::Param(param_idx)) = sources[val_r] else {
                         return None;
                     };
-                    plan.push((param_idx, offset, varn_core::TypeTag::from_u8(tag)));
+                    plan.push((param_idx, offset, kind));
                     ip += 4;
                 }
                 OpCode::LoadNull => {

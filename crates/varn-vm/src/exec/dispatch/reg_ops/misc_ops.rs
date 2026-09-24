@@ -14,11 +14,11 @@ impl ExecCtx {
         offset: u16,
         tag: u8,
     ) -> VmResult<VmValue> {
-        if tag != 0 {
+        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag) {
             if let Ok(v) = crate::exec::props::get_fixed_field_at(
                 obj,
                 offset as u32,
-                varn_core::TypeTag::from_u8(tag),
+                kind,
                 &self.heap,
             ) {
                 return Ok(v);
@@ -37,11 +37,11 @@ impl ExecCtx {
         tag: u8,
         val: VmValue,
     ) -> VmResult<()> {
-        if tag != 0 {
+        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag) {
             if crate::exec::props::set_fixed_field_at(
                 obj,
                 offset as u32,
-                varn_core::TypeTag::from_u8(tag),
+                kind,
                 val,
                 &self.heap,
             )
@@ -105,7 +105,7 @@ impl ExecCtx {
         &mut self,
         obj: VmValue,
         name_idx: usize,
-        tag: varn_core::TypeTag,
+        tag: Option<varn_core::RuntimeKind>,
         _frame_idx: usize,
         closure: &VmClosure,
     ) -> VmResult<()> {

@@ -299,7 +299,7 @@ impl<'a> FnEmitter<'a> {
     /// / `decimal` / `float`) leaves the value int-tagged while the static type
     /// says otherwise, so an op-id keyed on the static type would misdispatch.
     fn core_class_name(&self, ty: BackendTy) -> Option<&'static str> {
-        use varn_core::TypeTag as T;
+        use varn_core::RuntimeKind as T;
         let tag = match ty.non_nullable(self.tt) {
             BackendTy::Array(_) => T::Array,
             BackendTy::Str => T::Str,
@@ -2511,7 +2511,7 @@ impl<'a> FnEmitter<'a> {
                         k.lang_name()
                     }
                     varn_core::TypeKind::Named(n, _) => {
-                        varn_core::TypeTag::from_str(self.m.interner.resolve(*n)).map(|t| t.name())
+                        varn_core::RuntimeKind::from_str(self.m.interner.resolve(*n)).map(|t| t.name())
                     }
                     _ => None,
                 };

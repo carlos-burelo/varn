@@ -11,7 +11,7 @@
 //! `varn-builtins` runtime compute the exact same id (neither can depend on the
 //! other).
 
-use crate::type_tag::TypeTag;
+use crate::runtime_kind::RuntimeKind;
 
 #[inline]
 fn fnv1a(segments: &[&[u8]]) -> u64 {
@@ -63,22 +63,22 @@ pub fn core_method_op_id(class: &str, method: &str) -> u64 {
 /// ocurre una vez por sentencia lowerada.
 pub fn array_push_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Array.name(), "push"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Array.name(), "push"))
 }
 
 pub fn str_starts_with_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "startsWith"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "startsWith"))
 }
 
 pub fn str_ends_with_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "endsWith"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "endsWith"))
 }
 
 pub fn str_slice_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "slice"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "slice"))
 }
 
 /// Op-id de `str::charCodeAt` / `str::codePointAt`. El lowering los inlinea
@@ -86,12 +86,12 @@ pub fn str_slice_op_id() -> u64 {
 /// la frontera nativa, y el scan de regiones los trata como no-alloc.
 pub fn str_char_code_at_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "charCodeAt"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "charCodeAt"))
 }
 
 pub fn str_code_point_at_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Str.name(), "codePointAt"))
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "codePointAt"))
 }
 
 /// Whether `op_id` is a char-indexing `str` method the CLIF lowering inlines.
@@ -104,46 +104,46 @@ pub fn is_str_char_index_op_id(op_id: u64) -> bool {
 /// primitives/*`) and are therefore op-id-addressable.
 ///
 /// This is the **single source of truth** for "is this a core type with a
-/// native method table". Adding a primitive = add its [`TypeTag`] here and
+/// native method table". Adding a primitive = add its [`RuntimeKind`] here and
 /// nothing else in the dispatch layer. Distinct from the VM's intrinsic-class
 /// registry (which also carries `Error`/`TypeError`/`RangeError` for property
 /// fallback) — these are the op-id-dispatched primitives.
-pub const CORE_CLASSES: [TypeTag; 13] = [
-    TypeTag::Array,
-    TypeTag::Str,
-    TypeTag::Bytes,
-    TypeTag::Map,
-    TypeTag::Set,
-    TypeTag::Range,
-    TypeTag::Symbol,
-    TypeTag::Int,
-    TypeTag::Float,
-    TypeTag::Bool,
-    TypeTag::Char,
-    TypeTag::Decimal,
-    TypeTag::BigInt,
+pub const CORE_CLASSES: [RuntimeKind; 13] = [
+    RuntimeKind::Array,
+    RuntimeKind::Str,
+    RuntimeKind::Bytes,
+    RuntimeKind::Map,
+    RuntimeKind::Set,
+    RuntimeKind::Range,
+    RuntimeKind::Symbol,
+    RuntimeKind::Int,
+    RuntimeKind::Float,
+    RuntimeKind::Bool,
+    RuntimeKind::Char,
+    RuntimeKind::Decimal,
+    RuntimeKind::BigInt,
 ];
 
 /// Whether `tag` is a core class with a natively registered method table.
 #[inline]
-pub fn is_core_class(tag: TypeTag) -> bool {
+pub fn is_core_class(tag: RuntimeKind) -> bool {
     CORE_CLASSES.contains(&tag)
 }
 
 /// The class-registration name for a core class, i.e. the exact string used as
 /// the `class:` key in `varn_contract!` and in the `.vn` contracts. This is the
 /// string that feeds [`core_method_op_id`], so it must match the registration
-/// byte-for-byte — and it is the single canonical [`TypeTag::name`].
-pub fn core_class_name(tag: TypeTag) -> Option<&'static str> {
+/// byte-for-byte — and it is the single canonical [`RuntimeKind::name`].
+pub fn core_class_name(tag: RuntimeKind) -> Option<&'static str> {
     is_core_class(tag).then(|| tag.name())
 }
 
 /// Exact inverse of [`core_class_name`]: a registration name back to its
-/// [`TypeTag`], restricted to core classes. Only the canonical registration
+/// [`RuntimeKind`], restricted to core classes. Only the canonical registration
 /// name resolves (e.g. `"Symbol"`, not the surface `"symbol"`), so this never
 /// admits a name that wouldn't round-trip through [`core_class_name`]. Returns
 /// `None` for user classes / unknown names.
-pub fn core_class_tag(name: &str) -> Option<TypeTag> {
+pub fn core_class_tag(name: &str) -> Option<RuntimeKind> {
     CORE_CLASSES
         .into_iter()
         .find(|&tag| core_class_name(tag) == Some(name))
