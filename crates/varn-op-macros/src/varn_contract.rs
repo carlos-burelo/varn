@@ -5,10 +5,10 @@ use std::path::Path;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token};
 
-use varn_core::ast::{
-    AstArena, ClassDecl, ClassMember, Decl, ExportDecl, ExprKind, Param, Pattern, StmtId, StmtKind,
+use varn_core::ast::TypeNode;
+use crate::contract_members::{
+    collect_functions, collect_members, find_class, Kind, Member,
 };
-use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
 use varn_core::{AtomInterner, IntrinsicType, TypeTag};
 
@@ -73,7 +73,7 @@ impl Parse for ContractInput {
 }
 
 #[derive(Clone)]
-enum Mapped {
+pub(crate) enum Mapped {
     Int,
     Float,
     Bool,
@@ -109,7 +109,7 @@ fn scalar_mapped(tag: TypeTag) -> Mapped {
     }
 }
 
-fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
+pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     match &t.kind {
         TypeKind::Named(n, _) => TypeTag::from_str(interner.resolve(*n))
             .map(scalar_mapped)
@@ -211,204 +211,6 @@ fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
         }
         _ => quote!(#binding),
     }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Kind {
-    Method,
-    Getter,
-    StaticMethod,
-    StaticGetter,
-    Constructor,
-    Property,
-
-    Function,
-}
-
-struct ParamInfo {
-    mapped: Mapped,
-    is_rest: bool,
-}
-
-struct Member {
-    symbol: String,
-    kind: Kind,
-    params: Vec<ParamInfo>,
-    ret: Mapped,
-    /// `@fallible` in the contract: the impl returns `Result<T, NativeError>`,
-    /// so it can raise a typed platform error.
-    fallible: bool,
-}
-
-fn param_name_is_rest(p: &Param) -> bool {
-    p.is_rest || matches!(p.pattern, Pattern::Rest { .. })
-}
-
-fn is_fallible(decorators: &[varn_core::ast::Decorator], arena: &AstArena, interner: &AtomInterner) -> bool {
-    decorators.iter().any(|d| {
-        matches!(&arena.expr(d.expression).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "fallible")
-    })
-}
-
-fn collect_members(
-    class_name: &str,
-    decl: &ClassDecl,
-    arena: &AstArena,
-    interner: &AtomInterner,
-) -> Vec<Member> {
-    let mut out = Vec::new();
-    for m in &decl.body {
-        match m {
-            ClassMember::Method {
-                key,
-                params,
-                return_type,
-                modifiers,
-                decorators,
-                ..
-            } => {
-                let kind = if modifiers.is_static {
-                    Kind::StaticMethod
-                } else {
-                    Kind::Method
-                };
-                out.push(Member {
-                    symbol: interner.resolve(*key).to_string(),
-                    kind,
-                    params: map_params(params, interner),
-                    ret: return_type
-                        .as_ref()
-                        .map(|t| classify(t, interner))
-                        .unwrap_or(Mapped::Void),
-                    fallible: is_fallible(decorators, arena, interner),
-                });
-            }
-            ClassMember::Getter {
-                key,
-                return_type,
-                modifiers,
-                ..
-            } => {
-                let kind = if modifiers.is_static {
-                    Kind::StaticGetter
-                } else {
-                    Kind::Getter
-                };
-                out.push(Member {
-                    symbol: interner.resolve(*key).to_string(),
-                    kind,
-                    params: vec![],
-                    ret: return_type
-                        .as_ref()
-                        .map(|t| classify(t, interner))
-                        .unwrap_or(Mapped::Dynamic),
-                    fallible: false,
-                });
-            }
-
-            ClassMember::Property {
-                key,
-                type_ann,
-                init: None,
-                modifiers,
-                ..
-            } => {
-                let kind = if modifiers.is_static {
-                    Kind::StaticGetter
-                } else if modifiers.is_readonly {
-                    Kind::Getter
-                } else {
-                    Kind::Property
-                };
-                out.push(Member {
-                    symbol: interner.resolve(*key).to_string(),
-                    kind,
-                    params: vec![],
-                    ret: type_ann
-                        .as_ref()
-                        .map(|t| classify(t, interner))
-                        .unwrap_or(Mapped::Dynamic),
-                    fallible: false,
-                });
-            }
-            ClassMember::Constructor { params, .. } => {
-                out.push(Member {
-                    symbol: "constructor".to_string(),
-                    kind: Kind::Constructor,
-                    params: map_params(params, interner),
-                    ret: Mapped::Dynamic,
-                    fallible: false,
-                });
-            }
-            _ => {}
-        }
-    }
-    let _ = class_name;
-    out
-}
-
-fn collect_functions(body: &[StmtId], arena: &AstArena, interner: &AtomInterner) -> Vec<Member> {
-    fn from_decl(decl: &Decl, interner: &AtomInterner, out: &mut Vec<Member>) {
-        match decl {
-            Decl::Function(f) => out.push(function_member(f, interner)),
-            Decl::Export(ExportDecl::Decl { declaration, .. }) => {
-                from_decl(declaration, interner, out)
-            }
-            _ => {}
-        }
-    }
-    let mut out = Vec::new();
-    for &stmt_id in body {
-        if let StmtKind::Decl(decl) = &arena.stmt(stmt_id).kind {
-            from_decl(decl, interner, &mut out);
-        }
-    }
-    out
-}
-
-fn function_member(f: &FunctionDecl, interner: &AtomInterner) -> Member {
-    Member {
-        symbol: interner.resolve(f.id).to_string(),
-        kind: Kind::Function,
-        params: map_params(&f.params, interner),
-        ret: f
-            .return_type
-            .as_ref()
-            .map(|t| classify(t, interner))
-            .unwrap_or(Mapped::Void),
-        fallible: false,
-    }
-}
-
-fn param_type(p: &Param) -> Option<&TypeNode> {
-    if let Some(t) = &p.type_ann {
-        return Some(t);
-    }
-    if let Pattern::Identifier {
-        type_ann: Some(t), ..
-    } = &p.pattern
-    {
-        return Some(t);
-    }
-    None
-}
-
-fn map_params(params: &[Param], interner: &AtomInterner) -> Vec<ParamInfo> {
-    params
-        .iter()
-        .map(|p| {
-            let is_rest = param_name_is_rest(p);
-            let base = param_type(p)
-                .map(|t| classify(t, interner))
-                .unwrap_or(Mapped::Dynamic);
-            let mapped = if p.is_optional && !is_rest {
-                Mapped::Opt(Box::new(base))
-            } else {
-                base
-            };
-            ParamInfo { mapped, is_rest }
-        })
-        .collect()
 }
 
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
@@ -903,38 +705,6 @@ fn sanitize(s: &str) -> String {
 fn err(msg: String) -> TokenStream {
     let lit = LitStr::new(&msg, proc_macro2::Span::call_site());
     TokenStream::from(quote! { compile_error!(#lit); })
-}
-
-fn find_class(
-    body: &[StmtId],
-    arena: &AstArena,
-    name: &str,
-    interner: &AtomInterner,
-) -> Option<ClassDecl> {
-    for &stmt_id in body {
-        if let StmtKind::Decl(decl) = &arena.stmt(stmt_id).kind {
-            if let Some(c) = class_from_decl(decl, name, interner) {
-                return Some(c);
-            }
-        }
-    }
-    None
-}
-
-fn class_from_decl(decl: &Decl, name: &str, interner: &AtomInterner) -> Option<ClassDecl> {
-    match decl {
-        Decl::Class(c) => {
-            if c.id.map(|id| interner.resolve(id)) == Some(name) {
-                Some(c.clone())
-            } else {
-                None
-            }
-        }
-        Decl::Export(ExportDecl::Decl { declaration, .. }) => {
-            class_from_decl(declaration, name, interner)
-        }
-        _ => None,
-    }
 }
 
 fn map_to_arg_type_token(m: &Mapped) -> TS2 {
