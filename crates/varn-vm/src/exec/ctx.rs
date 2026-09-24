@@ -114,6 +114,9 @@ pub struct ExecCtx {
     pub gc_inhibited: bool,
     pub capabilities: varn_types::capabilities::CapabilitySet,
     pub metadata: FxHashMap<String, FxHashMap<String, VmValue>>,
+    /// Map/Set key representatives of `Hashable & Equatable` instances, by
+    /// `(class id, hash())` (see `hashable_keys.rs`). GC roots.
+    pub(crate) hashable_keys: FxHashMap<(u32, i64), Vec<VmValue>>,
     pub gc_root_scratch: Vec<VmValue>,
     /// Staging para el protocolo lento de llamadas (P2): la ventana
     /// callee+args como `Vec<VmValue>` contiguo, reutilizado entre llamadas.
@@ -170,6 +173,7 @@ impl ExecCtx {
             gc_inhibited: false,
             capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
             metadata: FxHashMap::default(),
+            hashable_keys: FxHashMap::default(),
             gc_root_scratch: Vec::with_capacity(1024),
             stage: Vec::with_capacity(32),
         };
@@ -345,6 +349,7 @@ impl ExecCtx {
             gc_inhibited: false,
             capabilities: self.capabilities.clone(),
             metadata: FxHashMap::default(),
+            hashable_keys: FxHashMap::default(),
             gc_root_scratch: Vec::with_capacity(1024),
             stage: Vec::with_capacity(32),
         }
@@ -414,6 +419,10 @@ impl ExecCtx {
                 all_vals.push(v);
             }
         }
+        let hashable_keys_start = all_vals.len();
+        for reps in self.hashable_keys.values() {
+            all_vals.extend_from_slice(reps);
+        }
         let jit_native_result_start = all_vals.len();
         all_vals.push(self.jit_native_result);
 
@@ -467,6 +476,16 @@ impl ExecCtx {
                 for v in map.values_mut() {
                     *v = all_vals[medi];
                     medi += 1;
+                }
+            }
+        }
+
+        {
+            let mut hi = hashable_keys_start;
+            for reps in self.hashable_keys.values_mut() {
+                for v in reps.iter_mut() {
+                    *v = all_vals[hi];
+                    hi += 1;
                 }
             }
         }
@@ -552,6 +571,13 @@ impl ExecCtx {
         }
         for map in self.metadata.values() {
             for &v in map.values() {
+                if v.is_heap() {
+                    roots.push(v.as_heap_idx());
+                }
+            }
+        }
+        for reps in self.hashable_keys.values() {
+            for v in reps {
                 if v.is_heap() {
                     roots.push(v.as_heap_idx());
                 }

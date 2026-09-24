@@ -16,6 +16,7 @@ pub(crate) mod ctx_tasks;
 pub(crate) mod dispatch;
 pub mod exceptions;
 pub mod frame_ctrl;
+pub(crate) mod hashable_keys;
 pub(crate) mod host;
 pub mod host_values;
 pub(crate) mod intrinsics;

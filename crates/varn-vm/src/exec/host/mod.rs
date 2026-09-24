@@ -25,6 +25,7 @@ impl NativeCtx for ExecCtx {
     }
 
     fn map_key(&mut self, v: VmValue) -> varn_types::value::MapKey {
+        let v = self.hashable_key(v);
         self.heap.canonical_map_key(v)
     }
 

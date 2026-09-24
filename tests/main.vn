@@ -119,6 +119,7 @@ import "./130-range-generic.vn"
 import "./131-object-record-class-equality.vn"
 import "./132-capabilities.vn"
 import "./133-operator-capabilities.vn"
+import "./134-hashable-keys.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()
