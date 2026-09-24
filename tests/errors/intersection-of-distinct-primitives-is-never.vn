@@ -1,0 +1,2 @@
+// expect: error[VN3001]
+const y: int & str = 1

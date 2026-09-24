@@ -10,7 +10,7 @@ use std::sync::Arc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
-use aliases::{is_primitive_type, try_stdlib_generic_alias};
+use aliases::try_stdlib_generic_alias;
 use conditional::resolve_conditional;
 use contexts::AliasSubstitutionContext;
 use keyed_access::{resolve_indexed_access, resolve_keyof};
@@ -354,20 +354,15 @@ pub fn resolve_type_node(
                 .map(|m| resolve_type_node(m, ctx, table))
                 .collect();
 
-            let primitives: Vec<Type> = resolved
+            let scalars: Vec<Type> = resolved
                 .iter()
                 .copied()
-                .filter(|m| is_primitive_type(m, table))
+                .filter(|m| is_scalar(m, table))
                 .collect();
-            if primitives.len() > 1 {
-                let first = primitives[0];
-                let first_kind = table.get(first.0).clone();
-                let incompatible = primitives.iter().any(|m| {
-                    std::mem::discriminant(&table.get(m.0)) != std::mem::discriminant(&first_kind)
-                });
-                if incompatible {
-                    return Type::Never;
-                }
+            if let Some((&first, rest)) = scalars.split_first() {
+                return rest
+                    .iter()
+                    .fold(first, |acc, m| intersect_two(acc, *m, table));
             }
 
             let parts_opt: Option<Vec<Vec<ObjectTypeMember>>> = resolved
@@ -422,7 +417,7 @@ pub fn resolve_type_node(
                 .collect();
 
             if let Some(parts) = parts_opt {
-                return Type::object(parts.into_iter().flatten().collect(), table);
+                return Type::object(merge_members(parts.into_iter().flatten(), table), table);
             }
             let ids: Vec<crate::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
             let list = table.intern_list(&ids);
@@ -492,4 +487,77 @@ pub fn resolve_type_node(
 
         _ => Type::Dynamic.tainted(),
     }
+}
+
+/// A primitive or literal type: the members of an intersection that can only
+/// meet at one value domain.
+fn is_scalar(ty: &Type, table: &CheckerTyTable) -> bool {
+    matches!(table.get(ty.0), TypeKind::Primitive(_) | TypeKind::Literal(_))
+        && *ty != Type::Dynamic
+}
+
+/// `a & b` for two member types: equal types meet at themselves, a literal
+/// meets its own base at the literal, distinct scalars at `never`; anything
+/// else stays an intersection.
+fn intersect_two(a: Type, b: Type, table: &mut CheckerTyTable) -> Type {
+    if a == b || b == Type::Dynamic {
+        return a;
+    }
+    if a == Type::Dynamic {
+        return b;
+    }
+    if a == Type::Never || b == Type::Never {
+        return Type::Never;
+    }
+    match (table.get(a.0), table.get(b.0)) {
+        (TypeKind::Literal(l), TypeKind::Primitive(p)) if l.base() == p => a,
+        (TypeKind::Primitive(p), TypeKind::Literal(l)) if l.base() == p => b,
+        (
+            TypeKind::Primitive(_) | TypeKind::Literal(_),
+            TypeKind::Primitive(_) | TypeKind::Literal(_),
+        ) => Type::Never,
+        _ => {
+            let list = table.intern_list(&[a.0, b.0]);
+            Type(table.intern(TypeKind::Intersection(list)), false)
+        }
+    }
+}
+
+/// Members of `A & B`: a property both sides declare has the intersection of
+/// its two types (`never` when they cannot meet); other members keep the
+/// first declaration.
+fn merge_members(
+    members: impl Iterator<Item = ObjectTypeMember>,
+    table: &mut CheckerTyTable,
+) -> Vec<ObjectTypeMember> {
+    let mut out: Vec<ObjectTypeMember> = Vec::new();
+    for member in members {
+        let ObjectTypeMember::Property {
+            name,
+            ty,
+            optional,
+            readonly,
+        } = &member
+        else {
+            out.push(member);
+            continue;
+        };
+        let existing = out.iter_mut().find(|m| {
+            matches!(m, ObjectTypeMember::Property { name: n, .. } if n == name)
+        });
+        match existing {
+            Some(ObjectTypeMember::Property {
+                ty: prev_ty,
+                optional: prev_opt,
+                readonly: prev_ro,
+                ..
+            }) => {
+                *prev_ty = intersect_two(Type(*prev_ty, false), Type(*ty, false), table).0;
+                *prev_opt = *prev_opt && *optional;
+                *prev_ro = *prev_ro || *readonly;
+            }
+            _ => out.push(member),
+        }
+    }
+    out
 }

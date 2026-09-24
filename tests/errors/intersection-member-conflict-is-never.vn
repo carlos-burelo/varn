@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+interface A { v: int }
+interface B { v: str }
+const x: A & B = { v: 1 }

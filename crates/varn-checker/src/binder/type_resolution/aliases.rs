@@ -25,13 +25,6 @@ pub(super) fn try_stdlib_generic_alias(
     Some(resolve_type_node(&alias_node, Some(&alias_ctx), table))
 }
 
-pub(super) fn is_primitive_type(ty: &Type, table: &CheckerTyTable) -> bool {
-    matches!(
-        table.get(ty.0),
-        TypeKind::Primitive(p) if p != varn_core::LangPrimitive::Dynamic
-    )
-}
-
 pub fn resolve_primitive(
     name: &str,
     ctx: Option<&dyn TypeContext>,

@@ -26,4 +26,18 @@ class Child extends Base {
 }
 assert("extends in the same module binds", new Child().greet() === "hi")
 
+interface Pos { x: int }
+interface Tagged { tag: str }
+const both: Pos & Tagged = { x: 1, tag: "p" }
+assert("intersection has both members", both.x === 1 && both.tag === "p")
+
+interface Loose { id: int? }
+interface Strict { id: int }
+const narrowed: Loose & Strict = { id: 3 }
+assert("shared member keeps the narrower type", narrowed.id === 3)
+
+type Method = "GET" | "POST"
+const onlyGet: "GET" & str = "GET"
+assert("literal & base is the literal", onlyGet === "GET")
+
 print("[PASSED] 118. Intersections")
