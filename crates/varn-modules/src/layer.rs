@@ -1,6 +1,7 @@
 //! The module layers of ADR-0018 and the one rule for which layer may import
-//! which. Every phase that sees an import (binder, loader, bundle builder)
-//! asks here, so the rule cannot drift between them.
+//! which. The rule governs import *statements*, so it is checked where source
+//! is read (binder, std bundle builder); resolving and loading only map ids,
+//! which is what lets the prelude link core modules into user code.
 
 /// A module's layer, from its id (`core:`, `runtime:`, `std:`) or, for a file
 /// of the std source tree, from where it lives.

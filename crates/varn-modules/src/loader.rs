@@ -366,13 +366,14 @@ mod tests {
             ModuleId::stdlib("std:math")
         );
 
-        // core is never imported; runtime only from std (ADR-0018).
-        let std_ref = ModuleId::stdlib("std:fs");
-        assert!(loader.resolve("core:int", &from).is_err());
-        assert!(loader.resolve("core:int", &std_ref).is_err());
-        assert!(loader.resolve("runtime:fs", &from).is_err());
+        // Resolution maps ids; which layer may import which is checked on
+        // source imports (`layer::check_import`), not here.
         assert_eq!(
-            loader.resolve("runtime:fs", &std_ref).unwrap(),
+            loader.resolve("core:types/int", &from).unwrap(),
+            ModuleId::core("core:types/int")
+        );
+        assert_eq!(
+            loader.resolve("runtime:fs", &from).unwrap(),
             ModuleId::Runtime("runtime:fs".into())
         );
     }

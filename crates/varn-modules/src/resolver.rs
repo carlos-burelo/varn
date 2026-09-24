@@ -22,7 +22,6 @@ impl ModuleResolver {
 
     pub fn resolve(&self, spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
         use varn_core::ImportSpecifier;
-        crate::layer::check_import(referrer_layer(referrer), spec)?;
         match ImportSpecifier::parse(spec) {
             ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
             ImportSpecifier::Core(s) => Ok(ModuleId::Core(s)),
@@ -53,17 +52,6 @@ impl ModuleResolver {
                     .ok_or_else(|| format!("cannot resolve package '{spec}'"))
             }
         }
-    }
-}
-
-fn referrer_layer(referrer: &ModuleId) -> crate::layer::Layer {
-    use crate::layer::Layer;
-    match referrer {
-        ModuleId::Core(_) => Layer::Core,
-        ModuleId::Std(_) => Layer::Std,
-        ModuleId::Runtime(_) => Layer::Runtime,
-        ModuleId::Local(path) => Layer::of_module(path),
-        ModuleId::Package { .. } => Layer::User,
     }
 }
 
