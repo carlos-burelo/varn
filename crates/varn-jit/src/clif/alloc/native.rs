@@ -51,7 +51,7 @@ pub(crate) fn emit_call_native_op(
         let res = call_helper(
             b,
             actx.cc,
-            actx.helpers.str_starts_with_intrinsic,
+            actx.helpers.str_starts_with,
             &[
                 actx.exec_ctx,
                 recv_tag,
@@ -76,7 +76,7 @@ pub(crate) fn emit_call_native_op(
         let res = call_helper(
             b,
             actx.cc,
-            actx.helpers.str_ends_with_intrinsic,
+            actx.helpers.str_ends_with,
             &[
                 actx.exec_ctx,
                 recv_tag,

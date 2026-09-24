@@ -1,5 +1,5 @@
-//! Char-index <-> byte-offset utilities shared by the VM string intrinsics
-//! and the native `str` builtins. Varn string ops are char-indexed (Unicode
+//! Char-index <-> byte-offset utilities for the native `str` builtins. Varn
+//! string ops are char-indexed (Unicode
 //! scalar values); for ASCII strings char index == byte index, which these
 //! helpers exploit to avoid per-call scans.
 

@@ -140,17 +140,6 @@ macro_rules! jit_helper_abi {
             /// length of what `str_ascii_bytes` returned. Meaningless unless
             /// that call answered non-zero for the same receiver.
             str_ascii_len => jit_str_ascii_len,
-            /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
-            /// `substring` without the stack-window flush/reload overhead.
-            str_substring_intrinsic => jit_str_substring_intrinsic,
-            /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
-            /// `slice` without the stack-window flush/reload overhead.
-            str_slice_intrinsic => jit_str_slice_intrinsic,
-            str_starts_with_intrinsic => jit_str_starts_with_intrinsic,
-            str_ends_with_intrinsic => jit_str_ends_with_intrinsic,
-            str_includes_intrinsic => jit_str_includes_intrinsic,
-            str_index_of_intrinsic => jit_str_index_of_intrinsic,
-            str_last_index_of_intrinsic => jit_str_last_index_of_intrinsic,
             jit_is_native_fn => jit_is_native_fn,
             /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, act_id, reg_start,
             /// total)` — the single native `CallNativeOp` entry. `fn_addr == 0`

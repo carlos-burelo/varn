@@ -60,18 +60,10 @@ fn str_receiver_source(
     header: usize,
     ip: usize,
 ) -> Result<Option<usize>, String> {
-    // `charCodeAt` reaches the lowering either as a `Str`-domain `Intrinsic`
-    // or as a `CallNativeOp` (the core-type method table dispatch), depending
-    // on how the checker resolved the receiver. Both stage the receiver into
-    // the op's own destination register with a `Move`, so both are hoistable.
-    let is_char_site = match OpCode::from_u8(code[ip] as u8) {
-        Some(OpCode::Intrinsic) => {
-            varn_core::intrinsic_ops::intrinsic_is_char_index((code[ip + 1] >> 8) as u8)
-        }
-        Some(OpCode::CallNativeOp) => call_native_op_id(code, pool, ip)
-            .is_some_and(varn_core::op_id::is_str_char_index_op_id),
-        _ => false,
-    };
+    // `charCodeAt` is a `CallNativeOp` that stages its receiver into the op's
+    // own destination register with a `Move`, which is what makes it hoistable.
+    let is_char_site = OpCode::from_u8(code[ip] as u8) == Some(OpCode::CallNativeOp)
+        && call_native_op_id(code, pool, ip).is_some_and(varn_core::op_id::is_str_char_index_op_id);
     if !is_char_site {
         return Ok(None);
     }

@@ -1,21 +1,18 @@
 //! String allocation and rendering.
 //!
-//! Four allocation paths, and the difference between them is not cosmetic:
+//! Three allocation paths, and the difference between them is not cosmetic:
 //! `alloc_str` interns, `alloc_str_dynamic` does not (a runtime-produced
-//! string would otherwise be hashed in full and retained), `alloc_substring`
-//! and `alloc_str_view` build views over an existing buffer instead of
-//! copying.
+//! string would otherwise be hashed in full and retained), and
+//! `alloc_str_view` stores an already-built `HeapStr` without copying.
 
 use super::core::alloc_into;
 use super::obj::HeapObj;
-use super::str::{ascii_flag, HeapStr, INLINE_STR_CAP};
+use super::str::{HeapStr, INLINE_STR_CAP};
 use super::structs::HeapInner;
 use crate::nursery::{old_idx_raw, pack_old_idx};
 use crate::value::VmValue;
 use std::sync::Arc;
 use varn_types::RuntimeString;
-
-const SLICE_LEN_MASK: u32 = 0x3FFF_FFFF;
 
 impl HeapInner {
     pub(crate) fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
@@ -110,33 +107,6 @@ impl HeapInner {
             )),
         };
         VmValue::from_heap_idx(idx)
-    }
-
-    pub(crate) fn alloc_substring(&mut self, handle: &HeapStr, bs: usize, be: usize) -> VmValue {
-        let sub = &handle.as_str()[bs..be];
-        if let Some(sso) = VmValue::try_from_sso(sub) {
-            return sso;
-        }
-        let flag = if handle.is_ascii() {
-            ascii_flag::YES
-        } else {
-            ascii_flag::NO
-        };
-        let len = be - bs;
-        if len as u64 <= SLICE_LEN_MASK as u64 {
-            match handle {
-                HeapStr::Shared(rc, _) => {
-                    let hs = HeapStr::slice_of(Arc::clone(rc), bs, len, flag);
-                    return self.alloc_str_view(hs);
-                }
-                HeapStr::Slice { src, off, .. } => {
-                    let hs = HeapStr::slice_of(Arc::clone(src), *off as usize + bs, len, flag);
-                    return self.alloc_str_view(hs);
-                }
-                HeapStr::Ext { .. } | HeapStr::Inline { .. } => {}
-            }
-        }
-        self.alloc_str_dynamic(sub)
     }
 
     pub(crate) fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {

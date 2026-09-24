@@ -1,4 +1,4 @@
-//! Intrinsic dispatch and the string intrinsics compiled code calls
+//! Intrinsic dispatch, and the string fast paths compiled code calls
 //! directly, without the stack-window flush and reload a generic call needs.
 
 use super::construct::jit_propagate_error;
@@ -30,7 +30,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
                 .collect();
             eprintln!("INTRINSIC {fname:?} wire={wire_byte:#x} args={tags:?}");
         }
-        match crate::exec::intrinsics::dispatch(wire_byte as u8, &args, &mut ctx_ref.heap) {
+        match crate::exec::intrinsics::dispatch(wire_byte as u8, &args) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
@@ -41,9 +41,8 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
 /// Takes the receiver and position directly — no stack-window staging,
 /// no flush/reload of all live boxed registers.
 ///
-/// A negative `pos` is out of range, not position zero: see
-/// [`crate::exec::intrinsics::str`] for why all three implementations of this
-/// operation had to agree on that.
+/// A negative `pos` is out of range, not position zero, as in the native
+/// `str.charCodeAt` the interpreter runs.
 pub(crate) extern "C" fn jit_str_char_code_at(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -130,172 +129,6 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     h.is_ascii().then(|| h.as_str())
 }
 
-/// Dedicated fast path for `substring(start, end?)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_substring_intrinsic(
-    ctx: *mut ExecCtx,
-    recv_tag: u64,
-    recv_payload: u64,
-    start_tag: u64,
-    start_payload: u64,
-    end_tag: u64,
-    end_payload: u64,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
-        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let start = VmValue::from_raw_parts(start_tag, start_payload);
-        let end = VmValue::from_raw_parts(end_tag, end_payload);
-        if receiver.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
-                let ascii = h.is_ascii();
-                let s = h.as_str();
-                let len = if ascii { s.len() } else { h.char_len() };
-                let st = heap.as_int(start);
-                let en = if end.is_null() {
-                    len
-                } else {
-                    (heap.as_int(end).max(0) as usize).min(len)
-                };
-                let st_clamped = (st.max(0) as usize).min(len);
-                let (si, ei) = if st_clamped <= en {
-                    (st_clamped, en)
-                } else {
-                    (en, st_clamped)
-                };
-                if si == 0 && ei == s.len() {
-                    ctx_ref.jit_native_result = receiver;
-                    return;
-                }
-                let (bs, be) = if ascii {
-                    (si, ei)
-                } else {
-                    varn_types::str_util::char_range_to_bytes(s, false, si, ei)
-                };
-                let sub = &s[bs..be];
-                if let Some(sso) = VmValue::try_from_sso(sub) {
-                    ctx_ref.jit_native_result = sso;
-                    return;
-                }
-                let h_clone = h.clone();
-                ctx_ref.jit_native_result = heap.alloc_substring(&h_clone, bs, be);
-                return;
-            }
-        }
-        let args = [receiver, start, end];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::Substring as u8,
-            &args,
-            heap,
-        ) {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
-/// Dedicated fast path for `slice(start, end?)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_slice_intrinsic(
-    ctx: *mut ExecCtx,
-    recv_tag: u64,
-    recv_payload: u64,
-    start_tag: u64,
-    start_payload: u64,
-    end_tag: u64,
-    end_payload: u64,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
-        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let start = VmValue::from_raw_parts(start_tag, start_payload);
-        let end = VmValue::from_raw_parts(end_tag, end_payload);
-        if receiver.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
-                let ascii = h.is_ascii();
-                let s = h.as_str();
-                let len = if ascii { s.len() } else { h.char_len() };
-                let st = heap.as_int(start);
-                let si = if st < 0 {
-                    (len as i64 + st).max(0) as usize
-                } else {
-                    (st as usize).min(len)
-                };
-                let ei = if end.is_null() {
-                    len
-                } else {
-                    let e = heap.as_int(end);
-                    if e < 0 {
-                        (len as i64 + e).max(0) as usize
-                    } else {
-                        (e as usize).min(len)
-                    }
-                }
-                .max(si);
-                if si == 0 && ei == s.len() {
-                    ctx_ref.jit_native_result = receiver;
-                    return;
-                }
-                let (bs, be) = if ascii {
-                    (si, ei)
-                } else {
-                    varn_types::str_util::char_range_to_bytes(s, false, si, ei)
-                };
-                let sub = &s[bs..be];
-                if let Some(sso) = VmValue::try_from_sso(sub) {
-                    ctx_ref.jit_native_result = sso;
-                    return;
-                }
-                let h_clone = h.clone();
-                ctx_ref.jit_native_result = heap.alloc_substring(&h_clone, bs, be);
-                return;
-            }
-        }
-        if receiver.is_sso() {
-            let mut buf = [0u8; 5];
-            let s = receiver.sso_as_str(&mut buf);
-            let len = s.len();
-            let st = heap.as_int(start);
-            let si = if st < 0 {
-                (len as i64 + st).max(0) as usize
-            } else {
-                (st as usize).min(len)
-            };
-            let ei = if end.is_null() {
-                len
-            } else {
-                let e = heap.as_int(end);
-                if e < 0 {
-                    (len as i64 + e).max(0) as usize
-                } else {
-                    (e as usize).min(len)
-                }
-            }
-            .max(si);
-            if si == 0 && ei == len {
-                ctx_ref.jit_native_result = receiver;
-                return;
-            }
-            let sub = &s[si..ei];
-            if let Some(sso) = VmValue::try_from_sso(sub) {
-                ctx_ref.jit_native_result = sso;
-                return;
-            }
-        }
-        let args = [receiver, start, end];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::Slice as u8,
-            &args,
-            heap,
-        ) {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
 #[inline(always)]
 unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'a str> {
     if v.is_sso() {
@@ -310,8 +143,7 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
 }
 
 /// Dedicated fast path for `startsWith(search)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
+pub(crate) extern "C" fn jit_str_starts_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,
     recv_payload: u64,
@@ -383,28 +215,15 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
                 0
             };
         }
-        let ctx_ref = &mut *ctx;
-        let args = [receiver, search];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::StartsWith as u8,
-            &args,
-            &mut ctx_ref.heap,
-        ) {
-            Ok(v) => {
-                if v.is_truthy() {
-                    1
-                } else {
-                    0
-                }
-            }
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("startsWith: receiver and argument must be strings"),
+        )
     }
 }
 
 /// Dedicated fast path for `endsWith(search)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
+pub(crate) extern "C" fn jit_str_ends_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,
     recv_payload: u64,
@@ -478,161 +297,9 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
                 0
             };
         }
-        let ctx_ref = &mut *ctx;
-        let args = [receiver, search];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::EndsWith as u8,
-            &args,
-            &mut ctx_ref.heap,
-        ) {
-            Ok(v) => {
-                if v.is_truthy() {
-                    1
-                } else {
-                    0
-                }
-            }
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
-/// Dedicated fast path for `includes(search)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_includes_intrinsic(
-    ctx: *mut ExecCtx,
-    recv_tag: u64,
-    recv_payload: u64,
-    search_tag: u64,
-    search_payload: u64,
-) -> u64 {
-    unsafe {
-        let heap = &(*ctx).heap;
-        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let search = VmValue::from_raw_parts(search_tag, search_payload);
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
-        if let (Some(s), Some(n)) = (
-            borrow_str_fast(receiver, heap, &mut b1),
-            borrow_str_fast(search, heap, &mut b2),
-        ) {
-            return if varn_types::str_util::find_bytes(s, n).is_some() {
-                1
-            } else {
-                0
-            };
-        }
-        let ctx_ref = &mut *ctx;
-        let args = [receiver, search];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::Includes as u8,
-            &args,
-            &mut ctx_ref.heap,
-        ) {
-            Ok(v) => {
-                if v.is_truthy() {
-                    1
-                } else {
-                    0
-                }
-            }
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
-/// Dedicated fast path for `indexOf(search)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_index_of_intrinsic(
-    ctx: *mut ExecCtx,
-    recv_tag: u64,
-    recv_payload: u64,
-    search_tag: u64,
-    search_payload: u64,
-) -> i64 {
-    unsafe {
-        let heap = &(*ctx).heap;
-        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let search = VmValue::from_raw_parts(search_tag, search_payload);
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
-        if let (Some(s), Some(n)) = (
-            borrow_str_fast(receiver, heap, &mut b1),
-            borrow_str_fast(search, heap, &mut b2),
-        ) {
-            if n.is_empty() {
-                return 0;
-            }
-            let is_ascii = receiver.is_sso()
-                || heap
-                    .get(receiver.as_heap_idx())
-                    .map(|o| match o {
-                        HeapObj::Str(h) => h.is_ascii_cached(),
-                        _ => false,
-                    })
-                    .unwrap_or(false);
-            let idx = varn_types::str_util::find_bytes(s, n)
-                .map(|b| varn_types::str_util::byte_to_char_idx(s, is_ascii, b))
-                .unwrap_or(-1);
-            return idx;
-        }
-        let ctx_ref = &mut *ctx;
-        let args = [receiver, search];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::IndexOf as u8,
-            &args,
-            &mut ctx_ref.heap,
-        ) {
-            Ok(v) => ctx_ref.heap.as_int(v),
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
-/// Dedicated fast path for `lastIndexOf(search)`.
-/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
-pub(crate) extern "C" fn jit_str_last_index_of_intrinsic(
-    ctx: *mut ExecCtx,
-    recv_tag: u64,
-    recv_payload: u64,
-    search_tag: u64,
-    search_payload: u64,
-) -> i64 {
-    unsafe {
-        let heap = &(*ctx).heap;
-        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let search = VmValue::from_raw_parts(search_tag, search_payload);
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
-        if let (Some(s), Some(n)) = (
-            borrow_str_fast(receiver, heap, &mut b1),
-            borrow_str_fast(search, heap, &mut b2),
-        ) {
-            let is_ascii = receiver.is_sso()
-                || heap
-                    .get(receiver.as_heap_idx())
-                    .map(|o| match o {
-                        HeapObj::Str(h) => h.is_ascii_cached(),
-                        _ => false,
-                    })
-                    .unwrap_or(false);
-            if n.is_empty() {
-                return varn_types::str_util::char_len(s, is_ascii) as i64;
-            }
-            let idx = varn_types::str_util::rfind_bytes(s, n)
-                .map(|b| varn_types::str_util::byte_to_char_idx(s, is_ascii, b))
-                .unwrap_or(-1);
-            return idx;
-        }
-        let ctx_ref = &mut *ctx;
-        let args = [receiver, search];
-        match crate::exec::intrinsics::str::dispatch(
-            varn_core::intrinsic_ops::str::StrOp::LastIndexOf as u8,
-            &args,
-            &mut ctx_ref.heap,
-        ) {
-            Ok(v) => ctx_ref.heap.as_int(v),
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("endsWith: receiver and argument must be strings"),
+        )
     }
 }

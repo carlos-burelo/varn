@@ -28,9 +28,8 @@ use crate::JitHelpers;
 pub(crate) enum IntrinsicScan {
     /// Every `Intrinsic` counts as allocating.
     Conservative,
-    /// An `Intrinsic` counts only when
-    /// [`varn_core::intrinsic_ops::intrinsic_allocates`] says its wire byte can
-    /// allocate.
+    /// No `Intrinsic` counts: every one is a `std:math` op on scalars
+    /// (`varn_core::intrinsic_ops`), which never touches the heap.
     ByWireByte,
 }
 
@@ -50,11 +49,8 @@ pub(crate) fn has_alloc_scan(
     let mut ip = 0usize;
     while ip < code.len() {
         let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
-        // The wire byte lives in the high half of the operand word, the same
-        // place `strings::emit_str_intrinsic_native` reads it from.
         if scan == IntrinsicScan::ByWireByte
             && OpCode::from_u8(code[ip] as u8) == Some(OpCode::Intrinsic)
-            && !varn_core::intrinsic_ops::intrinsic_allocates((code[ip + 1] >> 8) as u8)
         {
             ip += info.len;
             continue;

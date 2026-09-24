@@ -1,5 +1,3 @@
-use super::wire::{encode, IntrinsicDomain};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MathOp {
@@ -20,7 +18,7 @@ pub enum MathOp {
 
 impl MathOp {
     pub const fn wire(self) -> u8 {
-        encode(IntrinsicDomain::Math, self as u8)
+        self as u8
     }
 }
 
@@ -33,10 +31,7 @@ impl MathOp {
 /// natively would have nowhere to fall back TO. `round`/`sin`/`log`/… stay on
 /// the windowed `Intrinsic`, which reaches the generic helper as before.
 pub fn is_unary_math(wire_byte: u8) -> bool {
-    let (domain, op) = super::wire::decode(wire_byte);
-    if domain != IntrinsicDomain::Math as u8 {
-        return false;
-    }
+    let op = wire_byte;
     op == MathOp::Abs as u8
         || op == MathOp::Sqrt as u8
         || op == MathOp::Floor as u8

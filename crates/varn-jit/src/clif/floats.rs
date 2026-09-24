@@ -24,7 +24,6 @@ use cranelift_codegen::ir::{
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::intrinsic_ops::math::MathOp;
-use varn_core::intrinsic_ops::{intrinsic_decode, IntrinsicDomain};
 use varn_core::OpCode;
 use varn_types::register_meta::RegisterMeta;
 
@@ -79,7 +78,7 @@ pub(super) fn emit_intrinsic_direct(
     // hold an int VmValue (a widened int argument), which is precisely the
     // case `unbox_f64_coerce` above converts to the same f64 the interpreter
     // would have computed.
-    let (_domain, op) = intrinsic_decode(wire_byte);
+    let op = wire_byte;
     let res = match op {
         v if v == MathOp::Abs as u8 => b.ins().fabs(x),
         v if v == MathOp::Sqrt as u8 => b.ins().sqrt(x),
@@ -116,7 +115,6 @@ pub(super) fn emit_intrinsic_op(
     b: &mut FunctionBuilder,
     op: OpCode,
     actx: Option<&AllocCtx>,
-    loops: super::emit::LoopCaches,
     vars: &[Variable],
     state: &[K],
     meta: &[RegisterMeta],
@@ -130,12 +128,7 @@ pub(super) fn emit_intrinsic_op(
     if emit_math_intrinsic_native(b, actx, vars, state, meta, code, ip, has_round) {
         return Ok(());
     }
-    // String intrinsics: CharCodeAt, Substring, Slice — dedicated helpers
-    // that bypass the flush/reload of all live boxed registers.
     let actx = actx.ok_or("clif: Intrinsic outside alloc fn")?;
-    if super::strings::emit_str_intrinsic_native(b, actx, loops, vars, state, meta, code, ip) {
-        return Ok(());
-    }
     alloc::emit_intrinsic(b, actx, state, meta, code, ip);
     Ok(())
 }
@@ -217,10 +210,7 @@ pub(super) fn emit_math_intrinsic_native(
         return false;
     }
 
-    let (domain, op) = intrinsic_decode(wire_byte);
-    if domain != IntrinsicDomain::Math as u8 {
-        return false;
-    }
+    let op = wire_byte;
 
     // `state[arg] == K::Float` proves the VALUE is a float; it does NOT prove
     // the Variable is `F64`. `Move` copies the source's kind verbatim

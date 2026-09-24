@@ -81,7 +81,7 @@ pub(super) fn emit_call_method(
             let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_starts_with_intrinsic,
+                actx.helpers.str_starts_with,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
             let boxed = box_bool(b, res);
@@ -95,7 +95,7 @@ pub(super) fn emit_call_method(
             let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_ends_with_intrinsic,
+                actx.helpers.str_ends_with,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
             let boxed = box_bool(b, res);
@@ -217,7 +217,7 @@ pub(super) fn emit_invoke_virtual(
             let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_starts_with_intrinsic,
+                actx.helpers.str_starts_with,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
             let boxed = box_bool(b, res);
@@ -231,7 +231,7 @@ pub(super) fn emit_invoke_virtual(
             let res = call_helper(
                 b,
                 actx.cc,
-                actx.helpers.str_ends_with_intrinsic,
+                actx.helpers.str_ends_with,
                 &[actx.exec_ctx, this_tag, this_payload, val_tag, val_payload],
             );
             let boxed = box_bool(b, res);

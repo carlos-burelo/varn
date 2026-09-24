@@ -12,11 +12,6 @@ pub(crate) mod ascii_flag {
     pub const NO: u8 = 2;
 }
 
-/// Byte length limit for `HeapStr::Slice` (30 bits); the two high bits of
-/// `len_ascii` hold the ASCII flag so the variant stays within the enum's
-/// existing payload size.
-const SLICE_LEN_MASK: u32 = 0x3FFF_FFFF;
-
 /// Bytes a short dynamic string keeps inside its heap object instead of behind
 /// an `Rc`.
 ///
@@ -33,10 +28,7 @@ pub const INLINE_STR_CAP: usize = 37;
 /// to the buffer's tip never changes an existing prefix, so older views stay
 /// valid without any aliasing analysis; a view that is no longer the tip is
 /// copied out before growing. Single-threaded interior mutability via
-/// `UnsafeCell` mirrors `ArrayRef`. `Slice` is a zero-copy substring view of
-/// an immutable `Shared` buffer (`src[off..off+len]`), the representation
-/// `substring`/`slice` produce; note it retains the whole source buffer for
-/// its lifetime (the JS-engine substring-view trade-off).
+/// `UnsafeCell` mirrors `ArrayRef`.
 #[derive(Clone)]
 pub enum HeapStr {
     Shared(RuntimeString, std::cell::Cell<u8>),
@@ -44,12 +36,6 @@ pub enum HeapStr {
         buf: Rc<std::cell::UnsafeCell<String>>,
         len: usize,
         ascii: std::cell::Cell<u8>,
-    },
-    Slice {
-        src: RuntimeString,
-        off: u32,
-        /// bits 0..30 = byte length, bits 30..32 = `ascii_flag` state.
-        len_ascii: std::cell::Cell<u32>,
     },
     /// A short dynamic string stored IN the heap object, with no `Rc` behind
     /// it. `alloc_str_dynamic`'s `Arc::from` is a malloc plus a copy for every
@@ -108,19 +94,6 @@ impl HeapStr {
         }
     }
 
-    /// Zero-copy substring view over an immutable shared buffer. Caller
-    /// guarantees `off..off+len` lies on char boundaries and `len` fits
-    /// [`SLICE_LEN_MASK`].
-    #[inline]
-    pub(crate) fn slice_of(src: RuntimeString, off: usize, len: usize, ascii: u8) -> Self {
-        debug_assert!(len as u32 <= SLICE_LEN_MASK);
-        HeapStr::Slice {
-            src,
-            off: off as u32,
-            len_ascii: std::cell::Cell::new(len as u32 | ((ascii as u32) << 30)),
-        }
-    }
-
     #[inline]
     pub(crate) fn as_str(&self) -> &str {
         match self {
@@ -128,15 +101,6 @@ impl HeapStr {
             // Safety: single-threaded VM; the buffer is only appended to (via
             // `str_concat`), never while a borrow from this view is live.
             HeapStr::Ext { buf, len, .. } => unsafe { &(&*buf.get())[..*len] },
-            HeapStr::Slice {
-                src,
-                off,
-                len_ascii,
-            } => {
-                let off = *off as usize;
-                let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
-                &src[off..off + len]
-            }
             // Safety: `Inline` is only ever built from a `&str` in
             // `alloc_str_dynamic`, which copies whole bytes, so the prefix is
             // valid UTF-8 by construction.
@@ -151,7 +115,6 @@ impl HeapStr {
         match self {
             HeapStr::Shared(_, ascii) => ascii.get(),
             HeapStr::Ext { ascii, .. } => ascii.get(),
-            HeapStr::Slice { len_ascii, .. } => (len_ascii.get() >> 30) as u8,
             HeapStr::Inline { ascii, .. } => ascii.get(),
         }
     }
@@ -179,7 +142,6 @@ impl HeapStr {
         match self {
             HeapStr::Shared(s, _) => s.len(),
             HeapStr::Ext { len, .. } => *len,
-            HeapStr::Slice { len_ascii, .. } => (len_ascii.get() & SLICE_LEN_MASK) as usize,
             HeapStr::Inline { len, .. } => *len as usize,
         }
     }
@@ -201,15 +163,6 @@ impl HeapStr {
                 let slice = unsafe { &(&*buf.get())[..*len] };
                 Arc::from(slice)
             }
-            HeapStr::Slice {
-                src,
-                off,
-                len_ascii,
-            } => {
-                let off = *off as usize;
-                let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
-                Arc::from(&src[off..off + len])
-            }
             HeapStr::Inline { len, bytes, .. } => {
                 let slice = unsafe { std::str::from_utf8_unchecked(&bytes[..*len as usize]) };
                 Arc::from(slice)
@@ -222,10 +175,6 @@ impl HeapStr {
         match self {
             HeapStr::Shared(_, ascii) => ascii.set(state),
             HeapStr::Ext { ascii, .. } => ascii.set(state),
-            HeapStr::Slice { len_ascii, .. } => {
-                let len = len_ascii.get() & SLICE_LEN_MASK;
-                len_ascii.set(len | ((state as u32) << 30));
-            }
             HeapStr::Inline { ascii, .. } => ascii.set(state),
         }
     }
