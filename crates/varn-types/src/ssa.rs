@@ -181,6 +181,9 @@ pub enum SsaOp {
     /// `arr.length` — an `int` result.
     ArrayLength { operand: u32 },
 
+    /// `s.length` of a `str` — an `int` result (no allocation).
+    StrLength { operand: u32 },
+
     /// `arr.push(value)` — no result.
     ArrayPush { array: u32, value: u32 },
 

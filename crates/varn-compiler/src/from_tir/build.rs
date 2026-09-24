@@ -854,6 +854,16 @@ impl<'m> Builder<'m> {
                             name: name.clone(),
                         },
                     },
+                    _ if name.as_ref() == varn_core::MemberKey::Length.as_str() => {
+                        match self.value_ty(obj) {
+                            HirType::Str => InstKind::StrLength { operand: obj },
+                            HirType::Array(_) => InstKind::ArrayLength { operand: obj },
+                            _ => InstKind::GetProperty {
+                                object: obj,
+                                name: name.clone(),
+                            },
+                        }
+                    }
                     _ => InstKind::GetProperty {
                         object: obj,
                         name: name.clone(),

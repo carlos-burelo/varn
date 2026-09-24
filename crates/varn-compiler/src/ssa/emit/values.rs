@@ -134,16 +134,6 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack(total, call_base), line);
         }
         InstKind::GetProperty { object, name } => {
-            if name.as_ref() == varn_core::MemberKey::Length.as_str() {
-                if let Some(crate::hir::HirType::Str) = value_tys.get(object.0 as usize) {
-                    chunk.emit_rr(OpCode::StrLength, d, reg[object.0 as usize], line);
-                    return Ok(());
-                }
-                if let Some(crate::hir::HirType::Array(_)) = value_tys.get(object.0 as usize) {
-                    chunk.emit_rr(OpCode::ArrayLength, d, reg[object.0 as usize], line);
-                    return Ok(());
-                }
-            }
             let idx = chunk.add_str(name);
             if *cache_count > 255 {
                 return Err(OptError::Unsupported(
@@ -475,6 +465,12 @@ pub(super) fn emit_value(
         }
         InstKind::IsArray { operand } => {
             chunk.emit_rr(OpCode::IsArray, d, reg[operand.0 as usize], line);
+        }
+        InstKind::StrLength { operand } => {
+            chunk.emit_rr(OpCode::StrLength, d, reg[operand.0 as usize], line);
+        }
+        InstKind::ArrayLength { operand } => {
+            chunk.emit_rr(OpCode::ArrayLength, d, reg[operand.0 as usize], line);
         }
 
         InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, line),

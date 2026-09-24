@@ -134,6 +134,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true
         }
+        // A length of a receiver statically typed `str` / array: a read, no
+        // getter can run.
+        StrLength { .. } | ArrayLength { .. } => true,
         Convert { conv, .. } => !conv.can_fault(),
 
         // Puede lanzar si el valor no cabe en el ancho declarado (mismo

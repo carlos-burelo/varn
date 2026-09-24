@@ -34,6 +34,26 @@ pub(super) fn emit_array_length(
     ))
 }
 
+/// `s.length` of a `str` — the boxed `int` length.
+pub(super) fn emit_str_length(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    operand: u32,
+) -> Result<Value, String> {
+    let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
+    let ectx = exec_ctx(ctx)?;
+    Ok(super::super::strings::str_length_boxed(
+        b,
+        ctx.cc,
+        ctx.helpers.str_length,
+        ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+        tag,
+        payload,
+    ))
+}
+
 /// `arr.push(value)` — no result.
 pub(super) fn emit_array_push(
     b: &mut FunctionBuilder,

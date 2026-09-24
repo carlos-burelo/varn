@@ -206,7 +206,12 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         InstKind::LoadGlobal(_) | InstKind::LoadGlobalIdx(_) | InstKind::LoadNativeGlobalIdx(_) => {
             facts.globals_stable
         }
-        InstKind::IsNull { .. } | InstKind::IsArray { .. } | InstKind::GetEnumTag { .. } => true,
+        // A `str` is immutable, so its length is invariant with its operand;
+        // an array's is not (a push in the loop changes it).
+        InstKind::IsNull { .. }
+        | InstKind::IsArray { .. }
+        | InstKind::GetEnumTag { .. }
+        | InstKind::StrLength { .. } => true,
         InstKind::MakeClosure { upvalues_src, .. } => upvalues_src.is_empty(),
         _ => false,
     }
@@ -243,6 +248,8 @@ fn is_transparent(kind: &InstKind) -> bool {
             | InstKind::MapSetIndex { .. }
             | InstKind::IsNull { .. }
             | InstKind::IsArray { .. }
+            | InstKind::StrLength { .. }
+            | InstKind::ArrayLength { .. }
             | InstKind::GetEnumTag { .. }
             | InstKind::MakeClosure { .. }
     )

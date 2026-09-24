@@ -161,6 +161,10 @@ pub(super) fn emit(
             let boxed = props::emit_array_length(b, ctx, values, *operand)?;
             Out::Native(unbox_int(b, boxed))
         }
+        SsaOp::StrLength { operand } => {
+            let boxed = props::emit_str_length(b, ctx, values, *operand)?;
+            Out::Native(unbox_int(b, boxed))
+        }
         SsaOp::IsNull { operand } => {
             let a = load_value(b, ctx, values, *operand)?;
             let (tag, _) = b.ins().isplit(a);

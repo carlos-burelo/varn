@@ -7,7 +7,8 @@
 //   later read of it sees the call's result;
 // - a scalar that flows into a `dynamic` value is boxed, not stored raw;
 // - heap values pass as call arguments and arrive as heap parameters;
-// - a call whose result nobody reads still runs.
+// - a call whose result nobody reads still runs;
+// - `length` of a value statically typed `str` is its own instruction.
 
 function sscLabel(n: int): str {
     return "label-long-enough-for-the-heap-" + n
@@ -46,19 +47,29 @@ function sscIgnore(n: int): int {
     return n
 }
 
+// `str.length` in a compiled body.
+function sscLabelLength(n: int): int {
+    const s = sscLabel(n)
+    return s.length
+}
+
 let sscLastDecorated = ""
 let sscBoxedSum = 0
 let sscLastJoined = ""
+let sscLengths = 0
 for (let i = 0; i < 3000; i = i + 1) {
     sscLastDecorated = sscDecorated(i)
     sscBoxedSum = sscBoxedSum + (sscBoxed(i) as int)
     sscLastJoined = sscJoinCaller(i)
     sscIgnore(1)
+    sscLengths = sscLengths + sscLabelLength(i)
 }
 
 assert("a heap call result lands in its home", sscLastDecorated == "label-long-enough-for-the-heap-2999!")
 assert("a scalar entering a dynamic is boxed", sscBoxedSum === 4498500)
 assert("heap arguments reach heap parameters", sscLastJoined == "label-long-enough-for-the-heap-2999|right")
 assert("a call whose result is discarded still runs", sscHits === 3000)
+// 31 chars of prefix plus the digits of 0..2999: 10 + 90*2 + 900*3 + 2000*4.
+assert("str.length in a compiled body", sscLengths === 3000 * 31 + 10 + 180 + 2700 + 8000)
 
 print("[PASSED] 141. JIT calls from SSA")

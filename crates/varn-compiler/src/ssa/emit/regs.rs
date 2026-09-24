@@ -136,6 +136,8 @@ pub(super) fn assign_registers(
                 | InstKind::ModuleSlot { .. }
                 | InstKind::GetEnumTag { .. }
                 | InstKind::IsArray { .. }
+                | InstKind::StrLength { .. }
+                | InstKind::ArrayLength { .. }
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }

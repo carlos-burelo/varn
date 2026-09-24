@@ -225,16 +225,8 @@ fn project_inst(
         InstKind::GetSuper { name } => SsaOp::GetSuper {
             name: name.as_ref().into(),
         },
-        // `arr.length` is a `GetProperty`; only the statically-typed array case
-        // maps (a `str.length` would be a different op we do not lower yet).
-        InstKind::GetProperty { object, name }
-            if name.as_ref() == varn_core::MemberKey::Length.as_str()
-                && matches!(value_tys.get(object.0 as usize), Some(HirType::Array(_))) =>
-        {
-            SsaOp::ArrayLength {
-                operand: object.0,
-            }
-        }
+        InstKind::ArrayLength { operand } => SsaOp::ArrayLength { operand: operand.0 },
+        InstKind::StrLength { operand } => SsaOp::StrLength { operand: operand.0 },
         InstKind::GetProperty { object, name } => {
             let slot = *cs;
             *cs = cs.saturating_add(1);

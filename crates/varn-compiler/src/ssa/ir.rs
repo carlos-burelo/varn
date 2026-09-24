@@ -422,6 +422,17 @@ pub enum InstKind {
         operand: Value,
     },
 
+    /// `s.length` on a receiver statically typed `str`: an `int`. The one
+    /// place a `length` read is specialised; every later stage maps it 1:1.
+    StrLength {
+        operand: Value,
+    },
+
+    /// `a.length` on a receiver statically typed as an array: an `int`.
+    ArrayLength {
+        operand: Value,
+    },
+
     This,
 
     Range {

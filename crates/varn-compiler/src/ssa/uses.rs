@@ -53,6 +53,8 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | AssertNotNull { operand }
         | GetEnumTag { operand }
         | IsArray { operand }
+        | StrLength { operand }
+        | ArrayLength { operand }
         | ObjectKeys { operand }
         | Await { operand }
         | Spawn { operand }
@@ -214,6 +216,8 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | AssertNotNull { operand }
         | GetEnumTag { operand }
         | IsArray { operand }
+        | StrLength { operand }
+        | ArrayLength { operand }
         | ObjectKeys { operand }
         | Await { operand }
         | Spawn { operand }

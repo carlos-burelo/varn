@@ -210,6 +210,8 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ModuleSlot { object, slot } => format!("moduleslot {}[{slot}]", val(*object)),
         InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
+        InstKind::StrLength { operand } => format!("strlen {}", val(*operand)),
+        InstKind::ArrayLength { operand } => format!("arrlen {}", val(*operand)),
         InstKind::This => "this".to_owned(),
         InstKind::Range {
             start,

@@ -8,7 +8,7 @@
 //! directly; arithmetic results stay boxed (unboxed at an int use).
 use super::alloc::AllocCtx;
 use super::emit::{
-    box_int, box_or_pass, call_helper, call_helper_void, def_bool_result, def_boxed_leaf,
+    box_or_pass, call_helper, call_helper_void, def_bool_result, def_boxed_leaf,
     meta_is_float,
 };
 use super::kinds::K;
@@ -239,39 +239,15 @@ pub(super) fn emit_str_length(
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
     let (tag, payload) = box_operand(b, g, state, src);
-
-    let kind = b
-        .ins()
-        .band_imm(tag, varn_types::vm_value::KIND_MASK as i64);
-    let is_sso = b
-        .ins()
-        .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
-
-    let fast = b.create_block();
-    let slow = b.create_block();
-    let merge = b.create_block();
-    b.append_block_param(merge, types::I128);
-
-    b.ins().brif(is_sso, fast, &[], slow, &[]);
-
-    b.switch_to_block(fast);
-    let s = b.ins().ushr_imm(tag, 8);
-    let sso_len = b.ins().band_imm(s, 0xFF);
-    let boxed_len = box_int(b, sso_len);
-    b.ins().jump(merge, &[boxed_len.into()]);
-
-    b.switch_to_block(slow);
-    call_helper_void(b, g.cc, helper, &[g.exec_ctx, tag, payload]);
-    let res = b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
+    let res = super::strings::str_length_boxed(
+        b,
+        g.cc,
+        helper,
         g.exec_ctx,
         g.jit_native_result_offset as i32,
+        tag,
+        payload,
     );
-    b.ins().jump(merge, &[res.into()]);
-
-    b.switch_to_block(merge);
-    let res = b.block_params(merge)[0];
     def_boxed(b, g, dest, res);
 }
 
