@@ -32,4 +32,11 @@ class Box { v: int; constructor(v: int) { this.v = v } get(key: int): int? { ret
 const ix: Indexable<int, int> = new Box(4)
 assert("Indexable", ix.get(0) === 4 && ix.get(1) === null)
 
+class Settings {
+    retries: int = 3
+    static default(): Settings { return new Settings() }
+}
+function make<T>(factory: Default<T>): T { return factory.default() }
+assert("Default via the class's static factory", make(Settings).retries === 3)
+
 print("[PASSED] 132. Capabilities")

@@ -42,11 +42,14 @@
   [2m1:0     [0m │ class           │ [2m[core][0m [1mTypeError           [0m │ [33mTypeError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mSub                 [0m │ [33mSub[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mIterator            [0m │ [33mIterator[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mPow                 [0m │ [33mPow[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDiv                 [0m │ [33mDiv[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mIndexable           [0m │ [33mIndexable[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mSymbol              [0m │ [33mSymbol[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mdebug               [0m │ [33m(...args: dynamic[]) => void[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1massert              [0m │ [33m(label: str, cond: bool) => void[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mDefault             [0m │ [33mDefault[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mRem                 [0m │ [33mRem[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mMatchError          [0m │ [33mMatchError[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mDivisionByZero      [0m │ [33mDivisionByZero[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1misIsolate           [0m │ [33mbool[0m

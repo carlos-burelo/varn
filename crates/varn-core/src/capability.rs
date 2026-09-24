@@ -39,6 +39,8 @@ pub const fn binary_operator_method(op: BinaryOp) -> Option<OperatorMethod> {
         B::Sub => value("Sub", "sub"),
         B::Mul => value("Mul", "mul"),
         B::Div => value("Div", "div"),
+        B::Mod => value("Rem", "rem"),
+        B::Pow => value("Pow", "pow"),
         B::Lt | B::Gt | B::LtEq | B::GtEq => OperatorMethod {
             capability: "Comparable",
             method: "compare",
@@ -54,9 +56,7 @@ pub const fn binary_operator_method(op: BinaryOp) -> Option<OperatorMethod> {
             method: "equals",
             shape: OperatorShape::NotEquals,
         },
-        B::Mod
-        | B::Pow
-        | B::BitAnd
+        B::BitAnd
         | B::BitOr
         | B::BitXor
         | B::Shl

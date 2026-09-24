@@ -7,6 +7,8 @@ class Vec2 {
     mul(k: int): Vec2 { return new Vec2(this.x * k, this.y * k) }
     div(k: int): Vec2 { return new Vec2(this.x / k, this.y / k) }
     neg(): Vec2 { return new Vec2(-this.x, -this.y) }
+    rem(k: int): Vec2 { return new Vec2(this.x % k, this.y % k) }
+    pow(k: int): Vec2 { return new Vec2(this.x ** k, this.y ** k) }
     equals(o: Vec2): bool { return this.x === o.x && this.y === o.y }
     compare(o: Vec2): int { return (this.x * this.x + this.y * this.y) - (o.x * o.x + o.y * o.y) }
 }
@@ -19,6 +21,8 @@ assert("- is sub", (b - a).x === 2)
 assert("* is mul with a scalar", (a * 3).y === 6)
 assert("/ is div", (b / 1).x === 3)
 assert("unary - is neg", (-a).x === -1)
+assert("% is rem", (b % 2).x === 1 && (b % 2).y === 0)
+assert("** is pow", (b ** 2).x === 9 && (b ** 2).y === 16)
 assert("chained", (a + b - a).equals(b))
 assert("== is equals", a + b == new Vec2(4, 6))
 assert("!= is not equals", a != b)

@@ -55,6 +55,12 @@ export interface Cloneable<T> {
     clone(): T;
 }
 
+// A class satisfies `Default<T>` through its static `default()`: the class
+// value itself is the factory.
+export interface Default<T> {
+    default(): T;
+}
+
 export interface Display {
     toString(): str;
 }
@@ -81,6 +87,14 @@ export interface Mul<T, R> {
 
 export interface Div<T, R> {
     div(other: T): R;
+}
+
+export interface Rem<T, R> {
+    rem(other: T): R;
+}
+
+export interface Pow<T, R> {
+    pow(other: T): R;
 }
 
 export interface Neg<R> {
