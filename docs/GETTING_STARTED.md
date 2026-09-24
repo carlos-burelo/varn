@@ -244,6 +244,6 @@ vn run tests/main.vn
 
 ## Siguientes Pasos
 
-- 📖 [**WARP-SPEC.md**](WARP-SPEC.md) — Especificación completa de la sintaxis y semántica.
+- 📖 [**lang/**](lang/) — Especificación completa de la sintaxis y semántica.
 - 🏛️ [**ARCHITECTURE.md**](ARCHITECTURE.md) — Visión técnica interna de la VM y el compilador.
 - 💻 [**CLI_REFERENCE.md**](CLI_REFERENCE.md) — Referencia de comandos CLI e inspección de fases.

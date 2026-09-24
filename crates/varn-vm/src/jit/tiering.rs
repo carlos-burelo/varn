@@ -50,8 +50,7 @@ impl VmClosure {
     ///   a measurement, and a measurement that happens to coincide is not the
     ///   same claim as one that must.
     ///
-    /// Measured going from 1 to 128, paired and alternating per the protocol
-    /// in `docs/superpowers/plans/2026-08-01-jit-osr.md` §6 (medians of 9
+    /// Measured going from 1 to 128, paired and alternating (medians of 9
     /// alternating rounds, both binaries in one loop):
     ///
     /// ```text

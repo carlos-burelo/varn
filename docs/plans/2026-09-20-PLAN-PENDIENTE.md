@@ -243,5 +243,8 @@ se reproduce con caché limpio, es de la frontera de módulo (Ley 2).
     intrínsecos, `LoadStaticFn`, JIT tipado) se hicieron por otras vías.
 - Lo que queda en `docs/` son specs y arquitectura, no planes: `TIR_CONTRATO_TIPADO.md`
   (contrato vigente), `COMPILER_ARCHITECTURE.md`, `RUNTIME_ARCHITECTURE.md`,
-  `ARCHITECTURE.md`, `AUDIT_RESPONSE.md` (auditoría), `DISENO_IDEAL.md` y
-  `HIPOTESIS_DESCARTADAS.md` (diseño e hipótesis, con valor histórico).
+  `ARCHITECTURE.md`, `AUDIT_RESPONSE.md` (auditoría) e
+  `HIPOTESIS_DESCARTADAS.md` (hipótesis muertas por medición, con valor
+  histórico). (`AUDITORIA_DISENO.md` y `DISENO_IDEAL.md`, citados por docs
+  viejos, ya no existen: su contenido vivo está en `AUDIT_RESPONSE.md` y en
+  este plan.)

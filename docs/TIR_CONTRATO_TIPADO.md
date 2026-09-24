@@ -3,8 +3,8 @@
 Diseño aprobado el 2026-09-06, sobre `main @ 082d2ba`.
 
 Sustituye la tabla lateral de anotaciones por un IR tipado único. Es el
-primer bloque del rediseño descrito en `DISENO_IDEAL.md`, y el que habilita
-todos los demás.
+primer bloque del rediseño del motor tipado (ver
+`plans/2026-09-20-PLAN-PENDIENTE.md`), y el que habilita todos los demás.
 
 ---
 
@@ -260,8 +260,9 @@ lenguaje — 64 usos en el corpus.
 El tipo conserva la nulabilidad; la **representación** la elige el backend:
 
 * sobre referencia, el patrón nulo — gratis;
-* sobre escalar, el par `(valor, bit)` que pide `DISENO_IDEAL.md` §1, que
-  Cranelift pasa en dos registros.
+* sobre escalar, el par `(valor, bit)` (pendiente: `Nullable` hoy es `Dynamic`;
+  ver `plans/2026-09-20-PLAN-PENDIENTE.md` §5.3), que Cranelift pasa en dos
+  registros.
 
 ### 5.2 `Dynamic` lleva su razón
 
@@ -477,8 +478,9 @@ Explícitamente **no** se toca en este bloque: `VmValue` sigue siendo dos
 palabras, el heap sigue siendo tabla de índices, `ObjData` sigue con slots de
 16 bytes, el GC sigue con raíces enumeradas a mano.
 
-Todo eso es `DISENO_IDEAL.md` §7 pasos 2-5 y constituye el bloque siguiente.
-El TIR es su precondición: empaquetar campos requiere una sola autoridad de
+Todo eso es el bloque siguiente al TIR (frame por clases, GC por clase,
+layout compacto — hecho; ver `plans/2026-09-20-PLAN-PENDIENTE.md` §2).
+El TIR fue su precondición: empaquetar campos requiere una sola autoridad de
 layout y que el tipo del campo llegue al JIT.
 
 ---

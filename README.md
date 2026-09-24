@@ -27,10 +27,10 @@
 
 * **Tipado Estático Estricto y Bidireccional**: Inferencia de tipos sin sobrecarga en runtime, análisis de flujo de control (CFA), exhaustividad garantizada y cero coerción implícita de tipos.
 * **Memoria y Streaming Canónico (`Bytes`, `Stream`)**: Tipo de valor/referencia de primera clase `Bytes` con indexación nativa, slicing zero-copy, transparencia binaria 100% (cero corrupción UTF-8 en sockets) y tuberías asíncronas con contrapresión (`Stream.pipe`).
-* **VM de Registros con `VmValue` de 128 bits**: Representación canónica de dos palabras (`tag` + `payload`) con enteros `int` nativos de 64 bits, flotantes `float` IEEE 754, `bool`, `char` y *Small String Optimization* (SSO de hasta 5 bytes inline sin tocar el heap).
-* **Compilación Nativa JIT Multi-ISA**: Generación de código máquina nativo para hot paths mediante backend Cranelift con fast-paths optimizados, hoisting de comprobaciones de límites y fallback transparente al intérprete.
-* **Pipeline TIR & SSA Optimizado**: Lowering canónico a *Typed Intermediate Representation* (TIR), construcción SSA, eliminación de bloques inalcanzables (DCE), movimiento de código invariante de bucles (LICM) y reemplazo escalar de agregados (SROA).
-* **GC Generacional**: Nursery de bump-allocation ultrarrápido junto con un Old-Generation mark-and-sweep tricolor con write barriers de bajo coste.
+* **VM de Registros por Clases (`FrameStore`)**: registros particionados en `GPR:i64`, `FPR:f64`, `REF:u32`, `DYN:VmValue` de 128 bits (`tag` + `payload`) — el GC solo recorre lo que es raíz por construcción. Enteros `int` nativos de 64 bits, `float` IEEE 754, `bool`, `char` y *Small String Optimization* (SSO de hasta 5 bytes inline sin tocar el heap).
+* **Compilación Nativa JIT desde SSA**: el backend Cranelift baja del mismo SSA tipado que el intérprete (sin re-derivar tipos), con fallback transparente al intérprete para lo aún no cubierto; fast-paths optimizados y hoisting de comprobaciones de límites.
+* **Pipeline TIR & SSA Optimizado**: Lowering canónico a *Typed Intermediate Representation* (TIR), construcción SSA, DCE, LICM, CSE, plegado de constantes, escape analysis y TCO.
+* **GC Generacional**: nursery generacional junto con Old-Generation mark-and-sweep tricolor con write barriers de bajo coste.
 * **Concurrencia Determinista y Paralelismo Real**: Tareas cooperativas síncronas en micro-trampolín, `TaskGroup` con gestión de recursos por ámbito (`using`), e **Isolates** independientes en hilos OS comunicados por canales tipados de paso de mensajes sin memoria compartida.
 * **Tooling de Primera Clase**: CLI unificado (`vn run`, `vn check`, `vn build`, `vn bench`, `vn debug -p`, `vn repl`, `vn pkg`, `vn lsp`).
 
@@ -124,13 +124,12 @@ flowchart TD
     B --> C["varn-parser\n(Parser Pratt / Descendente Recursivo)"]
     C --> D["varn-checker\n(Tipado Estático, CFA, SemanticDB)"]
     D --> E["varn-tir\n(Typed Intermediate Representation)"]
-    E --> F["varn-compiler\n(from_tir → SSA IR → Opts: DCE, LICM, SROA)"]
-    F --> G["varn-regalloc\n(Liveness Analysis & Linear Scan)"]
-    G --> H["varn-vm\n(Register VM + VmValue 128-bit + GC Generacional)"]
-    G -.-> I["varn-jit\n(Cranelift Native Machine Code: x86-64, ARM64)"]
-    I -.-> H
-    H --> J["varn-runtime\n(Isolates en hilos OS + Canales Tipados)"]
-    H <--> K["varn-builtins\n(Stdlib Nativa Rust via LBI)"]
+    E --> F["varn-compiler\n(from_tir → SSA → Opts: DCE, LICM, CSE → bytecode + SSA)"]
+    F --> G["varn-vm\n(FrameStore por clases + GC Generacional)"]
+    F -.-> I["varn-jit\n(CLIF desde SSA tipado, fallback a bytecode)"]
+    I -.-> G
+    G --> J["varn-runtime\n(Isolates en hilos OS + Canales Tipados)"]
+    G <--> K["varn-builtins\n(Stdlib Nativa Rust via LBI)"]
 ```
 
 ---
@@ -294,27 +293,35 @@ La stdlib de Varn está estructurada en dominios cohesivos de alto nivel:
 
 ## 📊 Rendimiento Comparativo
 
-Resultados de la suite comparativa oficial (`cargo xtask compare`) ejecutada en perfil `release` con mediciones de tiempo de proceso completo (tiempo de pared de arranque, compilación JIT y ejecución). Evaluado en host Intel Core i7-1355U / Windows 11:
+Última medición completa en `release` (2026-09-20, Windows; ver
+`docs/plans/2026-09-20-PLAN-PENDIENTE.md` §16–19 para el detalle por sesión).
+Metodología: `cargo xtask compare`, tiempo de pared de proceso completo
+(arranque + compilación JIT + ejecución). Los números se mueven entre sesiones:
+**re-mide antes de citar**.
 
 ### 🚀 Latencia de Arranque (Cold Start)
-- **Varn**: **10.5 ms** ⚡ (**4.4x más rápido que Bun**, **5.4x más rápido que Node.js**, **1.7x más rápido que Python**)
-- **Python**: 18.0 ms
-- **Bun**: 46.1 ms
-- **Node.js**: 56.3 ms
+- **Varn: ~3x más rápido que Bun** en arranque en frío.
 
-### 📈 Matriz de Cargas de Trabajo
+### 📈 Matriz de Cargas de Trabajo (Varn vs Bun, menor es mejor para Varn)
 
-| Carga de Trabajo | Varn | Bun | Node.js | Python | Ventaja de Varn |
-|---|---|---|---|---|---|
-| `fib` (Recursión hot) | **41.2 ms** | 43.5 ms | 61.2 ms | 312.0 ms | 🏆 **1.06x vs Bun** (1.48x vs Node) |
-| `gc_alloc` (GC Trashing) | **45.0 ms** | 48.2 ms | 65.4 ms | 280.1 ms | 🏆 **1.07x vs Bun** (1.45x vs Node) |
-| `matrix` (Álgebra matricial) | **22.3 ms** | 24.8 ms | 35.6 ms | 386.2 ms | 🏆 **1.11x vs Bun** (1.60x vs Node) |
-| `csv_etl` (Extracción y parseo) | **30.5 ms** | 38.1 ms | 50.4 ms | 178.5 ms | 🏆 **1.25x vs Bun** (1.65x vs Node) |
-| `dto` (Instanciación tipada) | **23.5 ms** | 30.1 ms | 37.8 ms | 195.4 ms | 🏆 **1.28x vs Bun** (1.60x vs Node) |
-| `csv_pipeline` (Transformación) | **105.2 ms** | 146.2 ms | 153.9 ms | 612.0 ms | 🏆 **1.39x vs Bun** (1.46x vs Node) |
-| `json_native` (Parseo/Stringify) | **38.1 ms** | 41.3 ms | 57.0 ms | 145.0 ms | 🤝 **~empate con Bun** (1.50x vs Node) |
-| `json_api_payloads` | **57.4 ms** | 49.3 ms | 65.9 ms | 210.0 ms | ⚡ Más rápido que Node.js |
-| `collection_pipeline` | **63.2 ms** | 45.6 ms | 70.6 ms | 220.0 ms | ⚡ Más rápido que Node.js |
+| Carga de Trabajo | Ratio | Estado |
+|---|---|---|
+| `fib` (Recursión hot) | ~tied | JIT leaf con llamada directa |
+| `csv_etl` (Extracción y parseo) | ~tied | |
+| `dto` (Instanciación tipada) | ~1.3x | Campos compactos inline |
+| `matrix` (Álgebra matricial) | ~2.0x | |
+| `csv_pipeline` (Transformación) | ~1.25x | |
+| `json_pure` (Parseo puro) | ~1.18x | |
+| `json_native` (Parseo/Stringify) | ~1.39x | |
+| `json_api_payloads` | ~2.4x | Mapas dinámicos + strings |
+| `gc_alloc` (GC Trashing) | ~2.9x | Allocator/GC |
+| `str_ops` (Strings) | ~3.6x | `slice`/`substring` sin hoist |
+| `collection_pipeline` | ~7x | Allocator/GC |
+| `http_routing` | ~25x | Mapas dinámicos + strings |
+
+Cuellos conocidos (medidos, no adivinados): **allocator/GC** (`gc_alloc`,
+`collection_pipeline`) y **mapas dinámicos + strings** (`http_routing`,
+`str_ops`). La convención de llamada se descartó como causa por medición.
 
 > [!NOTE]
 > **Integridad Verificada (Zero Mismatches)**: Todos los benchmarks validan formalmente la equivalencia semántica de las salidas numéricas y estructuras de datos generadas frente a los demás motores.
@@ -333,13 +340,15 @@ El compilador y runtime de Varn están diseñados de forma modular siguiendo dom
 | [`varn-parser`](docs/ARCHITECTURE.md) | Analizador sintáctico Pratt y descendente recursivo. |
 | [`varn-checker`](docs/ARCHITECTURE.md) | Verificador estático, inferencia bidireccional, CFA y generación de TIR. |
 | [`varn-tir`](docs/ARCHITECTURE.md) | Representación Intermedia Tipada (*Typed Intermediate Representation*). |
-| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | Generador SSA, inlining de hojas, pasadas de optimización y emisión de bytecode. |
-| [`varn-regalloc`](docs/COMPILER_ARCHITECTURE.md) | Asignación lineal de registros y liveness analysis. |
-| [`varn-vm`](docs/VM_ARCHITECTURE.md) | Máquina virtual basada en registros, recolector de basura generacional e inline caches. |
+| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | Generador SSA, inlining de hojas, pasadas de optimización, regalloc y emisión de bytecode. |
+| [`varn-vm`](docs/VM_ARCHITECTURE.md) | Máquina virtual basada en registros por clases, recolector de basura generacional e inline caches. |
 | [`varn-jit`](docs/VM_ARCHITECTURE.md) | Motor JIT nativo multi-arquitectura basado en Cranelift. |
 | [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Gestión de hilos de SO, runtime asíncrono y canales entre Isolates. |
 | [`varn-builtins`](docs/LBI_ARCHITECTURE.md) | Biblioteca estándar nativa Rust vinculada mediante Linker-Bound Interface (LBI). |
 | [`varn-modules`](docs/STDLIB_ARCHITECTURE.md) | Cargador de módulos, resolución de dependencias y bundles `.vnb`. |
+| [`varn-op-macros`](docs/LBI_ARCHITECTURE.md) | Proc-macro `varn_contract!` para contratos de la stdlib nativa. |
+| [`varn-pm`](docs/CLI_REFERENCE.md) | Gestor de paquetes. |
+| [`varn-rt`](docs/NATIVE_ABI_SPEC.md) | Runtime estático mínimo para binarios AOT. |
 | [`varn-pipeline`](docs/ARCHITECTURE.md) | Orquestador de fases de compilación y almacenamiento en caché. |
 | [`varn-cli`](docs/CLI_REFERENCE.md) | Interfaz de línea de comandos unificada `vn`. |
 | [`varn-lsp`](docs/ARCHITECTURE.md) | Implementación del Language Server Protocol para soporte en IDEs y editores. |
@@ -358,6 +367,9 @@ El compilador y runtime de Varn están diseñados de forma modular siguiendo dom
 * 💻 [**Manual de Referencia CLI**](docs/CLI_REFERENCE.md)
 * 🔍 [**Inspección del Pipeline con `vn debug`**](docs/CLI_INSPECT.md)
 * 📦 [**Guía de Instalación Detallada**](docs/INSTALL.md)
+* 📖 [**Especificación del Lenguaje**](docs/lang/) — sintaxis, tipos y semántica.
+* 🗺️ [**Plan Único del Proyecto**](docs/plans/2026-09-20-PLAN-PENDIENTE.md) — estado, historial y pendiente.
+* 🔬 [**Respuesta de Auditoría**](docs/AUDIT_RESPONSE.md) — arquitectura y decisiones con evidencia.
 * 🤝 [**Guía para Contribuidores**](CONTRIBUTING.md)
 
 ---

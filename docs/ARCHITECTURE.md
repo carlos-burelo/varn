@@ -55,13 +55,15 @@ flowchart TD
 > que la mató.
 >
 > El frente abierto de rendimiento es el coste de alocar un objeto (60 ns
-> contra los 24 de Bun), que decide todos los benchmarks que perdemos. El plan
-> está en [PLAN_ALOCACION.md](PLAN_ALOCACION.md).
+> contra los 24 de Bun), que decide todos los benchmarks que perdemos. La
+> dirección tomada (tras medir que los tramos no son aditivos) fue el layout
+> compacto de instancia + constructores triviales inline, no la arena bump del
+> plan descartado; ver el plan único `plans/2026-09-20-PLAN-PENDIENTE.md` y
+> [HIPOTESIS_DESCARTADAS.md](HIPOTESIS_DESCARTADAS.md).
 >
 > Para las decisiones de fondo —por qué las referencias de heap son índices y
 > no punteros, y qué cuesta eso— ver
-> [AUDITORIA_DISENO.md](AUDITORIA_DISENO.md), y para el diseño de referencia
-> contra el que contrastarlas, [DISENO_IDEAL.md](DISENO_IDEAL.md).
+> [AUDIT_RESPONSE.md](AUDIT_RESPONSE.md).
 
 ## 2. Arquitectura de Crates y Modularidad
 

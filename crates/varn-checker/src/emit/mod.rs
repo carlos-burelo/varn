@@ -1,9 +1,9 @@
 //! The checker emits TIR.
 //!
-//! The stage-2 replacement for `checker_annotations/`: instead of walking the
-//! AST and noting types in a side map, it builds a `varn_tir::TirModule`
-//! whose every node carries its type and resolution as mandatory fields. See
-//! `docs/TIR_ETAPA_2_PLAN.md`.
+//! The replacement for `checker_annotations/`: instead of walking the AST and
+//! noting types in a side map, it builds a `varn_tir::TirModule` whose every
+//! node carries its type and resolution as mandatory fields. See
+//! `docs/TIR_CONTRATO_TIPADO.md`.
 //!
 //! The whole executable AST lowers: literals, `Var` (local / param / global /
 //! upvalue), every operator, member and index access, calls (direct / vtable /

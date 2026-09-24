@@ -435,13 +435,14 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 - Suite e2e: 1207/1207 (`tests/107-narrow-numeric-types.vn` nuevo + `tests/108-granular-numerics.vn`, preexistente y hasta ahora nunca importado a `main.vn`, ambos verdes).
 - `cargo build --workspace`: limpio, sin `_ =>` comodín nuevos escondiendo un caso sin decidir (cada `match` exhaustivo roto por las 8 variantes se resolvió explícitamente).
 - Stress test dedicado (no permanente): 50 000 instancias con 7 campos angostos mezclados (`i8/i16/i32/u8/u16/u32/f32`), GC completo, íntegro; `debug -p bytecode` confirma `SetFixedField` tipado (no `SetProperty` por nombre) para los 7.
-- Plan completo en `docs/superpowers/plans/2026-09-16-narrow-numeric-types.md`.
+- Detalle de implementación en el Anexo K5 de este documento.
 
 ## Anexo K5 — `ArrayRepr` angosto: literales y lectura compactos (cierra K4)
 
 **Problema (K4, "Pendiente, fuera de alcance").** `ArrayRepr` solo tenía `{Boxed, I64, F64}`, elegido por los VALORES en runtime (`from_items`) — un mecanismo que no puede funcionar para anchos angostos, porque un `i8` y un `int` son el mismo `VmValue` (el ancho es un hecho solo-estático, vive en el mismo registro de 64 bits). Un `Array<i8>` pagaba `Boxed`: 16 bytes por elemento.
 
-**Cambio (4 capas, cada una probada por separado, plan completo en `docs/superpowers/plans/2026-09-16-narrow-array-repr.md`).**
+**Cambio (4 capas, cada una probada por separado; detalle en el Anexo K5 de
+este documento).**
 1. **Runtime**: 7 variantes nuevas en `ArrayRepr` (`I8..U32,F32`, discriminantes 3..9, aditivas) + `VmArray::new_i8/../new_f32`. `element_slotkind`/`get_vm`/`set_vm`/`push_vm`/`pop_vm`/`migrate_to_boxed` en `vm_value.rs` cubren las 7 explícitamente; CSV (siempre `Boxed`, `unreachable!` nombrado) y serialización JSON (arms reales, ensanchan a `i64`/`f64`) igual.
 2. **Checker**: `ExprKind::Array` tipa cada elemento contra el `Array<T>` esperado cuando `T` es angosto, reusando `literal_fits_type`/`expr_satisfies_target_type` (ya existían desde K4, nunca se habían activado para el contexto de un literal de array). `let bad: Array<i8> = [300]` es ahora error de compilación, no truncamiento silencioso en runtime.
 3. **Codegen**: `InstKind::BuildArray` gana `narrow_elem: Option<TypeTag>`, calculado en `from_tir/build.rs` desde `BackendTy::Array(elem_id)` vía `narrow_tag_of` (misma función de K4). Se hila hasta el byte ya libre del segundo operando de bytecode de `BuildArray` (antes siempre `0`; `TypeTag::Null == 0` es el centinela "no angosto, usar el camino de inferencia existente"). El dispatch de la VM llama a la nueva `alloc_array_vm_narrow` cuando ese byte no es cero, construyendo el `ArrayRepr` tipado directo — cero pasos de inferencia por valor.
