@@ -59,7 +59,7 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
 
-**Fase 0, A, B y C cerradas** (Fase B: ADR-0016,
+**Fase 0, A, B, C y D cerradas** (Fase D: `docs/plans/2026-09-23-fase-D-superficie-tipos.md`, con su deuda) (Fase B: ADR-0016,
 `docs/plans/2026-09-23-fase-B-precision-arbitraria.md`; Fase C:
 `docs/plans/2026-09-23-fase-C-runtimekind.md`).
 
@@ -74,8 +74,7 @@ estructural en el checker).
 Hallazgos de Fase B, corregidos: la aritmética `bigint` no existía (`10n + 5n`
 daba `0`); el widening implícito `int → bigint/decimal` no convertía el valor;
 `dynamic as float` sobre `bigint`/`decimal` daba `0.0`; el AST HIR muerto se
-borró. Pendiente anotado: el contrato `Map<V>` fija las claves en `str`
-(`Map<int, str>.set(1, …)` no compila) — Fase D; un campo de clase `bigint`
+borró. Pendiente anotado: ~~el contrato `Map<V>` fija las claves en `str`~~ — resuelto en D.6; un campo de clase `bigint`
 asignado desde `int` no pasa por el widening (solo locales, globales,
 retornos, parámetros).
 
@@ -89,7 +88,7 @@ módulo de entrada tumbaba el checker (atom de otro interner); `NaN` y
 pool de constantes fusionaba `-0.0` con `0.0`; `check_misc.rs` huérfano.
 
 Brechas nuevas anotadas para fases siguientes:
-- Tipo tupla `#[T1, T2]` no parsea en posición de tipo (Fase D).
+- ~~Tipo tupla `#[T1, T2]` no parsea en posición de tipo~~ — resuelto en D.2.
 - No existe diagnóstico "tipo desconocido": `let x: Foo = 1` da VN3001
   (Fase D).
 - `docs/TIR_CONTRATO_TIPADO.md` aún describe anchos angostos; el usuario

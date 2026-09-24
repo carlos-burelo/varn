@@ -79,3 +79,27 @@ inmutabilidad de Record/Tuple.
 Miembros = unión de miembros; un miembro con tipos incompatibles en ambos
 lados es `never` (y un valor no puede satisfacerlo). Intersección de
 primitivos distintos (`int & str`) es `never`.
+
+## Ejecución (2026-09-24)
+
+| Paso | Commit | Nota |
+|---|---|---|
+| D.1 | `bd8a51f1` | `never` bottom también en la vía rápida de primitivos |
+| D.2 | `bc702bc4` | `()`/`Unit` = tupla vacía; `#[T, U]` en tipos; VN3022 `VoidValueUsed`. Hallazgo: una función sin anotación cuyo `return` no se podía inferir quedaba tipada `void` |
+| D.3 | `927d0c17` | `TypeKind::Literal`; `Type::apparent` para operadores y miembros |
+| D.4 | `c273791a` | cobertura de literales/`bool`/`T?`; `MatchError`. Hallazgo: un `match` de valor sin brazo tumbaba la VM (índice fuera de rango); errores no capturados de subclases de `Error` imprimían `[object]` |
+| D.5 | `4c89eed9` | VN3023 `ForbiddenRecordGeneric` |
+| D.6 | `54d74ff0` | `Map<K, V>` con claves por valor; fuera las ramas Map ≡ objeto |
+| D.7 | `87ee0201` | `Range<int>`/`Range<char>`, `step` perezoso. Hallazgo: `.length` ignoraba `step`; atoms sintetizados sin texto en el módulo tumbaban el checker (interner sembrado con `BuiltinType`) |
+| D.8 | `9f4d1ce4` | tuplas inmutables en compilación; tests de igualdad |
+| D.9 | `26489889` | `int & str` = `never`; miembros intersectados |
+
+Desviaciones y deuda:
+- `const` no conserva el tipo literal de su inicializador (el literal entra
+  por anotación y por contexto). Conservarlo exige que todo consumidor de
+  `Primitive` pase por `Type::apparent`.
+- `match` no exhaustivo sigue siendo *warning*; en runtime lanza `MatchError`
+  (valor) o no hace nada (sentencia).
+- `{ [key: K]: V }` está separado de `Map` en el sistema de tipos; su
+  representación runtime sigue siendo una tabla hash (layout, Fase F).
+- Un miembro de clase `Record` con un array compara el array por referencia.
