@@ -102,4 +102,4 @@ Desviaciones y deuda:
   (valor) o no hace nada (sentencia).
 - `{ [key: K]: V }` está separado de `Map` en el sistema de tipos; su
   representación runtime sigue siendo una tabla hash (layout, Fase F).
-- Un miembro de clase `Record` con un array compara el array por referencia.
+- Un campo de `Record` que es un array (mutable) se compara por referencia.
