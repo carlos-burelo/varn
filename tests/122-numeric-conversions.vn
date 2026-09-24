@@ -1,0 +1,37 @@
+function f2i(x: float): int { return x as int }
+function i2f(x: int): float { return x as float }
+
+assert("3.9 as int truncates", f2i(3.9) === 3)
+assert("-3.9 as int truncates toward zero", f2i(0.0 - 3.9) === 0 - 3)
+assert("int as float", i2f(2) === 2.0)
+assert("large int as float rounds", i2f(9007199254740993) === 9007199254740992.0)
+
+function faultOf(f: () => int): str {
+    try { f(); return "none" } catch (e) {
+        if (e instanceof IntegerOverflow) { return "ovf" }
+        return "other"
+    }
+}
+assert("NaN as int raises", faultOf(() => f2i(0.0 / 0.0)) === "ovf")
+assert("Inf as int raises", faultOf(() => f2i(1.0 / 0.0)) === "ovf")
+assert("1e19 as int raises", faultOf(() => f2i(1e19)) === "ovf")
+
+const big: bigint = 42n
+assert("small bigint as int", (big as int) === 42)
+const huge: bigint = 99999999999999999999999n
+assert("huge bigint as int raises", faultOf(() => huge as int) === "ovf")
+
+const dec: decimal = 7.9d
+assert("decimal as int truncates", (dec as int) === 7)
+
+const fromDyn: dynamic = 5
+assert("dynamic int as float converts", typeof (fromDyn as float) === "float")
+const fromDynF: dynamic = 5.7
+assert("dynamic float as int truncates", (fromDynF as int) === 5)
+
+let i = 0
+let acc = 0
+while (i < 500) { acc = acc + f2i(2.5); i = i + 1 }
+assert("hot float as int", acc === 1000)
+
+print("[PASSED] 122. Numeric conversions")

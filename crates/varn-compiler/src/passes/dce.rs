@@ -134,6 +134,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true
         }
+        Convert { conv, .. } => !conv.can_fault(),
 
         // Puede lanzar si el valor no cabe en el ancho declarado (mismo
         // motivo que Div/Mod/Pow abajo: el panic ES el efecto observable,

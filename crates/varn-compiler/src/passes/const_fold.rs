@@ -91,6 +91,7 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
             let rhs_const = const_map.get(rhs)?;
             fold_binary(*op, lhs_const, rhs_const, *ty)
         }
+        InstKind::Convert { operand, conv } => fold_convert(*conv, const_map.get(operand)?),
         InstKind::IsNull { operand } => {
             let operand_const = const_map.get(operand)?;
             match operand_const {
@@ -98,6 +99,16 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
                 _ => Some(InstKind::ConstBool(false)),
             }
         }
+        _ => None,
+    }
+}
+
+fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind> {
+    use varn_core::NumConv::*;
+    match (conv, operand) {
+        (IntToFloat, InstKind::ConstInt(n)) => Some(InstKind::ConstFloat(*n as f64)),
+        (FloatToInt, InstKind::ConstFloat(f)) => varn_core::float_to_int(*f).map(InstKind::ConstInt),
+        (BigIntToInt, InstKind::ConstBigInt(b)) => i64::try_from(*b).ok().map(InstKind::ConstInt),
         _ => None,
     }
 }

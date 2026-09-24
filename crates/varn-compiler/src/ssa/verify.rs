@@ -453,6 +453,27 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
                 }
             }
         }
+        InstKind::Convert { operand, conv } => {
+            let expected = convert_result_ty(*conv);
+            if let Some(dest) = inst.dest {
+                let dty = func.value_ty(dest);
+                if dty != expected {
+                    return Err(format!(
+                        "Convert {conv:?} defines v{}: {dty:?}, expected {expected:?}",
+                        dest.0
+                    ));
+                }
+            }
+            let oty = func.value_ty(*operand);
+            if let Some(want) = convert_operand_ty(*conv) {
+                if oty != want {
+                    return Err(format!(
+                        "Convert {conv:?} reads v{}: {oty:?}, expected {want:?}",
+                        operand.0
+                    ));
+                }
+            }
+        }
         InstKind::ArrayGetIndex { index, .. } | InstKind::ArraySetIndex { index, .. } => {
             let ity = func.value_ty(*index);
             if ity != HirType::Int && ity != HirType::Dynamic {
@@ -465,4 +486,24 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         _ => {}
     }
     Ok(())
+}
+
+/// SSA type a `Convert` defines. `bigint`/`decimal` have no scalar `HirType`.
+pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
+    use varn_core::NumConv::*;
+    match conv {
+        IntToFloat | DynToFloat => HirType::Float,
+        FloatToInt | BigIntToInt | DecimalToInt | DynToInt => HirType::Int,
+        IntToBigInt | IntToDecimal => HirType::Dynamic,
+    }
+}
+
+/// SSA type a `Convert` reads, when it is a scalar the verifier can hold it to.
+fn convert_operand_ty(conv: varn_core::NumConv) -> Option<HirType> {
+    use varn_core::NumConv::*;
+    match conv {
+        IntToFloat | IntToBigInt | IntToDecimal => Some(HirType::Int),
+        FloatToInt => Some(HirType::Float),
+        BigIntToInt | DecimalToInt | DynToInt | DynToFloat => None,
+    }
 }

@@ -4,6 +4,7 @@ pub(crate) mod calls;
 pub(crate) mod class;
 pub(crate) mod collections;
 pub(crate) mod compare;
+pub(crate) mod convert;
 pub(crate) mod ctx;
 pub(crate) mod ctx_csv;
 pub(crate) mod ctx_frames;

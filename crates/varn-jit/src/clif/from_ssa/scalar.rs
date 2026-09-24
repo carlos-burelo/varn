@@ -38,9 +38,14 @@ pub(super) fn emit_inst(
         SsaOp::ConstInt(n) => b.ins().iconst(types::I64, *n),
         SsaOp::ConstFloat(f) => b.ins().f64const(*f),
         SsaOp::ConstBool(x) => b.ins().iconst(types::I64, i64::from(*x)),
-        // A cast is not always an alias: the checker coerces operands to the
-        // widened scalar (`int / int` becomes `float / float`), so an
-        // `int → float` cast is a real `fcvt`. Same-class casts stay aliases.
+        SsaOp::Convert { operand, conv } => match (conv, ctx.ssa.value_ty(*operand)) {
+            (varn_core::NumConv::IntToFloat, SlotKind::Int) => {
+                let a = load_value(b, ctx, values, *operand)?;
+                b.ins().fcvt_from_sint(types::F64, a)
+            }
+            _ => return Err(format!("from_ssa: convert {conv:?}")),
+        },
+        // Representation-neutral: every real conversion is a `Convert`.
         SsaOp::Cast { operand } => {
             let a = load_value(b, ctx, values, *operand)?;
             match (ctx.ssa.value_ty(*operand), dest_ty) {

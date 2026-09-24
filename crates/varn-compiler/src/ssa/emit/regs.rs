@@ -108,6 +108,7 @@ pub(super) fn assign_registers(
                 | InstKind::ObjectMerge { .. }
                 | InstKind::IsNull { .. }
                 | InstKind::Cast { .. }
+                | InstKind::Convert { .. }
                 | InstKind::NarrowRangeCheck { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }

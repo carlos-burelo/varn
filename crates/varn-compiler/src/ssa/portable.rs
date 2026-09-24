@@ -267,6 +267,10 @@ fn project_inst(
         InstKind::Cast { operand, .. } => SsaOp::Cast {
             operand: operand.0,
         },
+        InstKind::Convert { operand, conv } => SsaOp::Convert {
+            operand: operand.0,
+            conv: *conv,
+        },
         InstKind::NarrowRangeCheck { operand, tag } => SsaOp::NarrowRangeCheck {
             operand: operand.0,
             tag: *tag,

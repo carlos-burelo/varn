@@ -48,6 +48,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
+        | Convert { operand, .. }
         | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }
@@ -209,6 +210,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
+        | Convert { operand, .. }
         | NarrowRangeCheck { operand, .. }
         | ToString { operand }
         | AssertNotNull { operand }

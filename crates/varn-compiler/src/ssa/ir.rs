@@ -280,6 +280,11 @@ pub enum InstKind {
     /// hace con su propio desbordamiento (`exec/arith.rs::overflow`).
     /// `varn_core::TypeTag::U64` nunca aparece aquí — ver la nota de `u64`
     /// en `varn_tir::BackendTy`.
+    /// Explicit numeric conversion (`as`) that changes representation.
+    Convert {
+        operand: Value,
+        conv: varn_core::NumConv,
+    },
     NarrowRangeCheck {
         operand: Value,
         tag: varn_core::TypeTag,

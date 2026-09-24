@@ -145,6 +145,9 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
         // encodings across emitter, dispatch and JIT — see git history.)
         OpCode::Spawn => s(2, Some(dest0), vec![hi1]),
 
+        // `[dst][src: hi1][conv: lo1]`.
+        OpCode::Convert => s(2, Some(dest0), vec![hi1]),
+
         // `[dest: hi1][tag: lo1]` en la palabra siguiente a la del opcode
         // (no hay dest en la palabra del opcode misma, a diferencia de
         // `Move`/`IsNull` de arriba) — lee y escribe el MISMO registro: pasa

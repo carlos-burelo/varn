@@ -225,12 +225,14 @@ pub enum OpCode {
     /// resultado es angosto (`i8 + i8`). Panica en runtime si no cabe, igual
     /// que `int` ya hace con su propio desbordamiento.
     CheckNarrowRange,
+    /// `dst = convert(src)` per the `NumConv` in the next word (`as`).
+    Convert,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::CheckNarrowRange as u8 {
+        if v <= OpCode::Convert as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

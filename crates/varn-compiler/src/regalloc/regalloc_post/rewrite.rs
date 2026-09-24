@@ -106,6 +106,10 @@ pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping:
                 OpCode::Inherit => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
+                OpCode::Convert => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
                 OpCode::Yield | OpCode::Return => {
                     code[offset + 1] = pack(hi1, m(mapping, lo1));
                 }

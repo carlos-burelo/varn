@@ -229,6 +229,11 @@ fn print_proto(
                     let w1 = w!();
                     format!("r{} = r{}", hi(op_val), hi(w1))
                 }
+                OpCode::Convert => {
+                    let w1 = w!();
+                    let conv = varn_core::NumConv::from_u8(lo(w1) as u8);
+                    format!("r{} = convert r{} {:?}", hi(op_val), hi(w1), conv)
+                }
                 OpCode::CheckNarrowRange => {
                     let w1 = w!();
                     let tag = varn_core::TypeTag::from_u8(lo(w1) as u8);

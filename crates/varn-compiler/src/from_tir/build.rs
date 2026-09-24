@@ -182,11 +182,20 @@ impl<'m> Builder<'m> {
         }
     }
 
-    /// Force `v` to `target`, inserting a `Cast` when the representation
-    /// actually differs (an `int` initializer for a `float` binding, say).
+    /// Force `v` to `target`: a real `Convert` for `int → float` (an exact
+    /// literal adopting `float`), a representation-neutral `Cast` otherwise.
     fn coerce(&mut self, v: Value, target: HirType) -> Value {
-        if self.value_ty(v) == target {
+        let from = self.value_ty(v);
+        if from == target {
             v
+        } else if from == HirType::Int && target == HirType::Float {
+            self.emit(
+                InstKind::Convert {
+                    operand: v,
+                    conv: varn_core::NumConv::IntToFloat,
+                },
+                HirType::Float,
+            )
         } else {
             self.emit(
                 InstKind::Cast {
@@ -795,41 +804,26 @@ impl<'m> Builder<'m> {
                 }
             }
             TirExprKind::Cast { operand } => {
+                use varn_core::NumericDomain as D;
                 let v = self.lower_expr(operand)?;
-                if ty == HirType::Float && self.value_ty(v) != HirType::Float {
-                    // `as float` on an operand not ALREADY statically float
-                    // (almost always `dynamic` — a value straight off CSV/JSON/
-                    // FFI) must really convert: `InstKind::Cast` compiles to a
-                    // bare `Move` (see ssa/emit/values.rs), which leaves an
-                    // underlying int `VmValue` exactly as it was — `typeof`
-                    // still reports `int` after the cast. That was invisible
-                    // as long as nothing downstream cared, but the checker
-                    // ALSO gives this register `SlotKind::Float` from here on
-                    // (it is declared/used as a float), so any JIT-compiled
-                    // caller unboxes it through the float coercion its
-                    // internal float-register representation requires — and
-                    // silently gets a genuine float where the interpreter
-                    // still has an int, a real value divergence the moment
-                    // that result crosses back into a plain boxed `VmValue`
-                    // (an object/array field, e.g. `tests/benchmarks/
-                    // bench_csv_etl.vn`'s `"base_amount": amt`).
-                    //
-                    // Fixed by making the CAST ITSELF convert, via the
-                    // generic (dynamically-dispatched) `Add` opcode's
-                    // existing, already-consistent int+float coercion —
-                    // `v + 0.0` — rather than inventing a new opcode for a
-                    // conversion this one already performs correctly and
-                    // identically across the interpreter and every JIT tier.
-                    let zero = self.emit(InstKind::ConstFloat(0.0), HirType::Float);
-                    return Ok(self.emit(
-                        InstKind::Binary {
-                            op: HirBinOp::Add,
-                            lhs: v,
-                            rhs: zero,
-                            ty: HirType::Dynamic,
-                        },
-                        HirType::Float,
-                    ));
+                // The lowered value decides for scalars: a statically `int`
+                // operand can still live boxed (`Dynamic`) in SSA.
+                let from = match self.value_ty(v) {
+                    HirType::Int => Some(D::Int),
+                    HirType::Float => Some(D::Float),
+                    _ => numeric_domain(operand.ty).filter(|d| matches!(d, D::BigInt | D::Decimal)),
+                };
+                let to = numeric_domain(e.ty);
+                let conv = match (from, to) {
+                    (Some(f), Some(t)) if f == t => return Ok(v),
+                    (Some(f), Some(t)) => varn_core::NumConv::between(f, t),
+                    (None, Some(D::Int)) => Some(varn_core::NumConv::DynToInt),
+                    (None, Some(D::Float)) => Some(varn_core::NumConv::DynToFloat),
+                    _ => None,
+                };
+                if let Some(conv) = conv {
+                    let result_ty = crate::ssa::verify::convert_result_ty(conv);
+                    return Ok(self.emit(InstKind::Convert { operand: v, conv }, result_ty));
                 }
                 if let Some(tag) = narrow_tag_of(e.ty) {
                     let v = self.emit(InstKind::Cast { operand: v, ty }, ty);
@@ -1608,6 +1602,18 @@ fn is_free_fn_name(name: &str) -> bool {
 /// resultado aritmético necesita `InstKind::NarrowRangeCheck` después de
 /// emitirse (ver `narrow_range.rs` en `varn-vm` para el porqué de estos
 /// siete y no `u64`).
+/// The numeric domain an `as` converts between, for the types that have one.
+fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
+    use varn_core::NumericDomain as D;
+    Some(match bt {
+        BackendTy::Int => D::Int,
+        BackendTy::Float => D::Float,
+        BackendTy::BigInt => D::BigInt,
+        BackendTy::Decimal => D::Decimal,
+        _ => return None,
+    })
+}
+
 fn narrow_tag_of(bt: BackendTy) -> Option<varn_core::TypeTag> {
     use varn_core::TypeTag as T;
     Some(match bt {

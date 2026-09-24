@@ -121,6 +121,8 @@ pub enum SsaOp {
     /// Checker-proven cast. Width-narrowing casts already carry a
     /// [`SsaOp::NarrowRangeCheck`]; a `Cast` itself is representation-neutral.
     Cast { operand: u32 },
+    /// Numeric conversion (`as`) that changes representation.
+    Convert { operand: u32, conv: varn_core::NumConv },
 
     /// Validate `operand` fits `tag`'s range, passing it through unchanged.
     NarrowRangeCheck { operand: u32, tag: TypeTag },

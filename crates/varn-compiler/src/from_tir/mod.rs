@@ -1,11 +1,7 @@
-//! `varn_tir::TirModule` -> SSA, the stage-3 reattachment point.
+//! `varn_tir::TirModule` -> SSA, the compiler's only frontend path.
 //!
-//! Runs parallel to `ssa/build/` (the HIR path) until it covers the whole
-//! corpus; then the pipeline switches to it and HIR is deleted. See
-//! `docs/TIR_ETAPA_3_PLAN.md`.
-//!
-//! Nothing is wired yet: the pipeline still compiles through HIR, so the
-//! corpus stays green while this fills in.
+//! Covers the whole corpus; the pipeline compiles through it (HIR was deleted
+//! at the cut). See `docs/TIR_CONTRATO_TIPADO.md`.
 
 pub mod build;
 pub mod compile;

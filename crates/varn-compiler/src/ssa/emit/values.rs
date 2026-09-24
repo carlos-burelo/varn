@@ -243,6 +243,10 @@ pub(super) fn emit_value(
                 chunk.emit_rr(OpCode::Move, d, src, line);
             }
         }
+        InstKind::Convert { operand, conv } => {
+            chunk.write(Chunk::pack_op(OpCode::Convert, d), line);
+            chunk.write(Chunk::pack(reg[operand.0 as usize], *conv as u8), line);
+        }
         InstKind::NarrowRangeCheck { operand, tag } => {
             let src = reg[operand.0 as usize];
             if d != src {

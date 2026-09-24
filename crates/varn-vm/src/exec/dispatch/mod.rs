@@ -247,6 +247,17 @@ impl ExecCtx {
                         // `register_count` por construcción del compilador.
                         tryv!((*ctx).stack.mov(base, first_reg, hi(w1)));
                     }
+                    OpCode::Convert => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let v = (*ctx).stack.box_reg(base, hi(w1));
+                        let r = match varn_core::NumConv::from_u8(lo(w1) as u8) {
+                            Some(conv) => crate::exec::convert::convert(conv, v, &mut (*ctx).heap),
+                            None => Err(crate::error::RuntimeError::new("convert: bad operand")),
+                        };
+                        let r = tryv!(r);
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, r));
+                    }
                     OpCode::CheckNarrowRange => {
                         let w1 = code[ip];
                         ip += 1;

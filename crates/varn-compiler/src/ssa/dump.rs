@@ -156,6 +156,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::IsNull { operand } => format!("isnull {}", val(*operand)),
         InstKind::Cast { operand, ty } => format!("cast {} as {ty:?}", val(*operand)),
+        InstKind::Convert { operand, conv } => format!("convert {} {conv:?}", val(*operand)),
         InstKind::NarrowRangeCheck { operand, tag } => {
             format!("narrow_range_check {} as {tag:?}", val(*operand))
         }
