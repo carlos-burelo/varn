@@ -8,6 +8,7 @@ pub mod marshal;
 pub mod module_graph;
 pub mod native;
 pub mod native_ctx;
+mod native_error;
 pub mod register_meta;
 pub mod resource;
 pub mod ssa;
@@ -27,6 +28,7 @@ pub use native::{
 };
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;
+pub use native_error::NativeError;
 pub use resource::ResourceStore;
 pub use task::{reject_task, reject_value_task, resolve_task, AsyncTask, Poll, TaskState};
 pub use value::{

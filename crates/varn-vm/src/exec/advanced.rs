@@ -151,7 +151,7 @@ pub(crate) fn get_symbol_property(
     Ok(heap.intern(result))
 }
 
-fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let arr_nv = args.first().copied().unwrap_or(VmValue::null());
     let iter_nv = ctx.alloc_object();
     ctx.set_field(iter_nv, "__arr", arr_nv);
@@ -164,7 +164,7 @@ fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<Vm
     Ok(iter_nv)
 }
 
-fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let obj_nv = args
         .first()
         .copied()
@@ -190,7 +190,7 @@ fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
     Ok(result_nv)
 }
 
-fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let range_nv = args
         .first()
         .copied()
@@ -215,7 +215,7 @@ fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<Vm
     Ok(iter_nv)
 }
 
-fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let obj_nv = args
         .first()
         .copied()
@@ -245,7 +245,7 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
 fn generator_symbol_iterator(
     _ctx: &mut dyn NativeCtx,
     args: &[VmValue],
-) -> Result<VmValue, String> {
+) -> varn_types::NativeFnResult {
     Ok(args.first().copied().unwrap_or(VmValue::null()))
 }
 

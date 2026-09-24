@@ -233,7 +233,7 @@ impl ExecCtx {
                 } else {
                     (f)(self as &mut dyn NativeCtx, &args)
                 }
-                .map_err(RuntimeError::new)?;
+                .map_err(RuntimeError::from)?;
 
                 self.stage.clear();
                 self.stage.push(result);
@@ -244,14 +244,14 @@ impl ExecCtx {
                 let start = self.stage.len() - take;
                 let args: Vec<VmValue> = self.stage.drain(start..).collect();
                 let slice = if args.len() > 1 { &args[1..] } else { &[] };
-                let result = (f)(self as &mut dyn NativeCtx, slice).map_err(RuntimeError::new)?;
+                let result = (f)(self as &mut dyn NativeCtx, slice).map_err(RuntimeError::from)?;
 
                 self.stage.clear();
                 self.stage.push(result);
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native(f, None);
-                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::from)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {

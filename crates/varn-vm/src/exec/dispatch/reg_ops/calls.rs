@@ -67,7 +67,7 @@ impl ExecCtx {
                         }
                         let result = self
                             .invoke_native(f, &args)
-                            .map_err(crate::error::RuntimeError::new)?;
+                            .map_err(crate::error::RuntimeError::from)?;
                         self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }
@@ -129,7 +129,7 @@ impl ExecCtx {
                         let slice = if args.len() > 1 { &args[1..] } else { &[] };
                         let result = self
                             .invoke_native(f, slice)
-                            .map_err(crate::error::RuntimeError::new)?;
+                            .map_err(crate::error::RuntimeError::from)?;
                         self.stack.unbox_into_reg(base, dest, result)?;
                         return Ok(false);
                     }

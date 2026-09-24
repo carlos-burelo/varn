@@ -39,6 +39,12 @@ impl RuntimeError {
     }
 }
 
+impl From<varn_types::NativeError> for RuntimeError {
+    fn from(e: varn_types::NativeError) -> Self {
+        Self::of_kind(e.kind, e.message)
+    }
+}
+
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

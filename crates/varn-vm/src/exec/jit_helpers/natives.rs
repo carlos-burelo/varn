@@ -113,6 +113,6 @@ unsafe fn call_native_from_homes(
     }
     match ctx_ref.invoke_native(f, &args) {
         Ok(v) => v,
-        Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
+        Err(err) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::from(err)),
     }
 }

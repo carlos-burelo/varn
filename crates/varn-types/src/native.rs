@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{native_ctx::NativeCtx, vm_value::VmValue, Value};
 
-pub type NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> Result<VmValue, String>;
+pub type NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> crate::NativeFnResult;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

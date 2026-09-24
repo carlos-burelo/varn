@@ -192,7 +192,7 @@ impl ExecCtx {
         let cache_len = closure.ic_cache_len();
         if receiver_class.is_some() && cs < cache_len && !is_megamorphic {
             type NativeFnPtr =
-                fn(&mut dyn varn_types::NativeCtx, &[VmValue]) -> Result<VmValue, String>;
+                varn_types::NativeFn;
 
             let ic_native: Option<(NativeFnPtr, VmValue)>;
             let ic_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)>;
@@ -528,7 +528,7 @@ impl ExecCtx {
     #[inline(always)]
     pub(crate) fn call_native_with_receiver(
         &mut self,
-        f: fn(&mut dyn varn_types::NativeCtx, &[VmValue]) -> Result<VmValue, String>,
+        f: varn_types::NativeFn,
         receiver: VmValue,
         base: usize,
         arg_start: usize,
@@ -584,7 +584,7 @@ impl ExecCtx {
             }
             self.invoke_native(f, &args)
         }
-        .map_err(RuntimeError::new)?;
+        .map_err(RuntimeError::from)?;
         Ok(result)
     }
 

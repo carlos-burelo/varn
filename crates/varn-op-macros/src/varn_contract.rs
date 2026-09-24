@@ -6,7 +6,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token};
 
 use varn_core::ast::{
-    AstArena, ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, StmtId, StmtKind,
+    AstArena, ClassDecl, ClassMember, Decl, ExportDecl, ExprKind, Param, Pattern, StmtId, StmtKind,
 };
 use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
@@ -235,13 +235,27 @@ struct Member {
     kind: Kind,
     params: Vec<ParamInfo>,
     ret: Mapped,
+    /// `@fallible` in the contract: the impl returns `Result<T, NativeError>`,
+    /// so it can raise a typed platform error.
+    fallible: bool,
 }
 
 fn param_name_is_rest(p: &Param) -> bool {
     p.is_rest || matches!(p.pattern, Pattern::Rest { .. })
 }
 
-fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) -> Vec<Member> {
+fn is_fallible(decorators: &[varn_core::ast::Decorator], arena: &AstArena, interner: &AtomInterner) -> bool {
+    decorators.iter().any(|d| {
+        matches!(&arena.expr(d.expression).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "fallible")
+    })
+}
+
+fn collect_members(
+    class_name: &str,
+    decl: &ClassDecl,
+    arena: &AstArena,
+    interner: &AtomInterner,
+) -> Vec<Member> {
     let mut out = Vec::new();
     for m in &decl.body {
         match m {
@@ -250,6 +264,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
                 params,
                 return_type,
                 modifiers,
+                decorators,
                 ..
             } => {
                 let kind = if modifiers.is_static {
@@ -265,6 +280,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
                         .as_ref()
                         .map(|t| classify(t, interner))
                         .unwrap_or(Mapped::Void),
+                    fallible: is_fallible(decorators, arena, interner),
                 });
             }
             ClassMember::Getter {
@@ -286,6 +302,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
                         .as_ref()
                         .map(|t| classify(t, interner))
                         .unwrap_or(Mapped::Dynamic),
+                    fallible: false,
                 });
             }
 
@@ -311,6 +328,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
                         .as_ref()
                         .map(|t| classify(t, interner))
                         .unwrap_or(Mapped::Dynamic),
+                    fallible: false,
                 });
             }
             ClassMember::Constructor { params, .. } => {
@@ -319,6 +337,7 @@ fn collect_members(class_name: &str, decl: &ClassDecl, interner: &AtomInterner) 
                     kind: Kind::Constructor,
                     params: map_params(params, interner),
                     ret: Mapped::Dynamic,
+                    fallible: false,
                 });
             }
             _ => {}
@@ -357,6 +376,7 @@ fn function_member(f: &FunctionDecl, interner: &AtomInterner) -> Member {
             .as_ref()
             .map(|t| classify(t, interner))
             .unwrap_or(Mapped::Void),
+        fallible: false,
     }
 }
 
@@ -431,7 +451,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
     let members = match &input.class {
         Some(class) => match find_class(&program.body, &arena, class, &interner) {
-            Some(decl) => collect_members(class, &decl, &interner),
+            Some(decl) => collect_members(class, &decl, &arena, &interner),
             None => {
                 return err(format!(
                     "class `{class}` not found in contract `{abs_path_str}`"
@@ -481,7 +501,12 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             continue;
         }
         let rust_sym = sym.trim_end_matches('$');
-        let method_ident = format_ident!("{}", rust_sym);
+        // A Varn name that is a Rust keyword (`mod`) binds to a raw identifier.
+        let method_ident = if syn::parse_str::<Ident>(rust_sym).is_ok() {
+            format_ident!("{}", rust_sym)
+        } else {
+            format_ident!("r#{}", rust_sym)
+        };
         let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
         let fast_wrap_ident = format_ident!(
             "__varn_fast_wrap_{}_{}",
@@ -580,6 +605,9 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let trait_ret = if is_fn {
             let inner = if is_void { quote!(()) } else { rty.clone() };
             quote!(::core::result::Result<#inner, String>)
+        } else if m.fallible {
+            let inner = if is_void { quote!(()) } else { rty.clone() };
+            quote!(::core::result::Result<#inner, ::varn_types::NativeError>)
         } else if is_void {
             quote!(())
         } else {
@@ -592,7 +620,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         });
 
         let call = quote!(<__T>::#method_ident(ctx, #(#call_args),*));
-        let ret_encode = match (is_fn, is_void) {
+        let ret_encode = match (is_fn || m.fallible, is_void) {
             (true, true) => quote! { #call?; Ok(::varn_types::VmValue::null()) },
             (true, false) => quote! {
                 let __ret = #call?;
@@ -613,7 +641,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             pub fn #wrap_ident<__T: #trait_ident>(
                 ctx: &mut dyn ::varn_types::NativeCtx,
                 args: &[::varn_types::VmValue],
-            ) -> ::core::result::Result<::varn_types::VmValue, String> {
+            ) -> ::core::result::Result<::varn_types::VmValue, ::varn_types::NativeError> {
                 #(#decode)*
                 #ret_encode
             }
@@ -794,7 +822,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             pub fn #builder_ident(
                 ctx: &mut dyn ::varn_types::NativeCtx,
                 _args: &[::varn_types::VmValue],
-            ) -> ::core::result::Result<::varn_types::VmValue, String> {
+            ) -> ::core::result::Result<::varn_types::VmValue, ::varn_types::NativeError> {
                 let cls = ctx
                     .get_class(#class)
                     .unwrap_or_else(|| ::varn_types::value::ClassObj::new_native_rc(#class));
@@ -931,6 +959,9 @@ fn is_scalar(m: &Mapped) -> bool {
 }
 
 fn is_fast_eligible(m: &Member) -> bool {
+    if m.fallible {
+        return false;
+    }
     if !matches!(m.kind, Kind::Function | Kind::StaticMethod) {
         return false;
     }

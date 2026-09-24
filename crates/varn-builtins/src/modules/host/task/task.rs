@@ -200,10 +200,10 @@ pub fn alloc_endpoint(
     Ok(nv)
 }
 
-fn receiver_self_iterator(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn receiver_self_iterator(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     args.first()
         .copied()
-        .ok_or_else(|| "receiver iterator: missing self".to_string())
+        .ok_or_else(|| "receiver iterator: missing self".into())
 }
 
 fn chan_id(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<u64> {

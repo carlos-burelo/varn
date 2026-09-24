@@ -511,7 +511,7 @@ fn resolve_specialized_value_property(
     }
 }
 
-fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let gen_nv = args
         .first()
         .copied()
@@ -519,11 +519,11 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, 
     let gen_val = ctx.extract(gen_nv);
     let gen = match gen_val {
         Value::Generator(g) => g,
-        _ => return Err("generator.next: invalid receiver".to_string()),
+        _ => return Err("generator.next: invalid receiver".into()),
     };
     let input_nv = args.get(1).copied().unwrap_or(VmValue::null());
     let input = ctx.extract(input_nv);
-    gen.0.next(input).map(|v| ctx.intern(v))
+    gen.0.next(input).map(|v| ctx.intern(v)).map_err(Into::into)
 }
 
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
@@ -794,7 +794,7 @@ pub(crate) fn resolve_meta_property(
     }
 }
 
-fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let recv = args.first().copied().ok_or("meta.keys: missing receiver")?;
     let val = ctx.extract(recv);
     let keys: Vec<Value> = match &val {
@@ -815,7 +815,7 @@ fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue
     Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(keys))))
 }
 
-fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let recv = args
         .first()
         .copied()
@@ -834,7 +834,7 @@ fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVal
     Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(values))))
 }
 
-fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let recv = args
         .first()
         .copied()
@@ -879,7 +879,7 @@ fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmVa
     Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(entries))))
 }
 
-fn meta_has_own_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+fn meta_has_own_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let recv = args
         .first()
         .copied()

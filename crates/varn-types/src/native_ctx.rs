@@ -292,4 +292,4 @@ pub trait NativeCtx {
     }
 }
 
-pub type NativeFnResult = Result<VmValue, String>;
+pub type NativeFnResult = Result<VmValue, crate::NativeError>;
