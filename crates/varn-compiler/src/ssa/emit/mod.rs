@@ -6,7 +6,6 @@
 //! emission (`effects`, `values`), and block terminators (`terminator`).
 
 use super::ir::{BlockId, Inst, InstKind, SsaFunc, Terminator};
-use crate::hir::HirFunction;
 use crate::OptError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -25,8 +24,8 @@ use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-/// What `emit_function` needs about a function beyond its SSA body. Built from
-/// a `HirFunction` (current path) or a `varn_tir::TirFunction` (`from_tir`).
+/// What `emit_function_meta` needs about a function beyond its SSA body,
+/// built from a `varn_tir::TirFunction` (`from_tir`).
 pub struct FnMeta {
     pub name: Arc<str>,
     pub start_line: u32,
@@ -38,31 +37,6 @@ pub struct FnMeta {
     pub is_generator: bool,
     pub has_this: bool,
     pub upvalue_count: u32,
-}
-
-impl FnMeta {
-    pub fn from_hir(f: &HirFunction) -> Self {
-        FnMeta {
-            name: f.name.clone(),
-            start_line: f.start_line,
-            nparams: f.params.len(),
-            param_kinds: f.params.iter().map(|p| slot_kind_of(p.ty)).collect(),
-            return_kind: slot_kind_of(f.return_ty),
-            has_rest: f.has_rest,
-            is_async: f.is_async,
-            is_generator: f.is_generator,
-            has_this: f.has_this,
-            upvalue_count: f.upvalue_count,
-        }
-    }
-}
-
-pub fn emit_function(
-    ssa: SsaFunc,
-    f: &HirFunction,
-    source_file: Arc<str>,
-) -> Result<FunctionProto> {
-    emit_function_meta(ssa, &FnMeta::from_hir(f), source_file)
 }
 
 pub fn emit_function_meta(
