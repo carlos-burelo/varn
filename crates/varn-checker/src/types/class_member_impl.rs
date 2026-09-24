@@ -1,6 +1,27 @@
 use super::*;
 
 impl ClassMemberInfo {
+    /// This member as a member of a structural object type: a method keeps
+    /// its signature, everything else is a property.
+    pub fn as_object_member(&self, table: &CheckerTyTable) -> ObjectTypeMember {
+        if let (ClassMemberKind::Method, TypeKind::Fn(fid)) = (self.kind, table.get(self.ty.0)) {
+            let ft = table.get_function(fid);
+            return ObjectTypeMember::Method {
+                name: self.name.clone(),
+                params: ft.params.clone(),
+                return_type: ft.return_type,
+                optional: self.is_optional,
+                is_arrow: ft.is_arrow,
+            };
+        }
+        ObjectTypeMember::Property {
+            name: self.name.clone(),
+            ty: self.ty.0,
+            optional: self.is_optional,
+            readonly: self.is_readonly,
+        }
+    }
+
     pub fn params_str(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> String {
         match table.get(self.ty.0) {
             TypeKind::Fn(fid) => {

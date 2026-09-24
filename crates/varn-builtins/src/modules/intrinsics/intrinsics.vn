@@ -35,3 +35,54 @@ export interface AsyncDisposable {
     disposeAsync(): void;
 }
 
+
+// Standard capabilities (spec §33). Structural: a type satisfies one by
+// having the member, with no `implements` needed.
+
+export interface Equatable<T> {
+    equals(other: T): bool;
+}
+
+export interface Comparable<T> {
+    compare(other: T): int;
+}
+
+export interface Hashable {
+    hash(): int;
+}
+
+export interface Cloneable<T> {
+    clone(): T;
+}
+
+export interface Display {
+    toString(): str;
+}
+
+export interface Debug {
+    debug(): str;
+}
+
+export interface Indexable<K, V> {
+    get(key: K): V?;
+}
+
+export interface Add<T, R> {
+    add(other: T): R;
+}
+
+export interface Sub<T, R> {
+    sub(other: T): R;
+}
+
+export interface Mul<T, R> {
+    mul(other: T): R;
+}
+
+export interface Div<T, R> {
+    div(other: T): R;
+}
+
+export interface Neg<R> {
+    neg(): R;
+}

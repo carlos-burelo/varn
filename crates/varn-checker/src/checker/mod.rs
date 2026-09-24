@@ -712,6 +712,9 @@ impl<'r> Checker<'r> {
     ) -> bool {
         // The view is built here, at the one funnel every caller passes
         // through, so none of the 22 call sites has to carry a resolver.
+        let declared = &bind
+            .and_then(|b| self.instantiate_interface(declared, inferred, b))
+            .unwrap_or(*declared);
         let resolver = self.resolver;
         let view = bind.map(|b| BindView::new(b, resolver));
         compat::types_compatible_with_cache(
@@ -721,6 +724,63 @@ impl<'r> Checker<'r> {
             &mut self.compat_cache,
             &self.ty_table,
         )
+    }
+
+    /// A generic interface with its arguments applied, as the object type it
+    /// describes (`Cloneable<Money>` → `{ clone(): Money }`), so a class can
+    /// satisfy it structurally (spec §32). `None` when `ty` is not a generic
+    /// interface, or when `inferred` names the same generic (compared by its
+    /// arguments instead) or another generic type (nominal).
+    fn instantiate_interface(
+        &mut self,
+        ty: &Type,
+        inferred: &Type,
+        bind: &BindResult,
+    ) -> Option<Type> {
+        use crate::types::TypeContext;
+        let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) = self.ty_table.get(ty.0) else {
+            return None;
+        };
+        if !matches!(
+            self.ty_table.get(inferred.0),
+            varn_core::TypeKind::Named(..) | varn_core::TypeKind::Object(_)
+        ) {
+            return None;
+        }
+        if let varn_core::TypeKind::Named(inferred_name, _) = self.ty_table.get(inferred.0) {
+            if inferred_name == name_atom {
+                return None;
+            }
+        }
+        let name = self.resolve_bind_atom(bind, name_atom);
+        let origin = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+        let view = BindView::new(bind, self.resolver);
+        if view.get_class_members(&name, origin.as_deref()).is_some() {
+            return None;
+        }
+        let members = view.get_interface_members(&name, origin.as_deref())?;
+        let args: Vec<Type> = self
+            .ty_table
+            .get_list(args_list)
+            .iter()
+            .map(|id| Type(*id, false))
+            .collect();
+        let mapping = crate::checker_expressions::members::member_type::generic_mapping(
+            self.resolver,
+            &name,
+            &args,
+            origin.as_ref(),
+            bind,
+        );
+        if mapping.is_empty() {
+            return None;
+        }
+        let table = Arc::make_mut(&mut self.ty_table);
+        let object_members: Vec<_> = members
+            .iter()
+            .map(|cm| cm.as_object_member(table).map_generics(&mapping, table))
+            .collect();
+        Some(Type::object(object_members, table))
     }
 
     pub(crate) fn value_assignable_to(

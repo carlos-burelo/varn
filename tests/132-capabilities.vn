@@ -1,0 +1,35 @@
+class Money {
+    cents: int
+    constructor(c: int) { this.cents = c }
+    equals(other: Money): bool { return this.cents === other.cents }
+    compare(other: Money): int { return this.cents - other.cents }
+    hash(): int { return this.cents }
+    clone(): Money { return new Money(this.cents) }
+    debug(): str { return `Money(${this.cents})` }
+    toString(): str { return `$${this.cents}` }
+    add(other: Money): Money { return new Money(this.cents + other.cents) }
+    neg(): Money { return new Money(-this.cents) }
+}
+
+function same<T>(a: Equatable<T>, b: T): bool { return a.equals(b) }
+assert("Equatable is structural", same(new Money(1), new Money(1)))
+
+const c: Comparable<Money> = new Money(5)
+assert("Comparable", c.compare(new Money(3)) > 0)
+
+const h: Hashable = new Money(5)
+const k: Cloneable<Money> = new Money(9)
+const d: Display = new Money(7)
+const g: Debug = new Money(7)
+assert("Hashable / Cloneable", h.hash() === 5 && k.clone().cents === 9)
+assert("Display / Debug", d.toString() === "$7" && g.debug() === "Money(7)")
+
+const plus: Add<Money, Money> = new Money(1)
+const minus: Neg<Money> = new Money(2)
+assert("Add / Neg", plus.add(new Money(2)).cents === 3 && minus.neg().cents === -2)
+
+class Box { v: int; constructor(v: int) { this.v = v } get(key: int): int? { return key === 0 ? this.v : null } }
+const ix: Indexable<int, int> = new Box(4)
+assert("Indexable", ix.get(0) === 4 && ix.get(1) === null)
+
+print("[PASSED] 132. Capabilities")

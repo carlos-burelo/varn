@@ -376,41 +376,7 @@ pub fn resolve_type_node(
                         let members = ctx
                             .get_class_members(&name_str, origin_str.as_deref())
                             .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))?;
-                        Some(
-                            members
-                                .iter()
-                                .map(|cm| {
-                                    use crate::types::ClassMemberKind;
-                                    match cm.kind {
-                                        ClassMemberKind::Method => {
-                                            if let TypeKind::Fn(fid) = table.get(cm.ty.0) {
-                                                let ft = table.get_function(fid).clone();
-                                                ObjectTypeMember::Method {
-                                                    name: cm.name.clone(),
-                                                    params: ft.params.clone(),
-                                                    return_type: ft.return_type,
-                                                    optional: cm.is_optional,
-                                                    is_arrow: ft.is_arrow,
-                                                }
-                                            } else {
-                                                ObjectTypeMember::Property {
-                                                    name: cm.name.clone(),
-                                                    ty: cm.ty.0,
-                                                    optional: cm.is_optional,
-                                                    readonly: cm.is_readonly,
-                                                }
-                                            }
-                                        }
-                                        _ => ObjectTypeMember::Property {
-                                            name: cm.name.clone(),
-                                            ty: cm.ty.0,
-                                            optional: cm.is_optional,
-                                            readonly: cm.is_readonly,
-                                        },
-                                    }
-                                })
-                                .collect(),
-                        )
+                        Some(members.iter().map(|cm| cm.as_object_member(table)).collect())
                     }
                     _ => None,
                 })
