@@ -4,7 +4,7 @@ use crate::types::TypeContext;
 use crate::types::{CheckerTyId, ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
-use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind};
+use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
 
@@ -84,7 +84,7 @@ impl<'r> Checker<'r> {
                                 self.resolver,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             )
-                        } else if name_str == IntrinsicType::Map.as_str() {
+                        } else if name_str == varn_core::BuiltinType::Map.name() {
                             Type::generic_with_origin(
                                 name_str,
                                 vec![Type::Dynamic],
@@ -129,7 +129,7 @@ impl<'r> Checker<'r> {
                                     self.resolver,
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 )
-                            } else if name_str == IntrinsicType::Map.as_str() {
+                            } else if name_str == varn_core::BuiltinType::Map.name() {
                                 Type::generic(
                                     name_str,
                                     vec![Type::Dynamic],
@@ -633,18 +633,18 @@ impl<'r> Checker<'r> {
             TypeKind::Builtin(varn_core::BuiltinType::Bytes) if prop_ty.is_int() => Type::Int,
             TypeKind::Named(name, _)
                 if prop_ty.is_int()
-                    && bind.interner.get(IntrinsicType::Str.as_str()) == Some(name) =>
+                    && bind.interner.get(varn_core::LangPrimitive::Str.name()) == Some(name) =>
             {
                 Type::Str
             }
             TypeKind::Named(name, _)
-                if bind.interner.get(IntrinsicType::Bytes.as_str()) == Some(name)
+                if bind.interner.get(varn_core::BuiltinType::Bytes.name()) == Some(name)
                     && prop_ty.is_int() =>
             {
                 Type::Int
             }
             TypeKind::Generic(name, args, _)
-                if bind.interner.get(IntrinsicType::Map.as_str()) == Some(name) =>
+                if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name) =>
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
@@ -690,7 +690,7 @@ impl<'r> Checker<'r> {
                 let exp_kind = self.ty_table.get(exp.0);
                 let is_map = match exp_kind {
                     TypeKind::Generic(name, args, _) => {
-                        bind.interner.get(IntrinsicType::Map.as_str()) == Some(name) && {
+                        bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name) && {
                             let n = self.ty_table.get_list(args).len();
                             n == 1 || n == 2
                         }
@@ -714,7 +714,7 @@ impl<'r> Checker<'r> {
                             key_ty, value_ty, ..
                         }) = members.first()
                         {
-                            let map_atom = self.resolver.intern(IntrinsicType::Map.as_str());
+                            let map_atom = self.resolver.intern(varn_core::BuiltinType::Map.name());
                             return Type::generic_atom(
                                 map_atom,
                                 vec![Type(*key_ty, false), Type(*value_ty, false)],

@@ -108,7 +108,7 @@ pub fn resolve_type_node(
             //
             // Placed after the user/stdlib alias lookups so an explicitly
             // declared `Array<T>` alias still wins.
-            if name_str.as_ref() == varn_core::IntrinsicType::Array.as_str() {
+            if name_str.as_ref() == varn_core::BuiltinType::Array.name() {
                 if let [el] = resolved_args.as_slice() {
                     return Type::array(*el, table);
                 }

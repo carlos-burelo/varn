@@ -76,11 +76,11 @@ pub(crate) fn normalize_for_binary(
 ) -> Type {
     if let TypeKind::Named(name, _) = table.get(ty.0) {
         match interner.resolve(name) {
-            n if n == varn_core::IntrinsicType::Str.as_str() => return Type::Str,
-            n if n == varn_core::IntrinsicType::Int.as_str() => return Type::Int,
-            n if n == varn_core::IntrinsicType::Float.as_str() => return Type::Float,
-            n if n == varn_core::IntrinsicType::Bool.as_str() => return Type::Bool,
-            n if n == varn_core::IntrinsicType::Decimal.as_str() => return Type::Decimal,
+            n if n == varn_core::LangPrimitive::Str.name() => return Type::Str,
+            n if n == varn_core::LangPrimitive::Int.name() => return Type::Int,
+            n if n == varn_core::LangPrimitive::Float.name() => return Type::Float,
+            n if n == varn_core::LangPrimitive::Bool.name() => return Type::Bool,
+            n if n == varn_core::LangPrimitive::Decimal.name() => return Type::Decimal,
             _ => {}
         }
     }

@@ -10,7 +10,7 @@ use crate::contract_members::{
     collect_functions, collect_members, find_class, Kind, Member,
 };
 use varn_core::kinds::TypeKind;
-use varn_core::{AtomInterner, IntrinsicType, TypeTag};
+use varn_core::{AtomInterner, TypeTag};
 
 pub(crate) struct ContractInput {
     module: String,
@@ -146,7 +146,7 @@ fn mapped_tag_path(m: &Mapped) -> TS2 {
 }
 
 fn receiver_mapped(class: &str) -> Mapped {
-    if class == IntrinsicType::Array.as_str() {
+    if class == varn_core::BuiltinType::Array.name() {
         return Mapped::Array;
     }
     if TypeTag::from_str(class) == Some(TypeTag::Str) {

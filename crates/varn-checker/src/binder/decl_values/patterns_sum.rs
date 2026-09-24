@@ -37,7 +37,7 @@ impl<'r> super::super::Binder<'r> {
                     varn_core::TypeKind::Array(inner) => Some(Type(inner, false)),
                     varn_core::TypeKind::Generic(name, args, _)
                         if self.interner.resolve(name)
-                            == varn_core::IntrinsicType::Array.as_str()
+                            == varn_core::BuiltinType::Array.name()
                             && self.ty_table.get_list(args).len() == 1 =>
                     {
                         Some(Type(self.ty_table.get_list(args)[0], false))

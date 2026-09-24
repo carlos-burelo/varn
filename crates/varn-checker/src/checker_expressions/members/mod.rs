@@ -226,7 +226,7 @@ pub fn get_members_of_type(
             );
         }
         TypeKind::Array(inner) => {
-            let atom = resolver.intern(varn_core::IntrinsicType::Array.as_str());
+            let atom = resolver.intern(varn_core::BuiltinType::Array.name());
             let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
             return get_members_of_type(resolver, &array_ty, bind, table);
         }
@@ -468,7 +468,7 @@ fn extension_key(
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
         k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(Arc::from),
-        TypeKind::Array(_) => Some(Arc::from(varn_core::IntrinsicType::Array.as_str())),
+        TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         _ => None,
     }
 }

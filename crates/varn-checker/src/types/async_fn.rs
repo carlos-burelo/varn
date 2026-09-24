@@ -14,7 +14,7 @@
 
 use super::{CheckerTyTable, Type};
 use crate::module_resolver::ImportResolver;
-use varn_core::{AtomInterner, IntrinsicType, TypeKind};
+use varn_core::{AtomInterner, TypeKind};
 
 /// The return type an `async` function's *type* carries, given the return type
 /// its *body* produces. Idempotent: a body already declared as `Task<T>` or
@@ -43,7 +43,7 @@ pub fn async_fn_return(
     }
     match resolver {
         Some(r) => {
-            let atom = r.intern(IntrinsicType::Task.as_str());
+            let atom = r.intern(varn_core::BuiltinType::Task.name());
             Type::generic_atom(atom, vec![ret], None, table)
         }
         None => ret,
@@ -64,7 +64,7 @@ pub fn generator_of(
     let name = if is_async {
         "AsyncGenerator"
     } else {
-        IntrinsicType::Generator.as_str()
+        varn_core::BuiltinType::Generator.name()
     };
     match resolver {
         Some(r) => {
@@ -81,8 +81,8 @@ pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) 
     match table.get(ty.0) {
         TypeKind::Generic(name, args, _) => {
             table.get_list(args).len() == 1
-                && (interner.resolve(name) == IntrinsicType::Task.as_str()
-                    || interner.resolve(name) == IntrinsicType::TaskHandle.as_str())
+                && (interner.resolve(name) == varn_core::BuiltinType::Task.name()
+                    || interner.resolve(name) == varn_core::BuiltinType::TaskHandle.name())
         }
         _ => false,
     }

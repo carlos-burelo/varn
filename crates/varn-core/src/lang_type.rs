@@ -154,6 +154,12 @@ impl std::fmt::Display for BuiltinType {
     }
 }
 
+/// `true` when `name` is part of the language's type vocabulary rather than a
+/// user or platform declaration.
+pub fn is_lang_type_name(name: &str) -> bool {
+    LangPrimitive::from_str(name).is_some() || BuiltinType::from_str(name).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -34,12 +34,12 @@ pub use diagnostics::{
     Diagnostic, DiagnosticBag, DiagnosticKind, ErrorCode, RelatedInformation, Suggestion,
 };
 pub use kinds::TypeKind;
-pub use lang_type::{BuiltinType, LangPrimitive};
+pub use lang_type::{is_lang_type_name, BuiltinType, LangPrimitive};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
 pub use cg_ty::CgTy;
-pub use intrinsics::{IntrinsicType, MemberKey};
+pub use intrinsics::MemberKey;
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, floor_div_int, mod_int, mul_int, neg_int, pow_int, rem_int,

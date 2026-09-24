@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::{IntrinsicType, ModuleId};
+use varn_core::{ModuleId};
 use varn_types::{FunctionProto, NativeCtx};
 
 use crate::linker::Linker;
@@ -258,20 +258,20 @@ impl ExecCtx {
 
     fn init_intrinsics(&mut self) {
         // Intrinsic classes the VM registers for property/method fallback
-        // dispatch. Names are sourced from the canonical `IntrinsicType` table
+        // dispatch. Names are sourced from the canonical `TypeTag` names
         // (no raw literals). This set is broader than the op-id core classes:
         // it includes the `Error` hierarchy but not `Symbol`/`bigint`.
         let names = [
-            IntrinsicType::Array.as_str(),
-            IntrinsicType::Str.as_str(),
-            IntrinsicType::Int.as_str(),
-            IntrinsicType::Float.as_str(),
-            IntrinsicType::Decimal.as_str(),
-            IntrinsicType::Bool.as_str(),
-            IntrinsicType::Char.as_str(),
-            IntrinsicType::Map.as_str(),
-            IntrinsicType::Set.as_str(),
-            IntrinsicType::Range.as_str(),
+            varn_core::TypeTag::Array.name(),
+            varn_core::TypeTag::Str.name(),
+            varn_core::TypeTag::Int.name(),
+            varn_core::TypeTag::Float.name(),
+            varn_core::TypeTag::Decimal.name(),
+            varn_core::TypeTag::Bool.name(),
+            varn_core::TypeTag::Char.name(),
+            varn_core::TypeTag::Map.name(),
+            varn_core::TypeTag::Set.name(),
+            varn_core::TypeTag::Range.name(),
             varn_core::well_known::ERROR,
             varn_core::well_known::TYPE_ERROR,
             varn_core::well_known::RANGE_ERROR,

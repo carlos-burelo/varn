@@ -221,23 +221,22 @@ impl Type {
     // ── Everything else needs to read the shape via the table ─────────────
 
     pub fn stdlib_key<'t>(&self, table: &'t CheckerTyTable) -> Option<&'t str> {
-        use varn_core::IntrinsicType as I;
         match table.get(self.0) {
             TypeKind::Primitive(p) => match p {
-                varn_core::LangPrimitive::Int => Some(I::Int.as_str()),
-                varn_core::LangPrimitive::Float => Some(I::Float.as_str()),
-                varn_core::LangPrimitive::Decimal => Some(I::Decimal.as_str()),
-                varn_core::LangPrimitive::BigInt => Some(I::BigInt.as_str()),
-                varn_core::LangPrimitive::Str => Some(I::Str.as_str()),
-                varn_core::LangPrimitive::Char => Some(I::Char.as_str()),
-                varn_core::LangPrimitive::Bool => Some(I::Bool.as_str()),
+                varn_core::LangPrimitive::Int => Some(varn_core::LangPrimitive::Int.name()),
+                varn_core::LangPrimitive::Float => Some(varn_core::LangPrimitive::Float.name()),
+                varn_core::LangPrimitive::Decimal => Some(varn_core::LangPrimitive::Decimal.name()),
+                varn_core::LangPrimitive::BigInt => Some(varn_core::LangPrimitive::BigInt.name()),
+                varn_core::LangPrimitive::Str => Some(varn_core::LangPrimitive::Str.name()),
+                varn_core::LangPrimitive::Char => Some(varn_core::LangPrimitive::Char.name()),
+                varn_core::LangPrimitive::Bool => Some(varn_core::LangPrimitive::Bool.name()),
                 varn_core::LangPrimitive::Null
                 | varn_core::LangPrimitive::Void
                 | varn_core::LangPrimitive::Never
                 | varn_core::LangPrimitive::Dynamic => None,
             },
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Some(I::Bytes.as_str()),
-            TypeKind::Array(_) => Some(I::Array.as_str()),
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Some(varn_core::BuiltinType::Bytes.name()),
+            TypeKind::Array(_) => Some(varn_core::BuiltinType::Array.name()),
             _ => None,
         }
     }

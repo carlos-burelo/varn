@@ -230,7 +230,7 @@ impl<'r> Checker<'r> {
                     return None;
                 }
 
-                if name.as_ref() == varn_core::IntrinsicType::Str.as_str()
+                if name.as_ref() == varn_core::LangPrimitive::Str.name()
                     && key == varn_core::MemberKey::Length.as_str()
                 {
                     return Some((Type::Int, None));
@@ -531,7 +531,7 @@ impl<'r> Checker<'r> {
             TypeKind::Array(inner) => {
                 let atom = self
                     .resolver
-                    .intern(varn_core::IntrinsicType::Array.as_str());
+                    .intern(varn_core::BuiltinType::Array.name());
                 let array_ty = Type::generic_atom(
                     atom,
                     vec![Type(inner, false)],
@@ -544,14 +544,14 @@ impl<'r> Checker<'r> {
                 if key == varn_core::MemberKey::Length.as_str() {
                     Some((Type::Int, None))
                 } else {
-                    intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
+                    intrinsic_member_info(bind, varn_core::LangPrimitive::Str.name(), key)
                 }
             }
             TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
                 if key == varn_core::MemberKey::Length.as_str() {
                     Some((Type::Int, None))
                 } else {
-                    intrinsic_member_info(bind, varn_core::IntrinsicType::Bytes.as_str(), key)
+                    intrinsic_member_info(bind, varn_core::BuiltinType::Bytes.name(), key)
                 }
             }
             // A tuple's length is known at check time — it is the arity of the
@@ -572,7 +572,7 @@ impl<'r> Checker<'r> {
                 } else if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) {
                     let atom = self
                         .resolver
-                        .intern(varn_core::IntrinsicType::Range.as_str());
+                        .intern(varn_core::BuiltinType::Range.name());
                     let range_ty =
                         Type::named_atom(atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     self.find_member_info_uncached(&range_ty, key, bind)

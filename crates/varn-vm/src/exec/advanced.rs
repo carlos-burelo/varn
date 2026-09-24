@@ -1,7 +1,7 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use varn_core::{IntrinsicType, TypeTag};
+use varn_core::{TypeTag};
 use varn_types::value::RuntimeSymbol;
 use varn_types::{ClassObj, NativeCtx, Value};
 
@@ -40,24 +40,24 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     };
 
     match cls.name.as_str() {
-        n if n == IntrinsicType::Str.as_str() => {
+        n if n == varn_core::TypeTag::Str.name() => {
             return obj.is_sso()
                 || (obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Str(_))))
         }
-        n if n == IntrinsicType::Int.as_str() => {
+        n if n == varn_core::TypeTag::Int.name() => {
             return obj.is_int()
                 || (obj.is_f64() && {
                     let f = obj.as_f64();
                     f == f.floor()
                 })
         }
-        n if n == IntrinsicType::Float.as_str() => return obj.is_f64() || obj.is_int(),
-        n if n == IntrinsicType::Bool.as_str() => return obj.is_bool(),
-        n if n == IntrinsicType::Null.as_str() => return obj.is_null(),
-        n if n == IntrinsicType::Char.as_str() => {
+        n if n == varn_core::TypeTag::Float.name() => return obj.is_f64() || obj.is_int(),
+        n if n == varn_core::TypeTag::Bool.name() => return obj.is_bool(),
+        n if n == varn_core::TypeTag::Null.name() => return obj.is_null(),
+        n if n == varn_core::TypeTag::Char.name() => {
             return obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Char(_)))
         }
-        n if n == IntrinsicType::Decimal.as_str() => {
+        n if n == varn_core::TypeTag::Decimal.name() => {
             return obj.is_heap()
                 && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Decimal(_)))
         }

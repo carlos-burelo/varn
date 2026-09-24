@@ -375,12 +375,11 @@ fn val(v: Value) -> String {
 }
 
 fn ty(t: HirType) -> &'static str {
-    use varn_core::IntrinsicType;
     match t {
-        HirType::Int => IntrinsicType::Int.as_str(),
-        HirType::Float => IntrinsicType::Float.as_str(),
-        HirType::Bool => IntrinsicType::Bool.as_str(),
-        HirType::Str => IntrinsicType::Str.as_str(),
+        HirType::Int => varn_core::LangPrimitive::Int.name(),
+        HirType::Float => varn_core::LangPrimitive::Float.name(),
+        HirType::Bool => varn_core::LangPrimitive::Bool.name(),
+        HirType::Str => varn_core::LangPrimitive::Str.name(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
         // Nested TyIds need the module's TyTable to render; the dump shows

@@ -229,13 +229,13 @@ fn uninitialized_obj() -> ObjRef {
     uninitialized_panic(varn_core::TypeTag::Object.name())
 }
 fn uninitialized_arr() -> ArrayRef {
-    uninitialized_panic(varn_core::IntrinsicType::Array.as_str())
+    uninitialized_panic(varn_core::TypeTag::Array.name())
 }
 fn uninitialized_map() -> MapRef {
-    uninitialized_panic(varn_core::IntrinsicType::Map.as_str())
+    uninitialized_panic(varn_core::TypeTag::Map.name())
 }
 fn uninitialized_set() -> SetRef {
-    uninitialized_panic(varn_core::IntrinsicType::Set.as_str())
+    uninitialized_panic(varn_core::TypeTag::Set.name())
 }
 
 use std::cell::Cell;

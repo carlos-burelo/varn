@@ -147,7 +147,7 @@ impl BindResult {
     /// slot layout in the VM heap (excluding intrinsic / primitive built-in types).
     #[inline]
     pub fn is_user_class(&self, name: &str) -> bool {
-        if varn_core::IntrinsicType::is_intrinsic(name) {
+        if varn_core::is_lang_type_name(name) {
             return false;
         }
         self.get_class_entry(name)

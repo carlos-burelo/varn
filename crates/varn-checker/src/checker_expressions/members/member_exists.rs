@@ -90,7 +90,7 @@ impl<'r> Checker<'r> {
                 }
                 if let Some(b) = &bind.core {
                     if let Some(members) =
-                        b.class_members.get(varn_core::IntrinsicType::Str.as_str())
+                        b.class_members.get(varn_core::LangPrimitive::Str.name())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -106,7 +106,7 @@ impl<'r> Checker<'r> {
                 if let Some(b) = &bind.core {
                     if let Some(members) = b
                         .class_members
-                        .get(varn_core::IntrinsicType::Bytes.as_str())
+                        .get(varn_core::BuiltinType::Bytes.name())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -169,7 +169,7 @@ impl<'r> Checker<'r> {
                     }
                 }
 
-                if name.as_ref() == varn_core::IntrinsicType::Str.as_str()
+                if name.as_ref() == varn_core::LangPrimitive::Str.name()
                     && key == varn_core::MemberKey::Length.as_str()
                 {
                     return true;
@@ -302,7 +302,7 @@ impl<'r> Checker<'r> {
                 if let Some(b) = &bind.core {
                     if let Some(members) = b
                         .class_members
-                        .get(varn_core::IntrinsicType::Array.as_str())
+                        .get(varn_core::BuiltinType::Array.name())
                     {
                         return members.members.iter().any(|m| m.name.as_ref() == key);
                     }

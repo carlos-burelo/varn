@@ -3,7 +3,7 @@ mod helpers;
 use crate::binder::{BindResult, BindView};
 use crate::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
-use varn_core::{IntrinsicType, MemberKey, TypeKind};
+use varn_core::{MemberKey, TypeKind};
 
 use self::helpers::{
     class_members_match_object, compatible_named, is_known_named, named_members,
@@ -75,7 +75,7 @@ fn array_element_type(
         TypeKind::Array(inner) => Some(Type(inner, false)),
         TypeKind::Generic(name, args, _)
             if table.get_list(args).len() == 1
-                && interner.is_some_and(|it| it.resolve(name) == IntrinsicType::Array.as_str()) =>
+                && interner.is_some_and(|it| it.resolve(name) == varn_core::BuiltinType::Array.name()) =>
         {
             Some(Type(table.get_list(args)[0], false))
         }
@@ -295,7 +295,7 @@ pub(super) fn types_compatible_impl(
 
         (TypeKind::Generic(name, args, _origin), TypeKind::Array(inner)) => {
             let list = table.get_list(args);
-            if is_intrinsic(bind, name, IntrinsicType::Array) && list.len() == 1 {
+            if is_intrinsic(bind, name, varn_core::BuiltinType::Array.name()) && list.len() == 1 {
                 if t(inner).is_dynamic() {
                     true
                 } else {
@@ -307,7 +307,7 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Array(inner), TypeKind::Generic(name, args, _origin)) => {
             let list = table.get_list(args);
-            if is_intrinsic(bind, name, IntrinsicType::Array) && list.len() == 1 {
+            if is_intrinsic(bind, name, varn_core::BuiltinType::Array.name()) && list.len() == 1 {
                 types_compatible_impl(&t(inner), &t(list[0]), bind, cache, in_progress, table)
             } else {
                 false
@@ -317,8 +317,8 @@ pub(super) fn types_compatible_impl(
         (TypeKind::Generic(n1, a1, _o1), TypeKind::Generic(n2, a2, _o2)) => {
             let l1 = table.get_list(a1);
             let l2 = table.get_list(a2);
-            if is_intrinsic(bind, n1, IntrinsicType::Array)
-                && is_intrinsic(bind, n2, IntrinsicType::Array)
+            if is_intrinsic(bind, n1, varn_core::BuiltinType::Array.name())
+                && is_intrinsic(bind, n2, varn_core::BuiltinType::Array.name())
                 && l1.len() == 1
                 && l2.len() == 1
             {
@@ -413,7 +413,7 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Generic(dn, args, _), TypeKind::Object(inf_fields)) => {
             let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, dn, IntrinsicType::Map)
+            if !is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name())
                 || !(arg_ids.len() == 1 || arg_ids.len() == 2)
             {
                 false
@@ -469,7 +469,7 @@ pub(super) fn types_compatible_impl(
         (TypeKind::Builtin(varn_core::BuiltinType::Map), TypeKind::Object(_))
         | (TypeKind::Object(_), TypeKind::Builtin(varn_core::BuiltinType::Map)) => true,
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => {
-            if is_intrinsic(bind, dn, IntrinsicType::Map) {
+            if is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name()) {
                 true
             } else if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
                 let origin_d_s = origin_d.and_then(|o| resolve_atom(Some(bind), o));
@@ -491,7 +491,7 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Object(decl_fields), TypeKind::Generic(in_, args, _)) => {
             let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, in_, IntrinsicType::Map)
+            if !is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name())
                 || !(arg_ids.len() == 1 || arg_ids.len() == 2)
             {
                 false
@@ -526,7 +526,7 @@ pub(super) fn types_compatible_impl(
             }
         }
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i)) => {
-            if is_intrinsic(bind, in_, IntrinsicType::Map) {
+            if is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name()) {
                 true
             } else if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
                 let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));
@@ -547,7 +547,7 @@ pub(super) fn types_compatible_impl(
             }
         }
         (TypeKind::Named(dn, dn_origin), _) => {
-            if is_intrinsic(bind, dn, IntrinsicType::Map) {
+            if is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name()) {
                 true
             } else {
                 named_fallback(
@@ -564,7 +564,7 @@ pub(super) fn types_compatible_impl(
             }
         }
         (_, TypeKind::Named(in_, in_origin)) => {
-            if is_intrinsic(bind, in_, IntrinsicType::Map) {
+            if is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name()) {
                 true
             } else {
                 named_fallback(
@@ -582,7 +582,7 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Generic(name, args, _origin), _) => {
             let list = table.get_list(args);
-            if is_intrinsic(bind, name, IntrinsicType::Task) && list.len() == 1 {
+            if is_intrinsic(bind, name, varn_core::BuiltinType::Task.name()) && list.len() == 1 {
                 types_compatible_impl(&t(list[0]), inferred, bind, cache, in_progress, table)
             } else {
                 false
@@ -904,8 +904,8 @@ fn resolve_atom(bind: Option<&BindView>, atom: varn_core::Atom) -> Option<String
 /// `true` when `atom` names the intrinsic `intrinsic`, without resolving
 /// `atom` itself: a non-panicking lookup of the *known* side, so a foreign
 /// (or not-yet-published) atom simply doesn't match instead of crashing.
-fn is_intrinsic(bind: Option<&BindView>, atom: varn_core::Atom, intrinsic: IntrinsicType) -> bool {
-    ctx_interner(bind).is_some_and(|i| i.get(intrinsic.as_str()) == Some(atom))
+fn is_intrinsic(bind: Option<&BindView>, atom: varn_core::Atom, name: &str) -> bool {
+    ctx_interner(bind).is_some_and(|i| i.get(name) == Some(atom))
 }
 
 fn m_ty(m: &crate::types::ClassMemberInfo) -> Type {

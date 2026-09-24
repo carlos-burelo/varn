@@ -4,7 +4,6 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
-use varn_core::IntrinsicType;
 use varn_core::TypeKind;
 
 #[allow(clippy::too_many_arguments)]
@@ -197,7 +196,7 @@ pub(crate) fn infer_call_type(
                     }
                     return Some(Type::generic(Arc::from(name_str), args, resolver, table));
                 }
-                if name_str == IntrinsicType::Map.as_str() {
+                if name_str == varn_core::BuiltinType::Map.name() {
                     return Some(Type::generic(
                         Arc::from(name_str),
                         vec![Type::Dynamic],
@@ -240,8 +239,8 @@ pub(crate) fn infer_call_type(
             )?;
             match table.get(ty.0) {
                 TypeKind::Generic(name, args, _)
-                    if (interner.get(IntrinsicType::Task.as_str()) == Some(name)
-                        || interner.get(IntrinsicType::TaskHandle.as_str()) == Some(name))
+                    if (interner.get(varn_core::BuiltinType::Task.name()) == Some(name)
+                        || interner.get(varn_core::BuiltinType::TaskHandle.name()) == Some(name))
                         && table.get_list(args).len() == 1 =>
                 {
                     Some(Type(table.get_list(args)[0], false))

@@ -3,21 +3,20 @@
 
 use std::sync::Arc;
 
-use varn_core::IntrinsicType;
 
 /// Serde variant labels for [`Literal`], one per kind, sourced from the single
-/// canonical [`IntrinsicType`] names. Round-trip keys on the numeric index, so
+/// canonical `TypeTag` names. Round-trip keys on the numeric index, so
 /// these are identifiers only — but they stay the one canonical representation.
 static LITERAL_VARIANTS: [&str; 9] = [
-    IntrinsicType::Null.as_str(),
-    IntrinsicType::Bool.as_str(),
-    IntrinsicType::Int.as_str(),
-    IntrinsicType::Float.as_str(),
-    IntrinsicType::Str.as_str(),
-    IntrinsicType::BigInt.as_str(),
-    IntrinsicType::Decimal.as_str(),
-    IntrinsicType::Symbol.as_str(),
-    IntrinsicType::Char.as_str(),
+    varn_core::TypeTag::Null.name(),
+    varn_core::TypeTag::Bool.name(),
+    varn_core::TypeTag::Int.name(),
+    varn_core::TypeTag::Float.name(),
+    varn_core::TypeTag::Str.name(),
+    varn_core::TypeTag::BigInt.name(),
+    varn_core::TypeTag::Decimal.name(),
+    varn_core::TypeTag::Symbol.name(),
+    varn_core::TypeTag::Char.name(),
 ];
 
 pub(super) mod rc_str_serde {

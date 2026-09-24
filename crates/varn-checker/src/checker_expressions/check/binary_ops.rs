@@ -10,7 +10,7 @@ use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
 use varn_core::source::SourceRange;
-use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind};
+use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 impl<'r> Checker<'r> {
     pub(super) fn check_binary_operands(
@@ -36,7 +36,7 @@ impl<'r> Checker<'r> {
         {
             let is_numeric = |t: &Type, checker: &Checker| {
                 t.is_numeric()
-                    || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(n) == IntrinsicType::Decimal.as_str())
+                    || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(n) == varn_core::LangPrimitive::Decimal.name())
             };
             let both_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
             let (l_eff, r_eff) = crate::binder::type_inference::adopt_literal_operands(

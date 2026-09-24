@@ -252,13 +252,13 @@ impl<'r> Checker<'r> {
                     TypeKind::Array(inner) => Type(inner, false),
                     TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
                     TypeKind::Named(name, _)
-                        if bind.interner.get(varn_core::IntrinsicType::Str.as_str())
+                        if bind.interner.get(varn_core::LangPrimitive::Str.name())
                             == Some(name) =>
                     {
                         Type::Char
                     }
                     TypeKind::Generic(name, args, _)
-                        if bind.interner.get(varn_core::IntrinsicType::Map.as_str())
+                        if bind.interner.get(varn_core::BuiltinType::Map.name())
                             == Some(name)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {

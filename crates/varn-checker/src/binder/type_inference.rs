@@ -95,7 +95,7 @@ pub fn infer_expr_type(
             match table.get(inner.0) {
                 TypeKind::Generic(name, args, _)
                     if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                        i.get(varn_core::IntrinsicType::Task.as_str()) == Some(name)
+                        i.get(varn_core::BuiltinType::Task.name()) == Some(name)
                     }) && table.get_list(args).len() == 1 =>
                 {
                     Type(table.get_list(args)[0], false)
@@ -261,14 +261,14 @@ fn infer_member(
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
             TypeKind::Named(name, _)
                 if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                    i.get(varn_core::IntrinsicType::Str.as_str()) == Some(name)
+                    i.get(varn_core::LangPrimitive::Str.name()) == Some(name)
                 }) =>
             {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
                 if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                    i.get(varn_core::IntrinsicType::Map.as_str()) == Some(name)
+                    i.get(varn_core::BuiltinType::Map.name()) == Some(name)
                 }) =>
             {
                 let arg_ids = table.get_list(args).to_vec();
@@ -494,7 +494,7 @@ fn infer_new(
             .and_then(|c| c.source_file())
             .and_then(|s| resolver.map(|r| r.intern(s)));
         if type_args.is_empty() {
-            if name_str == varn_core::IntrinsicType::Map.as_str() {
+            if name_str == varn_core::BuiltinType::Map.name() {
                 return Type::generic_atom(*name, vec![Type::Dynamic], origin, table);
             }
             return Type::named_with_origin_atom(*name, origin, table);

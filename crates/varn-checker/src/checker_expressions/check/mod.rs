@@ -139,7 +139,7 @@ impl<'r> Checker<'r> {
                     for ep in &expected_fn.params {
                         if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
                             let n_str = bind.interner.resolve(n);
-                            if varn_core::IntrinsicType::from_str(n_str).is_none() {
+                            if !varn_core::is_lang_type_name(n_str) {
                                 injected_type_params.push(Arc::from(n_str));
                             }
                         }
@@ -148,7 +148,7 @@ impl<'r> Checker<'r> {
                         self.ty_table.get(expected_fn.return_type)
                     {
                         let n_str = bind.interner.resolve(n);
-                        if varn_core::IntrinsicType::from_str(n_str).is_none() {
+                        if !varn_core::is_lang_type_name(n_str) {
                             injected_type_params.push(Arc::from(n_str));
                         }
                     }
