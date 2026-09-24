@@ -53,7 +53,7 @@ pub(super) fn emit_value(
             chunk.emit_rc(OpCode::LoadConst, d, idx, line);
         }
         InstKind::ConstDecimal(dec) => {
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Decimal(*dec)));
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Decimal(dec.clone())));
             chunk.emit_rc(OpCode::LoadConst, d, idx, line);
         }
         InstKind::ConstBigInt(n) => {

@@ -204,10 +204,12 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             _ => None,
         },
         (InstKind::ConstDecimal(x), InstKind::ConstDecimal(y)) => match op {
-            Add => x.checked_add(*y).map(InstKind::ConstDecimal),
-            Sub => x.checked_sub(*y).map(InstKind::ConstDecimal),
-            Mul => x.checked_mul(*y).map(InstKind::ConstDecimal),
-            Div => x.checked_div(*y).map(InstKind::ConstDecimal),
+            Add => Some(InstKind::ConstDecimal(x + y)),
+            Sub => Some(InstKind::ConstDecimal(x - y)),
+            Mul => Some(InstKind::ConstDecimal(x * y)),
+            Div => varn_core::numeric_big::div_decimal(x, y)
+                .ok()
+                .map(InstKind::ConstDecimal),
             Eq => Some(InstKind::ConstBool(x == y)),
             Ne => Some(InstKind::ConstBool(x != y)),
             Lt => Some(InstKind::ConstBool(x < y)),

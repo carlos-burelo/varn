@@ -1,7 +1,8 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal as Decimal;
+use num_traits::Zero;
 use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
 
 /// The `integer overflow` error, naming the operands so the message points at
@@ -63,7 +64,7 @@ fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
         return None;
     }
     match heap.get(v.as_heap_idx()) {
-        Some(HeapObj::Decimal(d)) => Some(**d),
+        Some(HeapObj::Decimal(d)) => Some((**d).clone()),
         _ => None,
     }
 }
@@ -179,7 +180,9 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             if y.is_zero() {
                 return Err(RuntimeError::division_by_zero("division by zero"));
             }
-            return Ok(heap.alloc_decimal(x / y));
+            let q = varn_core::numeric_big::div_decimal(&x, &y)
+                .map_err(|f| int_div_fault(f, "/", 0, 0))?;
+            return Ok(heap.alloc_decimal(q));
         }
     }
     Ok(VmValue::from_f64(heap.to_f64_val(a) / heap.to_f64_val(b)))
@@ -198,9 +201,6 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
-            // The zero guard the decimal arms used to lack, while `div`'s had
-            // it. `Decimal % 0` panics inside rust_decimal, so the omission
-            // turned a Varn-level error into a process abort.
             if y.is_zero() {
                 return Err(RuntimeError::division_by_zero("modulo by zero"));
             }

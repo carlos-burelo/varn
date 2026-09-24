@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal as Decimal;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
 

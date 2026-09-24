@@ -44,7 +44,7 @@ pub struct HeapInner {
     pub(super) empty_map: Option<MapRef>,
     pub(super) set_interner: FxHashMap<SetRef, u32>,
     pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, u32>,
-    pub(super) decimal_interner: FxHashMap<rust_decimal::Decimal, u32>,
+    pub(super) decimal_interner: FxHashMap<bigdecimal::BigDecimal, u32>,
     pub(super) char_interner: FxHashMap<char, u32>,
     pub(super) gc_collector: Option<GcCollector>,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,

@@ -63,4 +63,25 @@ assert("int neq bigint", 42n !== 43n)
 function isBigInt(v: bigint): bool { return v is bigint }
 assert("bigint is bigint", isBigInt(100n))
 
+// ── Arbitrary precision (ADR-0016) ───────────────────────────────
+const wide: decimal = 12345678901234567890.123456789012345678d
+assert("decimal beyond 28 digits", (wide + 0.000000000000000001d).toString() === "12345678901234567890.123456789012345679")
+assert("decimal exact product", (1.5d * 2.0d).toString() === "3.00")
+assert("decimal terminating division is exact", (1.0d / 4.0d) === 0.25d)
+assert("decimal division rounds to 34 digits", (1.0d / 3.0d).toString() === "0.3333333333333333333333333333333333")
+assert("decimal remainder keeps dividend sign", (-7.5d % 2.0d) === -1.5d)
+assert("decimal equality is numeric", 1.0d === 1.00d)
+assert("decimal pow", (1.1d).pow(2) === 1.21d)
+assert("decimal parse", decimal.parse(" 2.50 ") === 2.5d)
+assert("decimal tryParse failure", decimal.tryParse("x") === null)
+
+function decKind(f: () => decimal): str {
+    try { f(); return "none" } catch (e) {
+        if (e instanceof DivisionByZero) { return "zero" }
+        return "other"
+    }
+}
+assert("decimal / 0 raises", decKind(() => 1.0d / 0.0d) === "zero")
+assert("decimal % 0 raises", decKind(() => 1.0d % 0.0d) === "zero")
+
 print("[PASSED] 35. Decimal & BigInt")

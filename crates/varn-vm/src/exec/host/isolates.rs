@@ -395,7 +395,7 @@ pub(super) fn to_sendable(
                 Ok(varn_types::value::SendValue::Set(items))
             }
             Some(HeapObj::BigInt(b)) => Ok(varn_types::value::SendValue::BigInt((**b).clone())),
-            Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal(**d)),
+            Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal((**d).clone())),
             Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
             Some(HeapObj::EnumVariant(d)) => {
                 // Payload may hold heap refs — walk it with the

@@ -41,7 +41,7 @@ pub enum HeapObj {
     Symbol(RuntimeSymbol),
     EnumVariant(Box<EnumVariantData>),
     BigInt(Box<num_bigint::BigInt>),
-    Decimal(Box<rust_decimal::Decimal>),
+    Decimal(Box<bigdecimal::BigDecimal>),
     Char(char),
     Generator(GeneratorObj),
     Spread(VmValue),

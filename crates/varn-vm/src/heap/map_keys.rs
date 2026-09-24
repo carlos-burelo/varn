@@ -79,8 +79,8 @@ impl HeapInner {
                 MapKey(self.intern(Value::BigInt(b)))
             }
             Some(HeapObj::Decimal(d)) => {
-                let d = **d;
-                MapKey(self.intern(Value::Decimal(Box::new(d))))
+                let d = d.clone();
+                MapKey(self.intern(Value::Decimal(d)))
             }
             _ => MapKey(v),
         }

@@ -53,7 +53,7 @@ pub enum Literal {
     Float(f64),
     Str(Arc<str>),
     BigInt(num_bigint::BigInt),
-    Decimal(rust_decimal::Decimal),
+    Decimal(bigdecimal::BigDecimal),
     Symbol(crate::value::RuntimeSymbol),
     Char(char),
 }
@@ -68,7 +68,8 @@ impl PartialEq for Literal {
             (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
             (Self::Str(a), Self::Str(b)) => a == b,
             (Self::BigInt(a), Self::BigInt(b)) => a == b,
-            (Self::Decimal(a), Self::Decimal(b)) => a == b,
+            // Representation identity: `1.0d` and `1.00d` print differently.
+            (Self::Decimal(a), Self::Decimal(b)) => a.as_bigint_and_scale() == b.as_bigint_and_scale(),
             (Self::Symbol(a), Self::Symbol(b)) => a == b,
             (Self::Char(a), Self::Char(b)) => a == b,
             _ => false,
@@ -93,10 +94,12 @@ impl serde::Serialize for Literal {
             Literal::BigInt(n) => {
                 ser.serialize_newtype_variant("Literal", 5, LITERAL_VARIANTS[5], n)
             }
-            Literal::Decimal(d) => {
-                let bits = d.serialize();
-                ser.serialize_newtype_variant("Literal", 6, LITERAL_VARIANTS[6], &bits)
-            }
+            Literal::Decimal(d) => ser.serialize_newtype_variant(
+                "Literal",
+                6,
+                LITERAL_VARIANTS[6],
+                &d.to_plain_string(),
+            ),
             Literal::Symbol(s) => {
                 ser.serialize_newtype_variant("Literal", 7, LITERAL_VARIANTS[7], s)
             }
@@ -132,8 +135,10 @@ impl<'de> serde::Deserialize<'de> for Literal {
                     ))),
                     5 => Ok(Literal::BigInt(variant.newtype_variant()?)),
                     6 => {
-                        let bits: [u8; 16] = variant.newtype_variant()?;
-                        Ok(Literal::Decimal(rust_decimal::Decimal::deserialize(bits)))
+                        let text: String = variant.newtype_variant()?;
+                        text.parse()
+                            .map(Literal::Decimal)
+                            .map_err(|_| de::Error::custom("malformed decimal literal"))
                     }
                     7 => Ok(Literal::Symbol(variant.newtype_variant()?)),
                     8 => Ok(Literal::Char(variant.newtype_variant()?)),
@@ -159,7 +164,7 @@ impl std::hash::Hash for Literal {
             Self::Float(f) => f.to_bits().hash(state),
             Self::Str(s) => s.hash(state),
             Self::BigInt(b) => b.hash(state),
-            Self::Decimal(d) => d.hash(state),
+            Self::Decimal(d) => d.as_bigint_and_scale().hash(state),
             Self::Symbol(s) => s.hash(state),
             Self::Char(c) => c.hash(state),
         }

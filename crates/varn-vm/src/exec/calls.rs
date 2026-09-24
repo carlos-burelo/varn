@@ -24,7 +24,7 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
                     Literal::Float(f) => VmValue::from_f64(*f),
                     Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
                     Literal::BigInt(n) => heap.intern(Value::BigInt(Box::new(n.clone()))),
-                    Literal::Decimal(d) => heap.intern(Value::Decimal(Box::new(*d))),
+                    Literal::Decimal(d) => heap.intern(Value::Decimal(Box::new(d.clone()))),
                     Literal::Symbol(s) => heap.intern(Value::Symbol(s.clone())),
                     Literal::Char(c) => heap.intern(Value::Char(*c)),
                 },

@@ -2,7 +2,7 @@ use crate::value::{
     alloc_array, alloc_map, alloc_set, new_object, nv_to_value, value_to_nv, ObjRef, Value,
 };
 use crate::vm_value::VmValue;
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal as Decimal;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -69,7 +69,7 @@ impl Value {
             Value::Float(f) => Ok(SendValue::Float(f.to_bits())),
             Value::Str(s) => Ok(SendValue::Str(s.to_string())),
             Value::BigInt(b) => Ok(SendValue::BigInt((**b).clone())),
-            Value::Decimal(d) => Ok(SendValue::Decimal(**d)),
+            Value::Decimal(d) => Ok(SendValue::Decimal((**d).clone())),
             Value::Char(c) => Ok(SendValue::Char(*c)),
             Value::Array(arr) => {
                 let mut items = Vec::new();
@@ -180,7 +180,7 @@ impl SendValue {
             SendValue::Float(bits) => Value::Float(f64::from_bits(*bits)),
             SendValue::Str(s) => Value::Str(Arc::from(s.as_str())),
             SendValue::BigInt(b) => Value::BigInt(Box::new(b.clone())),
-            SendValue::Decimal(d) => Value::Decimal(Box::new(*d)),
+            SendValue::Decimal(d) => Value::Decimal(Box::new(d.clone())),
             SendValue::Char(c) => Value::Char(*c),
             SendValue::Array(items) => {
                 let array_ref = alloc_array();
@@ -241,7 +241,7 @@ impl SendValue {
             SendValue::Float(bits) => ctx.intern(Value::Float(f64::from_bits(*bits))),
             SendValue::Str(s) => ctx.alloc_str(s),
             SendValue::BigInt(b) => ctx.intern(Value::BigInt(Box::new(b.clone()))),
-            SendValue::Decimal(d) => ctx.intern(Value::Decimal(Box::new(*d))),
+            SendValue::Decimal(d) => ctx.intern(Value::Decimal(Box::new(d.clone()))),
             SendValue::Char(c) => ctx.intern(Value::Char(*c)),
             SendValue::Array(items) => {
                 let mut vm_items = Vec::new();

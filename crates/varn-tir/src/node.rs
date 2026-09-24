@@ -250,7 +250,7 @@ pub enum TirExprKind {
     },
 
     /// A `decimal` literal, carried as its source text (minus the `d` suffix)
-    /// — the backend parses it, keeping this crate free of `rust_decimal`.
+    /// — the backend parses it, keeping this crate free of a bignum dependency.
     DecimalLit(Arc<str>),
     /// A `bigint` literal as canonical base-10 digits (arbitrary precision;
     /// the TIR carries no bignum dependency).

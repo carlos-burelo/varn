@@ -49,7 +49,7 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Range(r)))
     }
 
-    pub(crate) fn alloc_decimal(&mut self, d: rust_decimal::Decimal) -> VmValue {
+    pub(crate) fn alloc_decimal(&mut self, d: bigdecimal::BigDecimal) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::Decimal(Box::new(d))))
     }
 

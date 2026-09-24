@@ -229,7 +229,7 @@ impl fmt::Display for Value {
             }
             Value::Str(s) => write!(f, "{s}"),
             Value::BigInt(n) => write!(f, "{n}n"),
-            Value::Decimal(d) => write!(f, "{d}"),
+            Value::Decimal(d) => f.write_str(&d.to_plain_string()),
             Value::Array(arr) => {
                 let v = arr.read();
                 write!(f, "[")?;

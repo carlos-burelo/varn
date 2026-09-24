@@ -13,9 +13,10 @@ export declare class decimal {
     isZero(): bool;
     isPositive(): bool;
     isNegative(): bool;
-    pow(exp: int): decimal;
-    toInt(): int;
+    @fallible pow(exp: int): decimal;
+    @fallible toInt(): int;
     toFloat(): float;
 
-    static parse(s: str): decimal;
+    @fallible static parse(s: str): decimal;
+    static tryParse(s: str): decimal?;
 }

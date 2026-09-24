@@ -277,7 +277,7 @@ impl HeapInner {
                 },
                 Some(HeapObj::Class(c)) => format!("[class {}]", c.name),
                 Some(HeapObj::BigInt(n)) => n.to_string(),
-                Some(HeapObj::Decimal(d)) => d.to_string(),
+                Some(HeapObj::Decimal(d)) => d.to_plain_string(),
                 _ => "[object]".into(),
             };
         }

@@ -29,8 +29,8 @@ fn heap_to_int(v: VmValue, heap: &Heap) -> VmResult<VmValue> {
             .map(VmValue::from_int)
             .map_err(|_| out_of_int_range(b)),
         Some(HeapObj::Decimal(d)) => {
-            use rust_decimal::prelude::ToPrimitive;
-            d.trunc()
+            use num_traits::ToPrimitive;
+            d.with_scale_round(0, bigdecimal::RoundingMode::Down)
                 .to_i64()
                 .map(VmValue::from_int)
                 .ok_or_else(|| out_of_int_range(d))

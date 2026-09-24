@@ -53,7 +53,7 @@ impl HeapInner {
             }
             Value::Decimal(d) => {
                 let d_val = *d;
-                let packed = match self.decimal_interner.entry(d_val) {
+                let packed = match self.decimal_interner.entry(d_val.clone()) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => *e.insert(pack_old_idx(alloc_into(
                         &mut self.objects,
