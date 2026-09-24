@@ -159,15 +159,51 @@ fn build_classes(
     class_names: &[Arc<str>],
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
-    // `class_names` is parent-before-child, so a class's parent `ClassInfo` is
-    // already in `built` by the time we reach it — needed to lay inherited
-    // fields out first, with the slots the runtime's inherited shape uses.
-    let mut built: Vec<ClassInfo> = Vec::with_capacity(class_names.len());
-    for name in class_names {
-        let info = build_one_class(bind, table, interner, tt, names, name, signatures, &built);
-        built.push(info);
+    // A class is laid out after its parent: its fields and vtable extend the
+    // parent's, with the slots the runtime's inherited shape uses. Ids follow
+    // `class_names` (sorted); the build follows the `extends` chain.
+    let mut built: Vec<Option<ClassInfo>> = vec![None; class_names.len()];
+    for i in 0..class_names.len() {
+        build_with_parents(bind, table, interner, tt, names, class_names, i, signatures, &mut built);
     }
-    built
+    built.into_iter().map(|c| c.expect("every class is built")).collect()
+}
+
+/// Builds class `i` after its local ancestors. A cycle in `extends` (reported
+/// by the checker) leaves the class that closes it without parent info.
+#[allow(clippy::too_many_arguments)]
+fn build_with_parents(
+    bind: &BindResult,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &NameIndex,
+    class_names: &[Arc<str>],
+    i: usize,
+    signatures: &mut Vec<Signature>,
+    built: &mut [Option<ClassInfo>],
+) {
+    let mut chain = vec![i];
+    let mut cur = i;
+    while let Some(p) = bind
+        .class_parents
+        .get(&class_names[cur])
+        .and_then(|p| names.class_id(p))
+        .map(|id| id.0 as usize)
+    {
+        if built[p].is_some() || chain.contains(&p) {
+            break;
+        }
+        chain.push(p);
+        cur = p;
+    }
+    for &c in chain.iter().rev() {
+        if built[c].is_none() {
+            let info =
+                build_one_class(bind, table, interner, tt, names, &class_names[c], signatures, built);
+            built[c] = Some(info);
+        }
+    }
 }
 
 /// The binder's `type_members.classes[name].members` is already flattened —
@@ -184,11 +220,11 @@ fn build_one_class(
     names: &NameIndex,
     name: &Arc<str>,
     signatures: &mut Vec<Signature>,
-    built: &[ClassInfo],
+    built: &[Option<ClassInfo>],
 ) -> ClassInfo {
     let parent_name = bind.class_parents.get(name);
     let parent_id = parent_name.and_then(|p| names.class_id(p));
-    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize));
+    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize)?.as_ref());
     let mut inherited_fields: FxHashMap<Arc<str>, ()> = parent_info
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
         .unwrap_or_default();

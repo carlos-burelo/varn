@@ -122,6 +122,7 @@ import "./133-operator-capabilities.vn"
 import "./134-hashable-keys.vn"
 import "./135-callback-exceptions.vn"
 import "./136-enum-identity.vn"
+import "./137-class-build-order.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()
