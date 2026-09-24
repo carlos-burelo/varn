@@ -53,6 +53,7 @@ pub enum ErrorCode {
     InfiniteTypeExpansion = 3020,
     IntegerOverflow = 3021,
     VoidValueUsed = 3022,
+    ForbiddenRecordGeneric = 3023,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -244,6 +245,7 @@ impl ErrorCode {
             ErrorCode::CompilationInternalError => "compilation-internal-error",
             ErrorCode::IntegerOverflow => "integer-overflow",
             ErrorCode::VoidValueUsed => "void-value-used",
+            ErrorCode::ForbiddenRecordGeneric => "forbidden-record-generic",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

@@ -60,6 +60,7 @@ pub struct Binder<'r> {
     pub(crate) sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,
     pub(crate) extensions: Extensions,
     pub(crate) pending_enrich: Vec<PendingEnrich>,
+    reported_type_forms: rustc_hash::FxHashSet<u32>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
     /// Optimization-only element types proved for evolving empty-array
     /// locals (Task A0.3'); moved into `BindResult::evolved_array_types`.
@@ -310,6 +311,7 @@ impl<'r> Binder<'r> {
             sum_variant_fields: FxHashMap::default(),
             extensions: Extensions::default(),
             pending_enrich: Vec::new(),
+            reported_type_forms: Default::default(),
             array_watch: Vec::new(),
             evolved_array_types: FxHashMap::default(),
         };
@@ -366,6 +368,7 @@ impl<'r> Binder<'r> {
     /// checker's `compat` module), so swapping `self.ty_table` out for the
     /// call's duration is sound: nothing observes the gap.
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
+        self.reject_forbidden_type_forms(node);
         self.sync_ty_table();
         let mut table = std::mem::replace(
             std::sync::Arc::make_mut(&mut self.ty_table),
@@ -374,6 +377,41 @@ impl<'r> Binder<'r> {
         let result = resolve_type_node(node, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
         result
+    }
+
+    /// Spellings the language forbids outright, whatever they would resolve
+    /// to: `Record<K, V>` (spec §22 — `#{…}` is the only record form).
+    /// `resolve_type_node` resolves the form to `dynamic`, so no mismatch
+    /// cascades from it.
+    fn reject_forbidden_type_forms(&mut self, node: &TypeNode) {
+        use varn_core::TypeKind as K;
+        let children: Vec<&TypeNode> = match &node.kind {
+            K::Generic(name, args, _) => {
+                if self.interner.try_resolve(*name) == Some(varn_core::well_known::RECORD)
+                    && self.reported_type_forms.insert(node.range.start.offset)
+                {
+                    self.diagnostics.push(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::ForbiddenRecordGeneric,
+                            "`Record<K, V>` is not a type: use `Map<K, V>` for a keyed collection or `{ [key: K]: V }` for an indexable object",
+                        )
+                        .with_range(node.range),
+                    );
+                }
+                args.iter().collect()
+            }
+            K::Array(inner) | K::KeyOf(inner) => vec![inner.as_ref()],
+            K::Union(list) | K::Intersection(list) | K::Tuple(list) => list.iter().collect(),
+            K::Fn((params, ret)) => params
+                .iter()
+                .filter_map(|p| p.constraint.as_ref())
+                .chain(std::iter::once(ret.as_ref()))
+                .collect(),
+            _ => vec![],
+        };
+        for child in children {
+            self.reject_forbidden_type_forms(child);
+        }
     }
 
     /// Same rationale as [`Self::resolve_type`], for `infer_expr_type`.

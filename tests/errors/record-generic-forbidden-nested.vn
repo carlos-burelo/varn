@@ -1,0 +1,2 @@
+// expect: error[VN3023]
+function f(xs: Array<Record<str, int>>): int { return xs.length }

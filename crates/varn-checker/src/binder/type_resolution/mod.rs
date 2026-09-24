@@ -88,6 +88,10 @@ pub fn resolve_type_node(
         }
         TypeKind::Generic(name, args, _origin) => {
             let name_str = resolve_name(*name);
+            // Forbidden spelling (spec §22), reported by the binder.
+            if name_str.as_ref() == varn_core::well_known::RECORD {
+                return Type::Dynamic;
+            }
             let resolved_args: Vec<Type> = args
                 .iter()
                 .map(|m| resolve_type_node(m, ctx, table))
