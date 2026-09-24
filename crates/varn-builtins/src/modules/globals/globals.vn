@@ -28,6 +28,10 @@ export declare class DivisionByZero extends Error {
     constructor(message?: str);
 }
 
+export declare class MatchError extends Error {
+    constructor(message?: str);
+}
+
 export declare const NaN: float;
 export declare const Infinity: float;
 export declare const isIsolate: bool;

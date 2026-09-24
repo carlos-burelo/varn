@@ -7,16 +7,24 @@ pub enum RuntimeErrorKind {
     Error,
     IntegerOverflow,
     DivisionByZero,
+    /// A `match` used as a value where no arm matched.
+    MatchError,
 }
 
 impl RuntimeErrorKind {
-    pub const ALL: [Self; 3] = [Self::Error, Self::IntegerOverflow, Self::DivisionByZero];
+    pub const ALL: [Self; 4] = [
+        Self::Error,
+        Self::IntegerOverflow,
+        Self::DivisionByZero,
+        Self::MatchError,
+    ];
 
     pub const fn class_name(self) -> &'static str {
         match self {
             Self::Error => "Error",
             Self::IntegerOverflow => "IntegerOverflow",
             Self::DivisionByZero => "DivisionByZero",
+            Self::MatchError => "MatchError",
         }
     }
 }

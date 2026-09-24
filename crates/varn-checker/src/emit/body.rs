@@ -1259,7 +1259,10 @@ impl<'a> FnEmitter<'a> {
         dest: MatchDest,
     ) -> Vec<TirStmt> {
         let Some(case) = cases.get(i) else {
-            return vec![];
+            return match dest {
+                MatchDest::Statement => vec![],
+                MatchDest::Return | MatchDest::Assign(_) => vec![self.no_match_arm(s.span)],
+            };
         };
 
         self.scopes.push(FxHashMap::default());
@@ -1331,6 +1334,36 @@ impl<'a> FnEmitter<'a> {
                 }]
             }
         }
+    }
+
+    /// `throw new MatchError(…)`: a `match` that must produce a value and
+    /// found no arm would otherwise leave its result unwritten.
+    fn no_match_arm(&mut self, span: Span) -> TirStmt {
+        let class_name = varn_core::RuntimeErrorKind::MatchError.class_name();
+        let callee = TirExpr {
+            kind: TirExprKind::Var,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: self.resolve_name(class_name),
+            span,
+        };
+        let message = TirExpr {
+            kind: TirExprKind::StrLit(Arc::from("no match arm matched the value")),
+            ty: BackendTy::Str,
+            res: Resolution::None,
+            span,
+        };
+        TirStmt::Throw(TirExpr {
+            kind: TirExprKind::Call {
+                callee: Box::new(callee),
+                args: vec![TirArg::Expr(message)],
+            },
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::ByName {
+                name: Arc::from("<new>"),
+                why: DynReason::Unannotated,
+            },
+            span,
+        })
     }
 
     fn match_pattern(&mut self, s: &TirExpr, pat: &MatchPattern) -> (TirExpr, Vec<TirStmt>) {

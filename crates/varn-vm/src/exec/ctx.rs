@@ -277,6 +277,7 @@ impl ExecCtx {
             varn_core::well_known::RANGE_ERROR,
             varn_core::RuntimeErrorKind::IntegerOverflow.class_name(),
             varn_core::RuntimeErrorKind::DivisionByZero.class_name(),
+            varn_core::RuntimeErrorKind::MatchError.class_name(),
         ];
         for name in names {
             if let Some(nv) = self.globals.get_by_name(name) {

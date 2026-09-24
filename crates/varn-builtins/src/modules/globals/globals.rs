@@ -179,3 +179,18 @@ varn_contract! {
         }
     }
 }
+
+pub struct MatchErrorClass;
+
+varn_contract! {
+    module: "globals",
+    class: "MatchError",
+    extends: "Error",
+    contract: "src/modules/globals/globals.vn",
+    impl MatchErrorClass {
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, "MatchError");
+            this
+        }
+    }
+}

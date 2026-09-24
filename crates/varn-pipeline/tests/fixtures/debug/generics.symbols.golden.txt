@@ -27,6 +27,7 @@
   [2m1:0     [0m │ fn              │ [2m[core][0m [1massert              [0m │ [33m(label: str, cond: bool) => void[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAsyncIterator       [0m │ [33mAsyncIterator[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mTaskHandle          [0m │ [33mTaskHandle[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mMatchError          [0m │ [33mMatchError[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mDivisionByZero      [0m │ [33mDivisionByZero[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1misIsolate           [0m │ [33mbool[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mArray               [0m │ [33mArray[0m

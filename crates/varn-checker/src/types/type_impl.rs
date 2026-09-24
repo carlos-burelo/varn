@@ -68,6 +68,10 @@ impl Type {
         }
     }
 
+    pub fn literal(l: varn_core::TypeLiteral<varn_core::Atom>, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Literal(l)), false)
+    }
+
     pub fn builtin(b: varn_core::BuiltinType, table: &mut CheckerTyTable) -> Self {
         Type(table.intern(TypeKind::Builtin(b)), false)
     }

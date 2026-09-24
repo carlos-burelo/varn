@@ -1,10 +1,10 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
+use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::pattern::MatchPattern;
-use varn_core::ast::MatchCase;
+use varn_core::ast::{AstArena, ExprKind, MatchCase};
 use varn_core::source::SourceRange;
-use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
 
 impl<'r> Checker<'r> {
     pub(super) fn check_match_exhaustiveness(
@@ -21,19 +21,16 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        if let TypeKind::Union(list) = self.ty_table.get(subject_ty.0) {
-            let members: Vec<Type> = self
-                .ty_table
-                .get_list(list)
-                .iter()
-                .map(|id| Type(*id, false))
-                .collect();
+        if let Some(members) =
+            closed_members(subject_ty, std::sync::Arc::make_mut(&mut self.ty_table))
+        {
             let uncovered: Vec<String> = members
                 .iter()
                 .filter(|m| {
-                    !cases
-                        .iter()
-                        .any(|c| c.guard.is_none() && pattern_covers_type(&c.pattern, m))
+                    !cases.iter().any(|c| {
+                        c.guard.is_none()
+                            && pattern_covers(&c.pattern, m, &self.ty_table, self.ast_arena, bind)
+                    })
                 })
                 .map(|m| m.display(&self.ty_table, &bind.interner).to_string())
                 .collect();
@@ -185,6 +182,65 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn pattern_covers_type(pattern: &MatchPattern, _ty: &Type) -> bool {
-    matches!(pattern, MatchPattern::Wildcard)
+/// The members a closed subject splits into: union members, with `bool`
+/// (alone or inside a union) split into `true | false`. `None` for an open
+/// type, where only a catch-all arm can be exhaustive.
+fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type>> {
+    let split_bool = |t: Type, out: &mut Vec<Type>, table: &mut CheckerTyTable| {
+        if t == Type::Bool {
+            out.push(Type::literal(TypeLiteral::Bool(true), table));
+            out.push(Type::literal(TypeLiteral::Bool(false), table));
+        } else {
+            out.push(t);
+        }
+    };
+    let mut out = Vec::new();
+    match table.get(subject.0) {
+        TypeKind::Union(list) => {
+            for id in table.get_list(list).to_vec() {
+                split_bool(Type(id, false), &mut out, table);
+            }
+        }
+        TypeKind::Primitive(varn_core::LangPrimitive::Bool) => {
+            split_bool(Type::Bool, &mut out, table)
+        }
+        _ => return None,
+    }
+    Some(out)
+}
+
+fn pattern_covers(
+    pattern: &MatchPattern,
+    member: &Type,
+    table: &CheckerTyTable,
+    arena: &AstArena,
+    bind: &BindResult,
+) -> bool {
+    match pattern {
+        MatchPattern::Wildcard | MatchPattern::Identifier(_) => true,
+        MatchPattern::Literal(e) => match (table.get(member.0), &arena.expr(*e).kind) {
+            (TypeKind::Primitive(varn_core::LangPrimitive::Null), ExprKind::NullLiteral) => true,
+            (TypeKind::Literal(TypeLiteral::Str(a)), ExprKind::StrLiteral { value }) => {
+                bind.interner.try_resolve(a) == Some(value.as_str())
+            }
+            (TypeKind::Literal(TypeLiteral::Bool(b)), ExprKind::BoolLiteral { value }) => b == *value,
+            (TypeKind::Literal(TypeLiteral::Char(c)), ExprKind::CharLiteral { value }) => c == *value,
+            (TypeKind::Literal(TypeLiteral::Int(v)), _) => {
+                crate::types::numeric_literal::const_int_value(arena, *e) == Some(v)
+            }
+            _ => false,
+        },
+        MatchPattern::Type { type_name, .. } => {
+            let name = bind.interner.resolve(*type_name);
+            match table.get(member.0) {
+                TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
+                    bind.interner.try_resolve(n) == Some(name)
+                }
+                kind => kind.lang_name() == Some(name),
+            }
+        }
+        MatchPattern::Record { .. } | MatchPattern::Sequence(_) | MatchPattern::EnumVariant { .. } => {
+            false
+        }
+    }
 }
