@@ -1,44 +1,47 @@
-#[path = "host/buffer/buffer.rs"]
+#[path = "runtime/buffer/buffer.rs"]
 pub mod buffer;
-#[path = "host/compress/compress.rs"]
+#[path = "runtime/compress/compress.rs"]
 pub mod compress;
-#[path = "host/crypto/crypto.rs"]
+#[path = "runtime/crypto/crypto.rs"]
 pub mod crypto;
-#[path = "host/csv/csv.rs"]
+#[path = "runtime/csv/csv.rs"]
 pub mod csv;
-#[path = "host/ffi/ffi.rs"]
+#[path = "runtime/ffi/ffi.rs"]
 pub mod ffi;
-#[path = "host/fs/fs.rs"]
+#[path = "runtime/fs/fs.rs"]
 pub mod fs;
-#[path = "globals/globals.rs"]
+#[path = "core/errors/errors.rs"]
+pub mod errors;
+#[path = "core/globals/globals.rs"]
 pub mod globals;
-#[path = "host/io/io.rs"]
+#[path = "runtime/io/io.rs"]
 pub mod io;
-#[path = "host/json/json.rs"]
+#[path = "runtime/json/json.rs"]
 pub mod json;
-#[path = "host/math/math.rs"]
+#[path = "runtime/math/math.rs"]
 pub mod math;
-#[path = "host/net/net.rs"]
+#[path = "runtime/net/net.rs"]
 pub mod net;
-#[path = "primitives/mod.rs"]
-pub mod primitives;
-#[path = "host/process/process.rs"]
+
+#[path = "runtime/process/process.rs"]
 pub mod process;
-#[path = "host/reflect/reflect.rs"]
+#[path = "runtime/reflect/reflect.rs"]
 pub mod reflect;
-#[path = "host/regex/regex.rs"]
+#[path = "runtime/regex/regex.rs"]
 pub mod regex;
-#[path = "host/sqlite/sqlite.rs"]
+#[path = "runtime/sqlite/sqlite.rs"]
 pub mod sqlite;
-#[path = "host/sys/sys.rs"]
+#[path = "runtime/sys/sys.rs"]
 pub mod sys;
-#[path = "host/task/task.rs"]
+#[path = "runtime/task/task.rs"]
 pub mod task;
-#[path = "host/testing/testing.rs"]
+#[path = "runtime/testing/testing.rs"]
 pub mod testing;
-#[path = "host/time/time.rs"]
+#[path = "runtime/time/time.rs"]
 pub mod time;
-#[path = "host/ws/ws.rs"]
+#[path = "core/types/mod.rs"]
+pub mod types;
+#[path = "runtime/ws/ws.rs"]
 pub mod ws;
 
 use varn_types::{NativeCtx, VmValue};
@@ -69,9 +72,9 @@ pub fn force_link_builtins() -> usize {
     register_marker!(ffi, __VARN_LINK_MARKER_RUNTIME_FFI);
     register_marker!(fs, __VARN_LINK_MARKER_RUNTIME_FS);
     register_marker!(globals, __VARN_LINK_MARKER_GLOBALS);
-    register_marker!(globals, __VARN_LINK_MARKER_ERROR);
-    register_marker!(globals, __VARN_LINK_MARKER_TYPEERROR);
-    register_marker!(globals, __VARN_LINK_MARKER_RANGEERROR);
+    register_marker!(errors, __VARN_LINK_MARKER_ERROR);
+    register_marker!(errors, __VARN_LINK_MARKER_TYPEERROR);
+    register_marker!(errors, __VARN_LINK_MARKER_RANGEERROR);
     register_marker!(io, __VARN_LINK_MARKER_RUNTIME_IO);
     register_marker!(json, __VARN_LINK_MARKER_RUNTIME_JSON);
     register_marker!(math, __VARN_LINK_MARKER_RUNTIME_MATH);
@@ -90,18 +93,18 @@ pub fn force_link_builtins() -> usize {
     register_marker!(time, __VARN_LINK_MARKER_RUNTIME_TIME);
     register_marker!(ws, __VARN_LINK_MARKER_RUNTIME_WS);
 
-    register_marker!(primitives::array, __VARN_LINK_MARKER_ARRAY);
-    register_marker!(primitives::bigint, __VARN_LINK_MARKER_BIGINT);
-    register_marker!(primitives::bytes, __VARN_LINK_MARKER_BYTES);
-    register_marker!(primitives::bool, __VARN_LINK_MARKER_BOOL);
-    register_marker!(primitives::char, __VARN_LINK_MARKER_CHAR);
-    register_marker!(primitives::decimal, __VARN_LINK_MARKER_DECIMAL);
-    register_marker!(primitives::float, __VARN_LINK_MARKER_FLOAT);
-    register_marker!(primitives::int, __VARN_LINK_MARKER_INT);
-    register_marker!(primitives::map, __VARN_LINK_MARKER_MAP);
-    register_marker!(primitives::range, __VARN_LINK_MARKER_RANGE);
-    register_marker!(primitives::set, __VARN_LINK_MARKER_SET);
-    register_marker!(primitives::string, __VARN_LINK_MARKER_STR);
+    register_marker!(types::array, __VARN_LINK_MARKER_ARRAY);
+    register_marker!(types::bigint, __VARN_LINK_MARKER_BIGINT);
+    register_marker!(types::bytes, __VARN_LINK_MARKER_BYTES);
+    register_marker!(types::bool, __VARN_LINK_MARKER_BOOL);
+    register_marker!(types::char, __VARN_LINK_MARKER_CHAR);
+    register_marker!(types::decimal, __VARN_LINK_MARKER_DECIMAL);
+    register_marker!(types::float, __VARN_LINK_MARKER_FLOAT);
+    register_marker!(types::int, __VARN_LINK_MARKER_INT);
+    register_marker!(types::map, __VARN_LINK_MARKER_MAP);
+    register_marker!(types::range, __VARN_LINK_MARKER_RANGE);
+    register_marker!(types::set, __VARN_LINK_MARKER_SET);
+    register_marker!(types::string, __VARN_LINK_MARKER_STR);
 
     sum + dummy
 }

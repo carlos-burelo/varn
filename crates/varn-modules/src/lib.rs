@@ -11,12 +11,6 @@ pub mod uri;
 use semver::{Version, VersionReq};
 use std::path::{Path, PathBuf};
 
-pub const CORE_GLOBAL: &str = "core:global";
-pub const CORE_BIGINT: &str = "core:bigint";
-pub const CORE_MAP: &str = "core:map";
-pub const CORE_SET: &str = "core:set";
-pub const CORE_TYPES: &str = "core:types";
-
 pub const PKG_PREFIX: &str = "pkg:";
 pub const ENV_DIR_NAME: &str = ".vn";
 pub const MODULES_DIR_NAME: &str = "packages";
@@ -25,16 +19,6 @@ pub const PACKAGE_MANIFEST_FILE_VN: &str = "vn.toml";
 pub const VARN_FILE_EXTENSION: &str = "vn";
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.0.0";
 pub const RELATIVE_EXPORT_PREFIX: &str = "./";
-
-pub const CORE_STR: &str = "core:str";
-pub const CORE_INT: &str = "core:int";
-pub const CORE_FLOAT: &str = "core:float";
-pub const CORE_BOOL: &str = "core:bool";
-pub const CORE_CHAR: &str = "core:char";
-pub const CORE_DECIMAL: &str = "core:decimal";
-pub const CORE_RANGE: &str = "core:range";
-pub const CORE_ARRAY: &str = "core:array";
-pub const CORE_BYTES: &str = "core:bytes";
 
 pub const STD_TASK: &str = "std:task";
 pub const STD_COLLECTIONS: &str = "std:collections";

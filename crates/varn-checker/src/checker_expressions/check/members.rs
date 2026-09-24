@@ -289,24 +289,9 @@ impl<'r> Checker<'r> {
                 TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
                     orig.map(|o| self.resolve_bind_atom(bind, o))
                 }
-                TypeKind::Primitive(varn_core::LangPrimitive::Str)
-                | TypeKind::Literal(varn_core::TypeLiteral::Str(_)) => {
-                    Some(std::sync::Arc::from("core:str"))
-                }
-                TypeKind::Primitive(_) | TypeKind::Literal(_) => {
-                    Some(std::sync::Arc::from("core:primitives"))
-                }
-                TypeKind::Builtin(b) => Some(std::sync::Arc::from(match b {
-                    varn_core::BuiltinType::Map => "core:map",
-                    varn_core::BuiltinType::Set => "core:set",
-                    varn_core::BuiltinType::Range => "core:range",
-                    varn_core::BuiltinType::Array => "core:array",
-                    varn_core::BuiltinType::Bytes => "core:bytes",
-                    varn_core::BuiltinType::TaskHandle => "core:task",
-                    varn_core::BuiltinType::Task | varn_core::BuiltinType::Generator => {
-                        "core:primitives"
-                    }
-                })),
+                TypeKind::Primitive(p) => p.core_module().map(std::sync::Arc::from),
+                TypeKind::Literal(l) => l.base().core_module().map(std::sync::Arc::from),
+                TypeKind::Builtin(b) => Some(std::sync::Arc::from(b.core_module())),
                 _ => None,
             };
 

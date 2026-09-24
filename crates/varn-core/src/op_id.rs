@@ -45,7 +45,7 @@ pub fn compound_op_id3(module_id: &str, class: &str, symbol: &str) -> u64 {
 
 /// The native module under which all core-type classes (Array, str, int, Map,
 /// …) are registered. See the `varn_contract!` invocations in
-/// `varn-builtins/src/modules/primitives/*`.
+/// `varn-builtins/src/modules/core/types/*`.
 pub const CORE_MODULE: &str = "globals";
 
 /// op-id for a core-type method/getter, given its class name and member name.
@@ -101,7 +101,7 @@ pub fn is_str_char_index_op_id(op_id: u64) -> bool {
 
 /// The core builtin classes whose instance methods are natively registered
 /// (via the `varn_contract!` invocations in `varn-builtins/src/modules/
-/// primitives/*`) and are therefore op-id-addressable.
+/// core/types/*`) and are therefore op-id-addressable.
 ///
 /// This is the **single source of truth** for "is this a core type with a
 /// native method table". Adding a primitive = add its [`RuntimeKind`] here and

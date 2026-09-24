@@ -1,0 +1,28 @@
+export declare class Generator<T> {
+    next(value?: dynamic): { value: T; done: bool; };
+    return(value?: T): { value: T; done: bool; };
+}
+
+// What `async function*` produces. Same shape as `Generator<T>` on purpose:
+// the driver settles the body's awaits inside `next()` before returning, so
+// the caller gets a settled `{ value, done }` rather than a task to await.
+// `await` on a non-task is the identity, which is what makes `for await` work
+// over one of these and over a plain `Generator<T>` alike.
+export declare class AsyncGenerator<T> {
+    next(value?: dynamic): { value: T; done: bool; };
+    return(value?: T): { value: T; done: bool; };
+}
+
+export interface Iterator<T> {
+    next(): { value: T; done: bool; };
+}
+
+export interface AsyncIterator<T> {
+    next(): Task<{ value: T; done: bool; }>;
+}
+
+export interface TaskHandle<T = dynamic> {
+    isCompleted(): bool;
+    await(): T;
+    cancel(): void;
+}

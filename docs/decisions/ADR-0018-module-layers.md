@@ -20,11 +20,12 @@ sólo admite declaraciones respaldadas por natives en Rust.
 | Usuario | ruta relativa / `pkg:*` | paquetes | import explícito |
 
 Módulos de `core:*`:
-- `core:types` — tipos del lenguaje: clases de los primitivos (`int`,
-  `float`, `bigint`, `decimal`, `bool`, `char`, `str`, `Bytes`), colecciones
-  (`Array`, `Map`, `Set`, `Range`), `Option`/`Result` (con `Some`, `None`,
-  `Ok`, `Err`), `Generator`/`AsyncGenerator`/`Iterator`/`AsyncIterator`,
-  `TaskHandle` y los alias utilitarios (`Partial`, `Pick`, …).
+- `core:types` — tipos del lenguaje, un módulo por dominio:
+  `core:types/{int,float,bigint,decimal,bool,char,str,bytes}` (clases de los
+  primitivos), `core:types/{array,map,set,range}`, `core:types/iteration`
+  (`Generator`, `AsyncGenerator`, `Iterator`, `AsyncIterator`, `TaskHandle`),
+  `core:types/aliases` (`Partial`, `Pick`, …) y, con el paso 4,
+  `core:types/option`/`core:types/result` (`Some`, `None`, `Ok`, `Err`).
 - `core:errors` — `Error` y su jerarquía de plataforma (`TypeError`,
   `RangeError`, `IntegerOverflow`, `DivisionByZero`, `MatchError`).
 - `core:globals` — `print`, `debug`, `assert`, `assertSummary`, `input`,
@@ -32,6 +33,12 @@ Módulos de `core:*`:
 - `core:capabilities` — `Equatable`, `Comparable`, `Hashable`, `Cloneable`,
   `Default`, `Display`, `Debug`, `Indexable`, `Add`…`Neg`, `Disposable`,
   `AsyncDisposable`.
+
+El id de un módulo builtin es su lugar en el árbol:
+`crates/varn-builtins/src/modules/<capa>/<ruta>/` con un único contrato `.vn`
+es `<capa>:<ruta>`. No hay manifiesto (`module.json`) que lo repita. Todo
+`core:*` está en scope; que `core:types` agrupe varios módulos es
+organización, no una fachada que reexporta.
 
 `core:*` puede contener código Varn además de declaraciones: se compila en el
 bundle y el VM lo ejecuta al arrancar, antes que el programa, poblando los
@@ -44,9 +51,10 @@ Un tipo del núcleo se identifica por su origen (`core:types`), nunca por su
 texto: un `Result` declarado por el usuario no es el del núcleo.
 
 ## Migración (cada paso, un commit verde)
-1. `runtime:*` sólo importable desde `std:*` (diagnóstico en el import).
-2. Reorganizar `core:*` en los cuatro módulos (renombres de ids y archivos).
-3. Borrar `Symbol`.
+1. Una sola regla de capas para binder, loader y bundle
+   (`varn_modules::layer::check_import`).
+2. Borrar `Symbol`.
+3. Reorganizar `core:*` y `runtime:*` por ruta; sin `module.json`.
 4. `core:*` con código Varn compilado; `Option`/`Result` a `core:types`;
    `std:result` desaparece; las comprobaciones del checker por texto
    `"Result"`/`"Option"` pasan a origen.

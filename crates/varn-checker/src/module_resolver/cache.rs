@@ -604,7 +604,7 @@ pub(super) fn try_load_cache(
     source: &str,
     carrier: CarrierKind,
 ) -> Option<CachedModule> {
-    if virtual_id == "core:types" {
+    if virtual_id == "core:types/aliases" {
         return None;
     }
     let id = cache_module_id(virtual_id);
@@ -646,7 +646,7 @@ pub(super) fn save_to_cache(
     bind: &BindResult,
     carrier: CarrierKind,
 ) {
-    if virtual_id == "core:types" {
+    if virtual_id == "core:types/aliases" {
         return;
     }
     let id = cache_module_id(virtual_id);

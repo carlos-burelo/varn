@@ -56,6 +56,21 @@ impl LangPrimitive {
         Self::ALL.into_iter().find(|p| p.name() == name)
     }
 
+    /// The core module declaring this primitive's class (ADR-0018); `None`
+    /// for a primitive without members.
+    pub const fn core_module(self) -> Option<&'static str> {
+        match self {
+            Self::Bool => Some("core:types/bool"),
+            Self::Int => Some("core:types/int"),
+            Self::Float => Some("core:types/float"),
+            Self::BigInt => Some("core:types/bigint"),
+            Self::Decimal => Some("core:types/decimal"),
+            Self::Char => Some("core:types/char"),
+            Self::Str => Some("core:types/str"),
+            Self::Null | Self::Void | Self::Never | Self::Dynamic => None,
+        }
+    }
+
     /// Numeric domains (spec §2).
     pub const fn is_numeric(self) -> bool {
         matches!(self, Self::Int | Self::Float | Self::BigInt | Self::Decimal)
@@ -114,6 +129,17 @@ impl BuiltinType {
         Self::ALL.into_iter().find(|b| b.name() == name)
     }
 
+    /// The core module declaring this type (ADR-0018).
+    pub const fn core_module(self) -> &'static str {
+        match self {
+            Self::Array => "core:types/array",
+            Self::Map => "core:types/map",
+            Self::Set => "core:types/set",
+            Self::Range => "core:types/range",
+            Self::Bytes => "core:types/bytes",
+            Self::Task | Self::TaskHandle | Self::Generator => "core:types/iteration",
+        }
+    }
 }
 
 impl std::fmt::Display for BuiltinType {

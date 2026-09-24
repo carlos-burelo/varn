@@ -39,11 +39,6 @@ impl ModuleSpec {
         self
     }
 
-    pub const fn pure_module(mut self) -> Self {
-        self.pure = true;
-        self
-    }
-
     pub fn source(&self) -> Option<&'static str> {
         self.embedded
     }

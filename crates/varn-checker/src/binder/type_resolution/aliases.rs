@@ -11,7 +11,7 @@ pub(super) fn try_stdlib_generic_alias(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Option<Type> {
-    let bind_rc = ctx?.resolver()?.stdlib_bind("core:types")?;
+    let bind_rc = ctx?.resolver()?.stdlib_bind("core:types/aliases")?;
 
     let (params, alias_node) = bind_rc.get_alias_node_local(name)?;
     if params.is_empty() || params.len() != args.len() {

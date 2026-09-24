@@ -4,28 +4,28 @@
   [2mLoc      │ Kind            │ Name                 │ Type Details[0m
   ────────────────────────────────────────────────────────────────────────────────
   [2m1:0     [0m │ class           │ [2m[core][0m [1mBytes               [0m │ [33mBytes[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mRangeError          [0m │ [33mRangeError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDisposable          [0m │ [33mDisposable[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mError               [0m │ [33mError[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mRangeError          [0m │ [33mRangeError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mMul                 [0m │ [33mMul[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mError               [0m │ [33mError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mHashable            [0m │ [33mHashable[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDebug               [0m │ [33mDebug[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mint                 [0m │ [33mint[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mSet                 [0m │ [33mSet[0m
-  [2m1:0     [0m │ const           │ [2m[core][0m [1mNaN                 [0m │ [33mfloat[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mNonNullable         [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ type            │ [2m[core][0m [1mMutable             [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ const           │ [2m[core][0m [1mNaN                 [0m │ [33mfloat[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mint                 [0m │ [33mint[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAdd                 [0m │ [33mAdd[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mprint               [0m │ [33m(...args: dynamic[]) => void[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mEquatable           [0m │ [33mEquatable[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mbigint              [0m │ [33mbigint[0m
-  [2m1:0     [0m │ type            │ [2m[core][0m [1mMutable             [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mSet                 [0m │ [33mSet[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mReturnType          [0m │ [33mdynamic[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mExtract             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAsyncIterator       [0m │ [33mAsyncIterator[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mTaskHandle          [0m │ [33mTaskHandle[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mArray               [0m │ [33mArray[0m
-  [2m1:0     [0m │ interface       │ [2m[core][0m [1mComparable          [0m │ [33mComparable[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mPick                [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mComparable          [0m │ [33mComparable[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mArray               [0m │ [33mArray[0m
   [2m1:0     [0m │ namespace       │ [2m[core][0m [1mconsole             [0m │ [33mconsole[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mPartial             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mdecimal             [0m │ [33mdecimal[0m

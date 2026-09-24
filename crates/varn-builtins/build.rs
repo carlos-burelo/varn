@@ -2,8 +2,10 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+/// A module's id is its place in the tree (ADR-0018): the directory
+/// `src/modules/<layer>/<path>/` holding one `.vn` contract is `<layer>:<path>`.
+/// No manifest restates it.
 fn main() {
-    // Force rebuild of registry.generated.rs with $ suffix support
     println!("cargo:rerun-if-changed=src/modules");
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -11,235 +13,55 @@ fn main() {
     let mut out = fs::File::create(&out_path).expect("failed to create registry.generated.rs");
 
     writeln!(out, "pub static MODULE_REGISTRY: &[ModuleSpec] = &[").unwrap();
-
-    let modules_dir = Path::new("src/modules");
-    collect_registry_entries(modules_dir, &mut out);
-
+    for (layer, kind) in [("core", "ModuleKind::Core"), ("runtime", "ModuleKind::Runtime")] {
+        let root = Path::new("src/modules").join(layer);
+        collect_modules(&root, &root, layer, kind, &mut out);
+    }
     writeln!(out, "];").unwrap();
 }
 
-fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
+fn collect_modules(root: &Path, dir: &Path, layer: &str, kind: &str, out: &mut impl Write) {
+    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()));
     let mut paths: Vec<_> = entries.flatten().map(|e| e.path()).collect();
     paths.sort();
 
-    for path in paths {
-        if path.is_dir() {
-            let json_path = path.join("module.json");
-            if json_path.exists() {
-                let raw = fs::read_to_string(&json_path)
-                    .unwrap_or_else(|e| panic!("cannot read {}: {e}", json_path.display()));
-
-                let vn_rel = find_vn_source(&path)
-                    .unwrap_or_else(|| panic!("cannot find .vn source in {}", path.display()));
-
-                let vn_source_rel = vn_rel.trim_start_matches("src/").to_string();
-                let vn_source_field = format!("crates/varn-builtins/src/{vn_source_rel}");
-
-                let source_content = fs::read_to_string(&vn_rel)
-                    .unwrap_or_else(|e| panic!("cannot read .vn source at {vn_rel}: {e}"));
-                let exports = extract_exports_from_source(&source_content);
-
-                emit_entries_from_json(&raw, &vn_source_field, &vn_rel, &exports, out);
-            }
-
-            collect_registry_entries(&path, out);
-        }
-    }
-}
-
-fn find_vn_source(dir: &Path) -> Option<String> {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return None;
-    };
-    let mut candidates: Vec<_> = entries
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("vn")
-        })
+    let contracts: Vec<&Path> = paths
+        .iter()
+        .filter(|p| p.is_file() && p.extension().and_then(|e| e.to_str()) == Some("vn"))
+        .map(|p| p.as_path())
         .collect();
-    candidates.sort();
-    candidates
-        .into_iter()
-        .next()
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-}
-
-fn emit_entries_from_json(
-    json: &str,
-    vn_source_field: &str,
-    vn_include_path: &str,
-    exports: &[String],
-    out: &mut impl Write,
-) {
-    let json = json.trim();
-
-    if json.contains("\"modules\"") {
-        let inner = extract_array(json, "modules");
-        for entry in parse_object_array(&inner) {
-            if let (Some(id), Some(kind)) = (extract_str(&entry, "id"), extract_str(&entry, "kind"))
-            {
-                let capabilities = extract_capabilities(&entry);
-                let pure_module = extract_bool(&entry, "pure");
-                emit_spec_entry(
-                    out,
-                    &id,
-                    &kind,
-                    vn_source_field,
-                    vn_include_path,
-                    exports,
-                    &capabilities,
-                    pure_module,
-                );
-            }
+    match contracts.as_slice() {
+        [] => {}
+        [contract] => {
+            let rel = dir.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+            assert!(!rel.is_empty(), "{} is a layer root, not a module", dir.display());
+            emit_spec_entry(out, &format!("{layer}:{rel}"), kind, contract);
         }
-    } else {
-        if let (Some(id), Some(kind)) = (extract_str(json, "id"), extract_str(json, "kind")) {
-            let capabilities = extract_capabilities(json);
-            let pure_module = extract_bool(json, "pure");
-            emit_spec_entry(
-                out,
-                &id,
-                &kind,
-                vn_source_field,
-                vn_include_path,
-                exports,
-                &capabilities,
-                pure_module,
-            );
-        }
+        many => panic!(
+            "{} holds {} .vn contracts; a module is exactly one",
+            dir.display(),
+            many.len()
+        ),
+    }
+
+    for sub in paths.iter().filter(|p| p.is_dir()) {
+        collect_modules(root, sub, layer, kind, out);
     }
 }
 
-fn emit_spec_entry(
-    out: &mut impl Write,
-    id: &str,
-    kind: &str,
-    vn_source_field: &str,
-    vn_include_path: &str,
-    exports: &[String],
-    _capabilities: &[String],
-    pure_module: bool,
-) {
-    if kind == "stdlib" {
-        panic!(
-            "std module {id} must live in the top-level std/ tree, not in varn-builtins (see docs/STDLIB_ARCHITECTURE.md)"
-        );
-    }
-    let kind_expr = match kind {
-        "core" => "ModuleKind::Core",
-        "stdlib" => "ModuleKind::Stdlib",
-        "runtime" => "ModuleKind::Runtime",
-        other => panic!("unknown module kind: {other}"),
-    };
-    let mut exports_formatted = String::new();
-    if !exports.is_empty() {
-        exports_formatted.push_str("&[");
-        for exp in exports {
-            exports_formatted.push_str(&format!(r#""{exp}","#));
-        }
-        exports_formatted.push(']');
-    } else {
-        exports_formatted.push_str("&[]");
-    }
-    let pure_suffix = if pure_module { ".pure_module()" } else { "" };
+fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &Path) {
+    let include_path = contract.to_string_lossy().replace('\\', "/");
+    let source = fs::read_to_string(contract)
+        .unwrap_or_else(|e| panic!("cannot read {include_path}: {e}"));
+    let exports: String = extract_exports_from_source(&source)
+        .iter()
+        .map(|e| format!(r#""{e}","#))
+        .collect();
     writeln!(
         out,
-        r#"    ModuleSpec::new("{id}", {kind_expr}, "{vn_source_field}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{vn_include_path}"))).with_exports({exports_formatted}){pure_suffix},"#,
-    ).unwrap();
-}
-
-fn extract_bool(json: &str, key: &str) -> bool {
-    let needle = format!("\"{key}\"");
-    let Some(pos) = json.find(&needle) else {
-        return false;
-    };
-    let after_key = &json[pos + needle.len()..];
-    let Some(colon) = after_key.find(':') else {
-        return false;
-    };
-    let after_colon = after_key[colon + 1..].trim_start();
-    after_colon.starts_with("true")
-}
-
-fn extract_str(json: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{key}\"");
-    let pos = json.find(&needle)?;
-    let after_key = &json[pos + needle.len()..];
-    let colon = after_key.find(':')?;
-    let after_colon = after_key[colon + 1..].trim_start();
-    if !after_colon.starts_with('"') {
-        return None;
-    }
-    let inner = &after_colon[1..];
-    let end = inner.find('"')?;
-    Some(inner[..end].to_string())
-}
-
-fn extract_array(json: &str, key: &str) -> String {
-    let needle = format!("\"{key}\"");
-    let pos = json.find(&needle).unwrap_or(0);
-    let after = &json[pos + needle.len()..];
-    let bracket = after.find('[').unwrap_or(0);
-    let after_bracket = &after[bracket + 1..];
-    let mut depth = 1i32;
-    let mut end = 0;
-    for (i, c) in after_bracket.char_indices() {
-        match c {
-            '[' => depth += 1,
-            ']' => {
-                depth -= 1;
-                if depth == 0 {
-                    end = i;
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-    after_bracket[..end].to_string()
-}
-
-fn parse_object_array(inner: &str) -> Vec<String> {
-    let mut objs = Vec::new();
-    let mut depth = 0i32;
-    let mut start = None;
-    for (i, c) in inner.char_indices() {
-        match c {
-            '{' => {
-                if depth == 0 {
-                    start = Some(i);
-                }
-                depth += 1;
-            }
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    if let Some(s) = start {
-                        objs.push(inner[s..=i].to_string());
-                        start = None;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    objs
-}
-
-fn extract_capabilities(json: &str) -> Vec<String> {
-    if !json.contains("\"capabilities\"") {
-        return Vec::new();
-    }
-    let inner = extract_array(json, "capabilities");
-    inner
-        .split(',')
-        .map(|s| s.trim().trim_matches('"').to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
+        r#"    ModuleSpec::new("{id}", {kind_expr}, "crates/varn-builtins/{include_path}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{include_path}"))).with_exports(&[{exports}]),"#,
+    )
+    .unwrap();
 }
 
 fn extract_exports_from_source(source: &str) -> Vec<String> {
