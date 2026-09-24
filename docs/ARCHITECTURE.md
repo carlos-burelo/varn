@@ -71,7 +71,7 @@ El workspace son 20 crates consolidados. El inventario completo con tamaños y e
 
 | Crate | Categoría | Responsabilidad Principal |
 |---|---|---|
-| [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`), diagnósticos (`diagnostics/`), estilo de terminal (`term/`) y `TypeTag`. Sin dependencias internas. |
+| [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`), diagnósticos (`diagnostics/`), estilo de terminal (`term/`), vocabulario de tipos del lenguaje (`LangPrimitive`, `BuiltinType`) y clasificación runtime (`RuntimeKind`). Sin dependencias internas. |
 | [`varn-types`](#) | Base | Tipos compartidos por VM y compilador: `VmValue` (128-bit two-word + SSO), `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ObjData`/`ObjRef`, `Shape`. |
 | [`varn-lexer`](#) | Frontend | Tokenizador streaming UTF-8 con inserción automática de puntos y comas (ASI). |
 | [`varn-parser`](#) | Frontend | Parser en descenso recursivo + operador de precedencia Pratt (`|>`, ternarios, named args). |

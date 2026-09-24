@@ -380,6 +380,23 @@ dominios numéricos baja a `InstKind::Convert { conv: NumConv }` →
 `IntToDecimal`, `DynToInt`, `DynToFloat`). Las que pueden fallar lanzan
 `IntegerOverflow` y no son puras para DCE.
 
+**Tipo del lenguaje ≠ clase de valor runtime (Fase C).** Tres vocabularios,
+cada uno con un solo dueño:
+
+* `varn_core::LangPrimitive` (`null bool int float bigint decimal char str`
+  + `void never dynamic`) y `varn_core::BuiltinType` (`Array Map Set Range
+  Bytes Task TaskHandle Generator` nombrados sin argumentos): el checker los
+  usa como `TypeKind::Primitive` / `TypeKind::Builtin`. `Symbol`, `Error` y
+  demás son clases de plataforma nombradas (`TypeKind::Named`).
+* `BackendTy`: el tipo que el backend recibe (este documento).
+* `varn_core::RuntimeKind` (antes `TypeTag`): solo clasifica valores en
+  runtime; no tiene `Void`, `Never` ni `Dynamic`. El layout de un campo de
+  clase es `Option<RuntimeKind>` — `None` es un `VmValue` en caja — derivado
+  de `BackendTy` en un único sitio (`from_tir::field_kind`), y
+  `varn_types::class_layout::class_field_repr` es la única tabla de tamaños.
+  El operando de `GetFixedField`/`SetFixedField` es un `FieldAccess { Slot,
+  Compact(kind) }` codificado (`0` = slot, `0xFF` = en caja).
+
 Un `FieldSlot` sobre receptor `Dynamic` no compila. Un `AddInt` con un
 operando `Str` no compila. La clase entera de miscompiles deja de ser posible
 en vez de ser improbable.

@@ -50,3 +50,19 @@ previo a `TypeLayout` (Fase F).
 
 ### C.6 Docs
 `docs/TIR_CONTRATO_TIPADO.md`, `docs/ARCHITECTURE.md`, roadmap §0.
+
+## Ejecución (2026-09-23)
+
+| Paso | Commit | Nota |
+|---|---|---|
+| C.1 | `0d96f3a3` | tags solo-nombre borrados; `Error`/`TypeError`/`RangeError` en `well_known` |
+| C.2 | `ae71e4d4` | `Symbol` fuera del núcleo |
+| C.3 | `d49ea6a7`, `5f0f86b8` | `LangPrimitive` + `BuiltinType`; `IntrinsicType` borrado entero (no reducido) |
+| — | `67640b9b` | código muerto: `typed_ir`, `CgTy`, `to_type_tag`, `runtime_tag` |
+| C.4 | `dab858a1` | `RuntimeKind`; `VmRef` → `Opaque`; campos `Option<RuntimeKind>`; `FieldAccess` |
+| C.5 | `3d358333` | una tabla de layout (`class_field_repr`); `from_tir::field_kind` |
+
+Desviación: `Bytes/Map/Set/Range/Array/Task/TaskHandle/Generator` sin
+argumentos son `TypeKind::Builtin(BuiltinType)`, no tipos nombrados — el
+checker los compara estructuralmente y convertirlos a `Named` exigía resolver
+su clase en cada comparación.

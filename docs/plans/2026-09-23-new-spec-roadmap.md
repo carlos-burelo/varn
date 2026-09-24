@@ -59,8 +59,17 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
 
-**Fase 0, Fase A y Fase B cerradas** (Fase B: ADR-0016,
-`docs/plans/2026-09-23-fase-B-precision-arbitraria.md`).
+**Fase 0, A, B y C cerradas** (Fase B: ADR-0016,
+`docs/plans/2026-09-23-fase-B-precision-arbitraria.md`; Fase C:
+`docs/plans/2026-09-23-fase-C-runtimekind.md`).
+
+Fase C: `TypeKind::Intrinsic(TypeTag)` → `Primitive(LangPrimitive)` /
+`Builtin(BuiltinType)`; `Symbol` es clase de plataforma; `IntrinsicType`,
+`typed_ir`, `CgTy` borrados; `TypeTag` → `RuntimeKind` sin
+`Void/Never/Dynamic`; campos de clase con `Option<RuntimeKind>` y una sola
+tabla de layout. Desviación del plan: los contenedores sin argumentos quedaron
+como `BuiltinType` en vez de tipos nombrados (siguen necesitando identidad
+estructural en el checker).
 
 Hallazgos de Fase B, corregidos: la aritmética `bigint` no existía (`10n + 5n`
 daba `0`); el widening implícito `int → bigint/decimal` no convertía el valor;
