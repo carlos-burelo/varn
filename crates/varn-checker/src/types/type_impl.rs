@@ -27,10 +27,14 @@ impl Type {
     /// as a `TypeTag`, not to build a `Type`) still round-trip through the
     /// table, since only the 20 seeded intrinsics have fixed ids.
     /// NOTE (merge main): `Bytes` has no fixed id — use
-    /// `Type::intrinsic(TypeTag::Bytes, table)` instead of a `Type::Bytes`
+    /// `Type::builtin(varn_core::BuiltinType::Bytes, table)` instead of a `Type::Bytes`
     /// const, which cannot exist without resequencing every fixed id.
-    pub fn intrinsic(tag: TypeTag, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Intrinsic(tag)), false)
+    pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Primitive(p)), false)
+    }
+
+    pub fn builtin(b: varn_core::BuiltinType, table: &mut CheckerTyTable) -> Self {
+        Type(table.intern(TypeKind::Builtin(b)), false)
     }
 
     /// Content-addressed ids are portable, so there is nothing to sanitize:
@@ -219,17 +223,20 @@ impl Type {
     pub fn stdlib_key<'t>(&self, table: &'t CheckerTyTable) -> Option<&'t str> {
         use varn_core::IntrinsicType as I;
         match table.get(self.0) {
-            TypeKind::Intrinsic(tag) => match tag {
-                TypeTag::Int => Some(I::Int.as_str()),
-                TypeTag::Float => Some(I::Float.as_str()),
-                TypeTag::Decimal => Some(I::Decimal.as_str()),
-                TypeTag::BigInt => Some(I::BigInt.as_str()),
-                TypeTag::Str => Some(I::Str.as_str()),
-                TypeTag::Char => Some(I::Char.as_str()),
-                TypeTag::Bool => Some(I::Bool.as_str()),
-                TypeTag::Bytes => Some(I::Bytes.as_str()),
-                _ => None,
+            TypeKind::Primitive(p) => match p {
+                varn_core::LangPrimitive::Int => Some(I::Int.as_str()),
+                varn_core::LangPrimitive::Float => Some(I::Float.as_str()),
+                varn_core::LangPrimitive::Decimal => Some(I::Decimal.as_str()),
+                varn_core::LangPrimitive::BigInt => Some(I::BigInt.as_str()),
+                varn_core::LangPrimitive::Str => Some(I::Str.as_str()),
+                varn_core::LangPrimitive::Char => Some(I::Char.as_str()),
+                varn_core::LangPrimitive::Bool => Some(I::Bool.as_str()),
+                varn_core::LangPrimitive::Null
+                | varn_core::LangPrimitive::Void
+                | varn_core::LangPrimitive::Never
+                | varn_core::LangPrimitive::Dynamic => None,
             },
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Some(I::Bytes.as_str()),
             TypeKind::Array(_) => Some(I::Array.as_str()),
             _ => None,
         }
@@ -255,12 +262,13 @@ impl Type {
     /// (canonical bytes, ADR-0008); main callers using `is_bytes()` with no
     /// args must pass the table.
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
-        matches!(table.get(self.0), TypeKind::Intrinsic(TypeTag::Bytes))
+        matches!(table.get(self.0), TypeKind::Builtin(varn_core::BuiltinType::Bytes))
     }
 
     pub fn to_type_tag(&self, table: &CheckerTyTable) -> TypeTag {
         match table.get(self.0) {
-            TypeKind::Intrinsic(tag) => tag,
+            TypeKind::Primitive(p) => p.runtime_tag(),
+            TypeKind::Builtin(b) => b.runtime_tag(),
             TypeKind::Array(_) => TypeTag::Array,
             TypeKind::Object(_) => TypeTag::Object,
             TypeKind::Named(..) => TypeTag::Class,
@@ -273,7 +281,7 @@ impl Type {
 
     pub fn is_nullable(&self, table: &CheckerTyTable) -> bool {
         match table.get(self.0) {
-            TypeKind::Intrinsic(TypeTag::Null) => true,
+            TypeKind::Primitive(varn_core::LangPrimitive::Null) => true,
             TypeKind::Union(list) => table
                 .get_list(list)
                 .iter()
@@ -292,7 +300,7 @@ impl Type {
 
     pub fn non_nullified(&self, table: &mut CheckerTyTable) -> Type {
         match table.get(self.0).clone() {
-            TypeKind::Intrinsic(TypeTag::Null) => Type::Never,
+            TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Never,
             TypeKind::Union(list) => {
                 let members: Vec<Type> = table
                     .get_list(list)

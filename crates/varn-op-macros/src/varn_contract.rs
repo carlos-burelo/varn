@@ -114,13 +114,13 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
         TypeKind::Named(n, _) => TypeTag::from_str(interner.resolve(*n))
             .map(scalar_mapped)
             .unwrap_or(Mapped::Dynamic),
-        TypeKind::Intrinsic(TypeTag::Void) => Mapped::Void,
+        TypeKind::Primitive(varn_core::LangPrimitive::Void) => Mapped::Void,
         TypeKind::TypePredicate { .. } => Mapped::Bool,
         TypeKind::Array(_) => Mapped::Array,
         TypeKind::Union(members) if members.len() == 2 => {
-            if matches!(members[1].kind, TypeKind::Intrinsic(TypeTag::Null)) {
+            if matches!(members[1].kind, TypeKind::Primitive(varn_core::LangPrimitive::Null)) {
                 Mapped::Opt(Box::new(classify(&members[0], interner)))
-            } else if matches!(members[0].kind, TypeKind::Intrinsic(TypeTag::Null)) {
+            } else if matches!(members[0].kind, TypeKind::Primitive(varn_core::LangPrimitive::Null)) {
                 Mapped::Opt(Box::new(classify(&members[1], interner)))
             } else {
                 Mapped::Dynamic

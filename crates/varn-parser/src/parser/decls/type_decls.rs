@@ -121,7 +121,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
     } else {
         s.type_node(
             s.range(),
-            varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Dynamic),
+            varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Dynamic),
         )
     };
     s.eat_semicolon();
@@ -217,7 +217,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         (
                             s.type_node(
                                 field_range,
-                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Int),
                             ),
                             Some(expr),
                         )
@@ -227,7 +227,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         (
                             s.type_node(
                                 field_range,
-                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Float),
+                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Float),
                             ),
                             Some(expr),
                         )
@@ -237,7 +237,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         (
                             s.type_node(
                                 field_range,
-                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
+                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Str),
                             ),
                             Some(expr),
                         )
@@ -247,7 +247,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         (
                             s.type_node(
                                 field_range,
-                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Bool),
+                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Bool),
                             ),
                             Some(expr),
                         )

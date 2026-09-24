@@ -239,7 +239,7 @@ fn resolve_variants(
 ) -> Option<(String, Vec<String>)> {
     if let Some(ty) = subject_ty {
         match &ty.0 {
-            TypeKind::Intrinsic(varn_core::TypeTag::Bool) => {
+            TypeKind::Primitive(varn_core::LangPrimitive::Bool) => {
                 return Some((
                     "".to_string(),
                     vec!["true".to_string(), "false".to_string()],

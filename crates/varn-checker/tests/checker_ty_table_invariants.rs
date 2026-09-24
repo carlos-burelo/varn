@@ -13,7 +13,7 @@
 
 use std::sync::Arc;
 use varn_checker::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
-use varn_core::{TypeKind, TypeTag};
+use varn_core::TypeKind;
 
 // ── Seeding intrínseco ────────────────────────────────────────────────────
 
@@ -22,16 +22,16 @@ use varn_core::{TypeKind, TypeTag};
 #[test]
 fn intrinsic_ids_are_fixed_and_small() {
     let t = CheckerTyTable::new();
-    assert_eq!(t.get(CheckerTyId::INT), TypeKind::Intrinsic(TypeTag::Int));
-    assert_eq!(t.get(CheckerTyId::STR), TypeKind::Intrinsic(TypeTag::Str));
-    assert_eq!(t.get(CheckerTyId::BOOL), TypeKind::Intrinsic(TypeTag::Bool));
+    assert_eq!(t.get(CheckerTyId::INT), TypeKind::Primitive(varn_core::LangPrimitive::Int));
+    assert_eq!(t.get(CheckerTyId::STR), TypeKind::Primitive(varn_core::LangPrimitive::Str));
+    assert_eq!(t.get(CheckerTyId::BOOL), TypeKind::Primitive(varn_core::LangPrimitive::Bool));
     assert_eq!(
         t.get(CheckerTyId::FLOAT),
-        TypeKind::Intrinsic(TypeTag::Float)
+        TypeKind::Primitive(varn_core::LangPrimitive::Float)
     );
     assert_eq!(
         t.get(CheckerTyId::DYNAMIC),
-        TypeKind::Intrinsic(TypeTag::Dynamic)
+        TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
     );
     assert_eq!(t.get(CheckerTyId::THIS), TypeKind::This);
 }
@@ -47,14 +47,14 @@ fn content_ids_are_order_independent() {
     let mut left = CheckerTyTable::new();
     let mut right = CheckerTyTable::new();
 
-    let l_int = left.intern(TypeKind::Intrinsic(TypeTag::Int));
+    let l_int = left.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
     let l_arr = left.intern(TypeKind::Array(l_int));
     let l_list = left.intern_list(&[l_int, CheckerTyId::STR]);
     let l_union = left.intern(TypeKind::Union(l_list));
 
     // `right` interna las mismas formas en orden distinto.
-    let r_str = right.intern(TypeKind::Intrinsic(TypeTag::Str));
-    let r_int = right.intern(TypeKind::Intrinsic(TypeTag::Int));
+    let r_str = right.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
+    let r_int = right.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
     let r_list = right.intern_list(&[r_int, r_str]);
     let r_union = right.intern(TypeKind::Union(r_list));
     let r_arr = right.intern(TypeKind::Array(r_int));

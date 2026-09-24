@@ -1,11 +1,12 @@
-use crate::type_tag::TypeTag;
+use crate::lang_type::{BuiltinType, LangPrimitive};
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 
 pub enum TypeKind<T, N, C, F, O, E = ()> {
-    Intrinsic(TypeTag),
+    Primitive(LangPrimitive),
+    Builtin(BuiltinType),
     This,
     Array(T),
     Union(C),
@@ -56,33 +57,29 @@ pub enum TypeKind<T, N, C, F, O, E = ()> {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrimitiveType(pub TypeTag);
-
-impl From<TypeTag> for PrimitiveType {
-    fn from(tag: TypeTag) -> Self {
-        Self(tag)
-    }
-}
-
-impl PrimitiveType {
-    pub const COUNT: usize = 11;
-
-    pub fn from_str(name: &str) -> Option<Self> {
-        TypeTag::from_str(name).map(Self)
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        self.0.name()
-    }
-}
-
 impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
     pub fn is_primitive(&self) -> bool {
         match self {
-            TypeKind::Intrinsic(tag) => tag.is_primitive(),
+            TypeKind::Primitive(_) => true,
             TypeKind::This => true,
             _ => false,
         }
+    }
+
+    /// The language-vocabulary name of a primitive or builtin kind.
+    pub fn lang_name(&self) -> Option<&'static str> {
+        match self {
+            TypeKind::Primitive(p) => Some(p.name()),
+            TypeKind::Builtin(b) => Some(b.name()),
+            _ => None,
+        }
+    }
+
+    /// The kind a bare type name denotes when it is part of the language
+    /// vocabulary (`int`, `Bytes`), before any user declaration is consulted.
+    pub fn of_lang_name(name: &str) -> Option<Self> {
+        LangPrimitive::from_str(name)
+            .map(TypeKind::Primitive)
+            .or_else(|| BuiltinType::from_str(name).map(TypeKind::Builtin))
     }
 }

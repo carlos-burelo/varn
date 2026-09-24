@@ -17,13 +17,14 @@
 //! degrada a `Dynamic` (honesto-desconocido, igual que el resto del checker
 //! para un tipo que no puede determinar) en lugar de inventar un índice.
 
-use varn_core::{AtomInterner, TypeKind, TypeTag};
+use varn_core::{AtomInterner, BuiltinType, LangPrimitive, TypeKind};
 
 use super::{CheckerTyId, CheckerTyTable, FunctionParam, FunctionType, ObjectTypeMember, Type};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PortableType {
-    Intrinsic(TypeTag),
+    Primitive(LangPrimitive),
+    Builtin(BuiltinType),
     This,
     Array(Box<PortableType>),
     Union(Vec<PortableType>),
@@ -113,7 +114,8 @@ pub enum PortableObjectMember {
 pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> PortableType {
     let name = |a: varn_core::Atom| interner.resolve(a).to_string();
     match table.get(ty.0) {
-        TypeKind::Intrinsic(tag) => PortableType::Intrinsic(tag),
+        TypeKind::Primitive(p) => PortableType::Primitive(p),
+        TypeKind::Builtin(b) => PortableType::Builtin(b),
         TypeKind::This => PortableType::This,
         TypeKind::Array(inner) => {
             PortableType::Array(Box::new(encode(Type(inner, false), table, interner)))
@@ -142,7 +144,7 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
         ),
         // `ExprId` es arena-relativo: no hay forma portable de escribirlo.
         // Honesto-desconocido en vez de un número que apunte a otra cosa.
-        TypeKind::Typeof(_) => PortableType::Intrinsic(TypeTag::Dynamic),
+        TypeKind::Typeof(_) => PortableType::Primitive(LangPrimitive::Dynamic),
         TypeKind::KeyOf(inner) => {
             PortableType::KeyOf(Box::new(encode(Type(inner, false), table, interner)))
         }
@@ -201,7 +203,8 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
 /// otra.
 pub fn decode(p: &PortableType, table: &mut CheckerTyTable, interner: &mut AtomInterner) -> Type {
     let ty = match p {
-        PortableType::Intrinsic(tag) => table.intern(TypeKind::Intrinsic(*tag)),
+        PortableType::Primitive(p) => table.intern(TypeKind::Primitive(*p)),
+        PortableType::Builtin(b) => table.intern(TypeKind::Builtin(*b)),
         PortableType::This => table.intern(TypeKind::This),
         PortableType::Array(inner) => {
             let inner = decode(inner, table, interner).0;
@@ -570,7 +573,7 @@ mod tests {
             encoded,
             PortableType::Generic(
                 "Sender".to_string(),
-                vec![PortableType::Intrinsic(TypeTag::Int)],
+                vec![PortableType::Primitive(LangPrimitive::Int)],
                 Some("runtime:task".to_string())
             )
         );
@@ -642,10 +645,10 @@ mod tests {
         // por el match exhaustivo; aquí fijamos la forma portable resultante.
         let mut t = CheckerTyTable::new();
         let i = AtomInterner::new();
-        let dynamic = t.intern(TypeKind::Intrinsic(TypeTag::Dynamic));
+        let dynamic = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Dynamic));
         assert_eq!(
             encode(Type(dynamic, false), &t, &i),
-            PortableType::Intrinsic(TypeTag::Dynamic)
+            PortableType::Primitive(LangPrimitive::Dynamic)
         );
     }
 }

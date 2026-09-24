@@ -788,7 +788,7 @@ fn extension_target_label(
     match &t.kind {
         TypeKind::Named(n, _) => Some(Arc::from(interner.resolve(*n))),
         TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(*n))),
-        TypeKind::Intrinsic(tag) => Some(Arc::from(varn_core::IntrinsicType::from(*tag).as_str())),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(Arc::from),
         TypeKind::Array(_) => Some(Arc::from("Array")),
         _ => None,
     }

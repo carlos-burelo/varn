@@ -53,7 +53,8 @@ impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let table = self.table;
         match table.get(self.ty.0) {
-            TypeKind::Intrinsic(tag) => write!(f, "{}", tag.name()),
+            TypeKind::Primitive(p) => write!(f, "{}", p.name()),
+            TypeKind::Builtin(b) => write!(f, "{}", b.name()),
             TypeKind::This => write!(f, "this"),
             TypeKind::Array(t) => {
                 let t = t;

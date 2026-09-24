@@ -295,7 +295,7 @@ fn fn_signature_compatible_type(
             let ft2 = table.get_function(fid2).clone();
             let return_ok = matches!(
                 table.get(return_type),
-                TypeKind::Intrinsic(varn_core::TypeTag::Void)
+                TypeKind::Primitive(varn_core::LangPrimitive::Void)
             ) || types_compatible_impl(
                 &t(return_type),
                 &t(ft2.return_type),

@@ -68,7 +68,7 @@ fn cached_interface_keeps_real_member_types() {
     // bind cargado.
     assert_eq!(
         bind2.ty_table.get(value.ty.0),
-        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+        varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Int),
         "el tipo de `Box.value` debe ser `int`, no degradarse a Dynamic"
     );
 
@@ -79,7 +79,7 @@ fn cached_interface_keeps_real_member_types() {
         .expect("`Box.label` debe sobrevivir el caché");
     assert_eq!(
         bind2.ty_table.get(label.ty.0),
-        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
+        varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Str),
         "el tipo de `Box.label` debe ser `str`"
     );
 

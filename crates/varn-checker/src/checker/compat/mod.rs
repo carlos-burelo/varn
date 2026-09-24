@@ -21,17 +21,17 @@ fn t(id: CheckerTyId) -> Type {
 }
 
 fn is_simple_type(ty: &Type, table: &CheckerTyTable) -> bool {
-    matches!(table.get(ty.0), TypeKind::Intrinsic(_))
+    matches!(table.get(ty.0), TypeKind::Primitive(_) | TypeKind::Builtin(_))
 }
 
 /// Scalar assignability. Only `int` widens implicitly, and only into the
 /// exact domains `decimal` and `bigint` (spec §9, ADR-0015 D4).
 fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTable) -> bool {
-    use varn_core::TypeTag as T;
+    use varn_core::LangPrimitive as P;
     match (table.get(declared.0), table.get(inferred.0)) {
-        (TypeKind::Intrinsic(T::Dynamic), _) | (_, TypeKind::Intrinsic(T::Dynamic)) => true,
+        (TypeKind::Primitive(P::Dynamic), _) | (_, TypeKind::Primitive(P::Dynamic)) => true,
         (a, b) if a == b => true,
-        (TypeKind::Intrinsic(T::Decimal | T::BigInt), TypeKind::Intrinsic(T::Int)) => true,
+        (TypeKind::Primitive(P::Decimal | P::BigInt), TypeKind::Primitive(P::Int)) => true,
         _ => false,
     }
 }
@@ -52,17 +52,17 @@ fn plain_literal_matches(
     table: &CheckerTyTable,
 ) -> bool {
     use varn_core::ast::ExprKind;
-    use varn_core::TypeTag;
-    let TypeKind::Intrinsic(tag) = table.get(target.0) else {
+    use varn_core::LangPrimitive as P;
+    let TypeKind::Primitive(p) = table.get(target.0) else {
         return false;
     };
     matches!(
-        (&arena.expr(expr).kind, tag),
-        (ExprKind::StrLiteral { .. }, TypeTag::Str)
-            | (ExprKind::BoolLiteral { .. }, TypeTag::Bool)
-            | (ExprKind::CharLiteral { .. }, TypeTag::Char)
-            | (ExprKind::IntLiteral { .. }, TypeTag::Int)
-            | (ExprKind::FloatLiteral { .. }, TypeTag::Float)
+        (&arena.expr(expr).kind, p),
+        (ExprKind::StrLiteral { .. }, P::Str)
+            | (ExprKind::BoolLiteral { .. }, P::Bool)
+            | (ExprKind::CharLiteral { .. }, P::Char)
+            | (ExprKind::IntLiteral { .. }, P::Int)
+            | (ExprKind::FloatLiteral { .. }, P::Float)
     )
 }
 
@@ -124,10 +124,10 @@ pub(crate) fn expr_satisfies_target_type(
         // narrow *or another array*, so nesting does not bail out one level in.
         let literal_elem = matches!(
                 table.get(elem_ty.0),
-                TypeKind::Intrinsic(
-                    varn_core::TypeTag::Float
-                        | varn_core::TypeTag::Decimal
-                        | varn_core::TypeTag::BigInt
+                TypeKind::Primitive(
+                    varn_core::LangPrimitive::Float
+                        | varn_core::LangPrimitive::Decimal
+                        | varn_core::LangPrimitive::BigInt
                 )
             )
             || array_element_type(&elem_ty, table, interner).is_some();
@@ -273,15 +273,18 @@ pub(super) fn types_compatible_impl(
     }
 
     let result = match (table.get(declared.0).clone(), table.get(inferred.0).clone()) {
-        (TypeKind::Intrinsic(varn_core::TypeTag::Dynamic), _)
-        | (_, TypeKind::Intrinsic(varn_core::TypeTag::Dynamic)) => true,
+        (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _)
+        | (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => true,
 
         (a, b) if a == b => true,
 
-        (TypeKind::Intrinsic(_), TypeKind::Intrinsic(_)) => {
+        (
+            TypeKind::Primitive(_) | TypeKind::Builtin(_),
+            TypeKind::Primitive(_) | TypeKind::Builtin(_),
+        ) => {
             simple_types_compatible(declared, inferred, table)
         }
-        (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::TemplateLiteral(_)) => true,
+        (TypeKind::Primitive(varn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
 
         (TypeKind::Array(_), TypeKind::Array(inf_elem)) if t(inf_elem).is_dynamic() => true,
@@ -349,7 +352,7 @@ pub(super) fn types_compatible_impl(
             .to_vec()
             .iter()
             .all(|m| types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)),
-        (_, TypeKind::Intrinsic(varn_core::TypeTag::Never)) => true,
+        (_, TypeKind::Primitive(varn_core::LangPrimitive::Never)) => true,
 
         // Some intrinsics (`str`, `Error`, …) are also nameable declarations, so
         // the same type reaches here spelled two ways: an annotation resolves to
@@ -357,12 +360,12 @@ pub(super) fn types_compatible_impl(
         // class symbol. One spelling, one type. Restricted to the bare `Named`
         // form on purpose — a `Generic` spelling carries type arguments the
         // intrinsic side has nothing to check against.
-        (TypeKind::Intrinsic(tag), TypeKind::Named(name, _))
-        | (TypeKind::Named(name, _), TypeKind::Intrinsic(tag))
+        (lang @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)), TypeKind::Named(name, _))
+        | (TypeKind::Named(name, _), lang @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)))
             if resolve_atom(bind, name)
                 .as_deref()
-                .and_then(IntrinsicType::from_str)
-                .is_some_and(|it| it.0 == tag) =>
+                .and_then(TypeKind::of_lang_name)
+                .is_some_and(|k| k == lang) =>
         {
             true
         }
@@ -463,8 +466,8 @@ pub(super) fn types_compatible_impl(
                 }
             }
         }
-        (TypeKind::Intrinsic(varn_core::TypeTag::Map), TypeKind::Object(_))
-        | (TypeKind::Object(_), TypeKind::Intrinsic(varn_core::TypeTag::Map)) => true,
+        (TypeKind::Builtin(varn_core::BuiltinType::Map), TypeKind::Object(_))
+        | (TypeKind::Object(_), TypeKind::Builtin(varn_core::BuiltinType::Map)) => true,
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => {
             if is_intrinsic(bind, dn, IntrinsicType::Map) {
                 true
@@ -591,7 +594,7 @@ pub(super) fn types_compatible_impl(
             let return_ok = t(ft2.return_type).is_dynamic()
                 || matches!(
                     table.get(ft1.return_type),
-                    TypeKind::Intrinsic(varn_core::TypeTag::Void)
+                    TypeKind::Primitive(varn_core::LangPrimitive::Void)
                 )
                 || types_compatible_impl(
                     &t(ft1.return_type),
@@ -912,7 +915,7 @@ fn m_ty(m: &crate::types::ClassMemberInfo) -> Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use varn_core::TypeTag;
+    
 
     /// Parses `let probe = <src>` and hands back the arena plus the
     /// initializer's `ExprId`. `expr_satisfies_target_type` is a pure
@@ -945,8 +948,8 @@ mod tests {
         expr_satisfies_target_type(target, &Type::Dynamic, &arena, Some(init), table, None)
     }
 
-    fn array_of(tag: TypeTag, table: &mut CheckerTyTable) -> Type {
-        let elem = Type::intrinsic(tag, table);
+    fn array_of(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Type {
+        let elem = Type::primitive(p, table);
         Type::array(elem, table)
     }
 
@@ -955,7 +958,7 @@ mod tests {
     #[test]
     fn float_array_literal_accepts_exact_integers_only() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         assert!(accepts(&f_arr, &table, "[1, 2, 3]"));
         assert!(accepts(&f_arr, &table, "[-1, 9007199254740992]"));
         assert!(!accepts(&f_arr, &table, "[9007199254740993]"));
@@ -964,7 +967,7 @@ mod tests {
     #[test]
     fn nested_literal_arrays_recurse() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         let nested = Type::array(f_arr, &mut table);
         assert!(accepts(&nested, &table, "[[1, 2], [3]]"));
         assert!(!accepts(&nested, &table, "[[1, 2], [9007199254740993]]"));
@@ -975,7 +978,7 @@ mod tests {
     #[test]
     fn spread_element_is_not_waved_through() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         assert!(!accepts(&f_arr, &table, "[...other]"));
     }
 
@@ -993,7 +996,7 @@ mod tests {
     #[test]
     fn object_literal_missing_required_property_is_rejected() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         let members = table.intern_object_members(vec![
             prop("xs", f_arr, false),
             prop("name", Type::Str, false),
@@ -1005,7 +1008,7 @@ mod tests {
     #[test]
     fn object_literal_may_omit_an_optional_property() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         let members = table.intern_object_members(vec![
             prop("xs", f_arr, false),
             prop("name", Type::Str, true),
@@ -1021,7 +1024,7 @@ mod tests {
     #[test]
     fn object_literal_checks_plain_properties_too() {
         let mut table = CheckerTyTable::default();
-        let f_arr = array_of(TypeTag::Float, &mut table);
+        let f_arr = array_of(varn_core::LangPrimitive::Float, &mut table);
         let members = table.intern_object_members(vec![
             prop("xs", f_arr, false),
             prop("name", Type::Str, false),

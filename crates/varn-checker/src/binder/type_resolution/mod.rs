@@ -24,7 +24,7 @@ pub fn resolve_type_node(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    use varn_core::TypeTag;
+    
     // `node.kind`'s name slots (`TypeKind::Named`/`Generic`/interface member
     // keys) are `Atom` at the AST layer; resolving them to the `&str` this
     // function's checker-`Type` output and the `TypeContext` lookups need
@@ -48,18 +48,18 @@ pub fn resolve_type_node(
             .unwrap_or_default()
     };
     match &node.kind {
-        TypeKind::Intrinsic(TypeTag::Int) => Type::Int,
-        TypeKind::Intrinsic(TypeTag::Float) => Type::Float,
-        TypeKind::Intrinsic(TypeTag::Decimal) => Type::Decimal,
-        TypeKind::Intrinsic(TypeTag::BigInt) => Type::BigInt,
-        TypeKind::Intrinsic(TypeTag::Str) => Type::Str,
-        TypeKind::Intrinsic(TypeTag::Char) => Type::Char,
-        TypeKind::Intrinsic(TypeTag::Bool) => Type::Bool,
-        TypeKind::Intrinsic(TypeTag::Void) => Type::Void,
-        TypeKind::Intrinsic(TypeTag::Null) => Type::Null,
-        TypeKind::Intrinsic(TypeTag::Never) => Type::Never,
-        TypeKind::Intrinsic(TypeTag::Dynamic) => Type::Dynamic,
-        TypeKind::Intrinsic(TypeTag::Bytes) => Type::intrinsic(TypeTag::Bytes, table),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int) => Type::Int,
+        TypeKind::Primitive(varn_core::LangPrimitive::Float) => Type::Float,
+        TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Type::Decimal,
+        TypeKind::Primitive(varn_core::LangPrimitive::BigInt) => Type::BigInt,
+        TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
+        TypeKind::Primitive(varn_core::LangPrimitive::Char) => Type::Char,
+        TypeKind::Primitive(varn_core::LangPrimitive::Bool) => Type::Bool,
+        TypeKind::Primitive(varn_core::LangPrimitive::Void) => Type::Void,
+        TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Null,
+        TypeKind::Primitive(varn_core::LangPrimitive::Never) => Type::Never,
+        TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
+        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Type::builtin(varn_core::BuiltinType::Bytes, table),
         TypeKind::This => Type::This,
 
         TypeKind::Array(inner) => {

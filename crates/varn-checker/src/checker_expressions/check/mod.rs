@@ -176,7 +176,7 @@ impl<'r> Checker<'r> {
                             let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
                             let is_void = matches!(
                                 expected_kind,
-                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Void)
+                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
                             );
                             if !is_tp
                                 && !is_void

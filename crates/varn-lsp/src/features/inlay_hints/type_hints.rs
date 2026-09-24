@@ -61,7 +61,7 @@ fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHin
         _ => return None,
     };
 
-    if let TypeKind::Intrinsic(varn_core::TypeTag::Void | varn_core::TypeTag::Dynamic) = &ret_ty.0 {
+    if let TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic) = &ret_ty.0 {
         return None;
     }
     let ret_str = ret_ty.to_string();

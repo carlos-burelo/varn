@@ -32,7 +32,7 @@ impl<'r> Checker<'r> {
         if !matches!(
             callee_kind,
             TypeKind::Fn(_)
-                | TypeKind::Intrinsic(varn_core::TypeTag::Dynamic)
+                | TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
                 | TypeKind::Named(_, _)
                 | TypeKind::Generic(_, _, _)
         ) {

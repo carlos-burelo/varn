@@ -1,5 +1,5 @@
 use crate::types::{CheckerTyTable, Type, TypeContext};
-use varn_core::{IntrinsicType, TypeKind};
+use varn_core::TypeKind;
 
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
@@ -28,7 +28,7 @@ pub(super) fn try_stdlib_generic_alias(
 pub(super) fn is_primitive_type(ty: &Type, table: &CheckerTyTable) -> bool {
     matches!(
         table.get(ty.0),
-        TypeKind::Intrinsic(tag) if tag.is_primitive()
+        TypeKind::Primitive(p) if p != varn_core::LangPrimitive::Dynamic
     )
 }
 
@@ -37,9 +37,8 @@ pub fn resolve_primitive(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    use varn_core::TypeKind as K;
-    if let Some(it) = IntrinsicType::from_str(name) {
-        return Type(table.intern(K::Intrinsic(it.0)), false);
+    if let Some(kind) = TypeKind::of_lang_name(name) {
+        return Type(table.intern(kind), false);
     }
     // `name`/`source_file` may not already be interned `Atom`s (the latter is
     // stored as a plain `Arc<str>`, never routed through `AtomInterner`), so

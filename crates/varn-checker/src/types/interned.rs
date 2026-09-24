@@ -33,7 +33,7 @@
 use crate::types::{FunctionType, ObjectTypeMember};
 use rustc_hash::{FxHashMap, FxHasher};
 use std::hash::{Hash, Hasher};
-use varn_core::{Atom, TypeKind, TypeTag};
+use varn_core::{Atom, LangPrimitive, TypeKind};
 
 /// Content-addressed id of a shape. `Copy`, so cloning a `Type` is trivial and
 /// comparing two types is comparing two `u128`.
@@ -96,19 +96,18 @@ impl CheckerTyId {
 /// other shape.
 fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
     match kind {
-        TypeKind::Intrinsic(tag) => Some(match tag {
-            TypeTag::Int => CheckerTyId::INT,
-            TypeTag::Float => CheckerTyId::FLOAT,
-            TypeTag::Decimal => CheckerTyId::DECIMAL,
-            TypeTag::BigInt => CheckerTyId::BIGINT,
-            TypeTag::Str => CheckerTyId::STR,
-            TypeTag::Char => CheckerTyId::CHAR,
-            TypeTag::Bool => CheckerTyId::BOOL,
-            TypeTag::Void => CheckerTyId::VOID,
-            TypeTag::Null => CheckerTyId::NULL,
-            TypeTag::Never => CheckerTyId::NEVER,
-            TypeTag::Dynamic => CheckerTyId::DYNAMIC,
-            _ => return None,
+        TypeKind::Primitive(p) => Some(match p {
+            LangPrimitive::Int => CheckerTyId::INT,
+            LangPrimitive::Float => CheckerTyId::FLOAT,
+            LangPrimitive::Decimal => CheckerTyId::DECIMAL,
+            LangPrimitive::BigInt => CheckerTyId::BIGINT,
+            LangPrimitive::Str => CheckerTyId::STR,
+            LangPrimitive::Char => CheckerTyId::CHAR,
+            LangPrimitive::Bool => CheckerTyId::BOOL,
+            LangPrimitive::Void => CheckerTyId::VOID,
+            LangPrimitive::Null => CheckerTyId::NULL,
+            LangPrimitive::Never => CheckerTyId::NEVER,
+            LangPrimitive::Dynamic => CheckerTyId::DYNAMIC,
         }),
         TypeKind::This => Some(CheckerTyId::THIS),
         _ => None,
@@ -170,17 +169,17 @@ impl CheckerTyTable {
         // Seed the reserved intrinsic ids. `intern` maps these shapes back to
         // the same ids, so the seed is only so `get` is total over them.
         for (id, kind) in [
-            (CheckerTyId::INT, TypeKind::Intrinsic(TypeTag::Int)),
-            (CheckerTyId::FLOAT, TypeKind::Intrinsic(TypeTag::Float)),
-            (CheckerTyId::DECIMAL, TypeKind::Intrinsic(TypeTag::Decimal)),
-            (CheckerTyId::BIGINT, TypeKind::Intrinsic(TypeTag::BigInt)),
-            (CheckerTyId::STR, TypeKind::Intrinsic(TypeTag::Str)),
-            (CheckerTyId::CHAR, TypeKind::Intrinsic(TypeTag::Char)),
-            (CheckerTyId::BOOL, TypeKind::Intrinsic(TypeTag::Bool)),
-            (CheckerTyId::VOID, TypeKind::Intrinsic(TypeTag::Void)),
-            (CheckerTyId::NULL, TypeKind::Intrinsic(TypeTag::Null)),
-            (CheckerTyId::NEVER, TypeKind::Intrinsic(TypeTag::Never)),
-            (CheckerTyId::DYNAMIC, TypeKind::Intrinsic(TypeTag::Dynamic)),
+            (CheckerTyId::INT, TypeKind::Primitive(varn_core::LangPrimitive::Int)),
+            (CheckerTyId::FLOAT, TypeKind::Primitive(varn_core::LangPrimitive::Float)),
+            (CheckerTyId::DECIMAL, TypeKind::Primitive(varn_core::LangPrimitive::Decimal)),
+            (CheckerTyId::BIGINT, TypeKind::Primitive(varn_core::LangPrimitive::BigInt)),
+            (CheckerTyId::STR, TypeKind::Primitive(varn_core::LangPrimitive::Str)),
+            (CheckerTyId::CHAR, TypeKind::Primitive(varn_core::LangPrimitive::Char)),
+            (CheckerTyId::BOOL, TypeKind::Primitive(varn_core::LangPrimitive::Bool)),
+            (CheckerTyId::VOID, TypeKind::Primitive(varn_core::LangPrimitive::Void)),
+            (CheckerTyId::NULL, TypeKind::Primitive(varn_core::LangPrimitive::Null)),
+            (CheckerTyId::NEVER, TypeKind::Primitive(varn_core::LangPrimitive::Never)),
+            (CheckerTyId::DYNAMIC, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)),
             (CheckerTyId::THIS, TypeKind::This),
         ] {
             t.entries.insert(id, kind);
@@ -300,36 +299,36 @@ impl CheckerTyTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use varn_core::TypeTag;
+    
 
     #[test]
     fn interning_the_same_intrinsic_twice_dedups() {
         let mut t = CheckerTyTable::default();
-        let a = t.intern(TypeKind::Intrinsic(TypeTag::Int));
-        let b = t.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let a = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let b = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
         assert_eq!(a, b);
     }
 
     #[test]
     fn different_intrinsics_get_different_ids() {
         let mut t = CheckerTyTable::default();
-        let a = t.intern(TypeKind::Intrinsic(TypeTag::Int));
-        let b = t.intern(TypeKind::Intrinsic(TypeTag::Str));
+        let a = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let b = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
         assert_ne!(a, b);
     }
 
     #[test]
     fn get_roundtrips_the_interned_value() {
         let mut t = CheckerTyTable::default();
-        let a = t.intern(TypeKind::Intrinsic(TypeTag::Bool));
-        assert_eq!(t.get(a), TypeKind::Intrinsic(TypeTag::Bool));
+        let a = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Bool));
+        assert_eq!(t.get(a), TypeKind::Primitive(varn_core::LangPrimitive::Bool));
     }
 
     #[test]
     fn identical_unions_by_member_ids_dedup_via_ty_list() {
         let mut t = CheckerTyTable::default();
-        let int = t.intern(TypeKind::Intrinsic(TypeTag::Int));
-        let str_ = t.intern(TypeKind::Intrinsic(TypeTag::Str));
+        let int = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let str_ = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
         let list1 = t.intern_list(&[int, str_]);
         let list2 = t.intern_list(&[int, str_]);
         assert_eq!(list1, list2);
@@ -346,9 +345,9 @@ mod tests {
         let mut right = CheckerTyTable::default();
 
         // Same shapes, opposite insertion order.
-        let l_int = left.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let l_int = left.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
         let l_arr = left.intern(TypeKind::Array(l_int));
-        let r_int = right.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let r_int = right.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
         let r_arr = right.intern(TypeKind::Array(r_int));
 
         assert_eq!(l_int, CheckerTyId::INT);

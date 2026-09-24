@@ -82,9 +82,9 @@ impl<'r> Checker<'r> {
     pub(crate) fn member_exists(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
         let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
-            TypeKind::Intrinsic(varn_core::TypeTag::Dynamic) => true,
-            TypeKind::Intrinsic(varn_core::TypeTag::Never) => false,
-            TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
+            TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => true,
+            TypeKind::Primitive(varn_core::LangPrimitive::Never) => false,
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
                 if key == varn_core::MemberKey::Length.as_str() {
                     return true;
                 }
@@ -99,7 +99,7 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
-            TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
                 if key == varn_core::MemberKey::Length.as_str() {
                     return true;
                 }
@@ -115,7 +115,7 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
-            TypeKind::Intrinsic(_) => {
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) => {
                 let name = ty.display(&self.ty_table, &bind.interner).to_string();
                 if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_str()) {

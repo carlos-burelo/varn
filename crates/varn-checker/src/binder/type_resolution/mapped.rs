@@ -30,10 +30,10 @@ pub(super) fn resolve_mapped(
     };
 
     if keys.is_empty() {
-        use varn_core::TypeTag;
+        
         let key_ty = match table.get(source.0) {
-            TypeKind::Intrinsic(TypeTag::Str) => Some(Type::Str),
-            TypeKind::Intrinsic(TypeTag::Int) => Some(Type::Int),
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) => Some(Type::Str),
+            TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(Type::Int),
             _ => None,
         };
         if let Some(key_ty) = key_ty {

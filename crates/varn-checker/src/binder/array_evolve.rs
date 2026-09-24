@@ -146,8 +146,8 @@ impl<'r> Binder<'r> {
             return;
         }
         let normalized = match self.ty_table.get(value_ty.0) {
-            TypeKind::Intrinsic(varn_core::TypeTag::Int) => Some(Type::Int),
-            TypeKind::Intrinsic(varn_core::TypeTag::Float) => Some(Type::Float),
+            TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(Type::Int),
+            TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(Type::Float),
             _ => None,
         };
         if let Some(c) = self.find_candidate_mut(name) {

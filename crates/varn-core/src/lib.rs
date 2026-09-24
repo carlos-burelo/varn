@@ -8,6 +8,7 @@ pub mod errors;
 pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
+pub mod lang_type;
 pub mod module_id;
 pub mod numeric;
 pub mod numeric_big;
@@ -33,6 +34,7 @@ pub use diagnostics::{
     Diagnostic, DiagnosticBag, DiagnosticKind, ErrorCode, RelatedInformation, Suggestion,
 };
 pub use kinds::TypeKind;
+pub use lang_type::{BuiltinType, LangPrimitive};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 

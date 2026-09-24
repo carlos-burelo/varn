@@ -3,7 +3,7 @@ use crate::binder::BindResult;
 use crate::symbol::SymbolId;
 use crate::types::Type;
 use varn_core::ast::{AstArena, ExprId, ForInit, StmtId, StmtKind};
-use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeTag};
+use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_stmts(&mut self, stmts: &[StmtId], bind: &BindResult) {
@@ -250,7 +250,7 @@ impl<'r> Checker<'r> {
                 let right_kind = self.ty_table.get(right_ty.0);
                 let elem_ty = match right_kind {
                     TypeKind::Array(inner) => Type(inner, false),
-                    TypeKind::Intrinsic(TypeTag::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
+                    TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
                     TypeKind::Named(name, _)
                         if bind.interner.get(varn_core::IntrinsicType::Str.as_str())
                             == Some(name) =>
@@ -276,7 +276,7 @@ impl<'r> Checker<'r> {
                     {
                         Type(self.ty_table.get_list(args)[0], false)
                     }
-                    TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
+                    TypeKind::Builtin(varn_core::BuiltinType::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
                 self.loop_depth += 1;

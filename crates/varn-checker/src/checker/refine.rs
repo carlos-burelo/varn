@@ -159,14 +159,12 @@ impl<'r> Checker<'r> {
 /// Result type of an arithmetic operator over two operand types, following the
 /// language's numeric rules (every operator keeps its operands' domain). Anything not both-numeric yields no refinement.
 fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> Option<Type> {
-    use varn_core::{binary_operand_kind, NumericOperand, TypeTag};
+    use varn_core::{binary_operand_kind, NumericOperand};
 
     let operand = |t: &Type| match table.get(t.0) {
-        TypeKind::Intrinsic(
-            TypeTag::Int,
-        ) => Some(NumericOperand::Int),
-        TypeKind::Intrinsic(TypeTag::Float) => Some(NumericOperand::Float),
-        TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(NumericOperand::Int),
+        TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
+        TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         _ => None,
     };
     let combined = binary_operand_kind(operand(l), operand(r))?;

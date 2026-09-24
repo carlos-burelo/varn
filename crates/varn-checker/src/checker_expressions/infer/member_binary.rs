@@ -3,7 +3,6 @@ use crate::checker::Checker;
 use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
-use varn_core::TypeTag;
 
 use super::super::helpers::base_type;
 
@@ -19,7 +18,7 @@ pub(super) fn infer_member_type(
     let obj_ty = obj_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut checker.ty_table));
     let obj_ty = if matches!(
         checker.ty_table.get(obj_ty.0),
-        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Never)
+        varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Never)
     ) {
         obj_ty_raw
     } else {
@@ -40,8 +39,8 @@ pub(super) fn infer_member_type(
     match obj_kind {
         TypeKind::Array(_elem) => {
             if prop_name_str == varn_core::MemberKey::Length.as_str() {
-                return Type::intrinsic(
-                    TypeTag::Int,
+                return Type::primitive(
+                    varn_core::LangPrimitive::Int,
                     &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                 );
             }
@@ -124,8 +123,8 @@ pub(super) fn infer_binary_type(
             );
             match op {
                 BinaryOp::Add => {
-                    if matches!(checker.ty_table.get(l.0), TypeKind::Intrinsic(TypeTag::Str))
-                        || matches!(checker.ty_table.get(r.0), TypeKind::Intrinsic(TypeTag::Str))
+                    if matches!(checker.ty_table.get(l.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
+                        || matches!(checker.ty_table.get(r.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
                     {
                         return Type::Str;
                     }
@@ -143,8 +142,8 @@ pub(super) fn infer_binary_type(
                 | BinaryOp::Shr
                 | BinaryOp::UShr => {
                     if l.is_int() && r.is_int() {
-                        return Type::intrinsic(
-                            TypeTag::Int,
+                        return Type::primitive(
+                            varn_core::LangPrimitive::Int,
                             &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                         );
                     }

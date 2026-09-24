@@ -7,7 +7,7 @@
 //! value carries no more type information here, which is the honest state.
 
 use crate::types::{CheckerTyTable, Type};
-use varn_core::{AtomInterner, TypeKind, TypeTag};
+use varn_core::{AtomInterner, BuiltinType, LangPrimitive, TypeKind};
 use varn_tir::{BackendTy, ClassId, DynReason, EnumId, TyTable};
 
 /// Resolves a type name to the module-table handle the checker assigned it.
@@ -73,7 +73,7 @@ fn lower_kind(
         // what lets `m.get(k)` reach `CallNativeOp` and `.size` a typed read.
         // `Map<V>` (key defaults to `str`) or `Map<K, V>`.
         TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == TypeTag::Map.name()
+            if interner.resolve(name) == BuiltinType::Map.name()
                 && (table.get_list(args).len() == 1 || table.get_list(args).len() == 2) =>
         {
             let arg_ids = table.get_list(args).to_vec();
@@ -91,21 +91,22 @@ fn lower_kind(
             BackendTy::Map(tt.intern(k), tt.intern(v))
         }
         TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == TypeTag::Set.name() && table.get_list(args).len() == 1 =>
+            if interner.resolve(name) == BuiltinType::Set.name() && table.get_list(args).len() == 1 =>
         {
             let el = lower_type(&Type(table.get_list(args)[0], false), table, interner, tt, names);
             BackendTy::Set(tt.intern(el))
         }
-        TypeKind::Intrinsic(TypeTag::Map) => {
+        TypeKind::Builtin(varn_core::BuiltinType::Map) => {
             let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
             BackendTy::Map(d, d)
         }
-        TypeKind::Intrinsic(TypeTag::Set) => {
+        TypeKind::Builtin(varn_core::BuiltinType::Set) => {
             let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
             BackendTy::Set(d)
         }
 
-        TypeKind::Intrinsic(tag) => lower_tag(tag),
+        TypeKind::Primitive(p) => lower_primitive(p),
+        TypeKind::Builtin(b) => lower_builtin(b),
 
         TypeKind::Array(el) => {
             let inner = lower_type(&Type(el, false), table, interner, tt, names);
@@ -178,25 +179,35 @@ fn lower_kind(
     }
 }
 
-fn lower_tag(tag: TypeTag) -> BackendTy {
-    match tag {
-        TypeTag::Int => BackendTy::Int,
-        TypeTag::Float => BackendTy::Float,
-        TypeTag::Bool => BackendTy::Bool,
-        TypeTag::Char => BackendTy::Char,
-        TypeTag::Str => BackendTy::Str,
-        TypeTag::Bytes => BackendTy::Bytes,
-        TypeTag::Decimal => BackendTy::Decimal,
-        TypeTag::BigInt => BackendTy::BigInt,
-        TypeTag::Void => BackendTy::Void,
-        TypeTag::Never => BackendTy::Never,
+fn lower_primitive(p: LangPrimitive) -> BackendTy {
+    match p {
+        LangPrimitive::Int => BackendTy::Int,
+        LangPrimitive::Float => BackendTy::Float,
+        LangPrimitive::Bool => BackendTy::Bool,
+        LangPrimitive::Char => BackendTy::Char,
+        LangPrimitive::Str => BackendTy::Str,
+        LangPrimitive::Decimal => BackendTy::Decimal,
+        LangPrimitive::BigInt => BackendTy::BigInt,
+        LangPrimitive::Void => BackendTy::Void,
+        LangPrimitive::Never => BackendTy::Never,
         // "only null": a Nullable payload of Never, so the null pattern with
         // no non-null inhabitant.
-        TypeTag::Null => BackendTy::Nullable(NEVER_TY),
-        TypeTag::Dynamic => BackendTy::Dynamic(DynReason::Unannotated),
-        // Structured intrinsics with no resolved element type, plus the
-        // host-shaped ones (Task, Regex, DateTime, …): opaque dynamic.
-        _ => BackendTy::Dynamic(DynReason::Unannotated),
+        LangPrimitive::Null => BackendTy::Nullable(NEVER_TY),
+        LangPrimitive::Dynamic => BackendTy::Dynamic(DynReason::Unannotated),
+    }
+}
+
+/// A builtin named without type arguments has no element type to lower.
+fn lower_builtin(b: BuiltinType) -> BackendTy {
+    match b {
+        BuiltinType::Bytes => BackendTy::Bytes,
+        BuiltinType::Array
+        | BuiltinType::Map
+        | BuiltinType::Set
+        | BuiltinType::Range
+        | BuiltinType::Task
+        | BuiltinType::TaskHandle
+        | BuiltinType::Generator => BackendTy::Dynamic(DynReason::Unannotated),
     }
 }
 
@@ -220,7 +231,7 @@ fn lower_union(
 ) -> BackendTy {
     let member_ids = table.get_list(members);
     let is_null = |id: &crate::types::CheckerTyId| {
-        matches!(table.get(*id), TypeKind::Intrinsic(TypeTag::Null))
+        matches!(table.get(*id), TypeKind::Primitive(varn_core::LangPrimitive::Null))
     };
     let non_null: Vec<&crate::types::CheckerTyId> =
         member_ids.iter().filter(|id| !is_null(id)).collect();
@@ -259,17 +270,17 @@ mod tests {
     #[test]
     fn scalars_map_directly() {
         let (mut tt, mut ct, interner) = table();
-        let int_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Int));
+        let int_ty = intern(&mut ct, TypeKind::Primitive(varn_core::LangPrimitive::Int));
         assert_eq!(
             lower_type(&int_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Int
         );
-        let str_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Str));
+        let str_ty = intern(&mut ct, TypeKind::Primitive(varn_core::LangPrimitive::Str));
         assert_eq!(
             lower_type(&str_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Str
         );
-        let decimal_ty = intern(&mut ct, TypeKind::Intrinsic(TypeTag::Decimal));
+        let decimal_ty = intern(&mut ct, TypeKind::Primitive(varn_core::LangPrimitive::Decimal));
         assert_eq!(
             lower_type(&decimal_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Decimal
@@ -279,7 +290,7 @@ mod tests {
     #[test]
     fn array_of_int_is_array_of_int() {
         let (mut tt, mut ct, interner) = table();
-        let int_id: CheckerTyId = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
+        let int_id: CheckerTyId = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
         let ty = intern(&mut ct, TypeKind::Array(int_id));
         let BackendTy::Array(id) = lower_type(&ty, &ct, &interner, &mut tt, &NoNames) else {
             panic!("expected Array");
@@ -290,8 +301,8 @@ mod tests {
     #[test]
     fn int_or_null_is_nullable_int_not_dynamic() {
         let (mut tt, mut ct, interner) = table();
-        let int_id = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
-        let null_id = ct.intern(TypeKind::Intrinsic(TypeTag::Null));
+        let int_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let null_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Null));
         let list = ct.intern_list(&[int_id, null_id]);
         let ty = intern(&mut ct, TypeKind::Union(list));
         let BackendTy::Nullable(id) = lower_type(&ty, &ct, &interner, &mut tt, &NoNames) else {
@@ -303,8 +314,8 @@ mod tests {
     #[test]
     fn a_real_union_stays_dynamic_union() {
         let (mut tt, mut ct, interner) = table();
-        let int_id = ct.intern(TypeKind::Intrinsic(TypeTag::Int));
-        let str_id = ct.intern(TypeKind::Intrinsic(TypeTag::Str));
+        let int_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let str_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
         let list = ct.intern_list(&[int_id, str_id]);
         let ty = intern(&mut ct, TypeKind::Union(list));
         assert_eq!(

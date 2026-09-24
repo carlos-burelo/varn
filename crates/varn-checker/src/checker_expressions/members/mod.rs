@@ -298,7 +298,7 @@ pub fn get_members_of_type(
                 }
             }
         }
-        TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
+        TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
             add_member(
                 &mut results,
                 &mut seen,
@@ -312,7 +312,7 @@ pub fn get_members_of_type(
             let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
-        TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
             add_member(
                 &mut results,
                 &mut seen,
@@ -327,8 +327,9 @@ pub fn get_members_of_type(
                 Type::named(varn_core::TypeTag::Bytes.name().to_owned(), resolver, table);
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
-        TypeKind::Intrinsic(tag) => {
-            let named_ty = Type::named(tag.name().to_owned(), resolver, table);
+        kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => {
+            let name = kind.lang_name().unwrap_or_default();
+            let named_ty = Type::named(name.to_owned(), resolver, table);
             return get_members_of_type(resolver, &named_ty, bind, table);
         }
         _ => {}
@@ -466,7 +467,7 @@ fn extension_key(
 ) -> Option<Arc<str>> {
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
-        TypeKind::Intrinsic(tag) => Some(Arc::from(tag.name())),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(Arc::from),
         TypeKind::Array(_) => Some(Arc::from(varn_core::IntrinsicType::Array.as_str())),
         _ => None,
     }

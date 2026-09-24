@@ -155,7 +155,7 @@ pub fn infer_expr_type(
                 UnaryOp::Minus | UnaryOp::Plus => inner,
                 UnaryOp::Not => Type::Bool,
                 UnaryOp::BitNot => match table.get(inner.0) {
-                    TypeKind::Intrinsic(varn_core::TypeTag::Int) => Type::Int,
+                    TypeKind::Primitive(varn_core::LangPrimitive::Int) => Type::Int,
                     _ => Type::Dynamic,
                 },
                 _ => Type::Dynamic,
@@ -240,7 +240,7 @@ pub fn infer_expr_type(
             expr_arm_ty.unwrap_or(Type::Dynamic)
         }
         ExprKind::Object { properties } => infer_object(properties, arena, ctx, table),
-        ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range, table),
+        ExprKind::Range { .. } => Type::builtin(varn_core::BuiltinType::Range, table),
         ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
         _ => Type::Dynamic,
     }
@@ -258,7 +258,7 @@ fn infer_member(
     if computed {
         return match table.get(obj_ty.0).clone() {
             TypeKind::Array(inner) => Type(inner, false),
-            TypeKind::Intrinsic(varn_core::TypeTag::Str) => Type::Str,
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
             TypeKind::Named(name, _)
                 if ctx.and_then(|c| c.interner()).is_some_and(|i| {
                     i.get(varn_core::IntrinsicType::Str.as_str()) == Some(name)
@@ -384,13 +384,11 @@ fn infer_member(
 /// `varn_core::numeric`. `None` when the operands have no common numeric
 /// class — the caller picks its own fallback.
 pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
-    use varn_core::{binary_operand_kind, NumericOperand, TypeTag};
+    use varn_core::{binary_operand_kind, NumericOperand};
     let operand = |t: &Type| match table.get(t.0) {
-        TypeKind::Intrinsic(
-            TypeTag::Int,
-        ) => Some(NumericOperand::Int),
-        TypeKind::Intrinsic(TypeTag::Float) => Some(NumericOperand::Float),
-        TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(NumericOperand::Int),
+        TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
+        TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         _ => None,
     };
     let kind = binary_operand_kind(operand(l), operand(r))?;
@@ -420,7 +418,7 @@ pub(crate) fn adopt_literal_operands(
 /// Whether two numeric operand types may meet in one operator: a common
 /// class exists, or it is `bigint` with `int` (the exact widening, spec §7).
 pub(crate) fn numeric_operands_compatible(l: &Type, r: &Type, table: &CheckerTyTable) -> bool {
-    let is_big = |t: &Type| matches!(table.get(t.0), TypeKind::Intrinsic(varn_core::TypeTag::BigInt));
+    let is_big = |t: &Type| matches!(table.get(t.0), TypeKind::Primitive(varn_core::LangPrimitive::BigInt));
     let big_or_int = |t: &Type| is_big(t) || t.is_int();
     numeric_binary_type(l, r, table).is_some() || ((is_big(l) || is_big(r)) && big_or_int(l) && big_or_int(r))
 }
@@ -438,8 +436,8 @@ fn infer_binary(
             let l = infer_expr_type(left, arena, ctx, table);
             let r = infer_expr_type(right, arena, ctx, table);
             match (table.get(l.0), table.get(r.0)) {
-                (TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
-                | (_, TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
+                (TypeKind::Primitive(varn_core::LangPrimitive::Str), _)
+                | (_, TypeKind::Primitive(varn_core::LangPrimitive::Str)) => Type::Str,
                 _ => {
                     let (l, r) = adopt_literal_operands(arena, left, right, l, r, table);
                     numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic)
@@ -470,8 +468,8 @@ fn infer_binary(
             let r = infer_expr_type(right, arena, ctx, table);
             match (table.get(l.0), table.get(r.0)) {
                 (
-                    TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                    TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                    TypeKind::Primitive(varn_core::LangPrimitive::Int),
+                    TypeKind::Primitive(varn_core::LangPrimitive::Int),
                 ) => Type::Int,
                 _ => Type::Dynamic,
             }

@@ -3,7 +3,7 @@
 
 use super::{CheckerTyTable, Type};
 use varn_core::ast::{AstArena, ExprId, ExprKind, UnaryOp};
-use varn_core::{TypeKind, TypeTag};
+use varn_core::TypeKind;
 
 /// Largest magnitude every integer up to which `f64` represents exactly.
 const F64_EXACT_INT: i64 = 1 << 53;
@@ -32,8 +32,8 @@ pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
 /// Whether the integer `value` can take `target`'s numeric type exactly.
 pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
     match table.get(target.0) {
-        TypeKind::Intrinsic(TypeTag::Float) => (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value),
-        TypeKind::Intrinsic(TypeTag::Decimal | TypeTag::BigInt) => true,
+        TypeKind::Primitive(varn_core::LangPrimitive::Float) => (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value),
+        TypeKind::Primitive(varn_core::LangPrimitive::Decimal | varn_core::LangPrimitive::BigInt) => true,
         _ => false,
     }
 }

@@ -4,7 +4,7 @@ use crate::types::TypeContext;
 use crate::types::{CheckerTyId, ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
-use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind, TypeTag};
+use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
 
@@ -35,9 +35,9 @@ impl<'r> Checker<'r> {
             ExprKind::This => self
                 .current_class
                 .as_ref()
-                .map(|cn| match IntrinsicType::from_str(cn) {
-                    Some(it) if it.is_scalar_primitive() => {
-                        Type::intrinsic(it.0, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                .map(|cn| match varn_core::LangPrimitive::from_str(cn) {
+                    Some(p) if p != varn_core::LangPrimitive::Dynamic => {
+                        Type::primitive(p, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
                     _ => Type::named(
                         cn.to_string(),
@@ -384,8 +384,8 @@ impl<'r> Checker<'r> {
                         .filter(|id| {
                             !matches!(
                                 self.ty_table.get(*id),
-                                TypeKind::Intrinsic(TypeTag::Null)
-                                    | TypeKind::Intrinsic(TypeTag::Void)
+                                TypeKind::Primitive(varn_core::LangPrimitive::Null)
+                                    | TypeKind::Primitive(varn_core::LangPrimitive::Void)
                             )
                         })
                         .map(|id| Type(id, false))
@@ -472,8 +472,8 @@ impl<'r> Checker<'r> {
                     varn_core::ast::operators::UnaryOp::BitNot => {
                         let inner = self.infer_type(operand, bind);
                         if inner.is_int() {
-                            Type::intrinsic(
-                                TypeTag::Int,
+                            Type::primitive(
+                                varn_core::LangPrimitive::Int,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             )
                         } else {
@@ -550,8 +550,8 @@ impl<'r> Checker<'r> {
             ExprKind::CharLiteral { .. } => Type::Char,
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,
-            ExprKind::Range { .. } => Type::intrinsic(
-                varn_core::TypeTag::Range,
+            ExprKind::Range { .. } => Type::builtin(
+                varn_core::BuiltinType::Range,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
             ExprKind::Match { cases, .. } => {
@@ -629,8 +629,8 @@ impl<'r> Checker<'r> {
         let obj_kind = self.ty_table.get(obj_ty.0);
         match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type(inner, false),
-            TypeKind::Intrinsic(TypeTag::Str) if prop_ty.is_int() => Type::Str,
-            TypeKind::Intrinsic(TypeTag::Bytes) if prop_ty.is_int() => Type::Int,
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) if prop_ty.is_int() => Type::Str,
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) if prop_ty.is_int() => Type::Int,
             TypeKind::Named(name, _)
                 if prop_ty.is_int()
                     && bind.interner.get(IntrinsicType::Str.as_str()) == Some(name) =>
@@ -655,7 +655,7 @@ impl<'r> Checker<'r> {
                     Type::Dynamic
                 }
             }
-            TypeKind::Intrinsic(TypeTag::Map) => Type::Dynamic,
+            TypeKind::Builtin(varn_core::BuiltinType::Map) => Type::Dynamic,
             TypeKind::Object(mid) => self
                 .ty_table
                 .get_object_members(mid)
@@ -695,7 +695,7 @@ impl<'r> Checker<'r> {
                             n == 1 || n == 2
                         }
                     }
-                    TypeKind::Intrinsic(TypeTag::Map) => true,
+                    TypeKind::Builtin(varn_core::BuiltinType::Map) => true,
                     TypeKind::Object(mid) => {
                         let members = self.ty_table.get_object_members(mid);
                         members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })

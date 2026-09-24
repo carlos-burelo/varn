@@ -207,9 +207,9 @@ pub(super) fn resolve_indexed_access(
             }
         }
         _ => {
-            use varn_core::TypeTag;
-            if matches!(table.get(obj.0), TypeKind::Intrinsic(TypeTag::Str))
-                && matches!(table.get(index.0), TypeKind::Intrinsic(TypeTag::Int))
+            
+            if matches!(table.get(obj.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
+                && matches!(table.get(index.0), TypeKind::Primitive(varn_core::LangPrimitive::Int))
             {
                 return Type::Str;
             }

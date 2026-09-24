@@ -93,7 +93,7 @@ impl<'r> Checker<'r> {
                             _ => None,
                         })
                 }
-                TypeKind::Array(_) | TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+                TypeKind::Array(_) | TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
                     Some(Type::Int)
                 }
                 _ => None,
@@ -104,10 +104,11 @@ impl<'r> Checker<'r> {
                 let is_range_slice = matches!(
                     check_kind,
                     TypeKind::Array(_)
-                        | TypeKind::Intrinsic(varn_core::TypeTag::Str | varn_core::TypeTag::Bytes)
+                        | TypeKind::Primitive(varn_core::LangPrimitive::Str)
+                        | TypeKind::Builtin(varn_core::BuiltinType::Bytes)
                 ) && matches!(
                     self.ty_table.get(actual_k.0),
-                    TypeKind::Intrinsic(varn_core::TypeTag::Range)
+                    TypeKind::Builtin(varn_core::BuiltinType::Range)
                 );
                 if !actual_k.is_dynamic()
                     && !is_range_slice
@@ -170,7 +171,7 @@ impl<'r> Checker<'r> {
         }
         let should_check = !matches!(
             self.ty_table.get(check_ty.0),
-            TypeKind::Intrinsic(varn_core::TypeTag::Never)
+            TypeKind::Primitive(varn_core::LangPrimitive::Never)
         );
 
         if let Some(tn) = extension_type_name(self, &check_ty, &self.ty_table, bind) {
@@ -275,15 +276,20 @@ impl<'r> Checker<'r> {
                 TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => {
                     orig.map(|o| self.resolve_bind_atom(bind, o))
                 }
-                TypeKind::Intrinsic(tag) => Some(std::sync::Arc::from(match tag {
-                    varn_core::TypeTag::Map => "core:map",
-                    varn_core::TypeTag::Set => "core:set",
-                    varn_core::TypeTag::Range => "core:range",
-                    varn_core::TypeTag::Array => "core:array",
-                    varn_core::TypeTag::Str => "core:str",
-                    varn_core::TypeTag::Bytes => "core:bytes",
-                    varn_core::TypeTag::TaskHandle => "core:task",
+                TypeKind::Primitive(p) => Some(std::sync::Arc::from(match p {
+                    varn_core::LangPrimitive::Str => "core:str",
                     _ => "core:primitives",
+                })),
+                TypeKind::Builtin(b) => Some(std::sync::Arc::from(match b {
+                    varn_core::BuiltinType::Map => "core:map",
+                    varn_core::BuiltinType::Set => "core:set",
+                    varn_core::BuiltinType::Range => "core:range",
+                    varn_core::BuiltinType::Array => "core:array",
+                    varn_core::BuiltinType::Bytes => "core:bytes",
+                    varn_core::BuiltinType::TaskHandle => "core:task",
+                    varn_core::BuiltinType::Task | varn_core::BuiltinType::Generator => {
+                        "core:primitives"
+                    }
                 })),
                 _ => None,
             };
@@ -372,7 +378,7 @@ pub(crate) fn extension_type_name(
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             Some(checker.resolve_bind_atom(bind, n))
         }
-        TypeKind::Intrinsic(tag) => Some(std::sync::Arc::from(tag.name())),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => k.lang_name().map(std::sync::Arc::from),
         _ => None,
     }
 }

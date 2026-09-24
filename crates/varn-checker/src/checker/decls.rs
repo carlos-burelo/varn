@@ -581,10 +581,8 @@ impl<'r> Checker<'r> {
                         Some(Arc::from(bind.interner.resolve(n)))
                     }
 
-                    TypeKind::Intrinsic(tag)
-                        if varn_core::IntrinsicType(tag).is_scalar_primitive() =>
-                    {
-                        Some(varn_core::IntrinsicType(tag).as_str().into())
+                    TypeKind::Primitive(p) if p != varn_core::LangPrimitive::Dynamic => {
+                        Some(p.name().into())
                     }
                     _ => None,
                 };

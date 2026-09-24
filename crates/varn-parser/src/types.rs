@@ -1,6 +1,6 @@
 use crate::stream::TokenStream;
 use varn_core::ast::{TypeNode, TypeParam};
-use varn_core::{TokenKind, TypeKind, TypeTag};
+use varn_core::{TokenKind, TypeKind};
 
 pub fn parse_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let start = s.range();
@@ -134,7 +134,7 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             let q_range = s.range();
             s.advance();
             let full_range = s.span_from(start);
-            let null_node = s.type_node(q_range, TypeKind::Intrinsic(TypeTag::Null));
+            let null_node = s.type_node(q_range, TypeKind::Primitive(varn_core::LangPrimitive::Null));
             ty = s.type_node(full_range, TypeKind::Union(vec![ty, null_node]));
         } else {
             break;
@@ -362,12 +362,12 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
         )),
         TokenKind::Null => {
             s.advance();
-            Ok(s.type_node(range, TypeKind::Intrinsic(TypeTag::Null)))
+            Ok(s.type_node(range, TypeKind::Primitive(varn_core::LangPrimitive::Null)))
         }
 
         TokenKind::Void => {
             s.advance();
-            Ok(s.type_node(range, TypeKind::Intrinsic(TypeTag::Void)))
+            Ok(s.type_node(range, TypeKind::Primitive(varn_core::LangPrimitive::Void)))
         }
 
         TokenKind::Is
@@ -420,7 +420,7 @@ fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> 
         }
     }
     let full_range = s.span_from(start);
-    Ok(s.type_node(full_range, TypeKind::Intrinsic(varn_core::TypeTag::Str)))
+    Ok(s.type_node(full_range, TypeKind::Primitive(varn_core::LangPrimitive::Str)))
 }
 
 pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {

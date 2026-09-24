@@ -540,14 +540,14 @@ impl<'r> Checker<'r> {
                 );
                 self.find_member_info_uncached(&array_ty, key, bind)
             }
-            TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
                 if key == varn_core::MemberKey::Length.as_str() {
                     Some((Type::Int, None))
                 } else {
                     intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
                 }
             }
-            TypeKind::Intrinsic(varn_core::TypeTag::Bytes) => {
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
                 if key == varn_core::MemberKey::Length.as_str() {
                     Some((Type::Int, None))
                 } else {
@@ -565,10 +565,11 @@ impl<'r> Checker<'r> {
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
             }
-            TypeKind::Intrinsic(tag) => {
-                if let Some(info) = intrinsic_member_info(bind, tag.name(), key) {
+            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)) => {
+                let name = kind.lang_name().unwrap_or_default();
+                if let Some(info) = intrinsic_member_info(bind, name, key) {
                     Some(info)
-                } else if tag == varn_core::TypeTag::Range {
+                } else if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) {
                     let atom = self
                         .resolver
                         .intern(varn_core::IntrinsicType::Range.as_str());

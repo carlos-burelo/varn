@@ -18,7 +18,7 @@ use rustc_hash::FxHashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use varn_core::ast::operators::Visibility;
-use varn_core::{Atom, AtomInterner, TypeTag};
+use varn_core::{Atom, AtomInterner};
 
 pub type ExportMap = FxHashMap<String, Symbol>;
 
@@ -89,7 +89,7 @@ fn encode_with_owner(
     if fallback_table.contains(ty.0) {
         return encode_portable_type(ty, fallback_table, interner);
     }
-    PortableType::Intrinsic(TypeTag::Dynamic)
+    PortableType::Primitive(varn_core::LangPrimitive::Dynamic)
 }
 
 pub(crate) fn encode_symbol(

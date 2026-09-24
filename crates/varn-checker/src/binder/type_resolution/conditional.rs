@@ -173,10 +173,10 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         return true;
     }
 
-    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) =
-        (table.get(check.0), table.get(extends.0))
-    {
-        return t1 == t2;
+    match (table.get(check.0), table.get(extends.0)) {
+        (TypeKind::Primitive(p1), TypeKind::Primitive(p2)) => return p1 == p2,
+        (TypeKind::Builtin(b1), TypeKind::Builtin(b2)) => return b1 == b2,
+        _ => {}
     }
 
     match (table.get(check.0).clone(), table.get(extends.0).clone()) {
