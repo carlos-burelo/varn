@@ -251,6 +251,7 @@ fn build_one_class(
     let mut method_names: Vec<Arc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Arc<str>, varn_tir::SigId> = FxHashMap::default();
 
+    let mut constructor = None;
     let mut push_method = |key: Arc<str>, sig: varn_tir::SigId, order: &mut Vec<Arc<str>>| {
         if method_sig.insert(key.clone(), sig).is_none() {
             order.push(key);
@@ -290,6 +291,11 @@ fn build_one_class(
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(m.name.clone(), sig, &mut method_names);
             }
+            // The flattened list holds the parent's constructor first; the
+            // last one is the class's own.
+            ClassMemberKind::Constructor => {
+                constructor = Some(intern_signature(&m.ty, table, interner, tt, names, signatures));
+            }
             ClassMemberKind::Getter => {
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(Arc::from(format!("get {}", m.name)), sig, &mut method_names);
@@ -308,7 +314,9 @@ fn build_one_class(
         .collect();
 
     let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
-    ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods)
+    let mut info = ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods);
+    info.constructor = constructor;
+    info
 }
 
 /// Append a signature for a method and hand back its id.

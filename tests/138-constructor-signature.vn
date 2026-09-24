@@ -1,0 +1,34 @@
+// A constructor's parameters have the types they declare: an `int`
+// parameter is an `int` in the body, not `dynamic`.
+
+class CtorNeg {
+    b: int
+    constructor(i: int) {
+        this.b = -i
+    }
+}
+
+class CtorMixed {
+    total: float
+    label: str
+    constructor(n: int, f: float, s: str) {
+        this.total = (n as float) + f
+        this.label = s.toUpperCase()
+    }
+}
+
+class CtorChild extends CtorNeg {
+    c: int
+    constructor(i: int, j: int) {
+        super(i)
+        this.c = -j
+    }
+}
+
+assert("int constructor parameter negates", new CtorNeg(3).b === -3)
+const mixed = new CtorMixed(2, 0.5, "ok")
+assert("typed constructor parameters", mixed.total === 2.5 && mixed.label == "OK")
+const child = new CtorChild(4, 5)
+assert("subclass constructor parameters are typed", child.b === -4 && child.c === -5)
+
+print("[PASSED] 138. Constructor signature")

@@ -1283,7 +1283,9 @@ fn emit_class(
     for member in &class.body {
         match member {
             ClassMember::Constructor { params, body, .. } => {
-                let sig = info_sig("constructor", params.len(), signatures);
+                let sig = class_id
+                    .and_then(|cid| ctx.classes[cid.0 as usize].constructor)
+                    .unwrap_or_else(|| fresh_sig(signatures, params.len()));
                 let id = emit_member_fn(
                     Arc::from(format!("{class_name}.constructor")),
                     params,

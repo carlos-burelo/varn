@@ -29,23 +29,28 @@ TirModule {
                 VtableEntry {
                     name: "get celsius",
                     sig: SigId(
-                        1,
+                        2,
                     ),
                 },
                 VtableEntry {
                     name: "set celsius",
                     sig: SigId(
-                        2,
+                        3,
                     ),
                 },
                 VtableEntry {
                     name: "get fahrenheit",
                     sig: SigId(
-                        3,
+                        4,
                     ),
                 },
             ],
             payload_size: 16,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
         },
     ],
     enums: [],
@@ -55,29 +60,27 @@ TirModule {
             return_ty: Void,
         },
         Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
-        },
-        Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
-        },
-        Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
-        },
-        Signature {
             params: [
-                Dynamic(
-                    Unannotated,
-                ),
+                Float,
             ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [],
             return_ty: Dynamic(
                 Unannotated,
             ),
@@ -109,12 +112,10 @@ TirModule {
         TirFunction {
             name: "Temperature.constructor",
             sig: SigId(
-                4,
+                1,
             ),
             params: [
-                Dynamic(
-                    Unannotated,
-                ),
+                Float,
             ],
             return_ty: Dynamic(
                 Unannotated,
