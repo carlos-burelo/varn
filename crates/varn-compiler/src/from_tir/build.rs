@@ -67,6 +67,10 @@ struct Builder<'m> {
     current: BlockId,
     inlining_params: Vec<Vec<Value>>,
     inlining_stack: Vec<varn_tir::FnId>,
+    /// Declared type of each local and of the return, for the implicit
+    /// `int → bigint` / `int → decimal` widenings the checker allowed.
+    locals_bt: Vec<BackendTy>,
+    return_bt: Option<BackendTy>,
 }
 
 impl<'m> Builder<'m> {
@@ -93,6 +97,8 @@ impl<'m> Builder<'m> {
             current: BlockId(0),
             inlining_params: Vec::new(),
             inlining_stack: Vec::new(),
+            locals_bt: Vec::new(),
+            return_bt: None,
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;
@@ -184,6 +190,18 @@ impl<'m> Builder<'m> {
 
     /// Force `v` to `target`: a real `Convert` for `int → float` (an exact
     /// literal adopting `float`), a representation-neutral `Cast` otherwise.
+    /// The exact implicit widenings (`int → bigint`, `int → decimal`, spec §9)
+    /// as a real conversion: without it the value stays an `int` and `int`
+    /// arithmetic (with its overflow) runs on a `bigint`-typed variable.
+    fn widen_exact(&mut self, v: Value, from: BackendTy, to: BackendTy) -> Value {
+        let conv = match (from, to) {
+            (BackendTy::Int, BackendTy::BigInt) => varn_core::NumConv::IntToBigInt,
+            (BackendTy::Int, BackendTy::Decimal) => varn_core::NumConv::IntToDecimal,
+            _ => return v,
+        };
+        self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic)
+    }
+
     fn coerce(&mut self, v: Value, target: HirType) -> Value {
         let from = self.value_ty(v);
         if from == target {
@@ -413,6 +431,7 @@ impl<'m> Builder<'m> {
                 let value = match init {
                     Some(e) => {
                         let v = self.lower_expr(e)?;
+                        let v = self.widen_exact(v, e.ty, *ty);
                         // The binding's declared type wins — an `int`
                         // initializer for a `let x: float` needs the widening
                         // the checker proved, or a typed op reading `x` later
@@ -447,7 +466,13 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Return(v) => {
                 let val = match v {
-                    Some(e) => Some(self.lower_expr(e)?),
+                    Some(e) => {
+                        let v = self.lower_expr(e)?;
+                        Some(match self.return_bt {
+                            Some(rt) => self.widen_exact(v, e.ty, rt),
+                            None => v,
+                        })
+                    }
                     None => None,
                 };
                 // Leave every `try` region this return jumps out of.
@@ -1083,6 +1108,21 @@ impl<'m> Builder<'m> {
 
             TirExprKind::Assign { target, value } => {
                 let v = self.lower_expr(value)?;
+                let v = match (&target.kind, &target.res) {
+                    (TirExprKind::Var, Resolution::Local(id)) => {
+                        match self.locals_bt.get(id.0 as usize).copied() {
+                            Some(declared) => self.widen_exact(v, value.ty, declared),
+                            None => v,
+                        }
+                    }
+                    (TirExprKind::Var, Resolution::GlobalSlot(n)) => {
+                        match self.tir.globals.get(*n as usize).copied() {
+                            Some(declared) => self.widen_exact(v, value.ty, declared),
+                            None => v,
+                        }
+                    }
+                    _ => v,
+                };
                 self.lower_assign(target, v)?;
                 Ok(v)
             }
@@ -1278,12 +1318,14 @@ impl<'m> Builder<'m> {
         }
 
         let mut argv = Vec::with_capacity(args.len());
-        for a in args {
-            match a {
-                varn_tir::TirArg::Expr(e) => argv.push(self.lower_expr(e)?),
-                varn_tir::TirArg::Named { value, .. } => argv.push(self.lower_expr(value)?),
+        for (a, &pty) in args.iter().zip(&tf.params) {
+            let e = match a {
+                varn_tir::TirArg::Expr(e) => e,
+                varn_tir::TirArg::Named { value, .. } => value,
                 varn_tir::TirArg::Spread(_) => return Ok(None),
-            }
+            };
+            let v = self.lower_expr(e)?;
+            argv.push(self.widen_exact(v, e.ty, pty));
         }
 
         self.inlining_stack.push(f);
@@ -1974,6 +2016,8 @@ fn build_inner(
     pinned.extend(super::ctor_summary::try_pinned_vars(func));
     let mut b = Builder::with_pinned(tir, pinned.clone());
     b.self_fn = self_fn;
+    b.locals_bt = func.locals.clone();
+    b.return_bt = Some(func.return_ty);
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
 
@@ -1990,6 +2034,12 @@ fn build_inner(
         };
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
+        // A `bigint`/`decimal` parameter may arrive as an `int` (the implicit
+        // widening happens at the call site's type level only).
+        let v = match (*pty, defaulted[i]) {
+            (BackendTy::BigInt | BackendTy::Decimal, false) => b.widen_exact(v, BackendTy::Int, *pty),
+            _ => v,
+        };
         b.write_var(VarId::Param(i as u32), entry, v);
     }
 

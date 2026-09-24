@@ -35,4 +35,12 @@ const s: Set<bigint> = new Set<bigint>()
 s.add(huge)
 assert("bigint set member by value", s.has(170141183460469231731687303715884105728n))
 
+const maxI: int = 9223372036854775807
+const widened: bigint = maxI
+assert("implicit int to bigint widens for real", (widened + widened).toString() === "18446744073709551614")
+function sq(x: bigint): bigint { return x * x }
+assert("int argument to bigint parameter widens", sq(maxI).toString() === "85070591730234615847396907784232501249")
+function asBig(x: int): bigint { return x }
+assert("int returned as bigint widens", (asBig(maxI) + 1n).toString() === "9223372036854775808")
+
 print("[PASSED] 124. Arbitrary-precision bigint")
