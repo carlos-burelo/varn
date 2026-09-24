@@ -3,6 +3,7 @@ pub mod capabilities;
 pub mod chunk;
 pub mod class_layout;
 pub mod generator;
+pub mod layout;
 pub mod loop_analysis;
 pub mod marshal;
 pub mod module_graph;

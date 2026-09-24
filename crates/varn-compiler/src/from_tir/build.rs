@@ -253,7 +253,7 @@ impl<'m> Builder<'m> {
 
     /// Compact `(offset, tag)` of field `slot` on a statically-typed class
     /// receiver, or `None` if the receiver's type isn't a class. Mirrors
-    /// `ClassLayout::from_fields` exactly (same `class_field_repr`, same
+    /// `ClassLayout::from_fields` exactly (same `TypeLayout::of_field`, same
     /// slot-ordered field list), so the baked offset is byte-identical to the
     /// runtime layout.
     fn compact_field(

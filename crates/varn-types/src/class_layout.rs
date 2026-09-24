@@ -4,6 +4,7 @@
 //! offsets, alignments, and sizes are known and immutable. This module provides
 //! the compile-time and runtime descriptor representing that static memory layout.
 
+use crate::layout::{GcLayout, GcSlot, TypeLayout};
 use std::sync::Arc;
 use varn_core::RuntimeKind;
 
@@ -16,12 +17,20 @@ pub struct FieldLayout {
     pub kind: Option<RuntimeKind>,
     /// Byte offset relative to the payload start (after instance header).
     pub offset: u32,
-    /// Size of this field in bytes (e.g. 1 for bool, 8 for int/float, 16 for VmValue).
-    pub size: u32,
-    /// Alignment of this field in bytes.
-    pub align: u32,
-    /// True if this field holds a GC reference that the collector must trace.
-    pub is_gc_ref: bool,
+    pub layout: TypeLayout,
+}
+
+impl FieldLayout {
+    /// The field at `offset` laid out by `kind`, for an access whose offset
+    /// the compiler baked (no `ClassLayout` lookup).
+    pub fn at(offset: u32, kind: Option<RuntimeKind>) -> Self {
+        Self {
+            name: Arc::from(""),
+            kind,
+            offset,
+            layout: TypeLayout::of_field(kind),
+        }
+    }
 }
 
 /// Static memory layout for an entire class instance.
@@ -37,50 +46,8 @@ pub struct ClassLayout {
     pub alignment: u32,
     /// Ordered list of fields.
     pub fields: Vec<FieldLayout>,
-    /// 64-bit bitmap indicating which 8-byte words contain GC references.
-    /// Bit `i` is set if word `i` from the payload start is a GC reference.
-    pub gc_mask: u64,
-}
-
-/// `(size, align, is_gc_ref)` of a class field laid out by `kind` — the one
-/// table the compiler bakes offsets from and the runtime allocates by.
-///
-/// A boxed field (`None`, or a kind with no unboxed form) is a whole 16-byte
-/// `VmValue`. So are `str` — it can be `KIND_SSO`, an inline `VmValue` with
-/// no heap object (`vm_value.rs`'s `try_from_sso`) — and `char`, which is
-/// always `HeapObj::Char` and would need heap access `InstanceData` does not
-/// have. Every other GC reference is always `KIND_HEAP`, so it compacts to a
-/// bare 8-byte heap index.
-pub const fn class_field_repr(kind: Option<RuntimeKind>) -> (u32, u32, bool) {
-    match kind {
-        Some(RuntimeKind::Bool) => (1, 1, false),
-        Some(RuntimeKind::Int | RuntimeKind::Float) => (8, 8, false),
-        Some(
-            RuntimeKind::Array
-            | RuntimeKind::Map
-            | RuntimeKind::Set
-            | RuntimeKind::Object
-            | RuntimeKind::Class
-            | RuntimeKind::Function
-            | RuntimeKind::Task
-            | RuntimeKind::Bytes
-            | RuntimeKind::Generator,
-        ) => (8, 8, true),
-        Some(
-            RuntimeKind::Null
-            | RuntimeKind::Str
-            | RuntimeKind::Char
-            | RuntimeKind::BigInt
-            | RuntimeKind::Decimal
-            | RuntimeKind::Symbol
-            | RuntimeKind::Tuple
-            | RuntimeKind::Range
-            | RuntimeKind::Enum
-            | RuntimeKind::Opaque
-            | RuntimeKind::TaskHandle,
-        )
-        | None => (16, 8, true),
-    }
+    /// Where the instance's references are: what the collector visits.
+    pub gc: GcLayout,
 }
 
 impl ClassLayout {
@@ -92,7 +59,7 @@ impl ClassLayout {
             payload_size: 0,
             alignment: 8,
             fields: Vec::new(),
-            gc_mask: 0,
+            gc: GcLayout::default(),
         }
     }
 
@@ -113,40 +80,28 @@ impl ClassLayout {
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut cur_offset = 0u32;
         let mut max_align = 8u32;
-        let mut gc_mask = 0u64;
+        let mut gc = GcLayout::default();
 
-        for (field_name, tag) in fields_in {
-            let (size, align, is_gc) = class_field_repr(*tag);
-
+        for (field_name, kind) in fields_in {
+            let layout = TypeLayout::of_field(*kind);
+            let align = layout.align;
             max_align = max_align.max(align);
-            // Align current offset up to field's required alignment
             let padding = (align - (cur_offset % align)) % align;
             cur_offset += padding;
 
             let offset = cur_offset;
-            if is_gc {
-                // Mark every 8-byte word the field spans, not just its first
-                // — a 16-byte `Dynamic` field covers two words, and a mask
-                // that only ever set one bit per field was silently wrong for
-                // any multi-word GC-ref field the moment something finally
-                // read `gc_mask` (nothing does yet; this is the first
-                // consumer-shaped use, so it gets it right from the start).
-                let mut w = offset / 8;
-                let end_word = (offset + size).div_ceil(8);
-                while w < end_word && w < 64 {
-                    gc_mask |= 1u64 << w;
-                    w += 1;
-                }
+            if layout.repr.holds_reference() {
+                gc.slots.push(GcSlot {
+                    offset,
+                    repr: layout.repr,
+                });
             }
-
-            cur_offset += size;
+            cur_offset += layout.size;
             fields.push(FieldLayout {
                 name: field_name.clone(),
-                kind: *tag,
+                kind: *kind,
                 offset,
-                size,
-                align,
-                is_gc_ref: is_gc,
+                layout,
             });
         }
 
@@ -160,7 +115,7 @@ impl ClassLayout {
             payload_size,
             alignment: max_align,
             fields,
-            gc_mask,
+            gc,
         }
     }
 

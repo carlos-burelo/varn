@@ -629,7 +629,7 @@ impl LoopCaches<'_> {
     /// The object-data cache `r` should use at `ip`.
     ///
     /// Fase B: disabled. The hoisted base is `InstanceData::payload` for a
-    /// class instance, whose fields are COMPACT (`class_field_repr`); the
+    /// class instance, whose fields are COMPACT (`TypeLayout::of_field`); the
     /// access sites then load at `slot*16`, wrong for instances. Until the
     /// cache records the receiver's shape (instance vs dynamic object), no
     /// object access is hoisted — `GetFixedField`/`SetFixedField` route

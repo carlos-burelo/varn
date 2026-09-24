@@ -1,13 +1,13 @@
 use super::shape::{root_shape, Shape};
 use super::{ClassObj, RuntimeString, Value};
 use crate::class_layout::FieldLayout;
+use crate::layout::{ScalarRepr, COMPACT_REF_NULL};
 use crate::vm_value::{VmValue, VmValueRef};
 use std::cell::{Cell, UnsafeCell};
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::RuntimeKind;
 
 /// A property object, stored as a single allocation: the header and the
 /// object's fields share one `Rc` block, with the fields as a DST tail sized
@@ -685,7 +685,6 @@ impl InstanceData {
     /// check on the checker side is what routes anything possibly-unwritten
     /// to the 16-byte `Dynamic` slot instead), so an all-zero fresh payload
     /// is never actually observed as a value here.
-    const COMPACT_REF_UNINIT: u64 = u32::MAX as u64;
 
     /// Resolves this instance's `ClassLayout` through the class registry.
     /// `InstanceData` itself only knows the header word (`class_id` /
@@ -719,15 +718,7 @@ impl InstanceData {
     /// the tag.
     #[inline]
     pub fn read_field_at(&self, offset: u32, tag: Option<varn_core::RuntimeKind>) -> Option<VmValue> {
-        let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
-        let f = FieldLayout {
-            name: Arc::from(""),
-            kind: tag,
-            offset,
-            size,
-            align,
-            is_gc_ref,
-        };
+        let f = FieldLayout::at(offset, tag);
         self.read_field(&f)
     }
 
@@ -740,15 +731,7 @@ impl InstanceData {
         tag: Option<varn_core::RuntimeKind>,
         val: VmValue,
     ) -> Result<(), &'static str> {
-        let (size, align, is_gc_ref) = crate::class_layout::class_field_repr(tag);
-        let f = FieldLayout {
-            name: Arc::from(""),
-            kind: tag,
-            offset,
-            size,
-            align,
-            is_gc_ref,
-        };
+        let f = FieldLayout::at(offset, tag);
         self.write_field(&f, val)
     }
 
@@ -763,31 +746,27 @@ impl InstanceData {
         self.write_field(f, val).is_ok()
     }
 
-    /// Reads one field at its own `FieldLayout` — the packed-representation
-    /// counterpart of `field_at`'s old blind `slot * 16`. `str` and `char`
-    /// stay full `VmValue` slots (see `class_field_repr`'s doc comment: a
-    /// `str` can be `KIND_SSO` with no heap object at all, and `char` needs
-    /// heap access this struct doesn't have); a compact GC-ref field decodes
-    /// `COMPACT_REF_UNINIT` back to `null`, symmetric with how it is written.
+    /// Reads one field by its representation (`TypeLayout`); a `Ref` slot
+    /// decodes the `null` niche back to `null`, symmetric with the write.
     pub fn read_field(&self, f: &FieldLayout) -> Option<VmValue> {
         let offset = f.offset as usize;
-        if offset + f.size as usize > self.payload_size as usize {
+        if offset + f.layout.size as usize > self.payload_size as usize {
             return None;
         }
         unsafe {
-            Some(match f.kind {
-                Some(RuntimeKind::Bool) => VmValue::from_bool(self.read_bool(offset)),
-                Some(RuntimeKind::Int) => VmValue::from_int(self.read_i64(offset)),
-                Some(RuntimeKind::Float) => VmValue::from_f64(self.read_f64(offset)),
-                _ if f.is_gc_ref && f.size == 8 => {
+            Some(match f.layout.repr {
+                ScalarRepr::Bool => VmValue::from_bool(self.read_bool(offset)),
+                ScalarRepr::I64 => VmValue::from_int(self.read_i64(offset)),
+                ScalarRepr::F64 => VmValue::from_f64(self.read_f64(offset)),
+                ScalarRepr::Ref => {
                     let raw = self.read_u64(offset);
-                    if raw == Self::COMPACT_REF_UNINIT {
+                    if raw == COMPACT_REF_NULL {
                         VmValue::null()
                     } else {
                         VmValue::from_heap_idx(raw as u32)
                     }
                 }
-                _ => self.read_vm_value(offset),
+                ScalarRepr::Boxed => self.read_vm_value(offset),
             })
         }
     }
@@ -795,7 +774,7 @@ impl InstanceData {
     /// Writes one field at its own `FieldLayout`, converting the same way
     /// `varn_vm::frame_store`'s `Fpr`/`Ref` slot writes do: `int` widens into
     /// a `float` field the checker proved compatible, and `null` into a
-    /// compact GC-ref field is `COMPACT_REF_UNINIT`, not an error — a `class`
+    /// compact GC-ref field is the `null` niche, not an error — a `class`
     /// -typed field genuinely can be unset before the constructor assigns it
     /// (`tests/63-escape-analysis.vn`'s "unassigned field still reads null"
     /// pattern applies here exactly as it does to registers). Anything else
@@ -803,24 +782,24 @@ impl InstanceData {
     /// silently reinterpreted.
     pub fn write_field(&self, f: &FieldLayout, val: VmValue) -> Result<(), &'static str> {
         let offset = f.offset as usize;
-        if offset + f.size as usize > self.payload_size as usize {
+        if offset + f.layout.size as usize > self.payload_size as usize {
             return Err("field offset exceeds instance payload");
         }
         unsafe {
-            match f.kind {
-                Some(RuntimeKind::Bool) => {
+            match f.layout.repr {
+                ScalarRepr::Bool => {
                     if !val.is_bool() {
                         return Err("cannot store non-bool in a bool field");
                     }
                     self.write_bool(offset, val.as_bool());
                 }
-                Some(RuntimeKind::Int) => {
+                ScalarRepr::I64 => {
                     if !val.is_int() {
                         return Err("cannot store non-int in an int field");
                     }
                     self.write_i64(offset, val.as_int());
                 }
-                Some(RuntimeKind::Float) => {
+                ScalarRepr::F64 => {
                     // Symmetric with `frame_store`'s `Fpr`: `int` widens,
                     // `null` (a NaN result — `VmValue::from_f64` already
                     // folds NaN to `null`) round-trips through a real NaN
@@ -835,16 +814,16 @@ impl InstanceData {
                         return Err("cannot store non-numeric in a float field");
                     }
                 }
-                _ if f.is_gc_ref && f.size == 8 => {
+                ScalarRepr::Ref => {
                     if val.is_null() {
-                        self.write_u64(offset, Self::COMPACT_REF_UNINIT);
+                        self.write_u64(offset, COMPACT_REF_NULL);
                     } else if val.is_heap() {
                         self.write_u64(offset, val.as_heap_idx() as u64);
                     } else {
                         return Err("cannot store non-reference in a reference field");
                     }
                 }
-                _ => self.write_vm_value(offset, val),
+                ScalarRepr::Boxed => self.write_vm_value(offset, val),
             }
         }
         Ok(())

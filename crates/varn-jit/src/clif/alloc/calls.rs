@@ -2,7 +2,7 @@
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
-use varn_core::RuntimeKind;
+use varn_types::layout::ScalarRepr;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
@@ -87,30 +87,32 @@ pub(crate) fn emit_call(
                     let base = data_base;
                     let off = fi.offset as i32;
                     let m = MemFlags::new();
-                    match fi.tag {
-                        Some(RuntimeKind::Bool) => {
+                    match fi.repr {
+                        ScalarRepr::Bool => {
                             b.ins().istore8(m, payload, base, off);
                         }
-                        Some(RuntimeKind::Int) => {
+                        ScalarRepr::I64 => {
                             b.ins().store(m, payload, base, off);
                         }
-                        Some(RuntimeKind::Float) => {
+                        ScalarRepr::F64 => {
                             let f = unbox_f64_coerce(b, val);
                             b.ins().store(m, f, base, off);
                         }
-                        _ if fi.is_gc_ref && fi.size == 8 => {
-                            // `null` -> COMPACT_REF_UNINIT, heap -> index,
+                        ScalarRepr::Ref => {
+                            // `null` -> the null niche, heap -> index,
                             // exactly as `InstanceData::write_field`.
                             let is_null = b.ins().icmp_imm(
                                 IntCC::Equal,
                                 tag_v,
                                 varn_types::vm_value::KIND_NULL as i64,
                             );
-                            let uninit = b.ins().iconst(types::I64, u32::MAX as i64);
+                            let uninit = b
+                                .ins()
+                                .iconst(types::I64, varn_types::layout::COMPACT_REF_NULL as i64);
                             let stored = b.ins().select(is_null, uninit, payload);
                             b.ins().store(m, stored, base, off);
                         }
-                        _ => {
+                        ScalarRepr::Boxed => {
                             // `str` / `char` / Dynamic: a full 16-byte VmValue.
                             b.ins().store(m, val, base, off);
                         }

@@ -91,7 +91,7 @@ pub struct ClifClassTarget {
 }
 
 /// One field initialised by a trivial constructor, at its COMPACT layout —
-/// `(param, offset, size, tag, is_gc_ref)` from the class's `ClassLayout`, so
+/// `(param, offset, repr)` from the class's `ClassLayout`, so
 /// the inline `new X()` path writes the same bytes `InstanceData::write_field`
 /// would (`varn-types/src/value/object.rs`).
 #[derive(Clone, Copy, Debug)]
@@ -101,10 +101,7 @@ pub struct ClifFieldInit {
     pub param_idx: usize,
     /// Byte offset from the instance payload start.
     pub offset: u32,
-    /// Field size in bytes (1/2/4/8/16).
-    pub size: u32,
-    pub tag: Option<varn_core::RuntimeKind>,
-    pub is_gc_ref: bool,
+    pub repr: varn_types::layout::ScalarRepr,
 }
 
 /// VM-side resolver for clif→clif static calls. Implemented over the live

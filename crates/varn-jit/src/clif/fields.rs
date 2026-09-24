@@ -111,8 +111,8 @@ fn emit_object_field_addr(
     b.ins().brif(is_valid, ok, &[], slow, &[]);
     b.switch_to_block(ok);
 
-    // Instances have a COMPACT field layout (`class_field_repr` in
-    // `varn-types::class_layout`): sizes 1/2/4/8, not a 16-byte `VmValue`
+    // Instances have a COMPACT field layout (`TypeLayout::of_field` in
+    // `varn-types::layout`): sizes 1/8, not a 16-byte `VmValue`
     // slot. The constant-offset addressing below assumes 16-byte slots, which
     // is only true for dynamic `Object`s, so send instances to the
     // compact-aware runtime helper (`get_fixed_field`/`set_fixed_field`).
@@ -176,14 +176,13 @@ fn emit_get_fixed_field_compact(
     tag: Option<varn_core::RuntimeKind>,
     slot: usize,
 ) -> Result<(), String> {
-    use varn_types::class_layout::class_field_repr;
+    use varn_types::layout::{ScalarRepr, TypeLayout};
 
     let obj = if let Some(actx) = actx {
         super::alloc::box_or_load_home(b, actx, state, obj_r)
     } else {
         use_boxed(b, c.vars, state, obj_r)?
     };
-    let (size, _align, is_gc_ref) = class_field_repr(tag);
 
     let slow = b.create_block();
     let cont = b.create_block();
@@ -200,26 +199,26 @@ fn emit_get_fixed_field_compact(
     );
     let off = offset as i32;
     let m = MemFlags::trusted();
-    let pair = match tag {
-        Some(varn_core::RuntimeKind::Bool) => {
+    let pair = match TypeLayout::of_field(tag).repr {
+        ScalarRepr::Bool => {
             let b8 = b.ins().load(types::I8, m, data_base, off);
             let v = b.ins().uextend(types::I64, b8);
             emit::box_bool(b, v)
         }
-        Some(varn_core::RuntimeKind::Int) => {
+        ScalarRepr::I64 => {
             let v = b.ins().load(types::I64, m, data_base, off);
             emit::box_int(b, v)
         }
-        Some(varn_core::RuntimeKind::Float) => {
+        ScalarRepr::F64 => {
             let f = b.ins().load(types::F64, m, data_base, off);
             emit::box_f64(b, f)
         }
-        _ if is_gc_ref && size == 8 => {
+        ScalarRepr::Ref => {
             let raw = b.ins().load(types::I64, m, data_base, off);
             let is_uninit = b.ins().icmp_imm(
                 IntCC::Equal,
                 raw,
-                u32::MAX as i64,
+                varn_types::layout::COMPACT_REF_NULL as i64,
             );
             let null_tag = b
                 .ins()
@@ -232,7 +231,7 @@ fn emit_get_fixed_field_compact(
             let payload = b.ins().select(is_uninit, zero, raw);
             b.ins().iconcat(tag_v, payload)
         }
-        _ => b.ins().load(types::I128, m, data_base, off),
+        ScalarRepr::Boxed => b.ins().load(types::I128, m, data_base, off),
     };
     b.ins().jump(cont, &[pair.into()]);
 
@@ -463,7 +462,7 @@ fn emit_set_fixed_field_compact(
     tag: Option<varn_core::RuntimeKind>,
     slot: usize,
 ) -> Result<(), String> {
-    use varn_types::class_layout::class_field_repr;
+    use varn_types::layout::{ScalarRepr, TypeLayout};
 
     let obj = if let Some(actx) = actx {
         super::alloc::box_or_load_home(b, actx, state, first_reg)
@@ -480,8 +479,6 @@ fn emit_set_fixed_field_compact(
     } else {
         emit::box_int(b, val)
     };
-    let (size, _align, is_gc_ref) = class_field_repr(tag);
-
     let slow = b.create_block();
     let cont = b.create_block();
     let inline = b.create_block();
@@ -515,29 +512,31 @@ fn emit_set_fixed_field_compact(
     let off = offset as i32;
     let m = MemFlags::new();
     let (_vt, payload) = b.ins().isplit(val128);
-    match tag {
-        Some(varn_core::RuntimeKind::Bool) => {
+    match TypeLayout::of_field(tag).repr {
+        ScalarRepr::Bool => {
             b.ins().istore8(m, payload, data_base, off);
         }
-        Some(varn_core::RuntimeKind::Int) => {
+        ScalarRepr::I64 => {
             b.ins().store(m, payload, data_base, off);
         }
-        Some(varn_core::RuntimeKind::Float) => {
+        ScalarRepr::F64 => {
             let f = unbox_f64_coerce(b, val128);
             b.ins().store(m, f, data_base, off);
         }
-        _ if is_gc_ref && size == 8 => {
+        ScalarRepr::Ref => {
             let (tag_v, payload) = b.ins().isplit(val128);
             let is_null = b.ins().icmp_imm(
                 IntCC::Equal,
                 tag_v,
                 varn_types::vm_value::KIND_NULL as i64,
             );
-            let uninit = b.ins().iconst(types::I64, u32::MAX as i64);
+            let uninit = b
+                .ins()
+                .iconst(types::I64, varn_types::layout::COMPACT_REF_NULL as i64);
             let stored = b.ins().select(is_null, uninit, payload);
             b.ins().store(m, stored, data_base, off);
         }
-        _ => {
+        ScalarRepr::Boxed => {
             b.ins().store(m, val128, data_base, off);
         }
     }

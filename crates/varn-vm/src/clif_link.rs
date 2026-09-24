@@ -291,14 +291,10 @@ impl ClifLinker for CtxLinker {
                     wrapper.0.proto.trivial_field_init_plan().map(|p| {
                         p.iter()
                             .map(|&(param_idx, offset, tag)| {
-                                let (size, _align, is_gc_ref) =
-                                    varn_types::class_layout::class_field_repr(tag);
                                 varn_jit::clif::lower::ClifFieldInit {
                                     param_idx,
                                     offset,
-                                    size,
-                                    tag,
-                                    is_gc_ref,
+                                    repr: varn_types::layout::TypeLayout::of_field(tag).repr,
                                 }
                             })
                             .collect()
