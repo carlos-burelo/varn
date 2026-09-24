@@ -17,7 +17,6 @@ impl Type {
     pub const Str: Type = Type(CheckerTyId::STR, false);
     pub const Char: Type = Type(CheckerTyId::CHAR, false);
     pub const Bool: Type = Type(CheckerTyId::BOOL, false);
-    pub const Symbol: Type = Type(CheckerTyId::SYMBOL, false);
     pub const Void: Type = Type(CheckerTyId::VOID, false);
     pub const Null: Type = Type(CheckerTyId::NULL, false);
     pub const Never: Type = Type(CheckerTyId::NEVER, false);
@@ -228,7 +227,6 @@ impl Type {
                 TypeTag::Str => Some(I::Str.as_str()),
                 TypeTag::Char => Some(I::Char.as_str()),
                 TypeTag::Bool => Some(I::Bool.as_str()),
-                TypeTag::Symbol => Some(I::Symbol.as_str()),
                 TypeTag::Bytes => Some(I::Bytes.as_str()),
                 _ => None,
             },

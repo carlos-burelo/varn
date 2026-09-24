@@ -73,7 +73,6 @@ impl TypeTag {
             "bigint" => Some(Self::BigInt),
             "decimal" => Some(Self::Decimal),
             "char" => Some(Self::Char),
-            "symbol" => Some(Self::Symbol),
             "void" => Some(Self::Void),
             "never" => Some(Self::Never),
             "dynamic" => Some(Self::Dynamic),
@@ -108,7 +107,6 @@ impl TypeTag {
                 | Self::Str
                 | Self::BigInt
                 | Self::Decimal
-                | Self::Symbol
         )
     }
 }

@@ -55,7 +55,6 @@ pub fn resolve_type_node(
         TypeKind::Intrinsic(TypeTag::Str) => Type::Str,
         TypeKind::Intrinsic(TypeTag::Char) => Type::Char,
         TypeKind::Intrinsic(TypeTag::Bool) => Type::Bool,
-        TypeKind::Intrinsic(TypeTag::Symbol) => Type::Symbol,
         TypeKind::Intrinsic(TypeTag::Void) => Type::Void,
         TypeKind::Intrinsic(TypeTag::Null) => Type::Null,
         TypeKind::Intrinsic(TypeTag::Never) => Type::Never,

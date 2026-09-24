@@ -1,6 +1,6 @@
 export declare class Symbol {
-    static readonly iterator: symbol;
-    static readonly asyncIterator: symbol;
+    static readonly iterator: Symbol;
+    static readonly asyncIterator: Symbol;
 
     readonly description: str?;
 

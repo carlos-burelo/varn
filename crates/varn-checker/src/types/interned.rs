@@ -84,12 +84,11 @@ impl CheckerTyId {
     pub const STR: CheckerTyId = CheckerTyId(4);
     pub const CHAR: CheckerTyId = CheckerTyId(5);
     pub const BOOL: CheckerTyId = CheckerTyId(6);
-    pub const SYMBOL: CheckerTyId = CheckerTyId(7);
-    pub const VOID: CheckerTyId = CheckerTyId(8);
-    pub const NULL: CheckerTyId = CheckerTyId(9);
-    pub const NEVER: CheckerTyId = CheckerTyId(10);
-    pub const DYNAMIC: CheckerTyId = CheckerTyId(11);
-    pub const THIS: CheckerTyId = CheckerTyId(12);
+    pub const VOID: CheckerTyId = CheckerTyId(7);
+    pub const NULL: CheckerTyId = CheckerTyId(8);
+    pub const NEVER: CheckerTyId = CheckerTyId(9);
+    pub const DYNAMIC: CheckerTyId = CheckerTyId(10);
+    pub const THIS: CheckerTyId = CheckerTyId(11);
 }
 
 /// `CheckerTyId` of the seeded intrinsic `tag`, or `None` for the tags that
@@ -105,7 +104,6 @@ fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
             TypeTag::Str => CheckerTyId::STR,
             TypeTag::Char => CheckerTyId::CHAR,
             TypeTag::Bool => CheckerTyId::BOOL,
-            TypeTag::Symbol => CheckerTyId::SYMBOL,
             TypeTag::Void => CheckerTyId::VOID,
             TypeTag::Null => CheckerTyId::NULL,
             TypeTag::Never => CheckerTyId::NEVER,
@@ -179,7 +177,6 @@ impl CheckerTyTable {
             (CheckerTyId::STR, TypeKind::Intrinsic(TypeTag::Str)),
             (CheckerTyId::CHAR, TypeKind::Intrinsic(TypeTag::Char)),
             (CheckerTyId::BOOL, TypeKind::Intrinsic(TypeTag::Bool)),
-            (CheckerTyId::SYMBOL, TypeKind::Intrinsic(TypeTag::Symbol)),
             (CheckerTyId::VOID, TypeKind::Intrinsic(TypeTag::Void)),
             (CheckerTyId::NULL, TypeKind::Intrinsic(TypeTag::Null)),
             (CheckerTyId::NEVER, TypeKind::Intrinsic(TypeTag::Never)),

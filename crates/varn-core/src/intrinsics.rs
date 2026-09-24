@@ -47,9 +47,6 @@ impl IntrinsicType {
             "str" => Some(Self::Str),
             "char" => Some(Self::Char),
             "bool" => Some(Self::Bool),
-            // `Symbol` is the canonical class name; `symbol` is the surface
-            // scalar annotation. Both resolve to the one tag.
-            "Symbol" | "symbol" => Some(Self::Symbol),
             "void" => Some(Self::Void),
             "null" => Some(Self::Null),
             "never" => Some(Self::Never),
