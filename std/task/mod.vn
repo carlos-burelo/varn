@@ -32,4 +32,3 @@ export {
     WaitGroup
 } from "std:task/sync";
 
-export { Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle } from "core:intrinsics";

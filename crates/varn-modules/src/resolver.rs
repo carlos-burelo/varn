@@ -22,40 +22,11 @@ impl ModuleResolver {
 
     pub fn resolve(&self, spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
         use varn_core::ImportSpecifier;
+        crate::layer::check_import(referrer_layer(referrer), spec)?;
         match ImportSpecifier::parse(spec) {
             ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
-            ImportSpecifier::Core(s) => {
-                let in_intrinsic_context = matches!(referrer, ModuleId::Core(_) | ModuleId::Std(_))
-                    || match referrer {
-                        ModuleId::Local(ref_path) => {
-                            super::std_root::in_source_tree(ref_path.as_ref())
-                        }
-                        _ => false,
-                    };
-                if !in_intrinsic_context {
-                    return Err(format!(
-                        "'{}' is an intrinsic module and cannot be imported; use 'std:' equivalents",
-                        spec
-                    ));
-                }
-                Ok(ModuleId::Core(s))
-            }
-            ImportSpecifier::Runtime(s) => {
-                let in_intrinsic_context = matches!(
-                    referrer,
-                    ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_)
-                ) || match referrer {
-                    ModuleId::Local(ref_path) => super::std_root::in_source_tree(ref_path.as_ref()),
-                    _ => false,
-                };
-                if !in_intrinsic_context {
-                    return Err(format!(
-                        "'{}' is a private runtime module and cannot be imported by user code; use 'std:' equivalents",
-                        spec
-                    ));
-                }
-                Ok(ModuleId::Runtime(s))
-            }
+            ImportSpecifier::Core(s) => Ok(ModuleId::Core(s)),
+            ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
             ImportSpecifier::Relative(rel) => {
                 let joined = if rel.is_absolute() {
                     rel
@@ -82,6 +53,17 @@ impl ModuleResolver {
                     .ok_or_else(|| format!("cannot resolve package '{spec}'"))
             }
         }
+    }
+}
+
+fn referrer_layer(referrer: &ModuleId) -> crate::layer::Layer {
+    use crate::layer::Layer;
+    match referrer {
+        ModuleId::Core(_) => Layer::Core,
+        ModuleId::Std(_) => Layer::Std,
+        ModuleId::Runtime(_) => Layer::Runtime,
+        ModuleId::Local(path) => Layer::of_module(path),
+        ModuleId::Package { .. } => Layer::User,
     }
 }
 

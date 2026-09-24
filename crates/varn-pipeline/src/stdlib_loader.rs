@@ -231,7 +231,7 @@ fn compile_source_inner(
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
-/// Spec §2: std modules may only import `runtime:*`, `std:*` or `core:intrinsics`.
+/// std modules obey the layer rule (ADR-0018): `std:*` and `runtime:*` only.
 ///
 /// Parser-based (not string-scanning): lex + parse the module, then reuse the
 /// same import collector the pipeline uses for cache invalidation. Avoids the
@@ -239,12 +239,8 @@ fn compile_source_inner(
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
-        if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics")
-        {
-            return Err(format!(
-                "{id}: forbidden import \"{spec}\" — std may only import runtime:*/std:* or core:intrinsics"
-            ));
-        }
+        varn_modules::layer::check_import(varn_modules::layer::Layer::Std, &spec)
+            .map_err(|message| format!("{id}: {message}"))?;
     }
     Ok(())
 }

@@ -1,5 +1,4 @@
 import { spawn$, sleep$, parallel$, channel$, Channel } from "runtime:task";
-import { TaskHandle } from "core:intrinsics";
 
 export type TaskSettledResult<T> = {
     status: str,

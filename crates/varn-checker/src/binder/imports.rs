@@ -8,36 +8,15 @@ use crate::symbol::{Symbol, SymbolKind};
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
         let source_str = self.interner.resolve(i.source).to_string();
-        let in_stdlib_context = self.source_file.starts_with("core:")
-            || self.source_file.starts_with("std:")
-            || self.source_file.starts_with("runtime:")
-            || varn_modules::std_root::in_source_tree(self.source_file.as_ref());
-        if !in_stdlib_context {
-            if source_str.starts_with("core:") {
-                // Core names are already in scope: dropping the import leaves
-                // every use resolving to the builtin.
-                self.emit(
-                    Diagnostic::error(
-                        ErrorCode::InvalidImportPath,
-                        format!(
-                            "'{source_str}' is built into the language and always in scope; remove the import"
-                        ),
-                    )
-                    .with_range(i.range),
-                );
+        use varn_modules::layer::{check_import, Layer};
+        if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
+            self.emit(
+                Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range),
+            );
+            // Core names are already in scope, so their uses still resolve;
+            // any other import keeps binding so its uses do not cascade.
+            if Layer::of_module(&source_str) == Layer::Core {
                 return;
-            }
-            if source_str.starts_with("runtime:") {
-                // Keep binding the names so their uses do not cascade.
-                self.emit(
-                    Diagnostic::error(
-                        ErrorCode::InvalidImportPath,
-                        format!(
-                            "'{source_str}' is a host module reserved for the standard library; import its 'std:' counterpart"
-                        ),
-                    )
-                    .with_range(i.range),
-                );
             }
         }
 

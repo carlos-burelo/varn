@@ -366,12 +366,14 @@ mod tests {
             ModuleId::stdlib("std:math")
         );
 
-        // core from user code is rejected; from std it is allowed.
-        assert!(loader.resolve("core:int", &from).is_err());
+        // core is never imported; runtime only from std (ADR-0018).
         let std_ref = ModuleId::stdlib("std:fs");
+        assert!(loader.resolve("core:int", &from).is_err());
+        assert!(loader.resolve("core:int", &std_ref).is_err());
+        assert!(loader.resolve("runtime:fs", &from).is_err());
         assert_eq!(
-            loader.resolve("core:int", &std_ref).unwrap(),
-            ModuleId::core("core:int")
+            loader.resolve("runtime:fs", &std_ref).unwrap(),
+            ModuleId::Runtime("runtime:fs".into())
         );
     }
 
