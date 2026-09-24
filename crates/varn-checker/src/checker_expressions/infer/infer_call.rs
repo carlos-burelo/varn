@@ -172,6 +172,13 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ArrowBody::Block(block) => {
                     let return_tys = collect_checked_return_types(block, self, bind);
                     match return_tys.len() {
+                        0 if !crate::checker::completion::can_complete_normally(
+                            block,
+                            self.ast_arena,
+                        ) =>
+                        {
+                            Type::Never
+                        }
                         0 => Type::Void,
                         1 => return_tys.into_iter().next().unwrap(),
                         _ => Type::union(

@@ -16,3 +16,17 @@ assert("never flows into str", asStr(true) === "s")
 assert("never flows into T?", asOpt(true) === null)
 assert("never flows into class", asBox(true).v === 1)
 assert("never-typed call raises", raises(() => { asInt(false) }))
+
+// A body that always throws has type never, so it fits any return type.
+function produce(make: () => int): int {
+    return make()
+}
+assert("a throwing lambda is () => never", raises(() => { produce(() => { throw new Error("no") }) }))
+function unreachableEnd(flag: bool) {
+    if (flag) {
+        throw new Error("a")
+    } else {
+        throw new Error("b")
+    }
+}
+assert("both branches throw: never", raises(() => { unreachableEnd(true) }))

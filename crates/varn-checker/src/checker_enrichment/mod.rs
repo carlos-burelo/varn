@@ -92,6 +92,7 @@ pub fn enrich_call_returns(
                     None,
                     &mut table,
                 );
+                let inferred = never_when_diverging(inferred, stmt, ast_arena);
                 let returns_value = !inferred.is_empty();
                 let ret_ty = types::join_types(inferred, &mut table);
                 if returns_value {
@@ -143,6 +144,7 @@ pub fn enrich_call_returns(
                     Some(&class_name_str),
                     &mut table,
                 );
+                let inferred = never_when_diverging(inferred, stmt, ast_arena);
                 let returns_value = !inferred.is_empty();
                 let ret = types::join_types(inferred, &mut table);
                 bind.ty_table = std::sync::Arc::new(table);
@@ -278,5 +280,19 @@ pub fn enrich_call_returns(
                 );
             }
         }
+    }
+}
+
+/// A body with no `return` that cannot complete normally (it always throws)
+/// returns `never`, not `void`.
+fn never_when_diverging(
+    inferred: Vec<Type>,
+    body: varn_core::ast::StmtId,
+    ast_arena: &varn_core::ast::AstArena,
+) -> Vec<Type> {
+    if inferred.is_empty() && !crate::checker::completion::can_complete_normally(body, ast_arena) {
+        vec![Type::Never]
+    } else {
+        inferred
     }
 }

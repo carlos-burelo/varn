@@ -60,7 +60,7 @@ impl<'r> Checker<'r> {
         if alternate.is_some() {
             return None;
         }
-        if !stmt_terminates(consequent, self.ast_arena) {
+        if super::completion::can_complete_normally(consequent, self.ast_arena) {
             return None;
         }
         if !self.can_extract_narrowings(test) {
@@ -532,14 +532,6 @@ impl<'r> Checker<'r> {
             }
         }
         self.mark_infer_env_dirty();
-    }
-}
-
-fn stmt_terminates(stmt: StmtId, arena: &AstArena) -> bool {
-    match &arena.stmt(stmt).kind {
-        StmtKind::Return { .. } | StmtKind::Throw { .. } => true,
-        StmtKind::Block { stmts } => stmts.last().is_some_and(|&s| stmt_terminates(s, arena)),
-        _ => false,
     }
 }
 

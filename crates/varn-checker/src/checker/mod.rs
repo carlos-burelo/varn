@@ -1,4 +1,5 @@
 pub(crate) mod compat;
+pub(crate) mod completion;
 mod decls;
 mod definite_assignment;
 mod refine;

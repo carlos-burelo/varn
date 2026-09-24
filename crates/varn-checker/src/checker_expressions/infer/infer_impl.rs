@@ -3,7 +3,7 @@ use crate::checker::Checker;
 use crate::types::TypeContext;
 use crate::types::{CheckerTyId, ObjectTypeMember, Type};
 use std::sync::Arc;
-use varn_core::ast::{AstArena, ExprId, ExprKind};
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
@@ -580,7 +580,7 @@ impl<'r> Checker<'r> {
                             tys.push(ty);
                         }
                         varn_core::ast::MatchBody::Block(stmt) => {
-                            if stmt_terminates(*stmt, arena) {
+                            if !crate::checker::completion::can_complete_normally(*stmt, arena) {
                                 tys.push(Type::Never);
                             } else {
                                 tys.push(Type::Void);
@@ -907,12 +907,4 @@ fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Arc<str>> {
     }
 }
 
-fn stmt_terminates(stmt: varn_core::ast::StmtId, arena: &AstArena) -> bool {
-    match &arena.stmt(stmt).kind {
-        varn_core::ast::StmtKind::Return { .. } | varn_core::ast::StmtKind::Throw { .. } => true,
-        varn_core::ast::StmtKind::Block { stmts } => {
-            stmts.last().is_some_and(|s| stmt_terminates(*s, arena))
-        }
-        _ => false,
-    }
-}
+
