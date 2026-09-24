@@ -12,25 +12,33 @@ impl<'r> super::Binder<'r> {
             || self.source_file.starts_with("std:")
             || self.source_file.starts_with("runtime:")
             || varn_modules::std_root::in_source_tree(self.source_file.as_ref());
-        if (source_str.starts_with("core:") || source_str.starts_with("runtime:"))
-            && !in_stdlib_context
-        {
-            let kind = if source_str.starts_with("core:") {
-                "an intrinsic"
-            } else {
-                "a private runtime"
-            };
-            self.emit(
-                Diagnostic::error(
-                    ErrorCode::InvalidImportPath,
-                    format!(
-                        "'{}' is {kind} module and cannot be imported by user code; use 'std:' equivalents",
-                        source_str
-                    ),
-                )
-                .with_range(i.range),
-            );
-            return;
+        if !in_stdlib_context {
+            if source_str.starts_with("core:") {
+                // Core names are already in scope: dropping the import leaves
+                // every use resolving to the builtin.
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::InvalidImportPath,
+                        format!(
+                            "'{source_str}' is built into the language and always in scope; remove the import"
+                        ),
+                    )
+                    .with_range(i.range),
+                );
+                return;
+            }
+            if source_str.starts_with("runtime:") {
+                // Keep binding the names so their uses do not cascade.
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::InvalidImportPath,
+                        format!(
+                            "'{source_str}' is a host module reserved for the standard library; import its 'std:' counterpart"
+                        ),
+                    )
+                    .with_range(i.range),
+                );
+            }
         }
 
         let is_relative = source_str.starts_with('.') || source_str.starts_with('/');

@@ -1,0 +1,4 @@
+// expect: error[VN2010]
+import { print } from "core:globals";
+
+print(1);

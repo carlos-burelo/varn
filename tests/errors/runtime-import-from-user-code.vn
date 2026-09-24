@@ -1,0 +1,4 @@
+// expect: error[VN2010]
+import { args$ } from "runtime:sys";
+
+print(args$());
