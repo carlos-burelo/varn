@@ -64,7 +64,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
             (Some(HeapObj::BigInt(a)), Some(HeapObj::BigInt(b))) => return a == b,
             (Some(HeapObj::Decimal(da)), Some(HeapObj::Decimal(db))) => return da == db,
             (Some(HeapObj::EnumVariant(ea)), Some(HeapObj::EnumVariant(eb))) => {
-                return ea.variant_tag == eb.variant_tag;
+                return variant_eq(ea, eb, heap);
             }
             (Some(HeapObj::Array(_)), Some(HeapObj::Array(_))) => return false,
             (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => return false,
@@ -75,7 +75,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 for i in 0..arr_a.len() {
                     let va = arr_a.get_vm(i).unwrap_or(VmValue::null());
                     let vb = arr_b.get_vm(i).unwrap_or(VmValue::null());
-                    if !eq(va, vb, heap) {
+                    if !member_eq(va, vb, heap) {
                         return false;
                     }
                 }
@@ -92,7 +92,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                     let (Some(va), Some(vb)) = (obj_a.get(k_str), obj_b.get(k_str)) else {
                         return false;
                     };
-                    if !eq(va, vb, heap) {
+                    if !member_eq(va, vb, heap) {
                         return false;
                     }
                 }
@@ -123,6 +123,58 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         }
     }
     false
+}
+
+/// Equality of a member of a value type (a record field, a tuple element,
+/// a variant payload): deep, so a nested array compares by its elements.
+/// A mutable array at top level is still compared by identity.
+fn member_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+    if a.is_heap() && b.is_heap() {
+        if let (Some(HeapObj::Array(x)), Some(HeapObj::Array(y))) =
+            (heap.get(a.as_heap_idx()), heap.get(b.as_heap_idx()))
+        {
+            return x.len() == y.len()
+                && (0..x.len()).all(|i| {
+                    member_eq(
+                        x.get_vm(i).unwrap_or(VmValue::null()),
+                        y.get_vm(i).unwrap_or(VmValue::null()),
+                        heap,
+                    )
+                });
+        }
+    }
+    eq(a, b, heap)
+}
+
+/// Two enum values are equal when they are the same variant of the same enum
+/// with equal payloads.
+fn variant_eq(
+    a: &varn_types::value::EnumVariantData,
+    b: &varn_types::value::EnumVariantData,
+    heap: &Heap,
+) -> bool {
+    a.enum_name == b.enum_name && a.variant_tag == b.variant_tag && payload_eq(&a.payload, &b.payload, heap)
+}
+
+fn payload_eq(a: &varn_types::Value, b: &varn_types::Value, heap: &Heap) -> bool {
+    use varn_types::Value;
+    match (a, b) {
+        (Value::Array(x), Value::Array(y)) => {
+            let (x, y) = (x.read(), y.read());
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| payload_eq(p, q, heap))
+        }
+        (Value::Object(x), Value::Object(y)) => {
+            let (x, y) = (x.borrow(), y.borrow());
+            let keys: Vec<_> = x.keys().collect();
+            keys.len() == y.keys().count()
+                && keys.iter().all(|k| match (x.get(k), y.get(k)) {
+                    (Some(p), Some(q)) => member_eq(p, q, heap),
+                    _ => false,
+                })
+        }
+        (Value::EnumVariant(x), Value::EnumVariant(y)) => variant_eq(x, y, heap),
+        _ => a == b,
+    }
 }
 
 #[inline(always)]
