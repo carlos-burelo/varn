@@ -21,33 +21,35 @@ varn_contract! {
             ctx.intern(Value::Map(MapRef::new(varn_types::value::ValueMap::default())))
         }
 
-        fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> Option<VmValue> {
+        fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Option<VmValue> {
             let m = get_map(ctx, this)?;
-            let k = ctx.str_map_key(key);
+            let k = ctx.map_key(key);
             let found = m.borrow().get(&k).copied();
             found
         }
-        fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: &str, value: VmValue) {
+        fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue, value: VmValue) {
             if let Some(m) = get_map(ctx, this) {
-                let k = ctx.str_map_key(key);
+                let k = ctx.map_key(key);
                 m.borrow_mut().insert(k, value);
-                // Interior-mutability store: no opcode barrier sees it.
+                // Interior-mutability store: no opcode barrier sees it. A
+                // non-string key can be a nursery object too.
+                ctx.collection_write_barrier(this, k.0);
                 ctx.collection_write_barrier(this, value);
             }
         }
-        fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> bool {
+        fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let k = ctx.str_map_key(key);
+                    let k = ctx.map_key(key);
                     m.borrow().contains_key(&k)
                 }
                 None => false,
             }
         }
-        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> bool {
+        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let k = ctx.str_map_key(key);
+                    let k = ctx.map_key(key);
                     m.borrow_mut().remove(&k).is_some()
                 }
                 None => false,

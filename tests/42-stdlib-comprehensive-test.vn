@@ -71,7 +71,7 @@ async function runComprehensiveTest(): Task<void> {
     assert("Queue peek", queue.peek() === "first");
     assert("Queue dequeue", queue.dequeue() === "first");
 
-    let mapInst = new Map<int>();
+    let mapInst = new Map<str, int>();
     mapInst.set("key", 100);
     assert("Map has", mapInst.has("key"));
     assert("Map get", mapInst.get("key") === 100);
@@ -210,7 +210,7 @@ async function runComprehensiveTest(): Task<void> {
     let readonlyVar: Readonly<{ a: bool }> = { a: true };
     let requiredVar: Required<{ x?: int, y?: str }> = { x: 10, y: "yes" };
     let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
-    let recordVar: Map<str, int> = { "tested": 100 };
+    let recordVar: { [key: str]: int } = { "tested": 100 };
 
     assert("std:types partial compile value", partialVar.x === 42);
     assert("std:types readonly compile value", readonlyVar.a === true);

@@ -78,8 +78,6 @@ impl<'r> Checker<'r> {
                     let arg_ids = self.ty_table.get_list(args).to_vec();
                     if arg_ids.len() == 2 {
                         Some(Type(arg_ids[0], false))
-                    } else if arg_ids.len() == 1 {
-                        Some(Type::Str)
                     } else {
                         None
                     }

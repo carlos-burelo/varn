@@ -1,4 +1,4 @@
-const scores: Map<str, int> = {
+const scores: { [key: str]: int } = {
     "alice": 95,
     "bob": 87,
     "charlie": 72
@@ -14,4 +14,4 @@ const rec = #{ x: 10, y: 20 }
 assert("record prop x", rec.x === 10)
 assert("record prop y", rec.y === 20)
 
-print("[PASSED] 24. Map and Record types")
+print("[PASSED] 24. Index signatures and Record types")

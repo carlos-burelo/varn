@@ -1,13 +1,13 @@
-export declare class Map<V> {
+export declare class Map<K, V> {
     constructor();
-    get(key: str): V?;
-    set(key: str, value: V): void;
-    has(key: str): bool;
-    delete(key: str): bool;
+    get(key: K): V?;
+    set(key: K, value: V): void;
+    has(key: K): bool;
+    delete(key: K): bool;
     clear(): void;
-    keys(): str[];
+    keys(): K[];
     values(): V[];
-    entries(): [str, V][];
-    forEach(callback: (value: V, key: str, map: Map<V>) => void): void;
+    entries(): [K, V][];
+    forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
     readonly size: int;
 }

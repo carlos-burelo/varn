@@ -450,67 +450,10 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
-        (TypeKind::Generic(dn, args, _), TypeKind::Object(inf_fields)) => {
-            let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name())
-                || !(arg_ids.len() == 1 || arg_ids.len() == 2)
-            {
-                false
-            } else {
-                let (key_ty, val_ty) = if arg_ids.len() == 2 {
-                    (t(arg_ids[0]), t(arg_ids[1]))
-                } else {
-                    (Type::Str, t(arg_ids[0]))
-                };
-                let key_compat =
-                    types_compatible_impl(&key_ty, &Type::Str, bind, cache, in_progress, table);
-                if !key_compat {
-                    false
-                } else {
-                    table
-                        .get_object_members(inf_fields)
-                        .iter()
-                        .all(|im| match im {
-                            ObjectTypeMember::Property { ty, .. } => types_compatible_impl(
-                                &val_ty,
-                                &t(*ty),
-                                bind,
-                                cache,
-                                in_progress,
-                                table,
-                            ),
-                            ObjectTypeMember::Index {
-                                key_ty: ik,
-                                value_ty: iv,
-                                ..
-                            } => {
-                                types_compatible_impl(
-                                    &key_ty,
-                                    &t(*ik),
-                                    bind,
-                                    cache,
-                                    in_progress,
-                                    table,
-                                ) && types_compatible_impl(
-                                    &val_ty,
-                                    &t(*iv),
-                                    bind,
-                                    cache,
-                                    in_progress,
-                                    table,
-                                )
-                            }
-                            _ => false,
-                        })
-                }
-            }
-        }
-        (TypeKind::Builtin(varn_core::BuiltinType::Map), TypeKind::Object(_))
-        | (TypeKind::Object(_), TypeKind::Builtin(varn_core::BuiltinType::Map)) => true,
+        // `Map<K, V>` is a collection, not an indexable object (spec §24).
+        (TypeKind::Generic(..), TypeKind::Object(_)) => false,
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => {
-            if is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name()) {
-                true
-            } else if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
+            if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
                 let origin_d_s = origin_d.and_then(|o| resolve_atom(Some(bind), o));
                 if let Some(decl_members) = named_members(bind, &dn_s, origin_d_s.as_deref()) {
                     class_members_match_object(
@@ -528,46 +471,9 @@ pub(super) fn types_compatible_impl(
                 true
             }
         }
-        (TypeKind::Object(decl_fields), TypeKind::Generic(in_, args, _)) => {
-            let arg_ids = table.get_list(args).to_vec();
-            if !is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name())
-                || !(arg_ids.len() == 1 || arg_ids.len() == 2)
-            {
-                false
-            } else {
-                let (key_ty, val_ty) = if arg_ids.len() == 2 {
-                    (t(arg_ids[0]), t(arg_ids[1]))
-                } else {
-                    (Type::Str, t(arg_ids[0]))
-                };
-                table
-                    .get_object_members(decl_fields)
-                    .iter()
-                    .all(|dm| match dm {
-                        ObjectTypeMember::Index {
-                            key_ty: dk,
-                            value_ty: dv,
-                            ..
-                        } => {
-                            types_compatible_impl(&t(*dk), &key_ty, bind, cache, in_progress, table)
-                                && types_compatible_impl(
-                                    &t(*dv),
-                                    &val_ty,
-                                    bind,
-                                    cache,
-                                    in_progress,
-                                    table,
-                                )
-                        }
-                        ObjectTypeMember::Property { optional: true, .. } => true,
-                        _ => false,
-                    })
-            }
-        }
+        (TypeKind::Object(_), TypeKind::Generic(..)) => false,
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i)) => {
-            if is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name()) {
-                true
-            } else if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
+            if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
                 let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));
                 if let Some(inf_members) = named_members(bind, &in_s, origin_i_s.as_deref()) {
                     crate::checker::compat::helpers::object_matches_class_members(
@@ -585,40 +491,28 @@ pub(super) fn types_compatible_impl(
                 true
             }
         }
-        (TypeKind::Named(dn, dn_origin), _) => {
-            if is_intrinsic(bind, dn, varn_core::BuiltinType::Map.name()) {
-                true
-            } else {
-                named_fallback(
-                    declared,
-                    inferred,
-                    dn,
-                    dn_origin,
-                    bind,
-                    cache,
-                    in_progress,
-                    table,
-                    true,
-                )
-            }
-        }
-        (_, TypeKind::Named(in_, in_origin)) => {
-            if is_intrinsic(bind, in_, varn_core::BuiltinType::Map.name()) {
-                true
-            } else {
-                named_fallback(
-                    declared,
-                    inferred,
-                    in_,
-                    in_origin,
-                    bind,
-                    cache,
-                    in_progress,
-                    table,
-                    false,
-                )
-            }
-        }
+        (TypeKind::Named(dn, dn_origin), _) => named_fallback(
+            declared,
+            inferred,
+            dn,
+            dn_origin,
+            bind,
+            cache,
+            in_progress,
+            table,
+            true,
+        ),
+        (_, TypeKind::Named(in_, in_origin)) => named_fallback(
+            declared,
+            inferred,
+            in_,
+            in_origin,
+            bind,
+            cache,
+            in_progress,
+            table,
+            false,
+        ),
         (TypeKind::Generic(name, args, _origin), _) => {
             let list = table.get_list(args);
             if is_intrinsic(bind, name, varn_core::BuiltinType::Task.name()) && list.len() == 1 {

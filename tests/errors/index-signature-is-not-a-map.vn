@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+const o: { [key: str]: int } = { a: 1 }
+const m: Map<str, int> = o

@@ -71,23 +71,12 @@ fn lower_kind(
         // a `Generic` node, or are absent for a bare annotation. Either way the
         // container itself is a known reference type, not `Dynamic` — this is
         // what lets `m.get(k)` reach `CallNativeOp` and `.size` a typed read.
-        // `Map<V>` (key defaults to `str`) or `Map<K, V>`.
         TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Map.name()
-                && (table.get_list(args).len() == 1 || table.get_list(args).len() == 2) =>
+            if interner.resolve(name) == BuiltinType::Map.name() && table.get_list(args).len() == 2 =>
         {
             let arg_ids = table.get_list(args).to_vec();
-            let (k, v) = if arg_ids.len() == 2 {
-                (
-                    lower_type(&Type(arg_ids[0], false), table, interner, tt, names),
-                    lower_type(&Type(arg_ids[1], false), table, interner, tt, names),
-                )
-            } else {
-                (
-                    BackendTy::Str,
-                    lower_type(&Type(arg_ids[0], false), table, interner, tt, names),
-                )
-            };
+            let k = lower_type(&Type(arg_ids[0], false), table, interner, tt, names);
+            let v = lower_type(&Type(arg_ids[1], false), table, interner, tt, names);
             BackendTy::Map(tt.intern(k), tt.intern(v))
         }
         TypeKind::Generic(name, args, _)

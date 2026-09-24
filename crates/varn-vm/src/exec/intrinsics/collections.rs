@@ -46,7 +46,9 @@ pub(crate) fn dispatch_map(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResul
             let k = heap.canonical_map_key(arg(args, 1));
             let value = arg(args, 2);
             m.borrow_mut().insert(k, value);
-            // Interior-mutability store: no opcode barrier sees it.
+            // Interior-mutability store: no opcode barrier sees it. A
+            // non-string key can be a nursery object too.
+            heap.write_barrier(recv.as_heap_idx(), k.0);
             heap.write_barrier(recv.as_heap_idx(), value);
             Ok(VmValue::null())
         }

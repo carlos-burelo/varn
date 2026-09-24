@@ -87,7 +87,7 @@ impl<'r> Checker<'r> {
                         } else if name_str == varn_core::BuiltinType::Map.name() {
                             Type::generic_with_origin(
                                 name_str,
-                                vec![Type::Dynamic],
+                                vec![Type::Dynamic, Type::Dynamic],
                                 origin_str,
                                 self.resolver,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -132,7 +132,7 @@ impl<'r> Checker<'r> {
                             } else if name_str == varn_core::BuiltinType::Map.name() {
                                 Type::generic(
                                     name_str,
-                                    vec![Type::Dynamic],
+                                    vec![Type::Dynamic, Type::Dynamic],
                                     self.resolver,
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 )
@@ -649,8 +649,6 @@ impl<'r> Checker<'r> {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
                     Type(arg_ids[1], false)
-                } else if arg_ids.len() == 1 {
-                    Type(arg_ids[0], false)
                 } else {
                     Type::Dynamic
                 }
@@ -688,39 +686,17 @@ impl<'r> Checker<'r> {
                 let exp =
                     expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 let exp_kind = self.ty_table.get(exp.0);
-                let is_map = match exp_kind {
-                    TypeKind::Generic(name, args, _) => {
-                        bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name) && {
-                            let n = self.ty_table.get_list(args).len();
-                            n == 1 || n == 2
-                        }
-                    }
-                    TypeKind::Builtin(varn_core::BuiltinType::Map) => true,
+                let is_index_signature = match exp_kind {
                     TypeKind::Object(mid) => {
                         let members = self.ty_table.get_object_members(mid);
                         members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
                     }
                     _ => false,
                 };
-                if is_map {
+                if is_index_signature {
                     for prop in properties {
                         if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
                             self.infer_type(*value, bind);
-                        }
-                    }
-                    if let TypeKind::Object(mid) = exp_kind {
-                        let members = self.ty_table.get_object_members(mid).to_vec();
-                        if let Some(ObjectTypeMember::Index {
-                            key_ty, value_ty, ..
-                        }) = members.first()
-                        {
-                            let map_atom = self.resolver.intern(varn_core::BuiltinType::Map.name());
-                            return Type::generic_atom(
-                                map_atom,
-                                vec![Type(*key_ty, false), Type(*value_ty, false)],
-                                None,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            );
                         }
                     }
                     return exp;

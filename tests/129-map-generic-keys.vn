@@ -1,0 +1,31 @@
+const byId: Map<int, str> = new Map()
+byId.set(1, "one")
+byId.set(2, "two")
+assert("int keys get", byId.get(1) === "one" && byId.get(3) === null)
+assert("int keys has/size", byId.has(2) && byId.size === 2)
+assert("int keys delete", byId.delete(1) && !byId.has(1))
+
+const big: Map<bigint, int> = new Map()
+big.set(10n ** 30n, 1)
+assert("bigint keys by value", big.get(10n ** 30n) === 1)
+
+const flags: Map<bool, str> = new Map()
+flags.set(true, "yes")
+assert("bool keys", flags.get(true) === "yes" && flags.get(false) === null)
+
+const letters: Map<char, int> = new Map()
+letters.set('a', 1)
+assert("char keys", letters.get('a') === 1)
+
+let keySum = 0
+const counts: Map<int, int> = new Map()
+counts.set(3, 30)
+counts.set(4, 40)
+counts.forEach((v: int, k: int) => { keySum = keySum + k })
+assert("forEach sees typed keys", keySum === 7)
+assert("keys() typed", counts.keys().length === 2)
+
+const index: { [key: str]: int } = { a: 1 }
+assert("index signature object reads by key", index["a"] === 1)
+
+print("[PASSED] 129. Map<K, V>")

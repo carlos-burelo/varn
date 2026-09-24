@@ -282,8 +282,6 @@ fn infer_member(
                 let arg_ids = table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
                     Type(arg_ids[1], false)
-                } else if arg_ids.len() == 1 {
-                    Type(arg_ids[0], false)
                 } else {
                     Type::Dynamic
                 }
@@ -504,7 +502,7 @@ fn infer_new(
             .and_then(|s| resolver.map(|r| r.intern(s)));
         if type_args.is_empty() {
             if name_str == varn_core::BuiltinType::Map.name() {
-                return Type::generic_atom(*name, vec![Type::Dynamic], origin, table);
+                return Type::generic_atom(*name, vec![Type::Dynamic, Type::Dynamic], origin, table);
             }
             return Type::named_with_origin_atom(*name, origin, table);
         }

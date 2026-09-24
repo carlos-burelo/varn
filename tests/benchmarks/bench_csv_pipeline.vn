@@ -21,7 +21,7 @@ let csvText = rows.join("\n");
 let parsed = CSV.parse(csvText);
 
 let completedSales: dynamic[] = [];
-let categoryRevenue = new Map<float>();
+let categoryRevenue = new Map<str, float>();
 let totalRevenue = 0.0;
 
 for (let i = 0; i < parsed.length; i = i + 1) {

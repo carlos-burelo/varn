@@ -199,7 +199,7 @@ pub(crate) fn infer_call_type(
                 if name_str == varn_core::BuiltinType::Map.name() {
                     return Some(Type::generic(
                         Arc::from(name_str),
-                        vec![Type::Dynamic],
+                        vec![Type::Dynamic, Type::Dynamic],
                         resolver,
                         table,
                     ));
