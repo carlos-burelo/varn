@@ -3,6 +3,7 @@ mod class_member_impl;
 mod context;
 mod display;
 pub mod interned;
+pub(crate) mod numeric_literal;
 mod object_member_impl;
 mod portable;
 mod type_impl;

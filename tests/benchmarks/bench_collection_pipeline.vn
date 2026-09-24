@@ -45,7 +45,7 @@ for (let i = 0; i < 100000; i = i + 1) {
     let cat = categories[i % 5];
     let stat = statuses[i % 5];
     let qty = (i % 8) + 1;
-    let price = ((i % 150) + 10) * 1.5;
+    let price = (((i % 150) + 10) as float) * 1.5;
     let disc = (i % 3) === 0;
     orders.push(new OrderItem(
         i,

@@ -21,9 +21,10 @@
 //! - `int % int` has the dividend's sign; `INT_MIN % -1 == 0`.
 //! - `int ** int` produces an `int` (wrapping). A negative exponent
 //!   raises a runtime error instead of silently producing a float.
-//! - Mixed `int`/`float` operands promote to `float`; `decimal` absorbs
-//!   `int`. `decimal`/`float` mixes are a checker error and have no
-//!   numeric class.
+//! - `decimal` absorbs `int` (exact). Mixed `int`/`float` and
+//!   `decimal`/`float` operands are a checker error (spec §9); an integer
+//!   *literal* adopts the other operand's type when exactly representable
+//!   (`varn_checker::types::numeric_literal`).
 
 /// The largest and smallest values Varn's `int` can hold.
 pub const INT_MAX: i64 = i64::MAX;
@@ -98,8 +99,9 @@ pub enum NumericOperand {
 }
 
 /// The common operand class of a numeric binary operation, or `None` when
-/// the two sides don't reduce to a single numeric class (unknown types,
-/// strings, decimal/float mixes, ...).
+/// the two sides don't reduce to a single numeric class. Only `int` widens
+/// implicitly, and only into the exact domain `decimal` (spec §9): an
+/// `int`/`float` mix is lossy and needs an explicit `as`.
 pub fn binary_operand_kind(
     l: Option<NumericOperand>,
     r: Option<NumericOperand>,
@@ -107,15 +109,23 @@ pub fn binary_operand_kind(
     use NumericOperand::*;
     match (l?, r?) {
         (Int, Int) => Some(Int),
+        (Float, Float) => Some(Float),
         (Decimal, Decimal) | (Decimal, Int) | (Int, Decimal) => Some(Decimal),
-        (Float, Float) | (Float, Int) | (Int, Float) => Some(Float),
-        (Decimal, Float) | (Float, Decimal) => None,
+        (Int, Float) | (Float, Int) | (Decimal, Float) | (Float, Decimal) => None,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn int_float_mix_has_no_common_class() {
+        use NumericOperand::*;
+        assert_eq!(binary_operand_kind(Some(Int), Some(Float)), None);
+        assert_eq!(binary_operand_kind(Some(Float), Some(Int)), None);
+        assert_eq!(binary_operand_kind(Some(Int), Some(Decimal)), Some(Decimal));
+    }
 
     #[test]
     fn div_int_truncates_toward_zero() {

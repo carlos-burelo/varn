@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+let s: float = 1.5
+let d: decimal = s

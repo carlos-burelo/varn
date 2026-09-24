@@ -11,7 +11,7 @@ for (let i = 0; i < 50000; i = i + 1) {
     let cat = categories[i % 5];
     let stat = statuses[i % 5];
     let qty = (i % 10) + 1;
-    let price = ((i % 200) + 5) * 1.5;
+    let price = (((i % 200) + 5) as float) * 1.5;
     rows.push(i + ",Customer_" + (i % 1000) + ",Product_" + (i % 500) + "," + cat + "," + qty + "," + price + "," + stat + ",2026-08-21T12:00:00Z");
 }
 

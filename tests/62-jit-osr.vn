@@ -27,7 +27,7 @@ function osrMixed(n: int): float {
   let f: float = 1.0
   let k: int = 0
   for (let i: int = 0; i < n; i = i + 1) { k = k + 1; if (i % 2 === 0) { f = f + 0.25 } }
-  return f + k
+  return f + (k as float)
 }
 assert("osr: mixed int/float", osrMixed(20000) === 22501.0)
 

@@ -425,7 +425,21 @@ impl<'r> Checker<'r> {
                         t.is_numeric()
                             || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.resolve(n) == IntrinsicType::Decimal.as_str())
                     };
-                    let same_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
+                    let both_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
+                    let (l_eff, r_eff) = crate::binder::type_inference::adopt_literal_operands(
+                        self.ast_arena,
+                        left,
+                        right,
+                        l_base,
+                        r_base,
+                        &self.ty_table,
+                    );
+                    let same_numeric = both_numeric
+                        && crate::binder::type_inference::numeric_operands_compatible(
+                            &l_eff,
+                            &r_eff,
+                            &self.ty_table,
+                        );
                     let valid = match op {
                         BinaryOp::Add => same_numeric || l_base == Type::Str || r_base == Type::Str,
                         BinaryOp::Sub
@@ -442,6 +456,7 @@ impl<'r> Checker<'r> {
                         BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => {
                             same_numeric || (l_base == Type::Str && r_base == Type::Str)
                         }
+                        BinaryOp::Eq | BinaryOp::NotEq => !both_numeric || same_numeric,
                         _ => true,
                     };
                     if !valid {

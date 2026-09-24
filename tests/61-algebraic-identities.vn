@@ -54,9 +54,9 @@ assert("alg: inf - inf is not 0", selfSubF(inf) !== 0.0)
 assert("alg: finite * 0.0 still 0", mulZeroF(2.5) === 0.0)
 assert("alg: finite - itself still 0", selfSubF(2.5) === 0.0)
 
-// A mixed-type product keeps the float result type: forwarding the int
+// A converted product keeps the float result type: forwarding the int
 // operand would hand downstream code an int where a float was promised.
-function mixed(n: int): float { return 1.0 * n }
+function mixed(n: int): float { return 1.0 * (n as float) }
 assert("alg: mixed 1.0 * int stays float", mixed(3) === 3.0)
 assert("alg: mixed halves cleanly", mixed(3) / 2.0 === 1.5)
 

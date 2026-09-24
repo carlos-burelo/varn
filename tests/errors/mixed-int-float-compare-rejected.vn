@@ -1,0 +1,3 @@
+// expect: error[VN3010]
+let i: int = 3
+let ok = i < 2.5

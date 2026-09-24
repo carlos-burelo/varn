@@ -71,8 +71,7 @@ fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTa
         (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::Intrinsic(inf_tag)) => {
             matches!(
                 inf_tag,
-                varn_core::TypeTag::Int
-                    | varn_core::TypeTag::F32
+                varn_core::TypeTag::F32
                     | varn_core::TypeTag::I8
                     | varn_core::TypeTag::I16
                     | varn_core::TypeTag::I32
@@ -93,10 +92,6 @@ fn simple_types_compatible(declared: &Type, inferred: &Type, table: &CheckerTyTa
         (
             TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
-        ) => true,
-        (
-            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
-            TypeKind::Intrinsic(varn_core::TypeTag::Float),
         ) => true,
         (
             TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
@@ -130,28 +125,7 @@ pub(crate) fn literal_fits_type(target: &Type, int_val: i64, table: &CheckerTyTa
     }
 }
 
-/// Folds the sign/parens a narrow literal is written with, so `-128` reaches
-/// the range check as `-128` and not as "some unary expression of type int".
-/// The parser keeps `-128` as `Unary(Minus, IntLiteral(128))`; without this the
-/// only narrow lower bounds expressible were the ones a `as i8` cast spelled out.
-fn const_int_value(arena: &varn_core::ast::AstArena, expr: varn_core::ast::ExprId) -> Option<i64> {
-    use varn_core::ast::{ExprKind, UnaryOp};
-    match &arena.expr(expr).kind {
-        ExprKind::IntLiteral { value, .. } => Some(*value),
-        ExprKind::Paren { expression } => const_int_value(arena, *expression),
-        ExprKind::Unary {
-            op,
-            prefix: true,
-            operand,
-            ..
-        } => match op {
-            UnaryOp::Minus => const_int_value(arena, *operand).and_then(|v| v.checked_neg()),
-            UnaryOp::Plus => const_int_value(arena, *operand),
-            _ => None,
-        },
-        _ => None,
-    }
-}
+use crate::types::numeric_literal::{const_int_value, int_literal_adopts};
 
 fn const_float_value(
     arena: &varn_core::ast::AstArena,
@@ -273,6 +247,11 @@ pub(crate) fn expr_satisfies_target_type(
             interner,
         );
     }
+    if let Some(value) = const_int_value(arena, expr) {
+        if int_literal_adopts(target_ty, value, table) {
+            return true;
+        }
+    }
     if target_ty.is_granular_int() {
         if let Some(value) = const_int_value(arena, expr) {
             return literal_fits_type(target_ty, value, table);
@@ -291,13 +270,18 @@ pub(crate) fn expr_satisfies_target_type(
     {
         // `Array<Array<i8>>` recurses: the gate asks whether the element type is
         // narrow *or another array*, so nesting does not bail out one level in.
-        let narrow_elem = elem_ty.is_granular_int()
+        let literal_elem = elem_ty.is_granular_int()
             || matches!(
                 table.get(elem_ty.0),
-                TypeKind::Intrinsic(varn_core::TypeTag::F32)
+                TypeKind::Intrinsic(
+                    varn_core::TypeTag::F32
+                        | varn_core::TypeTag::Float
+                        | varn_core::TypeTag::Decimal
+                        | varn_core::TypeTag::BigInt
+                )
             )
             || array_element_type(&elem_ty, table, interner).is_some();
-        if narrow_elem && !elements.is_empty() {
+        if literal_elem && !elements.is_empty() {
             return elements.iter().all(|el| match el {
                 ArrayEl::Expr(e) => {
                     expr_satisfies_target_type(&elem_ty, &elem_ty, arena, Some(*e), table, interner)

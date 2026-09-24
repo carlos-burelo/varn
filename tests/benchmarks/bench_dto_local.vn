@@ -38,7 +38,7 @@ function run(): void {
             "User_" + i,
             (i % 60) + 10,
             (i % 2) === 0,
-            (i % 100) * 1.5
+            ((i % 100) as float) * 1.5
         ))
     }
 

@@ -408,6 +408,30 @@ pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) ->
     })
 }
 
+/// Operand types with an exact integer literal on either side adopting the
+/// other side's numeric type (`f * 2` is `float * float`).
+pub(crate) fn adopt_literal_operands(
+    arena: &AstArena,
+    left: ExprId,
+    right: ExprId,
+    l: Type,
+    r: Type,
+    table: &CheckerTyTable,
+) -> (Type, Type) {
+    use crate::types::numeric_literal::literal_operand_class;
+    let l2 = literal_operand_class(arena, left, &r, table).unwrap_or(l);
+    let r2 = literal_operand_class(arena, right, &l, table).unwrap_or(r);
+    (l2, r2)
+}
+
+/// Whether two numeric operand types may meet in one operator: a common
+/// class exists, or it is `bigint` with `int` (the exact widening, spec §7).
+pub(crate) fn numeric_operands_compatible(l: &Type, r: &Type, table: &CheckerTyTable) -> bool {
+    let is_big = |t: &Type| matches!(table.get(t.0), TypeKind::Intrinsic(varn_core::TypeTag::BigInt));
+    let big_or_int = |t: &Type| is_big(t) || t.is_int();
+    numeric_binary_type(l, r, table).is_some() || ((is_big(l) || is_big(r)) && big_or_int(l) && big_or_int(r))
+}
+
 fn infer_binary(
     op: &BinaryOp,
     left: ExprId,
@@ -423,12 +447,16 @@ fn infer_binary(
             match (table.get(l.0), table.get(r.0)) {
                 (TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
                 | (_, TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
-                _ => numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic),
+                _ => {
+                    let (l, r) = adopt_literal_operands(arena, left, right, l, r, table);
+                    numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic)
+                }
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
             let l = infer_expr_type(left, arena, ctx, table);
             let r = infer_expr_type(right, arena, ctx, table);
+            let (l, r) = adopt_literal_operands(arena, left, right, l, r, table);
             numeric_binary_type(&l, &r, table).unwrap_or(Type::Dynamic)
         }
         BinaryOp::Eq

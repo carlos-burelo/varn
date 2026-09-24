@@ -50,5 +50,5 @@ assert("clif negate decimal abs", (-d).abs() === 7.5d)
 function negFloat(f: float): float { return -f }
 assert("clif negate float", negFloat(1.5) === -1.5)
 
-function negMixed(a: int, f: float): float { return (-a) + (-f) }
+function negMixed(a: int, f: float): float { return ((-a) as float) + (-f) }
 assert("clif negate mixed", negMixed(3, 1.5) === -4.5)

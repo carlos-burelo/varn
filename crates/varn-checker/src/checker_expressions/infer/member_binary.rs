@@ -114,6 +114,14 @@ pub(super) fn infer_binary_type(
             if l.is_dynamic() || r.is_dynamic() {
                 return Type::Dynamic.tainted();
             }
+            let (l, r) = crate::binder::type_inference::adopt_literal_operands(
+                checker.ast_arena,
+                left,
+                right,
+                l,
+                r,
+                &checker.ty_table,
+            );
             match op {
                 BinaryOp::Add => {
                     if matches!(checker.ty_table.get(l.0), TypeKind::Intrinsic(TypeTag::Str))

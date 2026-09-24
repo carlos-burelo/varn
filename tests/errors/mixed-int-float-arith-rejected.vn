@@ -1,0 +1,4 @@
+// expect: error[VN3010]
+let a: int = 10
+let b: float = 2.5
+let c = a + b
