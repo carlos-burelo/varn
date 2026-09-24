@@ -56,3 +56,26 @@ nombre). `===` sigue siendo identidad. Primitivos: sin cambio (tabla de
 Una instancia cuya clase declara `hash()` y `equals()` es clave por valor:
 el runtime canoniza la clave a un representante (primer objeto visto con igual
 `hash` y `equals` verdadero), como ya hace con `str` y `bigint`.
+
+## Ejecución (2026-09-24)
+
+| Paso | Commit | Nota |
+|---|---|---|
+| E.1 | `f6878bf0` | capacidades en el prelude. Hallazgo: una interfaz genérica con el parámetro fuera de posición de argumento (`clone(): T`) no la satisfacía ninguna clase — compat comparaba por nombre y descartaba los argumentos |
+| E.2 | `55d5841a` | operadores por capacidad, bajados por slot de vtable; `Desugarings` agrupa las reescrituras del checker |
+| — | `a7671f6e` | hallazgo: el GC mayor disparado al empujar un frame omitía raíces (stage, closures estáticas, constructores/setters pendientes, metadata) |
+| E.3 | `0955a551` | claves `Hashable & Equatable` por valor en `Map`/`Set` |
+
+Desviaciones y deuda:
+- `Iterable<T>`/`AsyncIterable<T>` no se declaran: el parser no acepta
+  miembros con clave `[Symbol.iterator]` en interfaces.
+- `Default` no se declara: una fábrica estática no se expresa en una
+  interfaz estructural.
+- Los operadores se bajan por slot de vtable (sin búsqueda por nombre), no
+  por llamada directa: un método de clase puede sobrescribirse.
+- `Mod`/`Pow` no tienen capacidad (el spec sólo lista `Add/Sub/Mul/Div/Neg`).
+- Un `hash()`/`equals()` que lanza deja la clave como identidad (la interfaz
+  nativa `map_key` no propaga errores).
+- `varn_core::intrinsic_ops::core_method_intrinsic` y los intrinsics de
+  `Map`/`Set` del VM no tienen productor: los métodos de colección van por
+  natives. Candidatos a borrar.

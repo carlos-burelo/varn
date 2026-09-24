@@ -59,7 +59,7 @@ la Tarea 0.1). Se lee junto con `AGENTS.md` (Leyes 1–10) y
 
 ## 0. Estado (2026-09-23, rama `new-spec-fase-0-A`)
 
-**Fase 0, A, B, C y D cerradas** (Fase D: `docs/plans/2026-09-23-fase-D-superficie-tipos.md`, con su deuda) (Fase B: ADR-0016,
+**Fase 0, A, B, C, D y E cerradas** (Fase D: `docs/plans/2026-09-23-fase-D-superficie-tipos.md`; Fase E: `docs/plans/2026-09-24-fase-E-capacidades.md`; cada una con su deuda) (Fase B: ADR-0016,
 `docs/plans/2026-09-23-fase-B-precision-arbitraria.md`; Fase C:
 `docs/plans/2026-09-23-fase-C-runtimekind.md`).
 
