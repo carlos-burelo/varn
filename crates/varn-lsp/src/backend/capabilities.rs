@@ -54,7 +54,13 @@ pub fn server_capabilities() -> ServerCapabilities {
             more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
         }),
         execute_command_provider: Some(ExecuteCommandOptions {
-            commands: vec![],
+            commands: vec![
+                "varn.showAst".to_string(),
+                "varn.syntaxTree".to_string(),
+                "varn.showBytecode".to_string(),
+                "varn.showSSA".to_string(),
+                "varn.getCFG".to_string(),
+            ],
             work_done_progress_options: Default::default(),
         }),
         rename_provider: Some(OneOf::Right(RenameOptions {
