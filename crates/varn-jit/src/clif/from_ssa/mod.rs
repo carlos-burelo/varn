@@ -108,18 +108,19 @@ pub(super) fn try_lower(
         return Err("from_ssa: not a leaf-compatible proto".into());
     }
     let scalar = |k: SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
-    // Params must be scalar (the raw ABI passes non-float params as a bare
-    // payload, so heap params are read from homes — not modelled yet). The
-    // RETURN may be any class: a non-scalar return is written boxed to
+    // A non-scalar parameter makes the body frame-aware: the raw ABI passes it
+    // as a bare payload, but the wrapper (the only way into a frame-aware
+    // body — its `clif_raw` stays 0, so no call site links it directly) has
+    // already left every argument in its home, register `1 + i`. The RETURN
+    // may be any class: a non-scalar return is written boxed to
     // `jit_native_result` and the raw returns void, which is what the wrapper
     // reads (see `build_wrapper`).
-    if !proto.param_kinds.iter().all(|k| scalar(*k)) {
-        return Err("from_ssa: non-scalar parameter".into());
-    }
+    let heap_params = !proto.param_kinds.iter().all(|k| scalar(*k));
 
     let has_heap = ssa.values.iter().any(|v| is_heap(v.ty));
     let scalar_return = scalar(proto.return_kind);
     let frame_aware = has_heap
+        || heap_params
         || !scalar_return
         || proto.has_this
         || ssa.has_this
@@ -205,6 +206,28 @@ pub(super) fn try_lower(
         for (k, &p) in blk.params.iter().enumerate() {
             let pv = params[base + k];
             let kind = ssa.value_ty(p);
+            // An entry parameter arrives as the ABI classifies it: a scalar
+            // `param_kinds` entry as its native value, anything else only in
+            // the home of register `1 + k` (see `heap_params`).
+            let pv = if i == entry && !scalar(proto.param_kinds[k]) {
+                let arg_reg = 1 + k as u32;
+                if is_heap(kind) {
+                    if ssa.reg(p) != arg_reg {
+                        let boxed = use_heap(&mut b, &ctx, arg_reg)?;
+                        def_heap(&mut b, &ctx, ssa.reg(p), boxed)?;
+                    }
+                    continue;
+                }
+                let boxed = use_heap(&mut b, &ctx, arg_reg)?;
+                heap::unbox_dest(&mut b, kind, boxed)?
+            } else if i == entry && proto.param_kinds[k] != kind {
+                return Err(format!(
+                    "from_ssa: parameter {k} is {kind:?} in the SSA but {:?} in the ABI",
+                    proto.param_kinds[k]
+                ));
+            } else {
+                pv
+            };
             if is_heap(kind) {
                 def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
             } else {

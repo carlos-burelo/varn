@@ -8,7 +8,9 @@
 // - a scalar that flows into a `dynamic` value is boxed, not stored raw;
 // - heap values pass as call arguments and arrive as heap parameters;
 // - a call whose result nobody reads still runs;
-// - `length` of a value statically typed `str` is its own instruction.
+// - `length` of a value statically typed `str` is its own instruction;
+// - a function whose parameters are heap values (`str`, a class, an array)
+//   compiles and reads them from their homes.
 
 function sscLabel(n: int): str {
     return "label-long-enough-for-the-heap-" + n
@@ -47,6 +49,18 @@ function sscIgnore(n: int): int {
     return n
 }
 
+// Heap parameters of a compiled function, including one read after a call.
+class SscPoint {
+    x: int
+    constructor(x: int) {
+        this.x = x
+    }
+}
+function sscHeapParams(label: str, p: SscPoint, xs: int[]): int {
+    const n = sscLabel(p.x)
+    return label.length + p.x + xs[1] + n.length
+}
+
 // `str.length` in a compiled body.
 function sscLabelLength(n: int): int {
     const s = sscLabel(n)
@@ -64,12 +78,19 @@ for (let i = 0; i < 3000; i = i + 1) {
     sscIgnore(1)
     sscLengths = sscLengths + sscLabelLength(i)
 }
+const sscPoint = new SscPoint(7)
+const sscXs = [1, 2, 3]
+let sscParamSum = 0
+for (let i = 0; i < 3000; i = i + 1) {
+    sscParamSum = sscParamSum + sscHeapParams("abc", sscPoint, sscXs)
+}
 
 assert("a heap call result lands in its home", sscLastDecorated == "label-long-enough-for-the-heap-2999!")
 assert("a scalar entering a dynamic is boxed", sscBoxedSum === 4498500)
 assert("heap arguments reach heap parameters", sscLastJoined == "label-long-enough-for-the-heap-2999|right")
 assert("a call whose result is discarded still runs", sscHits === 3000)
 // 31 chars of prefix plus the digits of 0..2999: 10 + 90*2 + 900*3 + 2000*4.
+assert("heap parameters are read from their homes", sscParamSum === 3000 * (3 + 7 + 2 + 32))
 assert("str.length in a compiled body", sscLengths === 3000 * 31 + 10 + 180 + 2700 + 8000)
 
 print("[PASSED] 141. JIT calls from SSA")
