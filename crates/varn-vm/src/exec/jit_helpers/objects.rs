@@ -5,7 +5,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
+pub(crate) extern "C" fn jit_object_keys(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
@@ -16,23 +16,23 @@ pub(crate) extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val_tag: u64, v
     }
 }
 
-pub(crate) extern "C" fn jit_op_in_stub(
+/// `a in b`, returned as `0`/`1` like every comparison helper.
+pub(crate) extern "C" fn jit_op_in(
     ctx: *mut ExecCtx,
     a_tag: u64,
     a_payload: u64,
     b_tag: u64,
     b_payload: u64,
-) {
+) -> u64 {
     unsafe {
-        let ctx_ref = &mut *ctx;
+        let ctx_ref = &*ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        ctx_ref.jit_native_result =
-            VmValue::from_bool(crate::exec::advanced::op_in(a, b, &ctx_ref.heap));
+        u64::from(crate::exec::advanced::op_in(a, b, &ctx_ref.heap))
     }
 }
 
-pub(crate) extern "C" fn jit_object_merge_stub(
+pub(crate) extern "C" fn jit_object_merge(
     ctx: *mut ExecCtx,
     a_tag: u64,
     a_payload: u64,

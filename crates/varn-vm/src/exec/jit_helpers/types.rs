@@ -45,7 +45,7 @@ pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_p
     }
 }
 
-pub(crate) extern "C" fn jit_is_array_stub(
+pub(crate) extern "C" fn jit_is_array(
     ctx: *mut ExecCtx,
     val_tag: u64,
     val_payload: u64,

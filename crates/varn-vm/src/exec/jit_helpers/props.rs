@@ -210,7 +210,7 @@ pub(crate) extern "C" fn jit_set_fixed_field(
     }
 }
 
-pub(crate) extern "C" fn jit_get_property_maybe_stub(
+pub(crate) extern "C" fn jit_get_property_maybe(
     ctx: *mut ExecCtx,
     obj_tag: u64,
     obj_payload: u64,
