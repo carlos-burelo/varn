@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "varn": {
+      "command": "node",
+      "args": ["../varn-mcp/src/index.js"]
+    }
+  }
+}
