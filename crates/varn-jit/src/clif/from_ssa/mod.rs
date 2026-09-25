@@ -127,7 +127,10 @@ pub(super) fn try_lower(
             blk.insts.iter().any(|i| {
                 matches!(
                     i.op,
-                    SsaOp::Call { .. } | SsaOp::CallNativeOp { .. } | SsaOp::LoadGlobalIdx(_)
+                    SsaOp::Call { .. }
+                        | SsaOp::CallNativeOp { .. }
+                        | SsaOp::MethodCall { .. }
+                        | SsaOp::LoadGlobalIdx(_)
                 )
             })
         });

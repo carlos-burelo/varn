@@ -105,6 +105,47 @@ pub(crate) extern "C" fn jit_call_method_flat(
     }
 }
 
+/// A method call out of the lowering from typed SSA: `window` holds the
+/// receiver then the arguments, boxed, and `name_idx` / `cs` are the calling
+/// function's constant and cache slot. It runs the interpreter's own
+/// [`ExecCtx::call_method`] (one resolution, one inline cache) on those
+/// values and runs a VM method it pushes to completion. Every heap value in
+/// the window is also in its SSA value's home, a GC root, for the call.
+pub(crate) extern "C" fn jit_call_method_window(
+    ctx: *mut ExecCtx,
+    name_idx: usize,
+    cs: usize,
+    window: *const VmValue,
+    total: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure_ptr;
+        let window = std::slice::from_raw_parts(window, total);
+        let args = crate::exec::method_args::MethodArgs::Boxed(&window[1..]);
+        let outcome = ctx_ref.call_method(window[0], name_idx, cs, args, frame_idx, closure_ref);
+        let result = match outcome {
+            Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Ok(v),
+            Ok(crate::exec::method_args::MethodOutcome::FramePushed) => {
+                ctx_ref.run_until(caller_depth)
+            }
+            Err(e) => Err(e),
+        };
+        match result {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => {
+                while ctx_ref.frames.len() > caller_depth {
+                    let f = ctx_ref.frames.pop().unwrap();
+                    ctx_ref.close_upvalues_in(f.base);
+                }
+                jit_propagate_error(ctx_ref, e);
+            }
+        }
+    }
+}
+
 /// The single canonical VM call out of compiled code. The compiled caller has
 /// flushed `[callee, args...]` to the homes of registers
 /// `arg_start..arg_start + argc` in activation `act_id`; this gathers them and

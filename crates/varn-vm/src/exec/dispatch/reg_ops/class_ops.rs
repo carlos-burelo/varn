@@ -308,10 +308,9 @@ impl ExecCtx {
     pub(crate) fn construct_enum_variant(
         &mut self,
         template: &EnumVariantTemplate,
-        base: usize,
-        arg_start: usize,
-        arg_count: usize,
+        args: crate::exec::method_args::MethodArgs<'_>,
     ) -> Option<VmValue> {
+        let arg_count = args.len();
         if template.fields.is_empty() && arg_count == 0 {
             return None;
         }
@@ -320,7 +319,7 @@ impl ExecCtx {
             Value::Object(varn_types::value::ObjRef::from_pairs(
                 template.fields.iter().enumerate().map(|(idx, field_name)| {
                     let nv = if idx < arg_count {
-                        self.stack.box_reg(base, arg_start + idx)
+                        args.get(&self.stack, idx)
                     } else {
                         VmValue::null()
                     };
@@ -328,13 +327,13 @@ impl ExecCtx {
                 }),
             ))
         } else if arg_count == 1 {
-            let arg = self.stack.box_reg(base, arg_start);
+            let arg = args.get(&self.stack, 0);
             self.heap.extract(arg)
         } else if arg_count > 1 {
             Value::Array(varn_types::value::ArrayRef::new(
                 (0..arg_count)
                     .map(|i| {
-                        let arg = self.stack.box_reg(base, arg_start + i);
+                        let arg = args.get(&self.stack, i);
                         self.heap.extract(arg)
                     })
                     .collect(),

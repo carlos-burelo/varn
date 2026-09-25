@@ -171,6 +171,43 @@ pub(super) fn emit_self_call_framed(
     ))
 }
 
+/// `recv.name(args)`: `[receiver, args...]` boxed, handed to
+/// `jit_call_method_window` with the method name's constant and the site's
+/// cache slot. The boxed result.
+pub(super) fn emit_method_call(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    recv: u32,
+    name: &str,
+    args: &[u32],
+    cs: u16,
+) -> Result<Value, String> {
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: method call without a frame")?;
+    let receiver = super::heap::boxed_value(b, ctx, values, recv)?;
+    let window = boxed_window(b, ctx, values, receiver, args)?;
+    let name_v = b
+        .ins()
+        .iconst(types::I64, super::props::str_idx(ctx, name)? as i64);
+    let cs_v = b.ins().iconst(types::I64, i64::from(cs));
+    let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
+    call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.jit_call_method_window,
+        &[frame.exec_ctx, name_v, cs_v, window, total],
+    );
+    Ok(b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
 /// A core-type native op: `[receiver, args...]` boxed, handed to
 /// `jit_call_native_window` with the native resolved at compile time (or
 /// `0`, resolved by op-id at the call). The boxed result.

@@ -235,6 +235,12 @@ fn project_inst(
         },
         InstKind::ArrayLength { operand } => SsaOp::ArrayLength { operand: operand.0 },
         InstKind::StrLength { operand } => SsaOp::StrLength { operand: operand.0 },
+        InstKind::MethodCall { recv, name, args } => SsaOp::MethodCall {
+            recv: recv.0,
+            name: name.as_ref().into(),
+            args: args.iter().map(|v| v.0).collect(),
+            cs: u16::from(ic_slot?),
+        },
         InstKind::CallNativeOp {
             object,
             args,

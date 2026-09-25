@@ -593,9 +593,11 @@ impl ExecCtx {
                         let result = tryv!((*ctx).call_native_with_receiver(
                             f,
                             receiver,
-                            base,
-                            first_reg + 1,
-                            total - 1,
+                            crate::exec::method_args::MethodArgs::Regs {
+                                base,
+                                start: first_reg + 1,
+                                count: total - 1,
+                            },
                         ));
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }

@@ -106,6 +106,16 @@ pub(super) fn emit_inst(
             let call = b.ins().call(ctx.self_ref, &a);
             b.inst_results(call)[0]
         }
+        SsaOp::MethodCall {
+            recv,
+            name,
+            args,
+            cs,
+        } => {
+            return Ok(Some(Out::Boxed(call::emit_method_call(
+                b, ctx, values, *recv, name, args, *cs,
+            )?)))
+        }
         SsaOp::CallNativeOp {
             object,
             args,

@@ -217,6 +217,15 @@ pub enum SsaOp {
         operand: u32,
     },
 
+    /// `recv.name(args)`: a method call through the runtime's one method
+    /// resolution (inline cache slot `cs`); a boxed result.
+    MethodCall {
+        recv: u32,
+        name: Box<str>,
+        args: Vec<u32>,
+        cs: u16,
+    },
+
     /// A core-type method the checker resolved to a native op: `op_id`
     /// called with the receiver `object` then `args`; a boxed result.
     CallNativeOp {

@@ -99,9 +99,11 @@ impl ExecCtx {
                                 let alloc = self.push_call_frame_with_this(
                                     &nc.proto,
                                     receiver,
-                                    base,
-                                    arg_start + first_arg,
-                                    arg_count - first_arg,
+                                    crate::exec::method_args::MethodArgs::Regs {
+                                        base,
+                                        start: arg_start + first_arg,
+                                        count: arg_count - first_arg,
+                                    },
                                 )?;
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                                 frame.return_reg = dest as u16;

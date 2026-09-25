@@ -150,6 +150,10 @@ macro_rules! jit_helper_abi {
             /// VmValue, total)` — `jit_call_native` for the lowering from typed
             /// SSA: `[receiver, args...]` as a boxed window.
             jit_call_native_window => jit_call_native_window,
+            /// `extern "C" fn(*mut ExecCtx, name_idx, cs, window: *const
+            /// VmValue, total)` — a method call out of the lowering from typed
+            /// SSA: `[receiver, args...]` as a boxed window.
+            jit_call_method_window => jit_call_method_window,
             /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
             /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
