@@ -1,6 +1,7 @@
 //! Terminators of the SSA lowering: returns, jumps and branches, and the
 //! parallel argument windows that fill each target block's phi params.
 
+use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{types, BlockArg, InstBuilder, MemFlags, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
@@ -27,6 +28,30 @@ fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> R
     );
     b.ins().return_(&[]);
     Ok(())
+}
+
+/// Value `v` as a branch condition (non-zero taken), by the interpreter's one
+/// rule (`VmValue::is_truthy`): a `bool` as is, an `int` when non-zero, a
+/// `float` when non-zero and not NaN, anything boxed through `jit_truthy`.
+fn truthy(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    v: u32,
+) -> Result<Value, String> {
+    let x = load_value(b, ctx, values, v)?;
+    Ok(match ctx.ssa.value_ty(v) {
+        SlotKind::Bool => x,
+        SlotKind::Int => b.ins().icmp_imm(IntCC::NotEqual, x, 0),
+        SlotKind::Float => {
+            let zero = b.ins().f64const(0.0);
+            b.ins().fcmp(FloatCC::OrderedNotEqual, x, zero)
+        }
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => {
+            let (tag, payload) = b.ins().isplit(x);
+            super::super::emit::call_helper(b, ctx.cc, ctx.helpers.truthy, &[tag, payload])
+        }
+    })
 }
 
 /// Emit `term`. `back_edge(target)` tells whether jumping to `target` closes
@@ -107,7 +132,7 @@ pub(super) fn emit_term(
             else_blk,
             else_args,
         } => {
-            let c = load_value(b, ctx, values, *cond)?;
+            let c = truthy(b, ctx, values, *cond)?;
             let t: Vec<BlockArg> = resolve_args(b, ctx, values, then_args)?;
             let e: Vec<BlockArg> = resolve_args(b, ctx, values, else_args)?;
             let tb = block_of(blocks, *then_blk)?;

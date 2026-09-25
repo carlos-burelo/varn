@@ -45,6 +45,13 @@ pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_p
     }
 }
 
+/// Whether a boxed value is truthy: the interpreter's branch condition
+/// (`VmValue::is_truthy`), for compiled code branching on a value that is not
+/// a `bool`.
+pub(crate) extern "C" fn jit_truthy(tag: u64, payload: u64) -> u64 {
+    u64::from(VmValue::from_raw_parts(tag, payload).is_truthy())
+}
+
 pub(crate) extern "C" fn jit_is_array(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) -> u64 {
     unsafe {
         let ctx_ref = &*ctx;

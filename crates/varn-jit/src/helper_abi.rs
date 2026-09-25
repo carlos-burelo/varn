@@ -98,6 +98,8 @@ macro_rules! jit_helper_abi {
             close_upvalue => jit_close_upvalue,
             get_enum_tag => jit_get_enum_tag,
             is_array => jit_is_array,
+            /// `extern "C" fn(tag, payload) -> u64` — `VmValue::is_truthy`.
+            truthy => jit_truthy,
             wrap_spread => jit_wrap_spread,
             object_keys => jit_object_keys,
             op_in => jit_op_in,
