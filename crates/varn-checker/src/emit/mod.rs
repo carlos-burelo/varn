@@ -14,6 +14,7 @@
 //! real nodes typed `Dynamic(Unannotated)` — never a bare hole.
 
 mod body;
+mod nested_types;
 mod prelude;
 mod tables;
 mod ty;
@@ -115,6 +116,23 @@ pub fn emit_module(
             global_slots.insert(name, slot);
         }
     }
+    // Classes and enums declared inside functions: a global each, built where
+    // the declaration first runs (see `nested_types`). Their class definitions
+    // follow the top-level ones, so the first takes the ordinal after them.
+    let top_types = nested_types::top_level_types(program, ast_arena, interner);
+    let first_nested_ordinal = top_level_type_builds(program, ast_arena);
+    let nested = nested_types::NestedTypes::collect(
+        bind,
+        &top_types,
+        &global_slots,
+        globals.len() as u32,
+        first_nested_ordinal,
+    );
+    for (name, slot) in nested.new_globals(&global_slots) {
+        debug_assert_eq!(slot as usize, globals.len());
+        globals.push(BackendTy::Dynamic(DynReason::Unannotated));
+        global_slots.insert(name, slot);
+    }
     let mut global_names: Vec<Arc<str>> = vec![Arc::from(""); globals.len()];
     for (name, &slot) in &global_slots {
         global_names[slot as usize] = name.clone();
@@ -183,6 +201,7 @@ pub fn emit_module(
         math_intrinsics: &math_intrinsics,
         interner,
         checker_table: &bind.ty_table,
+        nested_types: &nested,
     };
 
     // `functions` holds the free functions at indices 0..N (matching
@@ -331,6 +350,26 @@ pub fn emit_module(
             }
         }
     }
+    // The nested types, in the order their declarations were met — a nested
+    // class's own methods may declare more, so until none are left.
+    debug_assert_eq!(class_defs.len() as u32, first_nested_ordinal);
+    let mut emitted = 0;
+    loop {
+        let met = nested.met(ast_arena);
+        if emitted == met.len() {
+            break;
+        }
+        for decl in &met[emitted..] {
+            emit_type(
+                decl,
+                &mut class_defs,
+                &mut functions,
+                &mut types,
+                &mut signatures,
+            );
+        }
+        emitted = met.len();
+    }
 
     emit_extensions(
         program,
@@ -362,6 +401,28 @@ pub fn emit_module(
     }
 }
 
+/// How many `BuildClass` statements the module top level emits: one per
+/// class or enum declared there (a `let X = class { … }` included), and one
+/// per class or enum a namespace declares — the order `class_defs` is filled
+/// in, before the nested types.
+fn top_level_type_builds(program: &Program, ast_arena: &AstArena) -> u32 {
+    let mut n = 0;
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
+            continue;
+        };
+        if class_decl(d).is_some()
+            || enum_decl(d).is_some()
+            || anon_class_of(d, ast_arena).is_some()
+        {
+            n += 1;
+        } else if let Some(ns) = namespace_decl(d) {
+            n += ns_nested_types(ns).len() as u32;
+        }
+    }
+    n
+}
+
 /// Owns the borrows a `ModuleCtx` bundles, so the many emit helpers take one
 /// `&MCtx` instead of four separate references.
 struct MCtx<'a> {
@@ -376,6 +437,7 @@ struct MCtx<'a> {
     math_intrinsics: &'a FxHashMap<Atom, u8>,
     interner: &'a AtomInterner,
     checker_table: &'a crate::types::CheckerTyTable,
+    nested_types: &'a nested_types::NestedTypes,
 }
 
 impl<'a> MCtx<'a> {
@@ -392,6 +454,7 @@ impl<'a> MCtx<'a> {
             math_intrinsics: self.math_intrinsics,
             interner: self.interner,
             checker_table: self.checker_table,
+            nested_types: self.nested_types,
         }
     }
 }

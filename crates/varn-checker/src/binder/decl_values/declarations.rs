@@ -265,6 +265,7 @@ impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
         let line = e.range.start.line;
         let id_rc: Arc<str> = Arc::from(self.interner.resolve(e.id));
+        self.note_type_decl(&id_rc, self.current, e.range);
         let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),

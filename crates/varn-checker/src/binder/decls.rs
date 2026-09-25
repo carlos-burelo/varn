@@ -325,6 +325,8 @@ impl<'r> super::Binder<'r> {
                 // `bind_array_whitelisted_member`). Default-deny: escape
                 // it (array_evolve rule 3). A no-op for every other name.
                 self.escape_array_candidate(*name);
+                let range = arena.expr(id).range;
+                self.check_local_class_capture(*name, range);
             }
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }

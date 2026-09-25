@@ -37,6 +37,8 @@ pub(super) struct ModuleCtx<'a> {
     pub interner: &'a AtomInterner,
 
     pub checker_table: &'a crate::types::CheckerTyTable,
+
+    pub nested_types: &'a super::nested_types::NestedTypes,
 }
 
 pub(super) struct FnEmitter<'a> {
@@ -414,7 +416,18 @@ impl<'a> FnEmitter<'a> {
             StmtKind::Empty | StmtKind::Debugger | StmtKind::Error => vec![],
 
             StmtKind::Decl(decl) => {
-                let built = self.lower_decl_stmt(decl);
+                // A class or enum declared here: built where it first runs.
+                let nested = super::class_decl(decl)
+                    .and_then(|c| c.id)
+                    .or_else(|| super::enum_decl(decl).map(|e| e.id))
+                    .and_then(|id| {
+                        let name = self.m.interner.resolve(id);
+                        self.m.nested_types.declare(name, s)
+                    });
+                let built = match nested {
+                    Some(stmt) => vec![stmt],
+                    None => self.lower_decl_stmt(decl),
+                };
                 drained(self, built)
             }
 
