@@ -24,7 +24,7 @@ pub use error::PipelineError;
 pub use execute::{execute, execute_with_caps};
 pub use lex::lex as phase_lex;
 pub use opts::{parse_debug_opt, CapabilitySet, DebugFlags, RunOpts};
-pub use parse::parse as phase_parse;
+pub use parse::{in_shared_atoms, parse as phase_parse};
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
