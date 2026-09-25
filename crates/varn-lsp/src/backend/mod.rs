@@ -104,8 +104,11 @@ impl Backend {
 
     /// Run a query on the analysis thread and time it.
     ///
-    /// The `Send` bound on `T` is what keeps `Rc`-backed analysis state from
-    /// leaving the thread that owns it; see [`crate::analysis`].
+    /// Goes on `AnalysisHandle`'s foreground queue (`run`, not
+    /// `run_background`) — every interactive request takes priority over the
+    /// initial workspace index; see [`crate::analysis`]. The `Send` bound on
+    /// `T` is what keeps state that must stay on the analysis thread from
+    /// leaving it.
     async fn query<T, F>(&self, op: &str, f: F) -> Option<T>
     where
         F: FnOnce(&mut Analyzer) -> Option<T> + Send + 'static,

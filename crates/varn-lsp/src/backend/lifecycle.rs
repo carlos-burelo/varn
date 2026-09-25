@@ -26,8 +26,9 @@ pub fn supports_configuration(caps: &ClientCapabilities) -> bool {
 /// Index every `.vn` file under the workspace root.
 ///
 /// Directory walk and file reads are I/O and stay off the analysis thread; only
-/// the analysis of each file is submitted to it. Doing the walk there would
-/// park every request behind the initial scan.
+/// the analysis of each file is submitted to it, one `run_background` call per
+/// file so a live request queued mid-scan only ever waits behind whichever
+/// single file is currently running, never the rest of the scan.
 pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_supported: bool) {
     let Ok(root) = std::env::current_dir() else {
         return;
@@ -70,7 +71,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
 
         if let Some((abs_path, uri, source)) = read {
             let elapsed = analysis
-                .run(move |a| {
+                .run_background(move |a| {
                     let file_start = std::time::Instant::now();
                     a.workspace.update_file(uri.to_string(), source);
                     file_start.elapsed()
