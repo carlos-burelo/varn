@@ -1,0 +1,375 @@
+//! Runtime-helper calls and the inline walks from a boxed value to its
+//! payload.
+
+use super::*;
+
+/// Indirect call to a template-JIT runtime helper
+/// (`extern "C" fn(exec_ctx, VmValue…) -> VmValue`). The admitted helpers
+/// never allocate on the VM heap (no GC can run under a clif frame) and
+/// raise VM errors by longjmp'ing to the outer setjmp, exactly like the
+/// template's slow paths.
+/// Normalize a RAW function's return value to boxed `VmValue` bits.
+///
+/// An `int`-returning raw yields an unboxed i64 payload — UNCONDITIONALLY.
+/// Every arm of `emit_return_value`'s `SlotKind::Int` case produces one: an
+/// `Int` register is already a payload, a boxed one goes through `use_int`,
+/// and a float one converts and wraps. Every other return kind is boxed by
+/// construction and passes straight through.
+///
+/// This used to re-tag only when the high bits were clear, on the theory that
+/// a set NaN-box tag meant the value was already boxed. That test cannot tell
+/// a boxed value from a NEGATIVE payload — `-3` is `0xFFFF_FFFF_FFFF_FFFD`,
+/// whose high bits are all set — so every negative `int` return escaped
+/// untagged and decoded as null. `function sub(a: int, b: int): int` returned
+/// null for `sub(1, 4)`. Pinned by tests/59-clif-negative-int.vn.
+///
+/// Shared by `build_wrapper` and by the direct clif→clif call site: the two
+/// consume the same raw entry and must decode its result identically.
+pub(in crate::clif) fn retag_raw_return(
+    b: &mut FunctionBuilder,
+    raw_res: cranelift_codegen::ir::Value,
+    return_kind: SlotKind,
+) -> cranelift_codegen::ir::Value {
+    match return_kind {
+        SlotKind::Int => box_int(b, raw_res),
+        SlotKind::Float => box_f64(b, raw_res),
+        SlotKind::Bool => box_bool(b, raw_res),
+        _ => raw_res,
+    }
+}
+
+thread_local! {
+    /// Set when the lowering emits a call to a helper the VM left at address 0
+    /// (its body is still a fase-A tripwire). `try_compile` reads it and bails
+    /// the whole function instead of emitting a call to `unreachable!`/null.
+    static DISABLED_HELPER_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(crate) fn reset_disabled_helper_hit() {
+    DISABLED_HELPER_HIT.with(|c| c.set(false));
+}
+
+pub(crate) fn disabled_helper_hit() -> bool {
+    DISABLED_HELPER_HIT.with(|c| c.get())
+}
+
+#[inline]
+fn note_if_disabled(helper: usize) {
+    if helper == 0 {
+        DISABLED_HELPER_HIT.with(|c| c.set(true));
+    }
+}
+
+pub(in crate::clif) fn call_helper(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    helper: usize,
+    args: &[cranelift_codegen::ir::Value],
+) -> cranelift_codegen::ir::Value {
+    note_if_disabled(helper);
+    let mut sig = Signature::new(cc);
+    for _ in 0..args.len() {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    sig.returns.push(AbiParam::new(types::I64));
+    let sig_ref = b.import_signature(sig);
+    let ptr = b.ins().iconst(types::I64, helper as i64);
+    let call = b.ins().call_indirect(sig_ref, ptr, args);
+    b.inst_results(call)[0]
+}
+
+/// Like [`call_helper`] but for a `-> ()` helper (`gc_safepoint`,
+/// `array_push`, `set_fixed_field`).
+pub(in crate::clif) fn call_helper_void(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    helper: usize,
+    args: &[cranelift_codegen::ir::Value],
+) {
+    note_if_disabled(helper);
+    let mut sig = Signature::new(cc);
+    for _ in 0..args.len() {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    let sig_ref = b.import_signature(sig);
+    let ptr = b.ins().iconst(types::I64, helper as i64);
+    b.ins().call_indirect(sig_ref, ptr, args);
+}
+
+/// Payload via the loop cache when one exists for this access: cache != 0
+/// short-circuits the whole guard walk (one test + branch, perfectly
+/// predicted after iteration one); cache == 0 — or no cache — takes the
+/// full resolve.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::clif) fn cached_payload(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+    heap_off: usize,
+    slow: cranelift_codegen::ir::Block,
+    cache: Option<Variable>,
+    readonly: bool,
+) -> cranelift_codegen::ir::Value {
+    match cache {
+        Some(cv) => {
+            let c = b.use_var(cv);
+            let full = b.create_block();
+            let ready = b.create_block();
+            b.append_block_param(ready, types::I64);
+            b.ins().brif(c, ready, &[c.into()], full, &[]);
+            b.switch_to_block(full);
+            let p = emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly);
+            b.ins().jump(ready, &[p.into()]);
+            b.switch_to_block(ready);
+            b.block_params(ready)[0]
+        }
+        None => emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly),
+    }
+}
+
+/// Resolve a boxed receiver down to its array payload pointer (the three
+/// `Vec<VmValue>` words live at payload+16). Mirrors the template's
+/// `emit_resolve_array_payload`: heap-tag check, generation select on bit
+/// 31 of the index, slot tag check. Any rejection branches to `slow`; on
+/// return the builder is positioned in a fresh block where the payload is
+/// valid.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::clif) fn emit_array_payload(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+    heap_off: usize,
+    slow: cranelift_codegen::ir::Block,
+    nursery_only: bool,
+    _readonly: bool,
+) -> cranelift_codegen::ir::Value {
+    // The chain down to the payload pointer is `readonly` FOR THE DURATION
+    // OF ONE ROUTED ACTIVATION: heap indices only get rebound by a GC
+    // move or slot reuse, and in the ALLOC-FREE subset no op can allocate
+    // on the VM heap, so no collection can run underneath us — marking the
+    // chain readonly lets Cranelift's mid-end hoist the whole resolve out
+    // of loops. In an ALLOCATING function a back-edge safepoint CAN move
+    // these indices and grow the old-gen Vec, so `readonly` is false there:
+    // every access re-resolves from the (reloaded) receiver. The element
+    // Vec's data/len words are never readonly — an out-of-bounds store's
+    // append path reallocates them.
+    let ro = MemFlags::trusted();
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
+    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], slow, &[]);
+    b.switch_to_block(chk);
+
+    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, ro, exec_ctx, heap_off as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+
+    let (base, idx) = if nursery_only {
+        let cont = b.create_block();
+        b.ins().brif(old_bit, slow, &[], cont, &[]);
+        b.switch_to_block(cont);
+        let base = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        (base, raw)
+    } else {
+        let base_old = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        let base_nur = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+        let base = b.ins().select(old_bit, base_old, base_nur);
+        let idx = b.ins().select(old_bit, idx_old, raw);
+        (base, idx)
+    };
+
+    let byte_off = b.ins().imul_imm(idx, lay.slot_size as i64);
+    let slot = b.ins().iadd(base, byte_off);
+    let tagb = b.ins().uload8(types::I64, ro, slot, 0);
+    let is_arr = b.ins().icmp_imm(IntCC::Equal, tagb, lay.array_tag as i64);
+    let ok = b.create_block();
+    b.ins().brif(is_arr, ok, &[], slow, &[]);
+    b.switch_to_block(ok);
+    b.ins().load(types::I64, ro, slot, lay.payload_off as i32)
+}
+
+/// The `ArrayRepr` discriminant (0 = `Boxed`, 1 = `I64`, 2 = `F64`) of an
+/// already-resolved payload, zero-extended to `I64`.
+///
+/// Read at every element access rather than folded into
+/// [`emit_array_payload`]: the resolve can be hoisted into a loop cache
+/// (see [`cached_payload`]), but an array's repr changes *under* that cached
+/// pointer — an empty array specializes on its first push, a typed array
+/// migrates back to `Boxed` on a mismatched write. Both swap the contents of
+/// the same `ArrayRepr` cell, so the cached pointer stays valid while the tag
+/// under it does not.
+///
+/// This load DEREFERENCES `payload`, so it must be plain `trusted()` — NOT
+/// `readonly`/`can_move`. `can_move` would let the mid-end speculate the deref
+/// above the resolve's `is_arr` guard, reading `[payload + 16]` for a
+/// non-array receiver (bogus payload) → segfault. The element loads keyed off
+/// this discriminant use `trusted()` for the same reason.
+pub(in crate::clif) fn array_disc(
+    b: &mut FunctionBuilder,
+    payload: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+) -> cranelift_codegen::ir::Value {
+    b.ins().uload8(
+        types::I64,
+        MemFlags::trusted(),
+        payload,
+        (16 + lay.disc_off) as i32,
+    )
+}
+
+/// A boxed `VmValue`'s payload word IS the int — extract it.
+pub(in crate::clif) fn unbox_int(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    if b.func.dfg.value_type(v) == types::I128 {
+        let (_tag, payload) = b.ins().isplit(v);
+        payload
+    } else {
+        v
+    }
+}
+
+/// Raise `integer overflow` if the CPU's overflow flag was set, otherwise yield `r`.
+///
+/// `exec_ctx` is only ever consumed inside the cold `raise` block, and only
+/// when `leaf_ctx_helper` is `None` (a frame-aware lowering, where it is
+/// already a real pointer). When `leaf_ctx_helper` is `Some(getter)`, `exec_ctx`
+/// is the leaf placeholder from `body::leaf_ctx` — a leaf's raw ABI carries no
+/// `exec_ctx` — and using it directly would hand the raise helper a null
+/// `ExecCtx` AND (worse, for a value that turns out never to be dereferenced
+/// as a pointer within the deopt path but IS still passed to a call) trip the
+/// leaf's own dummy-use check, forcing the whole function frame-aware just to
+/// raise an error on a path most calls never take. `getter` is a zero-arg
+/// helper that recovers the live `ExecCtx` from a thread-local instead, so
+/// the placeholder is never referenced and the function stays a leaf.
+pub(in crate::clif) fn guard_overflow(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    exec_ctx: cranelift_codegen::ir::Value,
+    leaf_ctx_helper: Option<usize>,
+    helper: usize,
+    r: cranelift_codegen::ir::Value,
+    overflow: cranelift_codegen::ir::Value,
+    lhs: cranelift_codegen::ir::Value,
+    rhs: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let raise = b.create_block();
+    let cont = b.create_block();
+    b.ins().brif(overflow, raise, &[], cont, &[]);
+
+    b.switch_to_block(raise);
+    let live_ctx = match leaf_ctx_helper {
+        Some(getter) => call_helper(b, cc, getter, &[]),
+        None => exec_ctx,
+    };
+    let ba = box_int(b, lhs);
+    let bb = box_int(b, rhs);
+    let (a_tag, a_payload) = b.ins().isplit(ba);
+    let (b_tag, b_payload) = b.ins().isplit(bb);
+    call_helper_void(
+        b,
+        cc,
+        helper,
+        &[live_ctx, a_tag, a_payload, b_tag, b_payload],
+    );
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
+    r
+}
+
+/// Resolve boxed object `obj` to its inline field base address (`objdata + values_off`),
+/// branching to `invalid` if it is not a valid nursery/old-gen object.
+pub(in crate::clif) fn emit_object_data_base(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    olay: &crate::JitObjectLayout,
+    alay: &crate::JitArrayLayout,
+    heap_off: usize,
+    invalid: cranelift_codegen::ir::Block,
+) -> cranelift_codegen::ir::Value {
+    let m = MemFlags::trusted();
+    let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
+        b.ins().isplit(obj)
+    } else {
+        (b.ins().iconst(types::I64, HEAP_KIND), obj)
+    };
+
+    // 1. Heap-pointer tag check.
+    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], invalid, &[]);
+    b.switch_to_block(chk);
+
+    // 2. Heap index + generation select → slot address.
+    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let base = b.ins().select(old_bit, base_old, base_nur);
+    let idx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let slot_addr = b.ins().iadd(base, byte_off);
+
+    // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_inst = b
+        .ins()
+        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let is_valid = b.ins().bor(is_inst, is_obj);
+    let ok = b.create_block();
+    b.ins().brif(is_valid, ok, &[], invalid, &[]);
+    b.switch_to_block(ok);
+
+    // 4. Load the payload pointer:
+    let c_inst_pay = b.ins().iconst(types::I64, olay.instance_payload_off as i64);
+    let c_obj_pay = b.ins().iconst(types::I64, olay.payload_off as i64);
+    let payload_off = b.ins().select(is_inst, c_inst_pay, c_obj_pay);
+    let obj_ptr = b.ins().iadd(slot_addr, payload_off);
+    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
+
+    // 5. Compute the inline values base: data_ptr + values_off
+    let c_inst_val = b.ins().iconst(types::I64, olay.instance_values_off as i64);
+    let c_obj_val = b.ins().iconst(types::I64, olay.values_off as i64);
+    let values_off = b.ins().select(is_inst, c_inst_val, c_obj_val);
+    b.ins().iadd(data_ptr, values_off)
+}
