@@ -15,7 +15,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
-use super::{boxed, call, heap, heapvalue, is_heap, load_value, Ctx, Out};
+use super::{boxed, call, dynop, heap, heapvalue, is_heap, load_value, Ctx, Out};
 
 /// Emit one instruction; `Ok(None)` means it produces no result. The driver
 /// lands a result where `dest`'s class says it lives ([`super::store::land`]).
@@ -63,6 +63,15 @@ pub(super) fn emit_inst(
             }));
         }
 
+        SsaOp::Binary {
+            op: SsaBinOp::Dyn(op),
+            lhs,
+            rhs,
+        } => return Ok(Some(dynop::emit_bin(b, ctx, values, *op, *lhs, *rhs, dest_ty)?)),
+        SsaOp::Unary {
+            op: SsaUnOp::Dyn(op),
+            operand,
+        } => return Ok(Some(dynop::emit_un(b, ctx, values, *op, *operand, dest_ty)?)),
         SsaOp::Binary { op, lhs, rhs } => {
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
@@ -187,6 +196,7 @@ fn emit_bin(
         FloatGt => bool_f64(b, FloatCC::GreaterThan, a, c),
         FloatGe => bool_f64(b, FloatCC::GreaterThanOrEqual, a, c),
 
+        Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
         StrConcat => return Err("from_ssa: concat is a heap op".into()),
         IntDiv | IntMod | IntPow | FloatMod | FloatPow => unreachable!("delegated to boxed"),
     })
@@ -250,6 +260,7 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
         SsaUnOp::NegFloat => b.ins().fneg(a),
         SsaUnOp::Not => b.ins().bxor_imm(a, 1),
         SsaUnOp::BitNotInt => b.ins().bxor_imm(a, -1),
+        SsaUnOp::Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
     })
 }
 

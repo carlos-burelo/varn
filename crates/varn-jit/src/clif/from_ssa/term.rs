@@ -42,8 +42,20 @@ pub(super) fn emit_term(
 ) -> Result<(), String> {
     match term {
         SsaTerm::Return(Some(v)) => {
-            if scalar_return(ctx.proto.return_kind) {
-                let x = load_value(b, ctx, values, *v)?;
+            let ret = ctx.proto.return_kind;
+            if scalar_return(ret) {
+                // The value is converted from its class to the function's
+                // return class: a boxed value (a `dynamic` sum returned as
+                // `int`) is unboxed; a scalar must already be of that class.
+                let kind = ctx.ssa.value_ty(*v);
+                let x = if super::is_heap(kind) {
+                    let boxed = load_value(b, ctx, values, *v)?;
+                    heap::unbox_dest(b, ret, boxed)?
+                } else if kind == ret {
+                    load_value(b, ctx, values, *v)?
+                } else {
+                    return Err(format!("from_ssa: {kind:?} value returned as {ret:?}"));
+                };
                 b.ins().return_(&[x]);
             } else {
                 let boxed = heap::boxed_value(b, ctx, values, *v)?;

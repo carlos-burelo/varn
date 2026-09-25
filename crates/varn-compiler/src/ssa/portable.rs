@@ -15,7 +15,9 @@ use varn_core::OpCode;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{Inst, InstKind, SsaFunc, Terminator};
-use varn_types::ssa::{SsaBinOp, SsaBlock, SsaInst, SsaOp, SsaProto, SsaTerm, SsaUnOp, SsaValue};
+use varn_types::ssa::{
+    DynBinOp, DynUnOp, SsaBinOp, SsaBlock, SsaInst, SsaOp, SsaProto, SsaTerm, SsaUnOp, SsaValue,
+};
 
 /// Build the portable SSA for `ssa` (already phi-split and register-assigned).
 /// Returns why not when any instruction or terminator is outside the
@@ -116,8 +118,8 @@ fn project_inst(
         } => SsaOp::Typeof {
             operand: operand.0,
         },
-        InstKind::Unary { op, operand, ty } => SsaOp::Unary {
-            op: project_un(*op, *ty)?,
+        InstKind::Unary { op, operand, .. } => SsaOp::Unary {
+            op: project_un(*op, value_tys.get(operand.0 as usize).copied())?,
             operand: operand.0,
         },
         InstKind::IsArray { operand } => SsaOp::IsArray {
@@ -325,23 +327,19 @@ fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
     }
 }
 
-/// The typed `OpCode` the emitter already selects, mapped to its portable
-/// mirror. Generic (dynamic-operand) arithmetic has no portable variant, so it
-/// declines.
+/// The opcode the emitter selects ([`crate::lower::binary_opcode`]), mapped to
+/// its portable mirror: a typed opcode to its native op, a generic one to the
+/// same operator on boxed values. The bitwise opcodes serve every type, so
+/// they are native only when the operands are `int`.
 fn project_bin(
     op: HirBinOp,
     lhs_ty: Option<HirType>,
     rhs_ty: Option<HirType>,
     ty: HirType,
 ) -> Option<SsaBinOp> {
-    let str_operand = matches!(op, HirBinOp::Add)
-        && (matches!(lhs_ty, Some(HirType::Str)) || matches!(rhs_ty, Some(HirType::Str)));
-    let opcode = if str_operand {
-        OpCode::StrConcat
-    } else {
-        crate::lower::bin_opcode(op, ty)
-    };
-    Some(match opcode {
+    use DynBinOp as D;
+    let int = ty == HirType::Int;
+    Some(match crate::lower::binary_opcode(op, ty, lhs_ty, rhs_ty) {
         OpCode::AddInt => SsaBinOp::IntAdd,
         OpCode::SubInt => SsaBinOp::IntSub,
         OpCode::MulInt => SsaBinOp::IntMul,
@@ -354,12 +352,12 @@ fn project_bin(
         OpCode::LteInt => SsaBinOp::IntLe,
         OpCode::GtInt => SsaBinOp::IntGt,
         OpCode::GteInt => SsaBinOp::IntGe,
-        OpCode::BitAnd => SsaBinOp::IntAnd,
-        OpCode::BitOr => SsaBinOp::IntOr,
-        OpCode::BitXor => SsaBinOp::IntXor,
-        OpCode::Shl => SsaBinOp::IntShl,
-        OpCode::Shr => SsaBinOp::IntShr,
-        OpCode::Ushr => SsaBinOp::IntUshr,
+        OpCode::BitAnd if int => SsaBinOp::IntAnd,
+        OpCode::BitOr if int => SsaBinOp::IntOr,
+        OpCode::BitXor if int => SsaBinOp::IntXor,
+        OpCode::Shl if int => SsaBinOp::IntShl,
+        OpCode::Shr if int => SsaBinOp::IntShr,
+        OpCode::Ushr if int => SsaBinOp::IntUshr,
         OpCode::AddFloat => SsaBinOp::FloatAdd,
         OpCode::SubFloat => SsaBinOp::FloatSub,
         OpCode::MulFloat => SsaBinOp::FloatMul,
@@ -373,19 +371,43 @@ fn project_bin(
         OpCode::GtFloat => SsaBinOp::FloatGt,
         OpCode::GteFloat => SsaBinOp::FloatGe,
         OpCode::StrConcat => SsaBinOp::StrConcat,
+        OpCode::Add => SsaBinOp::Dyn(D::Add),
+        OpCode::Sub => SsaBinOp::Dyn(D::Sub),
+        OpCode::Mul => SsaBinOp::Dyn(D::Mul),
+        OpCode::Div => SsaBinOp::Dyn(D::Div),
+        OpCode::Mod => SsaBinOp::Dyn(D::Mod),
+        OpCode::Pow => SsaBinOp::Dyn(D::Pow),
+        OpCode::Eq => SsaBinOp::Dyn(D::Eq),
+        OpCode::Neq => SsaBinOp::Dyn(D::Ne),
+        OpCode::Lt => SsaBinOp::Dyn(D::Lt),
+        OpCode::Lte => SsaBinOp::Dyn(D::Le),
+        OpCode::Gt => SsaBinOp::Dyn(D::Gt),
+        OpCode::Gte => SsaBinOp::Dyn(D::Ge),
+        OpCode::BitAnd => SsaBinOp::Dyn(D::BitAnd),
+        OpCode::BitOr => SsaBinOp::Dyn(D::BitOr),
+        OpCode::BitXor => SsaBinOp::Dyn(D::BitXor),
+        OpCode::Shl => SsaBinOp::Dyn(D::Shl),
+        OpCode::Shr => SsaBinOp::Dyn(D::Shr),
+        OpCode::Ushr => SsaBinOp::Dyn(D::Ushr),
+        OpCode::Instanceof => SsaBinOp::Dyn(D::Instanceof),
+        OpCode::In => SsaBinOp::Dyn(D::In),
         _ => return None,
     })
 }
 
-fn project_un(op: HirUnOp, ty: HirType) -> Option<SsaUnOp> {
-    Some(match op {
-        HirUnOp::Neg => match ty {
-            HirType::Int => SsaUnOp::NegInt,
-            HirType::Float => SsaUnOp::NegFloat,
-            _ => return None,
-        },
-        HirUnOp::Not => SsaUnOp::Not,
-        HirUnOp::BitNot => SsaUnOp::BitNotInt,
-        HirUnOp::Typeof => return None,
+/// A unary operator, native only on an operand of the type it is native for
+/// (`!` on a `bool`, `-`/`~` on an `int`, `-` on a `float`); otherwise the
+/// operator on the boxed value, as the bytecode's generic opcode runs it.
+fn project_un(op: HirUnOp, operand_ty: Option<HirType>) -> Option<SsaUnOp> {
+    Some(match (op, operand_ty) {
+        (HirUnOp::Neg, Some(HirType::Int)) => SsaUnOp::NegInt,
+        (HirUnOp::Neg, Some(HirType::Float)) => SsaUnOp::NegFloat,
+        (HirUnOp::Neg, _) => SsaUnOp::Dyn(DynUnOp::Neg),
+        (HirUnOp::Not, Some(HirType::Bool)) => SsaUnOp::Not,
+        (HirUnOp::Not, _) => SsaUnOp::Dyn(DynUnOp::Not),
+        (HirUnOp::BitNot, Some(HirType::Int)) => SsaUnOp::BitNotInt,
+        (HirUnOp::BitNot, _) => SsaUnOp::Dyn(DynUnOp::BitNot),
+        // `typeof` has its own op (`SsaOp::Typeof`).
+        (HirUnOp::Typeof, _) => return None,
     })
 }

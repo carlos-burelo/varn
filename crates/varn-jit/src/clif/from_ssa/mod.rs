@@ -48,6 +48,7 @@ use crate::JitHelpers;
 mod boxed;
 mod call;
 mod classops;
+mod dynop;
 mod globals;
 mod heap;
 mod heapvalue;

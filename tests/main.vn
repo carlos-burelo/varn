@@ -127,6 +127,7 @@ import "./138-constructor-signature.vn"
 import "./139-gc-instance-layout.vn"
 import "./140-nullable-ref-fields.vn"
 import "./141-jit-ssa-calls.vn"
+import "./142-jit-dynamic-operators.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

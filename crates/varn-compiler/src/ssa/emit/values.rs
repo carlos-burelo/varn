@@ -5,7 +5,7 @@ use super::super::ir::{BlockId, Inst, InstKind, VarId};
 use super::regs::var_reg;
 use super::terminator::emit_call_args;
 use crate::hir::{HirUnOp, HirUpvalueSrc};
-use crate::lower::bin_opcode;
+use crate::lower::binary_opcode;
 use crate::OptError;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -65,25 +65,12 @@ pub(super) fn emit_value(
         }
         InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, line),
         InstKind::Binary { op, lhs, rhs, ty } => {
-            // `+` with a statically-proven string operand IS concatenation.
-            // That is exactly what `arith::add` works out at RUN TIME, one
-            // type test at a time, on every single execution — and the
-            // checker already proved it here. The binary's own `ty` is
-            // `Dynamic` for the common `"literal" + int`, so specializing on
-            // the result type alone never reaches this.
-            let str_operand = matches!(op, crate::hir::HirBinOp::Add)
-                && (matches!(
-                    value_tys.get(lhs.0 as usize),
-                    Some(crate::hir::HirType::Str)
-                ) || matches!(
-                    value_tys.get(rhs.0 as usize),
-                    Some(crate::hir::HirType::Str)
-                ));
-            let opcode = if str_operand {
-                OpCode::StrConcat
-            } else {
-                bin_opcode(*op, *ty)
-            };
+            let opcode = binary_opcode(
+                *op,
+                *ty,
+                value_tys.get(lhs.0 as usize).copied(),
+                value_tys.get(rhs.0 as usize).copied(),
+            );
             chunk.emit_rrr(opcode, d, reg[lhs.0 as usize], reg[rhs.0 as usize], line);
         }
         InstKind::Unary { op, operand, .. } => {
