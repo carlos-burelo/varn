@@ -6,7 +6,7 @@
 //! back an [`Out`] saying which representation it produced, and [`land`] puts
 //! it where the destination's class says it lives.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, StackSlotData, StackSlotKind, Value};
+use cranelift_codegen::ir::{types, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
@@ -112,6 +112,20 @@ pub(super) fn store_home_value(
     def_heap(b, ctx, ctx.ssa.reg(value), boxed)
 }
 
+/// Inline access to this activation's homes.
+fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String> {
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: heap value without a frame")?;
+    Ok(super::super::homes::Homes {
+        exec_ctx: frame.exec_ctx,
+        base: frame.base,
+        layout: &frame.layout,
+        offsets: &ctx.helpers.frame_layout,
+    })
+}
+
 /// Write a boxed heap value to `reg`'s home (the GC root).
 pub(super) fn def_heap(
     b: &mut FunctionBuilder,
@@ -119,18 +133,7 @@ pub(super) fn def_heap(
     reg: u32,
     boxed: Value,
 ) -> Result<(), String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: heap value without a frame")?;
-    let (tag, payload) = b.ins().isplit(boxed);
-    let reg_v = b.ins().iconst(types::I64, reg as i64);
-    super::super::emit::call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.home_store,
-        &[frame.exec_ctx, frame.base, reg_v, tag, payload],
-    );
+    homes(ctx)?.store(b, reg as usize, boxed);
     Ok(())
 }
 
@@ -140,20 +143,7 @@ pub(super) fn use_heap(
     ctx: &Ctx<'_>,
     reg: u32,
 ) -> Result<Value, String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: heap value without a frame")?;
-    let slot = b.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 4));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
-    let reg_v = b.ins().iconst(types::I64, reg as i64);
-    super::super::emit::call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.home_load,
-        &[frame.exec_ctx, frame.base, reg_v, addr],
-    );
-    Ok(b.ins().load(types::I128, MemFlags::trusted(), addr, 0))
+    Ok(homes(ctx)?.load(b, reg as usize))
 }
 
 /// CLIF type of an SSA value. `Bool` is a raw `I64` 0/1; `Ref`/`Dyn`/`Str` is a

@@ -67,6 +67,8 @@ pub(super) struct FrameIo<'a> {
     pub closure: Value,
     pub base: Value,
     pub linker: &'a dyn ClifLinker,
+    /// Register → (class, index): where each register's home is.
+    pub layout: varn_types::register_meta::FrameLayout,
 }
 
 /// Everything an instruction emission needs that is not the builder or the
@@ -178,6 +180,7 @@ pub(super) fn try_lower(
             base: params[2],
             exec_ctx: params[3],
             linker,
+            layout: varn_types::register_meta::FrameLayout::for_proto(proto),
         })
     } else {
         None

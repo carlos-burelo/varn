@@ -9,7 +9,7 @@
 //! is the only code that knows how a boxed argument becomes a raw one.
 
 use cranelift_codegen::ir::{
-    types, AbiParam, Function, InstBuilder, MemFlags, Signature, StackSlotData, StackSlotKind,
+    types, AbiParam, Function, InstBuilder, MemFlags, Signature,
     UserFuncName,
 };
 use cranelift_codegen::isa::OwnedTargetIsa;
@@ -131,9 +131,15 @@ pub(super) fn build_wrapper(
         helpers.frame_prepushed_offset as i32,
     );
 
-    // Args live in each parameter register's home slot, addressed by the
-    // class-aware `home_load` helper (the frame is partitioned, so there is no
-    // contiguous `stack[base + 1 + i]` to load from anymore).
+    // Args live in each parameter register's home slot (the frame is
+    // partitioned, so there is no contiguous `stack[base + 1 + i]`).
+    let layout = varn_types::register_meta::FrameLayout::for_proto(proto);
+    let homes = super::homes::Homes {
+        exec_ctx,
+        base,
+        layout: &layout,
+        offsets: &helpers.frame_layout,
+    };
     let mut args = Vec::with_capacity(4 + nparams);
     if frame_aware {
         args.push(stack_ptr);
@@ -141,19 +147,8 @@ pub(super) fn build_wrapper(
         args.push(base);
         args.push(exec_ctx);
     }
-    let cc = isa.default_call_conv();
     for i in 0..nparams {
-        let slot = b
-            .create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-        let addr = b.ins().stack_addr(types::I64, slot, 0);
-        let reg_v = b.ins().iconst(types::I64, (1 + i) as i64);
-        super::emit::call_helper_void(
-            &mut b,
-            cc,
-            helpers.home_load,
-            &[exec_ctx, base, reg_v, addr],
-        );
-        let boxed = b.ins().load(types::I128, MemFlags::trusted(), addr, 0);
+        let boxed = homes.load(&mut b, 1 + i);
         if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
             let un = super::emit::unbox_int(&mut b, boxed);
             args.push(un);

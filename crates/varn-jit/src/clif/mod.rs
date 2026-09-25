@@ -21,6 +21,7 @@ pub(crate) mod floats;
 pub(crate) mod from_ssa;
 pub(crate) mod generic;
 pub(crate) mod globals;
+pub(crate) mod homes;
 pub mod invariants;
 pub(crate) mod kinds;
 pub(crate) mod liveness;
