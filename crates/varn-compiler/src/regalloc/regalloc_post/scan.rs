@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap as HashMap;
 use varn_core::OpCode;
-use varn_types::bytecode::decode;
+use varn_types::bytecode::{decode, layout};
 use varn_types::chunk::PoolEntry;
 
 use crate::regalloc::liveness::DefSites;
@@ -26,15 +26,9 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
             None => break,
         };
 
-        if let Some(OpCode::MakeClosure) = OpCode::from_u16(code[offset]) {
-            let uv_count = (code[offset + 1] & 0xff) as usize;
-            for i in 0..uv_count {
-                let desc = code.get(offset + 3 + i).copied().unwrap_or(0);
-                let is_local = (desc >> 8) as u8;
-                if is_local == 1 {
-                    open_captures.push((desc & 0xff) as u8);
-                }
-            }
+        // A captured register is read for as long as the closure lives.
+        if let Some(l) = layout(code, offset, constants).filter(|l| l.op == OpCode::MakeClosure) {
+            open_captures.extend(l.read_registers(code, offset));
         }
 
         if info.opaque {
@@ -71,81 +65,19 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
     }
 }
 
+/// Every run of registers an instruction reads together — a call's
+/// arguments, a collection's elements — as `(first, count)`, when it spans
+/// more than one register: the colouring must keep each contiguous.
 pub(crate) fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8, u8)> {
     let mut blocks = Vec::new();
     let mut offset = 0;
-    while offset < code.len() {
-        let info = match decode(code, offset, constants) {
-            Some(i) => i,
-            None => break,
-        };
-        if let Some((arg_start, arg_count)) = info.call_args {
-            if arg_count > 1 {
-                blocks.push((arg_start, arg_count));
-            }
-        }
-        if let Some(op) = OpCode::from_u16(code[offset]) {
-            match op {
-                OpCode::BuildArray | OpCode::BuildTuple => {
-                    let w1 = if offset + 1 < code.len() {
-                        code[offset + 1]
-                    } else {
-                        0
-                    };
-                    let w2 = if offset + 2 < code.len() {
-                        code[offset + 2]
-                    } else {
-                        0
-                    };
-                    let start = (w1 & 0xff) as u8;
-                    let count = (w2 >> 8) as u8;
-                    if count > 1 {
-                        blocks.push((start, count));
-                    }
-                }
-                OpCode::BuildMap => {
-                    let w1 = if offset + 1 < code.len() {
-                        code[offset + 1]
-                    } else {
-                        0
-                    };
-                    let w2 = if offset + 2 < code.len() {
-                        code[offset + 2]
-                    } else {
-                        0
-                    };
-                    let start = (w1 & 0xff) as u8;
-                    let count = (w2 >> 8) as u8;
-                    let total_regs = count * 2;
-                    if total_regs > 1 {
-                        blocks.push((start, total_regs));
-                    }
-                }
-                OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
-                    let w1 = if offset + 1 < code.len() {
-                        code[offset + 1]
-                    } else {
-                        0
-                    };
-                    let w2 = if offset + 2 < code.len() {
-                        code[offset + 2]
-                    } else {
-                        0
-                    };
-                    let start = (w1 & 0xff) as u8;
-                    let shape_idx = w2 as usize;
-                    let count = match constants.get(shape_idx) {
-                        Some(PoolEntry::Shape(k)) => k.len(),
-                        _ => 0,
-                    };
-                    if count > 1 {
-                        blocks.push((start, count as u8));
-                    }
-                }
-                _ => {}
-            }
-        }
-        offset += info.len;
+    while let Some(l) = layout(code, offset, constants) {
+        blocks.extend(
+            l.runs(code, offset)
+                .filter(|&(_, count, _)| count > 1)
+                .map(|(start, count, _)| (start, count as u8)),
+        );
+        offset += l.len;
     }
     blocks
 }

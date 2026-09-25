@@ -126,11 +126,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     while offset < proto.chunk.code.len() {
         if let Some(info) = decode(&proto.chunk.code, offset, &proto.chunk.constants) {
             if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move) {
-                let w1 = proto.chunk.code[offset + 1];
-                let dest = (proto.chunk.code[offset] >> 8) as u8;
-                let src = (w1 >> 8) as u8;
-                if dest >= base && src >= base {
-                    copies.push((dest, src));
+                if let (Some(dest), Some(&src)) = (info.def, info.uses.first()) {
+                    if dest >= base && src >= base {
+                        copies.push((dest, src));
+                    }
                 }
             }
             offset += info.len;
@@ -157,23 +156,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    if !verify_call_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
+    if !verify_run_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
         return;
     }
 
     if !verify_callee_frame_constraints(&scan, &mapping) {
-        return;
-    }
-
-    if !verify_build_array_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
-        return;
-    }
-
-    if !verify_build_object_with_shape_constraints(
-        &proto.chunk.code,
-        &proto.chunk.constants,
-        &mapping,
-    ) {
         return;
     }
 
