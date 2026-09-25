@@ -137,6 +137,37 @@ fn boxed_window(
     Ok(addr)
 }
 
+/// Self-recursion out of a frame-aware body: a boxed window — this
+/// activation's register 0 (the receiver of a method) then the arguments —
+/// handed to `jit_call_self_window`, which runs a fresh activation of the
+/// running closure. The boxed result.
+pub(super) fn emit_self_call_framed(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    args: &[u32],
+) -> Result<Value, String> {
+    let frame = ctx.frame.as_ref().ok_or("from_ssa: framed self-call without a frame")?;
+    if args.len() + 1 != ctx.proto.arity {
+        return Err("from_ssa: self-call arity mismatch".into());
+    }
+    let receiver = super::use_heap(b, ctx, 0)?;
+    let window = boxed_window(b, ctx, values, receiver, args)?;
+    let argc = b.ins().iconst(types::I64, (args.len() + 1) as i64);
+    call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.jit_call_self_window,
+        &[frame.exec_ctx, window, argc],
+    );
+    Ok(b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
 /// The canonical invocation of a boxed window (`ExecCtx::invoke`); the
 /// result is the boxed `VmValue` the helper left in `jit_native_result`.
 fn emit_invoke(b: &mut FunctionBuilder, ctx: &Ctx<'_>, window: Value, argc: usize) -> Value {

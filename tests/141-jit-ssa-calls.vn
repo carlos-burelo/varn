@@ -10,7 +10,10 @@
 // - a call whose result nobody reads still runs;
 // - `length` of a value statically typed `str` is its own instruction;
 // - a function whose parameters are heap values (`str`, a class, an array)
-//   compiles and reads them from their homes.
+//   compiles and reads them from their homes;
+// - a frame-aware function recursing on itself with heap arguments, under
+//   enough allocation that collections run while its argument window is in
+//   flight.
 
 function sscLabel(n: int): str {
     return "label-long-enough-for-the-heap-" + n
@@ -61,6 +64,15 @@ function sscHeapParams(label: str, p: SscPoint, xs: int[]): int {
     return label.length + p.x + xs[1] + n.length
 }
 
+// Frame-aware self-recursion carrying heap values.
+function sscChain(prefix: str, parts: str[], n: int): str {
+    if (n == 0) {
+        return prefix + parts.length
+    }
+    parts.push("part-long-enough-for-the-heap-" + n)
+    return sscChain(prefix + n, parts, n - 1)
+}
+
 // `str.length` in a compiled body.
 function sscLabelLength(n: int): int {
     const s = sscLabel(n)
@@ -78,6 +90,11 @@ for (let i = 0; i < 3000; i = i + 1) {
     sscIgnore(1)
     sscLengths = sscLengths + sscLabelLength(i)
 }
+let sscChainLast = ""
+for (let i = 0; i < 2000; i = i + 1) {
+    const parts: str[] = []
+    sscChainLast = sscChain("c", parts, 20)
+}
 const sscPoint = new SscPoint(7)
 const sscXs = [1, 2, 3]
 let sscParamSum = 0
@@ -90,6 +107,7 @@ assert("a scalar entering a dynamic is boxed", sscBoxedSum === 4498500)
 assert("heap arguments reach heap parameters", sscLastJoined == "label-long-enough-for-the-heap-2999|right")
 assert("a call whose result is discarded still runs", sscHits === 3000)
 // 31 chars of prefix plus the digits of 0..2999: 10 + 90*2 + 900*3 + 2000*4.
+assert("framed self-recursion keeps its heap arguments", sscChainLast == "c2019181716151413121110987654321" + "20")
 assert("heap parameters are read from their homes", sscParamSum === 3000 * (3 + 7 + 2 + 32))
 assert("str.length in a compiled body", sscLengths === 3000 * 31 + 10 + 180 + 2700 + 8000)
 

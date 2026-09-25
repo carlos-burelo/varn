@@ -73,11 +73,12 @@ pub(super) fn emit_inst(
             emit_un(b, ctx, *op, a)?
         }
         SsaOp::SelfCall { args } => {
-            // A frame-aware callee needs its own frame pushed (the raw ABI
-            // prepends `stack, closure, base, exec_ctx`); this lowering does not
-            // model that, so it declines and the bytecode lowering takes it.
+            // A frame-aware body cannot hand its own frame to the callee:
+            // the recursion gets a fresh activation from the runtime.
             if ctx.frame.is_some() {
-                return Err("from_ssa: frame-aware self-call".into());
+                return Ok(Some(Out::Boxed(call::emit_self_call_framed(
+                    b, ctx, values, args,
+                )?)));
             }
             let a: Vec<Value> = args
                 .iter()

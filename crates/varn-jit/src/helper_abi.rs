@@ -162,6 +162,11 @@ macro_rules! jit_helper_abi {
             /// to the callee and has no boxed callee to route through
             /// `clif_call_fallback`.
             clif_call_self => clif_call_self,
+            /// `extern "C" fn(*mut ExecCtx, window: *const VmValue, argc)` —
+            /// self-recursion out of the lowering from typed SSA, whose
+            /// arguments are not in contiguous homes: a boxed window,
+            /// placeholder first.
+            jit_call_self_window => jit_call_self_window,
             /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, arg_start, arg_count) -> usize`
             /// — half of `clif_call_fallback`'s fast path (`invoke_compiled_closure`),
             /// split so the call site makes the wrapper call itself instead of
