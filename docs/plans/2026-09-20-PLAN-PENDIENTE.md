@@ -202,9 +202,30 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
   - las vistas del compilador bajan el documento como una compilación
     (`call_mappings` y `desugar` incluidos) y la de SSA usa
     `varn_compiler::ssa::dump`.
-- Pendiente derivado: hay tres desensambladores de bytecode (`varn-cli`,
-  `varn-debug`, el de la vista del LSP, que además lee una palabra por
-  instrucción). Unificarlos en uno que escriba a `String`.
+- Codificación de instrucciones en una sola tabla —
+  `varn_types::bytecode::layout`: por opcode, qué byte o palabra contiene
+  qué (registro leído/escrito, racha contigua, constante y su clase,
+  inmediato, salto). De ella se derivan `decode` (largo, def, uses, ventana
+  de llamada), `remap_registers` (renumeración del coalescer) y
+  `bytecode::disasm` (listados de `vn debug` y del editor). Sustituye a
+  cuatro tablas escritas a mano que no coincidían:
+  - `decode`: `ObjectMerge` no contaba la lectura de su destino,
+    `ArrayExtend` decía escribir el array que muta en sitio, `Yield` no
+    declaraba el registro donde se reanuda y `GetSuper` no leía `this`.
+  - el coalescer no renombraba el destino de `Spawn` (y sí un byte que no es
+    registro); sus reglas de contigüidad por opcode son ahora "toda racha
+    sigue contigua".
+  - el listado de `varn-debug` leía `Spawn` y `Get/SetFixedField` con el
+    largo equivocado, perdía el paso e inventaba instrucciones (goldens
+    regenerados: el stream listado ahora es el real); mostraba mal los
+    registros de `Throw`, `StoreUpvalue` y `CloseUpvalue`.
+  - el del editor leía una palabra por instrucción; el de `varn-cli` no se
+    compilaba (borrado).
+  `tests/bytecode_layout_agrees.rs` recorre el bytecode de toda la suite
+  (151 programas, 121 opcodes) y comprueba largos, registros dentro del
+  frame, clase de cada constante, saltos a inicios de instrucción y que
+  renombrar toca exactamente los bytes de registro. El intérprete y la
+  bajada del JIT siguen decodificando a mano (camino caliente).
 
 ### 5.4 Pendientes del audit (menores)
 

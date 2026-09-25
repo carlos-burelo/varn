@@ -9,9 +9,7 @@
 mod ast_json;
 mod cfg;
 
-use varn_compiler::FunctionProto;
 use varn_tir::TirModule;
-use varn_types::chunk::PoolEntry;
 
 use crate::document::DocumentState;
 use crate::workspace::Workspace;
@@ -80,10 +78,7 @@ fn build_ssa(state: &DocumentState) -> Result<Vec<varn_compiler::ssa::ir::SsaFun
 pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> {
     let proto = varn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new())
         .map_err(|e| format!("Compilation failed: {e:?}"))?;
-
-    let mut out = String::new();
-    format_proto(&proto, 0, &mut out);
-    Ok(out)
+    Ok(varn_types::bytecode::disasm::render(&proto))
 }
 
 pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
@@ -98,59 +93,4 @@ pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
         out.push('\n');
     }
     Ok(out)
-}
-fn format_proto(proto: &FunctionProto, depth: usize, out: &mut String) {
-    let indent = "  ".repeat(depth);
-    let name = proto.name.as_deref().unwrap_or("<top-level>");
-    out.push_str(&format!(
-        "{}=== Function '{}' (arity: {}, registers: {}, upvalues: {}) ===\n",
-        indent, name, proto.arity, proto.register_count, proto.upvalue_count
-    ));
-
-    out.push_str(&format!(
-        "{}Constants ({}):\n",
-        indent,
-        proto.chunk.constants.len()
-    ));
-    for (idx, c) in proto.chunk.constants.iter().enumerate() {
-        match c {
-            PoolEntry::Literal(lit) => {
-                out.push_str(&format!("{}  [{:03}] Literal: {:?}\n", indent, idx, lit))
-            }
-            PoolEntry::Function(f) => {
-                let fname = f.name.as_deref().unwrap_or("<anonymous>");
-                out.push_str(&format!("{}  [{:03}] Function: {}\n", indent, idx, fname));
-            }
-            PoolEntry::Shape(keys) => out.push_str(&format!(
-                "{}  [{:03}] Shape: [{}]\n",
-                indent,
-                idx,
-                keys.join(", ")
-            )),
-        }
-    }
-
-    out.push_str(&format!(
-        "{}Bytecode ({} instructions):\n",
-        indent,
-        proto.chunk.code.len()
-    ));
-    let mut ip = 0;
-    while ip < proto.chunk.code.len() {
-        let op_u16 = proto.chunk.code[ip];
-        let op_byte = (op_u16 & 0xFF) as u8;
-        let op = varn_core::OpCode::from_u8(op_byte);
-        let reg_a = (op_u16 >> 8) as u8;
-
-        out.push_str(&format!("{}  {:04} | r{} {:?}\n", indent, ip, reg_a, op));
-        ip += 1;
-    }
-    out.push('\n');
-
-    // Recursively format nested functions
-    for c in &proto.chunk.constants {
-        if let PoolEntry::Function(sub_proto) = c {
-            format_proto(sub_proto, depth + 1, out);
-        }
-    }
 }

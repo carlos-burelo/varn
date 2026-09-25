@@ -22,63 +22,63 @@
   [2mcode (126) words[0m
   [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
   ────────────────────────────────────────────────────────────────────────
-  0000 │   0 │ [34mMakeClass           [0m │ r1 = class[0] (raw=013f 0000 0000)  [2m;[0m [32m"Temperature"[0m
-  0003 │   0 │ [34mDeclareField        [0m │ r1 field[1]: float  [2m;[0m [32m"_celsius"[0m
-  0006 │   0 │ [34mLoadStaticFn        [0m │ r2 = static_fn[2]  [2m;[0m [34m→ fn Temperature.constructor[0m
-  0008 │   0 │ [34mMethod              [0m │ r1[3] = r2  [2m;[0m [32m"constructor"[0m
-  0011 │   0 │ [34mLoadStaticFn        [0m │ r2 = static_fn[4]  [2m;[0m [34m→ fn Temperature.get celsius[0m
-  0013 │   0 │ [34mDefineGetter        [0m │ r1[5] = r2  [2m;[0m [32m"celsius"[0m
-  0016 │   0 │ [34mLoadStaticFn        [0m │ r2 = static_fn[6]  [2m;[0m [34m→ fn Temperature.set celsius[0m
-  0018 │   0 │ [34mDefineSetter        [0m │ r1[5] = r2  [2m;[0m [32m"celsius"[0m
-  0021 │   0 │ [34mLoadStaticFn        [0m │ r2 = static_fn[7]  [2m;[0m [34m→ fn Temperature.get fahrenheit[0m
-  0023 │   0 │ [34mDefineGetter        [0m │ r1[8] = r2  [2m;[0m [32m"fahrenheit"[0m
-  0026 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@0] = r1
-  0029 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global[@0]
-  0031 │   0 │ [36mLoadConst           [0m │ r3 = const[9]  [2m;[0m [32m100[0m
-  0033 │   0 │ LoadNull            [0m │ r9
+  0000 │   0 │ [34mMakeClass           [0m │ r1 = #0, r0  [2m;[0m [32m"Temperature"[0m
+  0003 │   0 │ [34mDeclareField        [0m │ r1, #1, :float  [2m;[0m [32m"_celsius"[0m
+  0006 │   0 │ [34mLoadStaticFn        [0m │ r2 = #2  [2m;[0m [34mfn Temperature.constructor[0m(arity=2)
+  0008 │   0 │ [34mMethod              [0m │ r1, #3, r2  [2m;[0m [32m"constructor"[0m
+  0011 │   0 │ [34mLoadStaticFn        [0m │ r2 = #4  [2m;[0m [34mfn Temperature.get celsius[0m(arity=1)
+  0013 │   0 │ [34mDefineGetter        [0m │ r1, #5, r2  [2m;[0m [32m"celsius"[0m
+  0016 │   0 │ [34mLoadStaticFn        [0m │ r2 = #6  [2m;[0m [34mfn Temperature.set celsius[0m(arity=2)
+  0018 │   0 │ [34mDefineSetter        [0m │ r1, #5, r2  [2m;[0m [32m"celsius"[0m
+  0021 │   0 │ [34mLoadStaticFn        [0m │ r2 = #7  [2m;[0m [34mfn Temperature.get fahrenheit[0m(arity=1)
+  0023 │   0 │ [34mDefineGetter        [0m │ r1, #8, r2  [2m;[0m [32m"fahrenheit"[0m
+  0026 │   0 │ [36mDefineGlobalIdx     [0m │ r1, global@0
+  0029 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@0
+  0031 │   0 │ [36mLoadConst           [0m │ r3 = #9  [2m;[0m [32m100[0m
+  0033 │   0 │ LoadNull            [0m │ r9 = null
   0034 │   0 │ Move                [0m │ r10 = r3
-  0036 │   0 │ [35mCall                [0m │ r2 = call r1(2 args @ r9)
-  0039 │   0 │ [36mDefineGlobalIdx     [0m │ def global[@1] = r2
-  0042 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
-  0044 │   0 │ [36mLoadConst           [0m │ r4 = const[10]  [2m;[0m [32m"class getter"[0m
-  0046 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global[@1]
-  0048 │   0 │ GetProperty         [0m │ r5 = r2.prop[5] cs=0  [2m;[0m [32m"celsius"[0m
-  0051 │   0 │ [32mEqFloat             [0m │ r6 = r5 op r3
-  0053 │   0 │ LoadNull            [0m │ r9
+  0036 │   0 │ [35mCall                [0m │ r2 = r1, (r9..r10)
+  0039 │   0 │ [36mDefineGlobalIdx     [0m │ r2, global@1
+  0042 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@1
+  0044 │   0 │ [36mLoadConst           [0m │ r4 = #10  [2m;[0m [32m"class getter"[0m
+  0046 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global@1
+  0048 │   0 │ GetProperty         [0m │ r5 = r2, #5, ic0  [2m;[0m [32m"celsius"[0m
+  0051 │   0 │ [32mEqFloat             [0m │ r6 = r5 == r3
+  0053 │   0 │ LoadNull            [0m │ r9 = null
   0054 │   0 │ Move                [0m │ r10 = r4
   0056 │   0 │ Move                [0m │ r11 = r6
-  0058 │   0 │ [35mCall                [0m │ r7 = call r1(3 args @ r9)
-  0061 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
-  0063 │   0 │ [36mLoadConst           [0m │ r4 = const[11]  [2m;[0m [32m"class derived"[0m
-  0065 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global[@1]
-  0067 │   0 │ GetProperty         [0m │ r3 = r2.prop[8] cs=1  [2m;[0m [32m"fahrenheit"[0m
-  0070 │   0 │ [36mLoadConst           [0m │ r5 = const[12]  [2m;[0m [32m212[0m
-  0072 │   0 │ [32mEqFloat             [0m │ r6 = r3 op r5
-  0074 │   0 │ LoadNull            [0m │ r9
+  0058 │   0 │ [35mCall                [0m │ r7 = r1, (r9..r11)
+  0061 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@1
+  0063 │   0 │ [36mLoadConst           [0m │ r4 = #11  [2m;[0m [32m"class derived"[0m
+  0065 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global@1
+  0067 │   0 │ GetProperty         [0m │ r3 = r2, #8, ic1  [2m;[0m [32m"fahrenheit"[0m
+  0070 │   0 │ [36mLoadConst           [0m │ r5 = #12  [2m;[0m [32m212[0m
+  0072 │   0 │ [32mEqFloat             [0m │ r6 = r3 == r5
+  0074 │   0 │ LoadNull            [0m │ r9 = null
   0075 │   0 │ Move                [0m │ r10 = r4
   0077 │   0 │ Move                [0m │ r11 = r6
-  0079 │   0 │ [35mCall                [0m │ r7 = call r1(3 args @ r9)
-  0082 │   0 │ [36mLoadConst           [0m │ r3 = const[13]  [2m;[0m [32m0[0m
-  0084 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global[@1]
-  0086 │   0 │ SetProperty         [0m │ r1.prop[5] = r3 cs=2  [2m;[0m [32m"celsius"[0m
-  0089 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@1]
-  0091 │   0 │ [36mLoadConst           [0m │ r4 = const[14]  [2m;[0m [32m"class setter"[0m
-  0093 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global[@1]
-  0095 │   0 │ GetProperty         [0m │ r3 = r2.prop[8] cs=3  [2m;[0m [32m"fahrenheit"[0m
-  0098 │   0 │ [36mLoadConst           [0m │ r5 = const[15]  [2m;[0m [32m32[0m
-  0100 │   0 │ [32mEqFloat             [0m │ r6 = r3 op r5
-  0102 │   0 │ LoadNull            [0m │ r9
+  0079 │   0 │ [35mCall                [0m │ r7 = r1, (r9..r11)
+  0082 │   0 │ [36mLoadConst           [0m │ r3 = #13  [2m;[0m [32m0[0m
+  0084 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@1
+  0086 │   0 │ SetProperty         [0m │ r1, r3, #5, ic2  [2m;[0m [32m"celsius"[0m
+  0089 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@1
+  0091 │   0 │ [36mLoadConst           [0m │ r4 = #14  [2m;[0m [32m"class setter"[0m
+  0093 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global@1
+  0095 │   0 │ GetProperty         [0m │ r3 = r2, #8, ic3  [2m;[0m [32m"fahrenheit"[0m
+  0098 │   0 │ [36mLoadConst           [0m │ r5 = #15  [2m;[0m [32m32[0m
+  0100 │   0 │ [32mEqFloat             [0m │ r6 = r3 == r5
+  0102 │   0 │ LoadNull            [0m │ r9 = null
   0103 │   0 │ Move                [0m │ r10 = r4
   0105 │   0 │ Move                [0m │ r11 = r6
-  0107 │   0 │ [35mCall                [0m │ r7 = call r1(3 args @ r9)
-  0110 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = global[native@0]
-  0112 │   0 │ [36mLoadConst           [0m │ r4 = const[16]  [2m;[0m [32m"class ok"[0m
-  0114 │   0 │ LoadNull            [0m │ r9
+  0107 │   0 │ [35mCall                [0m │ r7 = r1, (r9..r11)
+  0110 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
+  0112 │   0 │ [36mLoadConst           [0m │ r4 = #16  [2m;[0m [32m"class ok"[0m
+  0114 │   0 │ LoadNull            [0m │ r9 = null
   0115 │   0 │ Move                [0m │ r10 = r4
-  0117 │   0 │ [35mCall                [0m │ r7 = call r1(2 args @ r9)
-  0120 │   1 │ LoadNull            [0m │ r8
+  0117 │   0 │ [35mCall                [0m │ r7 = r1, (r9..r10)
+  0120 │   1 │ LoadNull            [0m │ r8 = null
   0121 │   1 │ [33mReturn              [0m │ r8
-  0123 │   1 │ LoadNull            [0m │ r8
+  0123 │   1 │ LoadNull            [0m │ r8 = null
   0124 │   1 │ [33mReturn              [0m │ r8
 
   [1mfn[0m [34mTemperature.constructor[0m (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
@@ -86,10 +86,10 @@
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r2 = r0
-    0002 │   0 │ SetFixedField       [0m │ r2.fixed[0] = r1
-    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[769]
+    0002 │   0 │ SetFixedField       [0m │ r2, r1, field0, +0, :float
+    0006 │   1 │ LoadNull            [0m │ r3 = null
     0007 │   1 │ [33mReturn              [0m │ r3
-    0009 │   1 │ LoadNull            [0m │ r3
+    0009 │   1 │ LoadNull            [0m │ r3 = null
     0010 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.get celsius[0m (arity: 1, regs: 4, upvalues: 0)  [2m[has_this][0m
@@ -97,10 +97,9 @@
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r1 = r0
-    0002 │   0 │ GetFixedField       [0m │ r2 = r1.fixed[0]
-    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[44]
-    0007 │   1 │ LoadTrue            [0m │ r0
-    0008 │   1 │ LoadNull            [0m │ r3
+    0002 │   0 │ GetFixedField       [0m │ r2 = r1, field0, +0, :float
+    0006 │   1 │ [33mReturn              [0m │ r2
+    0008 │   1 │ LoadNull            [0m │ r3 = null
     0009 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.set celsius[0m (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
@@ -108,10 +107,10 @@
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r2 = r0
-    0002 │   0 │ SetFixedField       [0m │ r2.fixed[0] = r1
-    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[769]
+    0002 │   0 │ SetFixedField       [0m │ r2, r1, field0, +0, :float
+    0006 │   1 │ LoadNull            [0m │ r3 = null
     0007 │   1 │ [33mReturn              [0m │ r3
-    0009 │   1 │ LoadNull            [0m │ r3
+    0009 │   1 │ LoadNull            [0m │ r3 = null
     0010 │   1 │ [33mReturn              [0m │ r3
 
   [1mfn[0m [34mTemperature.get fahrenheit[0m (arity: 1, regs: 6, upvalues: 0)  [2m[has_this][0m
@@ -122,14 +121,13 @@
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
     0000 │   0 │ Move                [0m │ r1 = r0
-    0002 │   0 │ GetFixedField       [0m │ r2 = r1.fixed[0]
-    0005 │   0 │ [36mLoadConst           [0m │ r0 = const[768]
-    0007 │   0 │ [36mLoadConst           [0m │ r0 = const[1141]
-    0009 │   0 │ LoadFalse           [0m │ r2
-    0010 │   0 │ [36mLoadConst           [0m │ r2 = const[1]  [2m;[0m [32m32[0m
-    0012 │   0 │ [32mAddFloat            [0m │ r3 = r4 op r2
+    0002 │   0 │ GetFixedField       [0m │ r2 = r1, field0, +0, :float
+    0006 │   0 │ [36mLoadConst           [0m │ r3 = #0  [2m;[0m [32m1.8[0m
+    0008 │   0 │ [32mMulFloat            [0m │ r4 = r2 * r3
+    0010 │   0 │ [36mLoadConst           [0m │ r2 = #1  [2m;[0m [32m32[0m
+    0012 │   0 │ [32mAddFloat            [0m │ r3 = r4 + r2
     0014 │   1 │ [33mReturn              [0m │ r3
-    0016 │   1 │ LoadNull            [0m │ r5
+    0016 │   1 │ LoadNull            [0m │ r5 = null
     0017 │   1 │ [33mReturn              [0m │ r5
 
   [2m── end: bytecode ──[0m
