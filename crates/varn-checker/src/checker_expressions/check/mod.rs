@@ -687,7 +687,7 @@ impl<'r> Checker<'r> {
                     self.current_scope = saved_scope;
                 }
                 let subject_ty = self.infer_type(subject, bind);
-                self.check_match_exhaustiveness(&subject_ty, &cases, &range, bind);
+                self.check_match_exhaustiveness(expr, &subject_ty, &cases, &range, bind);
             }
 
             ExprKind::Update { operand, .. } => {

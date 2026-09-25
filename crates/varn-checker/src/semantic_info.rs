@@ -74,6 +74,15 @@ pub struct MemberResolution {
     pub doc: Option<Arc<str>>,
 }
 
+/// The arms a non-exhaustive `match` lacks, each as the pattern that would
+/// cover it (`None`, `Err(_)`, `false`, or `_` for what no pattern can name).
+/// Recorded where the checker reports the match, for tooling that offers to
+/// add them.
+#[derive(Clone, Debug, Default)]
+pub struct MatchGap {
+    pub missing: Vec<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct CallParamInfo {
     pub name: Option<Arc<str>>,

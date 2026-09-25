@@ -2,15 +2,30 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::pattern::MatchPattern;
-use varn_core::ast::{AstArena, ExprKind, MatchCase};
+use varn_core::ast::{AstArena, ExprId, ExprKind, MatchCase};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
 
 impl<'r> Checker<'r> {
+    /// Report `expr` non-exhaustive, missing the arms `missing` (each the
+    /// pattern that would cover it, as source).
+    fn report_gap(
+        &mut self,
+        expr: ExprId,
+        missing: Vec<String>,
+        message: String,
+        range: &SourceRange,
+    ) {
+        self.emit(Diagnostic::error(ErrorCode::NonExhaustiveMatch, message).with_range(*range));
+        self.match_gaps
+            .insert(expr.index(), crate::semantic_info::MatchGap { missing });
+    }
+
     /// An open type (`int`, `str`, a class, `dynamic`) has no finite set of
     /// values to cover: only a catch-all arm makes the match exhaustive.
     fn require_catch_all(
         &mut self,
+        expr: ExprId,
         subject_ty: &Type,
         cases: &[MatchCase],
         range: &SourceRange,
@@ -25,18 +40,14 @@ impl<'r> Checker<'r> {
         });
         if !catch_all {
             let ty = subject_ty.display(&self.ty_table, &bind.interner);
-            self.emit(
-                Diagnostic::error(
-                    ErrorCode::NonExhaustiveMatch,
-                    format!("non-exhaustive match: a match on '{ty}' needs a `_` arm"),
-                )
-                .with_range(*range),
-            );
+            let message = format!("non-exhaustive match: a match on '{ty}' needs a `_` arm");
+            self.report_gap(expr, vec!["_".to_owned()], message, range);
         }
     }
 
     pub(super) fn check_match_exhaustiveness(
         &mut self,
+        expr: ExprId,
         subject_ty: &Type,
         cases: &[MatchCase],
         range: &SourceRange,
@@ -52,27 +63,34 @@ impl<'r> Checker<'r> {
         if let Some(members) =
             closed_members(subject_ty, std::sync::Arc::make_mut(&mut self.ty_table))
         {
-            let uncovered: Vec<String> = members
-                .iter()
+            let uncovered: Vec<Type> = members
+                .into_iter()
                 .filter(|m| {
                     !cases.iter().any(|c| {
                         c.guard.is_none()
                             && pattern_covers(&c.pattern, m, &self.ty_table, self.ast_arena, bind)
                     })
                 })
-                .map(|m| m.display(&self.ty_table, &bind.interner).to_string())
                 .collect();
             if !uncovered.is_empty() {
-                self.emit(
-                    Diagnostic::error(
-                        ErrorCode::NonExhaustiveMatch,
-                        format!(
-                            "non-exhaustive match: missing cases for {}",
-                            uncovered.join(", ")
-                        ),
-                    )
-                    .with_range(*range),
+                let text = |t: &Type| t.display(&self.ty_table, &bind.interner).to_string();
+                let names: Vec<String> = uncovered.iter().map(text).collect();
+                // A literal or `null` is its own pattern; a class in the union
+                // has none (`MatchPattern::Type` is not in the surface syntax),
+                // so only a catch-all covers it.
+                let mut missing: Vec<String> = uncovered
+                    .iter()
+                    .filter(|t| is_literal_pattern(t, &self.ty_table))
+                    .map(text)
+                    .collect();
+                if missing.len() < uncovered.len() {
+                    missing.push("_".to_owned());
+                }
+                let message = format!(
+                    "non-exhaustive match: missing cases for {}",
+                    names.join(", ")
                 );
+                self.report_gap(expr, missing, message, range);
             }
             return;
         }
@@ -80,7 +98,7 @@ impl<'r> Checker<'r> {
         let (TypeKind::Named(type_name_atom, origin_atom)
         | TypeKind::Generic(type_name_atom, _, origin_atom)) = self.ty_table.get(subject_ty.0)
         else {
-            self.require_catch_all(subject_ty, cases, range, bind);
+            self.require_catch_all(expr, subject_ty, cases, range, bind);
             return;
         };
         let type_name: std::sync::Arc<str> = self.resolve_bind_atom(bind, type_name_atom);
@@ -143,16 +161,21 @@ impl<'r> Checker<'r> {
                 .map(|v| v.to_string())
                 .collect();
             if !uncovered.is_empty() {
-                self.emit(
-                    Diagnostic::error(
-                        ErrorCode::NonExhaustiveMatch,
-                        format!(
-                            "non-exhaustive match: missing cases for {}",
-                            uncovered.join(", ")
-                        ),
-                    )
-                    .with_range(*range),
+                // A variant with a payload is matched with its fields bound.
+                let missing = uncovered
+                    .iter()
+                    .map(|v| match owner.sum_variant_fields.get(v.as_str()) {
+                        Some(fields) if !fields.is_empty() => {
+                            format!("{v}({})", vec!["_"; fields.len()].join(", "))
+                        }
+                        _ => v.clone(),
+                    })
+                    .collect();
+                let message = format!(
+                    "non-exhaustive match: missing cases for {}",
+                    uncovered.join(", ")
                 );
+                self.report_gap(expr, missing, message, range);
             }
             return;
         }
@@ -206,20 +229,15 @@ impl<'r> Checker<'r> {
                 .map(|v| v.name.to_string())
                 .collect();
             if !uncovered.is_empty() {
-                self.emit(
-                    Diagnostic::error(
-                        ErrorCode::NonExhaustiveMatch,
-                        format!(
-                            "non-exhaustive match: missing cases for {}",
-                            uncovered.join(", ")
-                        ),
-                    )
-                    .with_range(*range),
+                let message = format!(
+                    "non-exhaustive match: missing cases for {}",
+                    uncovered.join(", ")
                 );
+                self.report_gap(expr, uncovered, message, range);
             }
             return;
         }
-        self.require_catch_all(subject_ty, cases, range, bind);
+        self.require_catch_all(expr, subject_ty, cases, range, bind);
     }
 }
 
@@ -248,6 +266,15 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
         _ => return None,
     }
     Some(out)
+}
+
+/// Whether a member of a closed subject is written as a literal pattern:
+/// a literal type (`true`, `"a"`, `1`) or `null`.
+fn is_literal_pattern(t: &Type, table: &CheckerTyTable) -> bool {
+    matches!(
+        table.get(t.0),
+        TypeKind::Literal(_) | TypeKind::Primitive(varn_core::LangPrimitive::Null)
+    )
 }
 
 fn pattern_covers(

@@ -100,6 +100,8 @@ pub struct CheckResult {
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
     pub member_resolutions: FxHashMap<u32, MemberResolution>,
     pub call_resolutions: FxHashMap<u32, CallResolution>,
+    /// The missing arms of each non-exhaustive `match`, keyed by its id.
+    pub match_gaps: FxHashMap<varn_core::ast::AstId, crate::semantic_info::MatchGap>,
     /// **The** record of what the checker decided, keyed by `Expr::id()`.
     ///
     /// Everything else that carries an expression's type is derived from this:
@@ -218,6 +220,7 @@ pub struct Checker<'r> {
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
+    pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, crate::semantic_info::MatchGap>,
     /// Seeded from `bind.ty_table` and grown as checking synthesizes types
     /// beyond what binding produced (unions from narrowing, instantiated
     /// generics, etc). Same snapshot/publish discipline as `AtomInterner`:
@@ -440,6 +443,7 @@ impl<'r> Checker<'r> {
             } else {
                 FxHashMap::default()
             },
+            match_gaps: FxHashMap::default(),
             ty_table: bind.ty_table.clone(),
         };
 
@@ -577,6 +581,7 @@ impl<'r> Checker<'r> {
             symbol_types,
             member_resolutions: checker.member_resolutions,
             call_resolutions: checker.call_resolutions,
+            match_gaps: checker.match_gaps,
             expr_table,
             call_mappings: checker.call_mappings,
             desugar: checker.desugar,
