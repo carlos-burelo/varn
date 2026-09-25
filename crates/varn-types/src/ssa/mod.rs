@@ -33,8 +33,10 @@ use serde::{Deserialize, Serialize};
 use crate::register_meta::{SlotClass, SlotKind};
 
 mod op;
+mod operators;
 
-pub use op::{DynBinOp, DynUnOp, SsaBinOp, SsaOp, SsaUnOp, SsaUpvalue, UPVALUE_LOCAL};
+pub use op::{SsaOp, SsaUpvalue, UPVALUE_LOCAL};
+pub use operators::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
 /// The static kind of a value, exactly the checker's proof projected onto the
 /// register file. It is the same [`SlotKind`] the JIT already reads from

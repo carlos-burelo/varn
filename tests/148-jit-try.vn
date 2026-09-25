@@ -1,0 +1,123 @@
+// `try` in a compiled body: the normal path runs compiled, and a throw —
+// from `throw` or from the runtime — resumes the interpreter at the catch
+// with every value the catch reads in place. Each function runs past the
+// tiering threshold and has two statements, so it executes compiled instead
+// of being inlined.
+
+class TyFail {
+    check(i: int): int {
+        if (i % 4 == 0) {
+            throw new Error("four")
+        }
+        return i
+    }
+}
+
+// The catch reads values of every class defined before the `try`.
+function tyReads(i: int, label: str): int {
+    const k = i * 3
+    const f = (i as float) + 0.5
+    const flag = i % 2 == 0
+    let r = 0
+    try {
+        if (i % 5 == 0) {
+            throw new Error("five")
+        }
+        r = k
+    } catch (e) {
+        r = k + (flag ? 1000 : 2000) + label.length
+        if (f > 1000000.0) { r = 0 }
+    }
+    return r
+}
+
+// A runtime error raised by a helper (a method that throws) is caught too.
+function tyHelper(t: TyFail, i: int): int {
+    let r = -1
+    try {
+        r = t.check(i)
+    } catch (e) {
+        r = 0
+    }
+    return r + 1
+}
+
+// A variable written inside the `try` keeps its latest value in the catch.
+function tyPinned(i: int): int {
+    let steps = 0
+    try {
+        steps = steps + 1
+        steps = steps + 10
+        if (i % 3 == 0) { throw new Error("three") }
+        steps = steps + 100
+    } catch (e) {
+        steps = steps + 1000
+    }
+    return steps
+}
+
+// Nested regions: the inner catch handles, the outer one sees a rethrow.
+function tyNested(i: int): int {
+    let r = 0
+    try {
+        try {
+            if (i % 2 == 0) { throw new Error("inner") }
+            r = 1
+        } catch (e) {
+            r = 10
+            if (i % 4 == 0) { throw new Error("again") }
+        }
+    } catch (e2) {
+        r = r + 100
+    }
+    return r
+}
+
+// No handler here: the caller's catch gets it.
+function tyThrows(i: int): int {
+    const half = i / 2
+    if (i % 2 == 1) { throw new Error("odd") }
+    return half
+}
+function tyCaller(i: int): int {
+    let r = 0
+    try {
+        r = tyThrows(i)
+    } catch (e) {
+        r = -1
+    }
+    return r
+}
+
+let reads = 0
+let helper = 0
+let pinned = 0
+let nested = 0
+let caller = 0
+const fail = new TyFail()
+for (let i = 0; i < 2000; i = i + 1) {
+    reads = reads + tyReads(i, "ab")
+    helper = helper + tyHelper(fail, i)
+    pinned = pinned + tyPinned(i)
+    nested = nested + tyNested(i)
+    caller = caller + tyCaller(i)
+}
+
+// Without a throw r = 3i; with one (i % 5 == 0) it is 3i + 1000 or 2000 by
+// parity, plus the label's length.
+let expReads = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    expReads = expReads + 3 * i
+    if (i % 5 == 0) { expReads = expReads + (i % 2 == 0 ? 1000 : 2000) + 2 }
+}
+assert("the catch reads the values from before the try", reads === expReads)
+// i % 4 == 0 gives 0 + 1, otherwise i + 1.
+assert("a helper's error is caught", helper === (1999000 - 4 * 124750) + 2000)
+// 667 multiples of 3 below 2000 end at 1011, the rest at 111.
+assert("a variable written in the try", pinned === 667 * 1011 + 1333 * 111)
+// Odd: 1; even not multiple of 4: 10; multiple of 4: 110.
+assert("nested try regions", nested === 1000 * 1 + 500 * 10 + 500 * 110)
+// Even i gives i / 2, odd gives -1.
+assert("the caller catches a throw from a compiled callee", caller === 499500 - 1000)
+
+print("[PASSED] 148. JIT try")

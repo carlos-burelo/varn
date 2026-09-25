@@ -234,6 +234,24 @@ pub(super) fn project_inst(
         InstKind::CloseUpvalues { targets } => SsaOp::CloseUpvalues {
             vars: targets.iter().map(|t| captured.index(*t)).collect(),
         },
+        // The landing pad writes the thrown value to the `Try`'s value at run
+        // time; the op itself defines nothing.
+        InstKind::Try { .. } => {
+            let (catch_ip, live) = site.landing?;
+            let mut live: Vec<u32> = live.iter().copied().collect();
+            live.sort_unstable();
+            return Some(SsaInst {
+                dest: None,
+                op: SsaOp::Try {
+                    catch_ip,
+                    catch_value: inst.dest?.0,
+                    live,
+                },
+                line: inst.line,
+            });
+        }
+        InstKind::PopTry => SsaOp::PopTry,
+        InstKind::CatchParam { try_val } => SsaOp::CatchParam { try_val: try_val.0 },
         // Calls, heap ops, closures, classes, suspension: outside the family.
         _ => return None,
     };

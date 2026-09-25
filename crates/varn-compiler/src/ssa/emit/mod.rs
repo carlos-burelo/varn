@@ -151,6 +151,7 @@ pub fn emit_function_meta(
         nparams,
         ic: &ic,
         closure_consts: &closure_consts,
+        block_offset: &block_offset,
     };
     let ssa_proto = match super::portable::project(&ssa, &emitted, f.has_this, &f.name) {
         Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),

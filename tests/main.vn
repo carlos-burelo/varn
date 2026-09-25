@@ -133,6 +133,7 @@ import "./144-jit-method-calls.vn"
 import "./145-jit-closures.vn"
 import "./146-jit-branch-truthiness.vn"
 import "./147-jit-globals.vn"
+import "./148-jit-try.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

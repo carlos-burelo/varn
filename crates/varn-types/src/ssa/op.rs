@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use varn_core::RuntimeKind;
 
+use super::operators::{SsaBinOp, SsaUnOp};
+
 /// Typed operation of the scalar/arith family.
 ///
 /// The scalar arithmetic and comparison variants encode the width the checker
@@ -52,6 +54,26 @@ pub enum SsaOp {
     /// Prelude / host global read at its absolute native-layout index, a
     /// boxed `VmValue`.
     LoadNativeGlobalIdx(u32),
+
+    /// Open a `try` region. A throw inside it resumes the INTERPRETER at the
+    /// landing pad (`catch_ip`, a bytecode offset) with the thrown value in
+    /// `catch_value`'s register; the catch path never runs compiled. `live`
+    /// are the values the landing pad reads, which must be in their homes
+    /// while the region is open.
+    Try {
+        catch_ip: u32,
+        catch_value: u32,
+        live: Vec<u32>,
+    },
+
+    /// Close the innermost `try` region; no result.
+    PopTry,
+
+    /// The thrown value a landing pad starts from. Only a landing pad holds
+    /// it, and landing pads run interpreted.
+    CatchParam {
+        try_val: u32,
+    },
 
     /// Module-relative global write of `value`; no result.
     StoreGlobalIdx {
@@ -286,95 +308,3 @@ pub enum SsaUpvalue {
 /// word each, a frame register with this bit set, or the creating closure's
 /// upvalue index without it.
 pub const UPVALUE_LOCAL: u64 = 1 << 32;
-
-/// Binary operations, already specialized to a physical domain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SsaBinOp {
-    IntAdd,
-    IntSub,
-    IntMul,
-    IntDiv,
-    IntMod,
-    IntPow,
-    IntEq,
-    IntNe,
-    IntLt,
-    IntLe,
-    IntGt,
-    IntGe,
-    IntAnd,
-    IntOr,
-    IntXor,
-    IntShl,
-    IntShr,
-    IntUshr,
-
-    FloatAdd,
-    FloatSub,
-    FloatMul,
-    FloatDiv,
-    FloatMod,
-    FloatPow,
-    FloatEq,
-    FloatNe,
-    FloatLt,
-    FloatLe,
-    FloatGt,
-    FloatGe,
-
-    /// Statically-proven string concatenation (`"a" + b`).
-    StrConcat,
-
-    /// The operator on boxed operands, run by its runtime helper: the
-    /// bytecode's generic opcode, for operands no type proves native.
-    Dyn(DynBinOp),
-}
-
-/// A binary operator on boxed values: arithmetic and bitwise ones yield a
-/// boxed value, comparisons, `instanceof` and `in` a `bool`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DynBinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Pow,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    BitAnd,
-    BitOr,
-    BitXor,
-    Shl,
-    Shr,
-    Ushr,
-    Instanceof,
-    In,
-}
-
-/// A unary operator on a boxed value.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DynUnOp {
-    /// `-x`; a boxed result.
-    Neg,
-    /// `!x` by truthiness; a `bool`.
-    Not,
-    /// `~x`; a boxed result.
-    BitNot,
-}
-
-/// Unary operations, specialized to a physical domain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SsaUnOp {
-    NegInt,
-    NegFloat,
-    /// Logical negation; result is a bool (`Dyn` class).
-    Not,
-    BitNotInt,
-    /// The operator on the boxed operand, run by its runtime helper.
-    Dyn(DynUnOp),
-}

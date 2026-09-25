@@ -142,8 +142,7 @@ pub(super) fn emit_term(
         SsaTerm::Unreachable => {
             b.ins().trap(TrapCode::user(1).unwrap());
         }
-        // Throw needs a convention this ABI does not carry; decline.
-        SsaTerm::Throw(_) => return Err("from_ssa: unhandled terminator".into()),
+        SsaTerm::Throw(v) => super::exceptions::emit_throw(b, ctx, values, *v)?,
     }
     Ok(())
 }

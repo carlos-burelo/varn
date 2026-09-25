@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
+use crate::ssa::liveness::Liveness;
+use rustc_hash::FxHashSet;
 use varn_types::ssa::{SsaBlock, SsaProto, SsaTerm, SsaValue};
 
 mod inst;
@@ -30,6 +32,8 @@ pub(crate) struct Emitted<'a> {
     pub ic: &'a crate::ssa::ic::IcSlots,
     /// The function constant each `MakeClosure` was emitted with.
     pub closure_consts: &'a [Vec<Option<u16>>],
+    /// The bytecode offset each block was emitted at.
+    pub block_offset: &'a [usize],
 }
 
 /// The captured variables of a function, numbered in first-use order: the
@@ -81,6 +85,14 @@ pub(crate) fn project(
         }
     }
 
+    // What each landing pad reads, for the `Try`s that open one.
+    let has_try = ssa.blocks.iter().any(|b| {
+        b.insts
+            .iter()
+            .any(|i| matches!(i.kind, InstKind::Try { .. }))
+    });
+    let liveness = has_try.then(|| Liveness::analyze(ssa));
+
     let mut captured = Captured {
         vars: Vec::new(),
         nparams: emitted.nparams,
@@ -97,6 +109,15 @@ pub(crate) fn project(
                     .and_then(|c| c.get(i))
                     .copied()
                     .flatten(),
+                landing: match (&inst.kind, &liveness) {
+                    (InstKind::Try { handler }, Some(lv)) => {
+                        let h = handler.0 as usize;
+                        let off = emitted.block_offset.get(h).copied();
+                        off.and_then(|o| u32::try_from(o).ok())
+                            .map(|o| (o, &lv.live_in[h]))
+                    }
+                    _ => None,
+                },
             };
             let projected = project_inst(inst, &value_tys, &global_of, site, &mut captured)
                 .ok_or_else(|| why_not(&inst.kind, &value_tys))?;
@@ -136,11 +157,13 @@ pub(crate) fn project(
 
 /// What the bytecode baked for one instruction.
 #[derive(Clone, Copy)]
-struct Site {
+struct Site<'a> {
     /// Its inline-cache slot (`ssa::ic`).
     ic_slot: Option<u8>,
     /// The function constant of a `MakeClosure`.
     closure_const: Option<u16>,
+    /// A `Try`'s landing pad: its bytecode offset and the values live into it.
+    landing: Option<(u32, &'a FxHashSet<u32>)>,
 }
 
 fn project_term(term: &Terminator) -> SsaTerm {

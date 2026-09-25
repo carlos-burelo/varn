@@ -30,10 +30,12 @@
 //! * [`globals`] — module-relative global reads;
 //! * [`call`] — self-recursion and cross-proto calls;
 //! * [`closures`] — closure creation, captured variables and upvalues;
+//! * [`exceptions`] — `try` regions (resumed interpreted) and `throw`;
 //! * [`term`] — terminators and the branch/jump argument windows.
 
 use cranelift_codegen::ir::{
-    ExtFuncData, ExternalName, FuncRef, Function, UserExternalName, UserFuncName, Value,
+    ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, UserExternalName, UserFuncName,
+    Value,
 };
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -51,6 +53,7 @@ mod call;
 mod classops;
 mod closures;
 mod dynop;
+mod exceptions;
 mod globals;
 mod heap;
 mod heapvalue;
@@ -125,10 +128,9 @@ pub(super) fn try_lower(
         || proto.has_this
         || ssa.has_this
         || proto.upvalue_count > 0
-        || ssa
-            .blocks
-            .iter()
-            .any(|blk| blk.insts.iter().any(|i| needs_frame(&i.op)));
+        || ssa.blocks.iter().any(|blk| {
+            blk.insts.iter().any(|i| needs_frame(&i.op)) || matches!(blk.term, SsaTerm::Throw(_))
+        });
 
     let cc = isa.default_call_conv();
     let mut func = Function::with_name_signature(
@@ -255,6 +257,16 @@ pub(super) fn try_lower(
         term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, back_edge)?;
     }
 
+    // Nothing compiled jumps to the rest; each still needs a body.
+    let reached: std::collections::HashSet<usize> = order(ssa).into_iter().collect();
+    for (i, cb) in blocks.iter().enumerate() {
+        if !reached.contains(&i) {
+            b.switch_to_block(cb.expect("block created"));
+            b.ins()
+                .trap(cranelift_codegen::ir::TrapCode::user(1).expect("non-zero trap code"));
+        }
+    }
+
     b.seal_all_blocks();
     b.finalize();
     Ok((compile_piece(func, isa)?, frame_aware))
@@ -277,11 +289,16 @@ fn needs_frame(op: &SsaOp) -> bool {
             | SsaOp::LoadUpvalue(_)
             | SsaOp::StoreUpvalue { .. }
             | SsaOp::CloseUpvalues { .. }
+            | SsaOp::Try { .. }
+            | SsaOp::PopTry
+            | SsaOp::CatchParam { .. }
     )
 }
 
-/// Reverse postorder from the entry so every value is defined before its uses,
-/// with unreachable blocks appended in index order so all are still filled.
+/// The blocks compiled code can reach — through terminators from the entry —
+/// in reverse postorder, so every value is defined before its uses. A block
+/// reachable only through a `try` handler is a landing pad or the catch path
+/// behind it, which runs interpreted (see [`exceptions`]).
 fn order(ssa: &SsaProto) -> Vec<usize> {
     let n = ssa.blocks.len();
     let entry = ssa.entry as usize;
@@ -311,13 +328,7 @@ fn order(ssa: &SsaProto) -> Vec<usize> {
             }
         }
     }
-    let mut out: Vec<usize> = post.into_iter().rev().collect();
-    for (i, seen) in visited.iter().enumerate() {
-        if !seen {
-            out.push(i);
-        }
-    }
-    out
+    post.into_iter().rev().collect()
 }
 
 pub(super) fn resolve_args(

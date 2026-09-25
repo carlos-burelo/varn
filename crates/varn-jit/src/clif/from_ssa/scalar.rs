@@ -16,7 +16,8 @@ use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
 use super::{
-    boxed, call, closures, dynop, globals, heap, heapvalue, is_heap, load_value, Ctx, Out,
+    boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap, load_value, Ctx,
+    Out,
 };
 
 /// Emit one instruction; `Ok(None)` means it produces no result. The driver
@@ -165,6 +166,22 @@ pub(super) fn emit_inst(
         SsaOp::StoreUpvalue { index, value } => {
             closures::emit_store_upvalue(b, ctx, values, *index, *value)?;
             return Ok(None);
+        }
+        SsaOp::Try {
+            catch_ip,
+            catch_value,
+            live,
+        } => {
+            exceptions::emit_try(b, ctx, values, *catch_ip, *catch_value, live)?;
+            return Ok(None);
+        }
+        SsaOp::PopTry => {
+            exceptions::emit_pop_try(b, ctx)?;
+            return Ok(None);
+        }
+        // Only a landing pad reads it, and the driver never compiles one.
+        SsaOp::CatchParam { .. } => {
+            return Err("from_ssa: a landing pad reached compiled code".into())
         }
         SsaOp::StoreGlobalIdx { slot, value } => {
             let boxed = heap::boxed_value(b, ctx, values, *value)?;
