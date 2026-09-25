@@ -46,6 +46,12 @@ impl<'a> SymbolView<'a> {
     pub fn ty(&self) -> &'a Type {
         self.ty
     }
+    /// This symbol's type as source text — never format the handle itself
+    /// (Ley 2: a `Type` only means something inside the table that interned
+    /// it).
+    pub fn ty_text(&self) -> String {
+        self.db.ty_text(self.ty)
+    }
     /// 0-based, as LSP positions are; the checker counts from 1.
     pub fn line(&self) -> u32 {
         self.sym.line.saturating_sub(1)

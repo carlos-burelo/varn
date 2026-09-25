@@ -137,11 +137,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         ));
         let mut sorted: Vec<_> = analysis.db.expr_types.iter().collect();
         sorted.sort_by_key(|(off, _)| *off);
-        for (off, ty) in sorted {
+        for (off, info) in sorted {
             terminal::log(format!(
                 "    {DIM}offset {:>4}{RESET} : {YELLOW}{}{RESET}",
                 off,
-                ty,
+                analysis.db.ty_text(&info.ty),
                 DIM = DIM,
                 RESET = R,
                 YELLOW = YELLOW

@@ -70,7 +70,7 @@ fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {
     match s.kind() {
         SymbolKind::Function => {
             let async_prefix = if s.is_async() { "async " } else { "" };
-            format!("{async_prefix}{}", s.ty())
+            format!("{async_prefix}{}", s.ty_text())
         }
         SymbolKind::Class | SymbolKind::Interface => {
             let mut parts = Vec::new();
@@ -79,6 +79,6 @@ fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {
             }
             parts.join(" ")
         }
-        _ => s.ty().to_string(),
+        _ => s.ty_text(),
     }
 }
