@@ -230,8 +230,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     // bytecode uses, so it must follow the same permutation. Without this,
     // `from_ssa` would write a heap value into the pre-coalescing register,
     // whose post-coalescing class is a different (possibly scalar) slot.
-    if let Some(ssa) = proto.ssa.as_mut() {
-        let ssa = std::sync::Arc::make_mut(ssa);
+    if let Some(ssa) = proto.ssa.get_mut() {
         for r in ssa.regs.iter_mut() {
             let old = *r as u8;
             *r = mapping.get(&old).copied().unwrap_or(old) as u32;

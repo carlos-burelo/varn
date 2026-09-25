@@ -54,7 +54,7 @@ fn bytecode_sites(proto: &FunctionProto) -> Sites {
 }
 
 fn ssa_sites(proto: &FunctionProto) -> Option<Sites> {
-    let ssa = proto.ssa.as_deref()?;
+    let ssa = proto.ssa.get()?;
     let mut sites = Sites::new();
     for block in &ssa.blocks {
         for inst in &block.insts {
@@ -71,7 +71,7 @@ fn ssa_sites(proto: &FunctionProto) -> Option<Sites> {
 /// Sites numbered in SSA block-index order — what a projection counting on
 /// its own would assign.
 fn index_order_slots(proto: &FunctionProto) -> Vec<u16> {
-    let ssa = proto.ssa.as_deref().expect("portable SSA");
+    let ssa = proto.ssa.get().expect("portable SSA");
     ssa.blocks
         .iter()
         .flat_map(|b| &b.insts)

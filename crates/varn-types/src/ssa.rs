@@ -341,6 +341,45 @@ impl SsaProto {
     }
 }
 
+/// A function's portable SSA, or why it has none. The JIT lowers a function
+/// without one from bytecode, and `VARN_CLIF_TRACE` reports the reason — a
+/// function never falls back silently.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum PortableSsa {
+    Available(std::sync::Arc<SsaProto>),
+    Unavailable(std::sync::Arc<str>),
+}
+
+impl Default for PortableSsa {
+    fn default() -> Self {
+        Self::Unavailable(std::sync::Arc::from("not built from typed SSA"))
+    }
+}
+
+impl PortableSsa {
+    pub fn get(&self) -> Option<&SsaProto> {
+        match self {
+            Self::Available(ssa) => Some(ssa),
+            Self::Unavailable(_) => None,
+        }
+    }
+
+    pub fn get_mut(&mut self) -> Option<&mut SsaProto> {
+        match self {
+            Self::Available(ssa) => Some(std::sync::Arc::make_mut(ssa)),
+            Self::Unavailable(_) => None,
+        }
+    }
+
+    /// Why there is no portable SSA, when there is none.
+    pub fn unavailable(&self) -> Option<&str> {
+        match self {
+            Self::Available(_) => None,
+            Self::Unavailable(why) => Some(why),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

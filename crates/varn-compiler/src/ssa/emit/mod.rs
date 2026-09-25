@@ -60,8 +60,10 @@ pub fn emit_function_meta(
     let order = emission_order(&ssa);
     let ic = super::ic::IcSlots::number(&ssa, &order)?;
     let ssa_proto =
-        super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name, &ic)
-            .map(std::sync::Arc::new);
+        match super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name, &ic) {
+            Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),
+            Err(why) => varn_types::ssa::PortableSsa::Unavailable(Arc::from(why)),
+        };
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();

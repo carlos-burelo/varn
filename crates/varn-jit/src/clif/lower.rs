@@ -302,7 +302,15 @@ pub fn try_compile(
     // through to the bytecode path below, so correctness never depends on this
     // succeeding.
     if osr_ip.is_none() && debug.is_none() {
-        if let Some(ssa) = proto.ssa.as_deref() {
+        if let Some(why) = proto.ssa.unavailable() {
+            if super::trace() {
+                eprintln!(
+                    "clif: from_ssa unavailable {}: {why}",
+                    proto.name.as_deref().unwrap_or("<module>")
+                );
+            }
+        }
+        if let Some(ssa) = proto.ssa.get() {
             match super::from_ssa::try_lower(proto, ssa, constants, helpers, isa, linker) {
                 Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
                     if super::trace() {

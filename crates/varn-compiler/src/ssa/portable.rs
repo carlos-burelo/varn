@@ -18,8 +18,8 @@ use crate::ssa::ir::{Inst, InstKind, SsaFunc, Terminator};
 use varn_types::ssa::{SsaBinOp, SsaBlock, SsaInst, SsaOp, SsaProto, SsaTerm, SsaUnOp, SsaValue};
 
 /// Build the portable SSA for `ssa` (already phi-split and register-assigned).
-/// Returns `None` when any instruction or value type is outside the projected
-/// family.
+/// Returns why not when any instruction or terminator is outside the
+/// projected family.
 pub(crate) fn project(
     ssa: &SsaFunc,
     reg: &[u8],
@@ -27,7 +27,7 @@ pub(crate) fn project(
     has_this: bool,
     name: &Arc<str>,
     ic: &crate::ssa::ic::IcSlots,
-) -> Option<SsaProto> {
+) -> Result<SsaProto, String> {
     let value_tys: Vec<HirType> = ssa.values.iter().map(|v| v.ty).collect();
 
     // Module-relative global slot each value was loaded from, so a `Call` can
@@ -46,12 +46,14 @@ pub(crate) fn project(
     for (b, block) in ssa.blocks.iter().enumerate() {
         let mut insts = Vec::with_capacity(block.insts.len());
         for (i, inst) in block.insts.iter().enumerate() {
-            insts.push(project_inst(inst, &value_tys, &global_of, ic.of(b, i))?);
+            let projected = project_inst(inst, &value_tys, &global_of, ic.of(b, i))
+                .ok_or_else(|| why_not(&inst.kind, &value_tys))?;
+            insts.push(projected);
         }
         blocks.push(SsaBlock {
             params: block.params.iter().map(|v| v.0).collect(),
             insts,
-            term: project_term(&block.term)?,
+            term: project_term(&block.term),
         });
     }
 
@@ -63,7 +65,7 @@ pub(crate) fn project(
         })
         .collect();
 
-    Some(SsaProto {
+    Ok(SsaProto {
         name: name.as_ref().into(),
         nparams: ssa
             .blocks
@@ -279,8 +281,8 @@ fn project_inst(
     })
 }
 
-fn project_term(term: &Terminator) -> Option<SsaTerm> {
-    Some(match term {
+fn project_term(term: &Terminator) -> SsaTerm {
+    match term {
         Terminator::Return(v) => SsaTerm::Return(v.map(|v| v.0)),
         Terminator::Throw(v) => SsaTerm::Throw(v.0),
         Terminator::Jump { target, args } => SsaTerm::Jump {
@@ -301,7 +303,26 @@ fn project_term(term: &Terminator) -> Option<SsaTerm> {
             else_args: else_args.iter().map(|v| v.0).collect(),
         },
         Terminator::Unreachable => SsaTerm::Unreachable,
-    })
+    }
+}
+
+/// Why an instruction has no portable form: its name, and for an operator
+/// the operand types it was asked for.
+fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
+    let ty = |v: &crate::ssa::ir::Value| value_tys.get(v.0 as usize).copied();
+    match kind {
+        InstKind::Binary { op, lhs, rhs, .. } => {
+            format!("no portable form for {op:?} on {:?} and {:?}", ty(lhs), ty(rhs))
+        }
+        InstKind::Unary { op, operand, .. } => {
+            format!("no portable form for {op:?} on {:?}", ty(operand))
+        }
+        other => {
+            let full = format!("{other:?}");
+            let end = full.find([' ', '(', '{']).unwrap_or(full.len());
+            format!("no portable form for {}", &full[..end])
+        }
+    }
 }
 
 /// The typed `OpCode` the emitter already selects, mapped to its portable
