@@ -66,7 +66,7 @@ compartido en `varn-types::register_meta`: `SlotClass { Gpr, Fpr, Ref, Dyn }`,
 - **K4** tipos angostos `i8..u32/f32` (`BackendTy` + `NarrowRangeCheck`).
 - **K5** `ArrayRepr` angosto (literales/lectura compactos).
 
-### 2.4 JIT desde SSA — F1–F4 HECHO, F5 avanzado (ver §5.1)
+### 2.4 JIT desde SSA — F1–F5 HECHO (ver §5.1); F6 pendiente
 
 Contrato (Ley 2/6/8): `TIR/SSA tipada (varn-compiler) → bytecode (intérprete) y
 SSA serializada en `.vnc → varn-jit baja de SSA (CLIF)`.
@@ -142,26 +142,34 @@ apuntan a registros de otra clase → panic `jit_store_home`).
 
 ## 5. Pendiente real
 
-### 5.1 F5 — resto
+### 5.1 F5 — HECHO
 
-**Hecho** (cada uno con su test en `tests/`):
-- Operadores genéricos sobre valores boxeados (`Dyn`), `!x` como truthiness
-  (142).
-- Métodos nativos de tipos core vía `jit_call_native_window` (143).
-- Llamadas a método vía `jit_call_method_window` sobre **la** llamada del
-  runtime (`ExecCtx::call_method`, `MethodArgs::{Regs, Boxed}`): misma
-  resolución, IC y fast paths que el intérprete (144). Salida (B) elegida.
-- Closures: `MakeClosure` ip-free (`jit_make_closure_window` + palabras
-  `UPVALUE_LOCAL`), capturadas en su registro de frame (`SsaProto::captured`,
-  renumeradas por `SsaProto::map_registers`), upvalues del cuerpo; una sola
-  creación de closure en el runtime (`ExecCtx::make_closure`) (145).
-- Poll de GC en back-edges de bucles que asignan.
+Toda función de `tests/main.vn` baja desde SSA tipada; `varn-cli`'s
+`jit_ssa_coverage` falla si alguna declina o aborta, con nombre y motivo.
 
-**Resta** (declinaciones en `tests/main.vn`, `VARN_CLIF_TRACE=1`):
-- `StoreGlobalIdx` (21) — y `LoadNativeGlobalIdx` (6).
-- `Try`/`Throw` (10): landing pads + resume interpretado.
-- `IntrinsicCall` (3).
-- `Convert` fuera de `IntToFloat`; OSR sobre SSA (mapa `ip`↔bloque).
+- Operadores `Dyn`, `!x` como truthiness, condiciones de rama por
+  `VmValue::is_truthy` (142, 146).
+- Nativas de tipos core (143), llamadas a método por **la** llamada del
+  runtime (`ExecCtx::call_method`, `MethodArgs`) (144).
+- Closures: `MakeClosure` ip-free, capturadas en su registro de frame,
+  upvalues; una creación de closure (`ExecCtx::make_closure`) (145).
+- Globals de módulo (escritura) y nativos (lectura) (147).
+- `try`/`throw`: el camino normal compilado, el catch reanuda interpretado;
+  lo que lee el landing pad se escribe a su home al abrir la región (148).
+- Intrínsecas (`abs/sqrt/floor/ceil` float como una instrucción),
+  conversiones por el único `convert`, variantes de enum
+  (`ExecCtx::make_enum_variant`), literales de pool (149).
+- Acceso a arrays probados inline por representación, vistas cacheadas entre
+  safepoints, poll de GC solo en bucles que asignan, contadores sin chequeo
+  de overflow donde la guarda lo prueba (150).
+- OSR desde SSA: cabeceras de bucle con ip y vivos (liveness del asignador),
+  escalares redefinidos por el cuerpo como variables Cranelift (151,
+  `jit_osr`).
+- `a?.b` nullable y merges que convierten cada valor al tipo del join;
+  `cfg::check_block_args` como red (152).
+
+Benchmarks: sin regresión frente a 8810074 (conteo de instrucciones;
+`bench_matrix` 424M vs 427M).
 
 ### 5.2 F6 — borrado final
 
@@ -170,7 +178,14 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
   desde bytecode (`clif/body/*`); `from_ssa` pasa a ser la única bajada.
 - Re-medir `compare.ps1`.
 
-### 5.3 Pendientes del audit (menores)
+### 5.3 Encontrados en F5, fuera de su alcance
+
+- `enum` declarado dentro de una función: pasa el checker y falla en runtime
+  en ambos tiers (`cannot read property 'A' of null`).
+- `varn-lsp` no compila (237 errores de tipos, anterior a F5): fuera de
+  `default-members`; `cargo test --workspace` necesita `--exclude varn-lsp`.
+
+### 5.4 Pendientes del audit (menores)
 
 - `Nullable` como par (valor, bit) — hoy `Dynamic`.
 - `u64`: sin aritmética sin signo; no es tipo de superficie en checker/parser.
