@@ -54,9 +54,10 @@ fn truthy(
     })
 }
 
-/// Emit `term`. `back_edge(target)` tells whether jumping to `target` closes
-/// a loop: before such a jump a frame-aware body polls the collector, since
-/// an allocating loop has no other point where one could run. Its heap
+/// Emit `term`. `polls(target)` tells whether jumping to `target` closes a
+/// loop that can allocate: before such a jump a frame-aware body polls the
+/// collector, since an allocating loop has no other point where one could
+/// run. Its heap
 /// values live in their homes, which the collector sees and rewrites, and
 /// its scalars cannot move, so nothing is flushed or reloaded around it.
 pub(super) fn emit_term(
@@ -65,13 +66,13 @@ pub(super) fn emit_term(
     blocks: &[Option<cranelift_codegen::ir::Block>],
     values: &[Option<Value>],
     term: &SsaTerm,
-    back_edge: impl Fn(u32) -> bool,
+    polls: impl Fn(u32) -> bool,
 ) -> Result<(), String> {
     let loops = match term {
-        SsaTerm::Jump { target, .. } => back_edge(*target),
+        SsaTerm::Jump { target, .. } => polls(*target),
         SsaTerm::Branch {
             then_blk, else_blk, ..
-        } => back_edge(*then_blk) || back_edge(*else_blk),
+        } => polls(*then_blk) || polls(*else_blk),
         SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => false,
     };
     if loops {
@@ -84,6 +85,8 @@ pub(super) fn emit_term(
                     ctx.helpers.gc_safepoint,
                     &[exec_ctx],
                 );
+                // A collection may have moved any array.
+                ctx.views.clear(b);
             });
         }
     }

@@ -11,7 +11,9 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::SsaOp;
 
 use super::super::emit::unbox_int;
-use super::{classops, globals, heap, load_value, props, Ctx, Out};
+use varn_types::Literal;
+
+use super::{classops, globals, heap, load_value, pool, props, Ctx, Out};
 
 /// Emit a heap instruction. `Ok(None)` means `op` is not a heap instruction
 /// and the caller's scalar path must handle it.
@@ -81,9 +83,32 @@ pub(super) fn emit(
             let boxed = b.ins().iconcat(tag, payload);
             Out::Boxed(boxed)
         }
-        SsaOp::ConstStr(s) => {
-            let boxed = const_str(b, ctx, s)?;
-            Out::Boxed(boxed)
+        SsaOp::ConstStr(s) => Out::Boxed(pool::literal(
+            b,
+            ctx,
+            "string",
+            |l| matches!(l, Literal::Str(t) if t.as_ref() == s.as_ref()),
+        )?),
+        SsaOp::ConstChar(c) => Out::Boxed(pool::literal(
+            b,
+            ctx,
+            "char",
+            |l| matches!(l, Literal::Char(x) if x == c),
+        )?),
+        SsaOp::ConstBigInt(digits) => Out::Boxed(pool::literal(
+            b,
+            ctx,
+            "bigint",
+            |l| matches!(l, Literal::BigInt(n) if n.to_string() == digits.as_ref()),
+        )?),
+        SsaOp::ConstDecimal(text) => Out::Boxed(pool::literal(
+            b,
+            ctx,
+            "decimal",
+            |l| matches!(l, Literal::Decimal(d) if d.to_string() == text.as_ref()),
+        )?),
+        SsaOp::MakeEnumVariant { tag, meta } => {
+            Out::Boxed(classops::emit_make_enum_variant(b, ctx, *tag, meta)?)
         }
         SsaOp::LoadGlobalIdx(slot) => {
             let boxed = globals::emit_load(b, ctx, *slot, globals::Region::Module)?;
@@ -190,29 +215,4 @@ pub(super) fn emit(
         _ => return Ok(None),
     };
     Ok(Some(Some(v)))
-}
-
-/// A string literal's resolved `VmValue`, found in the proto's pool (1:1 with
-/// the resolved constants). Interned, so the handle is the same one the
-/// bytecode `LoadConst` would bake.
-fn const_str(b: &mut FunctionBuilder, ctx: &Ctx<'_>, s: &str) -> Result<Value, String> {
-    use varn_types::{Literal, PoolEntry};
-    let idx = ctx
-        .proto
-        .chunk
-        .constants
-        .iter()
-        .position(|e| matches!(e, PoolEntry::Literal(Literal::Str(t)) if t.as_ref() == s))
-        .ok_or("from_ssa: string constant not in pool")?;
-    let cv = ctx
-        .constants
-        .get(idx)
-        .ok_or("from_ssa: unresolved string constant")?;
-    let tag = b
-        .ins()
-        .iconst(cranelift_codegen::ir::types::I64, cv.raw_tag() as i64);
-    let payload = b
-        .ins()
-        .iconst(cranelift_codegen::ir::types::I64, cv.raw_payload() as i64);
-    Ok(b.ins().iconcat(tag, payload))
 }

@@ -16,8 +16,8 @@ use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
 use super::{
-    boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap, load_value, Ctx,
-    Out,
+    arrays, boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap,
+    load_value, numeric, Ctx, Out,
 };
 
 /// Emit one instruction; `Ok(None)` means it produces no result. The driver
@@ -38,13 +38,29 @@ pub(super) fn emit_inst(
         SsaOp::ConstInt(n) => b.ins().iconst(types::I64, *n),
         SsaOp::ConstFloat(f) => b.ins().f64const(*f),
         SsaOp::ConstBool(x) => b.ins().iconst(types::I64, i64::from(*x)),
-        SsaOp::Convert { operand, conv } => match (conv, ctx.ssa.value_ty(*operand)) {
-            (varn_core::NumConv::IntToFloat, SlotKind::Int) => {
-                let a = load_value(b, ctx, values, *operand)?;
-                b.ins().fcvt_from_sint(types::F64, a)
-            }
-            _ => return Err(format!("from_ssa: convert {conv:?}")),
-        },
+        SsaOp::Convert { operand, conv } => {
+            return Ok(Some(numeric::emit_convert(
+                b, ctx, values, *operand, *conv,
+            )?))
+        }
+        SsaOp::ArrayGetIndex { object, index } => {
+            return Ok(Some(arrays::emit_get(
+                b, ctx, values, *object, *index, dest,
+            )?))
+        }
+        SsaOp::ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
+            arrays::emit_set(b, ctx, values, *object, *index, *value)?;
+            return Ok(None);
+        }
+        SsaOp::IntrinsicCall { object, args, wire } => {
+            return Ok(Some(numeric::emit_intrinsic(
+                b, ctx, values, *object, args, *wire, dest,
+            )?))
+        }
         // Representation-neutral: every real conversion is a `Convert`. What a
         // cast may change is the storage class — a scalar entering a heap
         // (`Dynamic`) value is boxed, a heap value entering a scalar one is
@@ -88,7 +104,8 @@ pub(super) fn emit_inst(
         SsaOp::Binary { op, lhs, rhs } => {
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
-            emit_bin(b, ctx, *op, a, c)?
+            let in_range = dest.is_some_and(|d| ctx.in_range_steps.contains(&d));
+            emit_bin(b, ctx, *op, a, c, in_range)?
         }
         SsaOp::Unary { op, operand } => {
             let a = load_value(b, ctx, values, *operand)?;
@@ -196,6 +213,10 @@ pub(super) fn emit_inst(
         // Handled by `heapvalue` above.
         SsaOp::ConstNull
         | SsaOp::ConstStr(_)
+        | SsaOp::ConstChar(_)
+        | SsaOp::ConstBigInt(_)
+        | SsaOp::ConstDecimal(_)
+        | SsaOp::MakeEnumVariant { .. }
         | SsaOp::LoadGlobalIdx(_)
         | SsaOp::LoadNativeGlobalIdx(_)
         | SsaOp::This
@@ -234,6 +255,8 @@ fn emit_bin(
     op: SsaBinOp,
     a: Value,
     c: Value,
+    // Proven unable to overflow ([`super::induction`]).
+    in_range: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
     // Integer division/mod/power and float mod/power keep the VM's exact
@@ -243,6 +266,8 @@ fn emit_bin(
         return boxed::emit_bin(b, ctx, op, a, c, dest_float);
     }
     Ok(match op {
+        IntAdd if in_range => b.ins().iadd(a, c),
+        IntSub if in_range => b.ins().isub(a, c),
         IntAdd | IntSub | IntMul => checked_int(b, ctx, op, a, c),
         IntAnd => b.ins().band(a, c),
         IntOr => b.ins().bor(a, c),

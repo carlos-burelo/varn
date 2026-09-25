@@ -114,7 +114,7 @@ pub(super) fn emit_call(
 }
 
 /// The boxed `[callee, args…]` window on the native stack.
-fn boxed_window(
+pub(super) fn boxed_window(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],

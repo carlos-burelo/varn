@@ -24,13 +24,19 @@
 //!
 //! Module split by domain (each file owns one invariant):
 //! * this file — driver, eligibility, block/phi plumbing;
+//! * [`cfg`] — the compiled CFG: reachable blocks, order, loops;
 //! * [`store`] — where a value lives and how a result lands there;
 //! * [`scalar`] — native scalar ops (arith/compare/bitwise/negate);
+//! * [`arrays`] — inline element access on proven arrays;
 //! * [`boxed`] — ops whose semantics live behind a boxed runtime helper;
 //! * [`globals`] — module-relative global reads;
 //! * [`call`] — self-recursion and cross-proto calls;
+//! * [`numeric`] — `std:math` intrinsics and numeric conversions;
+//! * [`pool`] — constant-pool literals;
 //! * [`closures`] — closure creation, captured variables and upvalues;
 //! * [`exceptions`] — `try` regions (resumed interpreted) and `throw`;
+//! * [`views`] — array views cached between safepoints;
+//! * [`induction`] — loop counters whose step cannot overflow;
 //! * [`term`] — terminators and the branch/jump argument windows.
 
 use cranelift_codegen::ir::{
@@ -48,8 +54,10 @@ use super::lower::ClifLinker;
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
 
+mod arrays;
 mod boxed;
 mod call;
+mod cfg;
 mod classops;
 mod closures;
 mod dynop;
@@ -57,10 +65,14 @@ mod exceptions;
 mod globals;
 mod heap;
 mod heapvalue;
+mod induction;
+mod numeric;
+mod pool;
 mod props;
 mod scalar;
 mod store;
 mod term;
+mod views;
 
 use store::{clif_ty, def_heap, is_heap, land, load_value, use_heap, Out};
 
@@ -88,6 +100,12 @@ pub(super) struct Ctx<'a> {
     pub self_ref: FuncRef,
     /// `Some` iff this body is frame-aware (heap/globals/calls).
     pub frame: Option<FrameIo<'a>>,
+    /// Whether the host rounds in one instruction (`floor`/`ceil`, SSE4.1).
+    pub has_round: bool,
+    /// Each array receiver's view, valid until the next safepoint.
+    pub views: views::Views,
+    /// The `int` steps proven unable to overflow ([`induction`]).
+    pub in_range_steps: std::collections::HashSet<u32>,
 }
 
 /// Attempt the SSA lowering. `Err` is the fallback signal, not a failure: the
@@ -129,7 +147,8 @@ pub(super) fn try_lower(
         || ssa.has_this
         || proto.upvalue_count > 0
         || ssa.blocks.iter().any(|blk| {
-            blk.insts.iter().any(|i| needs_frame(&i.op)) || matches!(blk.term, SsaTerm::Throw(_))
+            blk.insts.iter().any(|i| needs_frame(ssa, &i.op))
+                || matches!(blk.term, SsaTerm::Throw(_))
         });
 
     let cc = isa.default_call_conv();
@@ -167,6 +186,22 @@ pub(super) fn try_lower(
         blocks[i] = Some(cb);
     }
 
+    // The compiled CFG: blocks in reverse postorder from the entry, their
+    // predecessors, and which blocks compiled code reaches at all. A jump to
+    // a block at or before its own position in reverse postorder is a loop
+    // back edge.
+    let rpo = cfg::order(ssa);
+    let preds = cfg::predecessors(ssa);
+    let mut rpo_pos = vec![0usize; ssa.blocks.len()];
+    let mut reached = vec![false; ssa.blocks.len()];
+    for (pos, &blk) in rpo.iter().enumerate() {
+        rpo_pos[blk] = pos;
+        reached[blk] = true;
+    }
+
+    b.switch_to_block(entry_blk);
+    let views = views::Views::declare(&mut b, ssa);
+
     // The frame-aware raw ABI prepends `stack, closure, base, exec_ctx`.
     let frame = if frame_aware {
         let params = b.block_params(entry_blk);
@@ -191,17 +226,13 @@ pub(super) fn try_lower(
         constants,
         self_ref,
         frame,
+        has_round: super::floats::has_round_support(isa),
+        views,
+        in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
     };
 
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
 
-    let rpo = order(ssa);
-    // A jump to a block at or before its own position in reverse postorder
-    // is a loop back edge.
-    let mut rpo_pos = vec![0usize; ssa.blocks.len()];
-    for (pos, &blk) in rpo.iter().enumerate() {
-        rpo_pos[blk] = pos;
-    }
     for i in rpo {
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
@@ -252,15 +283,21 @@ pub(super) fn try_lower(
                 }
                 None => {}
             }
+            if !views::keeps_views(ssa, &inst.op) {
+                ctx.views.clear(&mut b);
+            }
         }
-        let back_edge = |target: u32| rpo_pos[target as usize] <= rpo_pos[i];
-        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, back_edge)?;
+        // A back edge polls the collector only when its loop can allocate.
+        let polls = |target: u32| {
+            rpo_pos[target as usize] <= rpo_pos[i]
+                && cfg::loop_may_collect(ssa, &preds, target as usize, i)
+        };
+        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
     }
 
     // Nothing compiled jumps to the rest; each still needs a body.
-    let reached: std::collections::HashSet<usize> = order(ssa).into_iter().collect();
     for (i, cb) in blocks.iter().enumerate() {
-        if !reached.contains(&i) {
+        if !reached[i] {
             b.switch_to_block(cb.expect("block created"));
             b.ins()
                 .trap(cranelift_codegen::ir::TrapCode::user(1).expect("non-zero trap code"));
@@ -274,7 +311,7 @@ pub(super) fn try_lower(
 
 /// Whether `op` reaches the activation, the running closure or the runtime
 /// even when every value it touches is a scalar.
-fn needs_frame(op: &SsaOp) -> bool {
+fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
     matches!(
         op,
         SsaOp::Call { .. }
@@ -292,43 +329,12 @@ fn needs_frame(op: &SsaOp) -> bool {
             | SsaOp::Try { .. }
             | SsaOp::PopTry
             | SsaOp::CatchParam { .. }
-    )
-}
-
-/// The blocks compiled code can reach — through terminators from the entry —
-/// in reverse postorder, so every value is defined before its uses. A block
-/// reachable only through a `try` handler is a landing pad or the catch path
-/// behind it, which runs interpreted (see [`exceptions`]).
-fn order(ssa: &SsaProto) -> Vec<usize> {
-    let n = ssa.blocks.len();
-    let entry = ssa.entry as usize;
-    let mut visited = vec![false; n];
-    let mut post = Vec::with_capacity(n);
-    let mut stack: Vec<(usize, u8)> = vec![(entry, 0)];
-    visited[entry] = true;
-    while let Some(&(b, stage)) = stack.last() {
-        stack.last_mut().unwrap().1 += 1;
-        let succs: Vec<usize> = match &ssa.blocks[b].term {
-            SsaTerm::Jump { target, .. } => vec![*target as usize],
-            SsaTerm::Branch {
-                then_blk, else_blk, ..
-            } => vec![*else_blk as usize, *then_blk as usize],
-            _ => Vec::new(),
-        };
-        match succs.get(stage as usize) {
-            Some(&s) => {
-                if !visited[s] {
-                    visited[s] = true;
-                    stack.push((s, 0));
-                }
-            }
-            None => {
-                post.push(b);
-                stack.pop();
-            }
-        }
-    }
-    post.into_iter().rev().collect()
+            | SsaOp::MakeEnumVariant { .. }
+            | SsaOp::IntrinsicCall { .. }
+            | SsaOp::ArrayGetIndex { .. }
+            | SsaOp::ArraySetIndex { .. }
+    ) || matches!(op, SsaOp::Convert { operand, conv }
+        if !numeric::is_inline_convert(ssa, *operand, *conv))
 }
 
 pub(super) fn resolve_args(

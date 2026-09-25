@@ -51,6 +51,46 @@ pub enum SsaOp {
     /// a boxed `VmValue` (`Ref`/`Dyn`).
     LoadGlobalIdx(u32),
 
+    /// `object[index]` with `object` proven an array and `index` an `int`:
+    /// the element, read inline in the representation of the destination.
+    ArrayGetIndex {
+        object: u32,
+        index: u32,
+    },
+
+    /// `object[index] = value` on a proven array and `int` index; no result.
+    ArraySetIndex {
+        object: u32,
+        index: u32,
+        value: u32,
+    },
+
+    /// A `char` literal of this proto's constant pool.
+    ConstChar(char),
+
+    /// A `bigint` literal of the pool, by its canonical base-10 digits — a
+    /// heap result.
+    ConstBigInt(Box<str>),
+
+    /// A `decimal` literal of the pool, by its canonical text — a heap
+    /// result.
+    ConstDecimal(Box<str>),
+
+    /// The enum variant with discriminant `tag` described by `meta`
+    /// (`Enum.Variant[:field,...]`) — a heap result.
+    MakeEnumVariant {
+        tag: i64,
+        meta: Box<str>,
+    },
+
+    /// A `std:math` intrinsic, selected by `wire`, on `[object, args...]` —
+    /// `object` is the free function's null receiver. A boxed result.
+    IntrinsicCall {
+        object: u32,
+        args: Vec<u32>,
+        wire: u8,
+    },
+
     /// Prelude / host global read at its absolute native-layout index, a
     /// boxed `VmValue`.
     LoadNativeGlobalIdx(u32),

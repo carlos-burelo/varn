@@ -98,6 +98,14 @@ macro_rules! jit_helper_abi {
             close_upvalue => jit_close_upvalue,
             get_enum_tag => jit_get_enum_tag,
             is_array => jit_is_array,
+            /// `extern "C" fn(*mut ExecCtx, closure, tag, meta_idx)` —
+            /// `MakeEnumVariant` out of the lowering from typed SSA.
+            make_enum_variant_const => jit_make_enum_variant_const,
+            /// `extern "C" fn(*mut ExecCtx, conv, tag, payload)` — `as`.
+            convert => jit_convert,
+            /// `extern "C" fn(*mut ExecCtx, wire_byte, window: *const VmValue,
+            /// count)` — an intrinsic out of the lowering from typed SSA.
+            intrinsic_window => jit_intrinsic_window,
             /// `extern "C" fn(tag, payload) -> u64` — `VmValue::is_truthy`.
             truthy => jit_truthy,
             wrap_spread => jit_wrap_spread,

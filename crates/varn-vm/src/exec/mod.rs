@@ -15,6 +15,7 @@ pub(crate) mod ctx_modules;
 pub(crate) mod ctx_profiling;
 pub(crate) mod ctx_tasks;
 pub(crate) mod dispatch;
+pub(crate) mod enum_variants;
 pub mod exceptions;
 pub mod frame_ctrl;
 pub(crate) mod hashable_keys;

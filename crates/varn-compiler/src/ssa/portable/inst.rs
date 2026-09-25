@@ -21,6 +21,22 @@ pub(super) fn project_inst(
         InstKind::ConstBool(b) => SsaOp::ConstBool(*b),
         InstKind::ConstNull => SsaOp::ConstNull,
         InstKind::ConstStr(s) => SsaOp::ConstStr(s.as_ref().into()),
+        InstKind::ConstChar(c) => SsaOp::ConstChar(*c),
+        InstKind::ConstBigInt(digits) => SsaOp::ConstBigInt(digits.as_ref().into()),
+        InstKind::ConstDecimal(d) => SsaOp::ConstDecimal(d.to_string().into()),
+        InstKind::MakeEnumVariant { tag, meta } => SsaOp::MakeEnumVariant {
+            tag: *tag,
+            meta: meta.as_ref().into(),
+        },
+        InstKind::IntrinsicCall {
+            object,
+            args,
+            wire_byte,
+        } => SsaOp::IntrinsicCall {
+            object: object.0,
+            args: args.iter().map(|v| v.0).collect(),
+            wire: *wire_byte,
+        },
         InstKind::LoadGlobalIdx(slot) => SsaOp::LoadGlobalIdx(*slot),
         InstKind::LoadNativeGlobalIdx(slot) => SsaOp::LoadNativeGlobalIdx(*slot),
         InstKind::StoreGlobalIdx { slot, value } => SsaOp::StoreGlobalIdx {
@@ -67,6 +83,21 @@ pub(super) fn project_inst(
             keys: pairs.iter().map(|(k, _)| k.as_ref().into()).collect(),
             values: pairs.iter().map(|(_, v)| v.0).collect(),
             is_record: matches!(&inst.kind, InstKind::BuildRecord { .. }),
+        },
+        InstKind::ArrayGetIndex { object, index } if is_int(value_tys, *index) => {
+            SsaOp::ArrayGetIndex {
+                object: object.0,
+                index: index.0,
+            }
+        }
+        InstKind::ArraySetIndex {
+            object,
+            index,
+            value,
+        } if is_int(value_tys, *index) => SsaOp::ArraySetIndex {
+            object: object.0,
+            index: index.0,
+            value: value.0,
         },
         InstKind::GetIndex { object, index }
         | InstKind::ArrayGetIndex { object, index }
@@ -259,5 +290,12 @@ pub(super) fn project_inst(
         dest: inst.dest.map(|v| v.0),
         op,
         line: inst.line,
+    })
+}
+
+/// Whether `v` is a native `int` in the portable SSA.
+fn is_int(value_tys: &[HirType], v: crate::ssa::ir::Value) -> bool {
+    value_tys.get(v.0 as usize).is_some_and(|t| {
+        crate::ssa::emit::slot_kind_of(*t) == varn_types::register_meta::SlotKind::Int
     })
 }
