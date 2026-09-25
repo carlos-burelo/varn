@@ -78,7 +78,14 @@ impl RuntimeKind {
             "Task" => Some(Self::Task),
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
-            "enum" => Some(Self::Enum),
+            "enum" => Some(Self::Enum),
+
+
+
+
+
+
+
             _ => None,
         }
     }
@@ -122,7 +129,7 @@ impl RuntimeKind {
 /// How a fixed-field access addresses its field: by dynamic `slot` (enum
 /// payloads, records), or at a compact offset laid out by the field's kind
 /// (`None` = a boxed `VmValue`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum FieldAccess {
     Slot,
     Compact(Option<RuntimeKind>),

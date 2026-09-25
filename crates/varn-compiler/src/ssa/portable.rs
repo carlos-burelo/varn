@@ -174,16 +174,29 @@ fn project_inst(
             value: value.0,
         },
         InstKind::This => SsaOp::This,
-        InstKind::GetFixedField { object, slot, .. } => SsaOp::GetFixedField {
+        InstKind::GetFixedField {
+            object,
+            slot,
+            offset,
+            tag,
+        } => SsaOp::GetFixedField {
             object: object.0,
             slot: *slot,
+            offset: *offset,
+            access: *tag,
         },
         InstKind::SetFixedField {
-            object, value, slot, ..
+            object,
+            value,
+            slot,
+            offset,
+            tag,
         } => SsaOp::SetFixedField {
             object: object.0,
             value: value.0,
             slot: *slot,
+            offset: *offset,
+            kind: *tag,
         },
         InstKind::MakeClass { name, super_class } => SsaOp::MakeClass {
             name: name.as_ref().into(),

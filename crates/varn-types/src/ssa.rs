@@ -190,11 +190,26 @@ pub enum SsaOp {
     /// The current receiver (`this`), read from home 0; a heap result.
     This,
 
-    /// Class/object field read by dynamic `slot`; a heap result.
-    GetFixedField { object: u32, slot: u16 },
+    /// Fixed-field read. A class field (`access: Compact`) is at the payload
+    /// `offset` the compiler laid out, in its kind's representation; an
+    /// object/record/enum-payload field (`Slot`) is found by `slot`, which a
+    /// compact access also keeps for its fallback.
+    GetFixedField {
+        object: u32,
+        slot: u16,
+        offset: u32,
+        access: varn_core::FieldAccess,
+    },
 
-    /// Class/object field write by dynamic `slot`; no result.
-    SetFixedField { object: u32, value: u32, slot: u16 },
+    /// Class field write at the payload `offset`, laid out by `kind`; no
+    /// result.
+    SetFixedField {
+        object: u32,
+        value: u32,
+        slot: u16,
+        offset: u32,
+        kind: Option<varn_core::RuntimeKind>,
+    },
 
     /// `class Name [extends Super]` — a heap class object.
     MakeClass {

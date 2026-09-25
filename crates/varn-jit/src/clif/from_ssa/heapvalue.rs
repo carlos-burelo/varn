@@ -40,8 +40,10 @@ pub(super) fn emit(
             object,
             value,
             slot,
+            offset,
+            kind,
         } => {
-            props::emit_set_fixed_field(b, ctx, values, *object, *value, *slot)?;
+            props::emit_set_fixed_field(b, ctx, values, *object, *value, *slot, *offset, *kind)?;
             return Ok(Some(None));
         }
         SsaOp::SetProperty {
@@ -122,9 +124,14 @@ pub(super) fn emit(
         SsaOp::GetIndex { object, index } => {
             Out::Boxed(props::emit_get_index(b, ctx, values, *object, *index)?)
         }
-        SsaOp::GetFixedField { object, slot } => {
-            Out::Boxed(props::emit_get_fixed_field(b, ctx, values, *object, *slot)?)
-        }
+        SsaOp::GetFixedField {
+            object,
+            slot,
+            offset,
+            access,
+        } => Out::Boxed(props::emit_get_fixed_field(
+            b, ctx, values, *object, *slot, *offset, *access,
+        )?),
         SsaOp::GetProperty { object, name, cs } => {
             let d = dest.ok_or("from_ssa: get_property without dest")?;
             let dest_reg = ctx.ssa.reg(d);
