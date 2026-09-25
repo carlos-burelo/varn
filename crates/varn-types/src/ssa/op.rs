@@ -49,6 +49,16 @@ pub enum SsaOp {
     /// a boxed `VmValue` (`Ref`/`Dyn`).
     LoadGlobalIdx(u32),
 
+    /// Prelude / host global read at its absolute native-layout index, a
+    /// boxed `VmValue`.
+    LoadNativeGlobalIdx(u32),
+
+    /// Module-relative global write of `value`; no result.
+    StoreGlobalIdx {
+        slot: u32,
+        value: u32,
+    },
+
     /// A closure over function constant `proto` of this proto's pool,
     /// capturing `upvalues` in order — a `Ref` result. With no upvalues it is
     /// the function's one shared closure.

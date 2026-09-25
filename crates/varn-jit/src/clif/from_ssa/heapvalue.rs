@@ -86,7 +86,11 @@ pub(super) fn emit(
             Out::Boxed(boxed)
         }
         SsaOp::LoadGlobalIdx(slot) => {
-            let boxed = globals::emit_load(b, ctx, *slot)?;
+            let boxed = globals::emit_load(b, ctx, *slot, globals::Region::Module)?;
+            Out::Boxed(boxed)
+        }
+        SsaOp::LoadNativeGlobalIdx(slot) => {
+            let boxed = globals::emit_load(b, ctx, *slot, globals::Region::Native)?;
             Out::Boxed(boxed)
         }
         SsaOp::This => {

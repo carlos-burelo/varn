@@ -22,6 +22,11 @@ pub(super) fn project_inst(
         InstKind::ConstNull => SsaOp::ConstNull,
         InstKind::ConstStr(s) => SsaOp::ConstStr(s.as_ref().into()),
         InstKind::LoadGlobalIdx(slot) => SsaOp::LoadGlobalIdx(*slot),
+        InstKind::LoadNativeGlobalIdx(slot) => SsaOp::LoadNativeGlobalIdx(*slot),
+        InstKind::StoreGlobalIdx { slot, value } => SsaOp::StoreGlobalIdx {
+            slot: *slot,
+            value: value.0,
+        },
         InstKind::Call { callee, args } => SsaOp::Call {
             callee: callee.0,
             callee_global: global_of.get(callee.0 as usize).copied().flatten(),

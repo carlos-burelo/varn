@@ -269,6 +269,8 @@ fn needs_frame(op: &SsaOp) -> bool {
             | SsaOp::CallNativeOp { .. }
             | SsaOp::MethodCall { .. }
             | SsaOp::LoadGlobalIdx(_)
+            | SsaOp::LoadNativeGlobalIdx(_)
+            | SsaOp::StoreGlobalIdx { .. }
             | SsaOp::MakeClosure { .. }
             | SsaOp::LoadCaptured { .. }
             | SsaOp::StoreCaptured { .. }
