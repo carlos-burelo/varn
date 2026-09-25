@@ -236,6 +236,33 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
 - Limpiar comentarios NaN-box legacy.
 - Regenerar `AUDIT_RESPONSE.md` con el estado real.
 
+### 5.5 Auditoría LSP/extensión (2026-09-25) — HECHO salvo debugger
+
+Confirmado: `Atom` (`u32` `Copy`) + `Workspace`/`Database` en `DashMap`/`Arc`/
+`RwLock` (`crates/varn-lsp/src/workspace/mod.rs`, `db/mod.rs`) ya soportan
+concurrencia real (la migración `Rc → Atom/Arc` la habilitó); `run_server`
+corre en runtime tokio multi-thread (`#[tokio::main]`). Los 32 métodos de
+`LanguageServer` (`backend/mod.rs`) tienen implementación real; las vistas
+`showAst`/`showBytecode`/`showSSA`/`getCFG` coinciden campo a campo con
+`varn-extension` y ya leen SSA portable (`varn_compiler::ssa::dump`), no
+lógica duplicada. `cargo check -p varn-lsp --all-targets`: limpio.
+
+Encontrado y corregido:
+- `varn.evalSelection` (código muerto en ambos repos, stub que ni evaluaba
+  nada) — borrado de `compiler_inspect/mod.rs` y `varn-extension/src/manager.js`.
+- `execute_command_provider.commands: vec![]` en `backend/capabilities.rs` no
+  declaraba los comandos reales — ahora lista `showAst`/`syntaxTree`/
+  `showBytecode`/`showSSA`/`getCFG`.
+
+**Pendiente, pospuesto (deliberado, no arquitectura nueva del compilador)**:
+`varn-extension/src/debug.js` es un *runner*, no un debugger — `stackTrace`/
+`scopes`/`variables` siempre vacíos, `setBreakpoints` siempre
+`verified:false`. Implementar debugging real (breakpoints que pausan,
+inspección de frames) exige protocolo de pausa/inspección nuevo en
+`varn-vm` ↔ DAP — subsistema propio, no touch de LSP. Sin decidir todavía:
+¿DAP embebido en `vn` o proceso separado `vn debug-server`? Requiere spec
+arquitectónico dedicado antes de tocar código.
+
 ---
 
 ## 6. Puerta de validación (cada commit)
