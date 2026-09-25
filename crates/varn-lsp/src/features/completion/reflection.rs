@@ -174,7 +174,12 @@ pub fn build_reflection_completions(
                                     CompletionItemKind::PROPERTY
                                 },
                             ),
-                            detail: Some(format!("static {}::{}: {}", receiver_name, m_name, m.ty)),
+                            detail: Some(format!(
+                                "static {}::{}: {}",
+                                receiver_name,
+                                m_name,
+                                state.ty_text(&m.ty)
+                            )),
                             sort_text: Some(format!("1_{}", m_name)),
                             ..Default::default()
                         });

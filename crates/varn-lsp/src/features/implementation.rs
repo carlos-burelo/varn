@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use tower_lsp::lsp_types::{GotoDefinitionResponse, Location, Position, Range, Url};
-use varn_core::ast::{ClassDecl, ClassMember, Decl, Program, StmtKind, TypeNode};
-use varn_core::TypeKind;
+use varn_core::ast::{ClassDecl, ClassMember, Decl, StmtKind};
 
 use crate::document::DocumentState;
 use crate::workspace::Workspace;
@@ -43,12 +42,10 @@ pub fn build_goto_implementation(
             Err(_) => continue,
         };
 
-        if let Some(program) = &file_state.ast {
-            if is_interface {
-                find_interface_implementations(program, target_name, &url, &mut locations);
-            } else if is_class_or_method {
-                find_class_subtypes(program, target_name, &url, &mut locations);
-            }
+        if is_interface {
+            find_interface_implementations(file_state, target_name, &url, &mut locations);
+        } else if is_class_or_method {
+            find_class_subtypes(file_state, target_name, &url, &mut locations);
         }
     }
 
@@ -63,81 +60,84 @@ pub fn build_goto_implementation(
     }
 }
 
+/// The classes declared at `file`'s top level.
+fn top_level_classes(file: &DocumentState) -> impl Iterator<Item = &ClassDecl> {
+    let body = file
+        .ast
+        .as_ref()
+        .map(|p| p.body.as_slice())
+        .unwrap_or_default();
+    body.iter()
+        .filter_map(|&id| match &file.ast_arena.stmt(id).kind {
+            StmtKind::Decl(decl) => match decl.as_ref() {
+                Decl::Class(c) => Some(c),
+                _ => None,
+            },
+            _ => None,
+        })
+}
+
 fn find_interface_implementations(
-    program: &Program,
+    file: &DocumentState,
     iface_name: &str,
     url: &Url,
     locations: &mut Vec<Location>,
 ) {
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Class(c) = decl.as_ref() {
-                let implements_iface = c.implements.iter().any(|t| type_node_name(t) == iface_name);
-
-                if implements_iface {
-                    locations.push(class_location(c, url));
-                }
-            }
+    for c in top_level_classes(file) {
+        if c.implements
+            .iter()
+            .any(|t| file.type_node_decl_name(t) == Some(iface_name))
+        {
+            locations.push(class_location(file, c, url));
         }
     }
 }
 
 fn find_class_subtypes(
-    program: &Program,
+    file: &DocumentState,
     class_or_method_name: &str,
     url: &Url,
     locations: &mut Vec<Location>,
 ) {
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Class(c) = decl.as_ref() {
-                // Check if extends class
-                if let Some(super_expr) = &c.super_class {
-                    if let varn_core::ast::ExprKind::Identifier { name } = &super_expr.kind {
-                        if name.as_ref() == class_or_method_name {
-                            locations.push(class_location(c, url));
-                        }
-                    }
+    for c in top_level_classes(file) {
+        // A class extending it.
+        if let Some(super_expr) = c.super_class {
+            if let varn_core::ast::ExprKind::Identifier { name } =
+                &file.ast_arena.expr(super_expr).kind
+            {
+                if file.name(*name) == class_or_method_name {
+                    locations.push(class_location(file, c, url));
                 }
+            }
+        }
 
-                // Check if class implements method with this name
-                for member in &c.body {
-                    if let ClassMember::Method { key, range, .. } = member {
-                        if key.as_ref() == class_or_method_name {
-                            locations.push(Location::new(
-                                url.clone(),
-                                Range {
-                                    start: Position {
-                                        line: range.start.line.saturating_sub(1),
-                                        character: range.start.column,
-                                    },
-                                    end: Position {
-                                        line: range.end.line.saturating_sub(1),
-                                        character: range.end.column,
-                                    },
-                                },
-                            ));
-                        }
-                    }
+        // A class declaring a method of that name.
+        for member in &c.body {
+            if let ClassMember::Method { key, range, .. } = member {
+                if file.name(*key) == class_or_method_name {
+                    locations.push(Location::new(
+                        url.clone(),
+                        Range {
+                            start: Position {
+                                line: range.start.line.saturating_sub(1),
+                                character: range.start.column,
+                            },
+                            end: Position {
+                                line: range.end.line.saturating_sub(1),
+                                character: range.end.column,
+                            },
+                        },
+                    ));
                 }
             }
         }
     }
 }
 
-fn type_node_name(node: &TypeNode) -> String {
-    match &node.kind {
-        TypeKind::Named(name, _) => name.clone(),
-        TypeKind::Generic(name, _, _) => name.clone(),
-        TypeKind::Intrinsic(tag) => format!("{:?}", tag).to_lowercase(),
-        _ => "any".to_string(),
-    }
-}
-
-fn class_location(c: &ClassDecl, url: &Url) -> Location {
+fn class_location(file: &DocumentState, c: &ClassDecl, url: &Url) -> Location {
     let s_line = c.range.start.line.saturating_sub(1);
     let s_col = c.range.start.column;
-    let name_len = c.id.as_deref().map(|n| n.len()).unwrap_or(5) as u32;
+    let name_len = c.id.map_or(5, |n| file.name(n).len()) as u32;
 
     Location::new(
         url.clone(),

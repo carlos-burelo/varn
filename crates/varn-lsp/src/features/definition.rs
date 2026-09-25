@@ -100,7 +100,7 @@ fn resolve_symbol_location(state: &DocumentState, sid: SymbolId) -> Option<Locat
     let sym = state.db.arena.get(sid);
 
     let url = if let Some(origin) = &sym.origin_module {
-        resolve_origin_to_url(origin)?
+        resolve_origin_to_url(state.name(*origin))?
     } else {
         Url::parse(&state.uri).ok()?
     };

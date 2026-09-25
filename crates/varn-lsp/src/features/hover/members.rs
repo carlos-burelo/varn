@@ -1,122 +1,81 @@
 use crate::document::DocumentState;
 use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
 
-use super::format::format_summary_member;
+use super::format::{format_summary_member, format_type_params_str};
+
+/// What `dynamic` prints as: a receiver that names no type.
+const DYNAMIC: &str = varn_core::LangPrimitive::Dynamic.name();
 
 pub fn format_member_sig(
     state: &DocumentState,
     parent_name: &str,
     member: &ResolvedMemberSummary,
 ) -> String {
-    if member.kind == ResolvedMemberKind::EnumMember {
-        return format_enum_member(parent_name, &member.name, "");
-    }
-
     let clean_parent = parent_name.trim().trim_end_matches(['.', ')', '(']);
-    let has_parent = !clean_parent.is_empty()
-        && clean_parent != varn_core::RuntimeKind::Dynamic.name()
-        && clean_parent != member.name.as_ref();
+    let has_parent =
+        !clean_parent.is_empty() && clean_parent != DYNAMIC && clean_parent != member.name.as_ref();
+    let name = &member.name;
+    let owner = if has_parent {
+        format!("{clean_parent}.")
+    } else {
+        String::new()
+    };
+    let is_static = member.is_static && has_parent;
 
     match member.kind {
         ResolvedMemberKind::Property
         | ResolvedMemberKind::StaticProperty
         | ResolvedMemberKind::ExtensionProperty
         | ResolvedMemberKind::Getter => {
-            if member.is_static && has_parent {
-                format!(
-                    "(static property) {}.{}: {}",
-                    clean_parent, member.name, member.ty
-                )
-            } else if has_parent {
-                format!("(property) {}.{}: {}", clean_parent, member.name, member.ty)
+            let label = if is_static {
+                "static property"
             } else {
-                format!("(property) {}: {}", member.name, member.ty)
-            }
+                "property"
+            };
+            format!("({label}) {owner}{name}: {}", state.ty_text(&member.ty))
         }
         ResolvedMemberKind::Setter => {
-            if member.is_static && has_parent {
-                format!(
-                    "(static setter) {}.{}({})",
-                    clean_parent,
-                    member.name,
-                    member_params(member)
-                )
-            } else if has_parent {
-                format!(
-                    "(setter) {}.{}({})",
-                    clean_parent,
-                    member.name,
-                    member_params(member)
-                )
-            } else {
-                format!("(setter) {}({})", member.name, member_params(member))
-            }
+            let label = if is_static { "static setter" } else { "setter" };
+            format!("({label}) {owner}{name}({})", member_params(state, member))
         }
         ResolvedMemberKind::Constructor => {
-            if has_parent {
-                format!("constructor {}({})", clean_parent, member_params(member))
+            let class = if has_parent {
+                format!(" {clean_parent}")
             } else {
-                format!("constructor({})", member_params(member))
-            }
+                String::new()
+            };
+            format!("constructor{class}({})", member_params(state, member))
         }
         ResolvedMemberKind::Method
         | ResolvedMemberKind::StaticMethod
         | ResolvedMemberKind::ExtensionMethod => {
-            if member.is_static && has_parent {
-                format!(
-                    "(static method) {}.{}({}): {}",
-                    clean_parent,
-                    member.name,
-                    member_params(member),
-                    member.ty
-                )
+            let params = member_params(state, member);
+            let ret = member_return(state, member);
+            if is_static {
+                format!("(static method) {owner}{name}({params}): {ret}")
             } else if has_parent {
-                format!(
-                    "(method) {}.{}({}): {}",
-                    clean_parent,
-                    member.name,
-                    member_params(member),
-                    member.ty
-                )
+                format!("(method) {owner}{name}({params}): {ret}")
             } else {
-                format!(
-                    "function {}({}): {}",
-                    member.name,
-                    member_params(member),
-                    member.ty
-                )
+                format!("function {name}({params}): {ret}")
             }
         }
-        ResolvedMemberKind::NestedType(NestedTypeKind::Class) => {
-            format_nested_class(state, clean_parent, member)
+        ResolvedMemberKind::NestedType(k @ (NestedTypeKind::Class | NestedTypeKind::Interface)) => {
+            let tp = format_type_params_str(state, &member.ty);
+            format_nested(state, k.label(), &owner, member, &tp)
         }
-        ResolvedMemberKind::NestedType(NestedTypeKind::Interface) => {
-            format_nested_interface(state, clean_parent, member)
+        ResolvedMemberKind::NestedType(k @ NestedTypeKind::Namespace) => {
+            format_nested(state, k.label(), &owner, member, "")
         }
-        ResolvedMemberKind::NestedType(NestedTypeKind::Namespace) => {
-            format_nested_namespace(state, clean_parent, member)
+        ResolvedMemberKind::NestedType(k @ (NestedTypeKind::Enum | NestedTypeKind::Struct)) => {
+            format!("{} {owner}{name}", k.label())
         }
-        ResolvedMemberKind::NestedType(NestedTypeKind::Enum) => {
-            if has_parent {
-                format!("enum {}.{}", clean_parent, member.name)
-            } else {
-                format!("enum {}", member.name)
-            }
-        }
-        ResolvedMemberKind::EnumMember => format_enum_member(clean_parent, &member.name, ""),
-        ResolvedMemberKind::NestedType(NestedTypeKind::Struct) => {
-            if has_parent {
-                format!("struct {}.{}", clean_parent, member.name)
-            } else {
-                format!("struct {}", member.name)
-            }
-        }
+        ResolvedMemberKind::EnumMember => format_enum_member(clean_parent, name, ""),
     }
 }
 
 pub fn format_enum_member(enum_name: &str, member_name: &str, init_value: &str) -> String {
     let clean_enum = enum_name.trim().trim_end_matches(['.', ')', '(']);
-    let prefix = if !clean_enum.is_empty() && clean_enum != "dynamic" {
+    let prefix = if !clean_enum.is_empty() && clean_enum != DYNAMIC {
         format!("{}.", clean_enum)
     } else {
         String::new()
@@ -129,87 +88,50 @@ pub fn format_enum_member(enum_name: &str, member_name: &str, init_value: &str) 
     }
 }
 
-fn format_nested_class(
+/// A nested class, interface or namespace, with its own body — asked of the
+/// checker by the name it declares.
+fn format_nested(
     state: &DocumentState,
-    parent_name: &str,
+    keyword: &str,
+    owner: &str,
     m: &ResolvedMemberSummary,
+    type_params: &str,
 ) -> String {
-    use super::format::format_type_params_str;
-    let tp = format_type_params_str(&m.ty);
-    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
-        format!("{}.", parent_name)
-    } else {
-        String::new()
-    };
-    // The nested type's own body, asked of the checker by the name it declares.
-    let inner_members = state.members_of_type(&varn_checker::Type::named(m.name.clone()));
+    let head = format!("{keyword} {owner}{}{type_params}", m.name);
+    let inner_members = state.members_of_type(&state.db.named_type(&m.name));
     if inner_members.is_empty() {
-        return format!("class {}{}{}", prefix, m.name, tp);
+        return head;
     }
-    let mut lines = vec![format!("class {}{}{} {{", prefix, m.name, tp)];
+    let mut lines = vec![format!("{head} {{")];
     for inner in &inner_members {
-        lines.push(format_summary_member(inner));
-    }
-    lines.push("}".to_owned());
-    lines.join("\n")
-}
-
-fn format_nested_interface(
-    state: &DocumentState,
-    parent_name: &str,
-    m: &ResolvedMemberSummary,
-) -> String {
-    use super::format::format_type_params_str;
-    let tp = format_type_params_str(&m.ty);
-    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
-        format!("{}.", parent_name)
-    } else {
-        String::new()
-    };
-    // The nested type's own body, asked of the checker by the name it declares.
-    let inner_members = state.members_of_type(&varn_checker::Type::named(m.name.clone()));
-    if inner_members.is_empty() {
-        return format!("interface {}{}{}", prefix, m.name, tp);
-    }
-    let mut lines = vec![format!("interface {}{}{} {{", prefix, m.name, tp)];
-    for inner in &inner_members {
-        lines.push(format_summary_member(inner));
-    }
-    lines.push("}".to_owned());
-    lines.join("\n")
-}
-
-fn format_nested_namespace(
-    state: &DocumentState,
-    parent_name: &str,
-    m: &ResolvedMemberSummary,
-) -> String {
-    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
-        format!("{}.", parent_name)
-    } else {
-        String::new()
-    };
-    let inner_members = state.members_of_type(&varn_checker::Type::named(m.name.clone()));
-    if inner_members.is_empty() {
-        return format!("namespace {}{}", prefix, m.name);
-    }
-    let mut lines = vec![format!("namespace {}{} {{", prefix, m.name)];
-    for inner in &inner_members {
-        lines.push(format_summary_member(inner));
+        lines.push(format_summary_member(state, inner));
     }
     lines.push("}".to_owned());
     lines.join("\n")
 }
 
 /// A member's parameter list, when its type is a function.
-fn member_params(m: &ResolvedMemberSummary) -> String {
-    match &m.ty.0 {
-        varn_core::TypeKind::Fn(ft) => ft
-            .params
-            .iter()
-            .map(|p| format!("{}: {}", p.name.as_deref().unwrap_or("arg"), p.ty))
-            .collect::<Vec<_>>()
-            .join(", "),
-        _ => String::new(),
+fn member_params(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
+    let Some(ft) = state.db.fn_shape(&m.ty) else {
+        return String::new();
+    };
+    ft.params
+        .iter()
+        .map(|p| {
+            format!(
+                "{}: {}",
+                p.name.as_deref().unwrap_or("arg"),
+                state.db.id_text(p.ty)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What calling a method member returns: its function type's return type.
+fn member_return(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
+    match state.db.fn_shape(&m.ty) {
+        Some(ft) => state.db.id_text(ft.return_type),
+        None => state.ty_text(&m.ty),
     }
 }

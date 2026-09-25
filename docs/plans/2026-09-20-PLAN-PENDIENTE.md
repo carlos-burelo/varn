@@ -21,7 +21,8 @@ dominio.**
 
 ## 1. Estado actual (verde)
 
-- `cargo check --workspace --exclude varn-lsp --all-targets`: limpio.
+- `cargo check --workspace --all-targets`: limpio (varn-lsp incluido y de nuevo
+  en el build por defecto).
 - `tests/main.vn`: **PASSED 1233, FAILED 0** en JIT y en `VARN_NO_JIT=1`, con
   `VARN_CACHE_DIR` limpio (fuerza el round-trip de serialización).
 - Tier-parity `56/58/62/65/101` dentro de `main.vn`: verde.
@@ -178,12 +179,32 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
   desde bytecode (`clif/body/*`); `from_ssa` pasa a ser la única bajada.
 - Re-medir `compare.ps1`.
 
-### 5.3 Encontrados en F5, fuera de su alcance
+### 5.3 Encontrados en F5 — HECHO
 
-- `enum` declarado dentro de una función: pasa el checker y falla en runtime
-  en ambos tiers (`cannot read property 'A' of null`).
-- `varn-lsp` no compila (237 errores de tipos, anterior a F5): fuera de
-  `default-members`; `cargo test --workspace` necesita `--exclude varn-lsp`.
+- Tipos locales (`class`/`enum` declarados en una función o bloque): cada uno
+  tiene su global desde el inicio y su declaración baja a "construir si el
+  global está vacío" (`emit/nested_types.rs`), con su `class_def` tras las de
+  nivel superior. Dos tipos locales con el mismo nombre en el módulo son
+  VN4002 (las tablas de tipos van por nombre a nivel de módulo); una clase
+  local que captura un valor local de su función es VN3002. `tests/153`.
+- `varn-lsp` compila y vuelve al build por defecto (`default-members`
+  eliminado): arena de AST, átomos resueltos por el interner del documento, y
+  tipos leídos a través de la tabla del documento (`document/types.rs`:
+  `ty_text`, `ty_kind`, `fn_shape`, `callable_shape`, `decl_name`…), nunca
+  con `Display` ni `ty.0`. De paso, lo que duplicaba al compilador se lee
+  ahora de él:
+  - "rellenar arms de `match`" usa los casos que el checker encontró
+    ausentes (`CheckResult::match_gaps`, escritos donde se reporta
+    `NonExhaustiveMatch`), no una heurística propia;
+  - hints de parámetros/pipelines, jerarquía de llamadas y el resto de
+    búsquedas recorren todas las expresiones alcanzables
+    (`SpatialIndex::exprs`), no un recorrido parcial de sentencias;
+  - las vistas del compilador bajan el documento como una compilación
+    (`call_mappings` y `desugar` incluidos) y la de SSA usa
+    `varn_compiler::ssa::dump`.
+- Pendiente derivado: hay tres desensambladores de bytecode (`varn-cli`,
+  `varn-debug`, el de la vista del LSP, que además lee una palabra por
+  instrucción). Unificarlos en uno que escriba a `String`.
 
 ### 5.4 Pendientes del audit (menores)
 
@@ -198,7 +219,7 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
 
 ## 6. Puerta de validación (cada commit)
 
-1. `cargo check --workspace --exclude varn-lsp --all-targets` sin warnings.
+1. `cargo check --workspace --all-targets` sin warnings nuevos.
 2. `cargo build -p varn-jit -p varn-vm`.
 3. `tests/main.vn` verde en JIT y `VARN_NO_JIT=1` con `VARN_CACHE_DIR` limpio
    (round-trip de serialización). Tier-parity `56/58/62/65/101`.

@@ -65,34 +65,26 @@ pub fn build_call_argument_completions(
     let mut fn_params = Vec::new();
 
     if let Some(info) = state.db.expr_types.get(&callee_tok.offset) {
-        let ty = &info.ty.0;
-        let mut current_ty = ty;
-        if let TypeKind::Union(variants) = ty {
-            if let Some(t) = variants.iter().find(|v| matches!(v.0, TypeKind::Fn(_))) {
-                current_ty = &t.0;
-            }
-        }
-
-        if let TypeKind::Fn(f) = current_ty {
-            for p in &f.params {
-                if let Some(name) = &p.name {
-                    fn_params.push(name.to_string());
-                }
-            }
-        } else if let TypeKind::Named(name, _) = current_ty {
+        if let Some(f) = state.db.callable_shape(&info.ty) {
+            fn_params.extend(
+                f.params
+                    .iter()
+                    .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+            );
+        } else if let TypeKind::Named(name, _) = state.db.ty_kind(&info.ty) {
             // Straight off the checker's class entry. `ResolvedMemberKind` has no
             // `Constructor` — it flattens one to `Property` — so the summary API
             // cannot answer this; the class entry can.
-            push_constructor_params(state, name.as_ref(), &mut fn_params);
+            push_constructor_params(state, state.name(name), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
         if let Some(sym) = state.symbols().find(|s| s.name() == callee_tok.lexeme) {
-            if let TypeKind::Fn(f) = &sym.ty().0 {
-                for p in &f.params {
-                    if let Some(name) = &p.name {
-                        fn_params.push(name.to_string());
-                    }
-                }
+            if let Some(f) = state.db.fn_shape(sym.ty()) {
+                fn_params.extend(
+                    f.params
+                        .iter()
+                        .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+                );
             } else if matches!(sym.kind(), varn_checker::SymbolKind::Class) {
                 push_constructor_params(state, &callee_tok.lexeme, &mut fn_params);
             }
@@ -151,11 +143,11 @@ fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Ve
     else {
         return;
     };
-    if let TypeKind::Fn(f) = &ctor.ty.0 {
-        for p in &f.params {
-            if let Some(name) = &p.name {
-                out.push(name.to_string());
-            }
-        }
+    if let Some(f) = state.db.fn_shape(&ctor.ty) {
+        out.extend(
+            f.params
+                .iter()
+                .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+        );
     }
 }

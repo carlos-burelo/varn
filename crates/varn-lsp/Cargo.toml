@@ -12,6 +12,7 @@ varn-modules  = { path = "../varn-modules" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
 varn-compiler = { path = "../varn-compiler" }
+varn-tir      = { path = "../varn-tir" }
 
 tower-lsp  = { workspace = true }
 tokio      = { workspace = true }

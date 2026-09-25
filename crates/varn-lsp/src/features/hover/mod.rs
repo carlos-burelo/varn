@@ -36,8 +36,8 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         // Handle 'this' keyword via Checker scope resolution
         if tok.kind == TokenKind::This {
             if let Some((_, ty)) = state.db.resolve_at("this", tok.offset) {
-                if !ty.is_dynamic() {
-                    return Some(make_lang_hover(format!("this: {}", ty)));
+                if !state.db.is_dynamic(&ty) {
+                    return Some(make_lang_hover(format!("this: {}", state.ty_text(&ty))));
                 }
             }
             return Some(make_lang_hover("this".to_owned()));
@@ -57,96 +57,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
 
         // Direct semantic MemberResolution from Checker
         if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
-            let parent_str = mem_res.receiver_ty.to_string();
-            let sig = match mem_res.member_kind {
-                varn_checker::ResolvedMemberKind::EnumMember => {
-                    format!("(enum member) {}.{}", parent_str, mem_res.member_name)
-                }
-                varn_checker::ResolvedMemberKind::Method => {
-                    if let varn_core::TypeKind::Fn(ft) = &mem_res.member_ty.0 {
-                        let params = format_fn_params(&ft.params);
-                        format!(
-                            "(method) {}.{}({}): {}",
-                            parent_str, mem_res.member_name, params, ft.return_type
-                        )
-                    } else {
-                        format!(
-                            "(method) {}.{}: {}",
-                            parent_str, mem_res.member_name, mem_res.member_ty
-                        )
-                    }
-                }
-                varn_checker::ResolvedMemberKind::StaticMethod => {
-                    if let varn_core::TypeKind::Fn(ft) = &mem_res.member_ty.0 {
-                        let params = format_fn_params(&ft.params);
-                        format!(
-                            "(static method) {}.{}({}): {}",
-                            parent_str, mem_res.member_name, params, ft.return_type
-                        )
-                    } else {
-                        format!(
-                            "(static method) {}.{}: {}",
-                            parent_str, mem_res.member_name, mem_res.member_ty
-                        )
-                    }
-                }
-                varn_checker::ResolvedMemberKind::StaticProperty => {
-                    format!(
-                        "(static property) {}.{}: {}",
-                        parent_str, mem_res.member_name, mem_res.member_ty
-                    )
-                }
-                varn_checker::ResolvedMemberKind::ExtensionMethod => {
-                    if let varn_core::TypeKind::Fn(ft) = &mem_res.member_ty.0 {
-                        let params = format_fn_params(&ft.params);
-                        format!(
-                            "(extension method) {}.{}({}): {}",
-                            parent_str, mem_res.member_name, params, ft.return_type
-                        )
-                    } else {
-                        format!(
-                            "(extension method) {}.{}: {}",
-                            parent_str, mem_res.member_name, mem_res.member_ty
-                        )
-                    }
-                }
-                varn_checker::ResolvedMemberKind::ExtensionProperty => {
-                    format!(
-                        "(extension property) {}.{}: {}",
-                        parent_str, mem_res.member_name, mem_res.member_ty
-                    )
-                }
-                varn_checker::ResolvedMemberKind::Getter => {
-                    format!(
-                        "(getter) {}.{}: {}",
-                        parent_str, mem_res.member_name, mem_res.member_ty
-                    )
-                }
-                varn_checker::ResolvedMemberKind::Setter => {
-                    format!(
-                        "(setter) {}.{}: {}",
-                        parent_str, mem_res.member_name, mem_res.member_ty
-                    )
-                }
-                varn_checker::ResolvedMemberKind::Property => {
-                    format!(
-                        "(property) {}.{}: {}",
-                        parent_str, mem_res.member_name, mem_res.member_ty
-                    )
-                }
-                varn_checker::ResolvedMemberKind::Constructor => {
-                    format!(
-                        "(constructor) {}({})",
-                        parent_str,
-                        format_member_params(&mem_res.member_ty)
-                    )
-                }
-                // A nested type reads as the declaration it is — `class A.B`,
-                // not `(property) A.B: B`.
-                varn_checker::ResolvedMemberKind::NestedType(k) => {
-                    format!("{} {}.{}", k.label(), parent_str, mem_res.member_name)
-                }
-            };
+            let sig = member_resolution_sig(state, mem_res);
             return Some(make_lang_hover(sig));
         }
     }
@@ -230,14 +141,52 @@ pub(crate) fn make_lang_hover(value: String) -> Hover {
     }
 }
 
-fn format_fn_params(params: &[varn_checker::types::FunctionParam]) -> String {
+/// The hover for a member access the checker resolved.
+fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolution) -> String {
+    use varn_checker::ResolvedMemberKind as R;
+    let parent = state.ty_text(&res.receiver_ty);
+    let name = &res.member_name;
+    let ty = state.ty_text(&res.member_ty);
+    let callable = |label: &str| match state.db.fn_shape(&res.member_ty) {
+        Some(ft) => format!(
+            "({label}) {parent}.{name}({}): {}",
+            format_fn_params(state, &ft.params),
+            state.db.id_text(ft.return_type)
+        ),
+        None => format!("({label}) {parent}.{name}: {ty}"),
+    };
+    let typed = |label: &str| format!("({label}) {parent}.{name}: {ty}");
+    match res.member_kind {
+        R::EnumMember => format!("(enum member) {parent}.{name}"),
+        R::Method => callable("method"),
+        R::StaticMethod => callable("static method"),
+        R::ExtensionMethod => callable("extension method"),
+        R::StaticProperty => typed("static property"),
+        R::ExtensionProperty => typed("extension property"),
+        R::Getter => typed("getter"),
+        R::Setter => typed("setter"),
+        R::Property => typed("property"),
+        R::Constructor => format!(
+            "(constructor) {parent}({})",
+            format_member_params(state, &res.member_ty)
+        ),
+        // A nested type reads as the declaration it is — `class A.B`, not
+        // `(property) A.B: B`.
+        R::NestedType(k) => format!("{} {parent}.{name}", k.label()),
+    }
+}
+
+fn format_fn_params(
+    state: &DocumentState,
+    params: &[varn_checker::types::FunctionParam],
+) -> String {
     params
         .iter()
         .map(|p| {
-            if let Some(name) = &p.name {
-                format!("{}: {}", name, p.ty)
-            } else {
-                format!("{}", p.ty)
+            let ty = state.db.id_text(p.ty);
+            match &p.name {
+                Some(name) => format!("{name}: {ty}"),
+                None => ty,
             }
         })
         .collect::<Vec<_>>()
@@ -245,9 +194,10 @@ fn format_fn_params(params: &[varn_checker::types::FunctionParam]) -> String {
 }
 
 /// The parameter list of a member whose type is a function, else empty.
-fn format_member_params(ty: &varn_checker::Type) -> String {
-    match &ty.0 {
-        varn_core::TypeKind::Fn(ft) => format_fn_params(&ft.params),
-        _ => String::new(),
-    }
+fn format_member_params(state: &DocumentState, ty: &varn_checker::Type) -> String {
+    state
+        .db
+        .fn_shape(ty)
+        .map(|ft| format_fn_params(state, &ft.params))
+        .unwrap_or_default()
 }

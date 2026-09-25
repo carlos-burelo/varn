@@ -2,10 +2,7 @@ use std::collections::HashMap;
 use tower_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
 };
-use varn_core::ast::{
-    ClassDecl, ClassMember, Decl, InterfaceDecl, InterfaceMember, Program, StmtKind, TypeNode,
-};
-use varn_core::TypeKind;
+use varn_core::ast::{ClassDecl, ClassMember, Decl, InterfaceDecl, InterfaceMember, StmtKind};
 
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
@@ -18,7 +15,7 @@ pub fn generate_interface_impl_action(
     _cursor_col: u32,
 ) -> Option<CodeActionOrCommand> {
     let program = state.ast.as_ref()?;
-    let class_decl = find_class_at_line(program, cursor_line)?;
+    let class_decl = find_class_at_line(state, program, cursor_line)?;
 
     if class_decl.implements.is_empty() {
         return None;
@@ -28,18 +25,17 @@ pub fn generate_interface_impl_action(
         .body
         .iter()
         .filter_map(|m| match m {
-            ClassMember::Method { key, .. } => Some(key.to_string()),
+            ClassMember::Method { key, .. } => Some(state.name(*key).to_owned()),
             _ => None,
         })
         .collect();
 
     for iface_type in &class_decl.implements {
-        let iface_name = type_node_name(iface_type);
-        if iface_name.is_empty() {
+        let Some(iface_name) = state.type_node_decl_name(iface_type) else {
             continue;
-        }
+        };
 
-        let iface_decl = find_interface(program, index, &iface_name);
+        let iface_decl = find_interface(state, program, index, iface_name);
         if let Some(iface) = iface_decl {
             let mut missing_methods = Vec::new();
             for member in &iface.body {
@@ -51,9 +47,10 @@ pub fn generate_interface_impl_action(
                     ..
                 } = member
                 {
-                    if !existing_methods.contains(&key.to_string()) {
+                    let key = state.name(*key);
+                    if !existing_methods.iter().any(|m| m == key) {
                         missing_methods.push((
-                            key.to_string(),
+                            key.to_owned(),
                             params.clone(),
                             return_type.clone(),
                             *is_async,
@@ -80,11 +77,11 @@ pub fn generate_interface_impl_action(
                         let ty_str = p
                             .type_ann
                             .as_ref()
-                            .map(|t| format!(": {}", type_node_name(t)))
+                            .map(|t| format!(": {}", state.source_text(t.range)))
                             .unwrap_or_default();
                         match &p.pattern {
                             varn_core::ast::Pattern::Identifier { name, .. } => {
-                                format!("{}{}", name, ty_str)
+                                format!("{}{}", state.name(*name), ty_str)
                             }
                             _ => format!("arg{}", ty_str),
                         }
@@ -93,7 +90,7 @@ pub fn generate_interface_impl_action(
 
                 let ret_str = ret
                     .as_ref()
-                    .map(|t| format!(": {}", type_node_name(t)))
+                    .map(|t| format!(": {}", state.source_text(t.range)))
                     .unwrap_or_default();
 
                 stubs.push_str(&format!(
@@ -140,43 +137,44 @@ pub fn generate_interface_impl_action(
     None
 }
 
-pub fn type_node_name(node: &TypeNode) -> String {
-    match &node.kind {
-        TypeKind::Named(name, _) => name.clone(),
-        TypeKind::Generic(name, _, _) => name.clone(),
-        TypeKind::Intrinsic(tag) => format!("{:?}", tag).to_lowercase(),
-        _ => "any".to_string(),
-    }
-}
-
-fn find_class_at_line(program: &Program, line: u32) -> Option<&ClassDecl> {
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Class(c) = decl.as_ref() {
-                let s_line = c.range.start.line.saturating_sub(1);
-                let e_line = c.range.end.line.saturating_sub(1);
-                if line >= s_line && line <= e_line {
-                    return Some(c);
+fn find_class_at_line<'a>(
+    state: &'a DocumentState,
+    program: &varn_core::ast::Program,
+    line: u32,
+) -> Option<&'a ClassDecl> {
+    program
+        .body
+        .iter()
+        .find_map(|&id| match &state.ast_arena.stmt(id).kind {
+            StmtKind::Decl(decl) => match decl.as_ref() {
+                Decl::Class(c)
+                    if (c.range.start.line.saturating_sub(1)
+                        ..=c.range.end.line.saturating_sub(1))
+                        .contains(&line) =>
+                {
+                    Some(c)
                 }
-            }
-        }
-    }
-    None
+                _ => None,
+            },
+            _ => None,
+        })
 }
 
+/// The interface `name` this document declares at its top level.
 fn find_interface(
-    program: &Program,
+    state: &DocumentState,
+    program: &varn_core::ast::Program,
     _index: Option<&ProjectIndex>,
     name: &str,
 ) -> Option<InterfaceDecl> {
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Interface(i) = decl.as_ref() {
-                if i.id.as_ref() == name {
-                    return Some(i.clone());
-                }
-            }
-        }
-    }
-    None
+    program
+        .body
+        .iter()
+        .find_map(|&id| match &state.ast_arena.stmt(id).kind {
+            StmtKind::Decl(decl) => match decl.as_ref() {
+                Decl::Interface(i) if state.name(i.id) == name => Some(i.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
 }

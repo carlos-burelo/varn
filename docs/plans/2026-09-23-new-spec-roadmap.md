@@ -514,7 +514,7 @@ elimination, escape analysis / scalar replacement, auto-vectorización,
 
 ## 6. Puerta de validación (cada commit)
 
-1. `cargo check --workspace --exclude varn-lsp --all-targets` sin warnings.
+1. `cargo check --workspace --all-targets` sin warnings nuevos (varn-lsp incluido).
 2. `cargo test -p varn-core -p varn-checker -p varn-compiler -p varn-vm` (los
    tests unitarios tocados).
 3. `cargo test -p varn-cli --test error_corpus` (desde Tarea 0.2).

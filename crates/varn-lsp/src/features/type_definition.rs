@@ -20,16 +20,12 @@ pub fn build_goto_type_definition(
             .symbol_types
             .get(&sid)
             .cloned()
-            .or_else(|| state.db.arena.get(sid).ty.clone())
+            .or_else(|| state.db.arena.get(sid).ty)
     } else {
-        state
-            .db
-            .expr_types
-            .get(&token.offset)
-            .map(|info| info.ty.clone())
+        state.db.expr_types.get(&token.offset).map(|info| info.ty)
     }?;
 
-    let type_name = extract_type_identifier(&target_type)?;
+    let type_name = extract_type_identifier(state, &target_type)?;
 
     // 2. Search for the type definition in the current document
     for sym in state.symbols() {
@@ -97,19 +93,26 @@ pub fn build_goto_type_definition(
     None
 }
 
-fn extract_type_identifier(ty: &varn_checker::Type) -> Option<String> {
-    match &ty.0 {
-        TypeKind::Named(name, _) => Some(name.to_string()),
-        TypeKind::Generic(name, _, _) => Some(name.to_string()),
-        TypeKind::Array(elem) => extract_type_identifier(elem),
-        TypeKind::EnumVariant { enum_name, .. } => Some(enum_name.to_string()),
-        _ => {
-            let s = ty.to_string();
-            if !s.is_empty() && s.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
-                Some(s)
-            } else {
-                None
+/// The declaration `ty` names: a named or generic type's own, an array's
+/// element type's, the one named member of an optional (`Foo | null`).
+fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Option<String> {
+    match state.db.ty_kind(ty) {
+        TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
+            Some(state.name(name).to_owned())
+        }
+        TypeKind::Array(elem) => extract_type_identifier(state, &varn_checker::Type(elem, false)),
+        TypeKind::Union(list) => {
+            let named: Vec<String> = state
+                .db
+                .ty_list(list)
+                .iter()
+                .filter_map(|t| extract_type_identifier(state, t))
+                .collect();
+            match named.as_slice() {
+                [only] => Some(only.clone()),
+                _ => None,
             }
         }
+        _ => None,
     }
 }
