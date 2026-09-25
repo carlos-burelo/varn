@@ -62,6 +62,7 @@ tungstenite  = "0.21"
 # silent build-graph weight.
 [workspace.lints.rust]
 unused_crate_dependencies = "warn"
+linker_messages = "allow"
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"
