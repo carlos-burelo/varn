@@ -337,25 +337,24 @@ pub(crate) fn def_result(
     store_boxed_home_at(b, actx, dest, res, site);
 }
 
-pub(crate) fn emit_backedge_safepoint(
+/// The collector's poll at a loop back edge: when the nursery has reached its
+/// threshold, `collect` runs on the slow path (it must call the
+/// `gc_safepoint` helper, with whatever the lowering has to do around it).
+/// A call-free allocating loop depends on it, as the interpreter's `Loop`
+/// does on `gc_backedge_safepoint`: nothing else would ever collect. The one
+/// check, shared by the bytecode and the SSA lowerings.
+pub(crate) fn emit_gc_poll(
     b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    payload_caches: &[Variable],
+    h: &crate::JitHelpers,
+    exec_ctx: cranelift_codegen::ir::Value,
+    collect: impl FnOnce(&mut FunctionBuilder),
 ) {
-    let h = actx.helpers;
-    let rcbox = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        h.heap_field_offset as i32,
-    );
-    let len = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        rcbox,
-        h.nursery_len_offset as i32,
-    );
+    let rcbox = b
+        .ins()
+        .load(types::I64, MemFlags::trusted(), exec_ctx, h.heap_field_offset as i32);
+    let len = b
+        .ins()
+        .load(types::I64, MemFlags::trusted(), rcbox, h.nursery_len_offset as i32);
     let over = b.ins().icmp_imm(
         IntCC::UnsignedGreaterThanOrEqual,
         len,
@@ -366,16 +365,28 @@ pub(crate) fn emit_backedge_safepoint(
     b.ins().brif(over, slow, &[], cont, &[]);
 
     b.switch_to_block(slow);
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
-    call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
-    reload_boxed(b, actx, state, &regs);
-    let invalid = b.ins().iconst(types::I64, 0);
-    for &cv in payload_caches {
-        b.def_var(cv, invalid);
-    }
+    collect(b);
     b.ins().jump(cont, &[]);
     b.switch_to_block(cont);
+}
+
+pub(crate) fn emit_backedge_safepoint(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    payload_caches: &[Variable],
+) {
+    let h = actx.helpers;
+    emit_gc_poll(b, h, actx.exec_ctx, |b| {
+        let regs = live_boxed(actx, state);
+        flush_boxed(b, actx, state, &regs);
+        call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
+        reload_boxed(b, actx, state, &regs);
+        let invalid = b.ins().iconst(types::I64, 0);
+        for &cv in payload_caches {
+            b.def_var(cv, invalid);
+        }
+    });
 }
 
 /// Live registers that can hold a heap reference and therefore must be

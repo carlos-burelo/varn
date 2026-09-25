@@ -33,13 +33,39 @@ fn store_boxed_return(
     Ok(())
 }
 
+/// Emit `term`. `back_edge(target)` tells whether jumping to `target` closes
+/// a loop: before such a jump a frame-aware body polls the collector, since
+/// an allocating loop has no other point where one could run. Its heap
+/// values live in their homes, which the collector sees and rewrites, and
+/// its scalars cannot move, so nothing is flushed or reloaded around it.
 pub(super) fn emit_term(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     blocks: &[Option<cranelift_codegen::ir::Block>],
     values: &[Option<Value>],
     term: &SsaTerm,
+    back_edge: impl Fn(u32) -> bool,
 ) -> Result<(), String> {
+    let loops = match term {
+        SsaTerm::Jump { target, .. } => back_edge(*target),
+        SsaTerm::Branch {
+            then_blk, else_blk, ..
+        } => back_edge(*then_blk) || back_edge(*else_blk),
+        SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => false,
+    };
+    if loops {
+        if let Some(frame) = &ctx.frame {
+            let exec_ctx = frame.exec_ctx;
+            super::super::alloc::emit_gc_poll(b, ctx.helpers, exec_ctx, |b| {
+                super::super::emit::call_helper_void(
+                    b,
+                    ctx.cc,
+                    ctx.helpers.gc_safepoint,
+                    &[exec_ctx],
+                );
+            });
+        }
+    }
     match term {
         SsaTerm::Return(Some(v)) => {
             let ret = ctx.proto.return_kind;

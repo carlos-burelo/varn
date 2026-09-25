@@ -199,7 +199,14 @@ pub(super) fn try_lower(
 
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
 
-    for i in order(ssa) {
+    let rpo = order(ssa);
+    // A jump to a block at or before its own position in reverse postorder
+    // is a loop back edge.
+    let mut rpo_pos = vec![0usize; ssa.blocks.len()];
+    for (pos, &blk) in rpo.iter().enumerate() {
+        rpo_pos[blk] = pos;
+    }
+    for i in rpo {
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
         b.switch_to_block(cb);
@@ -250,7 +257,8 @@ pub(super) fn try_lower(
                 None => {}
             }
         }
-        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term)?;
+        let back_edge = |target: u32| rpo_pos[target as usize] <= rpo_pos[i];
+        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, back_edge)?;
     }
 
     b.seal_all_blocks();
