@@ -16,12 +16,8 @@ path = "src/debug_binder.rs"
 required-features = ["dev-tools"]
 
 [features]
+default = ["lsp"]
 dev-tools = []
-# varn-lsp is disconnected during the Fase 1 (IDEAS_BASE.md alignment)
-# compiler refactor: it consumes varn-core/varn-checker in ways not
-# migrated yet. Off by default so `cargo check -p varn-cli` (the plan's
-# validation gate) does not depend on it compiling. Build with
-# `--features lsp` once varn-lsp itself is migrated in its own phase.
 lsp = ["dep:varn-lsp", "dep:tower-lsp"]
 
 [dependencies]
