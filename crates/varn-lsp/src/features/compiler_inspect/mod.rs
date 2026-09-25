@@ -40,15 +40,6 @@ pub fn execute_command(
             &*document()?,
         )?))),
         "varn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
-        "varn.evalSelection" => {
-            let code = arguments
-                .first()
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Missing code argument".to_string())?;
-
-            let result = format!("Evaluated: {code}");
-            Ok(Some(serde_json::Value::String(result)))
-        }
         _ => Err(format!("Unknown command: {command}")),
     }
 }
