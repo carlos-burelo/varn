@@ -3202,13 +3202,19 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
             let access = self.field_access(recv, name, ty, span);
+            // `a?.b` is `null` whenever `a` is, so its type is the member's
+            // made nullable — not the member's own: a `null` typed `int` is a
+            // value no representation of `int` can hold.
             let null_arm = TirExpr {
                 kind: TirExprKind::NullLit,
-                ty: access.ty,
+                ty: BackendTy::Nullable(self.tt.intern(BackendTy::Never)),
                 res: Resolution::None,
                 span,
             };
-            let result_ty = access.ty;
+            let result_ty = match access.ty {
+                BackendTy::Nullable(_) | BackendTy::Dynamic(_) => access.ty,
+                member => BackendTy::Nullable(self.tt.intern(member)),
+            };
             return TirExpr {
                 kind: TirExprKind::Select {
                     cond: Box::new(is_null),

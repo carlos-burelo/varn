@@ -3,6 +3,7 @@
 
 use varn_types::ssa::{SsaProto, SsaTerm};
 
+use super::store::clif_ty;
 use super::views;
 
 /// Each block's predecessors through terminators.
@@ -87,4 +88,47 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
         }
     }
     post.into_iter().rev().collect()
+}
+
+/// Every jump argument has its parameter's representation. The compiler
+/// brings each value reaching a merge to the merge's type; a body where one
+/// does not is declined here, by name, rather than handed to Cranelift — which
+/// only checks this when its verifier runs, and it does not in release.
+pub(super) fn check_block_args(ssa: &SsaProto) -> Result<(), String> {
+    let check = |from: usize, target: u32, args: &[u32]| -> Result<(), String> {
+        let params = &ssa.blocks[target as usize].params;
+        if params.len() != args.len() {
+            return Err(format!(
+                "from_ssa: block {from} passes {} values to block {target}, which takes {}",
+                args.len(),
+                params.len()
+            ));
+        }
+        for (&a, &p) in args.iter().zip(params) {
+            let (ak, pk) = (ssa.value_ty(a), ssa.value_ty(p));
+            if clif_ty(ak) != clif_ty(pk) {
+                return Err(format!(
+                    "from_ssa: block {from} passes {ak:?} value {a} to {pk:?} parameter {p} of block {target}"
+                ));
+            }
+        }
+        Ok(())
+    };
+    for (b, blk) in ssa.blocks.iter().enumerate() {
+        match &blk.term {
+            SsaTerm::Jump { target, args } => check(b, *target, args)?,
+            SsaTerm::Branch {
+                then_blk,
+                then_args,
+                else_blk,
+                else_args,
+                ..
+            } => {
+                check(b, *then_blk, then_args)?;
+                check(b, *else_blk, else_args)?;
+            }
+            SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => {}
+        }
+    }
+    Ok(())
 }

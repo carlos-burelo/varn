@@ -140,6 +140,7 @@ pub(super) fn try_lower(
         ),
     };
     let nparams = proto.arity.saturating_sub(1);
+    cfg::check_block_args(ssa)?;
     if proto.is_generator
         || proto.is_async
         || ssa.blocks.is_empty()

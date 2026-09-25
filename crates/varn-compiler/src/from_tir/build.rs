@@ -1537,8 +1537,11 @@ impl<'m> Builder<'m> {
 
         let phi = self.add_block_param(join, ty);
 
+        // Each arm reaches the join in the join's type: `a?.b`'s non-null arm
+        // is the member's own (an `int`), the result `int?`.
         self.current = then_blk;
         let tv = self.lower_expr(then_val)?;
+        let tv = self.coerce(tv, ty);
         let tfrom = self.current;
         self.set_term(Terminator::Jump {
             target: join,
@@ -1548,6 +1551,7 @@ impl<'m> Builder<'m> {
 
         self.current = else_blk;
         let ev = self.lower_expr(else_val)?;
+        let ev = self.coerce(ev, ty);
         let efrom = self.current;
         self.set_term(Terminator::Jump {
             target: join,
@@ -1951,6 +1955,8 @@ impl<'m> Builder<'m> {
         let then_blk = self.new_block();
         let else_blk = self.new_block();
         let join = self.new_block();
+        let then_v = self.coerce(then_v, ty);
+        let else_v = self.coerce(else_v, ty);
         let from = self.current;
         self.set_term(Terminator::Branch {
             cond,

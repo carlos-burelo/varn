@@ -137,6 +137,7 @@ import "./148-jit-try.vn"
 import "./149-jit-numeric.vn"
 import "./150-jit-arrays.vn"
 import "./151-jit-osr.vn"
+import "./152-jit-optional-chains.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()
