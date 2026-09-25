@@ -84,6 +84,30 @@ fn map_class_member_kind(
     }
 }
 
+/// `atom`'s text, resolved against the table that actually interned it: the
+/// current bind's if `atom` is in range there, the resolver's live (always
+/// append-only, whole-compilation) table otherwise.
+///
+/// A `TypeKind::Named`/`Generic` embedded in a field or return type can name
+/// a class declared in a module bound *after* `bind`'s own interner snapshot
+/// was frozen — its atom exists only past `bind.interner`'s length. Same
+/// doctrine as `module_resolver::cache::encode_with_owner`: never index a
+/// table the atom wasn't minted in.
+fn resolve_atom_text(
+    resolver: &dyn crate::module_resolver::ImportResolver,
+    bind: &BindResult,
+    atom: varn_core::Atom,
+) -> String {
+    if let Some(s) = bind.interner.try_resolve(atom) {
+        return s.to_owned();
+    }
+    resolver
+        .interner_snapshot()
+        .try_resolve(atom)
+        .map(str::to_owned)
+        .unwrap_or_default()
+}
+
 /// Every member reachable on `ty`, including those declared in other modules.
 ///
 /// `resolver` is what makes the cross-module half possible; without it this
@@ -232,8 +256,9 @@ pub fn get_members_of_type(
             return get_members_of_type(resolver, &array_ty, bind, table);
         }
         TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
-            let cn: Arc<str> = Arc::from(bind.interner.resolve(cn_atom));
-            let origin: Option<Arc<str>> = origin_atom.map(|o| Arc::from(bind.interner.resolve(o)));
+            let cn: Arc<str> = Arc::from(resolve_atom_text(resolver, bind, cn_atom));
+            let origin: Option<Arc<str>> =
+                origin_atom.map(|o| Arc::from(resolve_atom_text(resolver, bind, o)));
             let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
                 let args: Vec<Type> = table
                     .get_list(args_list)
@@ -343,7 +368,7 @@ pub fn get_members_of_type(
         _ => {}
     }
 
-    collect_extension_members(&mut results, &mut seen, ty, bind, table);
+    collect_extension_members(resolver, &mut results, &mut seen, ty, bind, table);
     results
 }
 
@@ -355,13 +380,14 @@ pub fn get_members_of_type(
 /// table to fill the gap, so extensions had a second, parallel definition that
 /// only tooling could see.
 fn collect_extension_members(
+    resolver: &dyn crate::module_resolver::ImportResolver,
     results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
     seen: &mut rustc_hash::FxHashSet<Arc<str>>,
     ty: &Type,
     bind: &BindResult,
     table: &mut CheckerTyTable,
 ) {
-    let Some(type_name) = extension_key(ty, table, &bind.interner) else {
+    let Some(type_name) = extension_key(resolver, ty, table, bind) else {
         return;
     };
     let scope = bind.scopes.get(bind.global_scope);
@@ -469,12 +495,15 @@ fn collect_extension_members(
 
 /// The name `extension` blocks are keyed by for `ty`.
 fn extension_key(
+    resolver: &dyn crate::module_resolver::ImportResolver,
     ty: &Type,
     table: &CheckerTyTable,
-    interner: &varn_core::AtomInterner,
+    bind: &BindResult,
 ) -> Option<Arc<str>> {
     match table.get(ty.0) {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
+            Some(Arc::from(resolve_atom_text(resolver, bind, n)))
+        }
         k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
             k.lang_name().map(Arc::from)
         }
@@ -498,8 +527,8 @@ impl<'r> Checker<'r> {
                 })
                 .collect(),
             TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => {
-                let cn_str = bind.interner.resolve(cn);
-                bind.get_class_entry(cn_str)
+                let cn_str = resolve_atom_text(self.resolver, bind, cn);
+                bind.get_class_entry(&cn_str)
                     .map(|entry| entry.members.iter().map(|m| m.name.clone()).collect())
                     .unwrap_or_default()
             }
