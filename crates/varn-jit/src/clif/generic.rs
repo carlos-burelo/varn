@@ -8,8 +8,7 @@
 //! directly; arithmetic results stay boxed (unboxed at an int use).
 use super::alloc::AllocCtx;
 use super::emit::{
-    box_or_pass, call_helper, call_helper_void, def_bool_result, def_boxed_leaf,
-    meta_is_float,
+    box_or_pass, call_helper, call_helper_void, def_bool_result, def_boxed_leaf, meta_is_float,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -77,7 +76,15 @@ pub(super) fn emit_binop(
     let b_r = (code[ip + 1] & 0xFF) as usize;
     let a = box_operand(b, g, state, a_r);
     let c = box_operand(b, g, state, b_r);
-    let res = boxed_binop(b, g.cc, helper, g.exec_ctx, g.jit_native_result_offset as i32, a, c);
+    let res = boxed_binop(
+        b,
+        g.cc,
+        helper,
+        g.exec_ctx,
+        g.jit_native_result_offset as i32,
+        a,
+        c,
+    );
     def_boxed(b, g, dest, res);
 }
 
@@ -94,8 +101,12 @@ pub(crate) fn boxed_binop(
     c: (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value),
 ) -> cranelift_codegen::ir::Value {
     call_helper_void(b, cc, helper, &[exec_ctx, a.0, a.1, c.0, c.1]);
-    b.ins()
-        .load(types::I128, MemFlags::trusted(), exec_ctx, native_result_offset)
+    b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        exec_ctx,
+        native_result_offset,
+    )
 }
 
 /// `IsNull dest, src` — compare against the null VmValue bits (0/1 result).
@@ -357,16 +368,23 @@ pub(crate) fn boxed_compare(
     let (a_tag, a_payload) = a;
     let (b_tag, b_payload) = c;
     let Some(is_eq) = equality else {
-        return call_helper(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+        return call_helper(
+            b,
+            cc,
+            helper,
+            &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+        );
     };
     let tag_eq = b.ins().icmp(IntCC::Equal, a_tag, b_tag);
     let pay_eq = b.ins().icmp(IntCC::Equal, a_payload, b_payload);
     let bits_eq = b.ins().band(tag_eq, pay_eq);
 
     let a_kind = b.ins().band_imm(a_tag, 0xFF);
-    let not_float = b
-        .ins()
-        .icmp_imm(IntCC::NotEqual, a_kind, varn_types::vm_value::KIND_FLOAT as i64);
+    let not_float = b.ins().icmp_imm(
+        IntCC::NotEqual,
+        a_kind,
+        varn_types::vm_value::KIND_FLOAT as i64,
+    );
     let same_non_float = b.ins().band(bits_eq, not_float);
 
     let a_is_sso = b
@@ -393,7 +411,12 @@ pub(crate) fn boxed_compare(
     b.ins().jump(merge_blk, &[fast_res.into()]);
 
     b.switch_to_block(slow_blk);
-    let slow_res = call_helper(b, cc, helper, &[exec_ctx, a_tag, a_payload, b_tag, b_payload]);
+    let slow_res = call_helper(
+        b,
+        cc,
+        helper,
+        &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
+    );
     b.ins().jump(merge_blk, &[slow_res.into()]);
 
     b.switch_to_block(merge_blk);

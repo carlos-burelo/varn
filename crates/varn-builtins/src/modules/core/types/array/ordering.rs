@@ -68,7 +68,8 @@ pub(super) fn merge_sort(
             let hi = (lo + 2 * width).min(len);
             let (mut i, mut j) = (lo, mid);
             for slot in scratch.iter_mut().take(hi).skip(lo) {
-                let take_right = j < hi && (i >= mid || cmp(items[i], items[j])? == Ordering::Greater);
+                let take_right =
+                    j < hi && (i >= mid || cmp(items[i], items[j])? == Ordering::Greater);
                 if take_right {
                     *slot = items[j];
                     j += 1;

@@ -134,7 +134,8 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             let q_range = s.range();
             s.advance();
             let full_range = s.span_from(start);
-            let null_node = s.type_node(q_range, TypeKind::Primitive(varn_core::LangPrimitive::Null));
+            let null_node =
+                s.type_node(q_range, TypeKind::Primitive(varn_core::LangPrimitive::Null));
             ty = s.type_node(full_range, TypeKind::Union(vec![ty, null_node]));
         } else {
             break;
@@ -181,7 +182,10 @@ fn literal_type_error(range: varn_core::SourceRange) -> String {
     )
 }
 
-fn parse_tuple_type(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<TypeNode, String> {
+fn parse_tuple_type(
+    s: &mut TokenStream,
+    range: varn_core::SourceRange,
+) -> Result<TypeNode, String> {
     s.expect(TokenKind::LBracket)?;
     let mut elements = vec![];
     while !s.check(TokenKind::RBracket) && !s.is_eof() {
@@ -467,7 +471,10 @@ fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> 
         }
     }
     let full_range = s.span_from(start);
-    Ok(s.type_node(full_range, TypeKind::Primitive(varn_core::LangPrimitive::Str)))
+    Ok(s.type_node(
+        full_range,
+        TypeKind::Primitive(varn_core::LangPrimitive::Str),
+    ))
 }
 
 pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {

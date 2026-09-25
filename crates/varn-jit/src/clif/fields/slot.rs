@@ -156,9 +156,9 @@ pub(super) fn emit_get(
                 b.def_var(c.vars[first_reg], f);
                 if let Some(actx) = actx {
                     let payload = b.ins().bitcast(types::I64, MemFlags::new(), f);
-                    let tag_v =
-                        b.ins()
-                            .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
+                    let tag_v = b
+                        .ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
                     let boxed = b.ins().iconcat(tag_v, payload);
                     super::super::alloc::store_boxed_home(b, actx, first_reg, boxed);
                 }

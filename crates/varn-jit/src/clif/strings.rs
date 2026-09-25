@@ -113,9 +113,12 @@ pub(super) fn str_length_boxed(
 
     b.switch_to_block(slow);
     super::emit::call_helper_void(b, cc, helper, &[exec_ctx, tag, payload]);
-    let res = b
-        .ins()
-        .load(types::I128, MemFlags::trusted(), exec_ctx, native_result_offset);
+    let res = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        exec_ctx,
+        native_result_offset,
+    );
     b.ins().jump(merge, &[res.into()]);
 
     b.switch_to_block(merge);

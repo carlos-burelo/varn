@@ -240,7 +240,8 @@ pub(crate) fn infer_call_type(
             match table.get(ty.0) {
                 TypeKind::Generic(name, args, _)
                     if (interner.get(varn_core::BuiltinType::Task.name()) == Some(name)
-                        || interner.get(varn_core::BuiltinType::TaskHandle.name()) == Some(name))
+                        || interner.get(varn_core::BuiltinType::TaskHandle.name())
+                            == Some(name))
                         && table.get_list(args).len() == 1 =>
                 {
                     Some(Type(table.get_list(args)[0], false))

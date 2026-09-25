@@ -140,7 +140,8 @@ impl ExecCtx {
         Ok(alloc)
     }
 
-    pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {        for (s, uv) in &self.open_upvalues {
+    pub(crate) fn capture_upvalue(&mut self, slot: SlotAddr) -> VmUpvalue {
+        for (s, uv) in &self.open_upvalues {
             if *s == slot {
                 return uv.clone();
             }

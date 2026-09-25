@@ -76,9 +76,7 @@ pub(crate) extern "C" fn jit_load_static_fn(
                 ctx_ref.settings,
             );
             vm_closure.module_base = closure_ref.module_base;
-            let val = ctx_ref
-                .heap
-                .alloc_vm_closure(std::rc::Rc::new(vm_closure));
+            let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
             ctx_ref
                 .static_closures
                 .insert(proto_ptr, (proto.clone(), val));

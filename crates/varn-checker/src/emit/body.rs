@@ -2350,7 +2350,8 @@ impl<'a> FnEmitter<'a> {
                     && matches!(&self.ast_arena.expr(*target).kind, ExprKind::Member { .. })
                     && self
                         .m
-                        .desugar.extension_set_members
+                        .desugar
+                        .extension_set_members
                         .contains_key(&self.ast_arena.expr(*target).range.start.offset) =>
             {
                 let (target, value) = (*target, *value);
@@ -2358,8 +2359,9 @@ impl<'a> FnEmitter<'a> {
                     unreachable!()
                 };
                 let object = *object;
-                let mangled =
-                    self.m.desugar.extension_set_members[&self.ast_arena.expr(target).range.start.offset].clone();
+                let mangled = self.m.desugar.extension_set_members
+                    [&self.ast_arena.expr(target).range.start.offset]
+                    .clone();
                 let recv = self.lower_expr(object);
                 let v = self.lower_expr(value);
                 return TirExpr {
@@ -2560,11 +2562,10 @@ impl<'a> FnEmitter<'a> {
                 let tag_name: Option<&'static str> = match &type_ann.kind {
                     k @ (varn_core::TypeKind::Primitive(_)
                     | varn_core::TypeKind::Builtin(_)
-                    | varn_core::TypeKind::Literal(_)) => {
-                        k.lang_name()
-                    }
+                    | varn_core::TypeKind::Literal(_)) => k.lang_name(),
                     varn_core::TypeKind::Named(n, _) => {
-                        varn_core::RuntimeKind::from_str(self.m.interner.resolve(*n)).map(|t| t.name())
+                        varn_core::RuntimeKind::from_str(self.m.interner.resolve(*n))
+                            .map(|t| t.name())
                     }
                     _ => None,
                 };
@@ -2759,8 +2760,10 @@ impl<'a> FnEmitter<'a> {
                 // Case 1: the core Result or Option (the checker admits no other enum).
                 if let (Some(sum), BackendTy::Enum(eid)) = (sum, hoisted.ty.non_nullable(self.tt)) {
                     if let Some(info) = self.m.enums.get(eid.0 as usize) {
-                        let variant = |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
-                        let is_err_res = variant("Err").filter(|_| sum == varn_core::CoreSum::Result);
+                        let variant =
+                            |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
+                        let is_err_res =
+                            variant("Err").filter(|_| sum == varn_core::CoreSum::Result);
                         let is_ok_res = variant("Ok").filter(|_| sum == varn_core::CoreSum::Result);
                         if let (Some(err_var), Some(ok_var)) = (is_err_res, is_ok_res) {
                             let disc = TirExpr {
@@ -2806,8 +2809,10 @@ impl<'a> FnEmitter<'a> {
                             };
                         }
 
-                        let is_none_opt = variant("None").filter(|_| sum == varn_core::CoreSum::Option);
-                        let is_some_opt = variant("Some").filter(|_| sum == varn_core::CoreSum::Option);
+                        let is_none_opt =
+                            variant("None").filter(|_| sum == varn_core::CoreSum::Option);
+                        let is_some_opt =
+                            variant("Some").filter(|_| sum == varn_core::CoreSum::Option);
                         if let (Some(none_var), Some(some_var)) = (is_none_opt, is_some_opt) {
                             let disc = TirExpr {
                                 kind: TirExprKind::Discriminant {
@@ -3277,7 +3282,8 @@ impl<'a> FnEmitter<'a> {
 
         if let Some(mangled) = self
             .m
-            .desugar.extension_members
+            .desugar
+            .extension_members
             .get(&self.ast_arena.expr(property).range.start.offset)
             .cloned()
         {
@@ -3754,7 +3760,9 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         use varn_core::capability::OperatorShape;
         let recv = self.lower_expr(recv);
-        let args = arg.map(|a| vec![TirArg::Expr(self.lower_expr(a))]).unwrap_or_default();
+        let args = arg
+            .map(|a| vec![TirArg::Expr(self.lower_expr(a))])
+            .unwrap_or_default();
         let name: Arc<str> = Arc::from(method.method);
         match method.shape {
             OperatorShape::Value => self.method_call(recv, name, args, ty, span),

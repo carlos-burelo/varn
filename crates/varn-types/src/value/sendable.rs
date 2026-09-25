@@ -278,7 +278,9 @@ impl SendValue {
                 let mut g = set_ref.write();
                 for item in items {
                     let item_nv = item.to_value_ctx(ctx);
-                    let key = ctx.map_key(item_nv).unwrap_or(crate::value::MapKey(item_nv));
+                    let key = ctx
+                        .map_key(item_nv)
+                        .unwrap_or(crate::value::MapKey(item_nv));
                     g.insert(key);
                 }
                 drop(g);

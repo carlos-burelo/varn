@@ -191,8 +191,7 @@ impl ExecCtx {
         let receiver_class = crate::exec::props::get_class(this_val, &self.heap);
         let cache_len = closure.ic_cache_len();
         if receiver_class.is_some() && cs < cache_len && !is_megamorphic {
-            type NativeFnPtr =
-                varn_types::NativeFn;
+            type NativeFnPtr = varn_types::NativeFn;
 
             let ic_native: Option<(NativeFnPtr, VmValue)>;
             let ic_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)>;

@@ -1,5 +1,5 @@
 use varn_checker::{SymbolKind, Type};
-use varn_core::{IntrinsicType, TokenKind, TypeKind, RuntimeKind};
+use varn_core::{IntrinsicType, RuntimeKind, TokenKind, TypeKind};
 
 use super::{
     TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,

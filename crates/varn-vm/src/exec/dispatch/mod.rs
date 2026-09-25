@@ -551,10 +551,7 @@ impl ExecCtx {
                             ))
                         } else {
                             let boxed = (*ctx).stack.box_range(base, args_start, arg_count);
-                            tryv!(crate::exec::intrinsics::dispatch(
-                                wire_byte,
-                                &boxed,
-                            ))
+                            tryv!(crate::exec::intrinsics::dispatch(wire_byte, &boxed,))
                         };
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }

@@ -87,7 +87,11 @@ pub(crate) extern "C" fn jit_call_native_window(
 /// The native a call site targets: the address resolved at compile time,
 /// or — `fn_addr == 0` — the op-id's entry, looked up now (an unknown op-id
 /// raises a VM error).
-unsafe fn resolve_native(ctx_ref: &mut ExecCtx, fn_addr: usize, op_id: u64) -> varn_types::NativeFn {
+unsafe fn resolve_native(
+    ctx_ref: &mut ExecCtx,
+    fn_addr: usize,
+    op_id: u64,
+) -> varn_types::NativeFn {
     if fn_addr != 0 {
         return std::mem::transmute::<usize, varn_types::NativeFn>(fn_addr);
     }

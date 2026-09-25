@@ -54,7 +54,12 @@ fn fault(f: varn_core::IntDivFault, op: &str) -> RuntimeError {
 /// `a op b` when at least one side is a `bigint` and the other is a
 /// `bigint` or an `int`; `None` hands the operation back to the caller.
 #[cold]
-pub(crate) fn binary(op: BigOp, a: VmValue, b: VmValue, heap: &mut Heap) -> Option<VmResult<VmValue>> {
+pub(crate) fn binary(
+    op: BigOp,
+    a: VmValue,
+    b: VmValue,
+    heap: &mut Heap,
+) -> Option<VmResult<VmValue>> {
     if !is_bigint(a, heap) && !is_bigint(b, heap) {
         return None;
     }

@@ -532,10 +532,18 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => {
                 return heap.get_intrinsic_class(varn_core::RuntimeKind::Array.name())
             }
-            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Str.name()),
-            Some(HeapObj::Map(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Map.name()),
-            Some(HeapObj::Set(_)) => return heap.get_intrinsic_class(varn_core::RuntimeKind::Set.name()),
-            Some(HeapObj::EnumVariant(ev)) => return ev.enum_class_id.and_then(ClassObj::find_by_id),
+            Some(HeapObj::Str(_)) => {
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Str.name())
+            }
+            Some(HeapObj::Map(_)) => {
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Map.name())
+            }
+            Some(HeapObj::Set(_)) => {
+                return heap.get_intrinsic_class(varn_core::RuntimeKind::Set.name())
+            }
+            Some(HeapObj::EnumVariant(ev)) => {
+                return ev.enum_class_id.and_then(ClassObj::find_by_id)
+            }
             Some(HeapObj::Range(_)) => {
                 return heap.get_intrinsic_class(varn_core::RuntimeKind::Range.name())
             }

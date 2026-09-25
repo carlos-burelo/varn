@@ -10,9 +10,7 @@ impl<'r> super::Binder<'r> {
         let source_str = self.interner.resolve(i.source).to_string();
         use varn_modules::layer::{check_import, Layer};
         if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
-            self.emit(
-                Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range),
-            );
+            self.emit(Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range));
             // Core names are already in scope, so their uses still resolve;
             // any other import keeps binding so its uses do not cascade.
             if Layer::of_module(&source_str) == Layer::Core {

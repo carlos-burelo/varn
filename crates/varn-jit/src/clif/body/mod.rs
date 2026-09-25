@@ -2,9 +2,7 @@
 
 pub(crate) mod op_dispatch;
 
-use cranelift_codegen::ir::{
-    condcodes::IntCC, types, Function, InstBuilder, UserFuncName, Value,
-};
+use cranelift_codegen::ir::{condcodes::IntCC, types, Function, InstBuilder, UserFuncName, Value};
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use std::collections::HashMap;
@@ -17,9 +15,7 @@ use super::abi::raw_signature;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
-use super::emit::{
-    box_or_pass, call_helper, dest_is_ref, meta_is_float, meta_is_int, unbox_int,
-};
+use super::emit::{box_or_pass, call_helper, dest_is_ref, meta_is_float, meta_is_int, unbox_int};
 use super::fields;
 use super::floats;
 use super::generic;
@@ -406,7 +402,10 @@ pub(super) fn lower_raw(
             b.set_srcloc(cranelift_codegen::ir::SourceLoc::new(ip as u32));
         }
         if crate::clif::home_trace() {
-            eprintln!("OPIP {ip} {op:?} dst={first_reg} state_dst={:?}", state.get(first_reg));
+            eprintln!(
+                "OPIP {ip} {op:?} dst={first_reg} state_dst={:?}",
+                state.get(first_reg)
+            );
         }
 
         match op {
@@ -452,42 +451,30 @@ pub(super) fn lower_raw(
                 // generic truthiness helper), which is what lets a function
                 // like `fib` — whose `n <= 1` comparison is a `Dyn` bool —
                 // compile as a leaf and recurse through a direct hardware call.
-                let cond = if proto.register_meta.get(first_reg).map(|m| m.kind)
-                    == Some(SlotKind::Bool)
-                {
-                    let v = b.use_var(vars[first_reg]);
-                    if b.func.dfg.value_type(v) == types::I128 {
-                        b.ins().isplit(v).1
+                let cond =
+                    if proto.register_meta.get(first_reg).map(|m| m.kind) == Some(SlotKind::Bool) {
+                        let v = b.use_var(vars[first_reg]);
+                        if b.func.dfg.value_type(v) == types::I128 {
+                            b.ins().isplit(v).1
+                        } else {
+                            v
+                        }
                     } else {
-                        v
-                    }
-                } else {
-                    match state[first_reg] {
-                        // A `Bool`/`Int` KIND may still live in a heap-classed
-                        // (`Dyn`) variable, which holds the whole tag+payload
-                        // `VmValue` pair after C1. The branch condition is the
-                        // payload word (0/1 bool, raw int); reading the pair
-                        // directly makes every `brif` unconditionally true.
-                        K::Bool | K::Int => {
-                            let v = b.use_var(vars[first_reg]);
-                            if b.func.dfg.value_type(v) == types::I128 {
-                                b.ins().isplit(v).1
-                            } else {
-                                v
+                        match state[first_reg] {
+                            // A `Bool`/`Int` KIND may still live in a heap-classed
+                            // (`Dyn`) variable, which holds the whole tag+payload
+                            // `VmValue` pair after C1. The branch condition is the
+                            // payload word (0/1 bool, raw int); reading the pair
+                            // directly makes every `brif` unconditionally true.
+                            K::Bool | K::Int => {
+                                let v = b.use_var(vars[first_reg]);
+                                if b.func.dfg.value_type(v) == types::I128 {
+                                    b.ins().isplit(v).1
+                                } else {
+                                    v
+                                }
                             }
-                        }
-                        k if is_boxed_kind(k) => {
-                            let v = if let Some(ref actx) = actx {
-                                alloc::box_or_load_home(&mut b, actx, &state, first_reg)
-                            } else {
-                                box_or_pass(&mut b, &vars, &state, first_reg)
-                            };
-                            emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
-                        }
-                        _ => {
-                            if meta_is_int(&proto.register_meta, first_reg) {
-                                b.use_var(vars[first_reg])
-                            } else {
+                            k if is_boxed_kind(k) => {
                                 let v = if let Some(ref actx) = actx {
                                     alloc::box_or_load_home(&mut b, actx, &state, first_reg)
                                 } else {
@@ -495,9 +482,20 @@ pub(super) fn lower_raw(
                                 };
                                 emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
                             }
+                            _ => {
+                                if meta_is_int(&proto.register_meta, first_reg) {
+                                    b.use_var(vars[first_reg])
+                                } else {
+                                    let v = if let Some(ref actx) = actx {
+                                        alloc::box_or_load_home(&mut b, actx, &state, first_reg)
+                                    } else {
+                                        box_or_pass(&mut b, &vars, &state, first_reg)
+                                    };
+                                    emit_truthy_fast(&mut b, cc, exec_ctx, helpers.logical_not, v)
+                                }
+                            }
                         }
-                    }
-                };
+                    };
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target_ip = ip + 3 + off;
                 let target = blocks[&target_ip];

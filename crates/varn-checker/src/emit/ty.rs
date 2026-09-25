@@ -106,7 +106,8 @@ fn lower_kind(
         // container itself is a known reference type, not `Dynamic` — this is
         // what lets `m.get(k)` reach `CallNativeOp` and `.size` a typed read.
         TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Map.name() && table.get_list(args).len() == 2 =>
+            if interner.resolve(name) == BuiltinType::Map.name()
+                && table.get_list(args).len() == 2 =>
         {
             let arg_ids = table.get_list(args).to_vec();
             let k = lower_type(&Type(arg_ids[0], false), table, interner, tt, names);
@@ -114,9 +115,16 @@ fn lower_kind(
             BackendTy::Map(tt.intern(k), tt.intern(v))
         }
         TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Set.name() && table.get_list(args).len() == 1 =>
+            if interner.resolve(name) == BuiltinType::Set.name()
+                && table.get_list(args).len() == 1 =>
         {
-            let el = lower_type(&Type(table.get_list(args)[0], false), table, interner, tt, names);
+            let el = lower_type(
+                &Type(table.get_list(args)[0], false),
+                table,
+                interner,
+                tt,
+                names,
+            );
             BackendTy::Set(tt.intern(el))
         }
         TypeKind::Builtin(varn_core::BuiltinType::Map) => {
@@ -171,7 +179,9 @@ fn lower_kind(
         TypeKind::Object(members) => {
             let members = table.get_object_members(members);
             if members.len() == 1 {
-                if let crate::types::ObjectTypeMember::Index { key_ty, value_ty, .. } = &members[0]
+                if let crate::types::ObjectTypeMember::Index {
+                    key_ty, value_ty, ..
+                } = &members[0]
                 {
                     let k = lower_type(&Type(*key_ty, false), table, interner, tt, names);
                     let v = lower_type(&Type(*value_ty, false), table, interner, tt, names);
@@ -248,7 +258,10 @@ fn lower_union(
 ) -> BackendTy {
     let member_ids = table.get_list(members);
     let is_null = |id: &crate::types::CheckerTyId| {
-        matches!(table.get(*id), TypeKind::Primitive(varn_core::LangPrimitive::Null))
+        matches!(
+            table.get(*id),
+            TypeKind::Primitive(varn_core::LangPrimitive::Null)
+        )
     };
     let non_null: Vec<&crate::types::CheckerTyId> =
         member_ids.iter().filter(|id| !is_null(id)).collect();
@@ -297,7 +310,10 @@ mod tests {
             lower_type(&str_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Str
         );
-        let decimal_ty = intern(&mut ct, TypeKind::Primitive(varn_core::LangPrimitive::Decimal));
+        let decimal_ty = intern(
+            &mut ct,
+            TypeKind::Primitive(varn_core::LangPrimitive::Decimal),
+        );
         assert_eq!(
             lower_type(&decimal_ty, &ct, &interner, &mut tt, &NoNames),
             BackendTy::Decimal

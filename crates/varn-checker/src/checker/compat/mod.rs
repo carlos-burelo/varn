@@ -21,7 +21,10 @@ fn t(id: CheckerTyId) -> Type {
 }
 
 fn is_simple_type(ty: &Type, table: &CheckerTyTable) -> bool {
-    matches!(table.get(ty.0), TypeKind::Primitive(_) | TypeKind::Builtin(_))
+    matches!(
+        table.get(ty.0),
+        TypeKind::Primitive(_) | TypeKind::Builtin(_)
+    )
 }
 
 /// Scalar assignability. Only `int` widens implicitly, and only into the
@@ -106,7 +109,8 @@ fn array_element_type(
         TypeKind::Array(inner) => Some(Type(inner, false)),
         TypeKind::Generic(name, args, _)
             if table.get_list(args).len() == 1
-                && interner.is_some_and(|it| it.resolve(name) == varn_core::BuiltinType::Array.name()) =>
+                && interner
+                    .is_some_and(|it| it.resolve(name) == varn_core::BuiltinType::Array.name()) =>
         {
             Some(Type(table.get_list(args)[0], false))
         }
@@ -157,14 +161,13 @@ pub(crate) fn expr_satisfies_target_type(
         // `Array<Array<i8>>` recurses: the gate asks whether the element type is
         // narrow *or another array*, so nesting does not bail out one level in.
         let literal_elem = matches!(
-                table.get(elem_ty.0),
-                TypeKind::Primitive(
-                    varn_core::LangPrimitive::Float
-                        | varn_core::LangPrimitive::Decimal
-                        | varn_core::LangPrimitive::BigInt
-                )
+            table.get(elem_ty.0),
+            TypeKind::Primitive(
+                varn_core::LangPrimitive::Float
+                    | varn_core::LangPrimitive::Decimal
+                    | varn_core::LangPrimitive::BigInt
             )
-            || array_element_type(&elem_ty, table, interner).is_some();
+        ) || array_element_type(&elem_ty, table, interner).is_some();
         if literal_elem && !elements.is_empty() {
             return elements.iter().all(|el| match el {
                 ArrayEl::Expr(e) => {
@@ -315,9 +318,7 @@ pub(super) fn types_compatible_impl(
         (
             TypeKind::Primitive(_) | TypeKind::Builtin(_),
             TypeKind::Primitive(_) | TypeKind::Builtin(_),
-        ) => {
-            simple_types_compatible(declared, inferred, table)
-        }
+        ) => simple_types_compatible(declared, inferred, table),
         (TypeKind::Primitive(p), TypeKind::Literal(l)) => {
             use varn_core::LangPrimitive as P;
             let base = l.base();
@@ -848,7 +849,6 @@ fn m_ty(m: &crate::types::ClassMemberInfo) -> Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     /// Parses `let probe = <src>` and hands back the arena plus the
     /// initializer's `ExprId`. `expr_satisfies_target_type` is a pure
@@ -965,6 +965,10 @@ mod tests {
         let target = Type(table.intern(TypeKind::Object(members)), false);
         assert!(accepts(&target, &table, "{ xs: [1, 2], name: \"ok\" }"));
         assert!(!accepts(&target, &table, "{ xs: [1, 2], name: 42 }"));
-        assert!(!accepts(&target, &table, "{ xs: [9007199254740993], name: \"ok\" }"));
+        assert!(!accepts(
+            &target,
+            &table,
+            "{ xs: [9007199254740993], name: \"ok\" }"
+        ));
     }
 }

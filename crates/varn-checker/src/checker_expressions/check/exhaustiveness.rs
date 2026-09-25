@@ -18,7 +18,10 @@ impl<'r> Checker<'r> {
     ) {
         let catch_all = cases.iter().any(|c| {
             c.guard.is_none()
-                && matches!(c.pattern, MatchPattern::Wildcard | MatchPattern::Identifier(_))
+                && matches!(
+                    c.pattern,
+                    MatchPattern::Wildcard | MatchPattern::Identifier(_)
+                )
         });
         if !catch_all {
             let ty = subject_ty.display(&self.ty_table, &bind.interner);
@@ -261,8 +264,12 @@ fn pattern_covers(
             (TypeKind::Literal(TypeLiteral::Str(a)), ExprKind::StrLiteral { value }) => {
                 bind.interner.try_resolve(a) == Some(value.as_str())
             }
-            (TypeKind::Literal(TypeLiteral::Bool(b)), ExprKind::BoolLiteral { value }) => b == *value,
-            (TypeKind::Literal(TypeLiteral::Char(c)), ExprKind::CharLiteral { value }) => c == *value,
+            (TypeKind::Literal(TypeLiteral::Bool(b)), ExprKind::BoolLiteral { value }) => {
+                b == *value
+            }
+            (TypeKind::Literal(TypeLiteral::Char(c)), ExprKind::CharLiteral { value }) => {
+                c == *value
+            }
             (TypeKind::Literal(TypeLiteral::Int(v)), _) => {
                 crate::types::numeric_literal::const_int_value(arena, *e) == Some(v)
             }
@@ -277,8 +284,8 @@ fn pattern_covers(
                 kind => kind.lang_name() == Some(name),
             }
         }
-        MatchPattern::Record { .. } | MatchPattern::Sequence(_) | MatchPattern::EnumVariant { .. } => {
-            false
-        }
+        MatchPattern::Record { .. }
+        | MatchPattern::Sequence(_)
+        | MatchPattern::EnumVariant { .. } => false,
     }
 }

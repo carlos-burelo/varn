@@ -248,12 +248,7 @@ pub(crate) fn box_or_load_home(
     }
 }
 
-pub(crate) fn store_home(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    reg: usize,
-) {
+pub(crate) fn store_home(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], reg: usize) {
     let Some(&var) = actx.vars.get(reg) else {
         let null_val = super::super::emit::box_null(b);
         store_boxed_home(b, actx, reg, null_val);
@@ -349,12 +344,18 @@ pub(crate) fn emit_gc_poll(
     exec_ctx: cranelift_codegen::ir::Value,
     collect: impl FnOnce(&mut FunctionBuilder),
 ) {
-    let rcbox = b
-        .ins()
-        .load(types::I64, MemFlags::trusted(), exec_ctx, h.heap_field_offset as i32);
-    let len = b
-        .ins()
-        .load(types::I64, MemFlags::trusted(), rcbox, h.nursery_len_offset as i32);
+    let rcbox = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        exec_ctx,
+        h.heap_field_offset as i32,
+    );
+    let len = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        rcbox,
+        h.nursery_len_offset as i32,
+    );
     let over = b.ins().icmp_imm(
         IntCC::UnsignedGreaterThanOrEqual,
         len,
@@ -403,10 +404,7 @@ pub(crate) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
             .get(r)
             .map(|m| m.kind)
             .unwrap_or(varn_types::register_meta::SlotKind::Dynamic);
-        matches!(
-            SlotClass::of_kind(kind),
-            SlotClass::Ref | SlotClass::Dyn
-        )
+        matches!(SlotClass::of_kind(kind), SlotClass::Ref | SlotClass::Dyn)
     };
     let live_root = (0..actx.nregs)
         .filter(|&r| is_root_class(r))

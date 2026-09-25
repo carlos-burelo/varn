@@ -95,14 +95,22 @@ pub fn rem_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
 pub fn floor_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     let q = div_int(a, b)?;
     let inexact = a.wrapping_rem(b) != 0;
-    Ok(if inexact && ((a < 0) != (b < 0)) { q - 1 } else { q })
+    Ok(if inexact && ((a < 0) != (b < 0)) {
+        q - 1
+    } else {
+        q
+    })
 }
 
 /// `a / b` rounded toward positive infinity.
 pub fn ceil_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     let q = div_int(a, b)?;
     let inexact = a.wrapping_rem(b) != 0;
-    Ok(if inexact && ((a < 0) == (b < 0)) { q + 1 } else { q })
+    Ok(if inexact && ((a < 0) == (b < 0)) {
+        q + 1
+    } else {
+        q
+    })
 }
 
 /// Euclidean modulo: always in `0..|b|`.

@@ -21,7 +21,11 @@ fn declared_field_types_reach_the_layout() {
     assert_eq!(tag_of("loose"), Some(None));
 
     // Whether the collector has to trace a field follows from its type.
-    let gc_of = |name: &str| layout.get_field(name).map(|f| f.layout.repr.holds_reference());
+    let gc_of = |name: &str| {
+        layout
+            .get_field(name)
+            .map(|f| f.layout.repr.holds_reference())
+    };
     assert_eq!(gc_of("x"), Some(false));
     assert_eq!(gc_of("label"), Some(true));
 }

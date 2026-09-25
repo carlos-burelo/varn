@@ -131,7 +131,11 @@ impl ExecCtx {
                     format!("{:#x}/{:#x}{k}", v.raw_tag(), v.raw_payload())
                 })
                 .collect();
-            eprintln!("INVOKE_NATIVE {name} f={:#x} nargs={} {kinds:?}", f as usize, args.len());
+            eprintln!(
+                "INVOKE_NATIVE {name} f={:#x} nargs={} {kinds:?}",
+                f as usize,
+                args.len()
+            );
         }
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);

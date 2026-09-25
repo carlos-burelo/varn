@@ -80,16 +80,9 @@ impl RuntimeKind {
             "Bytes" => Some(Self::Bytes),
             "enum" => Some(Self::Enum),
 
-
-
-
-
-
-
             _ => None,
         }
     }
-
 }
 
 pub trait VmValuePayload: std::fmt::Debug + std::any::Any {
@@ -141,7 +134,11 @@ impl FieldAccess {
         match self {
             Self::Slot => 0,
             Self::Compact(kind) => {
-                debug_assert_ne!(kind, Some(RuntimeKind::Null), "a field is never laid out as null");
+                debug_assert_ne!(
+                    kind,
+                    Some(RuntimeKind::Null),
+                    "a field is never laid out as null"
+                );
                 RuntimeKind::encode(kind)
             }
         }

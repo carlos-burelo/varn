@@ -370,7 +370,9 @@ impl FunctionProto {
     /// Checks if this constructor proto is a trivial field-initializer:
     /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
     /// instructions ending in Return.
-    pub fn trivial_field_init_plan(&self) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
+    pub fn trivial_field_init_plan(
+        &self,
+    ) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
         if let Some(ref cached) = *self.trivial_init_memo.borrow() {
             return cached.clone();
         }
@@ -379,7 +381,9 @@ impl FunctionProto {
         plan
     }
 
-    fn compute_trivial_field_init_plan(&self) -> Option<Vec<(usize, u32, Option<varn_core::RuntimeKind>)>> {
+    fn compute_trivial_field_init_plan(
+        &self,
+    ) -> Option<Vec<(usize, u32, Option<varn_core::RuntimeKind>)>> {
         if self.is_async || self.is_generator || self.has_rest || self.upvalue_count > 0 {
             return None;
         }

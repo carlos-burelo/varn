@@ -147,7 +147,10 @@ pub(super) fn emit_self_call_framed(
     values: &[Option<Value>],
     args: &[u32],
 ) -> Result<Value, String> {
-    let frame = ctx.frame.as_ref().ok_or("from_ssa: framed self-call without a frame")?;
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: framed self-call without a frame")?;
     if args.len() + 1 != ctx.proto.arity {
         return Err("from_ssa: self-call arity mismatch".into());
     }
@@ -179,7 +182,10 @@ pub(super) fn emit_call_native_op(
     args: &[u32],
     op_id: u64,
 ) -> Result<Value, String> {
-    let frame = ctx.frame.as_ref().ok_or("from_ssa: native call without a frame")?;
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: native call without a frame")?;
     let receiver = super::heap::boxed_value(b, ctx, values, object)?;
     // `charCodeAt`/`codePointAt`: the dedicated helper, as the bytecode
     // lowering's unhoisted path — no argument window, no marshal.

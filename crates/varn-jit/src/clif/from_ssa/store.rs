@@ -119,11 +119,7 @@ pub(super) fn def_heap(
 }
 
 /// Read a boxed heap value back from `reg`'s home.
-pub(super) fn use_heap(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    reg: u32,
-) -> Result<Value, String> {
+pub(super) fn use_heap(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
     Ok(homes(ctx)?.load(b, reg as usize))
 }
 
@@ -136,4 +132,3 @@ pub(super) fn clif_ty(kind: SlotKind) -> Option<cranelift_codegen::ir::Type> {
         SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => Some(types::I128),
     }
 }
-

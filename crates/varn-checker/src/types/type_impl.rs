@@ -39,13 +39,9 @@ impl Type {
                 P::Str => Type::Str,
                 P::Bool => Type::Bool,
                 P::Char => Type::Char,
-                P::Null
-                | P::Float
-                | P::BigInt
-                | P::Decimal
-                | P::Void
-                | P::Never
-                | P::Dynamic => Type::Dynamic,
+                P::Null | P::Float | P::BigInt | P::Decimal | P::Void | P::Never | P::Dynamic => {
+                    Type::Dynamic
+                }
             }
         }
         match table.get(self.0) {
@@ -70,9 +66,22 @@ impl Type {
 
     /// `Range<T>` over the domain of a range bound: `char` bounds make a
     /// `Range<char>`, every other bound a `Range<int>`.
-    pub fn range_over(bound: &Type, resolver: &dyn ImportResolver, table: &mut CheckerTyTable) -> Self {
-        let elem = if bound.apparent(table) == Type::Char { Type::Char } else { Type::Int };
-        Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], resolver, table)
+    pub fn range_over(
+        bound: &Type,
+        resolver: &dyn ImportResolver,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        let elem = if bound.apparent(table) == Type::Char {
+            Type::Char
+        } else {
+            Type::Int
+        };
+        Type::generic(
+            varn_core::BuiltinType::Range.name(),
+            vec![elem],
+            resolver,
+            table,
+        )
     }
 
     /// `Range` or `Range<T>`.
@@ -292,7 +301,9 @@ impl Type {
                 | varn_core::LangPrimitive::Never
                 | varn_core::LangPrimitive::Dynamic => None,
             },
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Some(varn_core::BuiltinType::Bytes.name()),
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
+                Some(varn_core::BuiltinType::Bytes.name())
+            }
             TypeKind::Array(_) => Some(varn_core::BuiltinType::Array.name()),
             _ => None,
         }
@@ -318,7 +329,10 @@ impl Type {
     /// (canonical bytes, ADR-0008); main callers using `is_bytes()` with no
     /// args must pass the table.
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
-        matches!(table.get(self.0), TypeKind::Builtin(varn_core::BuiltinType::Bytes))
+        matches!(
+            table.get(self.0),
+            TypeKind::Builtin(varn_core::BuiltinType::Bytes)
+        )
     }
 
     pub fn is_nullable(&self, table: &CheckerTyTable) -> bool {

@@ -250,7 +250,8 @@ impl<'r> Checker<'r> {
                 let right_kind = self.ty_table.get(right_ty.0);
                 let elem_ty = match right_kind {
                     TypeKind::Array(inner) => Type(inner, false),
-                    TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
+                    TypeKind::Primitive(varn_core::LangPrimitive::Str)
+                    | TypeKind::TemplateLiteral(_) => Type::Char,
                     TypeKind::Named(name, _)
                         if bind.interner.get(varn_core::LangPrimitive::Str.name())
                             == Some(name) =>
@@ -258,8 +259,7 @@ impl<'r> Checker<'r> {
                         Type::Char
                     }
                     TypeKind::Generic(name, args, _)
-                        if bind.interner.get(varn_core::BuiltinType::Map.name())
-                            == Some(name)
+                        if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();

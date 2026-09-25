@@ -155,8 +155,8 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         Binary { op, ty, .. } => {
             let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
-            let int_can_overflow = *ty == HirType::Int
-                && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
+            let int_can_overflow =
+                *ty == HirType::Int && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
             // Div/Mod/Pow raise on zero divisor and negative exponent.
             let never_traps = matches!(
                 op,

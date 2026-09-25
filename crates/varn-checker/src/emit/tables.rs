@@ -127,18 +127,20 @@ pub fn build(
     // A foreign enum's payload types live in its own module's table, which
     // this one cannot read: the fields are erased to `Dynamic`, the tags come
     // from the declaring module's layout.
-    enums.extend(foreign.iter().map(|f| EnumInfo {
-        name: f.name.clone(),
-        variants: f
-            .variants
-            .iter()
-            .enumerate()
-            .map(|(tag, (name, fields))| VariantInfo {
-                name: name.clone(),
-                tag: tag as u16,
-                payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
-            })
-            .collect(),
+    enums.extend(foreign.iter().map(|f| {
+        EnumInfo {
+            name: f.name.clone(),
+            variants: f
+                .variants
+                .iter()
+                .enumerate()
+                .map(|(tag, (name, fields))| VariantInfo {
+                    name: name.clone(),
+                    tag: tag as u16,
+                    payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
+                })
+                .collect(),
+        }
     }));
 
     Tables {
@@ -164,9 +166,22 @@ fn build_classes(
     // `class_names` (sorted); the build follows the `extends` chain.
     let mut built: Vec<Option<ClassInfo>> = vec![None; class_names.len()];
     for i in 0..class_names.len() {
-        build_with_parents(bind, table, interner, tt, names, class_names, i, signatures, &mut built);
+        build_with_parents(
+            bind,
+            table,
+            interner,
+            tt,
+            names,
+            class_names,
+            i,
+            signatures,
+            &mut built,
+        );
     }
-    built.into_iter().map(|c| c.expect("every class is built")).collect()
+    built
+        .into_iter()
+        .map(|c| c.expect("every class is built"))
+        .collect()
 }
 
 /// Builds class `i` after its local ancestors. A cycle in `extends` (reported
@@ -199,8 +214,16 @@ fn build_with_parents(
     }
     for &c in chain.iter().rev() {
         if built[c].is_none() {
-            let info =
-                build_one_class(bind, table, interner, tt, names, &class_names[c], signatures, built);
+            let info = build_one_class(
+                bind,
+                table,
+                interner,
+                tt,
+                names,
+                &class_names[c],
+                signatures,
+                built,
+            );
             built[c] = Some(info);
         }
     }
@@ -294,7 +317,9 @@ fn build_one_class(
             // The flattened list holds the parent's constructor first; the
             // last one is the class's own.
             ClassMemberKind::Constructor => {
-                constructor = Some(intern_signature(&m.ty, table, interner, tt, names, signatures));
+                constructor = Some(intern_signature(
+                    &m.ty, table, interner, tt, names, signatures,
+                ));
             }
             ClassMemberKind::Getter => {
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);

@@ -2,8 +2,8 @@ mod binary_ops;
 mod calls;
 mod contextual;
 mod exhaustiveness;
-mod operator_capability;
 pub(crate) mod members;
+mod operator_capability;
 
 use super::helpers::closest_in_list;
 use crate::binder::BindResult;

@@ -8,9 +8,9 @@
 //! collection), not in the heap's interners.
 
 use super::ctx::ExecCtx;
+use crate::error::{RuntimeError, VmResult};
 use crate::heap::HeapObj;
 use crate::value::VmValue;
-use crate::error::{RuntimeError, VmResult};
 
 impl ExecCtx {
     /// The representative `key` stands for, or `key` itself when it is not an
@@ -20,9 +20,10 @@ impl ExecCtx {
         let Some(class_id) = self.instance_class_id(key) else {
             return Ok(key);
         };
-        let (Some(hash_fn), Some(equals_fn)) =
-            (self.bound_method(key, "hash"), self.bound_method(key, "equals"))
-        else {
+        let (Some(hash_fn), Some(equals_fn)) = (
+            self.bound_method(key, "hash"),
+            self.bound_method(key, "equals"),
+        ) else {
             return Ok(key);
         };
         let hash = self.invoke(hash_fn, &[hash_fn])?;
@@ -30,7 +31,11 @@ impl ExecCtx {
             return Err(RuntimeError::new("hash() must return int"));
         }
         let bucket_key = (class_id, hash.as_int());
-        let candidates = self.hashable_keys.get(&bucket_key).cloned().unwrap_or_default();
+        let candidates = self
+            .hashable_keys
+            .get(&bucket_key)
+            .cloned()
+            .unwrap_or_default();
         for rep in candidates {
             if rep == key {
                 return Ok(rep);

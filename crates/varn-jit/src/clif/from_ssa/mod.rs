@@ -57,9 +57,7 @@ mod scalar;
 mod store;
 mod term;
 
-use store::{
-    clif_ty, def_heap, is_heap, land, load_value, use_heap, Out,
-};
+use store::{clif_ty, def_heap, is_heap, land, load_value, use_heap, Out};
 
 /// Frame resources a frame-aware body needs for global access, calls and home
 /// storage. `base` is the activation id (raw ABI param 2).
@@ -126,14 +124,12 @@ pub(super) fn try_lower(
         || proto.has_this
         || ssa.has_this
         || ssa.blocks.iter().any(|blk| {
-            blk.insts
-                .iter()
-                .any(|i| {
-                    matches!(
-                        i.op,
-                        SsaOp::Call { .. } | SsaOp::CallNativeOp { .. } | SsaOp::LoadGlobalIdx(_)
-                    )
-                })
+            blk.insts.iter().any(|i| {
+                matches!(
+                    i.op,
+                    SsaOp::Call { .. } | SsaOp::CallNativeOp { .. } | SsaOp::LoadGlobalIdx(_)
+                )
+            })
         });
 
     let cc = isa.default_call_conv();

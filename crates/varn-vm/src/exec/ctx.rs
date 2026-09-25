@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::{ModuleId};
+use varn_core::ModuleId;
 use varn_types::{FunctionProto, NativeCtx};
 
 use crate::linker::Linker;

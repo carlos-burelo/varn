@@ -91,7 +91,10 @@ pub(super) fn emit_un(
     Ok(match op {
         DynUnOp::Neg => {
             call_helper_void(b, ctx.cc, h.negate, &[ectx, tag, payload]);
-            Out::Boxed(b.ins().load(types::I128, MemFlags::trusted(), ectx, result_off))
+            Out::Boxed(
+                b.ins()
+                    .load(types::I128, MemFlags::trusted(), ectx, result_off),
+            )
         }
         DynUnOp::Not => {
             let cond = call_helper(b, ctx.cc, h.logical_not, &[ectx, tag, payload]);
@@ -102,7 +105,15 @@ pub(super) fn emit_un(
             let minus_one = b.ins().iconst(types::I64, -1);
             let boxed = box_int(b, minus_one);
             let m1 = b.ins().isplit(boxed);
-            Out::Boxed(boxed_binop(b, ctx.cc, h.bit_xor, ectx, result_off, (tag, payload), m1))
+            Out::Boxed(boxed_binop(
+                b,
+                ctx.cc,
+                h.bit_xor,
+                ectx,
+                result_off,
+                (tag, payload),
+                m1,
+            ))
         }
     })
 }

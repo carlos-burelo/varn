@@ -12,7 +12,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::Ctx;
 
-pub(super) fn emit_load(b: &mut FunctionBuilder, ctx: &Ctx<'_>, slot: u32) -> Result<Value, String> {
+pub(super) fn emit_load(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    slot: u32,
+) -> Result<Value, String> {
     let frame = ctx
         .frame
         .as_ref()

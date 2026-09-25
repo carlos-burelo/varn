@@ -30,7 +30,6 @@ pub(super) fn resolve_mapped(
     };
 
     if keys.is_empty() {
-        
         let key_ty = match table.get(source.0) {
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Some(Type::Str),
             TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(Type::Int),

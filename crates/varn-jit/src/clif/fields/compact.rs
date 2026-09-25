@@ -169,7 +169,14 @@ pub(crate) fn store_compact(
         b,
         io.cc,
         io.helpers.set_fixed_field,
-        &[io.exec_ctx, obj_tag, obj_payload, slot_v, value_tag, payload],
+        &[
+            io.exec_ctx,
+            obj_tag,
+            obj_payload,
+            slot_v,
+            value_tag,
+            payload,
+        ],
     );
     b.ins().jump(cont, &[]);
 

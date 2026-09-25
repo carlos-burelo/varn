@@ -402,7 +402,9 @@ pub(crate) fn collect_type_inferences(
 }
 
 fn is_generic_possible(ty: &Type, table: &CheckerTyTable) -> bool {
-    !matches!(table.get(ty.0), TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This
+    !matches!(
+        table.get(ty.0),
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This
     )
 }
 

@@ -18,9 +18,7 @@
 //! intrinsics that ARE a single ISA instruction, keeping them out of the
 //! generic `dispatch_intrinsic` helper (and its register flush/reload).
 
-use cranelift_codegen::ir::{
-    condcodes::FloatCC, types, InstBuilder, MemFlags, Value,
-};
+use cranelift_codegen::ir::{condcodes::FloatCC, types, InstBuilder, MemFlags, Value};
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::intrinsic_ops::math::MathOp;

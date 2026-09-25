@@ -118,36 +118,58 @@ pub enum SsaOp {
     LoadGlobalIdx(u32),
 
     /// Checker-proven, representation-neutral cast.
-    Cast { operand: u32 },
+    Cast {
+        operand: u32,
+    },
     /// Numeric conversion (`as`) that changes representation.
-    Convert { operand: u32, conv: varn_core::NumConv },
+    Convert {
+        operand: u32,
+        conv: varn_core::NumConv,
+    },
 
-
-    IsNull { operand: u32 },
+    IsNull {
+        operand: u32,
+    },
 
     /// `typeof x` — a heap string result.
-    Typeof { operand: u32 },
+    Typeof {
+        operand: u32,
+    },
 
     /// `String(x)` — a heap string result.
-    ToString { operand: u32 },
+    ToString {
+        operand: u32,
+    },
 
     /// Runtime array test; a `bool` result.
-    IsArray { operand: u32 },
+    IsArray {
+        operand: u32,
+    },
 
     /// Enum discriminant of `operand`; an `int` result.
-    GetEnumTag { operand: u32 },
+    GetEnumTag {
+        operand: u32,
+    },
 
     /// Own enumerable keys of `operand`; a heap array result.
-    ObjectKeys { operand: u32 },
+    ObjectKeys {
+        operand: u32,
+    },
 
     /// Interpolated string from `parts`; a heap string result.
-    BuildStr { parts: Vec<u32> },
+    BuildStr {
+        parts: Vec<u32>,
+    },
 
     /// Array literal from `elements`; a heap array result.
-    BuildArray { elements: Vec<u32> },
+    BuildArray {
+        elements: Vec<u32>,
+    },
 
     /// Map literal from `pairs`; a heap map result.
-    BuildMap { pairs: Vec<(u32, u32)> },
+    BuildMap {
+        pairs: Vec<(u32, u32)>,
+    },
 
     /// Object/record literal from `keys`/`values`; a heap result. The shape is
     /// resolved from the proto's pool by key match at lowering time.
@@ -173,16 +195,27 @@ pub enum SsaOp {
     },
 
     /// `obj[index]` — a heap result.
-    GetIndex { object: u32, index: u32 },
+    GetIndex {
+        object: u32,
+        index: u32,
+    },
 
     /// `obj[index] = value` — no result.
-    SetIndex { object: u32, index: u32, value: u32 },
+    SetIndex {
+        object: u32,
+        index: u32,
+        value: u32,
+    },
 
     /// `arr.length` — an `int` result.
-    ArrayLength { operand: u32 },
+    ArrayLength {
+        operand: u32,
+    },
 
     /// `s.length` of a `str` — an `int` result (no allocation).
-    StrLength { operand: u32 },
+    StrLength {
+        operand: u32,
+    },
 
     /// A core-type method the checker resolved to a native op: `op_id`
     /// called with the receiver `object` then `args`; a boxed result.
@@ -193,7 +226,10 @@ pub enum SsaOp {
     },
 
     /// `arr.push(value)` — no result.
-    ArrayPush { array: u32, value: u32 },
+    ArrayPush {
+        array: u32,
+        value: u32,
+    },
 
     /// The current receiver (`this`), read from home 0; a heap result.
     This,
@@ -243,7 +279,9 @@ pub enum SsaOp {
     },
 
     /// `GetSuper name` — a heap result.
-    GetSuper { name: Box<str> },
+    GetSuper {
+        name: Box<str>,
+    },
 }
 
 /// Binary operations, already specialized to a physical domain.

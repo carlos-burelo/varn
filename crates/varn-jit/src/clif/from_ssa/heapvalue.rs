@@ -10,8 +10,8 @@ use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::SsaOp;
 
-use super::{classops, globals, heap, load_value, props, Ctx, Out};
 use super::super::emit::unbox_int;
+use super::{classops, globals, heap, load_value, props, Ctx, Out};
 
 /// Emit a heap instruction. `Ok(None)` means `op` is not a heap instruction
 /// and the caller's scalar path must handle it.
@@ -136,7 +136,9 @@ pub(super) fn emit(
             let d = dest.ok_or("from_ssa: get_property without dest")?;
             let dest_reg = ctx.ssa.reg(d);
             // The IC helper writes the destination's home itself.
-            Out::Landed(props::emit_get_property(b, ctx, values, *object, name, *cs, dest_reg)?)
+            Out::Landed(props::emit_get_property(
+                b, ctx, values, *object, name, *cs, dest_reg,
+            )?)
         }
         SsaOp::MakeClass { name, super_class } => {
             let boxed = classops::emit_make_class(b, ctx, values, name, *super_class)?;
@@ -160,8 +162,7 @@ pub(super) fn emit(
         }
         SsaOp::IsArray { operand } => Out::Native(heap::emit_is_array(b, ctx, values, *operand)?),
         SsaOp::GetEnumTag { operand } => {
-            let boxed =
-                heap::emit_unary_boxed(b, ctx, values, *operand, ctx.helpers.get_enum_tag)?;
+            let boxed = heap::emit_unary_boxed(b, ctx, values, *operand, ctx.helpers.get_enum_tag)?;
             Out::Native(unbox_int(b, boxed))
         }
         SsaOp::ArrayLength { operand } => {
@@ -190,11 +191,7 @@ pub(super) fn emit(
 /// A string literal's resolved `VmValue`, found in the proto's pool (1:1 with
 /// the resolved constants). Interned, so the handle is the same one the
 /// bytecode `LoadConst` would bake.
-fn const_str(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    s: &str,
-) -> Result<Value, String> {
+fn const_str(b: &mut FunctionBuilder, ctx: &Ctx<'_>, s: &str) -> Result<Value, String> {
     use varn_types::{Literal, PoolEntry};
     let idx = ctx
         .proto
@@ -207,7 +204,9 @@ fn const_str(
         .constants
         .get(idx)
         .ok_or("from_ssa: unresolved string constant")?;
-    let tag = b.ins().iconst(cranelift_codegen::ir::types::I64, cv.raw_tag() as i64);
+    let tag = b
+        .ins()
+        .iconst(cranelift_codegen::ir::types::I64, cv.raw_tag() as i64);
     let payload = b
         .ins()
         .iconst(cranelift_codegen::ir::types::I64, cv.raw_payload() as i64);

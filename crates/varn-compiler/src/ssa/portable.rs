@@ -115,25 +115,15 @@ fn project_inst(
             op: HirUnOp::Typeof,
             operand,
             ..
-        } => SsaOp::Typeof {
-            operand: operand.0,
-        },
+        } => SsaOp::Typeof { operand: operand.0 },
         InstKind::Unary { op, operand, .. } => SsaOp::Unary {
             op: project_un(*op, value_tys.get(operand.0 as usize).copied())?,
             operand: operand.0,
         },
-        InstKind::IsArray { operand } => SsaOp::IsArray {
-            operand: operand.0,
-        },
-        InstKind::ToString { operand } => SsaOp::ToString {
-            operand: operand.0,
-        },
-        InstKind::ObjectKeys { operand } => SsaOp::ObjectKeys {
-            operand: operand.0,
-        },
-        InstKind::GetEnumTag { operand } => SsaOp::GetEnumTag {
-            operand: operand.0,
-        },
+        InstKind::IsArray { operand } => SsaOp::IsArray { operand: operand.0 },
+        InstKind::ToString { operand } => SsaOp::ToString { operand: operand.0 },
+        InstKind::ObjectKeys { operand } => SsaOp::ObjectKeys { operand: operand.0 },
+        InstKind::GetEnumTag { operand } => SsaOp::GetEnumTag { operand: operand.0 },
         InstKind::BuildStr { parts } => SsaOp::BuildStr {
             parts: parts.iter().map(|v| v.0).collect(),
         },
@@ -272,16 +262,12 @@ fn project_inst(
         InstKind::SelfCall { args } => SsaOp::SelfCall {
             args: args.iter().map(|v| v.0).collect(),
         },
-        InstKind::Cast { operand, .. } => SsaOp::Cast {
-            operand: operand.0,
-        },
+        InstKind::Cast { operand, .. } => SsaOp::Cast { operand: operand.0 },
         InstKind::Convert { operand, conv } => SsaOp::Convert {
             operand: operand.0,
             conv: *conv,
         },
-        InstKind::IsNull { operand } => SsaOp::IsNull {
-            operand: operand.0,
-        },
+        InstKind::IsNull { operand } => SsaOp::IsNull { operand: operand.0 },
         // Calls, heap ops, closures, classes, suspension: outside the family.
         _ => return None,
     };
@@ -323,7 +309,11 @@ fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
     let ty = |v: &crate::ssa::ir::Value| value_tys.get(v.0 as usize).copied();
     match kind {
         InstKind::Binary { op, lhs, rhs, .. } => {
-            format!("no portable form for {op:?} on {:?} and {:?}", ty(lhs), ty(rhs))
+            format!(
+                "no portable form for {op:?} on {:?} and {:?}",
+                ty(lhs),
+                ty(rhs)
+            )
         }
         InstKind::Unary { op, operand, .. } => {
             format!("no portable form for {op:?} on {:?}", ty(operand))

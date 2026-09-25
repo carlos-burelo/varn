@@ -20,8 +20,11 @@ impl IcSlots {
     /// Numbers the sites of `ssa`, walking blocks in `order` (the emission
     /// order).
     pub(crate) fn number(ssa: &SsaFunc, order: &[usize]) -> Result<Self, OptError> {
-        let mut slots: Vec<Vec<Option<u8>>> =
-            ssa.blocks.iter().map(|b| vec![None; b.insts.len()]).collect();
+        let mut slots: Vec<Vec<Option<u8>>> = ssa
+            .blocks
+            .iter()
+            .map(|b| vec![None; b.insts.len()])
+            .collect();
         let mut count: u16 = 0;
         for &b in order {
             for (i, inst) in ssa.blocks[b].insts.iter().enumerate() {

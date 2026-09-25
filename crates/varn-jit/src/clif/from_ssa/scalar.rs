@@ -51,7 +51,9 @@ pub(super) fn emit_inst(
             let to = dest_ty.ok_or("from_ssa: cast without dest")?;
             let a = load_value(b, ctx, values, *operand)?;
             return Ok(Some(match (from, to) {
-                (SlotKind::Int, SlotKind::Float) => Out::Native(b.ins().fcvt_from_sint(types::F64, a)),
+                (SlotKind::Int, SlotKind::Float) => {
+                    Out::Native(b.ins().fcvt_from_sint(types::F64, a))
+                }
                 (SlotKind::Int, SlotKind::Int)
                 | (SlotKind::Float, SlotKind::Float)
                 | (SlotKind::Bool, SlotKind::Bool) => Out::Native(a),
@@ -67,11 +69,19 @@ pub(super) fn emit_inst(
             op: SsaBinOp::Dyn(op),
             lhs,
             rhs,
-        } => return Ok(Some(dynop::emit_bin(b, ctx, values, *op, *lhs, *rhs, dest_ty)?)),
+        } => {
+            return Ok(Some(dynop::emit_bin(
+                b, ctx, values, *op, *lhs, *rhs, dest_ty,
+            )?))
+        }
         SsaOp::Unary {
             op: SsaUnOp::Dyn(op),
             operand,
-        } => return Ok(Some(dynop::emit_un(b, ctx, values, *op, *operand, dest_ty)?)),
+        } => {
+            return Ok(Some(dynop::emit_un(
+                b, ctx, values, *op, *operand, dest_ty,
+            )?))
+        }
         SsaOp::Binary { op, lhs, rhs } => {
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
@@ -120,7 +130,6 @@ pub(super) fn emit_inst(
                 dest,
             )?))
         }
-
 
         // Handled by `heapvalue` above.
         SsaOp::ConstNull

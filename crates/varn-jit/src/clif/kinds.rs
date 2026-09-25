@@ -166,7 +166,16 @@ pub(crate) fn kind_flow(
                 }
                 OpCode::Return => break,
                 _ => {
-                    apply_kinds(&mut state, code, pool, ip, op, constants, meta, _return_kind);
+                    apply_kinds(
+                        &mut state,
+                        code,
+                        pool,
+                        ip,
+                        op,
+                        constants,
+                        meta,
+                        _return_kind,
+                    );
                 }
             }
             ip += info.len;

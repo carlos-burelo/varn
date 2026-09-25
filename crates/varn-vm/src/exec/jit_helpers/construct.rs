@@ -24,7 +24,6 @@ pub(crate) unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::Run
     panic!("JIT error: no jump buffer");
 }
 
-
 pub(crate) extern "C" fn jit_alloc_instance_fast(
     ctx: *mut ExecCtx,
     class_id: u32,

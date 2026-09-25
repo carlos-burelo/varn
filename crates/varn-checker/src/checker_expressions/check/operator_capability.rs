@@ -39,11 +39,17 @@ impl Checker<'_> {
                 params,
                 return_type,
                 ..
-            } => (params.first().map(|p| Type(p.ty, false)), Type(return_type, false)),
+            } => (
+                params.first().map(|p| Type(p.ty, false)),
+                Type(return_type, false),
+            ),
             ObjectTypeMember::Property { ty, .. } => match self.ty_table.get(ty) {
                 TypeKind::Fn(fid) => {
                     let ft = self.ty_table.get_function(fid);
-                    (ft.params.first().map(|p| Type(p.ty, false)), Type(ft.return_type, false))
+                    (
+                        ft.params.first().map(|p| Type(p.ty, false)),
+                        Type(ft.return_type, false),
+                    )
                 }
                 _ => return None,
             },
@@ -75,8 +81,10 @@ impl Checker<'_> {
         let l_ty = self.infer_type(left, bind);
         let r_ty = self.infer_type(right, bind);
         // `x == null` stays the null test.
-        if matches!(method.shape, OperatorShape::Equals | OperatorShape::NotEquals)
-            && r_ty == Type::Null
+        if matches!(
+            method.shape,
+            OperatorShape::Equals | OperatorShape::NotEquals
+        ) && r_ty == Type::Null
         {
             return false;
         }

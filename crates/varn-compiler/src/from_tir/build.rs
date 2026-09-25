@@ -270,11 +270,8 @@ impl<'m> Builder<'m> {
             .iter()
             .map(|f| (f.name.clone(), field_kind(f.ty, &self.tir.types)))
             .collect();
-        let layout = varn_types::class_layout::ClassLayout::from_fields(
-            ci.name.as_ref(),
-            0,
-            &fields,
-        );
+        let layout =
+            varn_types::class_layout::ClassLayout::from_fields(ci.name.as_ref(), 0, &fields);
         let f = layout.get_field_by_index(slot as usize)?;
         Some((f.offset, f.kind))
     }
@@ -689,7 +686,9 @@ impl<'m> Builder<'m> {
                 let d = s.parse().unwrap_or_default();
                 Ok(self.emit(InstKind::ConstDecimal(d), HirType::Dynamic))
             }
-            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(n.clone()), HirType::Dynamic)),
+            TirExprKind::BigIntLit(n) => {
+                Ok(self.emit(InstKind::ConstBigInt(n.clone()), HirType::Dynamic))
+            }
             TirExprKind::RangeLit {
                 start,
                 end,
@@ -2065,7 +2064,9 @@ fn build_inner(
         // A `bigint`/`decimal` parameter may arrive as an `int` (the implicit
         // widening happens at the call site's type level only).
         let v = match (*pty, defaulted[i]) {
-            (BackendTy::BigInt | BackendTy::Decimal, false) => b.widen_exact(v, BackendTy::Int, *pty),
+            (BackendTy::BigInt | BackendTy::Decimal, false) => {
+                b.widen_exact(v, BackendTy::Int, *pty)
+            }
             _ => v,
         };
         b.write_var(VarId::Param(i as u32), entry, v);

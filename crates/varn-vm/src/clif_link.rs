@@ -290,13 +290,13 @@ impl ClifLinker for CtxLinker {
                         .downcast_ref::<crate::closure::VmClosurePayload>()?;
                     wrapper.0.proto.trivial_field_init_plan().map(|p| {
                         p.iter()
-                            .map(|&(param_idx, offset, tag)| {
-                                varn_jit::clif::lower::ClifFieldInit {
+                            .map(
+                                |&(param_idx, offset, tag)| varn_jit::clif::lower::ClifFieldInit {
                                     param_idx,
                                     offset,
                                     repr: varn_types::layout::TypeLayout::of_field(tag).repr,
-                                }
-                            })
+                                },
+                            )
                             .collect()
                     })
                 }

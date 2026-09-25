@@ -54,7 +54,9 @@ pub(super) fn emit_get_fixed_field(
             kind,
             slot,
         ),
-        varn_core::FieldAccess::Slot => slot::emit_get(b, c, actx, state, ip, first_reg, obj_r, slot),
+        varn_core::FieldAccess::Slot => {
+            slot::emit_get(b, c, actx, state, ip, first_reg, obj_r, slot)
+        }
     }
 }
 

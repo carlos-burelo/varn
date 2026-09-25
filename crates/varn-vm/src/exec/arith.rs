@@ -113,7 +113,9 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         if a_is_str || b_is_str {
             return Ok(crate::exec::strings::str_concat(a, b, heap));
         }
-        if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Add, a, b, heap) {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Add, a, b, heap)
+        {
             return r;
         }
 
@@ -134,7 +136,9 @@ pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         };
     }
     if a.is_heap() || b.is_heap() {
-        if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Sub, a, b, heap) {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Sub, a, b, heap)
+        {
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
@@ -154,7 +158,9 @@ pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         };
     }
     if a.is_heap() || b.is_heap() {
-        if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Mul, a, b, heap) {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Mul, a, b, heap)
+        {
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
@@ -173,7 +179,9 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             .map_err(|f| int_div_fault(f, "/", x, y));
     }
     if a.is_heap() || b.is_heap() {
-        if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Div, a, b, heap) {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Div, a, b, heap)
+        {
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
@@ -197,7 +205,9 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
             .map_err(|f| int_div_fault(f, "%", x, y));
     }
     if a.is_heap() || b.is_heap() {
-        if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Rem, a, b, heap) {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Rem, a, b, heap)
+        {
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
@@ -224,7 +234,8 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             None => Err(overflow("**", base, exp)),
         };
     }
-    if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Pow, a, b, heap) {
+    if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Pow, a, b, heap)
+    {
         return r;
     }
     Ok(VmValue::from_f64(

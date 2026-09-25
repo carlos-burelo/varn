@@ -152,7 +152,6 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
         // (no hay dest en la palabra del opcode misma, a diferencia de
         // `Move`/`IsNull` de arriba) — lee y escribe el MISMO registro: pasa
         // el valor sin modificar si cabe en el rango de `tag`, panica si no.
-
         OpCode::ArrayPush => s(2, None, vec![dest0, hi1]),
         OpCode::Inherit => s(2, None, vec![hi1, lo1]),
         OpCode::Yield | OpCode::Return => s(2, None, vec![lo1]),

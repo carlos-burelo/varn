@@ -5,10 +5,8 @@ use std::path::Path;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token};
 
+use crate::contract_members::{collect_functions, collect_members, find_class, Kind, Member};
 use varn_core::ast::TypeNode;
-use crate::contract_members::{
-    collect_functions, collect_members, find_class, Kind, Member,
-};
 use varn_core::kinds::TypeKind;
 use varn_core::{AtomInterner, LangPrimitive};
 
@@ -122,9 +120,15 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
         TypeKind::TypePredicate { .. } => Mapped::Bool,
         TypeKind::Array(_) => Mapped::Array,
         TypeKind::Union(members) if members.len() == 2 => {
-            if matches!(members[1].kind, TypeKind::Primitive(varn_core::LangPrimitive::Null)) {
+            if matches!(
+                members[1].kind,
+                TypeKind::Primitive(varn_core::LangPrimitive::Null)
+            ) {
                 Mapped::Opt(Box::new(classify(&members[0], interner)))
-            } else if matches!(members[0].kind, TypeKind::Primitive(varn_core::LangPrimitive::Null)) {
+            } else if matches!(
+                members[0].kind,
+                TypeKind::Primitive(varn_core::LangPrimitive::Null)
+            ) {
                 Mapped::Opt(Box::new(classify(&members[1], interner)))
             } else {
                 Mapped::Dynamic

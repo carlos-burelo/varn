@@ -68,11 +68,19 @@ impl Homes<'_> {
         let boxed = b.func.dfg.value_type(value) == types::I128;
         match class {
             SlotClass::Gpr => {
-                let payload = if boxed { b.ins().isplit(value).1 } else { value };
+                let payload = if boxed {
+                    b.ins().isplit(value).1
+                } else {
+                    value
+                };
                 b.ins().store(m, payload, home, 0);
             }
             SlotClass::Fpr => {
-                let payload = if boxed { b.ins().isplit(value).1 } else { value };
+                let payload = if boxed {
+                    b.ins().isplit(value).1
+                } else {
+                    value
+                };
                 let f = b.ins().bitcast(types::F64, MemFlags::new(), payload);
                 b.ins().store(m, f, home, 0);
             }

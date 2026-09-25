@@ -150,7 +150,8 @@ impl ExecCtx {
                                     "stack overflow: call depth exceeded 10000",
                                 ));
                             }
-                            let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
+                            let alloc =
+                                self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
                             let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                             frame.return_reg = dest as u16;
                             self.record_call_vm_fast();

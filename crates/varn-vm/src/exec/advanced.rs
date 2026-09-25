@@ -1,7 +1,7 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use varn_core::{RuntimeKind};
+use varn_core::RuntimeKind;
 use varn_types::value::RuntimeSymbol;
 use varn_types::{ClassObj, NativeCtx, Value};
 

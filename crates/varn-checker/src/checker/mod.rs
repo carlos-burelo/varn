@@ -744,7 +744,9 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Option<Type> {
         use crate::types::TypeContext;
-        let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) = self.ty_table.get(ty.0) else {
+        let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) =
+            self.ty_table.get(ty.0)
+        else {
             return None;
         };
         if !matches!(

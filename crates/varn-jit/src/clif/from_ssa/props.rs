@@ -65,12 +65,7 @@ pub(super) fn emit_array_push(
     let (at, ap) = boxed_parts(b, ctx, values, array)?;
     let (vt, vp) = boxed_parts(b, ctx, values, value)?;
     let ectx = exec_ctx(ctx)?;
-    call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.array_push,
-        &[ectx, at, ap, vt, vp],
-    );
+    call_helper_void(b, ctx.cc, ctx.helpers.array_push, &[ectx, at, ap, vt, vp]);
     Ok(())
 }
 

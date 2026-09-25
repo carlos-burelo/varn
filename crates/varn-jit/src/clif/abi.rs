@@ -9,8 +9,7 @@
 //! is the only code that knows how a boxed argument becomes a raw one.
 
 use cranelift_codegen::ir::{
-    types, AbiParam, Function, InstBuilder, MemFlags, Signature,
-    UserFuncName,
+    types, AbiParam, Function, InstBuilder, MemFlags, Signature, UserFuncName,
 };
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};

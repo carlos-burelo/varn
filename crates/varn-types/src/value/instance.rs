@@ -86,17 +86,11 @@ impl InstanceData {
         *ptr != 0
     }
 
-
-
     #[inline(always)]
     unsafe fn read_u64(&self, offset: usize) -> u64 {
         let ptr = self.raw_payload_ptr().add(offset) as *const u64;
         ptr.read()
     }
-
-
-
-
 
     #[inline(always)]
     unsafe fn read_vm_value(&self, offset: usize) -> VmValue {
@@ -135,7 +129,11 @@ impl InstanceData {
     /// lookup. Mirrors [`Self::read_field`] with the `FieldLayout` derived from
     /// the tag.
     #[inline]
-    pub fn read_field_at(&self, offset: u32, tag: Option<varn_core::RuntimeKind>) -> Option<VmValue> {
+    pub fn read_field_at(
+        &self,
+        offset: u32,
+        tag: Option<varn_core::RuntimeKind>,
+    ) -> Option<VmValue> {
         let f = FieldLayout::at(offset, tag);
         self.read_field(&f)
     }
@@ -342,8 +340,6 @@ impl InstanceData {
         let ptr = self.raw_payload_ptr().add(offset);
         *ptr = val as u8;
     }
-
-
 
     #[inline(always)]
     unsafe fn write_u64(&self, offset: usize, val: u64) {

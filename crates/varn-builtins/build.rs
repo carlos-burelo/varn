@@ -13,7 +13,10 @@ fn main() {
     let mut out = fs::File::create(&out_path).expect("failed to create registry.generated.rs");
 
     writeln!(out, "pub static MODULE_REGISTRY: &[ModuleSpec] = &[").unwrap();
-    for (layer, kind) in [("core", "ModuleKind::Core"), ("runtime", "ModuleKind::Runtime")] {
+    for (layer, kind) in [
+        ("core", "ModuleKind::Core"),
+        ("runtime", "ModuleKind::Runtime"),
+    ] {
         let root = Path::new("src/modules").join(layer);
         collect_modules(&root, &root, layer, kind, &mut out);
     }
@@ -21,7 +24,8 @@ fn main() {
 }
 
 fn collect_modules(root: &Path, dir: &Path, layer: &str, kind: &str, out: &mut impl Write) {
-    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()));
+    let entries =
+        fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()));
     let mut paths: Vec<_> = entries.flatten().map(|e| e.path()).collect();
     paths.sort();
 
@@ -33,8 +37,16 @@ fn collect_modules(root: &Path, dir: &Path, layer: &str, kind: &str, out: &mut i
     match contracts.as_slice() {
         [] => {}
         [contract] => {
-            let rel = dir.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
-            assert!(!rel.is_empty(), "{} is a layer root, not a module", dir.display());
+            let rel = dir
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            assert!(
+                !rel.is_empty(),
+                "{} is a layer root, not a module",
+                dir.display()
+            );
             emit_spec_entry(out, &format!("{layer}:{rel}"), kind, contract);
         }
         many => panic!(
@@ -51,13 +63,17 @@ fn collect_modules(root: &Path, dir: &Path, layer: &str, kind: &str, out: &mut i
 
 fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &Path) {
     let include_path = contract.to_string_lossy().replace('\\', "/");
-    let source = fs::read_to_string(contract)
-        .unwrap_or_else(|e| panic!("cannot read {include_path}: {e}"));
+    let source =
+        fs::read_to_string(contract).unwrap_or_else(|e| panic!("cannot read {include_path}: {e}"));
     let exports: String = extract_exports_from_source(&source)
         .iter()
         .map(|e| format!(r#""{e}","#))
         .collect();
-    let code = if has_code(&source) { ".with_code()" } else { "" };
+    let code = if has_code(&source) {
+        ".with_code()"
+    } else {
+        ""
+    };
     writeln!(
         out,
         r#"    ModuleSpec::new("{id}", {kind_expr}, "crates/varn-builtins/{include_path}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{include_path}"))).with_exports(&[{exports}]){code},"#,

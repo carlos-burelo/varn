@@ -8,10 +8,10 @@ use varn_core::ast::{AstArena, ExprKind, ForInit, Program, StmtId, StmtKind, Var
 mod array_evolve;
 mod class;
 mod decl_values;
+mod declared_types;
 mod decls;
 mod definite_field_assignment;
 mod diagnostics;
-mod declared_types;
 mod imports;
 mod inference_utils;
 mod interface;

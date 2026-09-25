@@ -104,6 +104,10 @@ fn portable_ssa_and_bytecode_share_cache_slots() {
     );
     let from_ssa = ssa_sites(walk).expect("`walk` projects to portable SSA");
     let from_bytecode = bytecode_sites(walk);
-    assert_eq!(from_bytecode.values().sum::<usize>(), 6, "every property site is emitted");
+    assert_eq!(
+        from_bytecode.values().sum::<usize>(),
+        6,
+        "every property site is emitted"
+    );
     assert_eq!(from_ssa, from_bytecode);
 }

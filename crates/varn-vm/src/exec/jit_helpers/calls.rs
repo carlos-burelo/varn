@@ -194,8 +194,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
         if !callee.is_heap() {
             return 0;
         }
-        let Some(crate::heap::HeapObj::VmClosure(closure)) =
-            ctx_ref.heap.get(callee.as_heap_idx())
+        let Some(crate::heap::HeapObj::VmClosure(closure)) = ctx_ref.heap.get(callee.as_heap_idx())
         else {
             return 0;
         };

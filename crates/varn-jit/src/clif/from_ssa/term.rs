@@ -14,11 +14,7 @@ fn scalar_return(k: SlotKind) -> bool {
 
 /// Write a non-scalar return to `jit_native_result` and return void — the
 /// convention the wrapper reads for a `Dynamic`/heap return class.
-fn store_boxed_return(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    boxed: Value,
-) -> Result<(), String> {
+fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> Result<(), String> {
     let frame = ctx
         .frame
         .as_ref()
@@ -92,7 +88,9 @@ pub(super) fn emit_term(
             if scalar_return(ctx.proto.return_kind) {
                 return Err("from_ssa: value-less return of a scalar".into());
             }
-            let tag = b.ins().iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
             let payload = b.ins().iconst(types::I64, 0);
             let null = b.ins().iconcat(tag, payload);
             store_boxed_return(b, ctx, null)?;

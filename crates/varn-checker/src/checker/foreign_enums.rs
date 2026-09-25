@@ -54,7 +54,10 @@ impl Checker<'_> {
                 let Some(layout) = owner.and_then(|b| b.enum_layout(&name)) else {
                     continue;
                 };
-                let variants = layout.into_iter().map(|(v, fields)| (v, fields.len())).collect();
+                let variants = layout
+                    .into_iter()
+                    .map(|(v, fields)| (v, fields.len()))
+                    .collect();
                 found.insert(
                     key,
                     ForeignEnum {
