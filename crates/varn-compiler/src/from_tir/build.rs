@@ -953,13 +953,14 @@ impl<'m> Builder<'m> {
                 // dispatch it directly, no name lookup, no inline cache.
                 if let Resolution::NativeOp(op_id) = &e.res {
                     if *op_id == varn_core::op_id::array_push_op_id() && argv.len() == 1 {
-                        return Ok(self.emit(
-                            InstKind::ArrayPush {
-                                array: r,
-                                value: argv[0],
-                            },
-                            ty,
-                        ));
+                        // `push` returns `void`: the instruction defines
+                        // nothing, and the expression's value is `null`, as
+                        // any void call's is at runtime.
+                        self.emit_effect(InstKind::ArrayPush {
+                            array: r,
+                            value: argv[0],
+                        });
+                        return Ok(self.emit(InstKind::ConstNull, ty));
                     }
                     return Ok(self.emit(
                         InstKind::CallNativeOp {
