@@ -53,14 +53,16 @@ pub fn server_capabilities() -> ServerCapabilities {
             first_trigger_character: "}".to_string(),
             more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
         }),
+        // Empty on purpose: the extension calls these (varn.showAst,
+        // varn.showBytecode, varn.showSSA, varn.getCFG) via a raw
+        // `workspace/executeCommand` request, never through VS Code's own
+        // command registry. Declaring them here would make
+        // vscode-languageclient's `ExecuteCommandFeature` auto-register a
+        // VS Code command of the same name to forward it — colliding with
+        // the extension's own `vscode.commands.registerCommand` for that
+        // same id, which does real UI work, not just forwarding.
         execute_command_provider: Some(ExecuteCommandOptions {
-            commands: vec![
-                "varn.showAst".to_string(),
-                "varn.syntaxTree".to_string(),
-                "varn.showBytecode".to_string(),
-                "varn.showSSA".to_string(),
-                "varn.getCFG".to_string(),
-            ],
+            commands: vec![],
             work_done_progress_options: Default::default(),
         }),
         rename_provider: Some(OneOf::Right(RenameOptions {
