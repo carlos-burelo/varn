@@ -9,6 +9,7 @@
 //! Everything here is a pure value operation over the running `ExecCtx` —
 //! no frame is pushed and no call is made.
 
+use crate::exec::closures::UpvalueSrc;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
@@ -226,8 +227,9 @@ pub(crate) extern "C" fn jit_store_upvalue(
         }
     }
 }
-/// Fase B: `base` is the `FrameStore` activation id of the compiled caller;
-/// a captured local register is addressed through `FrameStore::addr_of`.
+/// `MakeClosure` out of the lowering from bytecode: the descriptor follows
+/// the opcode at `ip_offset` of the running closure's code. `base` is the
+/// compiled caller's activation, whose registers a local upvalue captures.
 pub(crate) extern "C" fn jit_make_closure(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -238,68 +240,40 @@ pub(crate) extern "C" fn jit_make_closure(
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let code = &closure_ref.proto.chunk.code;
-        let mut ip = ip_offset + 1;
+        let uv_count = (code[ip_offset + 1] & 0xFF) as usize;
+        let proto_idx = code[ip_offset + 2] as usize;
+        let descs = &code[ip_offset + 3..ip_offset + 3 + uv_count];
+        let upvalues = descs.iter().map(|&w| UpvalueSrc::from_bytecode(w));
+        match ctx_ref.make_closure(closure_ref, proto_idx, base, upvalues) {
+            Ok(val) => ctx_ref.jit_native_result = val,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
 
-        let w1 = code[ip];
-        ip += 1;
-        let proto_idx = code[ip] as usize;
-        ip += 1;
-        let uv_count = (w1 & 0xFF) as usize;
-
-        let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
-            Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-            other => panic!(
-                "MakeClosure: invalid function proto at ip_offset={ip_offset} proto_idx={proto_idx} got={other:?}"
-            ),
+/// `MakeClosure` out of the lowering from typed SSA: function constant
+/// `proto_idx`, and `count` upvalue source words at `descs`
+/// ([`UpvalueSrc::from_word`]). `base` is the compiled caller's activation.
+pub(crate) extern "C" fn jit_make_closure_window(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    base: usize,
+    proto_idx: usize,
+    descs: *const u64,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let words: &[u64] = if count == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(descs, count)
         };
-
-        let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
-        if uv_count == 0 {
-            if let Some(&(_, cached_val)) = ctx_ref.static_closures.get(&proto_ptr) {
-                ctx_ref.jit_native_result = cached_val;
-                return;
-            }
+        let upvalues = words.iter().map(|&w| UpvalueSrc::from_word(w));
+        match ctx_ref.make_closure(closure_ref, proto_idx, base, upvalues) {
+            Ok(val) => ctx_ref.jit_native_result = val,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
         }
-
-        let mut upvalues = Vec::with_capacity(uv_count);
-        for _ in 0..uv_count {
-            let uv_desc = code[ip];
-            ip += 1;
-            let is_local = (uv_desc >> 8) != 0;
-            let index = (uv_desc & 0xFF) as usize;
-            if is_local {
-                let slot = ctx_ref.stack.addr_of(base, index);
-                let captured = ctx_ref.capture_upvalue(slot);
-                upvalues.push(captured);
-            } else {
-                upvalues.push(closure_ref.upvalues[index].clone());
-            }
-        }
-
-        let constants = ctx_ref
-            .proto_constants
-            .entry(proto_ptr)
-            .or_insert_with(|| {
-                let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                    &proto,
-                    &mut ctx_ref.heap,
-                ));
-                (proto.clone(), resolved)
-            })
-            .1
-            .clone();
-
-        let mut new_closure = crate::closure::VmClosure::with_upvalues(
-            proto.clone(),
-            upvalues,
-            constants,
-            ctx_ref.settings,
-        );
-        new_closure.module_base = closure_ref.module_base;
-        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
-        if uv_count == 0 {
-            ctx_ref.static_closures.insert(proto_ptr, (proto, val));
-        }
-        ctx_ref.jit_native_result = val;
     }
 }

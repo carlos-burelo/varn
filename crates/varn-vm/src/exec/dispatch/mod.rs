@@ -551,10 +551,7 @@ impl ExecCtx {
                             ))
                         } else {
                             let boxed = (*ctx).stack.box_range(base, args_start, arg_count);
-                            tryv!(crate::exec::intrinsics::dispatch(
-                                wire_byte,
-                                &boxed,
-                            ))
+                            tryv!(crate::exec::intrinsics::dispatch(wire_byte, &boxed,))
                         };
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }
@@ -596,9 +593,11 @@ impl ExecCtx {
                         let result = tryv!((*ctx).call_native_with_receiver(
                             f,
                             receiver,
-                            base,
-                            first_reg + 1,
-                            total - 1,
+                            crate::exec::method_args::MethodArgs::Regs {
+                                base,
+                                start: first_reg + 1,
+                                count: total - 1,
+                            },
                         ));
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
                     }
@@ -606,39 +605,13 @@ impl ExecCtx {
                     OpCode::LoadStaticFn => {
                         let proto_idx = code[ip] as usize;
                         ip += 1;
-                        let dest = first_reg;
-                        let proto = match closure.proto.chunk.constants.get(proto_idx) {
-                            Some(varn_types::PoolEntry::Function(p)) => p,
-                            _ => {
-                                return Err(crate::error::RuntimeError::new(format!(
-                                    "LoadStaticFn: const {proto_idx} is not a function"
-                                )))
-                            }
-                        };
-
-                        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-                        let val = if let Some(&(_, cached_val)) =
-                            (*ctx).static_closures.get(&proto_ptr)
-                        {
-                            cached_val
-                        } else {
-                            let constants = std::rc::Rc::new(
-                                crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap),
-                            );
-                            let mut vm_closure = crate::closure::VmClosure::with_upvalues(
-                                proto.clone(),
-                                vec![],
-                                constants,
-                                (*ctx).settings,
-                            );
-                            vm_closure.module_base = closure.module_base;
-                            let val = (*ctx).heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
-                            (*ctx)
-                                .static_closures
-                                .insert(proto_ptr, (proto.clone(), val));
-                            val
-                        };
-                        tryv!((*ctx).stack.unbox_into_reg(base, dest, val));
+                        let val = tryv!((*ctx).make_closure(
+                            closure,
+                            proto_idx,
+                            base,
+                            std::iter::empty()
+                        ));
+                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, val));
                     }
 
                     OpCode::Nop => {}

@@ -65,13 +65,10 @@ impl ClassLayout {
 
     /// Builds a static memory layout from a list of field (name, kind) declarations.
     ///
-    /// Computes aligned byte offsets for all fields according to native static typing rules:
-    /// - `int` (i64): size 8, align 8
-    /// - `float` (f64): size 8, align 8
-    /// - `bool`: size 1, align 1
-    /// - `char`: size 4, align 4
-    /// - GC references (`str`, `object`, `class`, `array`, `map`, `set`, etc.): size 8 (packed pointer), align 8
-    /// - Dynamic/Unknown: size 16 (`VmValue`), align 8
+    /// Each field takes the size, alignment and representation
+    /// [`TypeLayout::of_field`] gives its kind, at the next offset aligned to
+    /// it; the payload is padded to the widest alignment (at least 8). The
+    /// reference slots, in field order, are the class's [`GcLayout`].
     pub fn from_fields(
         name: impl Into<Arc<str>>,
         class_id: u32,

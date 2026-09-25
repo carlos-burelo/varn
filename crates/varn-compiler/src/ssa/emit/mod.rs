@@ -16,7 +16,11 @@ use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, PolyICSlot};
 mod effects;
 mod immediates;
 mod phi_edges;
+mod register_meta;
 mod regs;
+use register_meta::derive_register_meta;
+pub(crate) use register_meta::slot_kind_of;
+pub(crate) use regs::var_reg;
 mod terminator;
 mod values;
 
@@ -48,17 +52,27 @@ pub fn emit_function_meta(
 
     let fn_line = if f.start_line > 0 { f.start_line } else { 1 };
     let nparams = f.nparams;
-    let (reg, scratch, null_reg, call_base, register_count) =
-        regs::assign_registers(&ssa, nparams)?;
+    let regs::Assignment {
+        reg,
+        scratch,
+        null_reg,
+        call_base,
+        register_count,
+        liveness,
+    } = regs::assign_registers(&ssa, nparams)?;
     let param_kinds = f.param_kinds.clone();
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = f.return_kind;
 
-    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
-    // phi-split, register-assigned SSA here so it shares the exact value graph
-    // the bytecode was emitted from; `None` outside the projected family.
-    let ssa_proto = super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name)
-        .map(std::sync::Arc::new);
+    let order = emission_order(&ssa);
+    let ic = super::ic::IcSlots::number(&ssa, &order)?;
+    // The function constant each `MakeClosure` was emitted with, by
+    // `[block][inst]`, for the portable SSA below.
+    let mut closure_consts: Vec<Vec<Option<u16>>> = ssa
+        .blocks
+        .iter()
+        .map(|b| vec![None; b.insts.len()])
+        .collect();
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -67,13 +81,10 @@ pub fn emit_function_meta(
 
     let mut fixups: Vec<(usize, BlockId)> = Vec::new();
 
-    let mut cache_count: u16 = 0;
-
     let imms = immediates::plan_immediates(&ssa);
 
     let value_tys: Vec<crate::hir::HirType> = ssa.values.iter().map(|v| v.ty).collect();
 
-    let order = emission_order(&ssa);
     let mut pos_of = vec![usize::MAX; n];
     for (i, &b) in order.iter().enumerate() {
         pos_of[b] = i;
@@ -82,7 +93,7 @@ pub fn emit_function_meta(
     for (i, &b) in order.iter().enumerate() {
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
-        for inst in &insts {
+        for (idx, inst) in insts.iter().enumerate() {
             emit_inst(
                 &mut chunk,
                 inst,
@@ -90,13 +101,15 @@ pub fn emit_function_meta(
                 &reg,
                 scratch,
                 call_base,
-                &mut cache_count,
+                ic.of(b, idx),
                 &source_file,
                 nparams,
                 &mut fixups,
                 &imms,
+                &mut closure_consts[b][idx],
             )?;
         }
+        ssa.blocks[b].insts = insts;
         let term = ssa.blocks[b].term.clone();
         let term_line = if ssa.blocks[b].term_line > 0 {
             ssa.blocks[b].term_line
@@ -134,6 +147,24 @@ pub fn emit_function_meta(
         chunk.code[pos + 1] = (off & 0xFFFF) as u16;
     }
 
+    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
+    // phi-split, register-assigned SSA the bytecode was just emitted from, so
+    // it shares its value graph, cache slots and constants; `Unavailable`
+    // outside the projected family.
+    let emitted = super::portable::Emitted {
+        reg: &reg,
+        register_count,
+        nparams,
+        ic: &ic,
+        closure_consts: &closure_consts,
+        block_offset: &block_offset,
+        liveness: &liveness,
+    };
+    let ssa_proto = match super::portable::project(&ssa, &emitted, f.has_this, &f.name) {
+        Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),
+        Err(why) => varn_types::ssa::PortableSsa::Unavailable(Arc::from(why)),
+    };
+
     Ok(FunctionProto {
         name: Some(Arc::from(f.name.as_ref())),
         arity: 1 + nparams,
@@ -144,7 +175,7 @@ pub fn emit_function_meta(
         is_generator: f.is_generator,
         has_this: f.has_this,
         upvalue_count: f.upvalue_count as usize,
-        cache_count: cache_count as usize,
+        cache_count: ic.count() as usize,
         chunk,
         required_caps: Vec::new(),
         state_size: 0,
@@ -163,9 +194,9 @@ pub fn emit_function_meta(
         jit_serial: Cell::new(0),
         backedge_memo: Cell::new(0),
         ic_cache: Rc::new(RefCell::new(
-            (0..cache_count).map(|_| PolyICSlot::new()).collect(),
+            (0..ic.count()).map(|_| PolyICSlot::new()).collect(),
         )),
-        feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count as usize))),
+        feedback: Rc::new(RefCell::new(FeedbackVector::new(ic.count() as usize))),
         static_closure_val: Cell::new(0),
         jit_entry_count: Cell::new(0),
         backedge_count: Cell::new(0),
@@ -177,80 +208,6 @@ pub fn emit_function_meta(
         trivial_init_memo: RefCell::new(None),
         ssa: ssa_proto,
     })
-}
-
-/// Per-register slot kinds from checker-proven SSA value types: the meet of
-/// every value a register hosts, plus `Dynamic` for caller-written slots
-/// (callee, params, `this`) and helper registers that host no SSA value
-/// (scratch, call staging, null). Replaces the old opcode-walking
-/// re-inference in `varn-regalloc`, which guessed back what the checker
-/// already proved. `regalloc_post` re-permutes this when it coalesces.
-fn derive_register_meta(
-    ssa: &SsaFunc,
-    reg: &[u8],
-    register_count: u16,
-    param_kinds: &[varn_types::register_meta::SlotKind],
-) -> Vec<varn_types::register_meta::RegisterMeta> {
-    use varn_types::register_meta::{RegisterMeta, SlotKind};
-    let n = register_count as usize;
-    let mut kinds: Vec<Option<SlotKind>> = vec![None; n];
-    // r0 is the callee/`this` staging slot the caller writes; keep it Dynamic
-    // (it may host a heap ref during call staging, and the GC must flush it).
-    // Params (at r1+i, matching the JIT's entry contract) carry their declared
-    // kind: an immediate param (int/float/bool) is a proven fact the backend
-    // uses — it skips the GC flush and, for float, routes to native f64 — while
-    // a heap-ref param stays non-immediate and still flushes. The value meet
-    // below downgrades any param register the allocator reuses for a
-    // differently-typed value back to Dynamic.
-    if n > 0 {
-        kinds[0] = Some(SlotKind::Dynamic);
-    }
-    for (i, pk) in param_kinds.iter().enumerate() {
-        if 1 + i < n {
-            kinds[1 + i] = Some(*pk);
-        }
-    }
-    for (vi, def) in ssa.values.iter().enumerate() {
-        let Some(&r) = reg.get(vi) else { continue };
-        let r = r as usize;
-        if r >= n {
-            continue;
-        }
-        let k = slot_kind_of(def.ty);
-        kinds[r] = Some(match kinds[r] {
-            None => k,
-            Some(cur) if cur == k => cur,
-            Some(_) => SlotKind::Dynamic,
-        });
-    }
-    kinds
-        .into_iter()
-        .map(|k| RegisterMeta {
-            kind: k.unwrap_or(SlotKind::Dynamic),
-        })
-        .collect()
-}
-
-pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
-    use crate::hir::HirType;
-    use varn_types::register_meta::SlotKind;
-    match ty {
-        HirType::Int => SlotKind::Int,
-        HirType::Float => SlotKind::Float,
-        HirType::Bool => SlotKind::Bool,
-        HirType::Str => SlotKind::Str,
-        // Every heap-only shape collapses to `Ref` — the id was never read by
-        // the backend.
-        HirType::Class(_)
-        | HirType::Array(_)
-        | HirType::Ref
-        | HirType::Map(_, _)
-        | HirType::Set(_) => SlotKind::Ref,
-        // A nullable of anything is boxed today (tag word says null-or-not);
-        // the backend has no `Pair` kind yet.
-        HirType::Nullable(_) => SlotKind::Dynamic,
-        HirType::Dynamic => SlotKind::Dynamic,
-    }
 }
 
 /// Loop-aware emission order: reverse postorder from the entry, visiting
@@ -328,11 +285,14 @@ fn emit_inst(
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    cache_count: &mut u16,
+    // The inline-cache slot this instruction owns (`ic::IcSlots`).
+    ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     imms: &Immediates,
+    // Set to the function constant a `MakeClosure` was emitted with.
+    closure_const: &mut Option<u16>,
 ) -> Result<()> {
     // A constant that only ever rides inside an `AddImm`/`SubImm` needs no
     // instruction of its own.
@@ -358,7 +318,7 @@ fn emit_inst(
         return Ok(());
     }
 
-    if effects::emit_effect(chunk, inst, reg, cache_count, nparams)? {
+    if effects::emit_effect(chunk, inst, reg, ic_slot, nparams)? {
         return Ok(());
     }
 
@@ -381,9 +341,10 @@ fn emit_inst(
         reg,
         scratch,
         call_base,
-        cache_count,
+        ic_slot,
         source_file,
         nparams,
         fixups,
+        closure_const,
     )
 }

@@ -15,22 +15,22 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
-use super::{boxed, call, def_heap, heapvalue, is_heap, load_value, Ctx};
+use super::{
+    arrays, boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap,
+    load_value, numeric, Ctx, Out,
+};
 
-/// Emit one defining instruction; `Ok(None)` means the instruction defines no
-/// CLIF value of its own.
-///
-/// `dest` is the defined value id; its static kind decides whether the result
-/// lands in a CLIF register (scalar) or in its VM home (heap).
+/// Emit one instruction; `Ok(None)` means it produces no result. The driver
+/// lands a result where `dest`'s class says it lives ([`super::store::land`]).
 pub(super) fn emit_inst(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &mut [Option<Value>],
     op: &SsaOp,
     dest: Option<u32>,
-) -> Result<Option<Value>, String> {
-    if let Some(v) = heapvalue::emit(b, ctx, values, op, dest)? {
-        return Ok(v);
+) -> Result<Option<Out>, String> {
+    if let Some(out) = heapvalue::emit(b, ctx, values, op, dest)? {
+        return Ok(out);
     }
 
     let dest_ty = dest.map(|d| ctx.ssa.value_ty(d));
@@ -38,46 +38,86 @@ pub(super) fn emit_inst(
         SsaOp::ConstInt(n) => b.ins().iconst(types::I64, *n),
         SsaOp::ConstFloat(f) => b.ins().f64const(*f),
         SsaOp::ConstBool(x) => b.ins().iconst(types::I64, i64::from(*x)),
-        SsaOp::Convert { operand, conv } => match (conv, ctx.ssa.value_ty(*operand)) {
-            (varn_core::NumConv::IntToFloat, SlotKind::Int) => {
-                let a = load_value(b, ctx, values, *operand)?;
-                b.ins().fcvt_from_sint(types::F64, a)
-            }
-            _ => return Err(format!("from_ssa: convert {conv:?}")),
-        },
-        // Representation-neutral: every real conversion is a `Convert`.
+        SsaOp::Convert { operand, conv } => {
+            return Ok(Some(numeric::emit_convert(
+                b, ctx, values, *operand, *conv,
+            )?))
+        }
+        SsaOp::ArrayGetIndex { object, index } => {
+            return Ok(Some(arrays::emit_get(
+                b, ctx, values, *object, *index, dest,
+            )?))
+        }
+        SsaOp::ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
+            arrays::emit_set(b, ctx, values, *object, *index, *value)?;
+            return Ok(None);
+        }
+        SsaOp::IntrinsicCall { object, args, wire } => {
+            return Ok(Some(numeric::emit_intrinsic(
+                b, ctx, values, *object, args, *wire, dest,
+            )?))
+        }
+        // Representation-neutral: every real conversion is a `Convert`. What a
+        // cast may change is the storage class — a scalar entering a heap
+        // (`Dynamic`) value is boxed, a heap value entering a scalar one is
+        // unboxed, heap to heap is the same `VmValue`.
         SsaOp::Cast { operand } => {
+            let from = ctx.ssa.value_ty(*operand);
+            let to = dest_ty.ok_or("from_ssa: cast without dest")?;
             let a = load_value(b, ctx, values, *operand)?;
-            match (ctx.ssa.value_ty(*operand), dest_ty) {
-                (SlotKind::Int, Some(SlotKind::Float)) => b.ins().fcvt_from_sint(types::F64, a),
-                (SlotKind::Int, Some(SlotKind::Int))
-                | (SlotKind::Float, Some(SlotKind::Float))
-                | (SlotKind::Bool, Some(SlotKind::Bool)) => a,
-                // A heap-to-heap cast is an alias too: land it in the dest home.
-                (_, Some(k)) if is_heap(k) => {
-                    let d = dest.ok_or("from_ssa: cast without dest")?;
-                    def_heap(b, ctx, ctx.ssa.reg(d), a)?;
-                    return Ok(Some(a));
+            return Ok(Some(match (from, to) {
+                (SlotKind::Int, SlotKind::Float) => {
+                    Out::Native(b.ins().fcvt_from_sint(types::F64, a))
                 }
-                _ => return Err("from_ssa: unsupported cast".into()),
-            }
+                (SlotKind::Int, SlotKind::Int)
+                | (SlotKind::Float, SlotKind::Float)
+                | (SlotKind::Bool, SlotKind::Bool) => Out::Native(a),
+                (SlotKind::Int | SlotKind::Float | SlotKind::Bool, to) if is_heap(to) => {
+                    Out::Boxed(heap::boxed_value(b, ctx, values, *operand)?)
+                }
+                (from, _) if is_heap(from) => Out::Boxed(a),
+                (from, to) => return Err(format!("from_ssa: cast {from:?} -> {to:?}")),
+            }));
         }
 
+        SsaOp::Binary {
+            op: SsaBinOp::Dyn(op),
+            lhs,
+            rhs,
+        } => {
+            return Ok(Some(dynop::emit_bin(
+                b, ctx, values, *op, *lhs, *rhs, dest_ty,
+            )?))
+        }
+        SsaOp::Unary {
+            op: SsaUnOp::Dyn(op),
+            operand,
+        } => {
+            return Ok(Some(dynop::emit_un(
+                b, ctx, values, *op, *operand, dest_ty,
+            )?))
+        }
         SsaOp::Binary { op, lhs, rhs } => {
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
-            emit_bin(b, ctx, *op, a, c)?
+            let in_range = dest.is_some_and(|d| ctx.in_range_steps.contains(&d));
+            emit_bin(b, ctx, *op, a, c, in_range)?
         }
         SsaOp::Unary { op, operand } => {
             let a = load_value(b, ctx, values, *operand)?;
             emit_un(b, ctx, *op, a)?
         }
         SsaOp::SelfCall { args } => {
-            // A frame-aware callee needs its own frame pushed (the raw ABI
-            // prepends `stack, closure, base, exec_ctx`); this lowering does not
-            // model that, so it declines and the bytecode lowering takes it.
+            // A frame-aware body cannot hand its own frame to the callee:
+            // the recursion gets a fresh activation from the runtime.
             if ctx.frame.is_some() {
-                return Err("from_ssa: frame-aware self-call".into());
+                return Ok(Some(Out::Boxed(call::emit_self_call_framed(
+                    b, ctx, values, args,
+                )?)));
             }
             let a: Vec<Value> = args
                 .iter()
@@ -86,20 +126,99 @@ pub(super) fn emit_inst(
             let call = b.ins().call(ctx.self_ref, &a);
             b.inst_results(call)[0]
         }
+        SsaOp::MethodCall {
+            recv,
+            name,
+            args,
+            cs,
+        } => {
+            return Ok(Some(Out::Boxed(call::emit_method_call(
+                b, ctx, values, *recv, name, args, *cs,
+            )?)))
+        }
+        SsaOp::CallNativeOp {
+            object,
+            args,
+            op_id,
+        } => {
+            return Ok(Some(Out::Boxed(call::emit_call_native_op(
+                b, ctx, values, *object, args, *op_id,
+            )?)))
+        }
         SsaOp::Call {
             callee,
             callee_global,
             args,
         } => {
-            let d = dest.ok_or("from_ssa: call without dest")?;
-            call::emit_call(b, ctx, values, *callee, *callee_global, args, d)?
+            return Ok(Some(call::emit_call(
+                b,
+                ctx,
+                values,
+                *callee,
+                *callee_global,
+                args,
+                dest,
+            )?))
         }
 
+        SsaOp::MakeClosure { proto, upvalues } => {
+            return Ok(Some(Out::Boxed(closures::emit_make_closure(
+                b, ctx, *proto, upvalues,
+            )?)))
+        }
+        SsaOp::LoadCaptured { var } => {
+            return Ok(Some(Out::Boxed(closures::emit_load_captured(
+                b, ctx, *var,
+            )?)))
+        }
+        SsaOp::StoreCaptured { var, value } => {
+            closures::emit_store_captured(b, ctx, values, *var, *value)?;
+            return Ok(None);
+        }
+        SsaOp::LoadUpvalue(index) => {
+            return Ok(Some(Out::Boxed(closures::emit_load_upvalue(
+                b, ctx, *index,
+            )?)))
+        }
+        SsaOp::StoreUpvalue { index, value } => {
+            closures::emit_store_upvalue(b, ctx, values, *index, *value)?;
+            return Ok(None);
+        }
+        SsaOp::Try {
+            catch_ip,
+            catch_value,
+            live,
+        } => {
+            exceptions::emit_try(b, ctx, values, *catch_ip, *catch_value, live)?;
+            return Ok(None);
+        }
+        SsaOp::PopTry => {
+            exceptions::emit_pop_try(b, ctx)?;
+            return Ok(None);
+        }
+        // Only a landing pad reads it, and the driver never compiles one.
+        SsaOp::CatchParam { .. } => {
+            return Err("from_ssa: a landing pad reached compiled code".into())
+        }
+        SsaOp::StoreGlobalIdx { slot, value } => {
+            let boxed = heap::boxed_value(b, ctx, values, *value)?;
+            globals::emit_store(b, ctx, *slot, boxed)?;
+            return Ok(None);
+        }
+        SsaOp::CloseUpvalues { vars } => {
+            closures::emit_close_upvalues(b, ctx, vars)?;
+            return Ok(None);
+        }
 
         // Handled by `heapvalue` above.
         SsaOp::ConstNull
         | SsaOp::ConstStr(_)
+        | SsaOp::ConstChar(_)
+        | SsaOp::ConstBigInt(_)
+        | SsaOp::ConstDecimal(_)
+        | SsaOp::MakeEnumVariant { .. }
         | SsaOp::LoadGlobalIdx(_)
+        | SsaOp::LoadNativeGlobalIdx(_)
         | SsaOp::This
         | SsaOp::IsNull { .. }
         | SsaOp::IsArray { .. }
@@ -115,6 +234,7 @@ pub(super) fn emit_inst(
         | SsaOp::GetProperty { .. }
         | SsaOp::SetProperty { .. }
         | SsaOp::ArrayLength { .. }
+        | SsaOp::StrLength { .. }
         | SsaOp::GetFixedField { .. }
         | SsaOp::SetIndex { .. }
         | SsaOp::ArrayPush { .. }
@@ -126,7 +246,7 @@ pub(super) fn emit_inst(
             unreachable!("heap ops are emitted by heapvalue")
         }
     };
-    Ok(Some(v))
+    Ok(Some(Out::Native(v)))
 }
 
 fn emit_bin(
@@ -135,6 +255,8 @@ fn emit_bin(
     op: SsaBinOp,
     a: Value,
     c: Value,
+    // Proven unable to overflow ([`super::induction`]).
+    in_range: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
     // Integer division/mod/power and float mod/power keep the VM's exact
@@ -144,6 +266,8 @@ fn emit_bin(
         return boxed::emit_bin(b, ctx, op, a, c, dest_float);
     }
     Ok(match op {
+        IntAdd if in_range => b.ins().iadd(a, c),
+        IntSub if in_range => b.ins().isub(a, c),
         IntAdd | IntSub | IntMul => checked_int(b, ctx, op, a, c),
         IntAnd => b.ins().band(a, c),
         IntOr => b.ins().bor(a, c),
@@ -178,6 +302,7 @@ fn emit_bin(
         FloatGt => bool_f64(b, FloatCC::GreaterThan, a, c),
         FloatGe => bool_f64(b, FloatCC::GreaterThanOrEqual, a, c),
 
+        Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
         StrConcat => return Err("from_ssa: concat is a heap op".into()),
         IntDiv | IntMod | IntPow | FloatMod | FloatPow => unreachable!("delegated to boxed"),
     })
@@ -241,6 +366,7 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
         SsaUnOp::NegFloat => b.ins().fneg(a),
         SsaUnOp::Not => b.ins().bxor_imm(a, 1),
         SsaUnOp::BitNotInt => b.ins().bxor_imm(a, -1),
+        SsaUnOp::Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
     })
 }
 

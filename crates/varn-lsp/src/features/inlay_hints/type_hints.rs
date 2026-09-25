@@ -1,7 +1,7 @@
 use crate::document::SymbolView;
 use tower_lsp::lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Position};
 use varn_checker::SymbolKind;
-use varn_core::ast::{Expr, ExprKind, Program, Stmt, StmtKind};
+use varn_core::ast::ExprKind;
 use varn_core::TypeKind;
 
 use crate::document::DocumentState;
@@ -44,9 +44,7 @@ pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
         }
     }
 
-    if let Some(program) = &state.ast {
-        collect_pipeline_hints(state, program, &mut hints);
-    }
+    collect_pipeline_hints(state, &mut hints);
 
     hints
 }
@@ -56,18 +54,11 @@ fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHin
         return None;
     }
 
-    let ret_ty = match &sym.ty().0 {
-        TypeKind::Fn(ft) => ft.return_type.as_ref(),
-        _ => return None,
-    };
-
-    if let TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic) = &ret_ty.0 {
+    let ret_ty = varn_checker::Type(state.db.fn_shape(sym.ty())?.return_type, false);
+    if !worth_hinting(state, &ret_ty) {
         return None;
     }
-    let ret_str = ret_ty.to_string();
-    if ret_str.is_empty() || ret_str == "unknown" || ret_str == "void" {
-        return None;
-    }
+    let ret_str = state.ty_text(&ret_ty);
 
     let rparen_col = find_rparen_col_on_line(state, sym.line(), sym.col())?;
 
@@ -109,57 +100,41 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
     last_rparen_col
 }
 
-fn collect_pipeline_hints(state: &DocumentState, program: &Program, hints: &mut Vec<InlayHint>) {
-    for stmt in &program.body {
-        collect_pipeline_in_stmt(state, stmt, hints);
-    }
+/// Whether a hint showing `ty` tells the reader anything: `dynamic` and
+/// `void` do not.
+fn worth_hinting(state: &DocumentState, ty: &varn_checker::Type) -> bool {
+    !matches!(
+        state.db.ty_kind(ty),
+        TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic)
+    )
 }
 
-fn collect_pipeline_in_stmt(state: &DocumentState, stmt: &Stmt, hints: &mut Vec<InlayHint>) {
-    match &stmt.kind {
-        StmtKind::Expr { expression } => collect_pipeline_in_expr(state, expression, hints),
-        StmtKind::Block { stmts } => {
-            for s in stmts {
-                collect_pipeline_in_stmt(state, s, hints);
-            }
+/// A hint after each pipeline stage: the type of the value it produces.
+fn collect_pipeline_hints(state: &DocumentState, hints: &mut Vec<InlayHint>) {
+    let arena = &state.ast_arena;
+    for expr in state.spatial_index.exprs() {
+        let ExprKind::Pipeline { right, .. } = &arena.expr(expr).kind else {
+            continue;
+        };
+        let Some(entry) = state.db.expr_table.get(&expr.index()) else {
+            continue;
+        };
+        if !worth_hinting(state, &entry.ty) {
+            continue;
         }
-        StmtKind::If {
-            test,
-            consequent,
-            alternate,
-        } => {
-            collect_pipeline_in_expr(state, test, hints);
-            collect_pipeline_in_stmt(state, consequent, hints);
-            if let Some(alt) = alternate {
-                collect_pipeline_in_stmt(state, alt, hints);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn collect_pipeline_in_expr(state: &DocumentState, expr: &Expr, hints: &mut Vec<InlayHint>) {
-    if let ExprKind::Pipeline { left, right } = &expr.kind {
-        if let Some(info) = state.db.expr_types.get(&right.id) {
-            let ty_str = info.ty.to_string();
-            if !ty_str.is_empty() && ty_str != "unknown" && ty_str != "void" {
-                let r_end = &right.range.end;
-                hints.push(InlayHint {
-                    position: Position {
-                        line: r_end.line.saturating_sub(1),
-                        character: r_end.column,
-                    },
-                    label: InlayHintLabel::String(format!(": {ty_str}")),
-                    kind: Some(InlayHintKind::TYPE),
-                    text_edits: None,
-                    tooltip: None,
-                    padding_left: Some(true),
-                    padding_right: Some(false),
-                    data: None,
-                });
-            }
-        }
-        collect_pipeline_in_expr(state, left, hints);
-        collect_pipeline_in_expr(state, right, hints);
+        let r_end = &arena.expr(*right).range.end;
+        hints.push(InlayHint {
+            position: Position {
+                line: r_end.line.saturating_sub(1),
+                character: r_end.column,
+            },
+            label: InlayHintLabel::String(format!(": {}", state.ty_text(&entry.ty))),
+            kind: Some(InlayHintKind::TYPE),
+            text_edits: None,
+            tooltip: None,
+            padding_left: Some(true),
+            padding_right: Some(false),
+            data: None,
+        });
     }
 }

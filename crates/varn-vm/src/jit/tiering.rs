@@ -11,7 +11,7 @@ use crate::closure::VmClosure;
 use varn_types::FunctionProto;
 
 /// Fase B del frame por clases: el lowering ya direcciona los homes por
-/// `FrameStore` (helpers `home_store`/`home_load`, actividad = `base`) y el
+/// `FrameStore` (inline, `clif::homes`; actividad = `base`) y el
 /// wrapper carga los argumentos por clase, así que la compilación está
 /// abierta. Los protos que aún dependen de helpers tripwired (llamadas,
 /// excepciones, suspension, clases, ICs de propiedad, intrínsecos, módulos)

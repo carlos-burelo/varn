@@ -1,0 +1,68 @@
+// On-stack replacement from typed SSA: each function runs ONCE, so it only
+// reaches compiled code by resuming its running frame at a hot loop header.
+// The values live into the header must be read from where the interpreter
+// left them, and a value the resumed body also redefines — the outer counter
+// of a nested loop — must keep changing.
+
+function osSingle(n: int): str {
+    let count = 0
+    let total = 0.0
+    let text = ""
+    const xs: int[] = [1, 2, 3]
+    for (let i = 0; i < n; i = i + 1) {
+        count = count + xs[i % 3]
+        total = total + 0.5
+        if (i % 10000 == 0) { text = text + "." }
+    }
+    return count + "/" + total + "/" + text
+}
+
+// The inner loop gets hot; `row` is defined by the outer loop, which the
+// resumed body runs again.
+function osNested(n: int): int {
+    let sum = 0
+    for (let row = 0; row < n; row = row + 1) {
+        let inner = 0
+        for (let k = 0; k < n; k = k + 1) {
+            inner = inner + row * k
+        }
+        sum = sum + inner + row
+    }
+    return sum
+}
+
+// Three levels, the middle counter also carried.
+function osTriple(n: int): int {
+    let s = 0
+    for (let a = 0; a < n; a = a + 1) {
+        for (let b = 0; b < n; b = b + 1) {
+            for (let c = 0; c < n; c = c + 1) {
+                s = s + a + b * c
+            }
+        }
+    }
+    return s
+}
+
+function osDown(n: int): int {
+    let s = 0
+    for (let i = n; i > 0; i = i - 1) {
+        s = s + i
+    }
+    return s
+}
+
+// Expected values, computed with closed forms.
+const single = osSingle(30000)
+assert("a single loop resumed compiled", single == "60000/15000/...")
+// sum over row of (row * sum k) + row = (sum k)(sum row) + sum row.
+const n = 400
+const tri = n * (n - 1) / 2
+assert("an inner loop resumed with the outer counter live", osNested(n) === tri * tri + tri)
+// sum over a,b,c of a + b*c = n^2 * sum a + n * (sum b)(sum c).
+const m = 60
+const trm = m * (m - 1) / 2
+assert("three nested loops", osTriple(m) === m * m * trm + m * trm * trm)
+assert("a decrementing loop", osDown(50000) === 50000 * 50001 / 2)
+
+print("[PASSED] 151. JIT OSR")

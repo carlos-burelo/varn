@@ -1,5 +1,5 @@
 use varn_checker::{SymbolKind, Type};
-use varn_core::{IntrinsicType, TokenKind, TypeKind, RuntimeKind};
+use varn_core::{is_lang_type_name, TokenKind, TypeKind};
 
 use super::{
     TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,
@@ -91,15 +91,15 @@ pub fn resolve_token(
             // For some members the checker records the member's *type* symbol
             // (e.g. `arr.length` → the `int` class), which must not paint the
             // member as a class.
-            if sym.name.as_ref() == tok.lexeme.as_str() {
+            if state.name(sym.name) == tok.lexeme.as_str() {
                 return Some(tt_from_symbol(state, sym.kind, &info.ty, prev_is_dot));
             }
             if prev_is_dot {
-                return Some(member_tt(&info.ty));
+                return Some(member_tt(state, &info.ty));
             }
         } else if prev_is_dot {
             // Recorded with a type but no symbol (structural / dynamic member).
-            return Some(member_tt(&info.ty));
+            return Some(member_tt(state, &info.ty));
         }
     }
 
@@ -134,7 +134,7 @@ pub fn resolve_token(
         }
     }
 
-    if is_intrinsic_type_name(&tok.lexeme) {
+    if is_lang_type_name(&tok.lexeme) {
         return Some(TT_TYPE);
     }
     // Type parameters: exposed by the checker as TypeParameter symbols, but
@@ -149,8 +149,8 @@ pub fn resolve_token(
     None
 }
 
-fn member_tt(ty: &Type) -> u32 {
-    if matches!(ty.0, TypeKind::Fn(_)) {
+fn member_tt(state: &DocumentState, ty: &Type) -> u32 {
+    if matches!(state.db.ty_kind(ty), TypeKind::Fn(_)) {
         TT_FUNCTION
     } else {
         TT_PROPERTY
@@ -158,7 +158,7 @@ fn member_tt(ty: &Type) -> u32 {
 }
 
 fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_dot: bool) -> u32 {
-    let is_fn = matches!(ty.0, TypeKind::Fn(_));
+    let is_fn = matches!(state.db.ty_kind(ty), TypeKind::Fn(_));
     match kind {
         SymbolKind::Function | SymbolKind::Method => TT_FUNCTION,
         SymbolKind::Class | SymbolKind::Struct | SymbolKind::Extension => TT_CLASS,
@@ -197,29 +197,10 @@ fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_do
 }
 
 fn is_enum_type(state: &DocumentState, ty: &Type) -> bool {
-    match &ty.0 {
+    match state.db.ty_kind(ty) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
-            matches!(state.symbol_map.get(n.as_ref()), Some(SymbolKind::Enum))
+            matches!(state.symbol_map.get(state.name(n)), Some(SymbolKind::Enum))
         }
         _ => false,
     }
-}
-
-fn is_intrinsic_type_name(name: &str) -> bool {
-    name == IntrinsicType::Str.as_str()
-        || name == IntrinsicType::Int.as_str()
-        || name == IntrinsicType::Float.as_str()
-        || name == IntrinsicType::Decimal.as_str()
-        || name == IntrinsicType::BigInt.as_str()
-        || name == IntrinsicType::Char.as_str()
-        || name == IntrinsicType::Bool.as_str()
-        || name == IntrinsicType::Symbol.as_str()
-        || name == RuntimeKind::Object.name()
-        || name == IntrinsicType::Void.as_str()
-        || name == IntrinsicType::Never.as_str()
-        || name == IntrinsicType::Dynamic.as_str()
-        || name == IntrinsicType::Null.as_str()
-        || name == IntrinsicType::Task.as_str()
-        || name == IntrinsicType::Result.as_str()
-        || name == IntrinsicType::Array.as_str()
 }

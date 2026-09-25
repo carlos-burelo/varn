@@ -44,8 +44,7 @@ impl<'r> Checker<'r> {
             .and_then(|t| match self.ty_table.get(t.0) {
                 TypeKind::Array(inner) => Some(Type(inner, false)),
                 TypeKind::Generic(name, args, _)
-                    if bind.interner.get(varn_core::BuiltinType::Array.name())
-                        == Some(name)
+                    if bind.interner.get(varn_core::BuiltinType::Array.name()) == Some(name)
                         && self.ty_table.get_list(args).len() == 1 =>
                 {
                     Some(Type(self.ty_table.get_list(args)[0], false))
@@ -97,8 +96,7 @@ impl<'r> Checker<'r> {
                 let resolved = match ty_kind {
                     TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
                     TypeKind::Generic(name, args, _)
-                        if bind.interner.get(varn_core::BuiltinType::Map.name())
-                            == Some(name)
+                        if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();

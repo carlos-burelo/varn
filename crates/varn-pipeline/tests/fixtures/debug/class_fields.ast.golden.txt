@@ -1,5 +1,5 @@
 
-  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>\class_fields.vn[0m
+  [36mabstract syntax tree[0m [2m───────────────────────────── <fixtures>/class_fields.vn[0m
 ├── [1mClassDecl[0m [34mTemperature[0m
 │   ├── [1mProperty[0m [36m_celsius[0m
 │   ├── [1mConstructor[0m

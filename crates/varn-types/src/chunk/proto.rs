@@ -293,14 +293,10 @@ pub struct FunctionProto {
     pub trivial_init_memo:
         std::cell::RefCell<Option<Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>>>>,
 
-    /// Portable typed SSA for the scalar/arith family, attached after
-    /// regalloc. `None` when the body is outside that family (or the artifact
-    /// predates this field): the JIT then lowers from bytecode as before.
-    /// Appended last so older positional payloads read a missing field as the
-    /// `None` default while `BUILD_FINGERPRINT` (which covers `varn-types`)
-    /// invalidates them anyway.
+    /// Portable typed SSA, attached after regalloc, or why the body has none
+    /// (the JIT then lowers it from bytecode).
     #[serde(default)]
-    pub ssa: Option<std::sync::Arc<crate::ssa::SsaProto>>,
+    pub ssa: crate::ssa::PortableSsa,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
@@ -374,7 +370,9 @@ impl FunctionProto {
     /// Checks if this constructor proto is a trivial field-initializer:
     /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
     /// instructions ending in Return.
-    pub fn trivial_field_init_plan(&self) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
+    pub fn trivial_field_init_plan(
+        &self,
+    ) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
         if let Some(ref cached) = *self.trivial_init_memo.borrow() {
             return cached.clone();
         }
@@ -383,7 +381,9 @@ impl FunctionProto {
         plan
     }
 
-    fn compute_trivial_field_init_plan(&self) -> Option<Vec<(usize, u32, Option<varn_core::RuntimeKind>)>> {
+    fn compute_trivial_field_init_plan(
+        &self,
+    ) -> Option<Vec<(usize, u32, Option<varn_core::RuntimeKind>)>> {
         if self.is_async || self.is_generator || self.has_rest || self.upvalue_count > 0 {
             return None;
         }

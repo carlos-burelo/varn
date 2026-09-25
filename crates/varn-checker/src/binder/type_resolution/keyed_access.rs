@@ -207,10 +207,13 @@ pub(super) fn resolve_indexed_access(
             }
         }
         _ => {
-            
-            if matches!(table.get(obj.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
-                && matches!(table.get(index.0), TypeKind::Primitive(varn_core::LangPrimitive::Int))
-            {
+            if matches!(
+                table.get(obj.0),
+                TypeKind::Primitive(varn_core::LangPrimitive::Str)
+            ) && matches!(
+                table.get(index.0),
+                TypeKind::Primitive(varn_core::LangPrimitive::Int)
+            ) {
                 return Type::Str;
             }
             Type::Dynamic

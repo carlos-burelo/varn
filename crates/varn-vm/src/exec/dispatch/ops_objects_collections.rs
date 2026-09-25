@@ -1,5 +1,6 @@
 use crate::closure::VmClosure;
 use crate::error::VmResult;
+use crate::exec::closures::UpvalueSrc;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
@@ -26,61 +27,12 @@ impl ExecCtx {
         match op {
             OpCode::MakeClosure => {
                 let w1 = code[*ip];
-                *ip += 1;
-                let proto_idx = code[*ip] as usize;
-                *ip += 1;
+                let proto_idx = code[*ip + 1] as usize;
                 let (dest, uv_count) = (hi(w1), lo(w1));
-                let proto = match closure.proto.chunk.constants.get(proto_idx) {
-                    Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-                    _ => {
-                        return Err(crate::error::RuntimeError::new(format!(
-                            "MakeClosure: const {proto_idx} is not a function"
-                        )))
-                    }
-                };
-                let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
-                if uv_count == 0 {
-                    if let Some(&(_, cached_val)) = self.static_closures.get(&proto_ptr) {
-                        self.stack.unbox_into_reg(base, dest, cached_val)?;
-                        return Ok(Some(ObjectFlow::ContinueInstruction));
-                    }
-                }
-                let mut upvalues = Vec::with_capacity(uv_count);
-                for _ in 0..uv_count {
-                    let uv_desc = code[*ip];
-                    *ip += 1;
-                    let is_local = hi(uv_desc) != 0;
-                    let index = lo(uv_desc);
-                    if is_local {
-                        upvalues.push(self.capture_upvalue(self.stack.addr_of(base, index)));
-                    } else {
-                        upvalues.push(closure.upvalues[index].clone());
-                    }
-                }
-                let constants = self
-                    .proto_constants
-                    .entry(proto_ptr)
-                    .or_insert_with(|| {
-                        let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                            &proto,
-                            &mut self.heap,
-                        ));
-                        (proto.clone(), resolved)
-                    })
-                    .1
-                    .clone();
-                let mut vm_closure = crate::closure::VmClosure::with_upvalues(
-                    proto.clone(),
-                    upvalues,
-                    constants,
-                    self.settings,
-                );
-                // A nested closure runs against its defining module's globals.
-                vm_closure.module_base = closure.module_base;
-                let val = self.heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
-                if uv_count == 0 {
-                    self.static_closures.insert(proto_ptr, (proto, val));
-                }
+                let descs = &code[*ip + 2..*ip + 2 + uv_count];
+                *ip += 2 + uv_count;
+                let upvalues = descs.iter().map(|&w| UpvalueSrc::from_bytecode(w));
+                let val = self.make_closure(closure, proto_idx, base, upvalues)?;
                 self.stack.unbox_into_reg(base, dest, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }

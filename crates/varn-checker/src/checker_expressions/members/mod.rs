@@ -1,6 +1,6 @@
 mod member_exists;
-mod owner;
 pub(crate) mod member_type;
+mod owner;
 
 use std::sync::Arc;
 
@@ -310,7 +310,11 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let str_ty = Type::named(varn_core::RuntimeKind::Str.name().to_owned(), resolver, table);
+            let str_ty = Type::named(
+                varn_core::RuntimeKind::Str.name().to_owned(),
+                resolver,
+                table,
+            );
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
         TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
@@ -324,8 +328,11 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let bytes_ty =
-                Type::named(varn_core::RuntimeKind::Bytes.name().to_owned(), resolver, table);
+            let bytes_ty = Type::named(
+                varn_core::RuntimeKind::Bytes.name().to_owned(),
+                resolver,
+                table,
+            );
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
         kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
@@ -375,12 +382,12 @@ fn collect_extension_members(
     };
 
     let push = |name: &Arc<str>,
-                    mangled: &Arc<str>,
-                    kind: crate::semantic_info::ResolvedMemberKind,
-                    as_return: bool,
-                    results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
-                    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
-                    table: &mut CheckerTyTable| {
+                mangled: &Arc<str>,
+                kind: crate::semantic_info::ResolvedMemberKind,
+                as_return: bool,
+                results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+                seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+                table: &mut CheckerTyTable| {
         let Some(sid) = bind
             .interner
             .get(mangled.as_ref())
@@ -468,7 +475,9 @@ fn extension_key(
 ) -> Option<Arc<str>> {
     match table.get(ty.0) {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(n))),
-        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+            k.lang_name().map(Arc::from)
+        }
         TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         _ => None,
     }

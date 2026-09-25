@@ -45,12 +45,7 @@ pub(super) fn emit_bin(
     let (a_tag, a_payload) = box_native(b, a, operand_float);
     let (b_tag, b_payload) = box_native(b, c, operand_float);
     let live = call_helper(b, cc, helpers.current_exec_ctx, &[]);
-    call_helper_void(
-        b,
-        cc,
-        helper,
-        &[live, a_tag, a_payload, b_tag, b_payload],
-    );
+    call_helper_void(b, cc, helper, &[live, a_tag, a_payload, b_tag, b_payload]);
     let boxed = b.ins().load(
         types::I128,
         MemFlags::trusted(),

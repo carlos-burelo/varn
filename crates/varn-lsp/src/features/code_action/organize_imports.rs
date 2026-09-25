@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use tower_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
 };
-use varn_core::ast::{Decl, Program, StmtKind};
+use varn_core::ast::{AstArena, Decl, Program, StmtKind};
+use varn_core::SourceRange;
 
 use crate::document::DocumentState;
 
@@ -11,7 +12,8 @@ pub fn generate_organize_imports_action(
     uri: &tower_lsp::lsp_types::Url,
 ) -> Option<CodeActionOrCommand> {
     let program = state.ast.as_ref()?;
-    let imports = collect_imports(program, &state.source)?;
+    let ranges = import_ranges(program, &state.ast_arena);
+    let imports = collect_imports(&ranges, &state.source)?;
 
     if imports.len() < 2 {
         return None;
@@ -46,8 +48,8 @@ pub fn generate_organize_imports_action(
         organized.push('\n');
     }
 
-    let first_line = imports_first_line(program)?;
-    let last_line = imports_last_line(program)?;
+    let first_line = ranges.first()?.start.line.saturating_sub(1);
+    let last_line = ranges.last()?.end.line.saturating_sub(1);
 
     let mut changes = HashMap::new();
     changes.insert(
@@ -83,49 +85,30 @@ pub fn generate_organize_imports_action(
     }))
 }
 
-fn collect_imports(program: &Program, source: &str) -> Option<Vec<String>> {
+/// The source range of each top-level import, in order.
+fn import_ranges(program: &Program, arena: &AstArena) -> Vec<SourceRange> {
+    program
+        .body
+        .iter()
+        .map(|&id| arena.stmt(id))
+        .filter(
+            |stmt| matches!(&stmt.kind, StmtKind::Decl(d) if matches!(d.as_ref(), Decl::Import(_))),
+        )
+        .map(|stmt| stmt.range)
+        .collect()
+}
+
+/// The text of each import, whole lines.
+fn collect_imports(ranges: &[SourceRange], source: &str) -> Option<Vec<String>> {
     let lines: Vec<&str> = source.lines().collect();
-    let mut import_lines = Vec::new();
-
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Import(_) = decl.as_ref() {
-                let s_line = stmt.range().start.line.saturating_sub(1) as usize;
-                let e_line = stmt.range().end.line.saturating_sub(1) as usize;
-                if s_line < lines.len() && e_line < lines.len() {
-                    let text = lines[s_line..=e_line].join("\n");
-                    import_lines.push(text);
-                }
-            }
-        }
-    }
-
-    if import_lines.is_empty() {
-        None
-    } else {
-        Some(import_lines)
-    }
-}
-
-fn imports_first_line(program: &Program) -> Option<u32> {
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Import(_) = decl.as_ref() {
-                return Some(stmt.range().start.line.saturating_sub(1));
-            }
-        }
-    }
-    None
-}
-
-fn imports_last_line(program: &Program) -> Option<u32> {
-    let mut last = None;
-    for stmt in &program.body {
-        if let StmtKind::Decl(decl) = &stmt.kind {
-            if let Decl::Import(_) = decl.as_ref() {
-                last = Some(stmt.range().end.line.saturating_sub(1));
-            }
-        }
-    }
-    last
+    let import_lines: Vec<String> = ranges
+        .iter()
+        .filter_map(|r| {
+            let s_line = r.start.line.saturating_sub(1) as usize;
+            let e_line = r.end.line.saturating_sub(1) as usize;
+            (s_line < lines.len() && e_line < lines.len())
+                .then(|| lines[s_line..=e_line].join("\n"))
+        })
+        .collect();
+    (!import_lines.is_empty()).then_some(import_lines)
 }

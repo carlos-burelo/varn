@@ -22,9 +22,18 @@ use varn_core::TypeKind;
 #[test]
 fn intrinsic_ids_are_fixed_and_small() {
     let t = CheckerTyTable::new();
-    assert_eq!(t.get(CheckerTyId::INT), TypeKind::Primitive(varn_core::LangPrimitive::Int));
-    assert_eq!(t.get(CheckerTyId::STR), TypeKind::Primitive(varn_core::LangPrimitive::Str));
-    assert_eq!(t.get(CheckerTyId::BOOL), TypeKind::Primitive(varn_core::LangPrimitive::Bool));
+    assert_eq!(
+        t.get(CheckerTyId::INT),
+        TypeKind::Primitive(varn_core::LangPrimitive::Int)
+    );
+    assert_eq!(
+        t.get(CheckerTyId::STR),
+        TypeKind::Primitive(varn_core::LangPrimitive::Str)
+    );
+    assert_eq!(
+        t.get(CheckerTyId::BOOL),
+        TypeKind::Primitive(varn_core::LangPrimitive::Bool)
+    );
     assert_eq!(
         t.get(CheckerTyId::FLOAT),
         TypeKind::Primitive(varn_core::LangPrimitive::Float)

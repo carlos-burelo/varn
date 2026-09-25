@@ -1,7 +1,6 @@
 use crate::document::SymbolView;
 use varn_checker::SymbolKind;
 use varn_modules::resolver::path_to_uri;
-use varn_modules::spec::{CORE_PREFIX, STD_PREFIX};
 
 use crate::document::{import::uri_to_path, DocumentState};
 
@@ -83,7 +82,7 @@ fn collect_member_exports(
             uri: uri.to_owned(),
             line: line.saturating_sub(1),
             col: m.def_col,
-            type_str: m.ty.to_string(),
+            type_str: state.ty_text(&m.ty),
             doc: None,
         });
     }

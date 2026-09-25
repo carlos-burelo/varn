@@ -1,7 +1,7 @@
 
-=== TIR: <fixtures>\generics.vn ===
+=== TIR: <fixtures>/generics.vn ===
 TirModule {
-    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\generics.vn",
+    source_file: "<fixtures>/generics.vn",
     imports: [],
     exports: [],
     types: TyTable {
@@ -31,17 +31,22 @@ TirModule {
                 VtableEntry {
                     name: "get",
                     sig: SigId(
-                        1,
+                        2,
                     ),
                 },
                 VtableEntry {
                     name: "map",
                     sig: SigId(
-                        2,
+                        3,
                     ),
                 },
             ],
             payload_size: 16,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
         },
     ],
     enums: [],
@@ -51,17 +56,17 @@ TirModule {
             return_ty: Void,
         },
         Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
-        },
-        Signature {
             params: [
                 Dynamic(
                     Unannotated,
                 ),
             ],
+            return_ty: Dynamic(
+                Unannotated,
+            ),
+        },
+        Signature {
+            params: [],
             return_ty: Dynamic(
                 Unannotated,
             ),
@@ -91,7 +96,7 @@ TirModule {
         TirFunction {
             name: "identity",
             sig: SigId(
-                3,
+                4,
             ),
             params: [
                 Dynamic(
@@ -221,7 +226,7 @@ TirModule {
         TirFunction {
             name: "Box.constructor",
             sig: SigId(
-                4,
+                1,
             ),
             params: [
                 Dynamic(
@@ -302,7 +307,7 @@ TirModule {
         TirFunction {
             name: "Box.get",
             sig: SigId(
-                1,
+                2,
             ),
             params: [],
             return_ty: Dynamic(
@@ -356,7 +361,7 @@ TirModule {
         TirFunction {
             name: "Box.map",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Dynamic(

@@ -1,0 +1,77 @@
+// `std:math` intrinsics, numeric conversions and pool literals in a compiled
+// body. Float `abs`/`sqrt`/`floor`/`ceil` are single instructions; the rest
+// run the runtime's own dispatch and `convert`. Each function runs past the
+// tiering threshold and has two statements, so it executes compiled instead
+// of being inlined.
+import { abs, sqrt, floor, ceil, round, max, pow } from "std:math";
+
+function nmFloat(x: float): float {
+    const r = sqrt(abs(x)) + floor(x) + ceil(x)
+    return r
+}
+
+function nmWindowed(x: float): float {
+    const r = round(x) + pow(x, 2.0) + max(x, 0.5)
+    return r
+}
+
+function nmConvert(x: float, d: dynamic): int {
+    const a = x as int
+    const b = d as int
+    return a + b
+}
+
+function nmBig(i: int): bigint {
+    const b = (i as bigint) * 12345678901234567890n
+    return b
+}
+
+function nmBigBack(b: bigint): int {
+    const i = (b / 12345678901234567890n) as int
+    return i
+}
+
+function nmDecimal(i: int): decimal {
+    const d = (i as decimal) + 7.9d
+    return d
+}
+
+function nmChar(i: int): int {
+    const c = i % 2 == 0 ? 'y' : 'n'
+    return c === 'y' ? 1 : 0
+}
+
+let fl = 0.0
+let win = 0.0
+let conv = 0
+let bigBack = 0
+let lastDec = 0.0d
+let chars = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    const x = (i % 7) as float - 3.25
+    fl = fl + nmFloat(x)
+    win = win + nmWindowed(x)
+    conv = conv + nmConvert(x, i % 5)
+    bigBack = bigBack + nmBigBack(nmBig(i))
+    lastDec = nmDecimal(i)
+    chars = chars + nmChar(i)
+}
+
+// The same sums computed once, interpreted-style, outside any hot function.
+let expFl = 0.0
+let expWin = 0.0
+let expConv = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    const x = (i % 7) as float - 3.25
+    expFl = expFl + (sqrt(abs(x)) + floor(x) + ceil(x))
+    expWin = expWin + (round(x) + pow(x, 2.0) + max(x, 0.5))
+    expConv = expConv + ((x as int) + i % 5)
+}
+assert("float intrinsics as instructions", fl == expFl)
+assert("windowed intrinsics", win == expWin)
+assert("float and dynamic to int", conv === expConv)
+assert("int to bigint and back", bigBack === 1999000)
+assert("int to decimal", lastDec === 2006.9d)
+assert("char literals", chars === 1000)
+
+print("[PASSED] 149. JIT numeric")

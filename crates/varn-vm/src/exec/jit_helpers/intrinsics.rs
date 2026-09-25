@@ -19,7 +19,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = ctx_ref.stack.box_range(act_id, reg_start, arg_count);
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             let fname = ctx_ref
                 .frames
                 .last()
@@ -31,6 +31,25 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
             eprintln!("INTRINSIC {fname:?} wire={wire_byte:#x} args={tags:?}");
         }
         match crate::exec::intrinsics::dispatch(wire_byte as u8, &args) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// An intrinsic out of the lowering from typed SSA: `[receiver, args...]`
+/// as a boxed `window` of `count` values, dispatched as the interpreter's
+/// `Intrinsic` dispatches them.
+pub(crate) extern "C" fn jit_intrinsic_window(
+    ctx: *mut ExecCtx,
+    wire_byte: usize,
+    window: *const VmValue,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = std::slice::from_raw_parts(window, count);
+        match crate::exec::intrinsics::dispatch(wire_byte as u8, args) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }

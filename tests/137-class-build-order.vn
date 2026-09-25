@@ -1,0 +1,52 @@
+// A class is laid out after its parent whatever their names: `Zebra` sorts
+// after `Horse`, which extends it, and `Horse` must still inherit Zebra's
+// fields at Zebra's slots instead of re-declaring them as its own.
+
+class Zebra {
+    stripes: int
+    constructor(stripes: int) {
+        this.stripes = stripes
+    }
+    describe(): str {
+        return "stripes " + this.stripes
+    }
+}
+
+class Horse extends Zebra {
+    name: str
+    constructor(name: str) {
+        super(0)
+        this.name = name
+    }
+}
+
+// Three levels whose names sort child first.
+class Omega {
+    o: int
+    constructor() {
+        this.o = 3
+    }
+}
+class Mid extends Omega {
+    m: int
+    constructor() {
+        super()
+        this.m = 2
+    }
+}
+class Alpha extends Mid {
+    a: int
+    constructor() {
+        super()
+        this.a = 1
+    }
+}
+
+const horse = new Horse("h")
+assert("subclass sorting before its parent keeps its own field", horse.name == "h")
+assert("subclass sorting before its parent inherits the parent's field", horse.stripes === 0)
+assert("subclass sorting before its parent inherits methods", horse.describe() == "stripes 0")
+const alpha = new Alpha()
+assert("three-level chain sorting child first", alpha.a + alpha.m + alpha.o === 6)
+
+print("[PASSED] 137. Class build order")

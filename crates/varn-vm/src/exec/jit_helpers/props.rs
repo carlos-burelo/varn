@@ -167,7 +167,7 @@ pub(crate) extern "C" fn jit_get_fixed_field(
     unsafe {
         let ctx_ref = &mut *ctx;
         let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             eprintln!(
                 "GETFIX fn={:?} obj_tag={obj_tag:#x} obj_payload={obj_payload:#x} slot={slot}",
                 ctx_ref
@@ -178,7 +178,7 @@ pub(crate) extern "C" fn jit_get_fixed_field(
         }
         match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
             Ok(val) => {
-                if std::env::var_os("VARN_HOME_TRACE").is_some() {
+                if crate::home_trace::enabled() {
                     eprintln!(
                         "GETFIX  -> tag={:#x} payload={:#x}",
                         val.raw_tag(),
@@ -210,7 +210,7 @@ pub(crate) extern "C" fn jit_set_fixed_field(
     }
 }
 
-pub(crate) extern "C" fn jit_get_property_maybe_stub(
+pub(crate) extern "C" fn jit_get_property_maybe(
     ctx: *mut ExecCtx,
     obj_tag: u64,
     obj_payload: u64,

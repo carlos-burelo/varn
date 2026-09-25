@@ -7,8 +7,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::FunctionProto;
 
 use super::alloc::{
-    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
-    store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 use super::emit::{box_bool, call_helper, call_helper_void};
 use super::kinds::K;
@@ -104,7 +103,7 @@ pub(super) fn emit_call_method(
         }
     }
 
-        for i in 0..argc {
+    for i in 0..argc {
         store_home(b, actx, state, arg_start + i);
     }
 
@@ -240,7 +239,7 @@ pub(super) fn emit_invoke_virtual(
         }
     }
 
-        for i in 0..argc {
+    for i in 0..argc {
         store_home(b, actx, state, arg_start + i);
     }
     let this_val = box_or_load_home(b, actx, state, this_reg);

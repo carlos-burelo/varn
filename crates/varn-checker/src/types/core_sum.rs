@@ -17,7 +17,11 @@ impl Type {
         };
         let origin = origin.and_then(&resolve);
         let sum = CoreSum::identify(resolve(name)?.as_ref(), origin.as_ref().map(AsRef::as_ref))?;
-        let args = table.get_list(args).iter().map(|&id| Type(id, false)).collect();
+        let args = table
+            .get_list(args)
+            .iter()
+            .map(|&id| Type(id, false))
+            .collect();
         Some((sum, args))
     }
 }

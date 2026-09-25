@@ -139,7 +139,8 @@ pub trait NativeCtx {
 
     /// Run a VM callable. An exception it throws comes back as the error,
     /// thrown value included: a native propagates it with `?`, never drops it.
-    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, crate::NativeError>;
+    fn call_vm(&mut self, callee: VmValue, args: &[VmValue])
+        -> Result<VmValue, crate::NativeError>;
 
     /// `recv.name` as a callable bound to `recv`, when `recv` has such a
     /// method (how a native reaches a capability like `Comparable.compare`).

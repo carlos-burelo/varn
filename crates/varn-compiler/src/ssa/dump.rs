@@ -47,7 +47,8 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
     let _ = writeln!(out, "    {}", terminator(&block.term));
 }
 
-fn inst_kind(kind: &InstKind) -> String {
+/// One instruction, without its destination.
+pub fn inst_kind(kind: &InstKind) -> String {
     match kind {
         InstKind::ConstInt(n) => format!("int {n}"),
         InstKind::ConstFloat(n) => format!("float {n}"),
@@ -210,6 +211,8 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ModuleSlot { object, slot } => format!("moduleslot {}[{slot}]", val(*object)),
         InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
+        InstKind::StrLength { operand } => format!("strlen {}", val(*operand)),
+        InstKind::ArrayLength { operand } => format!("arrlen {}", val(*operand)),
         InstKind::This => "this".to_owned(),
         InstKind::Range {
             start,
@@ -341,7 +344,8 @@ fn inst_kind(kind: &InstKind) -> String {
     }
 }
 
-fn terminator(term: &Terminator) -> String {
+/// A block terminator.
+pub fn terminator(term: &Terminator) -> String {
     match term {
         Terminator::Return(Some(v)) => format!("return {}", val(*v)),
         Terminator::Return(None) => "return".to_owned(),

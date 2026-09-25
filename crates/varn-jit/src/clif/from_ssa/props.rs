@@ -34,6 +34,26 @@ pub(super) fn emit_array_length(
     ))
 }
 
+/// `s.length` of a `str` — the boxed `int` length.
+pub(super) fn emit_str_length(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    operand: u32,
+) -> Result<Value, String> {
+    let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
+    let ectx = exec_ctx(ctx)?;
+    Ok(super::super::strings::str_length_boxed(
+        b,
+        ctx.cc,
+        ctx.helpers.str_length,
+        ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+        tag,
+        payload,
+    ))
+}
+
 /// `arr.push(value)` — no result.
 pub(super) fn emit_array_push(
     b: &mut FunctionBuilder,
@@ -45,12 +65,7 @@ pub(super) fn emit_array_push(
     let (at, ap) = boxed_parts(b, ctx, values, array)?;
     let (vt, vp) = boxed_parts(b, ctx, values, value)?;
     let ectx = exec_ctx(ctx)?;
-    call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.array_push,
-        &[ectx, at, ap, vt, vp],
-    );
+    call_helper_void(b, ctx.cc, ctx.helpers.array_push, &[ectx, at, ap, vt, vp]);
     Ok(())
 }
 
@@ -106,15 +121,40 @@ pub(super) fn emit_this(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<Value,
     use_heap(b, ctx, 0)
 }
 
-/// `obj.slot` — a class/object field read by dynamic slot.
+/// What a compact field access needs from this body.
+fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::fields::FieldIo<'a>, String> {
+    Ok(super::super::fields::FieldIo {
+        helpers: ctx.helpers,
+        cc: ctx.cc,
+        exec_ctx: exec_ctx(ctx)?,
+    })
+}
+
+/// `obj.field` — a class field at its compact offset, inline (the same
+/// lowering as the bytecode path), or an object/record/enum-payload field by
+/// slot through the helper. The boxed value.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
     object: u32,
     slot: u16,
+    offset: u32,
+    access: varn_core::FieldAccess,
 ) -> Result<Value, String> {
-    let (ot, op) = boxed_parts(b, ctx, values, object)?;
+    let obj = super::heap::boxed_value(b, ctx, values, object)?;
+    if let varn_core::FieldAccess::Compact(kind) = access {
+        return Ok(super::super::fields::load_compact(
+            b,
+            &field_io(ctx)?,
+            obj,
+            offset,
+            kind,
+            slot as usize,
+        ));
+    }
+    let (ot, op) = b.ins().isplit(obj);
     let ectx = exec_ctx(ctx)?;
     let slot_v = b.ins().iconst(types::I64, slot as i64);
     call_helper_void(
@@ -131,7 +171,9 @@ pub(super) fn emit_get_fixed_field(
     ))
 }
 
-/// `obj.slot = value` — a class/object field write by dynamic slot.
+/// `obj.field = value` — a class field at its compact offset, inline for a
+/// nursery receiver (the same lowering as the bytecode path).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_set_fixed_field(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -139,17 +181,12 @@ pub(super) fn emit_set_fixed_field(
     object: u32,
     value: u32,
     slot: u16,
+    offset: u32,
+    kind: Option<varn_core::RuntimeKind>,
 ) -> Result<(), String> {
-    let (ot, op) = boxed_parts(b, ctx, values, object)?;
-    let (vt, vp) = boxed_parts(b, ctx, values, value)?;
-    let ectx = exec_ctx(ctx)?;
-    let slot_v = b.ins().iconst(types::I64, slot as i64);
-    call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.set_fixed_field,
-        &[ectx, ot, op, slot_v, vt, vp],
-    );
+    let obj = super::heap::boxed_value(b, ctx, values, object)?;
+    let val = super::heap::boxed_value(b, ctx, values, value)?;
+    super::super::fields::store_compact(b, &field_io(ctx)?, obj, val, offset, kind, slot as usize);
     Ok(())
 }
 

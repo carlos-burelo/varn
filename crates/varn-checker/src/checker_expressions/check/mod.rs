@@ -2,8 +2,8 @@ mod binary_ops;
 mod calls;
 mod contextual;
 mod exhaustiveness;
-mod operator_capability;
 pub(crate) mod members;
+mod operator_capability;
 
 use super::helpers::closest_in_list;
 use crate::binder::BindResult;
@@ -687,7 +687,7 @@ impl<'r> Checker<'r> {
                     self.current_scope = saved_scope;
                 }
                 let subject_ty = self.infer_type(subject, bind);
-                self.check_match_exhaustiveness(&subject_ty, &cases, &range, bind);
+                self.check_match_exhaustiveness(expr, &subject_ty, &cases, &range, bind);
             }
 
             ExprKind::Update { operand, .. } => {

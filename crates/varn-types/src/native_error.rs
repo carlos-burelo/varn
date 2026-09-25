@@ -31,7 +31,11 @@ impl NativeError {
     }
 
     /// An exception a VM callback threw, rethrown as is.
-    pub fn rethrow(kind: RuntimeErrorKind, message: impl Into<String>, thrown: Option<VmValue>) -> Self {
+    pub fn rethrow(
+        kind: RuntimeErrorKind,
+        message: impl Into<String>,
+        thrown: Option<VmValue>,
+    ) -> Self {
         Self {
             kind,
             message: message.into(),

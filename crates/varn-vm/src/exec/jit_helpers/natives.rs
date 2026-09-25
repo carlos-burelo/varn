@@ -55,19 +55,52 @@ pub(crate) extern "C" fn jit_call_native(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let f: varn_types::NativeFn = if fn_addr != 0 {
-            std::mem::transmute(fn_addr)
-        } else {
-            match varn_builtins::native_op_fn(op_id) {
-                Some(f) => f,
-                None => jit_propagate_error(
-                    ctx_ref,
-                    crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
-                ),
-            }
-        };
+        let f = resolve_native(ctx_ref, fn_addr, op_id);
         let res = call_native_from_homes(ctx_ref, f, act_id, reg_start, total);
         ctx_ref.jit_native_result = res;
+    }
+}
+
+/// As [`jit_call_native`], for a caller whose `[receiver, args...]` are not
+/// in contiguous homes (the lowering from typed SSA): a boxed `window` of
+/// `total` values. Every heap value in it is also in its SSA value's home,
+/// a GC root, for the length of the call.
+pub(crate) extern "C" fn jit_call_native_window(
+    ctx: *mut ExecCtx,
+    fn_addr: usize,
+    op_id: u64,
+    window: *const VmValue,
+    total: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let f = resolve_native(ctx_ref, fn_addr, op_id);
+        ctx_ref.record_call_native(f, None);
+        let args = std::slice::from_raw_parts(window, total);
+        ctx_ref.jit_native_result = match ctx_ref.invoke_native(f, args) {
+            Ok(v) => v,
+            Err(err) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::from(err)),
+        };
+    }
+}
+
+/// The native a call site targets: the address resolved at compile time,
+/// or — `fn_addr == 0` — the op-id's entry, looked up now (an unknown op-id
+/// raises a VM error).
+unsafe fn resolve_native(
+    ctx_ref: &mut ExecCtx,
+    fn_addr: usize,
+    op_id: u64,
+) -> varn_types::NativeFn {
+    if fn_addr != 0 {
+        return std::mem::transmute::<usize, varn_types::NativeFn>(fn_addr);
+    }
+    match varn_builtins::native_op_fn(op_id) {
+        Some(f) => f,
+        None => jit_propagate_error(
+            ctx_ref,
+            crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
+        ),
     }
 }
 
@@ -82,7 +115,7 @@ unsafe fn call_native_from_homes(
 ) -> VmValue {
     ctx_ref.record_call_native(f, None);
     let args = ctx_ref.stack.box_range(act_id, reg_start, total);
-    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+    if crate::home_trace::enabled() {
         let fname = ctx_ref
             .frames
             .last()

@@ -1,5 +1,6 @@
 pub mod dump;
 pub mod emit;
+pub(crate) mod ic;
 pub mod ir;
 pub mod liveness;
 pub mod portable;

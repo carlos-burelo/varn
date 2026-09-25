@@ -50,6 +50,7 @@ enum Key {
     Unary(HirUnOp, HirType, u32),
     IsNull(u32),
     IsArray(u32),
+    StrLength(u32),
     EnumTag(u32),
 
     // Memory-dependent from here down; see `loads`.
@@ -141,6 +142,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::Unary { op, operand, ty } => Key::Unary(*op, *ty, id(*operand)),
         InstKind::IsNull { operand } => Key::IsNull(id(*operand)),
         InstKind::IsArray { operand } => Key::IsArray(id(*operand)),
+        InstKind::StrLength { operand } => Key::StrLength(id(*operand)),
         InstKind::GetEnumTag { operand } => Key::EnumTag(id(*operand)),
 
         InstKind::GetFixedField { object, slot, .. } => Key::FixedField(id(*object), *slot),

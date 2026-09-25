@@ -537,9 +537,7 @@ impl<'r> Checker<'r> {
                 }
             }
             TypeKind::Array(inner) => {
-                let atom = self
-                    .resolver
-                    .intern(varn_core::BuiltinType::Array.name());
+                let atom = self.resolver.intern(varn_core::BuiltinType::Array.name());
                 let array_ty = Type::generic_atom(
                     atom,
                     vec![Type(inner, false)],
@@ -578,9 +576,7 @@ impl<'r> Checker<'r> {
                 if let Some(info) = intrinsic_member_info(bind, name, key) {
                     Some(info)
                 } else if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) {
-                    let atom = self
-                        .resolver
-                        .intern(varn_core::BuiltinType::Range.name());
+                    let atom = self.resolver.intern(varn_core::BuiltinType::Range.name());
                     let range_ty =
                         Type::named_atom(atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     self.find_member_info_uncached(&range_ty, key, bind)

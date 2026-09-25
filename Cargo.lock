@@ -2223,6 +2223,7 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-tir",
  "varn-types",
 ]
 
@@ -2320,7 +2321,6 @@ dependencies = [
  "bigdecimal",
  "memchr",
  "num-bigint",
- "num-traits",
  "postcard",
  "rustc-hash 1.1.0",
  "serde",

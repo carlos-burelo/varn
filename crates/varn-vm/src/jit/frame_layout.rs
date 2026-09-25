@@ -172,8 +172,7 @@ pub(crate) fn probe() -> varn_jit::JitFrameLayout {
     let dyn_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, dyn_) + vec_ptr_off;
 
     // --- FrameStore.allocs: per-activation class bases. ---
-    let allocs_ptr_offset =
-        stack_off + std::mem::offset_of!(FrameStore, allocs) + vec_ptr_off;
+    let allocs_ptr_offset = stack_off + std::mem::offset_of!(FrameStore, allocs) + vec_ptr_off;
     let alloc_size = std::mem::size_of::<crate::frame_store::FrameAlloc>();
     let alloc_bases_offset = std::mem::offset_of!(crate::frame_store::FrameAlloc, bases);
     assert_eq!(
@@ -234,14 +233,11 @@ mod tests {
         let base = &store as *const crate::frame_store::FrameStore as *const u8;
 
         unsafe {
-            let gpr =
-                *(base.add(lay.gpr_ptr_offset - stack_off) as *const *const i64);
-            let fpr =
-                *(base.add(lay.fpr_ptr_offset - stack_off) as *const *const f64);
-            let refs =
-                *(base.add(lay.refs_ptr_offset - stack_off) as *const *const u32);
-            let dyn_ = *(base.add(lay.dyn_ptr_offset - stack_off)
-                as *const *const varn_types::VmValue);
+            let gpr = *(base.add(lay.gpr_ptr_offset - stack_off) as *const *const i64);
+            let fpr = *(base.add(lay.fpr_ptr_offset - stack_off) as *const *const f64);
+            let refs = *(base.add(lay.refs_ptr_offset - stack_off) as *const *const u32);
+            let dyn_ =
+                *(base.add(lay.dyn_ptr_offset - stack_off) as *const *const varn_types::VmValue);
             assert_eq!(gpr, store.gpr.as_ptr());
             assert_eq!(fpr, store.fpr.as_ptr());
             assert_eq!(refs, store.refs.as_ptr());
@@ -250,7 +246,10 @@ mod tests {
 
         // `FrameAlloc.bases` is the first `#[repr(C)]` field: the JIT reads it
         // at offset 0 from an activation's `FrameAlloc`.
-        assert_eq!(std::mem::offset_of!(crate::frame_store::FrameAlloc, bases), 0);
+        assert_eq!(
+            std::mem::offset_of!(crate::frame_store::FrameAlloc, bases),
+            0
+        );
     }
 
     /// `allocs[act_id].bases` resolved through the probed offsets must match
@@ -260,10 +259,15 @@ mod tests {
         use varn_types::register_meta::{RegisterMeta, SlotKind};
         let mut proto = varn_types::FunctionProto::default();
         proto.register_count = 4;
-        proto.register_meta = [SlotKind::Dynamic, SlotKind::Int, SlotKind::Float, SlotKind::Ref]
-            .iter()
-            .map(|&kind| RegisterMeta { kind })
-            .collect();
+        proto.register_meta = [
+            SlotKind::Dynamic,
+            SlotKind::Int,
+            SlotKind::Float,
+            SlotKind::Ref,
+        ]
+        .iter()
+        .map(|&kind| RegisterMeta { kind })
+        .collect();
         let proto = std::rc::Rc::new(proto);
 
         let mut store = crate::frame_store::FrameStore::new();

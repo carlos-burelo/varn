@@ -126,11 +126,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     while offset < proto.chunk.code.len() {
         if let Some(info) = decode(&proto.chunk.code, offset, &proto.chunk.constants) {
             if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move) {
-                let w1 = proto.chunk.code[offset + 1];
-                let dest = (proto.chunk.code[offset] >> 8) as u8;
-                let src = (w1 >> 8) as u8;
-                if dest >= base && src >= base {
-                    copies.push((dest, src));
+                if let (Some(dest), Some(&src)) = (info.def, info.uses.first()) {
+                    if dest >= base && src >= base {
+                        copies.push((dest, src));
+                    }
                 }
             }
             offset += info.len;
@@ -157,23 +156,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    if !verify_call_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
+    if !verify_run_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
         return;
     }
 
     if !verify_callee_frame_constraints(&scan, &mapping) {
-        return;
-    }
-
-    if !verify_build_array_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
-        return;
-    }
-
-    if !verify_build_object_with_shape_constraints(
-        &proto.chunk.code,
-        &proto.chunk.constants,
-        &mapping,
-    ) {
         return;
     }
 
@@ -230,12 +217,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     // bytecode uses, so it must follow the same permutation. Without this,
     // `from_ssa` would write a heap value into the pre-coalescing register,
     // whose post-coalescing class is a different (possibly scalar) slot.
-    if let Some(ssa) = proto.ssa.as_mut() {
-        let ssa = std::sync::Arc::make_mut(ssa);
-        for r in ssa.regs.iter_mut() {
-            let old = *r as u8;
-            *r = mapping.get(&old).copied().unwrap_or(old) as u32;
-        }
+    if let Some(ssa) = proto.ssa.get_mut() {
+        ssa.map_registers(|r| {
+            let old = r as u8;
+            mapping.get(&old).copied().unwrap_or(old) as u32
+        });
         ssa.register_count = proto.register_count;
     }
 }

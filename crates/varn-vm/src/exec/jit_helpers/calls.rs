@@ -105,6 +105,47 @@ pub(crate) extern "C" fn jit_call_method_flat(
     }
 }
 
+/// A method call out of the lowering from typed SSA: `window` holds the
+/// receiver then the arguments, boxed, and `name_idx` / `cs` are the calling
+/// function's constant and cache slot. It runs the interpreter's own
+/// [`ExecCtx::call_method`] (one resolution, one inline cache) on those
+/// values and runs a VM method it pushes to completion. Every heap value in
+/// the window is also in its SSA value's home, a GC root, for the call.
+pub(crate) extern "C" fn jit_call_method_window(
+    ctx: *mut ExecCtx,
+    name_idx: usize,
+    cs: usize,
+    window: *const VmValue,
+    total: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure_ptr;
+        let window = std::slice::from_raw_parts(window, total);
+        let args = crate::exec::method_args::MethodArgs::Boxed(&window[1..]);
+        let outcome = ctx_ref.call_method(window[0], name_idx, cs, args, frame_idx, closure_ref);
+        let result = match outcome {
+            Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Ok(v),
+            Ok(crate::exec::method_args::MethodOutcome::FramePushed) => {
+                ctx_ref.run_until(caller_depth)
+            }
+            Err(e) => Err(e),
+        };
+        match result {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => {
+                while ctx_ref.frames.len() > caller_depth {
+                    let f = ctx_ref.frames.pop().unwrap();
+                    ctx_ref.close_upvalues_in(f.base);
+                }
+                jit_propagate_error(ctx_ref, e);
+            }
+        }
+    }
+}
+
 /// The single canonical VM call out of compiled code. The compiled caller has
 /// flushed `[callee, args...]` to the homes of registers
 /// `arg_start..arg_start + argc` in activation `act_id`; this gathers them and
@@ -194,8 +235,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
         if !callee.is_heap() {
             return 0;
         }
-        let Some(crate::heap::HeapObj::VmClosure(closure)) =
-            ctx_ref.heap.get(callee.as_heap_idx())
+        let Some(crate::heap::HeapObj::VmClosure(closure)) = ctx_ref.heap.get(callee.as_heap_idx())
         else {
             return 0;
         };
@@ -212,7 +252,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
                 Ok(a) => a,
                 Err(e) => jit_propagate_error(ctx_ref, e),
             };
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             let copied: Vec<String> = (0..arg_count)
                 .map(|i| {
                     let v = ctx_ref.stack.box_reg(callee_alloc, i);
@@ -259,32 +299,69 @@ pub(crate) extern "C" fn clif_call_self(
     argc: usize,
 ) {
     unsafe {
+        call_running_closure(&mut *ctx, argc, |ctx, callee, i| {
+            ctx.stack.mov_cross(callee, i, act_id, arg_start + i)
+        });
+    }
+}
+
+/// As [`clif_call_self`], for a caller whose arguments are not in contiguous
+/// homes (the lowering from typed SSA): they arrive as a boxed `window`,
+/// placeholder first. The window lives on the native stack, which the
+/// collector does not see, and pushing a frame can collect, so it is copied
+/// into staging — a root — before anything else.
+pub(crate) extern "C" fn jit_call_self_window(
+    ctx: *mut ExecCtx,
+    window: *const VmValue,
+    argc: usize,
+) {
+    unsafe {
         let ctx_ref = &mut *ctx;
-        let caller_depth = ctx_ref.frames.len();
-        let frame_idx = caller_depth - 1;
-        // The running closure is borrowed, not owned: `CallFrame::new` keeps it
-        // alive through the caller's frame (frames form a chain). Avoids
-        // requiring `_owned_closure`, which the entry frame may not carry.
-        let closure_ptr = ctx_ref.frames[frame_idx].closure_ptr;
-        let closure_ref = &*closure_ptr;
-        let proto = closure_ref.proto.clone();
-        let callee_alloc = ctx_ref.stack.push_frame(&proto);
-        for i in 0..argc {
-            if let Err(e) = ctx_ref
-                .stack
-                .mov_cross(callee_alloc, i, act_id, arg_start + i)
-            {
-                ctx_ref.stack.pop_frame();
-                jit_propagate_error(ctx_ref, e);
-            }
-        }
+        ctx_ref.stage.clear();
         ctx_ref
-            .frames
-            .push(crate::frame::CallFrame::new(closure_ref, callee_alloc));
-        match ctx_ref.run_until(caller_depth) {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
+            .stage
+            .extend_from_slice(std::slice::from_raw_parts(window, argc));
+        call_running_closure(ctx_ref, argc, |ctx, callee, i| {
+            let v = ctx.stage[i];
+            let addr = ctx.stack.addr_of(callee, i);
+            ctx.stack.set_addr(addr, v)
+        });
+    }
+}
+
+/// Push a fresh activation of the running closure, fill its `argc` argument
+/// registers with `place(ctx, callee_activation, i)`, and run it to
+/// completion; the result goes to `jit_native_result`.
+unsafe fn call_running_closure(
+    ctx_ref: &mut ExecCtx,
+    argc: usize,
+    mut place: impl FnMut(&mut ExecCtx, usize, usize) -> crate::error::VmResult<()>,
+) {
+    let caller_depth = ctx_ref.frames.len();
+    let frame_idx = caller_depth - 1;
+    // The running closure is borrowed, not owned: `CallFrame::new` keeps it
+    // alive through the caller's frame (frames form a chain). Avoids
+    // requiring `_owned_closure`, which the entry frame may not carry.
+    let closure_ptr = ctx_ref.frames[frame_idx].closure_ptr;
+    let closure_ref = &*closure_ptr;
+    let proto = closure_ref.proto.clone();
+    let callee_alloc = ctx_ref.stack.push_frame(&proto);
+    for i in 0..argc {
+        if let Err(e) = place(ctx_ref, callee_alloc, i) {
+            ctx_ref.stack.pop_frame();
+            ctx_ref.stage.clear();
+            jit_propagate_error(ctx_ref, e);
         }
+    }
+    // The arguments are in the callee's homes now; staging is free for the
+    // calls the callee makes.
+    ctx_ref.stage.clear();
+    ctx_ref
+        .frames
+        .push(crate::frame::CallFrame::new(closure_ref, callee_alloc));
+    match ctx_ref.run_until(caller_depth) {
+        Ok(v) => ctx_ref.jit_native_result = v,
+        Err(e) => jit_propagate_error(ctx_ref, e),
     }
 }
 

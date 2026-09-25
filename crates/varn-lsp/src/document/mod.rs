@@ -2,15 +2,20 @@ mod chain_queries;
 pub mod import;
 pub mod position;
 mod resolution;
+mod semantic_db;
 mod symbol_queries;
+mod symbol_view;
+mod types;
 
 use rustc_hash::FxHashMap;
 use std::collections::{HashMap, HashSet};
 
-use varn_checker::{ScopeArena, SymbolArena, SymbolKind, Type};
+use varn_checker::{SymbolKind, Type};
 use varn_core::TokenKind;
 
 pub use import::{import_path_at, named_import_module_at, named_imported_names_at, uri_to_path};
+pub use semantic_db::SemanticDB;
+pub use symbol_view::SymbolView;
 
 #[derive(Clone, Debug)]
 pub struct RelatedLocation {
@@ -31,144 +36,6 @@ pub struct LspDiag {
     pub code: Option<varn_core::ErrorCode>,
     pub related: Vec<RelatedLocation>,
     pub suggestions: Vec<varn_core::Suggestion>,
-}
-
-/// A symbol the checker bound, viewed as the editor needs it.
-///
-/// Borrows `varn_checker::Symbol` — it does not copy it. What used to sit here
-/// was `SymbolView<'_>`: the same twenty fields *materialized* for every symbol on
-/// every keystroke, with the signature pre-flattened into `String`s and the type
-/// cloned. Everything below the first two fields is derived on demand, so the
-/// editor always reports what the checker currently holds.
-#[derive(Clone, Copy)]
-pub struct SymbolView<'a> {
-    pub id: varn_checker::SymbolId,
-    pub sym: &'a varn_checker::symbol::Symbol,
-    uri: &'a str,
-    ty: &'a Type,
-}
-
-/// `Type::Dynamic` as a borrowable constant, for symbols the checker left
-/// untyped.
-fn dynamic_ty() -> &'static Type {
-    use std::sync::OnceLock;
-    // `Type` is `Rc`-based and therefore not `Sync`; the analysis thread is the
-    // only thread that ever reads this, and `OnceLock` here would require it.
-    // A thread-local leak gives a `'static` borrow without that bound.
-    thread_local! {
-        static DYNAMIC: &'static Type = Box::leak(Box::new(Type::Dynamic));
-    }
-    let _ = std::marker::PhantomData::<OnceLock<()>>;
-    DYNAMIC.with(|d| *d)
-}
-
-impl std::fmt::Debug for SymbolView<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SymbolView")
-            .field("name", &self.name())
-            .field("kind", &self.kind())
-            .finish()
-    }
-}
-
-impl<'a> SymbolView<'a> {
-    pub fn name(&self) -> &'a str {
-        self.sym.name.as_ref()
-    }
-    pub fn kind(&self) -> SymbolKind {
-        self.sym.kind
-    }
-    pub fn ty(&self) -> &'a Type {
-        self.ty
-    }
-    /// 0-based, as LSP positions are; the checker counts from 1.
-    pub fn line(&self) -> u32 {
-        self.sym.line.saturating_sub(1)
-    }
-    pub fn col(&self) -> u32 {
-        self.sym.col
-    }
-    pub fn end_line(&self) -> u32 {
-        if self.sym.full_range.end.line > 0 {
-            self.sym.full_range.end.line.saturating_sub(1)
-        } else {
-            self.line()
-        }
-    }
-    pub fn end_col(&self) -> u32 {
-        if self.sym.full_range.end.line > 0 {
-            self.sym.full_range.end.column
-        } else {
-            self.sym.col + self.name().chars().count() as u32
-        }
-    }
-    pub fn full_range(&self) -> varn_core::SourceRange {
-        self.sym.full_range
-    }
-    pub fn doc(&self) -> Option<&'a str> {
-        self.sym.doc.as_deref()
-    }
-    pub fn origin(&self) -> Option<&'a str> {
-        self.sym.origin_module.as_deref()
-    }
-    pub fn is_async(&self) -> bool {
-        self.sym.is_async
-    }
-    pub fn is_generator(&self) -> bool {
-        self.sym.is_generator
-    }
-    pub fn has_explicit_type(&self) -> bool {
-        self.sym.has_explicit_type
-    }
-    pub fn type_params(&self) -> Vec<String> {
-        self.sym.type_params.iter().map(|s| s.to_string()).collect()
-    }
-    pub fn is_arrow(&self) -> bool {
-        matches!(&self.ty.0, varn_core::TypeKind::Fn(ft) if ft.is_arrow)
-    }
-    pub fn is_from_stdlib(&self) -> bool {
-        self.origin().is_some_and(|m| {
-            m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")
-        })
-    }
-    /// A function reads as its return type; everything else as its own.
-    pub fn type_str(&self) -> String {
-        match (&self.ty.0, self.kind()) {
-            (varn_core::TypeKind::Fn(ft), SymbolKind::Function | SymbolKind::Method) => {
-                ft.return_type.to_string()
-            }
-            _ => self.ty.to_string(),
-        }
-    }
-    pub fn params_str(&self) -> String {
-        match &self.ty.0 {
-            varn_core::TypeKind::Fn(ft) => ft
-                .params
-                .iter()
-                .map(|p| {
-                    format!(
-                        "{}: {}{}",
-                        p.name.as_deref().unwrap_or("_"),
-                        p.ty,
-                        if p.optional { "?" } else { "" }
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", "),
-            _ => String::new(),
-        }
-    }
-    pub fn global_key(&self, is_global: bool) -> String {
-        crate::pipeline::stable_global_key(
-            self.uri,
-            self.name(),
-            self.kind(),
-            Some(self.id),
-            self.origin(),
-            self.sym.original_name.as_deref(),
-            is_global,
-        )
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -228,63 +95,6 @@ pub enum SymbolTarget {
     },
 }
 
-pub struct SemanticDB {
-    pub expr_table: FxHashMap<varn_core::ast::AstId, varn_checker::TypeEntry>,
-
-    pub expr_types: FxHashMap<u32, varn_checker::ExprInfo>,
-    pub node_scopes: FxHashMap<u32, varn_checker::ScopeId>,
-    pub scope_spans: Vec<varn_checker::checker::ScopeSpan>,
-    pub symbol_types: FxHashMap<varn_checker::SymbolId, varn_checker::Type>,
-
-    pub arena: SymbolArena,
-
-    pub scopes: ScopeArena,
-
-    pub global_scope: varn_checker::ScopeId,
-
-    pub flattened_members: FxHashMap<String, Vec<varn_checker::types::ClassMemberInfo>>,
-
-    pub member_resolutions: FxHashMap<u32, varn_checker::MemberResolution>,
-
-    pub call_resolutions: FxHashMap<u32, varn_checker::CallResolution>,
-
-    pub bind: varn_checker::BindResult,
-}
-
-impl SemanticDB {
-    pub fn resolve_at(
-        &self,
-        name: &str,
-        cursor_offset: u32,
-    ) -> Option<(varn_checker::SymbolId, varn_checker::Type)> {
-        let scope_id = self.scope_at_offset(cursor_offset);
-        let scope = self.scopes.get(scope_id);
-        let sym_id = scope.resolve(name, &self.scopes)?;
-        let ty = self
-            .symbol_types
-            .get(&sym_id)
-            .cloned()
-            .or_else(|| self.arena.get(sym_id).ty.clone())
-            .unwrap_or(varn_checker::Type::Dynamic);
-        Some((sym_id, ty))
-    }
-
-    pub fn scope_at_offset(&self, cursor_offset: u32) -> varn_checker::ScopeId {
-        let mut best_scope = self.global_scope;
-        let mut best_span_len = u32::MAX;
-        for span in &self.scope_spans {
-            if cursor_offset >= span.start && cursor_offset <= span.end {
-                let span_len = span.end.saturating_sub(span.start);
-                if span_len < best_span_len {
-                    best_span_len = span_len;
-                    best_scope = span.scope;
-                }
-            }
-        }
-        best_scope
-    }
-}
-
 pub struct DocumentState {
     pub source: String,
     pub uri: String,
@@ -313,6 +123,8 @@ pub struct DocumentState {
     pub import_paths: Vec<String>,
     pub spatial_index: crate::query::SpatialIndex,
     pub ast: Option<varn_core::ast::Program>,
+    /// The nodes `ast`'s ids point into.
+    pub ast_arena: varn_core::ast::AstArena,
 }
 
 // `DocumentState` is deliberately neither `Send` nor `Sync`. It is built on
@@ -345,8 +157,8 @@ impl DocumentState {
             | SymbolKind::Interface
             | SymbolKind::Enum
             | SymbolKind::Struct
-            | SymbolKind::Namespace => varn_checker::Type::named(sym.name().to_owned()),
-            _ => sym.ty().clone(),
+            | SymbolKind::Namespace => self.db.named_type(sym.name()),
+            _ => *sym.ty(),
         };
         self.members_of_type(&ty)
     }
@@ -354,8 +166,18 @@ impl DocumentState {
     /// The members reachable on `ty`, asked of the checker.
     pub fn members_of_type(&self, ty: &Type) -> Vec<varn_checker::ResolvedMemberSummary> {
         crate::workspace::resolver::with_resolver(|r| {
-            varn_checker::get_members_of_type(r, ty, &self.db.bind)
+            varn_checker::get_members_of_type(r, ty, &self.db.bind, &mut self.db.types.borrow_mut())
         })
+    }
+
+    /// The text of `atom`.
+    pub fn name(&self, atom: varn_core::Atom) -> &str {
+        self.db.name(atom)
+    }
+
+    /// `ty` as source text.
+    pub fn ty_text(&self, ty: &Type) -> String {
+        self.db.ty_text(ty)
     }
 
     /// Every symbol of this document, as a view over the checker's arena.
@@ -374,7 +196,8 @@ impl DocumentState {
                 .resolved_types
                 .get(&id)
                 .or(self.db.arena.get(id).ty.as_ref())
-                .unwrap_or_else(|| dynamic_ty()),
+                .unwrap_or(&symbol_view::DYNAMIC_TY),
+            db: &self.db,
         }
     }
 
@@ -402,10 +225,9 @@ impl DocumentState {
         if let Some((sid, _)) = self.db.resolve_at(&token.lexeme, token.offset) {
             return Some(sid);
         }
-        if let Some(sid) = self
-            .db
-            .arena
-            .find_id_by_name_and_line(&token.lexeme, token.line + 1)
+        let atom = self.db.bind.interner.get(&token.lexeme);
+        if let Some(sid) =
+            atom.and_then(|a| self.db.arena.find_id_by_name_and_line(a, token.line + 1))
         {
             return Some(sid);
         }
@@ -418,9 +240,12 @@ impl DocumentState {
             return None;
         }
         let sym = self.db.arena.get(id);
-        let name = sym.name.to_string();
-        if let Some(origin_mod) = &sym.origin_module {
-            let canonical_name = sym.original_name.as_deref().unwrap_or(&name).to_string();
+        let name = self.name(sym.name).to_owned();
+        if let Some(origin_mod) = sym.origin_module.map(|a| self.name(a)) {
+            let canonical_name = sym
+                .original_name
+                .map(|a| self.name(a).to_owned())
+                .unwrap_or_else(|| name.clone());
             let origin_uri = if origin_mod.starts_with("file://")
                 || origin_mod.starts_with("std:")
                 || origin_mod.starts_with("core:")
@@ -484,10 +309,10 @@ impl DocumentState {
             return None;
         }
         let sym = self.db.arena.get(id);
-        let name = sym.name.as_ref();
+        let name = self.name(sym.name);
         let kind = sym.kind;
-        let origin = sym.origin_module.as_deref();
-        let original_name = sym.original_name.as_deref();
+        let origin = sym.origin_module.map(|a| self.name(a));
+        let original_name = sym.original_name.map(|a| self.name(a));
 
         if let Some(origin_mod) = origin {
             let canonical_name = original_name.unwrap_or(name);

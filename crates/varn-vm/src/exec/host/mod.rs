@@ -24,7 +24,10 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_str_dynamic(s)
     }
 
-    fn map_key(&mut self, v: VmValue) -> Result<varn_types::value::MapKey, varn_types::NativeError> {
+    fn map_key(
+        &mut self,
+        v: VmValue,
+    ) -> Result<varn_types::value::MapKey, varn_types::NativeError> {
         let v = self.hashable_key(v)?;
         Ok(self.heap.canonical_map_key(v))
     }
@@ -302,7 +305,11 @@ impl NativeCtx for ExecCtx {
         None
     }
 
-    fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, varn_types::NativeError> {
+    fn call_vm(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<VmValue, varn_types::NativeError> {
         // The window is `[callee, args...]`, the exact shape the interpreter's
         // callee slot + arguments and the compiled caller's flushed staging
         // produce; `invoke` is the single run-to-completion entry.

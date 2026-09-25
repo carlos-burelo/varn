@@ -1,0 +1,63 @@
+// `a?.b` is `null` whenever `a` is, so its type is the member's made
+// nullable: a compiled body must be able to hold `null` where the member is
+// an `int`, a `float` or a `bool`. Each function runs past the tiering
+// threshold and has two statements, so it executes compiled instead of being
+// inlined.
+
+class OcLeaf {
+    count: int
+    ratio: float
+    on: bool
+    constructor(count: int) {
+        this.count = count
+        this.ratio = (count as float) * 0.5
+        this.on = count % 2 == 0
+    }
+}
+
+class OcBox {
+    leaf: OcLeaf?
+}
+
+function ocCount(b: OcBox): int {
+    const c = b.leaf?.count
+    return c ?? -1
+}
+
+function ocRatio(b: OcBox): float {
+    const r = b.leaf?.ratio
+    return r ?? -1.0
+}
+
+function ocOn(b: OcBox): int {
+    const o = b.leaf?.on
+    if (o == null) { return 2 }
+    return o ? 1 : 0
+}
+
+function ocIsNull(b: OcBox): bool {
+    const c = b.leaf?.count
+    return c == null
+}
+
+let counts = 0
+let ratios = 0.0
+let ons = 0
+let nulls = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    const b = new OcBox()
+    if (i % 2 == 0) { b.leaf = new OcLeaf(i) }
+    counts = counts + ocCount(b)
+    ratios = ratios + ocRatio(b)
+    ons = ons + ocOn(b)
+    if (ocIsNull(b)) { nulls = nulls + 1 }
+}
+
+// Even i hold a leaf: sum of even i, and -1 for each of the 1000 odd ones.
+assert("an int member through ?.", counts === 999000 - 1000)
+assert("a float member through ?.", ratios == 999000 * 0.5 - 1000.0)
+// Even leaves are all `on` (1); empty boxes give 2.
+assert("a bool member through ?.", ons === 1000 * 1 + 1000 * 2)
+assert("?. on a null receiver is null", nulls === 1000)
+
+print("[PASSED] 152. JIT optional chains")

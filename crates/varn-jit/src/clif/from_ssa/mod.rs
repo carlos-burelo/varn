@@ -23,16 +23,26 @@
 //!   needs `(stack, closure, base, exec_ctx, args…)`.
 //!
 //! Module split by domain (each file owns one invariant):
-//! * this file — driver, eligibility, block/phi plumbing, value storage;
+//! * this file — driver, eligibility, block/phi plumbing;
+//! * [`cfg`] — the compiled CFG: reachable blocks, order, loops;
+//! * [`store`] — where a value lives and how a result lands there;
 //! * [`scalar`] — native scalar ops (arith/compare/bitwise/negate);
+//! * [`arrays`] — inline element access on proven arrays;
 //! * [`boxed`] — ops whose semantics live behind a boxed runtime helper;
 //! * [`globals`] — module-relative global reads;
 //! * [`call`] — self-recursion and cross-proto calls;
+//! * [`numeric`] — `std:math` intrinsics and numeric conversions;
+//! * [`pool`] — constant-pool literals;
+//! * [`closures`] — closure creation, captured variables and upvalues;
+//! * [`exceptions`] — `try` regions (resumed interpreted) and `throw`;
+//! * [`views`] — array views cached between safepoints;
+//! * [`induction`] — loop counters whose step cannot overflow;
+//! * [`osr`] — resuming a running frame at a loop header;
 //! * [`term`] — terminators and the branch/jump argument windows.
 
 use cranelift_codegen::ir::{
-    types, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, MemFlags, StackSlotData,
-    StackSlotKind, UserExternalName, UserFuncName, Value,
+    ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, UserExternalName, UserFuncName,
+    Value,
 };
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -45,15 +55,28 @@ use super::lower::ClifLinker;
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
 
+mod arrays;
 mod boxed;
 mod call;
+mod cfg;
 mod classops;
+mod closures;
+mod dynop;
+mod exceptions;
 mod globals;
 mod heap;
 mod heapvalue;
+mod induction;
+mod numeric;
+mod osr;
+mod pool;
 mod props;
 mod scalar;
+mod store;
 mod term;
+mod views;
+
+use store::{clif_ty, def_heap, is_heap, land, load_value, use_heap, Out};
 
 /// Frame resources a frame-aware body needs for global access, calls and home
 /// storage. `base` is the activation id (raw ABI param 2).
@@ -62,6 +85,8 @@ pub(super) struct FrameIo<'a> {
     pub closure: Value,
     pub base: Value,
     pub linker: &'a dyn ClifLinker,
+    /// Register → (class, index): where each register's home is.
+    pub layout: varn_types::register_meta::FrameLayout,
 }
 
 /// Everything an instruction emission needs that is not the builder or the
@@ -77,127 +102,27 @@ pub(super) struct Ctx<'a> {
     pub self_ref: FuncRef,
     /// `Some` iff this body is frame-aware (heap/globals/calls).
     pub frame: Option<FrameIo<'a>>,
-    /// When true (frame-aware), the homes are authoritative for EVERY register,
-    /// scalar included — the interpreter's model. This is what lets closures,
-    /// `Try` resume and OSR read a scalar out of its home. A leaf body keeps
-    /// scalars in CLIF registers only.
-    pub homes_all: bool,
-}
-
-/// Whether an SSA value is stored in a home rather than a CLIF register.
-pub(super) fn is_heap(kind: SlotKind) -> bool {
-    matches!(kind, SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic)
-}
-
-pub(super) fn get(values: &[Option<Value>], v: u32) -> Result<Value, String> {
-    values
-        .get(v as usize)
-        .copied()
-        .flatten()
-        .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
-}
-
-/// Read a value: scalars from the CLIF map, heap values from their home. In a
-/// frame-aware body every value lives in its home.
-pub(super) fn load_value(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    values: &[Option<Value>],
-    v: u32,
-) -> Result<Value, String> {
-    let kind = ctx.ssa.value_ty(v);
-    if ctx.homes_all || is_heap(kind) {
-        load_home_value(b, ctx, ctx.ssa.reg(v), kind)
-    } else {
-        get(values, v)
-    }
-}
-
-/// Read `reg`'s home and unbox it into `kind`'s native representation.
-pub(super) fn load_home_value(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    reg: u32,
-    kind: SlotKind,
-) -> Result<Value, String> {
-    let boxed = use_heap(b, ctx, reg)?;
-    heap::unbox_dest(b, kind, boxed)
-}
-
-/// Write a native scalar value to its home (boxing it), for a frame-aware body.
-pub(super) fn store_home_value(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    value: u32,
-    native: Value,
-) -> Result<(), String> {
-    let kind = ctx.ssa.value_ty(value);
-    let boxed = match kind {
-        SlotKind::Int => super::emit::box_int(b, native),
-        SlotKind::Float => super::emit::box_f64(b, native),
-        SlotKind::Bool => super::emit::box_bool(b, native),
-        _ => native,
-    };
-    def_heap(b, ctx, ctx.ssa.reg(value), boxed)
-}
-
-/// Write a boxed heap value to `reg`'s home (the GC root).
-pub(super) fn def_heap(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    reg: u32,
-    boxed: Value,
-) -> Result<(), String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: heap value without a frame")?;
-    let (tag, payload) = b.ins().isplit(boxed);
-    let reg_v = b.ins().iconst(types::I64, reg as i64);
-    super::emit::call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.home_store,
-        &[frame.exec_ctx, frame.base, reg_v, tag, payload],
-    );
-    Ok(())
-}
-
-/// Read a boxed heap value back from `reg`'s home.
-pub(super) fn use_heap(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    reg: u32,
-) -> Result<Value, String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: heap value without a frame")?;
-    let slot = b.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 4));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
-    let reg_v = b.ins().iconst(types::I64, reg as i64);
-    super::emit::call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.home_load,
-        &[frame.exec_ctx, frame.base, reg_v, addr],
-    );
-    Ok(b.ins().load(types::I128, MemFlags::trusted(), addr, 0))
-}
-
-/// CLIF type of an SSA value. `Bool` is a raw `I64` 0/1; `Ref`/`Dyn`/`Str` is a
-/// 16-byte `VmValue` (`I128` = tag+payload).
-pub(super) fn clif_ty(kind: SlotKind) -> Option<cranelift_codegen::ir::Type> {
-    match kind {
-        SlotKind::Int | SlotKind::Bool => Some(types::I64),
-        SlotKind::Float => Some(types::F64),
-        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => Some(types::I128),
-    }
+    /// Whether the host rounds in one instruction (`floor`/`ceil`, SSE4.1).
+    pub has_round: bool,
+    /// Each array receiver's view, valid until the next safepoint.
+    pub views: views::Views,
+    /// The `int` steps proven unable to overflow ([`induction`]).
+    pub in_range_steps: std::collections::HashSet<u32>,
+    /// In an OSR lowering, the scalars live into the loop header that the
+    /// resumed body also redefines, each held in a Cranelift variable so the
+    /// header merges the entry's value with the body's (see [`store`]).
+    pub carried: std::collections::HashMap<u32, cranelift_frontend::Variable>,
 }
 
 /// Attempt the SSA lowering. `Err` is the fallback signal, not a failure: the
 /// caller re-lowers from bytecode. On success returns the raw piece and whether
 /// it takes the frame-aware ABI.
+///
+/// `osr_ip` selects the entry. `None` is a call: arguments in, execution from
+/// the entry block. `Some(ip)` is an on-stack-replacement entry into a running
+/// interpreted frame at the loop header starting at bytecode offset `ip`: no
+/// arguments, the header's parameters and live values read from their homes,
+/// and only the blocks reachable from the header compiled.
 pub(super) fn try_lower(
     proto: &FunctionProto,
     ssa: &SsaProto,
@@ -205,10 +130,18 @@ pub(super) fn try_lower(
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
+    osr_ip: Option<usize>,
 ) -> Result<(CompiledPiece, bool), String> {
+    let osr = match osr_ip {
+        None => None,
+        Some(ip) => Some(
+            ssa.loop_header_at(ip)
+                .ok_or_else(|| format!("from_ssa: no loop header at ip {ip}"))?,
+        ),
+    };
     let nparams = proto.arity.saturating_sub(1);
-    if proto.upvalue_count > 0
-        || proto.is_generator
+    cfg::check_block_args(ssa)?;
+    if proto.is_generator
         || proto.is_async
         || ssa.blocks.is_empty()
         || ssa.entry as usize >= ssa.blocks.len()
@@ -217,39 +150,39 @@ pub(super) fn try_lower(
         return Err("from_ssa: not a leaf-compatible proto".into());
     }
     let scalar = |k: SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
-    // Params must be scalar (the raw ABI passes non-float params as a bare
-    // payload, so heap params are read from homes — not modelled yet). The
-    // RETURN may be any class: a non-scalar return is written boxed to
+    // A non-scalar parameter makes the body frame-aware: the raw ABI passes it
+    // as a bare payload, but the wrapper (the only way into a frame-aware
+    // body — its `clif_raw` stays 0, so no call site links it directly) has
+    // already left every argument in its home, register `1 + i`. The RETURN
+    // may be any class: a non-scalar return is written boxed to
     // `jit_native_result` and the raw returns void, which is what the wrapper
     // reads (see `build_wrapper`).
-    if !proto.param_kinds.iter().all(|k| scalar(*k)) {
-        if std::env::var_os("VARN_CLIF_TRACE").is_some() {
-            eprintln!(
-                "from_ssa sig {:?}: params={:?} ret={:?} has_this={}",
-                proto.name, proto.param_kinds, proto.return_kind, proto.has_this
-            );
-        }
-        return Err("from_ssa: non-scalar parameter".into());
-    }
+    let heap_params = !proto.param_kinds.iter().all(|k| scalar(*k));
 
     let has_heap = ssa.values.iter().any(|v| is_heap(v.ty));
     let scalar_return = scalar(proto.return_kind);
-    let frame_aware = has_heap
+    // An OSR entry resumes a frame that exists: it reads the frame's homes.
+    let frame_aware = osr.is_some()
+        || has_heap
+        || heap_params
         || !scalar_return
         || proto.has_this
         || ssa.has_this
+        || proto.upvalue_count > 0
         || ssa.blocks.iter().any(|blk| {
-            blk.insts
-                .iter()
-                .any(|i| matches!(i.op, SsaOp::Call { .. } | SsaOp::LoadGlobalIdx(_)))
+            blk.insts.iter().any(|i| needs_frame(ssa, &i.op))
+                || matches!(blk.term, SsaTerm::Throw(_))
         });
 
     let cc = isa.default_call_conv();
+    let abi_params = if osr.is_some() { 0 } else { nparams };
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
-        raw_signature(proto, nparams, isa, frame_aware),
+        raw_signature(proto, abi_params, isa, frame_aware),
     );
-    let self_sig = func.import_signature(raw_signature(proto, nparams, isa, frame_aware));
+    // A self call in an OSR body goes through the runtime (it is frame-aware),
+    // never to this entry.
+    let self_sig = func.import_signature(raw_signature(proto, abi_params, isa, frame_aware));
     let self_name = func.declare_imported_user_function(UserExternalName::new(0, 0));
     let self_ref = func.import_function(ExtFuncData {
         name: ExternalName::user(self_name),
@@ -259,16 +192,21 @@ pub(super) fn try_lower(
     let mut fb_ctx = FunctionBuilderContext::new();
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
 
-    // One CLIF block per SSA block; the SSA entry block *is* the function entry
-    // and receives the raw function parameters directly.
+    // One CLIF block per SSA block. For a call the SSA entry block *is* the
+    // function entry and receives the raw function parameters directly; an
+    // OSR entry is a block of its own that jumps to the loop header.
     let entry = ssa.entry as usize;
+    let call_entry = osr.is_none().then_some(entry);
+    let start = osr.map_or(entry, |h| h.block as usize);
     let preamble = if frame_aware { 4 } else { 0 };
     let mut blocks: Vec<Option<cranelift_codegen::ir::Block>> = vec![None; ssa.blocks.len()];
     let entry_blk = b.create_block();
     b.append_block_params_for_function_params(entry_blk);
-    blocks[entry] = Some(entry_blk);
+    if let Some(e) = call_entry {
+        blocks[e] = Some(entry_blk);
+    }
     for (i, blk) in ssa.blocks.iter().enumerate() {
-        if i == entry {
+        if Some(i) == call_entry {
             continue;
         }
         let cb = b.create_block();
@@ -279,10 +217,31 @@ pub(super) fn try_lower(
         blocks[i] = Some(cb);
     }
 
+    // The compiled CFG: blocks in reverse postorder from the entry, their
+    // predecessors, and which blocks compiled code reaches at all. A jump to
+    // a block at or before its own position in reverse postorder is a loop
+    // back edge.
+    let rpo = cfg::order(ssa, start);
+    let preds = cfg::predecessors(ssa);
+    let mut rpo_pos = vec![0usize; ssa.blocks.len()];
+    let mut reached = vec![false; ssa.blocks.len()];
+    for (pos, &blk) in rpo.iter().enumerate() {
+        rpo_pos[blk] = pos;
+        reached[blk] = true;
+    }
+
+    b.switch_to_block(entry_blk);
+    let views = views::Views::declare(&mut b, ssa);
+
     // The frame-aware raw ABI prepends `stack, closure, base, exec_ctx`.
     let frame = if frame_aware {
         let params = b.block_params(entry_blk);
-        if params.len() != preamble + ssa.blocks[entry].params.len() {
+        let abi_count = if osr.is_some() {
+            0
+        } else {
+            ssa.blocks[entry].params.len()
+        };
+        if params.len() != preamble + abi_count {
             return Err("from_ssa: entry param count mismatch".into());
         }
         Some(FrameIo {
@@ -290,6 +249,7 @@ pub(super) fn try_lower(
             base: params[2],
             exec_ctx: params[3],
             linker,
+            layout: varn_types::register_meta::FrameLayout::for_proto(proto),
         })
     } else {
         None
@@ -302,51 +262,91 @@ pub(super) fn try_lower(
         constants,
         self_ref,
         frame,
-        homes_all: frame_aware,
+        has_round: super::floats::has_round_support(isa),
+        views,
+        in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
+        carried: match osr {
+            Some(h) => osr::carried(&mut b, ssa, h, &reached),
+            None => Default::default(),
+        },
     };
 
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
+    if let Some(h) = osr {
+        let header = blocks[h.block as usize].expect("block created");
+        osr::emit_entry(&mut b, &ctx, &mut values, h, header)?;
+    }
 
-    for i in order(ssa) {
+    for i in rpo {
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
         b.switch_to_block(cb);
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
-        let base = if i == entry { preamble } else { 0 };
-        if i == entry && params.len() != base + blk.params.len() {
+        let is_call_entry = Some(i) == call_entry;
+        let base = if is_call_entry { preamble } else { 0 };
+        if is_call_entry && params.len() != base + blk.params.len() {
             return Err("from_ssa: entry param count mismatch".into());
         }
         for (k, &p) in blk.params.iter().enumerate() {
             let pv = params[base + k];
             let kind = ssa.value_ty(p);
-            if ctx.homes_all {
-                // Homes are authoritative: land every phi (scalar or heap).
+            // An entry parameter arrives as the ABI classifies it: a scalar
+            // `param_kinds` entry as its native value, anything else only in
+            // the home of register `1 + k` (see `heap_params`).
+            let pv = if is_call_entry && !scalar(proto.param_kinds[k]) {
+                let arg_reg = 1 + k as u32;
                 if is_heap(kind) {
-                    def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
-                } else {
-                    store_home_value(&mut b, &ctx, p, pv)?;
+                    if ssa.reg(p) != arg_reg {
+                        let boxed = use_heap(&mut b, &ctx, arg_reg)?;
+                        def_heap(&mut b, &ctx, ssa.reg(p), boxed)?;
+                    }
+                    continue;
                 }
-            } else if is_heap(kind) {
+                let boxed = use_heap(&mut b, &ctx, arg_reg)?;
+                heap::unbox_dest(&mut b, kind, boxed)?
+            } else if is_call_entry && proto.param_kinds[k] != kind {
+                return Err(format!(
+                    "from_ssa: parameter {k} is {kind:?} in the SSA but {:?} in the ABI",
+                    proto.param_kinds[k]
+                ));
+            } else {
+                pv
+            };
+            if is_heap(kind) {
                 def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
             } else {
-                values[p as usize] = Some(pv);
+                store::define_scalar(&mut b, &ctx, &mut values, p, pv);
             }
         }
 
         for inst in &blk.insts {
-            if let Some(v) = scalar::emit_inst(&mut b, &ctx, &mut values, &inst.op, inst.dest)? {
-                if let Some(d) = inst.dest {
-                    let kind = ssa.value_ty(d);
-                    if ctx.homes_all && !is_heap(kind) {
-                        store_home_value(&mut b, &ctx, d, v)?;
-                    } else {
-                        values[d as usize] = Some(v);
-                    }
+            match scalar::emit_inst(&mut b, &ctx, &mut values, &inst.op, inst.dest)? {
+                Some(out) => land(&mut b, &ctx, &mut values, inst.dest, out)?,
+                None if inst.dest.is_some() => {
+                    return Err(format!("from_ssa: {:?} defines no value", inst.op));
                 }
+                None => {}
+            }
+            if !views::keeps_views(ssa, &inst.op) {
+                ctx.views.clear(&mut b);
             }
         }
-        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term)?;
+        // A back edge polls the collector only when its loop can allocate.
+        let polls = |target: u32| {
+            rpo_pos[target as usize] <= rpo_pos[i]
+                && cfg::loop_may_collect(ssa, &preds, target as usize, i)
+        };
+        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
+    }
+
+    // Nothing compiled jumps to the rest; each still needs a body.
+    for (i, cb) in blocks.iter().enumerate() {
+        if !reached[i] {
+            b.switch_to_block(cb.expect("block created"));
+            b.ins()
+                .trap(cranelift_codegen::ir::TrapCode::user(1).expect("non-zero trap code"));
+        }
     }
 
     b.seal_all_blocks();
@@ -354,64 +354,30 @@ pub(super) fn try_lower(
     Ok((compile_piece(func, isa)?, frame_aware))
 }
 
-/// Reverse postorder from the entry so every value is defined before its uses,
-/// with unreachable blocks appended in index order so all are still filled.
-fn order(ssa: &SsaProto) -> Vec<usize> {
-    let n = ssa.blocks.len();
-    let entry = ssa.entry as usize;
-    let mut visited = vec![false; n];
-    let mut post = Vec::with_capacity(n);
-    let mut stack: Vec<(usize, u8)> = vec![(entry, 0)];
-    visited[entry] = true;
-    while let Some(&(b, stage)) = stack.last() {
-        stack.last_mut().unwrap().1 += 1;
-        let succs: Vec<usize> = match &ssa.blocks[b].term {
-            SsaTerm::Jump { target, .. } => vec![*target as usize],
-            SsaTerm::Branch {
-                then_blk, else_blk, ..
-            } => vec![*else_blk as usize, *then_blk as usize],
-            _ => Vec::new(),
-        };
-        match succs.get(stage as usize) {
-            Some(&s) => {
-                if !visited[s] {
-                    visited[s] = true;
-                    stack.push((s, 0));
-                }
-            }
-            None => {
-                post.push(b);
-                stack.pop();
-            }
-        }
-    }
-    let mut out: Vec<usize> = post.into_iter().rev().collect();
-    for (i, seen) in visited.iter().enumerate() {
-        if !seen {
-            out.push(i);
-        }
-    }
-    out
-}
-
-pub(super) fn resolve_args(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    values: &[Option<Value>],
-    args: &[u32],
-) -> Result<Vec<cranelift_codegen::ir::BlockArg>, String> {
-    args.iter()
-        .map(|v| load_value(b, ctx, values, *v).map(cranelift_codegen::ir::BlockArg::from))
-        .collect()
-}
-
-pub(super) fn block_of(
-    blocks: &[Option<cranelift_codegen::ir::Block>],
-    id: u32,
-) -> Result<cranelift_codegen::ir::Block, String> {
-    blocks
-        .get(id as usize)
-        .copied()
-        .flatten()
-        .ok_or_else(|| format!("from_ssa: block {id} not created"))
+/// Whether `op` reaches the activation, the running closure or the runtime
+/// even when every value it touches is a scalar.
+fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
+    matches!(
+        op,
+        SsaOp::Call { .. }
+            | SsaOp::CallNativeOp { .. }
+            | SsaOp::MethodCall { .. }
+            | SsaOp::LoadGlobalIdx(_)
+            | SsaOp::LoadNativeGlobalIdx(_)
+            | SsaOp::StoreGlobalIdx { .. }
+            | SsaOp::MakeClosure { .. }
+            | SsaOp::LoadCaptured { .. }
+            | SsaOp::StoreCaptured { .. }
+            | SsaOp::LoadUpvalue(_)
+            | SsaOp::StoreUpvalue { .. }
+            | SsaOp::CloseUpvalues { .. }
+            | SsaOp::Try { .. }
+            | SsaOp::PopTry
+            | SsaOp::CatchParam { .. }
+            | SsaOp::MakeEnumVariant { .. }
+            | SsaOp::IntrinsicCall { .. }
+            | SsaOp::ArrayGetIndex { .. }
+            | SsaOp::ArraySetIndex { .. }
+    ) || matches!(op, SsaOp::Convert { operand, conv }
+        if !numeric::is_inline_convert(ssa, *operand, *conv))
 }

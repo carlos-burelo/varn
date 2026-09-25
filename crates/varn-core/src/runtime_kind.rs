@@ -78,11 +78,11 @@ impl RuntimeKind {
             "Task" => Some(Self::Task),
             "Range" => Some(Self::Range),
             "Bytes" => Some(Self::Bytes),
-            "enum" => Some(Self::Enum),
+            "enum" => Some(Self::Enum),
+
             _ => None,
         }
     }
-
 }
 
 pub trait VmValuePayload: std::fmt::Debug + std::any::Any {
@@ -122,7 +122,7 @@ impl RuntimeKind {
 /// How a fixed-field access addresses its field: by dynamic `slot` (enum
 /// payloads, records), or at a compact offset laid out by the field's kind
 /// (`None` = a boxed `VmValue`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum FieldAccess {
     Slot,
     Compact(Option<RuntimeKind>),
@@ -134,7 +134,11 @@ impl FieldAccess {
         match self {
             Self::Slot => 0,
             Self::Compact(kind) => {
-                debug_assert_ne!(kind, Some(RuntimeKind::Null), "a field is never laid out as null");
+                debug_assert_ne!(
+                    kind,
+                    Some(RuntimeKind::Null),
+                    "a field is never laid out as null"
+                );
                 RuntimeKind::encode(kind)
             }
         }

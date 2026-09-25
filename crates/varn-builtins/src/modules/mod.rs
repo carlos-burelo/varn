@@ -6,12 +6,12 @@ pub mod compress;
 pub mod crypto;
 #[path = "runtime/csv/csv.rs"]
 pub mod csv;
+#[path = "core/errors/errors.rs"]
+pub mod errors;
 #[path = "runtime/ffi/ffi.rs"]
 pub mod ffi;
 #[path = "runtime/fs/fs.rs"]
 pub mod fs;
-#[path = "core/errors/errors.rs"]
-pub mod errors;
 #[path = "core/globals/globals.rs"]
 pub mod globals;
 #[path = "runtime/io/io.rs"]

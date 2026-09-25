@@ -21,7 +21,8 @@ dominio.**
 
 ## 1. Estado actual (verde)
 
-- `cargo check --workspace --exclude varn-lsp --all-targets`: limpio.
+- `cargo check --workspace --all-targets`: limpio (varn-lsp incluido y de nuevo
+  en el build por defecto).
 - `tests/main.vn`: **PASSED 1233, FAILED 0** en JIT y en `VARN_NO_JIT=1`, con
   `VARN_CACHE_DIR` limpio (fuerza el round-trip de serialización).
 - Tier-parity `56/58/62/65/101` dentro de `main.vn`: verde.
@@ -66,7 +67,7 @@ compartido en `varn-types::register_meta`: `SlotClass { Gpr, Fpr, Ref, Dyn }`,
 - **K4** tipos angostos `i8..u32/f32` (`BackendTy` + `NarrowRangeCheck`).
 - **K5** `ArrayRepr` angosto (literales/lectura compactos).
 
-### 2.4 JIT desde SSA — F1–F4 HECHO, F5 parcial
+### 2.4 JIT desde SSA — F1–F5 HECHO (ver §5.1); F6 pendiente
 
 Contrato (Ley 2/6/8): `TIR/SSA tipada (varn-compiler) → bytecode (intérprete) y
 SSA serializada en `.vnc → varn-jit baja de SSA (CLIF)`.
@@ -142,23 +143,34 @@ apuntan a registros de otra clase → panic `jit_store_home`).
 
 ## 5. Pendiente real
 
-### 5.1 F5 — resto (llamadas a método/nativa, closures, `Try`, OSR)
+### 5.1 F5 — HECHO
 
-Cada uno con su puerta. **Bloqueo común**: los helpers de llamada leen la
-ventana de args de homes **contiguas** (`arg_start..`); las values SSA viven en
-homes arbitrarias. Salidas (elegir una):
-- **(A)** reservar la región de staging en `regalloc_post` (reusa los helpers;
-  toca el compilador).
-- **(B)** extraer la resolución de método del VM y añadir
-  `jit_call_method_window` (toca el VM; sin duplicar dispatch, alineado con C2).
-  **Recomendada.**
-- `CallMethod`/`InvokeVirtual`/`CallNativeOp`/`Intrinsic`: sobre (B). Es lo que
-  **ejercita las clases ya cableadas** (hoy definen/usarían una clase → declinan
-  por `new`/la llamada).
-- `MakeClosure`: el helper es **ip-coupled** (lee descriptores del bytecode);
-  hace falta uno ip-free `(proto_idx, descriptors)` o ventana.
-- `Try`/`Throw`: landing pads + resume interpretado.
-- OSR sobre SSA: mapa `ip`↔bloque (hoy OSR solo por bytecode).
+Toda función de `tests/main.vn` baja desde SSA tipada; `varn-cli`'s
+`jit_ssa_coverage` falla si alguna declina o aborta, con nombre y motivo.
+
+- Operadores `Dyn`, `!x` como truthiness, condiciones de rama por
+  `VmValue::is_truthy` (142, 146).
+- Nativas de tipos core (143), llamadas a método por **la** llamada del
+  runtime (`ExecCtx::call_method`, `MethodArgs`) (144).
+- Closures: `MakeClosure` ip-free, capturadas en su registro de frame,
+  upvalues; una creación de closure (`ExecCtx::make_closure`) (145).
+- Globals de módulo (escritura) y nativos (lectura) (147).
+- `try`/`throw`: el camino normal compilado, el catch reanuda interpretado;
+  lo que lee el landing pad se escribe a su home al abrir la región (148).
+- Intrínsecas (`abs/sqrt/floor/ceil` float como una instrucción),
+  conversiones por el único `convert`, variantes de enum
+  (`ExecCtx::make_enum_variant`), literales de pool (149).
+- Acceso a arrays probados inline por representación, vistas cacheadas entre
+  safepoints, poll de GC solo en bucles que asignan, contadores sin chequeo
+  de overflow donde la guarda lo prueba (150).
+- OSR desde SSA: cabeceras de bucle con ip y vivos (liveness del asignador),
+  escalares redefinidos por el cuerpo como variables Cranelift (151,
+  `jit_osr`).
+- `a?.b` nullable y merges que convierten cada valor al tipo del join;
+  `cfg::check_block_args` como red (152).
+
+Benchmarks: sin regresión frente a 8810074 (conteo de instrucciones;
+`bench_matrix` 424M vs 427M).
 
 ### 5.2 F6 — borrado final
 
@@ -167,7 +179,55 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
   desde bytecode (`clif/body/*`); `from_ssa` pasa a ser la única bajada.
 - Re-medir `compare.ps1`.
 
-### 5.3 Pendientes del audit (menores)
+### 5.3 Encontrados en F5 — HECHO
+
+- Tipos locales (`class`/`enum` declarados en una función o bloque): cada uno
+  tiene su global desde el inicio y su declaración baja a "construir si el
+  global está vacío" (`emit/nested_types.rs`), con su `class_def` tras las de
+  nivel superior. Dos tipos locales con el mismo nombre en el módulo son
+  VN4002 (las tablas de tipos van por nombre a nivel de módulo); una clase
+  local que captura un valor local de su función es VN3002. `tests/153`.
+- `varn-lsp` compila y vuelve al build por defecto (`default-members`
+  eliminado): arena de AST, átomos resueltos por el interner del documento, y
+  tipos leídos a través de la tabla del documento (`document/types.rs`:
+  `ty_text`, `ty_kind`, `fn_shape`, `callable_shape`, `decl_name`…), nunca
+  con `Display` ni `ty.0`. De paso, lo que duplicaba al compilador se lee
+  ahora de él:
+  - "rellenar arms de `match`" usa los casos que el checker encontró
+    ausentes (`CheckResult::match_gaps`, escritos donde se reporta
+    `NonExhaustiveMatch`), no una heurística propia;
+  - hints de parámetros/pipelines, jerarquía de llamadas y el resto de
+    búsquedas recorren todas las expresiones alcanzables
+    (`SpatialIndex::exprs`), no un recorrido parcial de sentencias;
+  - las vistas del compilador bajan el documento como una compilación
+    (`call_mappings` y `desugar` incluidos) y la de SSA usa
+    `varn_compiler::ssa::dump`.
+- Codificación de instrucciones en una sola tabla —
+  `varn_types::bytecode::layout`: por opcode, qué byte o palabra contiene
+  qué (registro leído/escrito, racha contigua, constante y su clase,
+  inmediato, salto). De ella se derivan `decode` (largo, def, uses, ventana
+  de llamada), `remap_registers` (renumeración del coalescer) y
+  `bytecode::disasm` (listados de `vn debug` y del editor). Sustituye a
+  cuatro tablas escritas a mano que no coincidían:
+  - `decode`: `ObjectMerge` no contaba la lectura de su destino,
+    `ArrayExtend` decía escribir el array que muta en sitio, `Yield` no
+    declaraba el registro donde se reanuda y `GetSuper` no leía `this`.
+  - el coalescer no renombraba el destino de `Spawn` (y sí un byte que no es
+    registro); sus reglas de contigüidad por opcode son ahora "toda racha
+    sigue contigua".
+  - el listado de `varn-debug` leía `Spawn` y `Get/SetFixedField` con el
+    largo equivocado, perdía el paso e inventaba instrucciones (goldens
+    regenerados: el stream listado ahora es el real); mostraba mal los
+    registros de `Throw`, `StoreUpvalue` y `CloseUpvalue`.
+  - el del editor leía una palabra por instrucción; el de `varn-cli` no se
+    compilaba (borrado).
+  `tests/bytecode_layout_agrees.rs` recorre el bytecode de toda la suite
+  (151 programas, 121 opcodes) y comprueba largos, registros dentro del
+  frame, clase de cada constante, saltos a inicios de instrucción y que
+  renombrar toca exactamente los bytes de registro. El intérprete y la
+  bajada del JIT siguen decodificando a mano (camino caliente).
+
+### 5.4 Pendientes del audit (menores)
 
 - `Nullable` como par (valor, bit) — hoy `Dynamic`.
 - `u64`: sin aritmética sin signo; no es tipo de superficie en checker/parser.
@@ -180,7 +240,7 @@ Solo cuando F5 esté verde en los 4 cuadrantes y sin regresión de benchmarks:
 
 ## 6. Puerta de validación (cada commit)
 
-1. `cargo check --workspace --exclude varn-lsp --all-targets` sin warnings.
+1. `cargo check --workspace --all-targets` sin warnings nuevos.
 2. `cargo build -p varn-jit -p varn-vm`.
 3. `tests/main.vn` verde en JIT y `VARN_NO_JIT=1` con `VARN_CACHE_DIR` limpio
    (round-trip de serialización). Tier-parity `56/58/62/65/101`.

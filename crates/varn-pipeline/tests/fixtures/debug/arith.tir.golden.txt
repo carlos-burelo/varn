@@ -1,7 +1,7 @@
 
-=== TIR: <fixtures>\arith.vn ===
+=== TIR: <fixtures>/arith.vn ===
 TirModule {
-    source_file: "\\\\?\\C:\\Users\\x\\dev\\varn\\varn-lang\\crates\\varn-pipeline\\tests\\fixtures\\debug\\arith.vn",
+    source_file: "<fixtures>/arith.vn",
     imports: [],
     exports: [],
     types: TyTable {

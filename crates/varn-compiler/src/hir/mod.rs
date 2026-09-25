@@ -65,7 +65,6 @@ impl TyTable {
     pub fn class_name(&self, id: ClassId) -> &Arc<str> {
         &self.class_names[id.0 as usize]
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

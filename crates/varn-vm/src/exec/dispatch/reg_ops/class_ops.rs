@@ -223,32 +223,7 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("MakeEnumVariant: non-string const"))?;
         let tag = self.stack.box_reg(base, tag_reg).as_int();
-
-        let name_str = name.as_ref();
-        let (name_part, fields_part) = match name_str.find(':') {
-            Some(idx) => (&name_str[..idx], &name_str[idx + 1..]),
-            None => (name_str, ""),
-        };
-        let (enum_name_str, variant_name_str) = match name_part.rfind('.') {
-            Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
-            None => ("", name_part),
-        };
-        let fields: Vec<Arc<str>> = if fields_part.is_empty() {
-            vec![]
-        } else {
-            fields_part.split(',').map(Arc::from).collect()
-        };
-
-        let variant =
-            varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
-                enum_class_id: None,
-                enum_name: Arc::from(enum_name_str),
-                variant_name: Arc::from(variant_name_str),
-                variant_tag: tag,
-                fields,
-                payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
-            }));
-        let iv = self.heap.intern(variant);
+        let iv = self.make_enum_variant(tag, name.as_ref());
         self.stack.unbox_into_reg(base, dest, iv)?;
         self.frames[frame_idx].ip = *ip;
         Ok(())
@@ -308,10 +283,9 @@ impl ExecCtx {
     pub(crate) fn construct_enum_variant(
         &mut self,
         template: &EnumVariantTemplate,
-        base: usize,
-        arg_start: usize,
-        arg_count: usize,
+        args: crate::exec::method_args::MethodArgs<'_>,
     ) -> Option<VmValue> {
+        let arg_count = args.len();
         if template.fields.is_empty() && arg_count == 0 {
             return None;
         }
@@ -320,7 +294,7 @@ impl ExecCtx {
             Value::Object(varn_types::value::ObjRef::from_pairs(
                 template.fields.iter().enumerate().map(|(idx, field_name)| {
                     let nv = if idx < arg_count {
-                        self.stack.box_reg(base, arg_start + idx)
+                        args.get(&self.stack, idx)
                     } else {
                         VmValue::null()
                     };
@@ -328,13 +302,13 @@ impl ExecCtx {
                 }),
             ))
         } else if arg_count == 1 {
-            let arg = self.stack.box_reg(base, arg_start);
+            let arg = args.get(&self.stack, 0);
             self.heap.extract(arg)
         } else if arg_count > 1 {
             Value::Array(varn_types::value::ArrayRef::new(
                 (0..arg_count)
                     .map(|i| {
-                        let arg = self.stack.box_reg(base, arg_start + i);
+                        let arg = args.get(&self.stack, i);
                         self.heap.extract(arg)
                     })
                     .collect(),

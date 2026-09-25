@@ -1,5 +1,5 @@
 use tower_lsp::lsp_types::{Position, Range, SelectionRange};
-use varn_core::ast::{Arg, Expr, ExprKind, Program, Stmt, StmtKind};
+use varn_core::ast::{Arg, AstArena, ExprId, ExprKind, Program, StmtId, StmtKind};
 use varn_core::source::SourceRange;
 
 use crate::document::DocumentState;
@@ -37,7 +37,13 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
 
     // 2. AST expression & statement hierarchy
     if let Some(program) = &state.ast {
-        collect_enclosing_ranges(program, pos.line, pos.character, &mut ranges);
+        collect_enclosing_ranges(
+            program,
+            &state.ast_arena,
+            pos.line,
+            pos.character,
+            &mut ranges,
+        );
     }
 
     // 3. Whole file fallback
@@ -76,22 +82,29 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
     })
 }
 
-fn collect_enclosing_ranges(program: &Program, line: u32, col: u32, ranges: &mut Vec<Range>) {
-    for stmt in &program.body {
-        collect_in_stmt(stmt, line, col, ranges);
+fn collect_enclosing_ranges(
+    program: &Program,
+    a: &AstArena,
+    line: u32,
+    col: u32,
+    ranges: &mut Vec<Range>,
+) {
+    for &stmt in &program.body {
+        collect_in_stmt(a, stmt, line, col, ranges);
     }
 }
 
-fn collect_in_stmt(stmt: &Stmt, line: u32, col: u32, ranges: &mut Vec<Range>) {
-    if !contains_pos(stmt.range(), line, col) {
+fn collect_in_stmt(a: &AstArena, stmt: StmtId, line: u32, col: u32, ranges: &mut Vec<Range>) {
+    let stmt = a.stmt(stmt);
+    if !contains_pos(&stmt.range, line, col) {
         return;
     }
 
     match &stmt.kind {
-        StmtKind::Expr { expression } => collect_in_expr(expression, line, col, ranges),
+        StmtKind::Expr { expression } => collect_in_expr(a, *expression, line, col, ranges),
         StmtKind::Block { stmts } => {
             for s in stmts {
-                collect_in_stmt(s, line, col, ranges);
+                collect_in_stmt(a, *s, line, col, ranges);
             }
         }
         StmtKind::If {
@@ -99,58 +112,59 @@ fn collect_in_stmt(stmt: &Stmt, line: u32, col: u32, ranges: &mut Vec<Range>) {
             consequent,
             alternate,
         } => {
-            collect_in_expr(test, line, col, ranges);
-            collect_in_stmt(consequent, line, col, ranges);
+            collect_in_expr(a, *test, line, col, ranges);
+            collect_in_stmt(a, *consequent, line, col, ranges);
             if let Some(alt) = alternate {
-                collect_in_stmt(alt, line, col, ranges);
+                collect_in_stmt(a, *alt, line, col, ranges);
             }
         }
         StmtKind::Decl(decl) => match decl.as_ref() {
             varn_core::ast::Decl::Function(f) => {
-                collect_in_stmt(&f.body, line, col, ranges);
+                collect_in_stmt(a, f.body, line, col, ranges);
             }
             varn_core::ast::Decl::Class(c) => {
                 for member in &c.body {
                     if let varn_core::ast::ClassMember::Method { body: Some(b), .. } = member {
-                        collect_in_stmt(b, line, col, ranges);
+                        collect_in_stmt(a, *b, line, col, ranges);
                     }
                 }
             }
             _ => {}
         },
-        StmtKind::Return { argument: Some(e) } => collect_in_expr(e, line, col, ranges),
+        StmtKind::Return { argument: Some(e) } => collect_in_expr(a, *e, line, col, ranges),
         _ => {}
     }
 
-    ranges.push(to_lsp_range(stmt.range()));
+    ranges.push(to_lsp_range(&stmt.range));
 }
 
-fn collect_in_expr(expr: &Expr, line: u32, col: u32, ranges: &mut Vec<Range>) {
+fn collect_in_expr(a: &AstArena, expr: ExprId, line: u32, col: u32, ranges: &mut Vec<Range>) {
+    let expr = a.expr(expr);
     if !contains_pos(&expr.range, line, col) {
         return;
     }
 
     match &expr.kind {
         ExprKind::Binary { left, right, .. } => {
-            collect_in_expr(left, line, col, ranges);
-            collect_in_expr(right, line, col, ranges);
+            collect_in_expr(a, *left, line, col, ranges);
+            collect_in_expr(a, *right, line, col, ranges);
         }
-        ExprKind::Unary { operand, .. } => collect_in_expr(operand, line, col, ranges),
+        ExprKind::Unary { operand, .. } => collect_in_expr(a, *operand, line, col, ranges),
         ExprKind::Call { callee, args, .. } => {
-            collect_in_expr(callee, line, col, ranges);
+            collect_in_expr(a, *callee, line, col, ranges);
             for arg in args {
                 let arg_expr = match arg {
                     Arg::Positional(e) | Arg::Spread(e) | Arg::Named { value: e, .. } => e,
                 };
-                collect_in_expr(arg_expr, line, col, ranges);
+                collect_in_expr(a, *arg_expr, line, col, ranges);
             }
         }
         ExprKind::Pipeline { left, right } => {
-            collect_in_expr(left, line, col, ranges);
-            collect_in_expr(right, line, col, ranges);
+            collect_in_expr(a, *left, line, col, ranges);
+            collect_in_expr(a, *right, line, col, ranges);
         }
         ExprKind::Match { subject, cases } => {
-            collect_in_expr(subject, line, col, ranges);
+            collect_in_expr(a, *subject, line, col, ranges);
             for case in cases {
                 if contains_pos(&case.range, line, col) {
                     ranges.push(to_lsp_range(&case.range));

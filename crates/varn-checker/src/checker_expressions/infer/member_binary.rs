@@ -125,9 +125,13 @@ pub(super) fn infer_binary_type(
             );
             match op {
                 BinaryOp::Add => {
-                    if matches!(checker.ty_table.get(l.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
-                        || matches!(checker.ty_table.get(r.0), TypeKind::Primitive(varn_core::LangPrimitive::Str))
-                    {
+                    if matches!(
+                        checker.ty_table.get(l.0),
+                        TypeKind::Primitive(varn_core::LangPrimitive::Str)
+                    ) || matches!(
+                        checker.ty_table.get(r.0),
+                        TypeKind::Primitive(varn_core::LangPrimitive::Str)
+                    ) {
                         return Type::Str;
                     }
                     crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)

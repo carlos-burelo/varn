@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tower_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, Url, WorkspaceEdit,
 };
-use varn_core::ast::{ClassMember, Decl, Program, Stmt, StmtKind};
+use varn_core::ast::{AstArena, ClassMember, Decl, Program, StmtId, StmtKind};
 
 use crate::document::DocumentState;
 
@@ -17,13 +17,13 @@ pub fn generate_class_member_actions(
         None => return actions,
     };
 
-    let target_class = find_class_at_line(program, cursor_line);
+    let target_class = find_class_at_line(program, &state.ast_arena, cursor_line);
     let class = match target_class {
         Some(c) => c,
         None => return actions,
     };
 
-    let class_name = class.id.as_deref().unwrap_or("Anonymous");
+    let class_name = class.id.map_or("Anonymous", |id| state.name(id));
     let mut fields = Vec::new();
     let mut has_constructor = false;
     let mut methods = std::collections::HashSet::new();
@@ -31,17 +31,17 @@ pub fn generate_class_member_actions(
     for member in &class.body {
         match member {
             ClassMember::Property { key, type_ann, .. } => {
-                let ty_str = type_ann
-                    .as_ref()
-                    .map(|t| format!("{t:?}"))
-                    .unwrap_or_else(|| "dynamic".to_string());
-                fields.push((key.to_string(), ty_str));
+                let ty_str = type_ann.as_ref().map_or_else(
+                    || varn_core::LangPrimitive::Dynamic.name().to_owned(),
+                    |t| state.source_text(t.range).to_owned(),
+                );
+                fields.push((state.name(*key).to_owned(), ty_str));
             }
             ClassMember::Constructor { .. } => {
                 has_constructor = true;
             }
             ClassMember::Method { key, .. } => {
-                methods.insert(key.to_string());
+                methods.insert(state.name(*key).to_owned());
             }
             _ => {}
         }
@@ -145,16 +145,25 @@ pub fn generate_class_member_actions(
     actions
 }
 
-fn find_class_at_line(program: &Program, line: u32) -> Option<&varn_core::ast::ClassDecl> {
+fn find_class_at_line<'a>(
+    program: &Program,
+    arena: &'a AstArena,
+    line: u32,
+) -> Option<&'a varn_core::ast::ClassDecl> {
     for stmt in &program.body {
-        if let Some(c) = find_class_in_stmt(stmt, line) {
+        if let Some(c) = find_class_in_stmt(arena, *stmt, line) {
             return Some(c);
         }
     }
     None
 }
 
-fn find_class_in_stmt(stmt: &Stmt, line: u32) -> Option<&varn_core::ast::ClassDecl> {
+fn find_class_in_stmt(
+    arena: &AstArena,
+    stmt: StmtId,
+    line: u32,
+) -> Option<&varn_core::ast::ClassDecl> {
+    let stmt = arena.stmt(stmt);
     let s_line = stmt.range.start.line.saturating_sub(1);
     let e_line = stmt.range.end.line;
     if line < s_line || line > e_line {
@@ -168,7 +177,7 @@ fn find_class_in_stmt(stmt: &Stmt, line: u32) -> Option<&varn_core::ast::ClassDe
         },
         StmtKind::Block { stmts } => {
             for s in stmts {
-                if let Some(c) = find_class_in_stmt(s, line) {
+                if let Some(c) = find_class_in_stmt(arena, *s, line) {
                     return Some(c);
                 }
             }

@@ -127,18 +127,20 @@ pub fn build(
     // A foreign enum's payload types live in its own module's table, which
     // this one cannot read: the fields are erased to `Dynamic`, the tags come
     // from the declaring module's layout.
-    enums.extend(foreign.iter().map(|f| EnumInfo {
-        name: f.name.clone(),
-        variants: f
-            .variants
-            .iter()
-            .enumerate()
-            .map(|(tag, (name, fields))| VariantInfo {
-                name: name.clone(),
-                tag: tag as u16,
-                payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
-            })
-            .collect(),
+    enums.extend(foreign.iter().map(|f| {
+        EnumInfo {
+            name: f.name.clone(),
+            variants: f
+                .variants
+                .iter()
+                .enumerate()
+                .map(|(tag, (name, fields))| VariantInfo {
+                    name: name.clone(),
+                    tag: tag as u16,
+                    payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
+                })
+                .collect(),
+        }
     }));
 
     Tables {
@@ -159,15 +161,72 @@ fn build_classes(
     class_names: &[Arc<str>],
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
-    // `class_names` is parent-before-child, so a class's parent `ClassInfo` is
-    // already in `built` by the time we reach it — needed to lay inherited
-    // fields out first, with the slots the runtime's inherited shape uses.
-    let mut built: Vec<ClassInfo> = Vec::with_capacity(class_names.len());
-    for name in class_names {
-        let info = build_one_class(bind, table, interner, tt, names, name, signatures, &built);
-        built.push(info);
+    // A class is laid out after its parent: its fields and vtable extend the
+    // parent's, with the slots the runtime's inherited shape uses. Ids follow
+    // `class_names` (sorted); the build follows the `extends` chain.
+    let mut built: Vec<Option<ClassInfo>> = vec![None; class_names.len()];
+    for i in 0..class_names.len() {
+        build_with_parents(
+            bind,
+            table,
+            interner,
+            tt,
+            names,
+            class_names,
+            i,
+            signatures,
+            &mut built,
+        );
     }
     built
+        .into_iter()
+        .map(|c| c.expect("every class is built"))
+        .collect()
+}
+
+/// Builds class `i` after its local ancestors. A cycle in `extends` (reported
+/// by the checker) leaves the class that closes it without parent info.
+#[allow(clippy::too_many_arguments)]
+fn build_with_parents(
+    bind: &BindResult,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &NameIndex,
+    class_names: &[Arc<str>],
+    i: usize,
+    signatures: &mut Vec<Signature>,
+    built: &mut [Option<ClassInfo>],
+) {
+    let mut chain = vec![i];
+    let mut cur = i;
+    while let Some(p) = bind
+        .class_parents
+        .get(&class_names[cur])
+        .and_then(|p| names.class_id(p))
+        .map(|id| id.0 as usize)
+    {
+        if built[p].is_some() || chain.contains(&p) {
+            break;
+        }
+        chain.push(p);
+        cur = p;
+    }
+    for &c in chain.iter().rev() {
+        if built[c].is_none() {
+            let info = build_one_class(
+                bind,
+                table,
+                interner,
+                tt,
+                names,
+                &class_names[c],
+                signatures,
+                built,
+            );
+            built[c] = Some(info);
+        }
+    }
 }
 
 /// The binder's `type_members.classes[name].members` is already flattened —
@@ -184,11 +243,11 @@ fn build_one_class(
     names: &NameIndex,
     name: &Arc<str>,
     signatures: &mut Vec<Signature>,
-    built: &[ClassInfo],
+    built: &[Option<ClassInfo>],
 ) -> ClassInfo {
     let parent_name = bind.class_parents.get(name);
     let parent_id = parent_name.and_then(|p| names.class_id(p));
-    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize));
+    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize)?.as_ref());
     let mut inherited_fields: FxHashMap<Arc<str>, ()> = parent_info
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
         .unwrap_or_default();
@@ -215,6 +274,7 @@ fn build_one_class(
     let mut method_names: Vec<Arc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Arc<str>, varn_tir::SigId> = FxHashMap::default();
 
+    let mut constructor = None;
     let mut push_method = |key: Arc<str>, sig: varn_tir::SigId, order: &mut Vec<Arc<str>>| {
         if method_sig.insert(key.clone(), sig).is_none() {
             order.push(key);
@@ -254,6 +314,13 @@ fn build_one_class(
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(m.name.clone(), sig, &mut method_names);
             }
+            // The flattened list holds the parent's constructor first; the
+            // last one is the class's own.
+            ClassMemberKind::Constructor => {
+                constructor = Some(intern_signature(
+                    &m.ty, table, interner, tt, names, signatures,
+                ));
+            }
             ClassMemberKind::Getter => {
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(Arc::from(format!("get {}", m.name)), sig, &mut method_names);
@@ -272,7 +339,9 @@ fn build_one_class(
         .collect();
 
     let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
-    ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods)
+    let mut info = ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods);
+    info.constructor = constructor;
+    info
 }
 
 /// Append a signature for a method and hand back its id.

@@ -17,7 +17,7 @@ impl DocumentState {
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             if let Some(sid) = info.symbol_id.filter(|sid| *sid < self.db.arena.len()) {
                 let arena_sym = self.db.arena.get(sid);
-                if arena_sym.name.as_ref() == tok.lexeme.as_str() {
+                if self.name(arena_sym.name) == tok.lexeme.as_str() {
                     return Some(sid);
                 }
             }
@@ -36,5 +36,26 @@ impl DocumentState {
     pub fn checker_symbol_at(&self, line: u32, col: u32) -> Option<SymbolView<'_>> {
         let sid = self.checker_symbol_id_at(line, col)?;
         self.symbols().find(|s| s.id == sid)
+    }
+}
+
+impl DocumentState {
+    /// The source text `range` spans, as written.
+    pub fn source_text(&self, range: varn_core::SourceRange) -> &str {
+        let (start, end) = (range.start.offset as usize, range.end.offset as usize);
+        self.source.get(start..end).unwrap_or("")
+    }
+}
+
+impl DocumentState {
+    /// The declaration a type annotation of this document names (`Foo`,
+    /// `Foo<T>`), when it names one.
+    pub fn type_node_decl_name(&self, node: &varn_core::ast::TypeNode) -> Option<&str> {
+        match &node.kind {
+            varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, _, _) => {
+                Some(self.name(*name))
+            }
+            _ => None,
+        }
     }
 }

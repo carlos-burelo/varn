@@ -37,6 +37,10 @@ macro_rules! jit_helper_abi {
             load_upvalue => jit_load_upvalue,
             store_upvalue => jit_store_upvalue,
             make_closure => jit_make_closure,
+            /// `extern "C" fn(*mut ExecCtx, closure, base, proto_idx, descs:
+            /// *const u64, count)` — `MakeClosure` out of the lowering from
+            /// typed SSA, its upvalue sources as a window of words.
+            make_closure_window => jit_make_closure_window,
             load_static_fn => jit_load_static_fn,
             call => jit_call,
             call_method => jit_call_method,
@@ -93,14 +97,24 @@ macro_rules! jit_helper_abi {
             assert_not_null => jit_assert_not_null,
             close_upvalue => jit_close_upvalue,
             get_enum_tag => jit_get_enum_tag,
-            is_array => jit_is_array_stub,
-            wrap_spread => jit_wrap_spread_stub,
-            object_keys => jit_object_keys_stub,
-            op_in => jit_op_in_stub,
-            object_merge => jit_object_merge_stub,
+            is_array => jit_is_array,
+            /// `extern "C" fn(*mut ExecCtx, closure, tag, meta_idx)` —
+            /// `MakeEnumVariant` out of the lowering from typed SSA.
+            make_enum_variant_const => jit_make_enum_variant_const,
+            /// `extern "C" fn(*mut ExecCtx, conv, tag, payload)` — `as`.
+            convert => jit_convert,
+            /// `extern "C" fn(*mut ExecCtx, wire_byte, window: *const VmValue,
+            /// count)` — an intrinsic out of the lowering from typed SSA.
+            intrinsic_window => jit_intrinsic_window,
+            /// `extern "C" fn(tag, payload) -> u64` — `VmValue::is_truthy`.
+            truthy => jit_truthy,
+            wrap_spread => jit_wrap_spread,
+            object_keys => jit_object_keys,
+            op_in => jit_op_in,
+            object_merge => jit_object_merge,
             get_fixed_field => jit_get_fixed_field,
             set_fixed_field => jit_set_fixed_field,
-            get_property_maybe => jit_get_property_maybe_stub,
+            get_property_maybe => jit_get_property_maybe,
             get_super => jit_get_super,
             get_symbol => jit_get_symbol,
             bind_method => jit_bind_method,
@@ -146,6 +160,14 @@ macro_rules! jit_helper_abi {
             /// resolves from `op_id` at run time. Both read the same
             /// `[receiver, args...]` home window and share one marshal.
             jit_call_native => jit_call_native,
+            /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, window: *const
+            /// VmValue, total)` — `jit_call_native` for the lowering from typed
+            /// SSA: `[receiver, args...]` as a boxed window.
+            jit_call_native_window => jit_call_native_window,
+            /// `extern "C" fn(*mut ExecCtx, name_idx, cs, window: *const
+            /// VmValue, total)` — a method call out of the lowering from typed
+            /// SSA: `[receiver, args...]` as a boxed window.
+            jit_call_method_window => jit_call_method_window,
             /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
             /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
@@ -162,6 +184,11 @@ macro_rules! jit_helper_abi {
             /// to the callee and has no boxed callee to route through
             /// `clif_call_fallback`.
             clif_call_self => clif_call_self,
+            /// `extern "C" fn(*mut ExecCtx, window: *const VmValue, argc)` —
+            /// self-recursion out of the lowering from typed SSA, whose
+            /// arguments are not in contiguous homes: a boxed window,
+            /// placeholder first.
+            jit_call_self_window => jit_call_self_window,
             /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, arg_start, arg_count) -> usize`
             /// — half of `clif_call_fallback`'s fast path (`invoke_compiled_closure`),
             /// split so the call site makes the wrapper call itself instead of
@@ -189,16 +216,6 @@ macro_rules! jit_helper_abi {
             /// `exec_ctx`, and adding one there is what forces the whole
             /// function frame-aware, losing the direct clif→clif entry.
             current_exec_ctx => jit_current_exec_ctx,
-            /// `extern "C" fn(*mut ExecCtx, act_id, reg, tag, payload)` — write
-            /// a boxed value into `reg`'s home slot of activation `act_id`,
-            /// converting to the slot's physical class (GPR/FPR/REF/DYN)
-            /// through `FrameStore`. Phase B home traffic, replacing inline
-            /// `stack[base + reg]` addressing now that the frame is
-            /// partitioned.
-            home_store => jit_store_home,
-            /// `extern "C" fn(*mut ExecCtx, act_id, reg, *mut VmValue)` — read
-            /// `reg`'s home slot of activation `act_id` as a boxed value.
-            home_load => jit_load_home,
         }
     };
 }

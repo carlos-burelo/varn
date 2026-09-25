@@ -1,0 +1,77 @@
+// A `T?` field over a reference type is laid out as the reference itself
+// (an 8-byte heap index) and `null` is its niche (spec §49). A field that is
+// never written reads `null`, not whatever a zero-filled payload holds.
+
+class NrNode {
+    value: int
+    next: NrNode?
+    constructor(value: int) {
+        this.value = value
+    }
+}
+
+class NrHolder {
+    node: NrNode?
+    items: int[]?
+    counts: Map<str, int>?
+    tags: Set<int>?
+    label: str?
+}
+
+// Never written: every nullable reference reads null.
+const holder = new NrHolder()
+assert("unwritten T? class field is null", holder.node == null)
+assert("unwritten T? array field is null", holder.items == null)
+assert("unwritten T? map field is null", holder.counts == null)
+assert("unwritten T? set field is null", holder.tags == null)
+assert("unwritten str? field is null", holder.label == null)
+
+// Written, read back, and cleared again.
+holder.node = new NrNode(5)
+holder.items = [1, 2, 3]
+holder.counts = new Map<str, int>()
+holder.counts?.set("a", 1)
+assert("T? class field holds its value", holder.node?.value === 5)
+assert("T? array field holds its value", holder.items?.length === 3)
+assert("T? map field holds its value", holder.counts?.get("a") === 1)
+holder.node = null
+holder.items = null
+assert("T? class field cleared to null", holder.node == null)
+assert("T? array field cleared to null", holder.items == null)
+
+// A linked list through a `T?` field, built hot enough for the JIT and
+// under enough allocation to collect while it is live.
+function nrBuild(n: int): NrNode {
+    let head = new NrNode(0)
+    for (let i = 1; i < n; i = i + 1) {
+        const node = new NrNode(i)
+        node.next = head
+        head = node
+    }
+    return head
+}
+function nrSum(head: NrNode): int {
+    let acc = 0
+    let cur: NrNode? = head
+    while (cur != null) {
+        acc = acc + cur.value
+        cur = cur.next
+    }
+    return acc
+}
+let nrLists: NrNode[] = []
+for (let round = 0; round < 20; round = round + 1) {
+    nrLists.push(nrBuild(3000))
+}
+let nrJunk: str[] = []
+for (let i = 0; i < 60000; i = i + 1) {
+    nrJunk.push("junk-" + i)
+}
+let nrTotal = 0
+for (const l of nrLists) {
+    nrTotal = nrTotal + nrSum(l)
+}
+assert("T? links survive collections", nrTotal === 20 * 4498500)
+assert("the last link is null", nrBuild(1).next == null)
+
+print("[PASSED] 140. Nullable reference fields")

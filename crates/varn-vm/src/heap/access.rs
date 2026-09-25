@@ -35,7 +35,6 @@ impl HeapInner {
         self.get_by_idx(idx)
     }
 
-
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         self.get_by_idx_mut(idx)

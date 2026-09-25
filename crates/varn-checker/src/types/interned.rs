@@ -169,17 +169,50 @@ impl CheckerTyTable {
         // Seed the reserved intrinsic ids. `intern` maps these shapes back to
         // the same ids, so the seed is only so `get` is total over them.
         for (id, kind) in [
-            (CheckerTyId::INT, TypeKind::Primitive(varn_core::LangPrimitive::Int)),
-            (CheckerTyId::FLOAT, TypeKind::Primitive(varn_core::LangPrimitive::Float)),
-            (CheckerTyId::DECIMAL, TypeKind::Primitive(varn_core::LangPrimitive::Decimal)),
-            (CheckerTyId::BIGINT, TypeKind::Primitive(varn_core::LangPrimitive::BigInt)),
-            (CheckerTyId::STR, TypeKind::Primitive(varn_core::LangPrimitive::Str)),
-            (CheckerTyId::CHAR, TypeKind::Primitive(varn_core::LangPrimitive::Char)),
-            (CheckerTyId::BOOL, TypeKind::Primitive(varn_core::LangPrimitive::Bool)),
-            (CheckerTyId::VOID, TypeKind::Primitive(varn_core::LangPrimitive::Void)),
-            (CheckerTyId::NULL, TypeKind::Primitive(varn_core::LangPrimitive::Null)),
-            (CheckerTyId::NEVER, TypeKind::Primitive(varn_core::LangPrimitive::Never)),
-            (CheckerTyId::DYNAMIC, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)),
+            (
+                CheckerTyId::INT,
+                TypeKind::Primitive(varn_core::LangPrimitive::Int),
+            ),
+            (
+                CheckerTyId::FLOAT,
+                TypeKind::Primitive(varn_core::LangPrimitive::Float),
+            ),
+            (
+                CheckerTyId::DECIMAL,
+                TypeKind::Primitive(varn_core::LangPrimitive::Decimal),
+            ),
+            (
+                CheckerTyId::BIGINT,
+                TypeKind::Primitive(varn_core::LangPrimitive::BigInt),
+            ),
+            (
+                CheckerTyId::STR,
+                TypeKind::Primitive(varn_core::LangPrimitive::Str),
+            ),
+            (
+                CheckerTyId::CHAR,
+                TypeKind::Primitive(varn_core::LangPrimitive::Char),
+            ),
+            (
+                CheckerTyId::BOOL,
+                TypeKind::Primitive(varn_core::LangPrimitive::Bool),
+            ),
+            (
+                CheckerTyId::VOID,
+                TypeKind::Primitive(varn_core::LangPrimitive::Void),
+            ),
+            (
+                CheckerTyId::NULL,
+                TypeKind::Primitive(varn_core::LangPrimitive::Null),
+            ),
+            (
+                CheckerTyId::NEVER,
+                TypeKind::Primitive(varn_core::LangPrimitive::Never),
+            ),
+            (
+                CheckerTyId::DYNAMIC,
+                TypeKind::Primitive(varn_core::LangPrimitive::Dynamic),
+            ),
             (CheckerTyId::THIS, TypeKind::This),
         ] {
             t.entries.insert(id, kind);
@@ -299,7 +332,6 @@ impl CheckerTyTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn interning_the_same_intrinsic_twice_dedups() {
@@ -321,7 +353,10 @@ mod tests {
     fn get_roundtrips_the_interned_value() {
         let mut t = CheckerTyTable::default();
         let a = t.intern(TypeKind::Primitive(varn_core::LangPrimitive::Bool));
-        assert_eq!(t.get(a), TypeKind::Primitive(varn_core::LangPrimitive::Bool));
+        assert_eq!(
+            t.get(a),
+            TypeKind::Primitive(varn_core::LangPrimitive::Bool)
+        );
     }
 
     #[test]

@@ -10,8 +10,7 @@ use super::super::emit::{
 };
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
-    store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 
 pub(crate) fn emit_call(
@@ -34,9 +33,9 @@ pub(crate) fn emit_call(
 
     if let Some(ct) = class_target {
         if let Some(ref plan) = ct.trivial_plan {
-            let valid_plan = plan.iter().all(|fi| {
-                1 + fi.param_idx < total && arg_start + 1 + fi.param_idx < actx.nregs
-            });
+            let valid_plan = plan
+                .iter()
+                .all(|fi| 1 + fi.param_idx < total && arg_start + 1 + fi.param_idx < actx.nregs);
             if valid_plan && arg_start + total <= actx.nregs {
                 let fast_blk = b.create_block();
                 let slow_blk = b.create_block();
@@ -75,6 +74,18 @@ pub(crate) fn emit_call(
                     actx.helpers.heap_field_offset,
                     slow_blk,
                 );
+
+                // A zero `Ref` slot is heap index 0: start every one at the
+                // `null` niche, as `InstanceData::alloc` does.
+                if !ct.ref_slots.is_empty() {
+                    let null_ref = b
+                        .ins()
+                        .iconst(types::I64, varn_types::layout::COMPACT_REF_NULL as i64);
+                    for &off in &ct.ref_slots {
+                        b.ins()
+                            .store(MemFlags::new(), null_ref, data_base, off as i32);
+                    }
+                }
 
                 // Write each field at its own COMPACT `ClassLayout` offset —
                 // the same bytes `InstanceData::write_field` produces. A class
@@ -359,8 +370,7 @@ fn emit_vm_call(
         actx.exec_ctx,
         actx.helpers.jit_call_base_offset as i32,
     );
-    let fast_res =
-        emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_alloc);
+    let fast_res = emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_alloc);
     b.ins().jump(merge, &[fast_res.into()]);
 
     b.switch_to_block(slow);

@@ -172,14 +172,11 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Instance(inst) => {
-                    for slot in 0..inst.slot_count() {
-                        let Some(val) = inst.field_at(slot) else {
-                            break;
-                        };
+                    inst.for_each_reference(|val| {
                         if let Some(child_idx) = heap.get_heap_idx(val) {
                             self.mark_gray(child_idx);
                         }
-                    }
+                    });
                 }
                 HeapObj::VmClosure(clos) => {
                     for upval in &clos.upvalues {

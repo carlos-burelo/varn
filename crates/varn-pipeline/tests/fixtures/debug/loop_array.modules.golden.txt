@@ -1,3 +1,3 @@
 
-  [36mmodule linkage[0m [2m─────────────────────────────────── <fixtures>\loop_array.vn[0m
+  [36mmodule linkage[0m [2m─────────────────────────────────── <fixtures>/loop_array.vn[0m
   [2m── end: module linkage ──[0m

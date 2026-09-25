@@ -6,8 +6,7 @@ use varn_types::register_meta::RegisterMeta;
 use super::super::emit::{box_bool, call_helper, call_helper_void};
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
-    store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 
 pub(crate) fn emit_call_native_op(
@@ -33,9 +32,8 @@ pub(crate) fn emit_call_native_op(
     // `Intrinsic` form uses; this op-id form comes from the core-type method
     // table dispatch.
     if total == 2 && varn_core::op_id::is_str_char_index_op_id(op_id) {
-        if super::super::strings::emit_char_code_inline(
-            b, actx, loops, actx.vars, state, ip, dest,
-        ) {
+        if super::super::strings::emit_char_code_inline(b, actx, loops, actx.vars, state, ip, dest)
+        {
             return Ok(());
         }
     }
@@ -117,7 +115,7 @@ pub(crate) fn emit_call_native_op(
         return Ok(());
     }
 
-        for r in dest..(dest + total).min(actx.nregs) {
+    for r in dest..(dest + total).min(actx.nregs) {
         store_home(b, actx, state, r);
     }
     let regs = live_boxed(actx, state);
@@ -159,7 +157,7 @@ pub(crate) fn emit_make_enum_variant(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let tag_reg = (code[ip + 1] & 0xFF) as usize;
-        store_home(b, actx, state, tag_reg);
+    store_home(b, actx, state, tag_reg);
 
     let ip_v = b.ins().iconst(types::I64, (ip + 1) as i64);
     let res = call_helper(
@@ -275,7 +273,7 @@ pub(crate) fn emit_intrinsic(
     let wire_byte = (w1 >> 8) as usize;
     let arg_count = (w1 & 0xFF) as usize;
 
-        for r in dest..dest + arg_count {
+    for r in dest..dest + arg_count {
         store_home(b, actx, state, r);
     }
 

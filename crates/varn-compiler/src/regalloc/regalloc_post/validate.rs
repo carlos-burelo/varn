@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap as HashMap;
-use varn_core::OpCode;
-use varn_types::bytecode::decode;
+use varn_types::bytecode::layout;
 use varn_types::chunk::PoolEntry;
 
 use super::scan::ScanResult;
@@ -17,31 +16,23 @@ pub(crate) fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8
     })
 }
 
-pub(crate) fn verify_call_constraints(
+/// Every run of registers an instruction reads together (a call's
+/// arguments, a collection's elements) is still contiguous under `mapping`.
+pub(crate) fn verify_run_constraints(
     code: &[u16],
     constants: &[PoolEntry],
     mapping: &HashMap<u8, u8>,
 ) -> bool {
+    let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
     let mut offset = 0;
-    while offset < code.len() {
-        let info = match decode(code, offset, constants) {
-            Some(i) => i,
-            None => break,
-        };
-        if let Some((arg_start, arg_count)) = info.call_args {
-            let mapped_start = match mapping.get(&arg_start) {
-                Some(&m) => m,
-                None => arg_start,
-            };
-            for i in 1..arg_count {
-                let orig = arg_start.wrapping_add(i);
-                let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                if mapped != mapped_start.wrapping_add(i) {
-                    return false;
-                }
-            }
+    while let Some(l) = layout(code, offset, constants) {
+        let contiguous = l.runs(code, offset).all(|(start, count, _)| {
+            (1..count).all(|i| m(start.wrapping_add(i as u8)) == m(start).wrapping_add(i as u8))
+        });
+        if !contiguous {
+            return false;
         }
-        offset += info.len;
+        offset += l.len;
     }
     true
 }
@@ -69,122 +60,6 @@ pub(crate) fn verify_callee_frame_constraints(
                 return false;
             }
         }
-    }
-    true
-}
-
-pub(crate) fn verify_build_array_constraints(
-    code: &[u16],
-    constants: &[PoolEntry],
-    mapping: &HashMap<u8, u8>,
-) -> bool {
-    let mut offset = 0;
-    while offset < code.len() {
-        let info = match decode(code, offset, constants) {
-            Some(i) => i,
-            None => break,
-        };
-
-        if let Some(op) = OpCode::from_u16(code[offset]) {
-            if matches!(op, OpCode::BuildArray | OpCode::BuildTuple) {
-                let w1 = if offset + 1 < code.len() {
-                    code[offset + 1]
-                } else {
-                    0
-                };
-                let w2 = if offset + 2 < code.len() {
-                    code[offset + 2]
-                } else {
-                    0
-                };
-                let start = (w1 & 0xff) as u8;
-                let count = (w2 >> 8) as u8;
-                if count > 1 {
-                    let mapped_start = mapping.get(&start).copied().unwrap_or(start);
-                    for i in 1..count {
-                        let orig = start.wrapping_add(i);
-                        let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                        if mapped != mapped_start.wrapping_add(i) {
-                            return false;
-                        }
-                    }
-                }
-            } else if matches!(op, OpCode::BuildMap) {
-                let w1 = if offset + 1 < code.len() {
-                    code[offset + 1]
-                } else {
-                    0
-                };
-                let w2 = if offset + 2 < code.len() {
-                    code[offset + 2]
-                } else {
-                    0
-                };
-                let start = (w1 & 0xff) as u8;
-                let count = (w2 >> 8) as u8;
-                let total_regs = count * 2;
-                if total_regs > 1 {
-                    let mapped_start = mapping.get(&start).copied().unwrap_or(start);
-                    for i in 1..total_regs {
-                        let orig = start.wrapping_add(i);
-                        let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                        if mapped != mapped_start.wrapping_add(i) {
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        offset += info.len;
-    }
-    true
-}
-
-pub(crate) fn verify_build_object_with_shape_constraints(
-    code: &[u16],
-    constants: &[PoolEntry],
-    mapping: &HashMap<u8, u8>,
-) -> bool {
-    let mut offset = 0;
-    while offset < code.len() {
-        let info = match decode(code, offset, constants) {
-            Some(i) => i,
-            None => break,
-        };
-
-        if let Some(op) = OpCode::from_u16(code[offset]) {
-            if matches!(op, OpCode::BuildObjectWithShape | OpCode::BuildRecord) {
-                let w1 = if offset + 1 < code.len() {
-                    code[offset + 1]
-                } else {
-                    0
-                };
-                let w2 = if offset + 2 < code.len() {
-                    code[offset + 2]
-                } else {
-                    0
-                };
-                let start = (w1 & 0xff) as u8;
-                let shape_idx = w2 as usize;
-                let count = match constants.get(shape_idx) {
-                    Some(PoolEntry::Shape(k)) => k.len(),
-                    _ => 0,
-                };
-                if count > 1 {
-                    let mapped_start = mapping.get(&start).copied().unwrap_or(start);
-                    for i in 1..count {
-                        let orig = start.wrapping_add(i as u8);
-                        let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                        if mapped != mapped_start.wrapping_add(i as u8) {
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        offset += info.len;
     }
     true
 }

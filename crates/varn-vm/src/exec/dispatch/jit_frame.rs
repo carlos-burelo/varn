@@ -205,9 +205,10 @@ pub(super) unsafe fn run_compiled_frame(
     if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
         if let Some(caller) = (*ctx).frames.last() {
             let caller_base = caller.base;
-            if let Err(e) = (*ctx)
-                .stack
-                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
+            if let Err(e) =
+                (*ctx)
+                    .stack
+                    .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
             {
                 return JitFrameOutcome::Failed(e);
             }

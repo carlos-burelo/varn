@@ -1,0 +1,63 @@
+// Classes and enums declared inside a function body: each is one module-wide
+// nominal type, built where its declaration first runs.
+
+class LtBase {
+    hello(): str { return "base" }
+}
+
+function ltEnum(i: int): int {
+    enum Dir { North, South }
+    const d = i % 2 == 0 ? Dir.North : Dir.South
+    return d as int
+}
+
+function ltShapes(i: int): str {
+    enum Shape { Circle(r: int), Square(s: int) }
+    class Kid extends LtBase {
+        override hello(): str { return "kid" }
+    }
+    const s = i % 2 == 0 ? Shape.Circle(i) : Shape.Square(i)
+    const n: int = match (s) {
+        Circle(r) => r * 10,
+        Square(q) => q
+    }
+    return new Kid().hello() + n
+}
+
+// A local class using a local enum, both module-wide types.
+function ltCounter(n: int): int {
+    enum Step { One, Two }
+    class Counter {
+        total: int = 0
+        add(s: Step): void {
+            this.total = this.total + (s == Step.One ? 1 : 2)
+        }
+    }
+    const c = new Counter()
+    for (let i = 0; i < n; i = i + 1) {
+        c.add(i % 2 == 0 ? Step.One : Step.Two)
+    }
+    return c.total
+}
+
+// The declaration runs on every call; only the first builds the class.
+function ltSame(): LtBase {
+    class Twin extends LtBase {}
+    return new Twin()
+}
+
+let dirs = 0
+let shapes = ""
+let counts = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    dirs = dirs + ltEnum(i)
+    shapes = ltShapes(i)
+    counts = counts + ltCounter(4)
+}
+
+assert("a local enum", dirs === 1000)
+assert("a local payload enum and a local subclass", shapes == "kid1999" && ltShapes(2) == "kid20")
+assert("a local class using a local enum", counts === 2000 * 6)
+assert("a local class declared again on a later call", ltSame().hello() == "base" && ltSame().hello() == "base")
+
+print("[PASSED] 153. Local classes and enums")

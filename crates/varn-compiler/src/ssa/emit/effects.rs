@@ -17,7 +17,7 @@ pub(super) fn emit_effect(
     chunk: &mut Chunk,
     inst: &Inst,
     reg: &[u8],
-    cache_count: &mut u16,
+    ic_slot: Option<u8>,
     nparams: usize,
 ) -> Result<bool> {
     let line = inst.line;
@@ -28,13 +28,7 @@ pub(super) fn emit_effect(
             value,
         } => {
             let idx = chunk.add_str(name);
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             chunk.emit_rrc_ic(
                 OpCode::SetProperty,
                 reg[object.0 as usize],
@@ -188,13 +182,7 @@ pub(super) fn emit_effect(
             let r = var_reg(VarId::Local(*target), nparams);
             let method = if *is_await { "disposeAsync" } else { "dispose" };
             let str_idx = chunk.add_str(method);
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), line);
             chunk.write(Chunk::pack(r, r), line);
             chunk.write(str_idx, line);

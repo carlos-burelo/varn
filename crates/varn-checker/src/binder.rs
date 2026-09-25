@@ -8,14 +8,15 @@ use varn_core::ast::{AstArena, ExprKind, ForInit, Program, StmtId, StmtKind, Var
 mod array_evolve;
 mod class;
 mod decl_values;
+mod declared_types;
 mod decls;
 mod definite_field_assignment;
 mod diagnostics;
-mod declared_types;
 mod imports;
 mod inference_utils;
 mod interface;
 pub(crate) mod type_inference;
+mod type_names;
 mod type_resolution;
 mod types;
 
@@ -67,6 +68,8 @@ pub struct Binder<'r> {
     /// Optimization-only element types proved for evolving empty-array
     /// locals (Task A0.3'); moved into `BindResult::evolved_array_types`.
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
+    /// Where each class and enum name was first declared (see `type_names`).
+    pub(crate) type_decls: FxHashMap<Arc<str>, (crate::scope::ScopeId, varn_core::SourceRange)>,
 }
 
 impl TypeContext for Binder<'_> {
@@ -323,6 +326,7 @@ impl<'r> Binder<'r> {
             reported_type_forms: Default::default(),
             array_watch: Vec::new(),
             evolved_array_types: FxHashMap::default(),
+            type_decls: FxHashMap::default(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));

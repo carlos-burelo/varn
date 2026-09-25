@@ -98,7 +98,10 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
 /// shown: one with no `def_line` has no source of its own — read out of a
 /// precompiled interface, or synthesised — and an outline entry that jumps
 /// nowhere is worse than no entry.
-fn summary_to_doc(m: &varn_checker::ResolvedMemberSummary) -> Option<DocumentSymbol> {
+fn summary_to_doc(
+    state: &DocumentState,
+    m: &varn_checker::ResolvedMemberSummary,
+) -> Option<DocumentSymbol> {
     let line = m.def_line?.saturating_sub(1);
     let name_end = m.def_col + m.name.chars().count() as u32;
     let kind = summary_to_symbol_kind(m.kind);
@@ -108,7 +111,7 @@ fn summary_to_doc(m: &varn_checker::ResolvedMemberSummary) -> Option<DocumentSym
     #[allow(deprecated)]
     Some(DocumentSymbol {
         name: m.name.to_string(),
-        detail: Some(m.ty.to_string()),
+        detail: Some(state.ty_text(&m.ty)),
         kind,
         tags: None,
         deprecated: None,
@@ -161,7 +164,7 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
         state
             .members_of(sym)
             .iter()
-            .filter_map(summary_to_doc)
+            .filter_map(|m| summary_to_doc(state, m))
             .collect()
     } else {
         Vec::new()

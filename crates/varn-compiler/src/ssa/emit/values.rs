@@ -5,7 +5,7 @@ use super::super::ir::{BlockId, Inst, InstKind, VarId};
 use super::regs::var_reg;
 use super::terminator::emit_call_args;
 use crate::hir::{HirUnOp, HirUpvalueSrc};
-use crate::lower::bin_opcode;
+use crate::lower::binary_opcode;
 use crate::OptError;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -24,10 +24,11 @@ pub(super) fn emit_value(
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    cache_count: &mut u16,
+    ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
+    closure_const: &mut Option<u16>,
 ) -> Result<()> {
     let line = inst.line;
     match &inst.kind {
@@ -65,25 +66,12 @@ pub(super) fn emit_value(
         }
         InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, line),
         InstKind::Binary { op, lhs, rhs, ty } => {
-            // `+` with a statically-proven string operand IS concatenation.
-            // That is exactly what `arith::add` works out at RUN TIME, one
-            // type test at a time, on every single execution — and the
-            // checker already proved it here. The binary's own `ty` is
-            // `Dynamic` for the common `"literal" + int`, so specializing on
-            // the result type alone never reaches this.
-            let str_operand = matches!(op, crate::hir::HirBinOp::Add)
-                && (matches!(
-                    value_tys.get(lhs.0 as usize),
-                    Some(crate::hir::HirType::Str)
-                ) || matches!(
-                    value_tys.get(rhs.0 as usize),
-                    Some(crate::hir::HirType::Str)
-                ));
-            let opcode = if str_operand {
-                OpCode::StrConcat
-            } else {
-                bin_opcode(*op, *ty)
-            };
+            let opcode = binary_opcode(
+                *op,
+                *ty,
+                value_tys.get(lhs.0 as usize).copied(),
+                value_tys.get(rhs.0 as usize).copied(),
+            );
             chunk.emit_rrr(opcode, d, reg[lhs.0 as usize], reg[rhs.0 as usize], line);
         }
         InstKind::Unary { op, operand, .. } => {
@@ -134,24 +122,8 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack(total, call_base), line);
         }
         InstKind::GetProperty { object, name } => {
-            if name.as_ref() == varn_core::MemberKey::Length.as_str() {
-                if let Some(crate::hir::HirType::Str) = value_tys.get(object.0 as usize) {
-                    chunk.emit_rr(OpCode::StrLength, d, reg[object.0 as usize], line);
-                    return Ok(());
-                }
-                if let Some(crate::hir::HirType::Array(_)) = value_tys.get(object.0 as usize) {
-                    chunk.emit_rr(OpCode::ArrayLength, d, reg[object.0 as usize], line);
-                    return Ok(());
-                }
-            }
             let idx = chunk.add_str(name);
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             chunk.emit_rrc_ic(
                 OpCode::GetProperty,
                 d,
@@ -212,13 +184,7 @@ pub(super) fn emit_value(
                 chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], line);
             }
             let argc = args.len() as u8;
-            if *cache_count > 255 {
-                return Err(OptError::Unsupported(
-                    "ssa-emit: too many inline-cache sites",
-                ));
-            }
-            let cs = *cache_count as u8;
-            *cache_count += 1;
+            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
             // `InvokeVirtual` when the checker knew the receiver's class — the
             // call site is then guaranteed monomorphic on the vtable. It shares
             // `CallMethod`'s call-site cache slot (packed into the opcode word)
@@ -348,6 +314,7 @@ pub(super) fn emit_value(
         InstKind::MakeClosure { func, upvalues_src } => {
             let proto = crate::from_tir::compile::emit_tir_closure(*func, source_file.clone())?;
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
+            *closure_const = Some(idx);
             if upvalues_src.is_empty() {
                 chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), line);
                 chunk.write(idx, line);
@@ -475,6 +442,12 @@ pub(super) fn emit_value(
         }
         InstKind::IsArray { operand } => {
             chunk.emit_rr(OpCode::IsArray, d, reg[operand.0 as usize], line);
+        }
+        InstKind::StrLength { operand } => {
+            chunk.emit_rr(OpCode::StrLength, d, reg[operand.0 as usize], line);
+        }
+        InstKind::ArrayLength { operand } => {
+            chunk.emit_rr(OpCode::ArrayLength, d, reg[operand.0 as usize], line);
         }
 
         InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, line),
@@ -622,17 +595,14 @@ pub(super) fn emit_value(
         InstKind::BuildObjectSpread { parts } => {
             chunk.emit(OpCode::BuildObject, line);
             chunk.write(Chunk::pack(d, 0), line);
+            let mut next_slot = ic_slot;
             for (key, v) in parts {
                 match key {
                     Some(k) => {
                         let idx = chunk.add_str(k);
-                        if *cache_count > 255 {
-                            return Err(OptError::Unsupported(
-                                "ssa-emit: too many inline-cache sites",
-                            ));
-                        }
-                        let cs = *cache_count as u8;
-                        *cache_count += 1;
+                        let cs = next_slot
+                            .ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
+                        next_slot = cs.checked_add(1);
                         chunk.emit_rrc_ic(OpCode::SetProperty, d, reg[v.0 as usize], idx, cs, line);
                     }
                     None => chunk.emit_rr(OpCode::ObjectMerge, d, reg[v.0 as usize], line),

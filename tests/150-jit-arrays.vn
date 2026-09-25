@@ -1,0 +1,144 @@
+// Element access on proven arrays in a compiled body: inline by element
+// representation, through a view (buffer, length, representation) cached
+// until something could move or reshape an array, and loop counters whose
+// step cannot overflow. Each function runs past the tiering threshold and
+// has two statements, so it executes compiled instead of being inlined.
+
+function arSum(xs: int[], n: int): int {
+    let s = 0
+    for (let i = 0; i < n; i = i + 1) {
+        s = s + xs[i]
+    }
+    return s
+}
+
+function arScale(xs: float[], k: float): float {
+    let s = 0.0
+    for (let i = 0; i < xs.length; i = i + 1) {
+        xs[i] = xs[i] * k
+        s = s + xs[i]
+    }
+    return s
+}
+
+function arFlags(bs: bool[]): int {
+    let n = 0
+    for (let i = 0; i < bs.length; i = i + 1) {
+        if (bs[i]) { n = n + 1 }
+        bs[i] = !bs[i]
+    }
+    return n
+}
+
+// A float written into an `int[]` changes its representation mid-loop;
+// the alias `ys` must see the new buffer.
+function arReshape(xs: dynamic[], ys: dynamic[]): float {
+    let s = 0.0
+    for (let i = 0; i < 4; i = i + 1) {
+        if (i == 2) { xs[0] = 0.5 }
+        s = s + (ys[i % 2] as float)
+    }
+    return s
+}
+
+// `push` grows the buffer inside the loop: the cached view must not survive.
+function arGrow(n: int): int {
+    const xs: int[] = [1]
+    for (let i = 0; i < n; i = i + 1) {
+        xs.push(xs[i] + 1)
+    }
+    return xs[n]
+}
+
+// Reading `xs` caches its view; the pushes reallocate the buffer, so the
+// store afterwards must resolve the array again, not write the old buffer.
+function arStale(xs: int[], n: int): int {
+    const first = xs[0]
+    for (let i = 0; i < n; i = i + 1) {
+        xs.push(i)
+    }
+    xs[0] = first + 100
+    return xs.length
+}
+
+// An allocating loop still polls the collector: the strings are garbage.
+function arAlloc(n: int): int {
+    let len = 0
+    for (let i = 0; i < n; i = i + 1) {
+        const s = "item-" + i
+        len = len + s.length
+    }
+    return len
+}
+
+// Counters at the edge of `int`: the step is unchecked only where the
+// guard proves it in range.
+function arUpToMax(start: int): int {
+    let n = 0
+    for (let k = start; k < 9223372036854775807; k = k + 1) {
+        n = n + 1
+    }
+    return n
+}
+function arDownToMin(start: int): int {
+    let n = 0
+    for (let k = start; k > -9223372036854775807 - 1; k = k - 1) {
+        n = n + 1
+    }
+    return n
+}
+// `<=` proves nothing about `k + 1`: the overflow still throws.
+function arOverflows(start: int): int {
+    let n = 0
+    try {
+        for (let k = start; k <= 9223372036854775807; k = k + 1) {
+            n = n + 1
+        }
+    } catch (e) {
+        n = -n
+    }
+    return n
+}
+
+let sum = 0
+let scaled = 0.0
+let flags = 0
+let reshaped = 0.0
+let grown = 0
+let stale = 0
+let alloc = 0
+let upMax = 0
+let downMin = 0
+let overflows = 0
+const ints: int[] = [1, 2, 3, 4, 5]
+const bools: bool[] = [true, false, true]
+for (let i = 0; i < 1200; i = i + 1) {
+    sum = sum + arSum(ints, 5)
+    scaled = arScale([1.0, 2.0, 3.0], 2.0)
+    flags = flags + arFlags(bools)
+    const shared: dynamic[] = [1, 2]
+    reshaped = reshaped + arReshape(shared, shared)
+    grown = grown + arGrow(10)
+    const fresh: int[] = [1]
+    stale = stale + arStale(fresh, 40) + fresh[0]
+    alloc = alloc + arAlloc(20)
+    upMax = upMax + arUpToMax(9223372036854775807 - 3)
+    downMin = downMin + arDownToMin(-9223372036854775807 + 1)
+    overflows = overflows + arOverflows(9223372036854775807 - 2)
+}
+
+assert("int elements read inline", sum === 1200 * 15)
+assert("float elements read and written inline", scaled == 12.0)
+// The flags flip every call: 2 then 1 set.
+assert("bool elements", flags === 600 * 2 + 600 * 1)
+// 1 + 2, then 0.5 + 2 after the reshape.
+assert("a reshaped array through an alias", reshaped == 1200 * (3.0 + 2.5))
+assert("push inside the loop", grown === 1200 * 11)
+assert("a store after the buffer moved", stale === 1200 * (41 + 101))
+// "item-" plus the digits of 0..19.
+assert("an allocating loop", alloc === 1200 * (5 * 20 + 10 + 20))
+assert("a counter up to INT_MAX", upMax === 1200 * 3)
+assert("a counter down to INT_MIN", downMin === 1200 * 2)
+assert("an unproven step still overflows", overflows === 1200 * -3)
+
+print("[PASSED] 150. JIT arrays")

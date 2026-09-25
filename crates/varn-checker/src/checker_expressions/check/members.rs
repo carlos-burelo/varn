@@ -49,7 +49,8 @@ impl<'r> Checker<'r> {
         if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
-                    self.desugar.extension_set_members
+                    self.desugar
+                        .extension_set_members
                         .insert(target_range.start.offset, mangled.clone());
                 }
             }
@@ -190,12 +191,14 @@ impl<'r> Checker<'r> {
         if let Some(tn) = extension_type_name(self, &check_ty, &self.ty_table, bind) {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name) {
-                    self.desugar.extension_members
+                    self.desugar
+                        .extension_members
                         .insert(property_range.start.offset, mangled.clone());
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
                 if let Some(mangled) = method_map.get(prop_name) {
-                    self.desugar.extension_members
+                    self.desugar
+                        .extension_members
                         .insert(property_range.start.offset, mangled.clone());
                 }
             }
@@ -265,7 +268,8 @@ impl<'r> Checker<'r> {
             let member_kind = if is_enum {
                 crate::semantic_info::ResolvedMemberKind::EnumMember
             } else if self
-                .desugar.extension_members
+                .desugar
+                .extension_members
                 .contains_key(&property_range.start.offset)
             {
                 if matches!(final_mem_kind, TypeKind::Fn(_)) {
@@ -379,7 +383,9 @@ pub(crate) fn extension_type_name(
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             Some(checker.resolve_bind_atom(bind, n))
         }
-        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => k.lang_name().map(std::sync::Arc::from),
+        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+            k.lang_name().map(std::sync::Arc::from)
+        }
         _ => None,
     }
 }

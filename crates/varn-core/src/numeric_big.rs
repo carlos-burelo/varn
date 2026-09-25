@@ -50,7 +50,9 @@ pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivF
         return Err(IntDivFault::DivisionByZero);
     }
     let digits = std::num::NonZeroU64::new(DECIMAL_DIV_DIGITS).expect("non-zero");
-    Ok((a / b).with_precision_round(digits, RoundingMode::HalfEven).normalized_if_exact(a, b))
+    Ok((a / b)
+        .with_precision_round(digits, RoundingMode::HalfEven)
+        .normalized_if_exact(a, b))
 }
 
 /// Remainder of `decimal` division, exact, with the dividend's sign.
@@ -69,7 +71,11 @@ trait NormalizedIfExact {
 impl NormalizedIfExact for BigDecimal {
     fn normalized_if_exact(self, a: &BigDecimal, b: &BigDecimal) -> BigDecimal {
         let n = self.normalized();
-        if &(&n * b) == a { n } else { self }
+        if &(&n * b) == a {
+            n
+        } else {
+            self
+        }
     }
 }
 
@@ -90,12 +96,18 @@ mod tests {
     #[test]
     fn decimal_division() {
         let d = |s: &str| s.parse::<BigDecimal>().unwrap();
-        assert_eq!(div_decimal(&d("1"), &d("4")).unwrap().to_plain_string(), "0.25");
+        assert_eq!(
+            div_decimal(&d("1"), &d("4")).unwrap().to_plain_string(),
+            "0.25"
+        );
         assert_eq!(
             div_decimal(&d("1"), &d("3")).unwrap().to_plain_string(),
             "0.3333333333333333333333333333333333"
         );
-        assert_eq!(div_decimal(&d("1"), &d("0")), Err(IntDivFault::DivisionByZero));
+        assert_eq!(
+            div_decimal(&d("1"), &d("0")),
+            Err(IntDivFault::DivisionByZero)
+        );
         assert_eq!(rem_decimal(&d("-7.5"), &d("2")).unwrap(), d("-1.5"));
     }
 
@@ -104,6 +116,9 @@ mod tests {
         let (a, b) = (BigInt::from(-7), BigInt::from(2));
         assert_eq!(div_big(&a, &b), Ok(BigInt::from(-3)));
         assert_eq!(rem_big(&a, &b), Ok(BigInt::from(-1)));
-        assert_eq!(div_big(&a, &BigInt::zero()), Err(IntDivFault::DivisionByZero));
+        assert_eq!(
+            div_big(&a, &BigInt::zero()),
+            Err(IntDivFault::DivisionByZero)
+        );
     }
 }

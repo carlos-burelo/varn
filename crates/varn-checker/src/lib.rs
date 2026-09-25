@@ -19,7 +19,7 @@ pub use checker::{
 pub use checker_expressions::members::get_members_of_type;
 pub use scope::{CheckerScope, ScopeArena, ScopeId, ScopeKind};
 pub use semantic_info::{
-    CallParamInfo, CallResolution, MemberResolution, NestedTypeKind, ResolvedMemberKind,
+    CallParamInfo, CallResolution, MatchGap, MemberResolution, NestedTypeKind, ResolvedMemberKind,
     ResolvedMemberSummary,
 };
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};

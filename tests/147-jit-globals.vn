@@ -1,0 +1,33 @@
+// Module globals written by compiled code, and native (prelude) globals read
+// by it. Each function runs past the tiering threshold and has two
+// statements, so it executes compiled instead of being inlined.
+
+let gCounter = 0
+let gLast = ""
+
+function glBump(label: str): int {
+    gCounter = gCounter + 1
+    gLast = label
+    return gCounter
+}
+
+// `Infinity` is a native (prelude) global.
+function glNative(x: float): int {
+    let n = 0
+    if (x < Infinity) { n = 1 }
+    return n
+}
+
+let bumped = 0
+let finite = 0
+for (let i = 0; i < 2200; i = i + 1) {
+    bumped = glBump("run" + (i % 3))
+    finite = finite + glNative(i % 2 == 0 ? 1.5 : Infinity)
+}
+
+assert("a module global written by compiled code", gCounter === 2200 && bumped === 2200)
+// 2199 % 3 is 0.
+assert("the last write of a global string", gLast == "run0")
+assert("a native global read by compiled code", finite === 1100)
+
+print("[PASSED] 147. JIT globals")

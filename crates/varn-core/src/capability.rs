@@ -56,14 +56,9 @@ pub const fn binary_operator_method(op: BinaryOp) -> Option<OperatorMethod> {
             method: "equals",
             shape: OperatorShape::NotEquals,
         },
-        B::BitAnd
-        | B::BitOr
-        | B::BitXor
-        | B::Shl
-        | B::Shr
-        | B::UShr
-        | B::Instanceof
-        | B::In => return None,
+        B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr | B::UShr | B::Instanceof | B::In => {
+            return None
+        }
     })
 }
 

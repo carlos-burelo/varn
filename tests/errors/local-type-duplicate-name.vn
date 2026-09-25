@@ -1,0 +1,12 @@
+// expect: error[VN4002]
+// Class and enum names are module-wide, even when declared inside a function:
+// two functions cannot each declare an `enum K`.
+function a(): int {
+    enum K { P, Q }
+    return K.Q as int
+}
+function b(): int {
+    enum K { X, Y, Z }
+    return K.Z as int
+}
+print(a(), b())

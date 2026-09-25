@@ -1,5 +1,5 @@
 
-  [34mtype inference engine[0m [2m──────────────────────────── <fixtures>\arith.vn[0m
+  [34mtype inference engine[0m [2m──────────────────────────── <fixtures>/arith.vn[0m
   Symbol Types
   [2mLoc      │ Kind            │ Name                 │ Type Details[0m
   ────────────────────────────────────────────────────────────────────────────────

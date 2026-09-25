@@ -897,5 +897,3 @@ fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Arc<str>> {
         _ => None,
     }
 }
-
-

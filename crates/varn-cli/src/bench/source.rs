@@ -99,9 +99,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (program, parse_profile, interner, arena) =
-        varn_parser::parse_with_profile(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
-            .map_err(|errs| {
+    let (program, parse_profile, interner, arena) = parse_shared(tokens, lexeme_buf, path)
+        .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
                 .map(|e| {
@@ -292,24 +291,19 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (program, _, interner, arena) = varn_parser::parse_with_profile(
-            tokens,
-            lexeme_buf,
-            path,
-            varn_core::AtomInterner::new(),
-        )
-        .map_err(|errs| {
-            let msgs: Vec<String> = errs
-                .iter()
-                .map(|e| {
-                    format!(
-                        "{}:{}:{}: {}",
-                        path, e.range.start.line, e.range.start.column, e.message
-                    )
-                })
-                .collect();
-            format!("parse errors:\n{}", msgs.join("\n"))
-        })?;
+        let (program, _, interner, arena) =
+            parse_shared(tokens, lexeme_buf, path).map_err(|errs| {
+                let msgs: Vec<String> = errs
+                    .iter()
+                    .map(|e| {
+                        format!(
+                            "{}:{}:{}: {}",
+                            path, e.range.start.line, e.range.start.column, e.message
+                        )
+                    })
+                    .collect();
+                format!("parse errors:\n{}", msgs.join("\n"))
+            })?;
 
         let check_result = varn_pipeline::resolver::with_resolver(|r| {
             Checker::check_with(
@@ -519,4 +513,26 @@ fn verbose_sections(
     }
     terminal::blank();
     Ok(())
+}
+
+/// Parse the benchmarked program into the resolver's atom space, with the
+/// parser's timing profile.
+fn parse_shared(
+    tokens: Vec<varn_core::Token>,
+    lexeme_buf: std::sync::Arc<[u8]>,
+    path: &str,
+) -> Result<
+    (
+        varn_core::ast::Program,
+        varn_parser::ParseProfile,
+        varn_core::AtomInterner,
+        varn_core::ast::AstArena,
+    ),
+    varn_core::DiagnosticBag,
+> {
+    varn_pipeline::in_shared_atoms(|interner| {
+        varn_parser::parse_with_profile(tokens, lexeme_buf, path, interner)
+            .map(|(program, profile, interner, arena)| ((program, profile, arena), interner))
+    })
+    .map(|((program, profile, arena), interner)| (program, profile, interner, arena))
 }

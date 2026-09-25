@@ -14,6 +14,7 @@
 use std::fmt::Write as _;
 
 use varn_core::OpCode;
+use varn_types::bytecode::{ConstKind, Operand};
 use varn_types::{FunctionProto, PoolEntry};
 
 use crate::render::truncate;
@@ -131,39 +132,40 @@ fn count_one(proto: &FunctionProto) -> Counts {
     let pool = &proto.chunk.constants;
     let mut ip = 0usize;
     while ip < code.len() {
-        let Some(info) = varn_types::bytecode::decode(code, ip, pool) else {
+        let Some(layout) = varn_types::bytecode::layout(code, ip, pool) else {
             break;
         };
-        if let Some(op) = OpCode::from_u8(code[ip] as u8) {
-            if matches!(op, OpCode::GetProperty | OpCode::SetProperty) {
-                // Both spell the member name in the constant two words along.
-                if let Some(name) = code
-                    .get(ip + 2)
-                    .and_then(|idx| pool.get(*idx as usize))
-                    .and_then(|entry| match entry {
-                        PoolEntry::Literal(varn_types::Literal::Str(s)) => Some(s.to_string()),
-                        _ => None,
-                    })
-                {
-                    if !c.members.contains(&name) {
-                        c.members.push(name);
-                    }
-                }
-            }
-            for (typed, gen) in PAIRS {
-                if op == *typed {
-                    c.typed += 1;
-                } else if op == *gen {
-                    c.generic += 1;
-                    let label = format!("{op:?}");
-                    match generic.iter_mut().find(|(n, _)| *n == label) {
-                        Some((_, n)) => *n += 1,
-                        None => generic.push((label, 1)),
-                    }
+        let op = layout.op;
+        if matches!(op, OpCode::GetProperty | OpCode::SetProperty) {
+            let name = layout.operands.iter().find_map(|o| match *o {
+                Operand::Const {
+                    word,
+                    kind: ConstKind::Name,
+                } => match code.get(ip + word).and_then(|&i| pool.get(i as usize)) {
+                    Some(PoolEntry::Literal(varn_types::Literal::Str(s))) => Some(s.to_string()),
+                    _ => None,
+                },
+                _ => None,
+            });
+            if let Some(name) = name {
+                if !c.members.contains(&name) {
+                    c.members.push(name);
                 }
             }
         }
-        ip += info.len;
+        for (typed, gen) in PAIRS {
+            if op == *typed {
+                c.typed += 1;
+            } else if op == *gen {
+                c.generic += 1;
+                let label = format!("{op:?}");
+                match generic.iter_mut().find(|(n, _)| *n == label) {
+                    Some((_, n)) => *n += 1,
+                    None => generic.push((label, 1)),
+                }
+            }
+        }
+        ip += layout.len;
     }
     generic.sort_by(|a, b| b.1.cmp(&a.1));
     c.by_op = generic;

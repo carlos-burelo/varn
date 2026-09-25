@@ -134,6 +134,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true
         }
+        // A length of a receiver statically typed `str` / array: a read, no
+        // getter can run.
+        StrLength { .. } | ArrayLength { .. } => true,
         Convert { conv, .. } => !conv.can_fault(),
 
         // Puede lanzar si el valor no cabe en el ancho declarado (mismo
@@ -152,8 +155,8 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         Binary { op, ty, .. } => {
             let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
-            let int_can_overflow = *ty == HirType::Int
-                && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
+            let int_can_overflow =
+                *ty == HirType::Int && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
             // Div/Mod/Pow raise on zero divisor and negative exponent.
             let never_traps = matches!(
                 op,

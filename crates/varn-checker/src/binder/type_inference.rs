@@ -268,16 +268,16 @@ fn infer_member(
             TypeKind::Array(inner) => Type(inner, false),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
             TypeKind::Named(name, _)
-                if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                    i.get(varn_core::LangPrimitive::Str.name()) == Some(name)
-                }) =>
+                if ctx
+                    .and_then(|c| c.interner())
+                    .is_some_and(|i| i.get(varn_core::LangPrimitive::Str.name()) == Some(name)) =>
             {
                 Type::Str
             }
             TypeKind::Generic(name, args, _)
-                if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                    i.get(varn_core::BuiltinType::Map.name()) == Some(name)
-                }) =>
+                if ctx
+                    .and_then(|c| c.interner())
+                    .is_some_and(|i| i.get(varn_core::BuiltinType::Map.name()) == Some(name)) =>
             {
                 let arg_ids = table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
@@ -425,9 +425,15 @@ pub(crate) fn adopt_literal_operands(
 /// Whether two numeric operand types may meet in one operator: a common
 /// class exists, or it is `bigint` with `int` (the exact widening, spec §7).
 pub(crate) fn numeric_operands_compatible(l: &Type, r: &Type, table: &CheckerTyTable) -> bool {
-    let is_big = |t: &Type| matches!(table.get(t.0), TypeKind::Primitive(varn_core::LangPrimitive::BigInt));
+    let is_big = |t: &Type| {
+        matches!(
+            table.get(t.0),
+            TypeKind::Primitive(varn_core::LangPrimitive::BigInt)
+        )
+    };
     let big_or_int = |t: &Type| is_big(t) || t.is_int();
-    numeric_binary_type(l, r, table).is_some() || ((is_big(l) || is_big(r)) && big_or_int(l) && big_or_int(r))
+    numeric_binary_type(l, r, table).is_some()
+        || ((is_big(l) || is_big(r)) && big_or_int(l) && big_or_int(r))
 }
 
 fn infer_binary(
@@ -502,7 +508,12 @@ fn infer_new(
             .and_then(|s| resolver.map(|r| r.intern(s)));
         if type_args.is_empty() {
             if name_str == varn_core::BuiltinType::Map.name() {
-                return Type::generic_atom(*name, vec![Type::Dynamic, Type::Dynamic], origin, table);
+                return Type::generic_atom(
+                    *name,
+                    vec![Type::Dynamic, Type::Dynamic],
+                    origin,
+                    table,
+                );
             }
             return Type::named_with_origin_atom(*name, origin, table);
         }

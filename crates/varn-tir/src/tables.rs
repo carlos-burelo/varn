@@ -36,6 +36,9 @@ pub struct ClassInfo {
     pub fields: Vec<FieldInfo>,
     pub vtable: Vec<VtableEntry>,
     pub payload_size: u32,
+    /// The signature of the class's own constructor, when it declares one.
+    /// Not a vtable entry: a constructor is reached by `new`, not dispatch.
+    pub constructor: Option<SigId>,
 }
 
 /// Bytes one field slot occupies today. Every read and write path still moves
@@ -107,6 +110,7 @@ impl ClassInfo {
             fields: out,
             vtable,
             payload_size,
+            constructor: None,
         }
     }
 

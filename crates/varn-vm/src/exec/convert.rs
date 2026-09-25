@@ -81,7 +81,11 @@ fn to_bigint(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
         Numeric::Float(f) => BigInt::from_f64(f.trunc()).ok_or_else(|| {
             RuntimeError::integer_overflow(format!("integer overflow: {f} has no bigint value"))
         })?,
-        Numeric::Dec(d) => d.with_scale_round(0, RoundingMode::Down).as_bigint_and_exponent().0,
+        Numeric::Dec(d) => {
+            d.with_scale_round(0, RoundingMode::Down)
+                .as_bigint_and_exponent()
+                .0
+        }
     };
     Ok(heap.intern(Value::BigInt(Box::new(b))))
 }

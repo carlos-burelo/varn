@@ -163,7 +163,8 @@ impl<'r> Checker<'r> {
             return;
         };
         if let Some(mangled) = method_map.get(bind.interner.resolve(*method_name)) {
-            self.desugar.extension_calls
+            self.desugar
+                .extension_calls
                 .insert(range.start.offset, mangled.clone());
         }
     }

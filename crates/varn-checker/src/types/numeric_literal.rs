@@ -32,8 +32,12 @@ pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
 /// Whether the integer `value` can take `target`'s numeric type exactly.
 pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
     match table.get(target.0) {
-        TypeKind::Primitive(varn_core::LangPrimitive::Float) => (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value),
-        TypeKind::Primitive(varn_core::LangPrimitive::Decimal | varn_core::LangPrimitive::BigInt) => true,
+        TypeKind::Primitive(varn_core::LangPrimitive::Float) => {
+            (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value)
+        }
+        TypeKind::Primitive(
+            varn_core::LangPrimitive::Decimal | varn_core::LangPrimitive::BigInt,
+        ) => true,
         TypeKind::Union(list) => table
             .get_list(list)
             .iter()

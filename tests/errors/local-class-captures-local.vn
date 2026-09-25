@@ -1,0 +1,10 @@
+// expect: error[VN3002]
+// A class declared inside a function is one module-wide type, built once: its
+// methods cannot use a local of the function it is declared in.
+function mk(x: int): int {
+    class C {
+        get(): int { return x }
+    }
+    return new C().get()
+}
+print(mk(7))

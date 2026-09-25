@@ -70,7 +70,9 @@ pub(super) fn emit_declare_field(
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    let tag_v = b.ins().iconst(types::I64, varn_core::RuntimeKind::encode(tag) as i64);
+    let tag_v = b
+        .ins()
+        .iconst(types::I64, varn_core::RuntimeKind::encode(tag) as i64);
     call_helper_void(
         b,
         ctx.cc,
@@ -142,6 +144,34 @@ pub(super) fn emit_get_super(
         types::I128,
         cranelift_codegen::ir::MemFlags::trusted(),
         ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
+/// The enum variant with discriminant `tag` described by `meta` — a heap
+/// result, built by the runtime's one `make_enum_variant`.
+pub(super) fn emit_make_enum_variant(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    tag: i64,
+    meta: &str,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: MakeEnumVariant without a frame")?;
+    let meta_v = b.ins().iconst(types::I64, str_idx(ctx, meta)? as i64);
+    let tag_v = b.ins().iconst(types::I64, tag);
+    call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.make_enum_variant_const,
+        &[frame.exec_ctx, frame.closure, tag_v, meta_v],
+    );
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlags::trusted(),
+        frame.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }

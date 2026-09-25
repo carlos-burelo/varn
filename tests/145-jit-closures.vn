@@ -1,0 +1,89 @@
+// Closures created and run by compiled code: a captured variable lives in
+// its frame register, which every closure capturing it shares, and a
+// closure body reads and writes its upvalues through the runtime. Each
+// function runs past the tiering threshold and has two statements, so it
+// executes compiled instead of being inlined.
+
+// A captured int, read by the closure after the parent changes it.
+function clAdder(base: int): int {
+    let offset = base * 2
+    const add = (x: int): int => x + offset
+    offset = offset + 1
+    return add(10)
+}
+
+// The closure writes the parent's variable; the parent sees the write.
+function clCounter(n: int): int {
+    let count = 0
+    const bump = (): void => { count = count + 1 }
+    for (let i = 0; i < n; i = i + 1) {
+        bump()
+    }
+    return count
+}
+
+// Per-iteration bindings: each closure keeps its own `k`.
+function clPerIteration(n: int): int {
+    const fns: (() => int)[] = []
+    for (let i = 0; i < n; i = i + 1) {
+        const k = i * 3
+        fns.push(() => k)
+    }
+    let sum = 0
+    for (let j = 0; j < fns.length; j = j + 1) {
+        sum = sum + fns[j]()
+    }
+    return sum
+}
+
+// A nested closure reaching the outer function's variable through its
+// parent's upvalue, and a captured string.
+function clNested(tag: str): str {
+    let label = tag + "-"
+    const outer = () => {
+        return () => label + "in"
+    }
+    label = label + "x"
+    return outer()()
+}
+
+// A captured parameter, written by the closure.
+function clParam(p: int): int {
+    const twice = (): void => { p = p * 2 }
+    twice()
+    return p + 1
+}
+
+// A closure without captures is the function's one shared closure.
+function clStatic(i: int): int {
+    const sq = (x: int): int => x * x
+    return sq(i)
+}
+
+let cAdd = 0
+let cCount = 0
+let cIter = 0
+let cNested = ""
+let cParam = 0
+let cStatic = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    cAdd = cAdd + clAdder(i)
+    cCount = cCount + clCounter(i % 5)
+    cIter = cIter + clPerIteration(i % 4)
+    cNested = clNested("t" + (i % 3))
+    cParam = cParam + clParam(i)
+    cStatic = cStatic + clStatic(i % 10)
+}
+
+// Sum over i of 2i + 1 + 10.
+assert("a closure reads its parent's current value", cAdd === 2 * 1999000 + 11 * 2000)
+// i % 5 = 0..4, 400 times each.
+assert("a closure writes its parent's variable", cCount === 400 * 10)
+// n = 0..3: 0, 0, 3, 9 — 500 times each.
+assert("each loop iteration captures its own binding", cIter === 500 * 12)
+assert("a nested closure through an inherited upvalue", cNested == "t1-xin")
+assert("a captured parameter written by a closure", cParam === 2 * 1999000 + 2000)
+// 0..9 squared is 285, 200 times.
+assert("a closure without captures", cStatic === 200 * 285)
+
+print("[PASSED] 145. JIT closures")

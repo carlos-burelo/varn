@@ -7,10 +7,20 @@ use crate::OptError;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-pub(super) fn assign_registers(
-    ssa: &SsaFunc,
-    nparams: usize,
-) -> Result<(Vec<u8>, u8, u8, u8, u16)> {
+/// Where every value lives, and the liveness that decided it.
+pub(super) struct Assignment {
+    /// Each value's register.
+    pub reg: Vec<u8>,
+    pub scratch: u8,
+    pub null_reg: u8,
+    pub call_base: u8,
+    pub register_count: u16,
+    /// A value keeps its register for as long as this says it is live — what
+    /// lets a resumed frame find a value where it was left.
+    pub liveness: crate::ssa::liveness::Liveness,
+}
+
+pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignment> {
     let mut reg = vec![0u8; ssa.values.len()];
     let mut assigned = vec![false; ssa.values.len()];
 
@@ -26,8 +36,8 @@ pub(super) fn assign_registers(
     let nvals = ssa.values.len();
     let order = super::emission_order(ssa);
     let lv = crate::ssa::liveness::Liveness::analyze_ordered(ssa, &order);
-    let def = lv.def;
-    let end = lv.end;
+    let def = &lv.def;
+    let end = &lv.end;
 
     let mut base = 1 + nparams as u32;
     for block in &ssa.blocks {
@@ -136,6 +146,8 @@ pub(super) fn assign_registers(
                 | InstKind::ModuleSlot { .. }
                 | InstKind::GetEnumTag { .. }
                 | InstKind::IsArray { .. }
+                | InstKind::StrLength { .. }
+                | InstKind::ArrayLength { .. }
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
@@ -240,10 +252,17 @@ pub(super) fn assign_registers(
     let null_reg = (next + 1) as u8;
     let call_base = (next + 2) as u8;
     let register_count = total.max(1) as u16;
-    Ok((reg, scratch, null_reg, call_base, register_count))
+    Ok(Assignment {
+        reg,
+        scratch,
+        null_reg,
+        call_base,
+        register_count,
+        liveness: lv,
+    })
 }
 
-pub(super) fn var_reg(var: VarId, nparams: usize) -> u8 {
+pub(crate) fn var_reg(var: VarId, nparams: usize) -> u8 {
     match var {
         VarId::Param(i) => (1 + i) as u8,
         VarId::Local(id) => (1 + nparams + id.0 as usize) as u8,

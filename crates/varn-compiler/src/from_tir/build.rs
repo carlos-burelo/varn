@@ -268,13 +268,10 @@ impl<'m> Builder<'m> {
         let fields: Vec<(std::sync::Arc<str>, Option<varn_core::RuntimeKind>)> = ci
             .fields
             .iter()
-            .map(|f| (f.name.clone(), field_kind(f.ty)))
+            .map(|f| (f.name.clone(), field_kind(f.ty, &self.tir.types)))
             .collect();
-        let layout = varn_types::class_layout::ClassLayout::from_fields(
-            ci.name.as_ref(),
-            0,
-            &fields,
-        );
+        let layout =
+            varn_types::class_layout::ClassLayout::from_fields(ci.name.as_ref(), 0, &fields);
         let f = layout.get_field_by_index(slot as usize)?;
         Some((f.offset, f.kind))
     }
@@ -689,7 +686,9 @@ impl<'m> Builder<'m> {
                 let d = s.parse().unwrap_or_default();
                 Ok(self.emit(InstKind::ConstDecimal(d), HirType::Dynamic))
             }
-            TirExprKind::BigIntLit(n) => Ok(self.emit(InstKind::ConstBigInt(n.clone()), HirType::Dynamic)),
+            TirExprKind::BigIntLit(n) => {
+                Ok(self.emit(InstKind::ConstBigInt(n.clone()), HirType::Dynamic))
+            }
             TirExprKind::RangeLit {
                 start,
                 end,
@@ -854,6 +853,16 @@ impl<'m> Builder<'m> {
                             name: name.clone(),
                         },
                     },
+                    _ if name.as_ref() == varn_core::MemberKey::Length.as_str() => {
+                        match self.value_ty(obj) {
+                            HirType::Str => InstKind::StrLength { operand: obj },
+                            HirType::Array(_) => InstKind::ArrayLength { operand: obj },
+                            _ => InstKind::GetProperty {
+                                object: obj,
+                                name: name.clone(),
+                            },
+                        }
+                    }
                     _ => InstKind::GetProperty {
                         object: obj,
                         name: name.clone(),
@@ -943,13 +952,14 @@ impl<'m> Builder<'m> {
                 // dispatch it directly, no name lookup, no inline cache.
                 if let Resolution::NativeOp(op_id) = &e.res {
                     if *op_id == varn_core::op_id::array_push_op_id() && argv.len() == 1 {
-                        return Ok(self.emit(
-                            InstKind::ArrayPush {
-                                array: r,
-                                value: argv[0],
-                            },
-                            ty,
-                        ));
+                        // `push` returns `void`: the instruction defines
+                        // nothing, and the expression's value is `null`, as
+                        // any void call's is at runtime.
+                        self.emit_effect(InstKind::ArrayPush {
+                            array: r,
+                            value: argv[0],
+                        });
+                        return Ok(self.emit(InstKind::ConstNull, ty));
                     }
                     return Ok(self.emit(
                         InstKind::CallNativeOp {
@@ -1527,8 +1537,11 @@ impl<'m> Builder<'m> {
 
         let phi = self.add_block_param(join, ty);
 
+        // Each arm reaches the join in the join's type: `a?.b`'s non-null arm
+        // is the member's own (an `int`), the result `int?`.
         self.current = then_blk;
         let tv = self.lower_expr(then_val)?;
+        let tv = self.coerce(tv, ty);
         let tfrom = self.current;
         self.set_term(Terminator::Jump {
             target: join,
@@ -1538,6 +1551,7 @@ impl<'m> Builder<'m> {
 
         self.current = else_blk;
         let ev = self.lower_expr(else_val)?;
+        let ev = self.coerce(ev, ty);
         let efrom = self.current;
         self.set_term(Terminator::Jump {
             target: join,
@@ -1615,23 +1629,36 @@ fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
 }
 
 /// The runtime kind a declared field is laid out by; `None` is boxed.
-fn field_kind(bt: BackendTy) -> Option<varn_core::RuntimeKind> {
+///
+/// `T?` over a type that compacts to a reference keeps that layout: `null` is
+/// the reference's niche (spec §49). Over anything else it stays boxed.
+fn field_kind(bt: BackendTy, types: &varn_tir::TyTable) -> Option<varn_core::RuntimeKind> {
     use varn_core::RuntimeKind as T;
-    Some(match bt {
-        BackendTy::Int => T::Int,
-        BackendTy::Float => T::Float,
-        BackendTy::Bool => T::Bool,
-        BackendTy::Str => T::Str,
-        BackendTy::Bytes => T::Bytes,
-        BackendTy::Char => T::Char,
-        BackendTy::Decimal => T::Decimal,
-        BackendTy::BigInt => T::BigInt,
-        BackendTy::Array(_) => T::Array,
-        BackendTy::Set(_) => T::Set,
-        BackendTy::Map(..) => T::Map,
-        BackendTy::Class(_) => T::Class,
-        _ => return None,
-    })
+    match bt {
+        BackendTy::Int => Some(T::Int),
+        BackendTy::Float => Some(T::Float),
+        BackendTy::Bool => Some(T::Bool),
+        BackendTy::Str => Some(T::Str),
+        BackendTy::Bytes => Some(T::Bytes),
+        BackendTy::Char => Some(T::Char),
+        BackendTy::Decimal => Some(T::Decimal),
+        BackendTy::BigInt => Some(T::BigInt),
+        BackendTy::Array(_) => Some(T::Array),
+        BackendTy::Set(_) => Some(T::Set),
+        BackendTy::Map(..) => Some(T::Map),
+        BackendTy::Class(_) => Some(T::Class),
+        BackendTy::Nullable(_) => {
+            let kind = field_kind(bt.non_nullable(types), types)?;
+            let repr = varn_types::layout::TypeLayout::of_field(Some(kind)).repr;
+            (repr == varn_types::layout::ScalarRepr::Ref).then_some(kind)
+        }
+        BackendTy::Tuple(_)
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_)
+        | BackendTy::Void
+        | BackendTy::Never
+        | BackendTy::Dynamic(_) => None,
+    }
 }
 
 impl<'m> Builder<'m> {
@@ -1777,7 +1804,7 @@ impl<'m> Builder<'m> {
             self.emit_effect(InstKind::DeclareField {
                 class: class_v,
                 name: fname,
-                tag: field_kind(fty),
+                tag: field_kind(fty, &self.tir.types),
             });
         }
 
@@ -1928,6 +1955,8 @@ impl<'m> Builder<'m> {
         let then_blk = self.new_block();
         let else_blk = self.new_block();
         let join = self.new_block();
+        let then_v = self.coerce(then_v, ty);
+        let else_v = self.coerce(else_v, ty);
         let from = self.current;
         self.set_term(Terminator::Branch {
             cond,
@@ -2041,7 +2070,9 @@ fn build_inner(
         // A `bigint`/`decimal` parameter may arrive as an `int` (the implicit
         // widening happens at the call site's type level only).
         let v = match (*pty, defaulted[i]) {
-            (BackendTy::BigInt | BackendTy::Decimal, false) => b.widen_exact(v, BackendTy::Int, *pty),
+            (BackendTy::BigInt | BackendTy::Decimal, false) => {
+                b.widen_exact(v, BackendTy::Int, *pty)
+            }
             _ => v,
         };
         b.write_var(VarId::Param(i as u32), entry, v);

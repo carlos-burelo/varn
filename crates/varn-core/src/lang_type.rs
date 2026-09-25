@@ -203,7 +203,10 @@ mod tests {
 
     #[test]
     fn core_sums_are_known_by_origin() {
-        assert_eq!(CoreSum::identify("Result", Some("core:types/result")), Some(CoreSum::Result));
+        assert_eq!(
+            CoreSum::identify("Result", Some("core:types/result")),
+            Some(CoreSum::Result)
+        );
         assert_eq!(CoreSum::identify("Result", Some("/app/result.vn")), None);
         assert_eq!(CoreSum::identify("Result", None), None);
     }

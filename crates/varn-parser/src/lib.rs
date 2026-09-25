@@ -53,18 +53,23 @@ pub fn parse_with_profile(
 /// Never shares state with another parse: partial parses back the LSP's
 /// incremental single-file path, which does not carry an `Atom` table forward
 /// between edits.
+/// As [`parse`], but error-tolerant: the program parsed so far comes back
+/// with the diagnostics instead of in place of them. Like `parse`, it takes
+/// the interner to mint into — the caller's shared table, so its atoms are
+/// comparable with every other module's — and returns it grown.
 pub fn parse_partial(
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
     filename: &str,
-) -> (Program, varn_core::DiagnosticBag, AstArena) {
-    let mut parser = Parser::new(
-        tokens,
-        lexeme_buf,
-        Arc::from(filename),
-        varn_core::AtomInterner::new(),
-    );
+    interner: varn_core::AtomInterner,
+) -> (
+    Program,
+    varn_core::DiagnosticBag,
+    AstArena,
+    varn_core::AtomInterner,
+) {
+    let mut parser = Parser::new(tokens, lexeme_buf, Arc::from(filename), interner);
     let (program, diagnostics) = parser.parse_program_partial();
     let arena = std::mem::take(&mut parser.stream.arena);
-    (program, diagnostics, arena)
+    (program, diagnostics, arena, parser.stream.interner)
 }

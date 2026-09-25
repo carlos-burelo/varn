@@ -161,7 +161,6 @@ pub fn parse_type_alias_decl(s: &mut TokenStream) -> Result<Decl, String> {
     }))
 }
 
-
 pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
     let range = s.range();
     s.expect(TokenKind::Enum)?;

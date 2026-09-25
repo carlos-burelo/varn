@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
 use varn_checker::SymbolKind;
-use varn_core::ast::{Decl, Stmt, StmtKind};
+use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
 
 pub(super) fn stable_global_key(
@@ -99,9 +99,13 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         })
         .collect();
 
-    // TODO(fase1-componente2): the LSP pipeline still expects `Vec<Stmt>`;
-    // arena wiring for varn-lsp lands in a later task.
-    let (program, parse_errs, _arena) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
+    // Parse into the resolver's shared atom table and publish it back, as the
+    // compile pipeline does: this document's atoms and every imported
+    // module's must be one space.
+    let interner = crate::workspace::resolver::with_resolver(|r| r.interner_snapshot());
+    let (program, parse_errs, ast_arena, interner) =
+        varn_parser::parse_partial(raw_tokens, lexeme_buf, &path, interner);
+    crate::workspace::resolver::with_resolver(|r| r.set_interner(interner.clone()));
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,
@@ -117,15 +121,10 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     }
 
     let result = crate::workspace::resolver::with_resolver(|r| {
-        // `parse_partial` (unlike `varn_parser::parse`) does not yet expose the
-        // `AtomInterner` it builds internally -- migrating the LSP's error-
-        // tolerant parse path to surface it is follow-on work, not part of this
-        // task's scope (see the 4 external callers this task threads a real
-        // interner through). An empty interner here matches the placeholder
-        // behavior `BindResult.interner` had before this task connected it.
         varn_checker::Checker::check_with(
             &program,
-            varn_core::AtomInterner::new(),
+            &ast_arena,
+            interner,
             r,
             varn_checker::CheckOptions::tooling(),
         )
@@ -195,13 +194,14 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             .expr_types
             .get(&sym.offset)
             .filter(|info| info.symbol_id == Some(id))
-            .map(|i| i.ty.clone())
+            .map(|i| i.ty)
             .filter(|t| !t.is_dynamic());
-        if let Some(ty) = recorded.or_else(|| sym.ty.clone()) {
+        if let Some(ty) = recorded.or(sym.ty) {
             resolved_types.insert(id, ty);
         }
         all_symbols.push(id);
-        symbol_map.entry(sym.name.to_string()).or_insert(sym.kind);
+        let name = result.bind.interner.resolve(sym.name).to_owned();
+        symbol_map.entry(name).or_insert(sym.kind);
     }
 
     // Type-parameter names: the token scan, plus every `TypeParameter` the
@@ -211,17 +211,17 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     for &id in &all_symbols {
         let sym = result.bind.arena.get(id);
         if sym.kind == SymbolKind::TypeParameter {
-            type_param_names.insert(sym.name.to_string());
+            type_param_names.insert(result.bind.interner.resolve(sym.name).to_owned());
         }
     }
 
-    let import_paths = collect_import_paths(&program.body);
+    let import_paths = collect_import_paths(&program.body, &ast_arena, &result.bind.interner);
 
     let global_scope = result.bind.global_scope;
     let scopes = result.bind.scopes.clone();
     let arena = result.bind.arena.clone();
 
-    let spatial_index = crate::query::SpatialIndex::build(&program);
+    let spatial_index = crate::query::SpatialIndex::build(&program, &ast_arena);
 
     let db = crate::document::SemanticDB {
         expr_table: result.expr_table,
@@ -239,6 +239,10 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             .collect(),
         member_resolutions: result.member_resolutions,
         call_resolutions: result.call_resolutions,
+        match_gaps: result.match_gaps,
+        call_mappings: result.call_mappings,
+        desugar: result.desugar,
+        types: std::cell::RefCell::new((*result.bind.ty_table).clone()),
         bind: result.bind,
     };
 
@@ -256,6 +260,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         import_paths,
         spatial_index,
         ast: Some(program),
+        ast_arena,
     }
 }
 
@@ -279,12 +284,16 @@ fn build_related_locations(d: &varn_core::Diagnostic, current_uri: &str) -> Vec<
         .collect()
 }
 
-fn collect_import_paths(stmts: &[Stmt]) -> Vec<String> {
+fn collect_import_paths(
+    stmts: &[StmtId],
+    arena: &AstArena,
+    interner: &varn_core::AtomInterner,
+) -> Vec<String> {
     let mut paths = Vec::new();
-    for stmt in stmts {
-        if let StmtKind::Decl(decl) = &stmt.kind {
+    for &stmt in stmts {
+        if let StmtKind::Decl(decl) = &arena.stmt(stmt).kind {
             if let Decl::Import(i) = decl.as_ref() {
-                paths.push(i.source.to_string());
+                paths.push(interner.resolve(i.source).to_owned());
             }
         }
     }

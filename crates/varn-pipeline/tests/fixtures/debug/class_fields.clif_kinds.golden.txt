@@ -7,7 +7,7 @@
 
   [1mTemperature.constructor[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [Boxed, Boxed, Boxed, Boxed]
+      block@0: [Boxed, Float, Boxed, Boxed]
 
   [1mTemperature.get celsius[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m

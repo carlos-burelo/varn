@@ -107,7 +107,9 @@ fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind
     use varn_core::NumConv::*;
     match (conv, operand) {
         (IntToFloat, InstKind::ConstInt(n)) => Some(InstKind::ConstFloat(*n as f64)),
-        (FloatToInt, InstKind::ConstFloat(f)) => varn_core::float_to_int(*f).map(InstKind::ConstInt),
+        (FloatToInt, InstKind::ConstFloat(f)) => {
+            varn_core::float_to_int(*f).map(InstKind::ConstInt)
+        }
         (BigIntToInt, InstKind::ConstBigInt(b)) => {
             let b: num_bigint::BigInt = b.parse().ok()?;
             i64::try_from(&b).ok().map(InstKind::ConstInt)

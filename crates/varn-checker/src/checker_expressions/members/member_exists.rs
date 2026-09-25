@@ -89,8 +89,7 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 if let Some(b) = &bind.core {
-                    if let Some(members) =
-                        b.class_members.get(varn_core::LangPrimitive::Str.name())
+                    if let Some(members) = b.class_members.get(varn_core::LangPrimitive::Str.name())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -104,9 +103,7 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 if let Some(b) = &bind.core {
-                    if let Some(members) = b
-                        .class_members
-                        .get(varn_core::BuiltinType::Bytes.name())
+                    if let Some(members) = b.class_members.get(varn_core::BuiltinType::Bytes.name())
                     {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -304,9 +301,7 @@ impl<'r> Checker<'r> {
             TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {
-                    if let Some(members) = b
-                        .class_members
-                        .get(varn_core::BuiltinType::Array.name())
+                    if let Some(members) = b.class_members.get(varn_core::BuiltinType::Array.name())
                     {
                         return members.members.iter().any(|m| m.name.as_ref() == key);
                     }

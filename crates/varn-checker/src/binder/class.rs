@@ -33,6 +33,9 @@ impl<'r> super::Binder<'r> {
             .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
         self.define(name_atom, sym);
+        if c.id.is_some() {
+            self.note_type_decl(&name, self.current, c.range);
+        }
 
         let child = self
             .scopes

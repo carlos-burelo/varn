@@ -24,7 +24,6 @@ pub fn resolve_type_node(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    
     // `node.kind`'s name slots (`TypeKind::Named`/`Generic`/interface member
     // keys) are `Atom` at the AST layer; resolving them to the `&str` this
     // function's checker-`Type` output and the `TypeContext` lookups need
@@ -59,7 +58,9 @@ pub fn resolve_type_node(
         TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Null,
         TypeKind::Primitive(varn_core::LangPrimitive::Never) => Type::Never,
         TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
-        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Type::builtin(varn_core::BuiltinType::Bytes, table),
+        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
+            Type::builtin(varn_core::BuiltinType::Bytes, table)
+        }
         TypeKind::This => Type::This,
         TypeKind::Literal(l) => {
             let l = match *l {
@@ -67,7 +68,9 @@ pub fn resolve_type_node(
                 // like every other name crossing into the checker's table.
                 varn_core::TypeLiteral::Str(a) => {
                     let text = resolve_name(a);
-                    let atom = ctx.and_then(|c| c.resolver()).map_or(a, |r| r.intern(&text));
+                    let atom = ctx
+                        .and_then(|c| c.resolver())
+                        .map_or(a, |r| r.intern(&text));
                     varn_core::TypeLiteral::Str(atom)
                 }
                 other => other,
@@ -385,8 +388,15 @@ pub fn resolve_type_node(
                         let origin_str = origin.and_then(|o| ctx.atom_text(o));
                         let members = ctx
                             .get_class_members(&name_str, origin_str.as_deref())
-                            .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))?;
-                        Some(members.iter().map(|cm| cm.as_object_member(table)).collect())
+                            .or_else(|| {
+                                ctx.get_interface_members(&name_str, origin_str.as_deref())
+                            })?;
+                        Some(
+                            members
+                                .iter()
+                                .map(|cm| cm.as_object_member(table))
+                                .collect(),
+                        )
                     }
                     _ => None,
                 })
@@ -468,8 +478,10 @@ pub fn resolve_type_node(
 /// A primitive or literal type: the members of an intersection that can only
 /// meet at one value domain.
 fn is_scalar(ty: &Type, table: &CheckerTyTable) -> bool {
-    matches!(table.get(ty.0), TypeKind::Primitive(_) | TypeKind::Literal(_))
-        && *ty != Type::Dynamic
+    matches!(
+        table.get(ty.0),
+        TypeKind::Primitive(_) | TypeKind::Literal(_)
+    ) && *ty != Type::Dynamic
 }
 
 /// `a & b` for two member types: equal types meet at themselves, a literal
@@ -518,9 +530,9 @@ fn merge_members(
             out.push(member);
             continue;
         };
-        let existing = out.iter_mut().find(|m| {
-            matches!(m, ObjectTypeMember::Property { name: n, .. } if n == name)
-        });
+        let existing = out
+            .iter_mut()
+            .find(|m| matches!(m, ObjectTypeMember::Property { name: n, .. } if n == name));
         match existing {
             Some(ObjectTypeMember::Property {
                 ty: prev_ty,

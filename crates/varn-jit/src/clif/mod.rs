@@ -21,6 +21,7 @@ pub(crate) mod floats;
 pub(crate) mod from_ssa;
 pub(crate) mod generic;
 pub(crate) mod globals;
+pub(crate) mod homes;
 pub mod invariants;
 pub(crate) mod kinds;
 pub(crate) mod liveness;
@@ -53,6 +54,12 @@ pub fn enabled() -> bool {
 pub fn trace() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
+}
+
+/// `VARN_HOME_TRACE`, read once: the lowering asks it for every instruction.
+pub(crate) fn home_trace() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VARN_HOME_TRACE").is_some())
 }
 
 /// The host ISA is immutable for the process lifetime; build it once.

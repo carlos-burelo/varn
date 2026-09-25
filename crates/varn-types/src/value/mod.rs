@@ -3,6 +3,7 @@ mod buffer;
 mod class;
 mod closure;
 mod constructors;
+mod instance;
 mod map;
 mod module;
 mod object;
@@ -18,13 +19,14 @@ pub use alloc::{
     install_allocator, register_global_vtable, AllocVtable, ArrayRef, MapKey, MapRef, ObjRef,
     RuntimeString, SetRef, ValueMap, ValueSet,
 };
+use bigdecimal::BigDecimal as Decimal;
 pub use buffer::VmBuffer;
 pub use class::{find_method_with_owner, ClassObj};
 pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};
+pub use instance::{InstanceData, InstanceRef};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
-pub use object::{nv_to_value, value_to_nv, InstanceData, InstanceRef, ObjData};
-use bigdecimal::BigDecimal as Decimal;
+pub use object::{nv_to_value, value_to_nv, ObjData};
 pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
 pub use shape::{root_shape, Shape};
 use std::rc::Rc;
@@ -93,7 +95,9 @@ impl RangeData {
 
     /// The raw bound of element `i`, or `None` past the end.
     pub fn nth(&self, i: i64) -> Option<i64> {
-        (0..self.len()).contains(&i).then(|| self.start + i * self.step)
+        (0..self.len())
+            .contains(&i)
+            .then(|| self.start + i * self.step)
     }
 
     pub fn contains(&self, raw: i64) -> bool {
@@ -105,7 +109,10 @@ impl RangeData {
         match self.elem {
             RangeElem::Int => crate::Value::Int(raw),
             RangeElem::Char => crate::Value::Char(
-                u32::try_from(raw).ok().and_then(char::from_u32).unwrap_or('\0'),
+                u32::try_from(raw)
+                    .ok()
+                    .and_then(char::from_u32)
+                    .unwrap_or('\0'),
             ),
         }
     }
@@ -123,7 +130,12 @@ impl std::fmt::Display for RangeData {
         let dots = if self.inclusive { "..=" } else { ".." };
         match self.elem {
             RangeElem::Int => write!(f, "{}{dots}{}", self.start, self.end)?,
-            RangeElem::Char => write!(f, "{}{dots}{}", self.element(self.start), self.element(self.end))?,
+            RangeElem::Char => write!(
+                f,
+                "{}{dots}{}",
+                self.element(self.start),
+                self.element(self.end)
+            )?,
         }
         if self.step != 1 {
             write!(f, " step {}", self.step)?;

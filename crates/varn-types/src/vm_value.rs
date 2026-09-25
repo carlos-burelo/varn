@@ -534,7 +534,6 @@ impl VmArray {
         Self(Rc::new(UnsafeCell::new(ArrayRepr::F64(items))))
     }
 
-
     /// Array from boxed values, choosing the narrowest repr the values admit:
     /// all-int → `I64`, all-float → `F64`, anything else (mixed, empty, or a
     /// non-numeric element) → `Boxed`.

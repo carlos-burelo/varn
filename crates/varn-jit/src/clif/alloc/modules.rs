@@ -4,8 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
 use super::safepoints::{
-    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed,
-    store_home, AllocCtx,
+    box_or_load_home, def_result, flush_boxed, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 
 pub(crate) fn emit_load_module(
@@ -17,7 +16,7 @@ pub(crate) fn emit_load_module(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let spec_idx = code[ip + 1] as usize;
-        for r in 0..actx.vars.len() {
+    for r in 0..actx.vars.len() {
         store_home(b, actx, state, r);
     }
     let regs = live_boxed(actx, state);
