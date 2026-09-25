@@ -1,8 +1,11 @@
 //! Where SSA values live and how an instruction's result gets there.
 //!
-//! One rule for the whole lowering: a **scalar** value is a CLIF register (and,
-//! in a frame-aware body, also its home); a **heap** value is its VM home,
-//! the GC root. An instruction emitter never stores its own result: it hands
+//! One rule for the whole lowering: a **scalar** value is a CLIF register; a
+//! **heap** value is its VM home, the GC root, so it survives a collection
+//! that moves it. Nothing in a compiled body reads a scalar back out of its
+//! home — no closure capture, `try` resume or OSR entry exists on this path
+//! — so scalars are never written there; a feature that needs them flushes
+//! them at the point it observes them. An instruction emitter never stores its own result: it hands
 //! back an [`Out`] saying which representation it produced, and [`land`] puts
 //! it where the destination's class says it lives.
 
@@ -25,8 +28,7 @@ pub(super) enum Out {
 }
 
 /// Put `out` where `dest` lives: a heap destination in its home, a scalar in
-/// the CLIF map (and its home, in a frame-aware body). A result nobody reads
-/// (`dest` is `None`) is dropped.
+/// the CLIF map. A result nobody reads (`dest` is `None`) is dropped.
 pub(super) fn land(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -48,9 +50,6 @@ pub(super) fn land(
         Out::Native(v) => v,
         Out::Boxed(v) | Out::Landed(v) => heap::unbox_dest(b, kind, v)?,
     };
-    if ctx.homes_all {
-        store_home_value(b, ctx, d, native)?;
-    }
     values[d as usize] = Some(native);
     Ok(())
 }
@@ -68,8 +67,7 @@ fn get(values: &[Option<Value>], v: u32) -> Result<Value, String> {
         .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
 }
 
-/// Read a value: scalars from the CLIF map, heap values from their home. In a
-/// frame-aware body every value lives in its home.
+/// Read a value: scalars from the CLIF map, heap values from their home.
 pub(super) fn load_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -77,7 +75,7 @@ pub(super) fn load_value(
     v: u32,
 ) -> Result<Value, String> {
     let kind = ctx.ssa.value_ty(v);
-    if ctx.homes_all || is_heap(kind) {
+    if is_heap(kind) {
         load_home_value(b, ctx, ctx.ssa.reg(v), kind)
     } else {
         get(values, v)
@@ -93,23 +91,6 @@ fn load_home_value(
 ) -> Result<Value, String> {
     let boxed = use_heap(b, ctx, reg)?;
     heap::unbox_dest(b, kind, boxed)
-}
-
-/// Write a native scalar value to its home (boxing it), for a frame-aware body.
-pub(super) fn store_home_value(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    value: u32,
-    native: Value,
-) -> Result<(), String> {
-    let kind = ctx.ssa.value_ty(value);
-    let boxed = match kind {
-        SlotKind::Int => super::super::emit::box_int(b, native),
-        SlotKind::Float => super::super::emit::box_f64(b, native),
-        SlotKind::Bool => super::super::emit::box_bool(b, native),
-        _ => native,
-    };
-    def_heap(b, ctx, ctx.ssa.reg(value), boxed)
 }
 
 /// Inline access to this activation's homes.

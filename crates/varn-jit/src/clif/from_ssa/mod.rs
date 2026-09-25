@@ -57,7 +57,7 @@ mod store;
 mod term;
 
 use store::{
-    clif_ty, def_heap, is_heap, land, load_value, store_home_value, use_heap, Out,
+    clif_ty, def_heap, is_heap, land, load_value, use_heap, Out,
 };
 
 /// Frame resources a frame-aware body needs for global access, calls and home
@@ -84,11 +84,6 @@ pub(super) struct Ctx<'a> {
     pub self_ref: FuncRef,
     /// `Some` iff this body is frame-aware (heap/globals/calls).
     pub frame: Option<FrameIo<'a>>,
-    /// When true (frame-aware), the homes are authoritative for EVERY register,
-    /// scalar included — the interpreter's model. This is what lets closures,
-    /// `Try` resume and OSR read a scalar out of its home. A leaf body keeps
-    /// scalars in CLIF registers only.
-    pub homes_all: bool,
 }
 
 /// Attempt the SSA lowering. `Err` is the fallback signal, not a failure: the
@@ -193,7 +188,6 @@ pub(super) fn try_lower(
         constants,
         self_ref,
         frame,
-        homes_all: frame_aware,
     };
 
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
@@ -211,14 +205,7 @@ pub(super) fn try_lower(
         for (k, &p) in blk.params.iter().enumerate() {
             let pv = params[base + k];
             let kind = ssa.value_ty(p);
-            if ctx.homes_all {
-                // Homes are authoritative: land every phi (scalar or heap).
-                if is_heap(kind) {
-                    def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
-                } else {
-                    store_home_value(&mut b, &ctx, p, pv)?;
-                }
-            } else if is_heap(kind) {
+            if is_heap(kind) {
                 def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
             } else {
                 values[p as usize] = Some(pv);
