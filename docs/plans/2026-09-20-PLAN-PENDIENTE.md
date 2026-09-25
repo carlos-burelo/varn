@@ -66,7 +66,7 @@ compartido en `varn-types::register_meta`: `SlotClass { Gpr, Fpr, Ref, Dyn }`,
 - **K4** tipos angostos `i8..u32/f32` (`BackendTy` + `NarrowRangeCheck`).
 - **K5** `ArrayRepr` angosto (literales/lectura compactos).
 
-### 2.4 JIT desde SSA — F1–F4 HECHO, F5 parcial
+### 2.4 JIT desde SSA — F1–F4 HECHO, F5 avanzado (ver §5.1)
 
 Contrato (Ley 2/6/8): `TIR/SSA tipada (varn-compiler) → bytecode (intérprete) y
 SSA serializada en `.vnc → varn-jit baja de SSA (CLIF)`.
@@ -142,23 +142,26 @@ apuntan a registros de otra clase → panic `jit_store_home`).
 
 ## 5. Pendiente real
 
-### 5.1 F5 — resto (llamadas a método/nativa, closures, `Try`, OSR)
+### 5.1 F5 — resto
 
-Cada uno con su puerta. **Bloqueo común**: los helpers de llamada leen la
-ventana de args de homes **contiguas** (`arg_start..`); las values SSA viven en
-homes arbitrarias. Salidas (elegir una):
-- **(A)** reservar la región de staging en `regalloc_post` (reusa los helpers;
-  toca el compilador).
-- **(B)** extraer la resolución de método del VM y añadir
-  `jit_call_method_window` (toca el VM; sin duplicar dispatch, alineado con C2).
-  **Recomendada.**
-- `CallMethod`/`InvokeVirtual`/`CallNativeOp`/`Intrinsic`: sobre (B). Es lo que
-  **ejercita las clases ya cableadas** (hoy definen/usarían una clase → declinan
-  por `new`/la llamada).
-- `MakeClosure`: el helper es **ip-coupled** (lee descriptores del bytecode);
-  hace falta uno ip-free `(proto_idx, descriptors)` o ventana.
-- `Try`/`Throw`: landing pads + resume interpretado.
-- OSR sobre SSA: mapa `ip`↔bloque (hoy OSR solo por bytecode).
+**Hecho** (cada uno con su test en `tests/`):
+- Operadores genéricos sobre valores boxeados (`Dyn`), `!x` como truthiness
+  (142).
+- Métodos nativos de tipos core vía `jit_call_native_window` (143).
+- Llamadas a método vía `jit_call_method_window` sobre **la** llamada del
+  runtime (`ExecCtx::call_method`, `MethodArgs::{Regs, Boxed}`): misma
+  resolución, IC y fast paths que el intérprete (144). Salida (B) elegida.
+- Closures: `MakeClosure` ip-free (`jit_make_closure_window` + palabras
+  `UPVALUE_LOCAL`), capturadas en su registro de frame (`SsaProto::captured`,
+  renumeradas por `SsaProto::map_registers`), upvalues del cuerpo; una sola
+  creación de closure en el runtime (`ExecCtx::make_closure`) (145).
+- Poll de GC en back-edges de bucles que asignan.
+
+**Resta** (declinaciones en `tests/main.vn`, `VARN_CLIF_TRACE=1`):
+- `StoreGlobalIdx` (21) — y `LoadNativeGlobalIdx` (6).
+- `Try`/`Throw` (10): landing pads + resume interpretado.
+- `IntrinsicCall` (3).
+- `Convert` fuera de `IntToFloat`; OSR sobre SSA (mapa `ip`↔bloque).
 
 ### 5.2 F6 — borrado final
 
