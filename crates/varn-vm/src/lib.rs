@@ -10,6 +10,7 @@ pub(crate) mod frame_store;
 pub(crate) mod gc;
 pub mod gc_report;
 pub mod gc_trace;
+pub(crate) mod home_trace;
 pub(crate) mod generator;
 pub mod globals;
 pub(crate) mod heap;

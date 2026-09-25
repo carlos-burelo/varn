@@ -295,7 +295,7 @@ pub(crate) fn def_result(
     res: cranelift_codegen::ir::Value,
 ) {
     let site = std::panic::Location::caller().line();
-    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+    if crate::clif::home_trace() {
         eprintln!(
             "DEFRESULT dest={dest} kind={:?} at={}",
             actx.register_meta.get(dest).map(|m| m.kind),

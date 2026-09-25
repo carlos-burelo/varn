@@ -212,7 +212,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
                 Ok(a) => a,
                 Err(e) => jit_propagate_error(ctx_ref, e),
             };
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             let copied: Vec<String> = (0..arg_count)
                 .map(|i| {
                     let v = ctx_ref.stack.box_reg(callee_alloc, i);

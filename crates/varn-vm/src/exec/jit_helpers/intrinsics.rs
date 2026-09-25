@@ -19,7 +19,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = ctx_ref.stack.box_range(act_id, reg_start, arg_count);
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             let fname = ctx_ref
                 .frames
                 .last()

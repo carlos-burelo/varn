@@ -56,6 +56,12 @@ pub fn trace() -> bool {
     *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
 }
 
+/// `VARN_HOME_TRACE`, read once: the lowering asks it for every instruction.
+pub(crate) fn home_trace() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VARN_HOME_TRACE").is_some())
+}
+
 /// The host ISA is immutable for the process lifetime; build it once.
 pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
     static ISA: OnceLock<Result<OwnedTargetIsa, String>> = OnceLock::new();

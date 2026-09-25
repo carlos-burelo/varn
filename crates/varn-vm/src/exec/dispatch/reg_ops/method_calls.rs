@@ -534,7 +534,7 @@ impl ExecCtx {
         arg_start: usize,
         arg_count: usize,
     ) -> VmResult<VmValue> {
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::home_trace::enabled() {
             let kind = |v: VmValue| -> &'static str {
                 if v.is_sso() {
                     ":sso"

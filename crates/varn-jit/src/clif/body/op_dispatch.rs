@@ -115,7 +115,7 @@ pub(crate) fn dispatch_opcode(
             let src = (code[ip + 1] >> 8) as usize;
             let src_is_float = meta_is_float(&proto.register_meta, src);
             let dest_is_float = meta_is_float(&proto.register_meta, first_reg);
-            if std::env::var_os("VARN_HOME_TRACE").is_some() {
+            if crate::clif::home_trace() {
                 eprintln!(
                     "MOVE fn={:?} ip={ip} dest={first_reg} src={src} state_src={:?} meta_src={:?} meta_dest={:?}",
                     proto.name,

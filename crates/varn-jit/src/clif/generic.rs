@@ -108,7 +108,7 @@ pub(super) fn emit_is_null(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
-    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+    if crate::clif::home_trace() {
         eprintln!(
             "ISNULL ip={ip} dest={dest} src={src} state_src={:?} meta_src={:?}",
             state.get(src).copied(),

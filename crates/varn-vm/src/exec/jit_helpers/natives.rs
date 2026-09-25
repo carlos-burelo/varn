@@ -111,7 +111,7 @@ unsafe fn call_native_from_homes(
 ) -> VmValue {
     ctx_ref.record_call_native(f, None);
     let args = ctx_ref.stack.box_range(act_id, reg_start, total);
-    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+    if crate::home_trace::enabled() {
         let fname = ctx_ref
             .frames
             .last()

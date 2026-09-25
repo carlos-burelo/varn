@@ -168,7 +168,7 @@ pub(super) fn lower_raw(
     for &var in local_obj_bases.values() {
         b.def_var(var, zero);
     }
-    if std::env::var_os("VARN_HOME_TRACE").is_some() {
+    if crate::clif::home_trace() {
         eprintln!("ENTRYINIT done frame_aware={frame_aware}");
     }
 
@@ -405,7 +405,7 @@ pub(super) fn lower_raw(
         if want_roots {
             b.set_srcloc(cranelift_codegen::ir::SourceLoc::new(ip as u32));
         }
-        if std::env::var_os("VARN_HOME_TRACE").is_some() {
+        if crate::clif::home_trace() {
             eprintln!("OPIP {ip} {op:?} dst={first_reg} state_dst={:?}", state.get(first_reg));
         }
 
