@@ -15,7 +15,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
-use super::{boxed, call, dynop, heap, heapvalue, is_heap, load_value, Ctx, Out};
+use super::{boxed, call, closures, dynop, heap, heapvalue, is_heap, load_value, Ctx, Out};
 
 /// Emit one instruction; `Ok(None)` means it produces no result. The driver
 /// lands a result where `dest`'s class says it lives ([`super::store::land`]).
@@ -139,6 +139,34 @@ pub(super) fn emit_inst(
                 args,
                 dest,
             )?))
+        }
+
+        SsaOp::MakeClosure { proto, upvalues } => {
+            return Ok(Some(Out::Boxed(closures::emit_make_closure(
+                b, ctx, *proto, upvalues,
+            )?)))
+        }
+        SsaOp::LoadCaptured { var } => {
+            return Ok(Some(Out::Boxed(closures::emit_load_captured(
+                b, ctx, *var,
+            )?)))
+        }
+        SsaOp::StoreCaptured { var, value } => {
+            closures::emit_store_captured(b, ctx, values, *var, *value)?;
+            return Ok(None);
+        }
+        SsaOp::LoadUpvalue(index) => {
+            return Ok(Some(Out::Boxed(closures::emit_load_upvalue(
+                b, ctx, *index,
+            )?)))
+        }
+        SsaOp::StoreUpvalue { index, value } => {
+            closures::emit_store_upvalue(b, ctx, values, *index, *value)?;
+            return Ok(None);
+        }
+        SsaOp::CloseUpvalues { vars } => {
+            closures::emit_close_upvalues(b, ctx, vars)?;
+            return Ok(None);
         }
 
         // Handled by `heapvalue` above.

@@ -16,7 +16,11 @@ use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, PolyICSlot};
 mod effects;
 mod immediates;
 mod phi_edges;
+mod register_meta;
 mod regs;
+use register_meta::derive_register_meta;
+pub(crate) use register_meta::slot_kind_of;
+pub(crate) use regs::var_reg;
 mod terminator;
 mod values;
 
@@ -54,16 +58,15 @@ pub fn emit_function_meta(
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = f.return_kind;
 
-    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
-    // phi-split, register-assigned SSA here so it shares the exact value graph
-    // the bytecode was emitted from; `None` outside the projected family.
     let order = emission_order(&ssa);
     let ic = super::ic::IcSlots::number(&ssa, &order)?;
-    let ssa_proto =
-        match super::portable::project(&ssa, &reg, register_count, f.has_this, &f.name, &ic) {
-            Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),
-            Err(why) => varn_types::ssa::PortableSsa::Unavailable(Arc::from(why)),
-        };
+    // The function constant each `MakeClosure` was emitted with, by
+    // `[block][inst]`, for the portable SSA below.
+    let mut closure_consts: Vec<Vec<Option<u16>>> = ssa
+        .blocks
+        .iter()
+        .map(|b| vec![None; b.insts.len()])
+        .collect();
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -97,8 +100,10 @@ pub fn emit_function_meta(
                 nparams,
                 &mut fixups,
                 &imms,
+                &mut closure_consts[b][idx],
             )?;
         }
+        ssa.blocks[b].insts = insts;
         let term = ssa.blocks[b].term.clone();
         let term_line = if ssa.blocks[b].term_line > 0 {
             ssa.blocks[b].term_line
@@ -135,6 +140,22 @@ pub fn emit_function_meta(
         chunk.code[pos] = (off >> 16) as u16;
         chunk.code[pos + 1] = (off & 0xFFFF) as u16;
     }
+
+    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
+    // phi-split, register-assigned SSA the bytecode was just emitted from, so
+    // it shares its value graph, cache slots and constants; `Unavailable`
+    // outside the projected family.
+    let emitted = super::portable::Emitted {
+        reg: &reg,
+        register_count,
+        nparams,
+        ic: &ic,
+        closure_consts: &closure_consts,
+    };
+    let ssa_proto = match super::portable::project(&ssa, &emitted, f.has_this, &f.name) {
+        Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),
+        Err(why) => varn_types::ssa::PortableSsa::Unavailable(Arc::from(why)),
+    };
 
     Ok(FunctionProto {
         name: Some(Arc::from(f.name.as_ref())),
@@ -179,80 +200,6 @@ pub fn emit_function_meta(
         trivial_init_memo: RefCell::new(None),
         ssa: ssa_proto,
     })
-}
-
-/// Per-register slot kinds from checker-proven SSA value types: the meet of
-/// every value a register hosts, plus `Dynamic` for caller-written slots
-/// (callee, params, `this`) and helper registers that host no SSA value
-/// (scratch, call staging, null). Replaces the old opcode-walking
-/// re-inference in `varn-regalloc`, which guessed back what the checker
-/// already proved. `regalloc_post` re-permutes this when it coalesces.
-fn derive_register_meta(
-    ssa: &SsaFunc,
-    reg: &[u8],
-    register_count: u16,
-    param_kinds: &[varn_types::register_meta::SlotKind],
-) -> Vec<varn_types::register_meta::RegisterMeta> {
-    use varn_types::register_meta::{RegisterMeta, SlotKind};
-    let n = register_count as usize;
-    let mut kinds: Vec<Option<SlotKind>> = vec![None; n];
-    // r0 is the callee/`this` staging slot the caller writes; keep it Dynamic
-    // (it may host a heap ref during call staging, and the GC must flush it).
-    // Params (at r1+i, matching the JIT's entry contract) carry their declared
-    // kind: an immediate param (int/float/bool) is a proven fact the backend
-    // uses — it skips the GC flush and, for float, routes to native f64 — while
-    // a heap-ref param stays non-immediate and still flushes. The value meet
-    // below downgrades any param register the allocator reuses for a
-    // differently-typed value back to Dynamic.
-    if n > 0 {
-        kinds[0] = Some(SlotKind::Dynamic);
-    }
-    for (i, pk) in param_kinds.iter().enumerate() {
-        if 1 + i < n {
-            kinds[1 + i] = Some(*pk);
-        }
-    }
-    for (vi, def) in ssa.values.iter().enumerate() {
-        let Some(&r) = reg.get(vi) else { continue };
-        let r = r as usize;
-        if r >= n {
-            continue;
-        }
-        let k = slot_kind_of(def.ty);
-        kinds[r] = Some(match kinds[r] {
-            None => k,
-            Some(cur) if cur == k => cur,
-            Some(_) => SlotKind::Dynamic,
-        });
-    }
-    kinds
-        .into_iter()
-        .map(|k| RegisterMeta {
-            kind: k.unwrap_or(SlotKind::Dynamic),
-        })
-        .collect()
-}
-
-pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
-    use crate::hir::HirType;
-    use varn_types::register_meta::SlotKind;
-    match ty {
-        HirType::Int => SlotKind::Int,
-        HirType::Float => SlotKind::Float,
-        HirType::Bool => SlotKind::Bool,
-        HirType::Str => SlotKind::Str,
-        // Every heap-only shape collapses to `Ref` — the id was never read by
-        // the backend.
-        HirType::Class(_)
-        | HirType::Array(_)
-        | HirType::Ref
-        | HirType::Map(_, _)
-        | HirType::Set(_) => SlotKind::Ref,
-        // A nullable of anything is boxed today (tag word says null-or-not);
-        // the backend has no `Pair` kind yet.
-        HirType::Nullable(_) => SlotKind::Dynamic,
-        HirType::Dynamic => SlotKind::Dynamic,
-    }
 }
 
 /// Loop-aware emission order: reverse postorder from the entry, visiting
@@ -336,6 +283,8 @@ fn emit_inst(
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     imms: &Immediates,
+    // Set to the function constant a `MakeClosure` was emitted with.
+    closure_const: &mut Option<u16>,
 ) -> Result<()> {
     // A constant that only ever rides inside an `AddImm`/`SubImm` needs no
     // instruction of its own.
@@ -388,5 +337,6 @@ fn emit_inst(
         source_file,
         nparams,
         fixups,
+        closure_const,
     )
 }

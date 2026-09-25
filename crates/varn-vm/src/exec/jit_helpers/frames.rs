@@ -40,10 +40,8 @@ pub(crate) extern "C" fn jit_post_call(
     bailed!()
 }
 
-/// Load the static function at `proto_idx` of the RUNNING closure's module as
-/// a `VmValue` closure, mirroring the interpreter's `LoadStaticFn` arm: the
-/// per-`proto` cache (`static_closures`) makes a second load a map hit, and the
-/// new closure inherits the running module's `module_base`.
+/// `LoadStaticFn` out of compiled code: the closure of the running closure's
+/// function constant `proto_idx`, which captures nothing.
 pub(crate) extern "C" fn jit_load_static_fn(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -51,37 +49,9 @@ pub(crate) extern "C" fn jit_load_static_fn(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
-            Some(varn_types::PoolEntry::Function(p)) => p,
-            _ => jit_propagate_error(
-                ctx_ref,
-                crate::error::RuntimeError::new(format!(
-                    "LoadStaticFn: const {proto_idx} is not a function"
-                )),
-            ),
-        };
-        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-        let val = if let Some(&(_, cached)) = ctx_ref.static_closures.get(&proto_ptr) {
-            cached
-        } else {
-            let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                proto,
-                &mut ctx_ref.heap,
-            ));
-            let mut vm_closure = crate::closure::VmClosure::with_upvalues(
-                proto.clone(),
-                vec![],
-                constants,
-                ctx_ref.settings,
-            );
-            vm_closure.module_base = closure_ref.module_base;
-            let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(vm_closure));
-            ctx_ref
-                .static_closures
-                .insert(proto_ptr, (proto.clone(), val));
-            val
-        };
-        ctx_ref.jit_native_result = val;
+        match ctx_ref.make_closure(&*closure, proto_idx, 0, std::iter::empty()) {
+            Ok(val) => ctx_ref.jit_native_result = val,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }

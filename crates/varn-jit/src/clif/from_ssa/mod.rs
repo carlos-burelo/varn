@@ -29,6 +29,7 @@
 //! * [`boxed`] — ops whose semantics live behind a boxed runtime helper;
 //! * [`globals`] — module-relative global reads;
 //! * [`call`] — self-recursion and cross-proto calls;
+//! * [`closures`] — closure creation, captured variables and upvalues;
 //! * [`term`] — terminators and the branch/jump argument windows.
 
 use cranelift_codegen::ir::{
@@ -48,6 +49,7 @@ use crate::JitHelpers;
 mod boxed;
 mod call;
 mod classops;
+mod closures;
 mod dynop;
 mod globals;
 mod heap;
@@ -97,8 +99,7 @@ pub(super) fn try_lower(
     linker: &dyn ClifLinker,
 ) -> Result<(CompiledPiece, bool), String> {
     let nparams = proto.arity.saturating_sub(1);
-    if proto.upvalue_count > 0
-        || proto.is_generator
+    if proto.is_generator
         || proto.is_async
         || ssa.blocks.is_empty()
         || ssa.entry as usize >= ssa.blocks.len()
@@ -123,17 +124,11 @@ pub(super) fn try_lower(
         || !scalar_return
         || proto.has_this
         || ssa.has_this
-        || ssa.blocks.iter().any(|blk| {
-            blk.insts.iter().any(|i| {
-                matches!(
-                    i.op,
-                    SsaOp::Call { .. }
-                        | SsaOp::CallNativeOp { .. }
-                        | SsaOp::MethodCall { .. }
-                        | SsaOp::LoadGlobalIdx(_)
-                )
-            })
-        });
+        || proto.upvalue_count > 0
+        || ssa
+            .blocks
+            .iter()
+            .any(|blk| blk.insts.iter().any(|i| needs_frame(&i.op)));
 
     let cc = isa.default_call_conv();
     let mut func = Function::with_name_signature(
@@ -263,6 +258,24 @@ pub(super) fn try_lower(
     b.seal_all_blocks();
     b.finalize();
     Ok((compile_piece(func, isa)?, frame_aware))
+}
+
+/// Whether `op` reaches the activation, the running closure or the runtime
+/// even when every value it touches is a scalar.
+fn needs_frame(op: &SsaOp) -> bool {
+    matches!(
+        op,
+        SsaOp::Call { .. }
+            | SsaOp::CallNativeOp { .. }
+            | SsaOp::MethodCall { .. }
+            | SsaOp::LoadGlobalIdx(_)
+            | SsaOp::MakeClosure { .. }
+            | SsaOp::LoadCaptured { .. }
+            | SsaOp::StoreCaptured { .. }
+            | SsaOp::LoadUpvalue(_)
+            | SsaOp::StoreUpvalue { .. }
+            | SsaOp::CloseUpvalues { .. }
+    )
 }
 
 /// Reverse postorder from the entry so every value is defined before its uses,

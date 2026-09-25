@@ -245,7 +245,7 @@ pub(super) fn assign_registers(
     Ok((reg, scratch, null_reg, call_base, register_count))
 }
 
-pub(super) fn var_reg(var: VarId, nparams: usize) -> u8 {
+pub(crate) fn var_reg(var: VarId, nparams: usize) -> u8 {
     match var {
         VarId::Param(i) => (1 + i) as u8,
         VarId::Local(id) => (1 + nparams + id.0 as usize) as u8,

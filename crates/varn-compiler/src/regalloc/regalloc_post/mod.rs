@@ -231,10 +231,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     // `from_ssa` would write a heap value into the pre-coalescing register,
     // whose post-coalescing class is a different (possibly scalar) slot.
     if let Some(ssa) = proto.ssa.get_mut() {
-        for r in ssa.regs.iter_mut() {
-            let old = *r as u8;
-            *r = mapping.get(&old).copied().unwrap_or(old) as u32;
-        }
+        ssa.map_registers(|r| {
+            let old = r as u8;
+            mapping.get(&old).copied().unwrap_or(old) as u32
+        });
         ssa.register_count = proto.register_count;
     }
 }

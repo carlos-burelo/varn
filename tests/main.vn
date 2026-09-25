@@ -130,6 +130,7 @@ import "./141-jit-ssa-calls.vn"
 import "./142-jit-dynamic-operators.vn"
 import "./143-jit-native-ops.vn"
 import "./144-jit-method-calls.vn"
+import "./145-jit-closures.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

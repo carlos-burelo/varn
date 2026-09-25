@@ -29,9 +29,12 @@
 //! frame (calls, safepoints) reads the same coordinates the interpreter does.
 
 use serde::{Deserialize, Serialize};
-use varn_core::RuntimeKind;
 
 use crate::register_meta::{SlotClass, SlotKind};
+
+mod op;
+
+pub use op::{DynBinOp, DynUnOp, SsaBinOp, SsaOp, SsaUnOp, SsaUpvalue, UPVALUE_LOCAL};
 
 /// The static kind of a value, exactly the checker's proof projected onto the
 /// register file. It is the same [`SlotKind`] the JIT already reads from
@@ -72,319 +75,6 @@ pub struct SsaInst {
     pub line: u32,
 }
 
-/// Typed operation of the scalar/arith family.
-///
-/// The scalar arithmetic and comparison variants encode the width the checker
-/// proved (`IntAdd` vs `FloatAdd`), so a backend never inspects operand types
-/// to choose an instruction. `Cast` is a representation-neutral fact the
-/// checker emitted; `Convert` is the one op that changes a numeric domain.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum SsaOp {
-    ConstInt(i64),
-    ConstFloat(f64),
-    ConstBool(bool),
-    ConstNull,
-    ConstStr(Box<str>),
-
-    Binary {
-        op: SsaBinOp,
-        lhs: u32,
-        rhs: u32,
-    },
-
-    Unary {
-        op: SsaUnOp,
-        operand: u32,
-    },
-
-    /// Direct self-recursion. The callee is this same proto, so no linker or
-    /// heap reference is involved — only the call arguments, in order.
-    SelfCall {
-        args: Vec<u32>,
-    },
-
-    /// Cross-function call. `callee` is a `Ref`/`Dyn` value (a closure) and
-    /// `callee_global` is the module-relative global slot it was loaded from,
-    /// when known — what the linker resolves a static target by. The fallback
-    /// is always the canonical `ExecCtx::invoke`.
-    Call {
-        callee: u32,
-        callee_global: Option<u32>,
-        args: Vec<u32>,
-    },
-
-    /// Module-relative global read (`GlobalStore[closure.module_base + slot]`),
-    /// a boxed `VmValue` (`Ref`/`Dyn`).
-    LoadGlobalIdx(u32),
-
-    /// Checker-proven, representation-neutral cast.
-    Cast {
-        operand: u32,
-    },
-    /// Numeric conversion (`as`) that changes representation.
-    Convert {
-        operand: u32,
-        conv: varn_core::NumConv,
-    },
-
-    IsNull {
-        operand: u32,
-    },
-
-    /// `typeof x` — a heap string result.
-    Typeof {
-        operand: u32,
-    },
-
-    /// `String(x)` — a heap string result.
-    ToString {
-        operand: u32,
-    },
-
-    /// Runtime array test; a `bool` result.
-    IsArray {
-        operand: u32,
-    },
-
-    /// Enum discriminant of `operand`; an `int` result.
-    GetEnumTag {
-        operand: u32,
-    },
-
-    /// Own enumerable keys of `operand`; a heap array result.
-    ObjectKeys {
-        operand: u32,
-    },
-
-    /// Interpolated string from `parts`; a heap string result.
-    BuildStr {
-        parts: Vec<u32>,
-    },
-
-    /// Array literal from `elements`; a heap array result.
-    BuildArray {
-        elements: Vec<u32>,
-    },
-
-    /// Map literal from `pairs`; a heap map result.
-    BuildMap {
-        pairs: Vec<(u32, u32)>,
-    },
-
-    /// Object/record literal from `keys`/`values`; a heap result. The shape is
-    /// resolved from the proto's pool by key match at lowering time.
-    BuildObject {
-        keys: Vec<Box<str>>,
-        values: Vec<u32>,
-        is_record: bool,
-    },
-
-    /// Dynamic property read; `cs` is the inline-cache slot. A heap result.
-    GetProperty {
-        object: u32,
-        name: Box<str>,
-        cs: u16,
-    },
-
-    /// Dynamic property write; no result.
-    SetProperty {
-        object: u32,
-        value: u32,
-        name: Box<str>,
-        cs: u16,
-    },
-
-    /// `obj[index]` — a heap result.
-    GetIndex {
-        object: u32,
-        index: u32,
-    },
-
-    /// `obj[index] = value` — no result.
-    SetIndex {
-        object: u32,
-        index: u32,
-        value: u32,
-    },
-
-    /// `arr.length` — an `int` result.
-    ArrayLength {
-        operand: u32,
-    },
-
-    /// `s.length` of a `str` — an `int` result (no allocation).
-    StrLength {
-        operand: u32,
-    },
-
-    /// `recv.name(args)`: a method call through the runtime's one method
-    /// resolution (inline cache slot `cs`); a boxed result.
-    MethodCall {
-        recv: u32,
-        name: Box<str>,
-        args: Vec<u32>,
-        cs: u16,
-    },
-
-    /// A core-type method the checker resolved to a native op: `op_id`
-    /// called with the receiver `object` then `args`; a boxed result.
-    CallNativeOp {
-        object: u32,
-        args: Vec<u32>,
-        op_id: u64,
-    },
-
-    /// `arr.push(value)` — no result.
-    ArrayPush {
-        array: u32,
-        value: u32,
-    },
-
-    /// The current receiver (`this`), read from home 0; a heap result.
-    This,
-
-    /// Fixed-field read. A class field (`access: Compact`) is at the payload
-    /// `offset` the compiler laid out, in its kind's representation; an
-    /// object/record/enum-payload field (`Slot`) is found by `slot`, which a
-    /// compact access also keeps for its fallback.
-    GetFixedField {
-        object: u32,
-        slot: u16,
-        offset: u32,
-        access: varn_core::FieldAccess,
-    },
-
-    /// Class field write at the payload `offset`, laid out by `kind`; no
-    /// result.
-    SetFixedField {
-        object: u32,
-        value: u32,
-        slot: u16,
-        offset: u32,
-        kind: Option<varn_core::RuntimeKind>,
-    },
-
-    /// `class Name [extends Super]` — a heap class object.
-    MakeClass {
-        name: Box<str>,
-        super_class: Option<u32>,
-    },
-
-    /// `DeclareField` on a class; no result.
-    DeclareField {
-        class: u32,
-        name: Box<str>,
-        tag: Option<RuntimeKind>,
-    },
-
-    /// A class member definition (`Method`/`DefineStatic`/accessors). `kind` is
-    /// the runtime discriminant: Method=0, DefineStatic=1, DefineGetter=2,
-    /// DefineSetter=3, DefineStaticGetter=4, DefineStaticSetter=5.
-    DefineMethod {
-        class: u32,
-        name: Box<str>,
-        member: u32,
-        kind: u8,
-    },
-
-    /// `GetSuper name` — a heap result.
-    GetSuper {
-        name: Box<str>,
-    },
-}
-
-/// Binary operations, already specialized to a physical domain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SsaBinOp {
-    IntAdd,
-    IntSub,
-    IntMul,
-    IntDiv,
-    IntMod,
-    IntPow,
-    IntEq,
-    IntNe,
-    IntLt,
-    IntLe,
-    IntGt,
-    IntGe,
-    IntAnd,
-    IntOr,
-    IntXor,
-    IntShl,
-    IntShr,
-    IntUshr,
-
-    FloatAdd,
-    FloatSub,
-    FloatMul,
-    FloatDiv,
-    FloatMod,
-    FloatPow,
-    FloatEq,
-    FloatNe,
-    FloatLt,
-    FloatLe,
-    FloatGt,
-    FloatGe,
-
-    /// Statically-proven string concatenation (`"a" + b`).
-    StrConcat,
-
-    /// The operator on boxed operands, run by its runtime helper: the
-    /// bytecode's generic opcode, for operands no type proves native.
-    Dyn(DynBinOp),
-}
-
-/// A binary operator on boxed values: arithmetic and bitwise ones yield a
-/// boxed value, comparisons, `instanceof` and `in` a `bool`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DynBinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Pow,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    BitAnd,
-    BitOr,
-    BitXor,
-    Shl,
-    Shr,
-    Ushr,
-    Instanceof,
-    In,
-}
-
-/// A unary operator on a boxed value.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DynUnOp {
-    /// `-x`; a boxed result.
-    Neg,
-    /// `!x` by truthiness; a `bool`.
-    Not,
-    /// `~x`; a boxed result.
-    BitNot,
-}
-
-/// Unary operations, specialized to a physical domain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SsaUnOp {
-    NegInt,
-    NegFloat,
-    /// Logical negation; result is a bool (`Dyn` class).
-    Not,
-    BitNotInt,
-    /// The operator on the boxed operand, run by its runtime helper.
-    Dyn(DynUnOp),
-}
-
 /// A terminator. Jump/branch args fill the target block's `params`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SsaTerm {
@@ -420,6 +110,9 @@ pub struct SsaProto {
     pub regs: Vec<u32>,
     pub register_count: u16,
     pub has_this: bool,
+    /// The frame register of each captured variable, by the index the
+    /// closure ops name it with.
+    pub captured: Vec<u32>,
 }
 
 impl SsaProto {
@@ -436,6 +129,21 @@ impl SsaProto {
     #[inline]
     pub fn reg(&self, v: u32) -> u32 {
         self.regs.get(v as usize).copied().unwrap_or(0)
+    }
+
+    /// The frame register of captured variable `var`.
+    #[inline]
+    pub fn captured_reg(&self, var: u32) -> Option<u32> {
+        self.captured.get(var as usize).copied()
+    }
+
+    /// Renumber every register this SSA names — the values' homes and the
+    /// captured variables — through `f`, as a pass that renumbers the
+    /// bytecode's registers must. The one place a register field is listed.
+    pub fn map_registers(&mut self, f: impl Fn(u32) -> u32) {
+        for r in self.regs.iter_mut().chain(self.captured.iter_mut()) {
+            *r = f(*r);
+        }
     }
 }
 
@@ -580,6 +288,7 @@ mod tests {
             regs: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             register_count: 13,
             has_this: false,
+            captured: Vec::new(),
         }
     }
 

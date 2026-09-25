@@ -37,6 +37,10 @@ macro_rules! jit_helper_abi {
             load_upvalue => jit_load_upvalue,
             store_upvalue => jit_store_upvalue,
             make_closure => jit_make_closure,
+            /// `extern "C" fn(*mut ExecCtx, closure, base, proto_idx, descs:
+            /// *const u64, count)` — `MakeClosure` out of the lowering from
+            /// typed SSA, its upvalue sources as a window of words.
+            make_closure_window => jit_make_closure_window,
             load_static_fn => jit_load_static_fn,
             call => jit_call,
             call_method => jit_call_method,
