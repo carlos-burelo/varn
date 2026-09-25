@@ -15,7 +15,7 @@ use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use crate::ssa::liveness::Liveness;
 use rustc_hash::FxHashSet;
-use varn_types::ssa::{SsaBlock, SsaProto, SsaTerm, SsaValue};
+use varn_types::ssa::{SsaBlock, SsaLoopHeader, SsaProto, SsaTerm, SsaValue};
 
 mod inst;
 mod ops;
@@ -34,6 +34,8 @@ pub(crate) struct Emitted<'a> {
     pub closure_consts: &'a [Vec<Option<u16>>],
     /// The bytecode offset each block was emitted at.
     pub block_offset: &'a [usize],
+    /// The liveness the registers were assigned by.
+    pub liveness: &'a Liveness,
 }
 
 /// The captured variables of a function, numbered in first-use order: the
@@ -85,13 +87,7 @@ pub(crate) fn project(
         }
     }
 
-    // What each landing pad reads, for the `Try`s that open one.
-    let has_try = ssa.blocks.iter().any(|b| {
-        b.insts
-            .iter()
-            .any(|i| matches!(i.kind, InstKind::Try { .. }))
-    });
-    let liveness = has_try.then(|| Liveness::analyze(ssa));
+    let lv = emitted.liveness;
 
     let mut captured = Captured {
         vars: Vec::new(),
@@ -109,8 +105,8 @@ pub(crate) fn project(
                     .and_then(|c| c.get(i))
                     .copied()
                     .flatten(),
-                landing: match (&inst.kind, &liveness) {
-                    (InstKind::Try { handler }, Some(lv)) => {
+                landing: match &inst.kind {
+                    InstKind::Try { handler } => {
                         let h = handler.0 as usize;
                         let off = emitted.block_offset.get(h).copied();
                         off.and_then(|o| u32::try_from(o).ok())
@@ -152,7 +148,44 @@ pub(crate) fn project(
         register_count: emitted.register_count,
         has_this,
         captured: captured.regs(),
+        loop_headers: loop_headers(ssa, emitted),
     })
+}
+
+/// Every block a back edge enters — a jump from a block emitted at or after
+/// it — with its bytecode offset and the values live into it.
+fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
+    let off = |b: usize| emitted.block_offset.get(b).copied().unwrap_or(usize::MAX);
+    let mut is_header = vec![false; ssa.blocks.len()];
+    for (b, block) in ssa.blocks.iter().enumerate() {
+        let targets = match &block.term {
+            Terminator::Jump { target, .. } => vec![target.0 as usize],
+            Terminator::Branch {
+                then_blk, else_blk, ..
+            } => vec![then_blk.0 as usize, else_blk.0 as usize],
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
+        };
+        for t in targets {
+            if off(b) != usize::MAX && off(t) <= off(b) {
+                is_header[t] = true;
+            }
+        }
+    }
+    is_header
+        .iter()
+        .enumerate()
+        .filter(|(_, h)| **h)
+        .filter_map(|(b, _)| {
+            let ip = u32::try_from(off(b)).ok()?;
+            let mut live: Vec<u32> = emitted.liveness.live_in[b].iter().copied().collect();
+            live.sort_unstable();
+            Some(SsaLoopHeader {
+                block: b as u32,
+                ip,
+                live,
+            })
+        })
+        .collect()
 }
 
 /// What the bytecode baked for one instruction.

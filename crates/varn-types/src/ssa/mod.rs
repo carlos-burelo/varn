@@ -115,6 +115,22 @@ pub struct SsaProto {
     /// The frame register of each captured variable, by the index the
     /// closure ops name it with.
     pub captured: Vec<u32>,
+    /// The loop headers an on-stack-replacement entry can resume at.
+    pub loop_headers: Vec<SsaLoopHeader>,
+}
+
+/// A loop header, where a running interpreted frame can continue compiled.
+///
+/// The interpreter reaches the header at bytecode offset `ip` with the
+/// header's parameters and every value in `live` in their registers — the
+/// register allocator keeps a value's register for as long as it is live —
+/// so a resumed body reads them from their homes and continues at `block`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SsaLoopHeader {
+    pub block: u32,
+    pub ip: u32,
+    /// The values live into the header, its parameters aside.
+    pub live: Vec<u32>,
 }
 
 impl SsaProto {
@@ -131,6 +147,11 @@ impl SsaProto {
     #[inline]
     pub fn reg(&self, v: u32) -> u32 {
         self.regs.get(v as usize).copied().unwrap_or(0)
+    }
+
+    /// The loop header at bytecode offset `ip`, if one starts there.
+    pub fn loop_header_at(&self, ip: usize) -> Option<&SsaLoopHeader> {
+        self.loop_headers.iter().find(|h| h.ip as usize == ip)
     }
 
     /// The frame register of captured variable `var`.
@@ -291,6 +312,7 @@ mod tests {
             register_count: 13,
             has_this: false,
             captured: Vec::new(),
+            loop_headers: Vec::new(),
         }
     }
 

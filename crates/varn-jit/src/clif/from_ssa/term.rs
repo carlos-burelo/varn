@@ -7,7 +7,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::SsaTerm;
 
-use super::{block_of, heap, load_value, resolve_args, Ctx};
+use super::{heap, load_value, Ctx};
 
 fn scalar_return(k: SlotKind) -> bool {
     matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
@@ -148,4 +148,26 @@ pub(super) fn emit_term(
         SsaTerm::Throw(v) => super::exceptions::emit_throw(b, ctx, values, *v)?,
     }
     Ok(())
+}
+
+fn resolve_args(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    args: &[u32],
+) -> Result<Vec<cranelift_codegen::ir::BlockArg>, String> {
+    args.iter()
+        .map(|v| load_value(b, ctx, values, *v).map(cranelift_codegen::ir::BlockArg::from))
+        .collect()
+}
+
+fn block_of(
+    blocks: &[Option<cranelift_codegen::ir::Block>],
+    id: u32,
+) -> Result<cranelift_codegen::ir::Block, String> {
+    blocks
+        .get(id as usize)
+        .copied()
+        .flatten()
+        .ok_or_else(|| format!("from_ssa: block {id} not created"))
 }

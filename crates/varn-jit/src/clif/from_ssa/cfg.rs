@@ -53,13 +53,13 @@ pub(super) fn loop_may_collect(
     })
 }
 
-/// The blocks compiled code can reach — through terminators from the entry —
-/// in reverse postorder, so every value is defined before its uses. A block
-/// reachable only through a `try` handler is a landing pad or the catch path
-/// behind it, which runs interpreted (see [`super::exceptions`]).
-pub(super) fn order(ssa: &SsaProto) -> Vec<usize> {
+/// The blocks compiled code can reach — through terminators from `entry`,
+/// the function's entry block or an OSR entry's loop header — in reverse
+/// postorder, so every value is defined before its uses. A block reachable
+/// only through a `try` handler is a landing pad or the catch path behind it,
+/// which runs interpreted (see [`super::exceptions`]).
+pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     let n = ssa.blocks.len();
-    let entry = ssa.entry as usize;
     let mut visited = vec![false; n];
     let mut post = Vec::with_capacity(n);
     let mut stack: Vec<(usize, u8)> = vec![(entry, 0)];

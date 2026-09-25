@@ -296,12 +296,11 @@ pub fn try_compile(
     super::emit::reset_disabled_helper_hit();
 
     // Sibling lowering: consume the portable typed SSA where the compiler
-    // attached it. `debug.is_none()` keeps the inspection paths on the bytecode
-    // lowering so `vn debug -p clif` still shows the bytecode-derived IR. Any
-    // `Err` — a heap op, an unsupported scalar op, a compile failure — falls
-    // through to the bytecode path below, so correctness never depends on this
-    // succeeding.
-    if osr_ip.is_none() && debug.is_none() {
+    // attached it, for a call entry or an OSR entry alike. `debug.is_none()`
+    // keeps the inspection paths on the bytecode lowering so `vn debug -p clif`
+    // still shows the bytecode-derived IR. Any `Err` falls through to the
+    // bytecode path below, so correctness never depends on this succeeding.
+    if debug.is_none() {
         if let Some(why) = proto.ssa.unavailable() {
             if super::trace() {
                 eprintln!(
@@ -311,16 +310,18 @@ pub fn try_compile(
             }
         }
         if let Some(ssa) = proto.ssa.get() {
-            match super::from_ssa::try_lower(proto, ssa, constants, helpers, isa, linker) {
+            match super::from_ssa::try_lower(proto, ssa, constants, helpers, isa, linker, osr_ip) {
                 Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
                     if super::trace() {
                         eprintln!(
-                            "clif: from_ssa {}{}",
+                            "clif: from_ssa {}{}{}",
                             proto.name.as_deref().unwrap_or("<module>"),
+                            osr_ip.map_or(String::new(), |ip| format!(" osr@{ip}")),
                             if frame_aware { " (frame-aware)" } else { "" }
                         );
                     }
-                    let wrapper = build_wrapper(proto, helpers, isa, frame_aware, false)?;
+                    let wrapper =
+                        build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
                     return finish_artifact(raw, wrapper, frame_aware, None);
                 }
                 Ok(_) => {}

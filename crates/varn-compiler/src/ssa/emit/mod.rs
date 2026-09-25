@@ -52,8 +52,14 @@ pub fn emit_function_meta(
 
     let fn_line = if f.start_line > 0 { f.start_line } else { 1 };
     let nparams = f.nparams;
-    let (reg, scratch, null_reg, call_base, register_count) =
-        regs::assign_registers(&ssa, nparams)?;
+    let regs::Assignment {
+        reg,
+        scratch,
+        null_reg,
+        call_base,
+        register_count,
+        liveness,
+    } = regs::assign_registers(&ssa, nparams)?;
     let param_kinds = f.param_kinds.clone();
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = f.return_kind;
@@ -152,6 +158,7 @@ pub fn emit_function_meta(
         ic: &ic,
         closure_consts: &closure_consts,
         block_offset: &block_offset,
+        liveness: &liveness,
     };
     let ssa_proto = match super::portable::project(&ssa, &emitted, f.has_this, &f.name) {
         Ok(p) => varn_types::ssa::PortableSsa::Available(std::sync::Arc::new(p)),

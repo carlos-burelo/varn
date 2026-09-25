@@ -2,12 +2,18 @@
 //!
 //! One rule for the whole lowering: a **scalar** value is a CLIF register; a
 //! **heap** value is its VM home, the GC root, so it survives a collection
-//! that moves it. Nothing in a compiled body reads a scalar back out of its
-//! home — no closure capture, `try` resume or OSR entry exists on this path
-//! — so scalars are never written there; a feature that needs them flushes
-//! them at the point it observes them. An instruction emitter never stores its own result: it hands
-//! back an [`Out`] saying which representation it produced, and [`land`] puts
-//! it where the destination's class says it lives.
+//! that moves it. A scalar's home is only written where the interpreter will
+//! read it: when a `try` region opens, for the values its landing pad reads
+//! ([`super::exceptions`]). A captured variable is not an SSA value and
+//! always lives in its home ([`super::closures`]). An OSR entry reads the
+//! scalars live into its loop header from their homes, where the interpreter
+//! left them; one the resumed body also redefines — an outer loop's counter,
+//! say — is a Cranelift variable instead of a fixed CLIF value, so the
+//! header merges the entry's value with the body's ([`Ctx::carried`]).
+//!
+//! An instruction emitter never stores its own result: it hands back an
+//! [`Out`] saying which representation it produced, and [`land`] puts it
+//! where the destination's class says it lives.
 
 use cranelift_codegen::ir::{types, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -50,7 +56,7 @@ pub(super) fn land(
         Out::Native(v) => v,
         Out::Boxed(v) | Out::Landed(v) => heap::unbox_dest(b, kind, v)?,
     };
-    values[d as usize] = Some(native);
+    define_scalar(b, ctx, values, d, native);
     Ok(())
 }
 
@@ -67,6 +73,20 @@ fn get(values: &[Option<Value>], v: u32) -> Result<Value, String> {
         .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
 }
 
+/// Define scalar value `v`: in its carried variable, or the CLIF map.
+pub(super) fn define_scalar(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &mut [Option<Value>],
+    v: u32,
+    x: Value,
+) {
+    match ctx.carried.get(&v) {
+        Some(var) => b.def_var(*var, x),
+        None => values[v as usize] = Some(x),
+    }
+}
+
 /// Read a value: scalars from the CLIF map, heap values from their home.
 pub(super) fn load_value(
     b: &mut FunctionBuilder,
@@ -77,13 +97,15 @@ pub(super) fn load_value(
     let kind = ctx.ssa.value_ty(v);
     if is_heap(kind) {
         load_home_value(b, ctx, ctx.ssa.reg(v), kind)
+    } else if let Some(var) = ctx.carried.get(&v) {
+        Ok(b.use_var(*var))
     } else {
         get(values, v)
     }
 }
 
 /// Read `reg`'s home and unbox it into `kind`'s native representation.
-fn load_home_value(
+pub(super) fn load_home_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     reg: u32,
