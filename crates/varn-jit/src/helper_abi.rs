@@ -146,6 +146,10 @@ macro_rules! jit_helper_abi {
             /// resolves from `op_id` at run time. Both read the same
             /// `[receiver, args...]` home window and share one marshal.
             jit_call_native => jit_call_native,
+            /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, window: *const
+            /// VmValue, total)` — `jit_call_native` for the lowering from typed
+            /// SSA: `[receiver, args...]` as a boxed window.
+            jit_call_native_window => jit_call_native_window,
             /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
             /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`

@@ -128,7 +128,12 @@ pub(super) fn try_lower(
         || ssa.blocks.iter().any(|blk| {
             blk.insts
                 .iter()
-                .any(|i| matches!(i.op, SsaOp::Call { .. } | SsaOp::LoadGlobalIdx(_)))
+                .any(|i| {
+                    matches!(
+                        i.op,
+                        SsaOp::Call { .. } | SsaOp::CallNativeOp { .. } | SsaOp::LoadGlobalIdx(_)
+                    )
+                })
         });
 
     let cc = isa.default_call_conv();

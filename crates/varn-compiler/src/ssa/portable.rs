@@ -245,6 +245,15 @@ fn project_inst(
         },
         InstKind::ArrayLength { operand } => SsaOp::ArrayLength { operand: operand.0 },
         InstKind::StrLength { operand } => SsaOp::StrLength { operand: operand.0 },
+        InstKind::CallNativeOp {
+            object,
+            args,
+            op_id,
+        } => SsaOp::CallNativeOp {
+            object: object.0,
+            args: args.iter().map(|v| v.0).collect(),
+            op_id: *op_id,
+        },
         InstKind::GetProperty { object, name } => SsaOp::GetProperty {
             object: object.0,
             name: name.as_ref().into(),

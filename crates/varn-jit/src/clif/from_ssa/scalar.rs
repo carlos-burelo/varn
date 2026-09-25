@@ -96,6 +96,15 @@ pub(super) fn emit_inst(
             let call = b.ins().call(ctx.self_ref, &a);
             b.inst_results(call)[0]
         }
+        SsaOp::CallNativeOp {
+            object,
+            args,
+            op_id,
+        } => {
+            return Ok(Some(Out::Boxed(call::emit_call_native_op(
+                b, ctx, values, *object, args, *op_id,
+            )?)))
+        }
         SsaOp::Call {
             callee,
             callee_global,

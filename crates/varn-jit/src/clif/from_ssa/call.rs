@@ -19,7 +19,7 @@ use varn_types::vm_value::KIND_HEAP;
 
 use super::{heap, load_value, Ctx, Out};
 
-use super::super::emit::call_helper_void;
+use super::super::emit::{box_int, call_helper, call_helper_void};
 
 fn is_scalar(k: SlotKind) -> bool {
     matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
@@ -159,6 +159,51 @@ pub(super) fn emit_self_call_framed(
         ctx.cc,
         ctx.helpers.jit_call_self_window,
         &[frame.exec_ctx, window, argc],
+    );
+    Ok(b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
+/// A core-type native op: `[receiver, args...]` boxed, handed to
+/// `jit_call_native_window` with the native resolved at compile time (or
+/// `0`, resolved by op-id at the call). The boxed result.
+pub(super) fn emit_call_native_op(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    object: u32,
+    args: &[u32],
+    op_id: u64,
+) -> Result<Value, String> {
+    let frame = ctx.frame.as_ref().ok_or("from_ssa: native call without a frame")?;
+    let receiver = super::heap::boxed_value(b, ctx, values, object)?;
+    // `charCodeAt`/`codePointAt`: the dedicated helper, as the bytecode
+    // lowering's unhoisted path — no argument window, no marshal.
+    if args.len() == 1 && varn_core::op_id::is_str_char_index_op_id(op_id) {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (pos_tag, pos_payload) = super::heap::boxed_parts(b, ctx, values, args[0])?;
+        let code = call_helper(
+            b,
+            ctx.cc,
+            ctx.helpers.str_char_code_at,
+            &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
+        );
+        return Ok(box_int(b, code));
+    }
+    let window = boxed_window(b, ctx, values, receiver, args)?;
+    let target = (ctx.helpers.resolve_native_op)(op_id);
+    let fn_v = b.ins().iconst(types::I64, target.func_ptr as i64);
+    let op_v = b.ins().iconst(types::I64, op_id as i64);
+    let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
+    call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.jit_call_native_window,
+        &[frame.exec_ctx, fn_v, op_v, window, total],
     );
     Ok(b.ins().load(
         types::I128,

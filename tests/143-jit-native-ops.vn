@@ -1,0 +1,67 @@
+// Core-type methods the checker resolved to a native op, called from a
+// compiled body. Each function runs past the tiering threshold and has two
+// statements, so it executes compiled instead of being inlined.
+
+function nvUpper(s: str): str {
+    const r = s.toUpperCase()
+    return r
+}
+
+function nvSplitJoin(s: str): str {
+    const parts = s.split(",")
+    return parts.join("|")
+}
+
+function nvSlices(s: str): str {
+    const head = s.slice(0, 3)
+    return head + s.slice(4)
+}
+
+function nvAffixes(s: str): int {
+    let n = 0
+    if (s.startsWith("ab")) { n = n + 1 }
+    if (s.endsWith("yz")) { n = n + 10 }
+    return n
+}
+
+// Character codes, including text outside ASCII and outside the BMP:
+// `charCodeAt` and `codePointAt` agree with the interpreter on every index.
+function nvCodes(s: str): int {
+    let acc = 0
+    for (let i = -1; i < 12; i = i + 1) {
+        acc = acc + s.charCodeAt(i) + s.codePointAt(i)
+    }
+    return acc
+}
+
+// A native op on an `int` receiver.
+function nvWrap(a: int): int {
+    const r = a.wrappingAdd(9223372036854775807)
+    return r
+}
+
+let nUpper = ""
+let nJoined = ""
+let nSliced = ""
+let nAffix = 0
+let nCodes = 0
+let nWrapped = 0
+for (let i = 0; i < 2000; i = i + 1) {
+    nUpper = nvUpper("abc-" + (i % 10))
+    nJoined = nvSplitJoin("a,b,c," + i)
+    nSliced = nvSlices("abcdefgh")
+    nAffix = nAffix + nvAffixes(i % 2 == 0 ? "abxyz" : "zzz")
+    nCodes = nCodes + nvCodes(i % 2 == 0 ? "hé😀llo-wörld" : "plain-ascii")
+    if (nvWrap(i % 3) < 0) { nWrapped = nWrapped + 1 }
+}
+
+assert("toUpperCase in a compiled body", nUpper == "ABC-9")
+assert("split and join in a compiled body", nJoined == "a|b|c|1999")
+assert("slice in a compiled body", nSliced == "abcefgh")
+assert("startsWith / endsWith in a compiled body", nAffix === 1000 * 11)
+// 259814 and 2192 are what the interpreter computes for the two strings.
+assert("character codes match the interpreter", nCodes === 1000 * (259814 + 2192))
+// i % 3 in {0, 1, 2}: MAX, then MIN and MIN + 1 after wrapping.
+assert("a native op on an int receiver", nWrapped === 1333 && nvWrap(1) === -9223372036854775807 - 1)
+
+print("[PASSED] 143. JIT native ops")

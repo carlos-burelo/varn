@@ -184,6 +184,14 @@ pub enum SsaOp {
     /// `s.length` of a `str` — an `int` result (no allocation).
     StrLength { operand: u32 },
 
+    /// A core-type method the checker resolved to a native op: `op_id`
+    /// called with the receiver `object` then `args`; a boxed result.
+    CallNativeOp {
+        object: u32,
+        args: Vec<u32>,
+        op_id: u64,
+    },
+
     /// `arr.push(value)` — no result.
     ArrayPush { array: u32, value: u32 },
 
