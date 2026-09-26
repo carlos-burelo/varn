@@ -288,7 +288,12 @@ impl CheckerTyTable {
             return id;
         }
         let id = content_id(&kind);
-        if let Some(existing) = self.base.entries.get(&id).or_else(|| self.delta_entries.get(&id)) {
+        if let Some(existing) = self
+            .base
+            .entries
+            .get(&id)
+            .or_else(|| self.delta_entries.get(&id))
+        {
             debug_assert_eq!(existing, &kind, "CheckerTyId content hash collision");
             return id;
         }
@@ -315,7 +320,12 @@ impl CheckerTyTable {
 
     pub fn intern_list(&mut self, tys: &[CheckerTyId]) -> TyListId {
         let id = content_list_id(tys);
-        if let Some(existing) = self.base.lists.get(&id).or_else(|| self.delta_lists.get(&id)) {
+        if let Some(existing) = self
+            .base
+            .lists
+            .get(&id)
+            .or_else(|| self.delta_lists.get(&id))
+        {
             debug_assert_eq!(existing.as_slice(), tys, "TyListId content hash collision");
             return id;
         }
@@ -411,7 +421,13 @@ impl CheckerTyTable {
             }
         }
         for (k, v) in other.base.lists.iter().chain(other.delta_lists.iter()) {
-            if self.base.lists.get(k).or_else(|| self.delta_lists.get(k)).is_none() {
+            if self
+                .base
+                .lists
+                .get(k)
+                .or_else(|| self.delta_lists.get(k))
+                .is_none()
+            {
                 self.delta_lists.insert(*k, v.clone());
             }
         }
@@ -539,14 +555,14 @@ mod tests {
         let mut foreign = CheckerTyTable::default();
         let mut foreign_ids = Vec::new();
         for i in 0..(FREEZE_THRESHOLD * 2 + 3) {
-            foreign_ids.push(foreign.intern_object_members(vec![
-                ObjectTypeMember::Property {
+            foreign_ids.push(
+                foreign.intern_object_members(vec![ObjectTypeMember::Property {
                     name: std::sync::Arc::from(format!("g{i}").as_str()),
                     ty: CheckerTyId::INT,
                     optional: false,
                     readonly: false,
-                },
-            ]));
+                }]),
+            );
         }
         local.absorb(&foreign);
         for (i, id) in foreign_ids.iter().enumerate() {

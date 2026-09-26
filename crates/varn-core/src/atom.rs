@@ -88,7 +88,11 @@ impl AtomInterner {
     /// not silently grow the table with a text that no declaration ever
     /// produced.
     pub fn get(&self, s: &str) -> Option<Atom> {
-        self.base.map.get(s).or_else(|| self.delta_map.get(s)).copied()
+        self.base
+            .map
+            .get(s)
+            .or_else(|| self.delta_map.get(s))
+            .copied()
     }
 
     /// Panics on an atom this table never minted; the panic names the
