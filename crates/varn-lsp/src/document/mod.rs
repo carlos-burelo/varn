@@ -166,7 +166,12 @@ impl DocumentState {
     /// The members reachable on `ty`, asked of the checker.
     pub fn members_of_type(&self, ty: &Type) -> Vec<varn_checker::ResolvedMemberSummary> {
         crate::workspace::resolver::with_resolver(|r| {
-            varn_checker::get_members_of_type(r, ty, &self.db.bind, &mut self.db.types.borrow_mut())
+            varn_checker::get_members_of_type(
+                r,
+                ty,
+                &self.db.bind,
+                std::sync::Arc::make_mut(&mut self.db.types.borrow_mut()),
+            )
         })
     }
 

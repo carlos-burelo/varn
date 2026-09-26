@@ -65,20 +65,24 @@ impl SemanticDB {
     /// The type named `name`, interned into this document's table.
     pub fn named_type(&self, name: &str) -> Type {
         crate::workspace::resolver::with_resolver(|r| {
-            Type::named(name.to_owned(), r, &mut self.types.borrow_mut())
+            Type::named(
+                name.to_owned(),
+                r,
+                std::sync::Arc::make_mut(&mut self.types.borrow_mut()),
+            )
         })
     }
 
     /// The type of a primitive.
     pub fn primitive(&self, p: LangPrimitive) -> Type {
-        Type::primitive(p, &mut self.types.borrow_mut())
+        Type::primitive(p, std::sync::Arc::make_mut(&mut self.types.borrow_mut()))
     }
 
     /// `ty` without its `null`: what a `?.` reads members from.
     pub fn non_null(&self, ty: &Type) -> Type {
         let nullable = ty.is_nullable(&self.types.borrow());
         if nullable {
-            ty.non_nullified(&mut self.types.borrow_mut())
+            ty.non_nullified(std::sync::Arc::make_mut(&mut self.types.borrow_mut()))
         } else {
             *ty
         }

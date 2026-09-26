@@ -242,7 +242,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         match_gaps: result.match_gaps,
         call_mappings: result.call_mappings,
         desugar: result.desugar,
-        types: std::cell::RefCell::new((*result.bind.ty_table).clone()),
+        types: std::cell::RefCell::new(result.bind.ty_table.clone()),
         bind: result.bind,
     };
 

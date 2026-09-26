@@ -38,7 +38,16 @@ pub struct SemanticDB {
     /// checker's, seeded from `bind`, grown by the editor's own queries
     /// (member lookups intern the types they build), and read by every
     /// display. One table, so a type a query minted still prints.
-    pub types: std::cell::RefCell<varn_checker::types::CheckerTyTable>,
+    /// `Arc`, not an owned table: the checker hands every document the SAME,
+    /// ever-growing, whole-compilation table (see `DiskResolver::ty_table`).
+    /// Cloning it into every document at analysis time — deep, not the Arc's
+    /// refcount bump — meant document N's clone copied every type the checker
+    /// had interned from documents 1..N-1 too, not just its own: O(n) work
+    /// repeated per file, O(n²) over a workspace scan. `Arc::make_mut` at the
+    /// few call sites that actually synthesize a document-local type (hover
+    /// asking for `Array<int>`, say) copies-on-write only those, and only the
+    /// first time — the common case (a file nobody is hovering) pays nothing.
+    pub types: std::cell::RefCell<std::sync::Arc<varn_checker::types::CheckerTyTable>>,
 }
 
 impl SemanticDB {
