@@ -395,19 +395,15 @@ impl<'r> Checker<'r> {
             expected_return_type: None,
             narrowed_types: FxHashMap::default(),
             narrowings_cache: FxHashMap::default(),
-            child_indices: FxHashMap::with_capacity_and_hasher(64, Default::default()),
-            expr_types: if record_expr_types {
-                FxHashMap::with_capacity_and_hasher(2048, Default::default())
-            } else {
-                FxHashMap::default()
-            },
-            infer_cache: FxHashMap::with_capacity_and_hasher(4096, Default::default()),
+            child_indices: FxHashMap::default(),
+            expr_types: FxHashMap::default(),
+            infer_cache: FxHashMap::default(),
             infer_env_rev: 0,
-            compat_cache: FxHashMap::with_capacity_and_hasher(4096, Default::default()),
-            type_node_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
-            symbol_type_params_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
+            compat_cache: FxHashMap::default(),
+            type_node_cache: FxHashMap::default(),
+            symbol_type_params_cache: FxHashMap::default(),
             symbol_types: FxHashMap::default(),
-            expr_table: FxHashMap::with_capacity_and_hasher(2048, Default::default()),
+            expr_table: FxHashMap::default(),
             expr_seq: 0,
             current_class: None,
             active_type_params: FxHashSet::default(),
@@ -416,33 +412,22 @@ impl<'r> Checker<'r> {
             in_pipeline_rhs: false,
             pipeline_value_type: None,
             desugar: Desugarings::default(),
-            member_exists_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
-            member_type_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
+            member_exists_cache: FxHashMap::default(),
+            member_type_cache: FxHashMap::default(),
             warn_implicit_dynamic,
             expected_type: None,
             call_mappings: FxHashMap::default(),
             record_expr_types,
             node_scopes: FxHashMap::default(),
             scope_spans: Vec::new(),
-            map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
+            map_generics_cache: FxHashMap::default(),
             yielded_types: None,
             loop_depth: 0,
             switch_depth: 0,
             in_function: false,
-            expected_object_members_cache: FxHashMap::with_capacity_and_hasher(
-                512,
-                Default::default(),
-            ),
-            member_resolutions: if record_expr_types {
-                FxHashMap::with_capacity_and_hasher(512, Default::default())
-            } else {
-                FxHashMap::default()
-            },
-            call_resolutions: if record_expr_types {
-                FxHashMap::with_capacity_and_hasher(512, Default::default())
-            } else {
-                FxHashMap::default()
-            },
+            expected_object_members_cache: FxHashMap::default(),
+            member_resolutions: FxHashMap::default(),
+            call_resolutions: FxHashMap::default(),
             match_gaps: FxHashMap::default(),
             ty_table: bind.ty_table.clone(),
         };
