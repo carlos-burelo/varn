@@ -141,15 +141,38 @@ fn content_object_id(members: &[ObjectTypeMember]) -> ObjectMembersId {
     ObjectMembersId(hash128(members) | CONTENT_FLAG)
 }
 
-/// Content-addressed store: a memo `id -> shape`. Identity never depends on
-/// insertion order, so this is a pure cache — two tables with the same shapes
-/// agree on every id, and merging them is a set union.
-#[derive(Debug, Clone)]
-pub struct CheckerTyTable {
+/// How many new entries any of `CheckerTyTable`'s four delta maps may hold
+/// before the next mutation folds all four into a fresh frozen base. Bounds
+/// the cost of every `Clone` regardless of session length — see
+/// `docs/plans/2026-09-25-shared-atom-type-tables.md` §3 (Enfoque B). Ids here
+/// are content-addressed (ADR-0012), so freezing at any point can never
+/// change what id a shape gets.
+const FREEZE_THRESHOLD: usize = 2048;
+
+/// Frozen, immutable half of a `CheckerTyTable`. Shared via `Arc`, so cloning
+/// a `CheckerTyTable` never copies this: only the (bounded) delta is copied.
+#[derive(Debug, Default)]
+struct CheckerTyBase {
     entries: FxHashMap<CheckerTyId, InternedTypeKind>,
     lists: FxHashMap<TyListId, Vec<CheckerTyId>>,
     functions: FxHashMap<FunctionTypeId, FunctionType>,
     object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
+}
+
+/// Content-addressed store: a memo `id -> shape`. Identity never depends on
+/// insertion order, so this is a pure cache — two tables with the same shapes
+/// agree on every id, and merging them is a set union.
+///
+/// Internally split into a frozen `base` (shared via `Arc`, O(1) to clone)
+/// and four small delta maps holding what was interned since the last
+/// freeze.
+#[derive(Debug, Clone)]
+pub struct CheckerTyTable {
+    base: std::sync::Arc<CheckerTyBase>,
+    delta_entries: FxHashMap<CheckerTyId, InternedTypeKind>,
+    delta_lists: FxHashMap<TyListId, Vec<CheckerTyId>>,
+    delta_functions: FxHashMap<FunctionTypeId, FunctionType>,
+    delta_object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
 }
 
 impl Default for CheckerTyTable {
@@ -160,12 +183,7 @@ impl Default for CheckerTyTable {
 
 impl CheckerTyTable {
     pub fn new() -> Self {
-        let mut t = Self {
-            entries: FxHashMap::default(),
-            lists: FxHashMap::default(),
-            functions: FxHashMap::default(),
-            object_members: FxHashMap::default(),
-        };
+        let mut base = CheckerTyBase::default();
         // Seed the reserved intrinsic ids. `intern` maps these shapes back to
         // the same ids, so the seed is only so `get` is total over them.
         for (id, kind) in [
@@ -215,9 +233,52 @@ impl CheckerTyTable {
             ),
             (CheckerTyId::THIS, TypeKind::This),
         ] {
-            t.entries.insert(id, kind);
+            base.entries.insert(id, kind);
         }
-        t
+        Self {
+            base: std::sync::Arc::new(base),
+            delta_entries: FxHashMap::default(),
+            delta_lists: FxHashMap::default(),
+            delta_functions: FxHashMap::default(),
+            delta_object_members: FxHashMap::default(),
+        }
+    }
+
+    /// Fold every delta map into a fresh frozen `base`. O(n) in the total
+    /// table size, but only runs once every `FREEZE_THRESHOLD` new entries
+    /// across all four maps combined, not once per caller.
+    fn freeze(&mut self) {
+        if self.delta_entries.is_empty()
+            && self.delta_lists.is_empty()
+            && self.delta_functions.is_empty()
+            && self.delta_object_members.is_empty()
+        {
+            return;
+        }
+        let mut entries = self.base.entries.clone();
+        let mut lists = self.base.lists.clone();
+        let mut functions = self.base.functions.clone();
+        let mut object_members = self.base.object_members.clone();
+        entries.extend(self.delta_entries.drain());
+        lists.extend(self.delta_lists.drain());
+        functions.extend(self.delta_functions.drain());
+        object_members.extend(self.delta_object_members.drain());
+        self.base = std::sync::Arc::new(CheckerTyBase {
+            entries,
+            lists,
+            functions,
+            object_members,
+        });
+    }
+
+    fn maybe_freeze(&mut self) {
+        let delta_size = self.delta_entries.len()
+            + self.delta_lists.len()
+            + self.delta_functions.len()
+            + self.delta_object_members.len();
+        if delta_size >= FREEZE_THRESHOLD {
+            self.freeze();
+        }
     }
 
     /// Intern `kind`, returning its content-addressed id. Idempotent and
@@ -227,11 +288,12 @@ impl CheckerTyTable {
             return id;
         }
         let id = content_id(&kind);
-        if let Some(existing) = self.entries.get(&id) {
+        if let Some(existing) = self.base.entries.get(&id).or_else(|| self.delta_entries.get(&id)) {
             debug_assert_eq!(existing, &kind, "CheckerTyId content hash collision");
             return id;
         }
-        self.entries.insert(id, kind);
+        self.delta_entries.insert(id, kind);
+        self.maybe_freeze();
         id
     }
 
@@ -239,74 +301,103 @@ impl CheckerTyTable {
     /// (the same invariant the old positional `Vec` index enforced).
     pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {
         *self
+            .base
             .entries
             .get(&id)
+            .or_else(|| self.delta_entries.get(&id))
             .unwrap_or_else(|| panic!("CheckerTyId {id:?} is not present in this table"))
     }
 
     /// True when this table can resolve `id` to a shape.
     pub fn contains(&self, id: CheckerTyId) -> bool {
-        self.entries.contains_key(&id)
+        self.base.entries.contains_key(&id) || self.delta_entries.contains_key(&id)
     }
 
     pub fn intern_list(&mut self, tys: &[CheckerTyId]) -> TyListId {
         let id = content_list_id(tys);
-        if let Some(existing) = self.lists.get(&id) {
+        if let Some(existing) = self.base.lists.get(&id).or_else(|| self.delta_lists.get(&id)) {
             debug_assert_eq!(existing.as_slice(), tys, "TyListId content hash collision");
             return id;
         }
-        self.lists.insert(id, tys.to_vec());
+        self.delta_lists.insert(id, tys.to_vec());
+        self.maybe_freeze();
         id
     }
 
     pub fn get_list(&self, id: TyListId) -> &[CheckerTyId] {
-        self.lists
+        self.base
+            .lists
             .get(&id)
+            .or_else(|| self.delta_lists.get(&id))
             .map(Vec::as_slice)
             .unwrap_or_else(|| panic!("TyListId {id:?} is not present in this table"))
     }
 
     pub fn intern_function(&mut self, f: FunctionType) -> FunctionTypeId {
         let id = content_function_id(&f);
-        if let Some(existing) = self.functions.get(&id) {
+        if let Some(existing) = self
+            .base
+            .functions
+            .get(&id)
+            .or_else(|| self.delta_functions.get(&id))
+        {
             debug_assert_eq!(existing, &f, "FunctionTypeId content hash collision");
             return id;
         }
-        self.functions.insert(id, f);
+        self.delta_functions.insert(id, f);
+        self.maybe_freeze();
         id
     }
 
     pub fn get_function(&self, id: FunctionTypeId) -> &FunctionType {
-        self.functions
+        self.base
+            .functions
             .get(&id)
+            .or_else(|| self.delta_functions.get(&id))
             .unwrap_or_else(|| panic!("FunctionTypeId {id:?} is not present in this table"))
     }
 
     pub fn intern_object_members(&mut self, members: Vec<ObjectTypeMember>) -> ObjectMembersId {
         let id = content_object_id(&members);
-        if let Some(existing) = self.object_members.get(&id) {
+        if let Some(existing) = self
+            .base
+            .object_members
+            .get(&id)
+            .or_else(|| self.delta_object_members.get(&id))
+        {
             debug_assert_eq!(existing, &members, "ObjectMembersId content hash collision");
             return id;
         }
-        self.object_members.insert(id, members);
+        self.delta_object_members.insert(id, members);
+        self.maybe_freeze();
         id
     }
 
     pub fn get_object_members(&self, id: ObjectMembersId) -> &[ObjectTypeMember] {
-        self.object_members
+        self.base
+            .object_members
             .get(&id)
+            .or_else(|| self.delta_object_members.get(&id))
             .map(Vec::as_slice)
             .unwrap_or_else(|| panic!("ObjectMembersId {id:?} is not present in this table"))
+    }
+
+    /// True when this table can resolve `id` to a member vector. Read-only
+    /// counterpart to `contains`, for the same reason: callers that must not
+    /// panic on a foreign id (and must not intern one either) need a way to
+    /// ask first.
+    pub fn contains_object_members(&self, id: ObjectMembersId) -> bool {
+        self.base.object_members.contains_key(&id) || self.delta_object_members.contains_key(&id)
     }
 
     /// Number of distinct interned shapes. Used as a cheap "did the live table
     /// grow past this snapshot" heuristic by `Binder::sync_ty_table`.
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.base.entries.len() + self.delta_entries.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.len() == 0
     }
 
     /// Union every shape in `other` into `self`. Commutative and idempotent:
@@ -314,18 +405,43 @@ impl CheckerTyTable {
     /// id, so this is a set union with no remap. This replaces the old
     /// `reintern`-based `absorb` (ADR-0012).
     pub fn absorb(&mut self, other: &CheckerTyTable) {
-        for (k, v) in &other.entries {
-            self.entries.entry(*k).or_insert(*v);
+        for (k, v) in other.base.entries.iter().chain(other.delta_entries.iter()) {
+            if !self.contains(*k) {
+                self.delta_entries.insert(*k, *v);
+            }
         }
-        for (k, v) in &other.lists {
-            self.lists.entry(*k).or_insert_with(|| v.clone());
+        for (k, v) in other.base.lists.iter().chain(other.delta_lists.iter()) {
+            if self.base.lists.get(k).or_else(|| self.delta_lists.get(k)).is_none() {
+                self.delta_lists.insert(*k, v.clone());
+            }
         }
-        for (k, v) in &other.functions {
-            self.functions.entry(*k).or_insert_with(|| v.clone());
+        for (k, v) in other
+            .base
+            .functions
+            .iter()
+            .chain(other.delta_functions.iter())
+        {
+            if self
+                .base
+                .functions
+                .get(k)
+                .or_else(|| self.delta_functions.get(k))
+                .is_none()
+            {
+                self.delta_functions.insert(*k, v.clone());
+            }
         }
-        for (k, v) in &other.object_members {
-            self.object_members.entry(*k).or_insert_with(|| v.clone());
+        for (k, v) in other
+            .base
+            .object_members
+            .iter()
+            .chain(other.delta_object_members.iter())
+        {
+            if !self.contains_object_members(*k) {
+                self.delta_object_members.insert(*k, v.clone());
+            }
         }
+        self.maybe_freeze();
     }
 }
 
@@ -387,5 +503,82 @@ mod tests {
 
         assert_eq!(l_int, CheckerTyId::INT);
         assert_eq!(l_arr, r_arr, "same shape -> same id regardless of order");
+    }
+
+    #[test]
+    fn interning_past_freeze_threshold_still_resolves_correctly() {
+        let mut t = CheckerTyTable::default();
+        let mut ids = Vec::new();
+        for i in 0..(FREEZE_THRESHOLD * 2 + 3) {
+            // Distinct shapes: nested `Array` of increasing depth via a
+            // synthetic list id keeps every entry unique without depending on
+            // string content (this table has no strings).
+            let list = t.intern_list(&[CheckerTyId::INT; 1]);
+            let _ = list;
+            ids.push(t.intern_object_members(vec![ObjectTypeMember::Property {
+                name: std::sync::Arc::from(format!("f{i}").as_str()),
+                ty: CheckerTyId::INT,
+                optional: false,
+                readonly: false,
+            }]));
+        }
+        for (i, id) in ids.iter().enumerate() {
+            let members = t.get_object_members(*id);
+            match &members[0] {
+                ObjectTypeMember::Property { name, .. } => {
+                    assert_eq!(name.as_ref(), format!("f{i}"));
+                }
+                other => panic!("expected Property, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn absorb_across_many_freezes_preserves_every_shape() {
+        let mut local = CheckerTyTable::default();
+        let mut foreign = CheckerTyTable::default();
+        let mut foreign_ids = Vec::new();
+        for i in 0..(FREEZE_THRESHOLD * 2 + 3) {
+            foreign_ids.push(foreign.intern_object_members(vec![
+                ObjectTypeMember::Property {
+                    name: std::sync::Arc::from(format!("g{i}").as_str()),
+                    ty: CheckerTyId::INT,
+                    optional: false,
+                    readonly: false,
+                },
+            ]));
+        }
+        local.absorb(&foreign);
+        for (i, id) in foreign_ids.iter().enumerate() {
+            let members = local.get_object_members(*id);
+            match &members[0] {
+                ObjectTypeMember::Property { name, .. } => {
+                    assert_eq!(name.as_ref(), format!("g{i}"));
+                }
+                other => panic!("expected Property, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn clone_after_freeze_does_not_leak_delta_between_instances() {
+        let mut t = CheckerTyTable::default();
+        for i in 0..(FREEZE_THRESHOLD + 1) {
+            t.intern_object_members(vec![ObjectTypeMember::Property {
+                name: std::sync::Arc::from(format!("h{i}").as_str()),
+                ty: CheckerTyId::INT,
+                optional: false,
+                readonly: false,
+            }]);
+        }
+        let mut clone = t.clone();
+        let extra = clone.intern_object_members(vec![ObjectTypeMember::Property {
+            name: std::sync::Arc::from("only-in-clone"),
+            ty: CheckerTyId::INT,
+            optional: false,
+            readonly: false,
+        }]);
+        assert!(!t.contains_object_members(extra));
+        assert_eq!(clone.get_object_members(extra).len(), 1);
     }
 }
