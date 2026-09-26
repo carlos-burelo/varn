@@ -79,7 +79,7 @@ pub fn build_goto_definition(
         let defs = idx.definitions_of(&token.lexeme);
         let locs: Vec<Location> = defs
             .iter()
-            .filter_map(|(uri, entry)| entry_location(uri, entry.line, entry.col))
+            .filter_map(|entry| entry_location(&entry.uri, entry.line, entry.col))
             .collect();
         if !locs.is_empty() {
             return Some(if locs.len() == 1 {
@@ -146,9 +146,9 @@ fn resolve_member_location(
     // the lookup had to ignore, so it matched by prefix — a key with a
     // component nobody could use is a key in the wrong shape.
     let key = format!("member:{parent_name}:{member_name}");
-    let entry_opt = entries.iter().find(|(_, entry)| entry.global_key == key);
-    if let Some((uri, entry)) = entry_opt {
-        let url = Url::parse(uri).ok()?;
+    let entry_opt = entries.iter().find(|entry| entry.global_key == key);
+    if let Some(entry) = entry_opt {
+        let url = Url::parse(&entry.uri).ok()?;
         let pos = Position {
             line: entry.line,
             character: entry.col,

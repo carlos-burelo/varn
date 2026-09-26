@@ -23,10 +23,12 @@ pub struct SpatialIndex {
 
 impl SpatialIndex {
     pub fn build(program: &Program, a: &AstArena) -> Self {
-        let mut entries = Vec::with_capacity(512);
+        let initial_cap = program.body.len().saturating_mul(4).min(512).max(16);
+        let mut entries = Vec::with_capacity(initial_cap);
         for stmt in &program.body {
             collect_stmt(a, stmt, &mut entries);
         }
+        entries.shrink_to_fit();
         // Sort by start ASC; for identical start, sort by span length DESC (larger/outer spans first)
         entries.sort_by(|a, b| {
             a.start

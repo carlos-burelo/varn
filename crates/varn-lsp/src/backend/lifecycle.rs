@@ -103,7 +103,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
             let elapsed = analysis
                 .run_background(move |a| {
                     let file_start = std::time::Instant::now();
-                    a.workspace.update_file(uri.to_string(), source);
+                    a.workspace.index_file(uri.to_string(), source);
                     file_start.elapsed()
                 })
                 .await;
@@ -135,10 +135,16 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     }
 
     progress.end(format!("{total} files")).await;
+    let mem_msg = crate::backend::mem::resident_kb()
+        .map(|kb| format!(" (RSS: {} MB)", kb / 1024))
+        .unwrap_or_default();
     client
         .log_message(
             MessageType::INFO,
-            format!("Workspace indexed successfully in {:?}", start.elapsed()),
+            format!(
+                "Workspace indexed successfully in {:?}{mem_msg}",
+                start.elapsed()
+            ),
         )
         .await;
 }
@@ -160,6 +166,9 @@ fn walk_dir(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
                             || n == "node_modules"
                             || n == ".vscode"
                             || n == ".claude"
+                            || n == ".gemini"
+                            || n == "dist"
+                            || n == "build"
                         {
                             continue;
                         }

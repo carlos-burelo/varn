@@ -132,6 +132,27 @@ impl Workspace {
         varn_core::ModuleId::local_str(&canonical)
     }
 
+    /// Index a file into the workspace symbol index without retaining its full
+    /// DocumentState in memory. Used during startup workspace scanning.
+    pub fn index_file(&self, uri: String, source: String) {
+        resolver::invalidate(&Self::module_id_of(&uri));
+        let file_id = self.db.intern(&uri);
+        let state = run_pipeline(source, uri.clone());
+        let current_exports = extract_exports(&state);
+        self.exports.insert(file_id, current_exports);
+        {
+            let mut idx = self.index.write().unwrap();
+            idx.update_file(&uri, &state);
+        }
+    }
+
+    /// Close an open document in the editor.
+    /// Drops the heavy DocumentState from memory while keeping the file's
+    /// exports and project index entries intact.
+    pub fn close_file(&self, uri: &str) {
+        self.files.remove(uri);
+    }
+
     pub fn remove_file(&self, uri: &str) {
         resolver::invalidate(&Self::module_id_of(uri));
         let file_id = self.db.intern(uri);

@@ -1,6 +1,7 @@
 pub mod builder;
 use crate::document::DocumentState;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use varn_checker::SymbolKind;
 
 #[derive(Debug, Clone)]
@@ -16,9 +17,8 @@ pub struct ExportEntry {
 }
 
 pub struct ProjectIndex {
-    pub module_exports: HashMap<String, Vec<ExportEntry>>,
-    pub name_index: HashMap<String, Vec<(String, ExportEntry)>>,
-    pub key_index: HashMap<String, Vec<(String, ExportEntry)>>,
+    pub module_exports: HashMap<String, Vec<Arc<ExportEntry>>>,
+    pub name_index: HashMap<String, Vec<Arc<ExportEntry>>>,
     pub reverse_deps: HashMap<String, HashSet<String>>,
     pub module_cache: HashMap<String, String>,
 }
@@ -28,7 +28,6 @@ impl ProjectIndex {
         Self {
             module_exports: HashMap::new(),
             name_index: HashMap::new(),
-            key_index: HashMap::new(),
             reverse_deps: HashMap::new(),
             module_cache: HashMap::new(),
         }
@@ -42,13 +41,9 @@ impl ProjectIndex {
     pub fn remove_file(&mut self, uri: &str) {
         self.module_exports.remove(uri);
         for entries in self.name_index.values_mut() {
-            entries.retain(|(u, _)| u != uri);
+            entries.retain(|e| e.uri != uri);
         }
         self.name_index.retain(|_, v| !v.is_empty());
-        for entries in self.key_index.values_mut() {
-            entries.retain(|(u, _)| u != uri);
-        }
-        self.key_index.retain(|_, v| !v.is_empty());
 
         for dependents in self.reverse_deps.values_mut() {
             dependents.remove(uri);
@@ -59,7 +54,7 @@ impl ProjectIndex {
         self.module_cache.retain(|_, v| v != uri);
     }
 
-    pub fn definitions_of(&self, name: &str) -> &[(String, ExportEntry)] {
+    pub fn definitions_of(&self, name: &str) -> &[Arc<ExportEntry>] {
         self.name_index.get(name).map_or(&[], Vec::as_slice)
     }
 

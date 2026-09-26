@@ -12,8 +12,8 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
         if !q.is_empty() && !name.to_lowercase().contains(q.as_str()) {
             continue;
         }
-        for (uri, entry) in entries {
-            let Ok(url) = Url::parse(uri) else { continue };
+        for entry in entries {
+            let Ok(url) = Url::parse(&entry.uri) else { continue };
             let pos = Position {
                 line: entry.line,
                 character: entry.col,

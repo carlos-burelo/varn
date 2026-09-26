@@ -47,15 +47,14 @@ pub fn build_autoimport_completions(
 
         let entry_opt = entries
             .iter()
-            .find(|(uri, _)| uri != doc_uri && is_stdlib_uri(uri))
-            .or_else(|| entries.iter().find(|(uri, _)| uri != doc_uri));
+            .find(|e| e.uri != doc_uri && is_stdlib_uri(&e.uri))
+            .or_else(|| entries.iter().find(|e| e.uri != doc_uri));
 
-        let (target_uri, entry) = match entry_opt {
-            Some(e) => e,
-            None => continue,
+        let Some(entry) = entry_opt else {
+            continue;
         };
 
-        let specifier = uri_to_specifier(doc_uri, target_uri);
+        let specifier = uri_to_specifier(doc_uri, &entry.uri);
         let import_text = format!("import {{ {name} }} from \"{specifier}\";\n");
 
         let kind = Some(to_completion_kind(entry.kind));

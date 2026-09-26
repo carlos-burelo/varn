@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::document::SymbolView;
 use varn_checker::SymbolKind;
 use varn_modules::resolver::path_to_uri;
@@ -7,18 +9,20 @@ use crate::document::{import::uri_to_path, DocumentState};
 use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
-    let mut exports: Vec<ExportEntry> = state
+    let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
         .filter(|s| is_indexable(s.kind(), s.line()))
-        .map(|s| ExportEntry {
-            name: s.name().to_owned(),
-            global_key: s.global_key(true),
-            kind: s.kind(),
-            uri: uri.to_owned(),
-            line: s.line(),
-            col: s.col(),
-            type_str: s.type_str(),
-            doc: s.doc().map(str::to_owned),
+        .map(|s| {
+            Arc::new(ExportEntry {
+                name: s.name().to_owned(),
+                global_key: s.global_key(true),
+                kind: s.kind(),
+                uri: uri.to_owned(),
+                line: s.line(),
+                col: s.col(),
+                type_str: s.type_str(),
+                doc: s.doc().map(str::to_owned),
+            })
         })
         .collect();
 
@@ -31,12 +35,7 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
             .name_index
             .entry(export.name.clone())
             .or_default()
-            .push((uri.to_owned(), export.clone()));
-        index
-            .key_index
-            .entry(export.global_key.clone())
-            .or_default()
-            .push((uri.to_owned(), export.clone()));
+            .push(Arc::clone(export));
     }
 
     index.module_exports.insert(uri.to_owned(), exports);
@@ -71,11 +70,11 @@ fn collect_member_exports(
     state: &crate::document::DocumentState,
     uri: &str,
     sym: SymbolView<'_>,
-    out: &mut Vec<ExportEntry>,
+    out: &mut Vec<Arc<ExportEntry>>,
 ) {
     for m in state.members_of(sym) {
         let Some(line) = m.def_line else { continue };
-        out.push(ExportEntry {
+        out.push(Arc::new(ExportEntry {
             name: m.name.to_string(),
             global_key: format!("member:{}:{}", sym.name(), m.name),
             kind: summary_to_symbol_kind(m.kind),
@@ -84,7 +83,7 @@ fn collect_member_exports(
             col: m.def_col,
             type_str: state.ty_text(&m.ty),
             doc: None,
-        });
+        }));
     }
 }
 

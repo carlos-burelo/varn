@@ -63,8 +63,8 @@ pub fn build_goto_type_definition(
         let defs = idx.definitions_of(&type_name);
         let locs: Vec<Location> = defs
             .iter()
-            .filter_map(|(uri, entry)| {
-                let url = Url::parse(uri).ok()?;
+            .filter_map(|entry| {
+                let url = Url::parse(&entry.uri).ok()?;
                 Some(Location::new(
                     url,
                     Range {

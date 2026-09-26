@@ -55,36 +55,50 @@ pub fn build_rename(
     };
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
-    for entry in workspace.iter() {
-        let file_uri = entry.key().clone();
-        let file_state = entry.value();
-        let url = match Url::parse(&file_uri) {
-            Ok(u) => u,
-            Err(_) => continue,
+    // 1. If target is Local, only rename in this document:
+    if matches!(target, SymbolTarget::Local { .. }) {
+        collect_rename_edits_in_document(state, &target, target_name, &new_name, &mut changes);
+        return if changes.is_empty() {
+            None
+        } else {
+            Some(WorkspaceEdit {
+                changes: Some(changes),
+                ..Default::default()
+            })
         };
+    }
 
-        let mut edits: Vec<TextEdit> = file_state
-            .tokens
-            .iter()
-            .filter(|t| {
-                if !matches!(t.kind, TokenKind::Identifier) && !t.kind.can_be_identifier() {
-                    return false;
-                }
-                if t.lexeme != target_name {
-                    return false;
-                }
-                file_state.symbol_target_at_offset(t.offset).as_ref() == Some(&target)
-            })
-            .map(|t| TextEdit {
-                range: range_on_line(t.line, t.col, t.col + t.length),
-                new_text: new_name.clone(),
-            })
-            .collect();
+    // 2. Global or Member:
+    let mut checked_uris = rustc_hash::FxHashSet::default();
 
-        if !edits.is_empty() {
-            edits.dedup_by(|a, b| a.range == b.range);
-            changes.entry(url).or_default().extend(edits);
+    let open_entries: Vec<(String, std::sync::Arc<DocumentState>)> = workspace
+        .iter()
+        .map(|entry| (entry.key().clone(), std::sync::Arc::clone(entry.value())))
+        .collect();
+
+    for (file_uri, file_state) in &open_entries {
+        checked_uris.insert(file_uri.clone());
+        collect_rename_edits_in_document(file_state, &target, target_name, &new_name, &mut changes);
+    }
+
+    let all_uris: Vec<String> = {
+        let idx = workspace.index.read().unwrap();
+        idx.module_exports.keys().cloned().collect()
+    };
+
+    for file_uri in all_uris {
+        if checked_uris.contains(&file_uri) {
+            continue;
         }
+        let doc_path = crate::document::uri_to_path(&file_uri);
+        let Ok(source) = std::fs::read_to_string(&doc_path) else {
+            continue;
+        };
+        if !source.contains(target_name) {
+            continue;
+        }
+        let temp_state = crate::pipeline::run_pipeline(source, file_uri.clone());
+        collect_rename_edits_in_document(&temp_state, &target, target_name, &new_name, &mut changes);
     }
 
     if changes.is_empty() {
@@ -95,6 +109,41 @@ pub fn build_rename(
         changes: Some(changes),
         ..Default::default()
     })
+}
+
+fn collect_rename_edits_in_document(
+    file_state: &DocumentState,
+    target: &SymbolTarget,
+    target_name: &str,
+    new_name: &str,
+    changes: &mut HashMap<Url, Vec<TextEdit>>,
+) {
+    let Ok(url) = Url::parse(&file_state.uri) else {
+        return;
+    };
+
+    let mut edits: Vec<TextEdit> = file_state
+        .tokens
+        .iter()
+        .filter(|t| {
+            if !matches!(t.kind, TokenKind::Identifier) && !t.kind.can_be_identifier() {
+                return false;
+            }
+            if t.lexeme != target_name {
+                return false;
+            }
+            file_state.symbol_target_at_offset(t.offset).as_ref() == Some(target)
+        })
+        .map(|t| TextEdit {
+            range: range_on_line(t.line, t.col, t.col + t.length),
+            new_text: new_name.to_string(),
+        })
+        .collect();
+
+    if !edits.is_empty() {
+        edits.dedup_by(|a, b| a.range == b.range);
+        changes.entry(url).or_default().extend(edits);
+    }
 }
 
 fn find_ident_at(state: &DocumentState, line: u32, col: u32) -> Option<&TokenRecord> {

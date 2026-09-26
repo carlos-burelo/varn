@@ -67,9 +67,9 @@ pub fn generate_auto_imports_action(
     // Check project index for workspace definitions
     if let Some(idx) = index {
         let defs = idx.definitions_of(sym_name);
-        for (file_uri, _) in defs {
-            if file_uri != uri.as_str() {
-                let rel_path = compute_relative_import_path(uri.as_str(), file_uri);
+        for entry in defs {
+            if entry.uri != uri.as_str() {
+                let rel_path = compute_relative_import_path(uri.as_str(), &entry.uri);
                 if let Some(action) = create_import_action(uri, diag, sym_name, &rel_path) {
                     actions.push(action);
                 }

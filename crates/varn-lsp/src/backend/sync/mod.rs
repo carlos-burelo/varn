@@ -141,7 +141,7 @@ pub async fn did_close(backend: &Backend, params: DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.to_string();
     backend
         .analysis
-        .submit(move |a| a.workspace.remove_file(&uri));
+        .submit(move |a| a.workspace.close_file(&uri));
 }
 
 /// A `.vn` file changed outside the editor.

@@ -61,3 +61,60 @@ const b = acc.balance;
         assert_eq!(e.new_text, "total_balance");
     }
 }
+
+#[test]
+fn test_workspace_indexing_memory_lifecycle() {
+    let source = "function compute_something(): int { return 42; }";
+    let uri = "file:///test/compute.vn".to_string();
+    let workspace = Workspace::new();
+
+    // 1. Indexing a workspace file must NOT keep DocumentState in workspace.files:
+    workspace.index_file(uri.clone(), source.to_string());
+    assert_eq!(
+        workspace.file_count(),
+        0,
+        "index_file must not retain DocumentState in workspace.files"
+    );
+    assert!(
+        workspace.get(&uri).is_none(),
+        "workspace.get must return None for un-opened indexed files"
+    );
+
+    // But definitions must be in the project index:
+    {
+        let idx = workspace.index.read().unwrap();
+        let defs = idx.definitions_of("compute_something");
+        assert_eq!(defs.len(), 1, "Exported function must be in ProjectIndex");
+        assert_eq!(defs[0].name, "compute_something");
+    }
+
+    // 2. Opening the file (update_file) puts it into workspace.files:
+    workspace.update_file(uri.clone(), source.to_string());
+    assert_eq!(
+        workspace.file_count(),
+        1,
+        "update_file must keep open DocumentState in workspace.files"
+    );
+    assert!(workspace.get(&uri).is_some());
+
+    // 3. Closing the file (close_file) evicts it from workspace.files, but keeps ProjectIndex:
+    workspace.close_file(&uri);
+    assert_eq!(
+        workspace.file_count(),
+        0,
+        "close_file must evict DocumentState from workspace.files"
+    );
+    {
+        let idx = workspace.index.read().unwrap();
+        let defs = idx.definitions_of("compute_something");
+        assert_eq!(defs.len(), 1, "ProjectIndex must retain definitions after close");
+    }
+
+    // 4. Deleting the file (remove_file) removes from both:
+    workspace.remove_file(&uri);
+    {
+        let idx = workspace.index.read().unwrap();
+        let defs = idx.definitions_of("compute_something");
+        assert_eq!(defs.len(), 0, "remove_file must evict from ProjectIndex");
+    }
+}
