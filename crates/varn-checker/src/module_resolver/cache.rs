@@ -620,7 +620,7 @@ pub(super) fn try_load_cache(
     let table = resolver.ty_table_snapshot();
     let mut interner = resolver.interner_snapshot();
     let result = deserialize_module_interface(&payload, &mut interner, table);
-    resolver.set_interner(interner);
+    resolver.set_interner(&interner);
     match result {
         Ok((exports, bind)) => {
             // Identity guard: even with the carrier in the key, a payload must

@@ -19,7 +19,7 @@ pub fn in_shared_atoms<T, E>(
 ) -> Result<(T, varn_core::AtomInterner), E> {
     let interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
     let (parsed, interner) = parse(interner)?;
-    crate::resolver::with_resolver(|r| r.set_interner(interner.clone()));
+    crate::resolver::with_resolver(|r| r.set_interner(&interner));
     Ok((parsed, interner))
 }
 

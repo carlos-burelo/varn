@@ -236,7 +236,7 @@ impl DiskResolver {
     /// minted index stable; symbols carrying a diverged binder's local atom
     /// still resolve through that binder's own interner for cross-module
     /// reads (the `cache::encode_symbol`/`decode_symbol` text round-trip).
-    pub fn set_interner(&self, interner: varn_core::AtomInterner) {
+    pub fn set_interner(&self, interner: &varn_core::AtomInterner) {
         let mut live = self.interner.lock();
         if interner.len() <= live.len() {
             return;
@@ -340,7 +340,7 @@ impl DiskResolver {
         let interner = self.interner_snapshot();
         let (program, interner, arena) =
             varn_parser::parse(tokens, lexeme_buf, key, interner).ok()?;
-        self.set_interner(interner);
+        self.set_interner(&interner);
         let program = Arc::new(program);
         let arena = Arc::new(arena);
         self.store_program(key.to_owned(), Arc::clone(&program));
@@ -383,7 +383,7 @@ impl DiskResolver {
         // Without publishing them back, a later `interner_snapshot()` (e.g.
         // `save_to_cache`) resolves against a table that never saw them and
         // panics out of bounds — same fix as `parse_and_cache`.
-        self.set_interner(bind.interner.clone());
+        self.set_interner(&bind.interner);
         self.set_ty_table(bind.ty_table.clone());
         let bind = Arc::new(bind);
         self.store_bind(key.to_owned(), Arc::clone(&bind));

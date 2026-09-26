@@ -105,7 +105,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let interner = crate::workspace::resolver::with_resolver(|r| r.interner_snapshot());
     let (program, parse_errs, ast_arena, interner) =
         varn_parser::parse_partial(raw_tokens, lexeme_buf, &path, interner);
-    crate::workspace::resolver::with_resolver(|r| r.set_interner(interner.clone()));
+    crate::workspace::resolver::with_resolver(|r| r.set_interner(&interner));
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,
