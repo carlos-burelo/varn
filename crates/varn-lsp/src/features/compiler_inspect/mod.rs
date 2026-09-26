@@ -9,6 +9,7 @@
 mod ast_json;
 mod cfg;
 
+use varn_checker::module_resolver::ImportResolver;
 use varn_tir::TirModule;
 
 use crate::document::DocumentState;
@@ -40,8 +41,24 @@ pub fn execute_command(
             &*document()?,
         )?))),
         "varn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
+        "varn.memoryStats" => Ok(Some(memory_stats(workspace))),
         _ => Err(format!("Unknown command: {command}")),
     }
+}
+
+/// Everything this server can say about its own memory without an external
+/// tool: the OS's own number for this process, plus the internal counts a
+/// spike in that number would be explained by.
+fn memory_stats(workspace: &Workspace) -> serde_json::Value {
+    let (interner_len, ty_table_len) = crate::workspace::resolver::with_resolver(|r| {
+        (r.interner_len(), r.ty_table_len())
+    });
+    serde_json::json!({
+        "residentKb": crate::backend::mem::resident_kb(),
+        "openDocuments": workspace.file_count(),
+        "internedAtoms": interner_len,
+        "internedTypes": ty_table_len,
+    })
 }
 
 /// The document lowered to TIR, as a compile lowers it.

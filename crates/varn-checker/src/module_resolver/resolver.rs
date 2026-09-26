@@ -103,6 +103,12 @@ pub trait ImportResolver {
     /// before every locally-minted `Atom`, not just at construction.
     fn interner_len(&self) -> usize;
 
+    /// Number of shapes interned in this resolver's live `CheckerTyId` table,
+    /// without cloning it (unlike [`Self::ty_table_snapshot`]) — memory
+    /// introspection reads this on every open document; cloning the table to
+    /// answer "how big is it" would be the exact bug it is trying to surface.
+    fn ty_table_len(&self) -> usize;
+
     /// The prelude's member tables.
     fn core_members(&self) -> Arc<crate::core::loader::CoreMembers>;
 
@@ -560,6 +566,10 @@ impl ImportResolver for DiskResolver {
 
     fn interner_len(&self) -> usize {
         self.interner.lock().len()
+    }
+
+    fn ty_table_len(&self) -> usize {
+        self.ty_table.lock().len()
     }
 
     fn intern(&self, s: &str) -> varn_core::Atom {

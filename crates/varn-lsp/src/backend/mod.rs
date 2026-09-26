@@ -9,6 +9,7 @@
 
 pub mod capabilities;
 pub mod lifecycle;
+pub mod mem;
 pub mod progress;
 pub mod settings;
 pub mod sync;

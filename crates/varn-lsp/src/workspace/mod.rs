@@ -149,6 +149,10 @@ impl Workspace {
         self.files.iter()
     }
 
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
     pub fn revision(&self) -> u32 {
         self.revision.read().unwrap().current()
     }
