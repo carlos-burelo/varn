@@ -23,6 +23,18 @@ pub fn supports_configuration(caps: &ClientCapabilities) -> bool {
         .unwrap_or(false)
 }
 
+/// Files past this size are skipped by the *automatic* startup scan.
+///
+/// A handful of `tests/errors/*.vn` fixtures exist specifically to be
+/// enormous (one is 1.5MB / 65,546 lines, generated to trip a constant-pool
+/// overflow) — checking one has been observed pushing the server to 8GB+ RSS.
+/// Nothing here fixes that cost; excluding these from the scan nobody asked
+/// for is the scoped mitigation for the deployment context that matters (a
+/// server sitting idle in an editor should not gamble a user's machine on a
+/// stress-test fixture). Opening one by hand still analyses it normally —
+/// this only skips the eager, unrequested pass.
+const INDEX_SIZE_LIMIT_BYTES: u64 = 256 * 1024;
+
 /// Index every `.vn` file under the workspace root.
 ///
 /// Directory walk and file reads are I/O and stay off the analysis thread; only
@@ -61,15 +73,33 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     for (idx, path) in files.into_iter().enumerate() {
         let read = tokio::task::spawn_blocking(move || {
             let abs_path = std::fs::canonicalize(&path).ok()?;
+            let size = std::fs::metadata(&abs_path).ok()?.len();
+            if size > INDEX_SIZE_LIMIT_BYTES {
+                return Some(Err((abs_path, size)));
+            }
             let uri = Url::from_file_path(&abs_path).ok()?;
             let source = std::fs::read_to_string(&abs_path).ok()?;
-            Some((abs_path, uri, source))
+            Some(Ok((abs_path, uri, source)))
         })
         .await
         .ok()
         .flatten();
 
-        if let Some((abs_path, uri, source)) = read {
+        if let Some(Err((abs_path, size))) = &read {
+            client
+                .log_message(
+                    MessageType::INFO,
+                    format!(
+                        "[index] skipping {} ({} KB > {} KB startup-scan limit)",
+                        abs_path.display(),
+                        size / 1024,
+                        INDEX_SIZE_LIMIT_BYTES / 1024
+                    ),
+                )
+                .await;
+        }
+
+        if let Some(Ok((abs_path, uri, source))) = read {
             let elapsed = analysis
                 .run_background(move |a| {
                     let file_start = std::time::Instant::now();
