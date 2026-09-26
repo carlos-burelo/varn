@@ -53,11 +53,79 @@ fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     let (interner_len, ty_table_len) = crate::workspace::resolver::with_resolver(|r| {
         (r.interner_len(), r.ty_table_len())
     });
+
+    // Approximate bytes actually retained per cached document — not exact
+    // (ignores allocator/hashmap bucket overhead, nested Vec/String payloads
+    // inside e.g. CheckerScope), but real enough to rank which field a
+    // memory spike is coming from, rather than guessing from source reading
+    // alone.
+    let mut source_bytes: u64 = 0;
+    let mut token_count: u64 = 0;
+    let mut token_lexeme_bytes: u64 = 0;
+    let mut symbol_count: u64 = 0;
+    let mut scope_count: u64 = 0;
+    let mut per_doc_interner_entries: u64 = 0;
+    let mut expr_node_count: u64 = 0;
+    let mut expr_node_bytes: u64 = 0;
+    let mut expr_table_entries: u64 = 0;
+    let mut expr_types_entries: u64 = 0;
+    let mut node_scopes_entries: u64 = 0;
+    let mut scope_spans_entries: u64 = 0;
+    let mut symbol_types_entries: u64 = 0;
+    let mut member_resolutions_entries: u64 = 0;
+    let mut call_resolutions_entries: u64 = 0;
+    let mut match_gaps_entries: u64 = 0;
+    let mut call_mappings_entries: u64 = 0;
+    let mut flattened_members_entries: u64 = 0;
+
+    for entry in workspace.iter() {
+        let state = entry.value();
+        source_bytes += state.source.len() as u64;
+        token_count += state.tokens.len() as u64;
+        token_lexeme_bytes += state.tokens.iter().map(|t| t.lexeme.len() as u64).sum::<u64>();
+        symbol_count += state.db.arena.all().len() as u64;
+        scope_count += state.db.scopes.len() as u64;
+        per_doc_interner_entries += state.db.bind.interner.len() as u64;
+        let n = state.ast_arena.exprs().count() as u64;
+        expr_node_count += n;
+        expr_node_bytes += n * std::mem::size_of::<varn_core::ast::arena::ExprNode>() as u64;
+        expr_table_entries += state.db.expr_table.len() as u64;
+        expr_types_entries += state.db.expr_types.len() as u64;
+        node_scopes_entries += state.db.node_scopes.len() as u64;
+        scope_spans_entries += state.db.scope_spans.len() as u64;
+        symbol_types_entries += state.db.symbol_types.len() as u64;
+        member_resolutions_entries += state.db.member_resolutions.len() as u64;
+        call_resolutions_entries += state.db.call_resolutions.len() as u64;
+        match_gaps_entries += state.db.match_gaps.len() as u64;
+        call_mappings_entries += state.db.call_mappings.len() as u64;
+        flattened_members_entries += state.db.flattened_members.len() as u64;
+    }
+
     serde_json::json!({
         "residentKb": crate::backend::mem::resident_kb(),
         "openDocuments": workspace.file_count(),
         "internedAtoms": interner_len,
         "internedTypes": ty_table_len,
+        "perDocument": {
+            "totalSourceBytes": source_bytes,
+            "totalTokens": token_count,
+            "totalTokenLexemeBytes": token_lexeme_bytes,
+            "totalSymbolCount": symbol_count,
+            "totalScopeCount": scope_count,
+            "sumOfEachDocsInternerLen": per_doc_interner_entries,
+            "totalExprNodeCount": expr_node_count,
+            "totalExprNodeBytes": expr_node_bytes,
+            "totalExprTableEntries": expr_table_entries,
+            "totalExprTypesEntries": expr_types_entries,
+            "totalNodeScopesEntries": node_scopes_entries,
+            "totalScopeSpansEntries": scope_spans_entries,
+            "totalSymbolTypesEntries": symbol_types_entries,
+            "totalMemberResolutionsEntries": member_resolutions_entries,
+            "totalCallResolutionsEntries": call_resolutions_entries,
+            "totalMatchGapsEntries": match_gaps_entries,
+            "totalCallMappingsEntries": call_mappings_entries,
+            "totalFlattenedMembersEntries": flattened_members_entries,
+        }
     })
 }
 

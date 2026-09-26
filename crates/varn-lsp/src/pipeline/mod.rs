@@ -218,6 +218,10 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let import_paths = collect_import_paths(&program.body, &ast_arena, &result.bind.interner);
 
     let global_scope = result.bind.global_scope;
+    // Looks like duplication with `db.arena`/`db.scopes` below if you only
+    // grep varn-lsp — but varn_checker::get_members_of_type and friends take
+    // `&BindResult` and read `bind.arena`/`bind.scopes` themselves, so `bind`
+    // needs its own live copies too. The clone is the real cost, not a bug.
     let scopes = result.bind.scopes.clone();
     let arena = result.bind.arena.clone();
 
