@@ -197,6 +197,19 @@ mod tests {
     }
 
     #[test]
+    fn delta_stays_bounded_by_freeze_threshold() {
+        let mut interner = AtomInterner::new();
+        for i in 0..(FREEZE_THRESHOLD * 3 + 7) {
+            interner.intern(&format!("bounded{i}"));
+        }
+        assert!(
+            interner.delta_strings.len() < FREEZE_THRESHOLD,
+            "delta grew to {} entries, unbounded by FREEZE_THRESHOLD ({FREEZE_THRESHOLD})",
+            interner.delta_strings.len()
+        );
+    }
+
+    #[test]
     fn resolve_at_base_delta_boundary_is_correct() {
         let mut interner = AtomInterner::new();
         for i in 0..(FREEZE_THRESHOLD + 1) {

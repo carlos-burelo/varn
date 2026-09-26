@@ -415,12 +415,37 @@ impl CheckerTyTable {
     /// id, so this is a set union with no remap. This replaces the old
     /// `reintern`-based `absorb` (ADR-0012).
     pub fn absorb(&mut self, other: &CheckerTyTable) {
-        for (k, v) in other.base.entries.iter().chain(other.delta_entries.iter()) {
+        // Skip the (redundant) base-vs-base walk when both tables already
+        // share the same frozen base: every entry `other.base` could offer
+        // is already in `self.base` by definition of sharing the `Arc`, so
+        // only `other`'s delta can possibly be new to `self`.
+        let shared_base = std::sync::Arc::ptr_eq(&self.base, &other.base);
+        if !shared_base {
+            for (k, v) in &other.base.entries {
+                if !self.contains(*k) {
+                    self.delta_entries.insert(*k, *v);
+                }
+            }
+        }
+        for (k, v) in &other.delta_entries {
             if !self.contains(*k) {
                 self.delta_entries.insert(*k, *v);
             }
         }
-        for (k, v) in other.base.lists.iter().chain(other.delta_lists.iter()) {
+        if !shared_base {
+            for (k, v) in &other.base.lists {
+                if self
+                    .base
+                    .lists
+                    .get(k)
+                    .or_else(|| self.delta_lists.get(k))
+                    .is_none()
+                {
+                    self.delta_lists.insert(*k, v.clone());
+                }
+            }
+        }
+        for (k, v) in &other.delta_lists {
             if self
                 .base
                 .lists
@@ -431,12 +456,20 @@ impl CheckerTyTable {
                 self.delta_lists.insert(*k, v.clone());
             }
         }
-        for (k, v) in other
-            .base
-            .functions
-            .iter()
-            .chain(other.delta_functions.iter())
-        {
+        if !shared_base {
+            for (k, v) in &other.base.functions {
+                if self
+                    .base
+                    .functions
+                    .get(k)
+                    .or_else(|| self.delta_functions.get(k))
+                    .is_none()
+                {
+                    self.delta_functions.insert(*k, v.clone());
+                }
+            }
+        }
+        for (k, v) in &other.delta_functions {
             if self
                 .base
                 .functions
@@ -447,12 +480,14 @@ impl CheckerTyTable {
                 self.delta_functions.insert(*k, v.clone());
             }
         }
-        for (k, v) in other
-            .base
-            .object_members
-            .iter()
-            .chain(other.delta_object_members.iter())
-        {
+        if !shared_base {
+            for (k, v) in &other.base.object_members {
+                if !self.contains_object_members(*k) {
+                    self.delta_object_members.insert(*k, v.clone());
+                }
+            }
+        }
+        for (k, v) in &other.delta_object_members {
             if !self.contains_object_members(*k) {
                 self.delta_object_members.insert(*k, v.clone());
             }
@@ -526,11 +561,6 @@ mod tests {
         let mut t = CheckerTyTable::default();
         let mut ids = Vec::new();
         for i in 0..(FREEZE_THRESHOLD * 2 + 3) {
-            // Distinct shapes: nested `Array` of increasing depth via a
-            // synthetic list id keeps every entry unique without depending on
-            // string content (this table has no strings).
-            let list = t.intern_list(&[CheckerTyId::INT; 1]);
-            let _ = list;
             ids.push(t.intern_object_members(vec![ObjectTypeMember::Property {
                 name: std::sync::Arc::from(format!("f{i}").as_str()),
                 ty: CheckerTyId::INT,
@@ -574,6 +604,44 @@ mod tests {
                 other => panic!("expected Property, got {other:?}"),
             }
         }
+        assert!(
+            local.delta_entries.is_empty()
+                && local.delta_lists.is_empty()
+                && local.delta_functions.is_empty()
+                && local.delta_object_members.is_empty(),
+            "absorb left an oversized delta instead of freezing it"
+        );
+    }
+
+    /// `absorb`'s `Arc::ptr_eq` shortcut must never skip content that is
+    /// genuinely new: when `other` shares `self`'s frozen base but has grown
+    /// its own delta since the clone, that delta is exactly what `self` is
+    /// missing and must still be copied over.
+    #[test]
+    fn absorb_with_shared_base_still_picks_up_the_other_deltas_new_entries() {
+        let mut local = CheckerTyTable::default();
+        let local_id = local.intern_object_members(vec![ObjectTypeMember::Property {
+            name: std::sync::Arc::from("local-only"),
+            ty: CheckerTyId::INT,
+            optional: false,
+            readonly: false,
+        }]);
+        let mut clone = local.clone();
+        assert!(std::sync::Arc::ptr_eq(&local.base, &clone.base));
+        let clone_only_id = clone.intern_object_members(vec![ObjectTypeMember::Property {
+            name: std::sync::Arc::from("clone-only"),
+            ty: CheckerTyId::INT,
+            optional: false,
+            readonly: false,
+        }]);
+
+        local.absorb(&clone);
+
+        assert!(local.contains_object_members(local_id));
+        assert!(
+            local.contains_object_members(clone_only_id),
+            "absorb must still pick up entries from other's delta even when bases are shared"
+        );
     }
 
     #[test]
