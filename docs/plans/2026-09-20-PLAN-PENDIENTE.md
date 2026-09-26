@@ -263,6 +263,24 @@ inspección de frames) exige protocolo de pausa/inspección nuevo en
 ¿DAP embebido en `vn` o proceso separado `vn debug-server`? Requiere spec
 arquitectónico dedicado antes de tocar código.
 
+### 5.6 Memoria del LSP (2026-09-25) — parcialmente HECHO, anexo aparte
+
+`varn.memoryStats` (comando LSP nuevo) + `dhat-heap` (`cargo build -p
+varn-cli --features dhat-heap`) para introspección real, no adivinada.
+Encontrado y **arreglado**: `Checker::check_internal` pre-asignaba 13
+hashmaps a capacidad fija (64–4096 slots) en CADA archivo sin importar su
+tamaño — ~350MB reales sobre un workspace de 386 archivos, verificado con
+profiler (dhat: 1473MB → 1120MB vivos), no solo RSS.
+
+**Pendiente, arquitectónico, con anexo propio**:
+`docs/plans/2026-09-25-shared-atom-type-tables.md` — `AtomInterner`/
+`CheckerTyTable` en `DiskResolver` crecen durante toda la sesión pero cada
+`BindResult` cacheado retiene su `Arc` para siempre, así que el
+`Arc::make_mut` en `set_interner`/`set_ty_table` clona la tabla completa
+en cada crecimiento (~260MB + ~60MB medidos). No toca `varn-vm`/`varn-jit`
+(Ley 10: fuera del eje que se mide) — requiere compartición estructural
+(persistente o base+delta), spec propio antes de tocar código.
+
 ---
 
 ## 6. Puerta de validación (cada commit)
