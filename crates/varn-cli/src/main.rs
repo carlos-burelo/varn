@@ -2,8 +2,18 @@
 /// DST detrás de un `Rc`), así que el allocator está en el camino caliente de
 /// todo programa que construya objetos. El de Windows (`HeapAlloc`) es la razón
 /// medida de que alocar cueste ~90 ns por objeto frente a los ~24 ns de Bun.
+///
+/// `--features dhat-heap` swaps this for dhat's own allocator instead: mimalloc
+/// retains freed pages rather than returning them to the OS, so its RSS
+/// includes allocator slack a heap profiler needs to see past. Mutually
+/// exclusive — only one binary can own `#[global_allocator]`.
+#[cfg(not(feature = "dhat-heap"))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
 mod bench;
 mod cli;
@@ -25,8 +35,20 @@ use cli::{Cli, Commands};
 use std::process;
 use varn_core::term::terminal;
 use varn_lexer as _;
+// Anchor: only used via the #[global_allocator] static when dhat-heap is
+// off, which `unused_crate_dependencies` can't see through a #[cfg] on a
+// static item.
+#[cfg(feature = "dhat-heap")]
+use mimalloc as _;
 
 fn main() {
+    // Held for the whole process; dropping it (on a clean exit — Ctrl+C,
+    // the LSP's shutdown/exit sequence, a CLI command finishing normally)
+    // writes dhat-heap.json next to the working directory. View at
+    // https://nnethercote.github.io/dh_view/dh_view.html.
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     // Lo primero, antes de registrar la stdlib o tocar argumentos: si el
     // proyecto trae `.env`/`.env.local`, sus claves quedan puestas en el
     // entorno del proceso para todo lo que sigue (`RUST_BACKTRACE`,

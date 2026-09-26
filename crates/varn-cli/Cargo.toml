@@ -19,6 +19,14 @@ required-features = ["dev-tools"]
 default = ["lsp"]
 dev-tools = []
 lsp = ["dep:varn-lsp", "dep:tower-lsp"]
+# Real heap profiling (dhat-rs), for when RSS doesn't add up to counted
+# structures — mimalloc retains freed pages instead of returning them to the
+# OS, so `Task Manager`/`GetProcessMemoryInfo` numbers can include a lot of
+# allocator slack that isn't live Rust data at all. dhat's allocator tracks
+# exactly what's live and dumps dhat-heap.json on clean exit (Viewable at
+# https://nnethercote.github.io/dh_view/dh_view.html). Mutually exclusive
+# with mimalloc — see main.rs's #[global_allocator] cfg split.
+dhat-heap = ["dep:dhat"]
 
 [dependencies]
 varn-pipeline = { path = "../varn-pipeline" }
@@ -41,6 +49,7 @@ clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"
 rustc-hash    = { workspace = true }
 mimalloc = "0.1.52"
+dhat     = { version = "0.3", optional = true }
 
 [build-dependencies]
 varn-pipeline = { path = "../varn-pipeline" }
