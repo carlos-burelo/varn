@@ -149,27 +149,33 @@ pub fn emit_module(
 
     // Free functions, in declaration order: FnId is the index, arity is the
     // parameter count (the signature is built to match, so the verifier's
-    // arity check agrees).
-    let mut free_fns: Vec<&FunctionDecl> = program
+    // arity check agrees). Namespace members carry their namespace: they are
+    // not binder symbols, so `emit_function` needs it to find their `Fn` type.
+    let mut free_fns: Vec<(&FunctionDecl, Option<Arc<str>>)> = program
         .body
         .iter()
         .filter_map(|&s| match &ast_arena.stmt(s).kind {
-            StmtKind::Decl(d) => free_function(d),
+            StmtKind::Decl(d) => free_function(d).map(|f| (f, None)),
             _ => None,
         })
         .collect();
     // `namespace NS { export function f … }` — a member function is a free
     // function too, so a sibling member can call it by bare name and the
     // namespace object can point an entry at it. The object is built below.
-    fn ns_member_fns<'a>(ns: &'a varn_core::ast::NamespaceDecl, out: &mut Vec<&'a FunctionDecl>) {
+    fn ns_member_fns<'a>(
+        ns: &'a varn_core::ast::NamespaceDecl,
+        interner: &AtomInterner,
+        out: &mut Vec<(&'a FunctionDecl, Option<Arc<str>>)>,
+    ) {
+        let ns_name: Arc<str> = Arc::from(interner.resolve(ns.id));
         for m in &ns.body {
             let inner = match m {
                 Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
                 other => other,
             };
             match inner {
-                Decl::Function(f) => out.push(f),
-                Decl::Namespace(inner_ns) => ns_member_fns(inner_ns, out),
+                Decl::Function(f) => out.push((f, Some(ns_name.clone()))),
+                Decl::Namespace(inner_ns) => ns_member_fns(inner_ns, interner, out),
                 _ => {}
             }
         }
@@ -179,11 +185,11 @@ pub fn emit_module(
             continue;
         };
         if let Some(ns) = namespace_decl(d) {
-            ns_member_fns(ns, &mut free_fns);
+            ns_member_fns(ns, interner, &mut free_fns);
         }
     }
     let mut fn_index: FxHashMap<Atom, (u32, u32)> = FxHashMap::default();
-    for (i, f) in free_fns.iter().enumerate() {
+    for (i, (f, _)) in free_fns.iter().enumerate() {
         fn_index
             .entry(f.id.clone())
             .or_insert((i as u32, f.params.len() as u32));
@@ -214,9 +220,10 @@ pub fn emit_module(
     // A closure's FnId is `n_free + <its absolute index in `closures`>`, and
     // `functions.extend(closures)` later places `closures[i]` at exactly that
     // index, so every free function and the module top level share this base.
-    for f in &free_fns {
+    for (f, ns) in &free_fns {
         let tf = emit_function(
             f,
+            ns.as_deref(),
             ast_arena,
             bind,
             expr_table,
@@ -1886,6 +1893,7 @@ fn param_name(p: &Param, interner: &AtomInterner) -> Arc<str> {
 #[allow(clippy::too_many_arguments)]
 fn emit_function(
     f: &FunctionDecl,
+    ns: Option<&str>,
     ast_arena: &AstArena,
     bind: &BindResult,
     expr_table: &FxHashMap<AstId, TypeEntry>,
@@ -1903,20 +1911,52 @@ fn emit_function(
         .global_symbols()
         .find(|s| s.name == f.id)
         .and_then(|s| s.ty.clone());
+    // Namespace members are not binder symbols, so the lookup above misses:
+    // use the member's `Fn` type on the namespace, built from the same
+    // annotations the checker used for the body (use-site types agree with
+    // the signature by construction). Qualified by namespace, never by bare
+    // name, so a top-level homonym cannot lend its type to the member.
+    // A member missing from the map keeps the old `Dynamic` instead of
+    // borrowing an unrelated symbol's type.
+    let fn_ty: Option<crate::types::Type> = match ns {
+        Some(ns) => bind.get_namespace_members_local(ns).and_then(|members| {
+            members
+                .iter()
+                .filter(|m| {
+                    m.kind == crate::types::ClassMemberKind::Function
+                        && m.name.as_ref() == fn_name_str
+                })
+                .find_map(|m| {
+                    matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty.clone())
+                })
+        }),
+        None => sym_ty.filter(|t| matches!(t.kind(ctx.checker_table), TypeKind::Fn(_))),
+    };
 
     let arity = f.params.len();
     let mut param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); arity];
     let mut return_ty = BackendTy::Dynamic(DynReason::Unannotated);
-    if let Some(TypeKind::Fn(fn_id)) = sym_ty.as_ref().map(|t| t.kind(ctx.checker_table)) {
+    if let Some(TypeKind::Fn(fn_id)) = fn_ty.as_ref().map(|t| t.kind(ctx.checker_table)) {
         let ft = ctx.checker_table.get_function(fn_id);
         for (i, p) in ft.params.iter().take(arity).enumerate() {
-            param_tys[i] = lower_type(
+            let inner = lower_type(
                 &crate::types::Type(p.ty, false),
                 ctx.checker_table,
                 ctx.interner,
                 types,
                 ctx.names,
             );
+            // An optional parameter may arrive unset (`null`), which only a
+            // `Dynamic`-classed register can represent (see
+            // `defaulted_param_mask` in `varn-compiler`). Publish the payload
+            // as `Nullable` so the entry accepts `null`; the body narrows it
+            // back itself. Applies to both paths: top-level and namespace
+            // functions share one entry convention.
+            param_tys[i] = match inner {
+                BackendTy::Dynamic(_) | BackendTy::Nullable(_) => inner,
+                _ if p.optional => BackendTy::Nullable(types.intern(inner)),
+                _ => inner,
+            };
         }
         return_ty = lower_type(
             &crate::types::Type(ft.return_type, false),
