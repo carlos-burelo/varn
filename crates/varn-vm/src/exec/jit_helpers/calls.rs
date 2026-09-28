@@ -146,38 +146,12 @@ pub(crate) extern "C" fn jit_call_method_window(
     }
 }
 
-/// The single canonical VM call out of compiled code. The compiled caller has
-/// flushed `[callee, args...]` to the homes of registers
-/// `arg_start..arg_start + argc` in activation `act_id`; this gathers them and
-/// runs the callee through [`ExecCtx::invoke`], the same entry the interpreter
-/// slow path and every host→VM call use.
-pub(crate) extern "C" fn clif_call_fallback(
-    ctx: *mut ExecCtx,
-    callee_tag: u64,
-    callee_payload: u64,
-    act_id: usize,
-    arg_start: usize,
-    argc: usize,
-) {
-    jit_invoke_dynamic(
-        ctx,
-        callee_tag,
-        callee_payload,
-        act_id,
-        arg_start,
-        argc as u32,
-    );
-}
-
 /// Camino dinámico ÚNICO v2 (§3.2): todo lo no-estático (métodos, closures,
 /// `dynamic`) pasa por aquí. Ventana contigua ya preparada por el caller en
 /// sus homes; resuelve, ejecuta (entrando a código compilado si existe) y deja
 /// boxed en `ctx.jit_native_result` (el retorno directo `-> VmValue` llega con
 /// la convención por target, §3.1). Un call-site monomórfico caliente se
 /// recompila a estático directo; sin IC inlineado a mano por call-site.
-///
-/// `clif_call_fallback` hoy delega aquí (mismo mecanismo, Ley 8); su nombre
-/// viejo muere en el siguiente paso con la familia `call`/`invoke_virtual`.
 #[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_invoke_dynamic(
     ctx: *mut ExecCtx,
@@ -203,7 +177,7 @@ pub(crate) extern "C" fn jit_invoke_dynamic(
 /// of its own to keep its argument window in. `window[0]` is the callee
 /// placeholder, `window[1..]` the arguments (built on the caller's native
 /// stack); this runs the callee through the SAME [`ExecCtx::invoke`] as
-/// `clif_call_fallback`, so there is still one invocation, and writes the
+/// `jit_invoke_dynamic`, so there is still one invocation, and writes the
 /// boxed result to `ctx.jit_native_result`.
 pub(crate) extern "C" fn jit_invoke_window(
     ctx: *mut ExecCtx,
@@ -227,7 +201,7 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// call site can make the one machine call that matters — into the callee's
 /// own compiled wrapper — itself, instead of crossing back into Rust only to
 /// have Rust make that same call through a bare function pointer.
-/// `clif_call_fallback` (unchanged) still does the ENTIRE thing in one FFI
+/// `jit_invoke_dynamic` still does the ENTIRE thing in one FFI
 /// hop for anything this declines: async/generator/rest closures, class
 /// construction, native functions, or a closure with no compiled code (yet,
 /// or ever).
@@ -239,7 +213,7 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// needs a heap lookup) and returns the callee's wrapper entry point (a
 /// `JitFn`, as a raw address) for the call site to invoke directly. Returns
 /// `0` on decline; nothing is pushed, and the call site must fall back to
-/// `clif_call_fallback`. A non-zero return always has a matching
+/// `jit_invoke_dynamic`. A non-zero return always has a matching
 /// `jit_finish_static_call` after the wrapper call — the frame stays pushed
 /// until then.
 /// Fase B: pushes a fresh `FrameStore` activation for the callee, copies the
@@ -248,7 +222,7 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// the caller invokes it directly (no Rust [`ExecCtx::invoke`] round-trip).
 /// Returns `0` — nothing pushed — for a non-closure, async/generator/rest, or
 /// a callee with no compiled entry; the call site then falls back to
-/// `clif_call_fallback`.
+/// `jit_invoke_dynamic`.
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,

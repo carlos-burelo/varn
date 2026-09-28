@@ -265,8 +265,8 @@ pub(crate) fn emit_call(
 /// 1. `jit_prepare_static_call` pushes the callee activation and returns its
 ///    wrapper entry; the call site invokes the wrapper directly
 ///    ([`emit_wrapper_call_and_finish`]).
-/// 2. `clif_call_fallback` — full generic VM dispatch
-///    (`ExecCtx::call_vm_window`). Async/generator/rest closures, class
+/// 2. `invoke_dynamic` — full generic VM dispatch
+///    (`ExecCtx::invoke`). Async/generator/rest closures, class
 ///    construction, native functions, or nothing compiled yet.
 ///
 /// `dest`/`next_ip` feed the exception-unwind protocol
@@ -324,9 +324,9 @@ fn emit_vm_call(
         actx.helpers.jit_call_dest_offset as i32,
     );
 
-    // One canonical VM call: `clif_call_fallback` gathers the argument window
+    // One canonical VM call: `invoke_dynamic` gathers the argument window
     // from the caller's home slots and runs the callee through
-    // `ExecCtx::call_vm_window` (prepare_call + run_until), which itself enters
+    // `ExecCtx::invoke` (prepare_call + run_until), which itself enters
     // the callee's compiled entry when one exists. The inline/wrapper tiers are
     // a later optimization; correctness first (Ley 8, one mechanism).
     let start_v = b.ins().iconst(types::I64, arg_start as i64);
@@ -377,7 +377,7 @@ fn emit_vm_call(
     call_helper_void(
         b,
         actx.cc,
-        actx.helpers.clif_call_fallback,
+        actx.helpers.invoke_dynamic,
         &[
             actx.exec_ctx,
             callee_tag,

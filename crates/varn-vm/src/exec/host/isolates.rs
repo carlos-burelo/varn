@@ -18,7 +18,7 @@ impl ExecCtx {
     /// occupies), followed by the arguments.
     ///
     /// Every run-to-completion entry into VM code goes through here:
-    /// `clif_call_fallback` (compiled caller), `NativeCtx::call_vm` (host →
+    /// `jit_invoke_dynamic` (compiled caller), `NativeCtx::call_vm` (host →
     /// VM), `spawn_internal`, and isolates. The window is adopted as staging,
     /// so it materialises through the SAME `prepare_call`/`materialize_frame`
     /// as the interpreter's slow path — one argument convention, not two.

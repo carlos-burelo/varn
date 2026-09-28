@@ -171,10 +171,6 @@ macro_rules! jit_helper_abi {
             jit_call_method_window => jit_call_method_window,
             /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
-            /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
-            /// — the CLIF static-call IC miss path: dispatch the (rebound or
-            /// GC-moved) callee through the interpreter/JIT with boxed args.
-            clif_call_fallback => clif_call_fallback,
             /// `extern "C" fn(*mut ExecCtx, callee_tag, callee_payload,
             /// window: *const VmValue, argc)` — the SSA lowering's call fallback
             /// when the caller has no VM activation to keep a window in. Runs
@@ -183,7 +179,7 @@ macro_rules! jit_helper_abi {
             /// `extern "C" fn(*mut ExecCtx, src, argc)` — direct self-recursion
             /// out of a frame-aware lowering, which cannot pass its own `base`
             /// to the callee and has no boxed callee to route through
-            /// `clif_call_fallback`.
+            /// `invoke_dynamic`.
             clif_call_self => clif_call_self,
             /// `extern "C" fn(*mut ExecCtx, window: *const VmValue, argc)` —
             /// self-recursion out of the lowering from typed SSA, whose
@@ -191,11 +187,10 @@ macro_rules! jit_helper_abi {
             /// placeholder first.
             jit_call_self_window => jit_call_self_window,
             /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, arg_start, arg_count) -> usize`
-            /// — half of `clif_call_fallback`'s fast path (`invoke_compiled_closure`),
-            /// split so the call site makes the wrapper call itself instead of
-            /// crossing back into Rust to do it. `0` = declined, take
-            /// `clif_call_fallback`; non-zero = the callee's wrapper entry
-            /// point, with a `CallFrame` already pushed and
+            /// — half of `invoke_dynamic`'s fast path, split so the call site
+            /// makes the wrapper call itself instead of crossing back into
+            /// Rust to do it. `0` = declined, take `invoke_dynamic`; non-zero
+            /// = the callee's wrapper entry point, with a `CallFrame` already pushed and
             /// `jit_call_base`/`jit_call_closure_ptr` holding what the wrapper
             /// call needs. Always paired with `jit_finish_static_call` after.
             jit_prepare_static_call => jit_prepare_static_call,
