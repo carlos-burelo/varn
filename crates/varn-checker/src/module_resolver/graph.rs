@@ -145,6 +145,33 @@ impl ModuleGraph {
         self.resolved_paths.retain(|_, v| !to_clear.contains(v));
     }
 
+    /// Drop binds, parsed programs and AST arenas, keeping exports,
+    /// specifier paths, dependency edges and project root.
+    ///
+    /// The evicted tables are pure memoization: every reader re-derives on
+    /// miss (`module_bind` re-parses + re-binds, `module_exports` re-collects,
+    /// both consult the on-disk artifact cache first). What stays is exactly
+    /// what answering later queries needs without re-reading: the export maps
+    /// (small, portable) and the graph shape that invalidation walks.
+    /// Returns per-table evicted counts `(binds, programs, arenas)`.
+    pub fn evict_heavy(&mut self) -> (usize, usize, usize) {
+        let counts = (self.binds.len(), self.programs.len(), self.arenas.len());
+        self.binds.clear();
+        self.programs.clear();
+        self.arenas.clear();
+        counts
+    }
+
+    /// Counts of `(binds, programs, arenas, exports)` memoized right now.
+    pub fn heavy_stats(&self) -> (usize, usize, usize, usize) {
+        (
+            self.binds.len(),
+            self.programs.len(),
+            self.arenas.len(),
+            self.exports.len(),
+        )
+    }
+
     /// Drop every memoized module. `project_root` survives: it describes where
     /// the workspace is, not what is in it.
     pub fn clear(&mut self) {

@@ -151,6 +151,19 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         }
     }
 
+    // Suelta los artefactos pesados del scan (binds, ASTs) conservando los
+    // exports: el índice ya extrajo lo que necesita y cada lector re-deriva
+    // en miss. Corre en el hilo de análisis, dueño del resolver thread-local.
+    let (ev_b, ev_p, ev_a) = analysis
+        .run_background(|_| {
+            crate::workspace::resolver::with_resolver(|r| {
+                use varn_checker::module_resolver::ImportResolver;
+                r.evict_heavy()
+            })
+        })
+        .await
+        .unwrap_or((0, 0, 0));
+
     progress.end(format!("{total} files")).await;
     let mem_msg = crate::backend::mem::resident_kb()
         .map(|kb| format!(" (RSS: {} MB)", kb / 1024))
@@ -159,7 +172,8 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         .log_message(
             MessageType::INFO,
             format!(
-                "Workspace indexed successfully in {:?}{mem_msg}",
+                "Workspace indexed successfully in {:?}{mem_msg} \
+                 (evicted binds:{ev_b} programs:{ev_p} arenas:{ev_a})",
                 start.elapsed()
             ),
         )

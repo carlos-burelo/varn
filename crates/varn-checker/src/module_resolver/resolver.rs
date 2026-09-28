@@ -109,6 +109,21 @@ pub trait ImportResolver {
     /// answer "how big is it" would be the exact bug it is trying to surface.
     fn ty_table_len(&self) -> usize;
 
+    /// Evict heavy memoized artifacts (`binds`, parsed `programs`, AST
+    /// `arenas`) while keeping `exports`, specifier paths and dependency
+    /// edges.
+    ///
+    /// Every evicted entry re-derives from source (or the on-disk artifact
+    /// cache) on next touch — `module_bind` and `module_exports` both rebuild
+    /// on miss — so this changes peak memory, not answers. Returns per-table
+    /// evicted counts `(binds, programs, arenas)` for observability.
+    fn evict_heavy(&self) -> (usize, usize, usize);
+
+    /// Counts of `(binds, programs, arenas, exports)` memoized right now.
+    /// Observability for [`Self::evict_heavy`]; the LSP `memoryStats` command
+    /// reports it per process.
+    fn graph_stats(&self) -> (usize, usize, usize, usize);
+
     /// The prelude's member tables.
     fn core_members(&self) -> Arc<crate::core::loader::CoreMembers>;
 
@@ -570,6 +585,14 @@ impl ImportResolver for DiskResolver {
 
     fn ty_table_len(&self) -> usize {
         self.ty_table.lock().len()
+    }
+
+    fn evict_heavy(&self) -> (usize, usize, usize) {
+        self.graph.lock().evict_heavy()
+    }
+
+    fn graph_stats(&self) -> (usize, usize, usize, usize) {
+        self.graph.lock().heavy_stats()
     }
 
     fn intern(&self, s: &str) -> varn_core::Atom {
