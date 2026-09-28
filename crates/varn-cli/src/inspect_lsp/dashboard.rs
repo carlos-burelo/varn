@@ -68,7 +68,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
                         tok.line + 1,
                         tok.col + 1,
-                        tok.lexeme,
+                        analysis.lexeme(tok),
                         content.replace('\n', " "),
                         DIM = DIM,
                         RESET = R,
@@ -115,7 +115,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             "    {DIM}({:>2}:{:>2}){RESET} {BOLD}{}{RESET} → [{}]",
                             tok.line + 1,
                             tok.col + 1,
-                            tok.lexeme,
+                            analysis.lexeme(tok),
                             labels.join(", "),
                             DIM = DIM,
                             RESET = R,
@@ -354,16 +354,20 @@ fn find_lexeme(
         .tokens
         .iter()
         .find(|t| t.line == line && t.col == col)
-        .map(|t| t.lexeme[..(length as usize).min(t.lexeme.len())].to_string())
+        .map(|t| {
+            let lex = analysis.lexeme(t);
+            lex[..(length as usize).min(lex.len())].to_string()
+        })
         .or_else(|| {
             analysis
                 .tokens
                 .iter()
                 .find(|t| t.line == line && t.col <= col && col < t.col + t.length)
                 .map(|t| {
+                    let lex = analysis.lexeme(t);
                     let start = (col - t.col) as usize;
-                    let end = (start + length as usize).min(t.lexeme.len());
-                    t.lexeme[start..end].to_string()
+                    let end = (start + length as usize).min(lex.len());
+                    lex[start..end].to_string()
                 })
         })
         .unwrap_or_else(|| "???".to_string())

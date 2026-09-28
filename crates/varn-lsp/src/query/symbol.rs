@@ -12,5 +12,5 @@ pub fn symbol_at(state: &DocumentState, line: u32, col: u32) -> Option<SymbolVie
 
     state
         .checker_symbol_at(line, col)
-        .filter(|sym| sym.name() == tok.lexeme)
+        .filter(|sym| sym.name() == state.lexeme(tok))
 }

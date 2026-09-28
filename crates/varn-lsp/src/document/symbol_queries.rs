@@ -15,8 +15,8 @@ impl DocumentState {
                 && t.col <= col
                 && col < t.col + t.length
         })?;
-        if self.type_param_names.contains(tok.lexeme.as_str()) {
-            Some(tok.lexeme.clone())
+        if self.type_param_names.contains(self.lexeme(tok)) {
+            Some(self.lexeme(tok).to_owned())
         } else {
             None
         }

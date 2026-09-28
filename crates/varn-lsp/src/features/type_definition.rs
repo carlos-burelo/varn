@@ -20,7 +20,7 @@ pub fn build_goto_type_definition(
             .symbol_types
             .get(&sid)
             .cloned()
-            .or_else(|| state.db.arena.get(sid).ty)
+            .or_else(|| state.db.bind.arena.get(sid).ty)
     } else {
         state.db.expr_types.get(&token.offset).map(|info| info.ty)
     }?;

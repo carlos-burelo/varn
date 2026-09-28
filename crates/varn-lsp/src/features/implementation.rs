@@ -12,15 +12,15 @@ pub fn build_goto_implementation(
     col: u32,
 ) -> Option<GotoDefinitionResponse> {
     let token = state.identifier_token_at(line, col)?;
-    let target_name = &token.lexeme;
+    let target_name = state.lexeme(token);
 
     // Check if target is an interface or class in current file
     let (is_interface, is_class_or_method) = {
         let is_iface = state
             .symbols()
-            .any(|s| s.name() == *target_name && s.kind() == varn_checker::SymbolKind::Interface);
+            .any(|s| s.name() == target_name && s.kind() == varn_checker::SymbolKind::Interface);
         let is_cls = state.symbols().any(|s| {
-            s.name() == *target_name
+            s.name() == target_name
                 && matches!(
                     s.kind(),
                     varn_checker::SymbolKind::Class | varn_checker::SymbolKind::Method

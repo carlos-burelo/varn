@@ -15,16 +15,16 @@ impl DocumentState {
 
     pub fn checker_symbol_id_at_token(&self, tok: &TokenRecord) -> Option<SymbolId> {
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
-            if let Some(sid) = info.symbol_id.filter(|sid| *sid < self.db.arena.len()) {
-                let arena_sym = self.db.arena.get(sid);
-                if self.name(arena_sym.name) == tok.lexeme.as_str() {
+            if let Some(sid) = info.symbol_id.filter(|sid| *sid < self.db.bind.arena.len()) {
+                let arena_sym = self.db.bind.arena.get(sid);
+                if self.name(arena_sym.name) == self.lexeme(tok) {
                     return Some(sid);
                 }
             }
         }
 
         self.db
-            .resolve_at(&tok.lexeme, tok.offset)
+            .resolve_at(self.lexeme(tok), tok.offset)
             .map(|(sid, _)| sid)
     }
 

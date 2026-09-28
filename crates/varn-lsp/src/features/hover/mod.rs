@@ -50,7 +50,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             .map(|t| t.kind == TokenKind::At)
             .unwrap_or(false);
         if prev_is_at {
-            if let Some(h) = decorator_hover(&tok.lexeme) {
+            if let Some(h) = decorator_hover(state.lexeme(tok)) {
                 return Some(h);
             }
         }
@@ -67,7 +67,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             ChainResult::Symbol(sym) => {
                 if sym.is_from_stdlib() {
                     if let Some((_, tok)) = tok_any {
-                        if let Some(h) = intrinsic_or_keyword_hover(tok) {
+                        if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
                             return Some(h);
                         }
                     }
@@ -91,7 +91,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     if let Some(sym) = query::symbol_at(state, line, col) {
         if sym.is_from_stdlib() {
             if let Some((_, tok)) = tok_any {
-                if let Some(h) = intrinsic_or_keyword_hover(tok) {
+                if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
                     return Some(h);
                 }
             }
@@ -123,7 +123,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
 
     // Fallback: Check for primitive types, literals, and language intrinsics
     if let Some((_, tok)) = tok_any {
-        if let Some(h) = intrinsic_or_keyword_hover(tok) {
+        if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
             return Some(h);
         }
     }

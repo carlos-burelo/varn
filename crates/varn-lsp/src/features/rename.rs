@@ -14,10 +14,10 @@ pub fn build_prepare_rename(
 
     match &target {
         SymbolTarget::Local { symbol_id, .. } => {
-            if *symbol_id >= state.db.arena.len() {
+            if *symbol_id >= state.db.bind.arena.len() {
                 return None;
             }
-            let sym = state.db.arena.get(*symbol_id);
+            let sym = state.db.bind.arena.get(*symbol_id);
             if sym.origin_module.is_some() {
                 return None;
             }
@@ -49,7 +49,7 @@ pub fn build_rename(
     let target = state.symbol_target_at_offset(token.offset)?;
 
     let target_name = match &target {
-        SymbolTarget::Local { .. } => token.lexeme.as_str(),
+        SymbolTarget::Local { .. } => state.lexeme(token),
         SymbolTarget::Global { canonical_name, .. } => canonical_name.as_str(),
         SymbolTarget::Member { member_name, .. } => member_name.as_str(),
     };
@@ -129,7 +129,7 @@ fn collect_rename_edits_in_document(
             if !matches!(t.kind, TokenKind::Identifier) && !t.kind.can_be_identifier() {
                 return false;
             }
-            if t.lexeme != target_name {
+            if file_state.lexeme(t) != target_name {
                 return false;
             }
             file_state.symbol_target_at_offset(t.offset).as_ref() == Some(target)

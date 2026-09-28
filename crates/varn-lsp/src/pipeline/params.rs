@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::document::TokenRecord;
+use crate::document::{token_lexeme, TokenRecord};
 use varn_core::TokenKind;
 
 pub fn collect_type_params(
+    source: &str,
     tokens: &[TokenRecord],
 ) -> (HashMap<String, Vec<String>>, HashSet<String>) {
     let mut name_to_params: HashMap<String, Vec<String>> = HashMap::new();
@@ -21,8 +22,8 @@ pub fn collect_type_params(
                     TokenKind::Class | TokenKind::Interface | TokenKind::Type | TokenKind::Function
                 )
             {
-                let sym_name = prev.lexeme.clone();
-                let params = collect_type_param_names(tokens, i);
+                let sym_name = token_lexeme(source, prev).to_owned();
+                let params = collect_type_param_names(source, tokens, i);
                 for p in &params {
                     all_names.insert(p.clone());
                 }
@@ -35,7 +36,11 @@ pub fn collect_type_params(
     (name_to_params, all_names)
 }
 
-fn collect_type_param_names(tokens: &[TokenRecord], langle_idx: usize) -> Vec<String> {
+fn collect_type_param_names(
+    source: &str,
+    tokens: &[TokenRecord],
+    langle_idx: usize,
+) -> Vec<String> {
     let mut params = Vec::new();
     let mut depth = 1i32;
     let mut j = langle_idx + 1;
@@ -52,7 +57,7 @@ fn collect_type_param_names(tokens: &[TokenRecord], langle_idx: usize) -> Vec<St
             TokenKind::Identifier if depth == 1 => {
                 let prev_kind = tokens[j - 1].kind;
                 if matches!(prev_kind, TokenKind::LAngle | TokenKind::Comma) {
-                    params.push(tokens[j].lexeme.clone());
+                    params.push(token_lexeme(source, &tokens[j]).to_owned());
                 }
             }
             _ => {}

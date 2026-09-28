@@ -7,7 +7,6 @@ mod symbol_queries;
 mod symbol_view;
 mod types;
 
-use rustc_hash::FxHashMap;
 use std::collections::{HashMap, HashSet};
 
 use varn_checker::{SymbolKind, Type};
@@ -45,7 +44,18 @@ pub struct TokenRecord {
     pub col: u32,
     pub length: u32,
     pub offset: u32,
-    pub lexeme: String,
+    /// Byte end offset into the document source. The lexeme is never stored:
+    /// one `String` per token duplicated ~0.7x the source plus 24B overhead
+    /// each. Resolve it with [`token_lexeme`] / [`DocumentState::lexeme`].
+    pub end: u32,
+}
+
+/// Lexeme of `tok` as a slice of `source`.
+///
+/// `offset`/`end` are the byte offsets the lexer guarantees for the same
+/// slicing `Token::get_lexeme` performs — no new panic class.
+pub fn token_lexeme<'a>(source: &'a str, tok: &TokenRecord) -> &'a str {
+    &source[tok.offset as usize..tok.end as usize]
 }
 
 #[derive(Debug)]
@@ -101,15 +111,9 @@ pub struct DocumentState {
     pub diagnostics: Vec<LspDiag>,
     /// The symbols this document declares or imports, by arena id.
     ///
-    /// Ids, not records: the symbol itself lives in `db.arena`, and what the
+    /// Ids, not records: the symbol itself lives in `db.bind.arena`, and what the
     /// editor adds to it is derived on demand by [`SymbolView`].
     pub symbols: Vec<varn_checker::SymbolId>,
-    /// The type each symbol resolved to during this analysis.
-    ///
-    /// Kept as one map rather than cloned into every symbol. It preserves the
-    /// pipeline's original rule exactly: the type recorded for the symbol's own
-    /// offset when it is not `dynamic`, else the declared type.
-    pub resolved_types: FxHashMap<varn_checker::SymbolId, Type>,
     pub tokens: Vec<TokenRecord>,
     /// Comments, in source order. Parallel to `tokens`, never mixed into them —
     /// see [`varn_core::Trivia`].
@@ -180,6 +184,11 @@ impl DocumentState {
         self.db.name(atom)
     }
 
+    /// The lexeme of `tok`, borrowed from this document's source.
+    pub fn lexeme(&self, tok: &TokenRecord) -> &str {
+        token_lexeme(&self.source, tok)
+    }
+
     /// `ty` as source text.
     pub fn ty_text(&self, ty: &Type) -> String {
         self.db.ty_text(ty)
@@ -195,12 +204,12 @@ impl DocumentState {
     pub fn symbol(&self, id: varn_checker::SymbolId) -> SymbolView<'_> {
         SymbolView {
             id,
-            sym: self.db.arena.get(id),
-            uri: &self.uri,
+            sym: self.db.bind.arena.get(id),
             ty: self
-                .resolved_types
+                .db
+                .symbol_types
                 .get(&id)
-                .or(self.db.arena.get(id).ty.as_ref())
+                .or(self.db.bind.arena.get(id).ty.as_ref())
                 .unwrap_or(&symbol_view::DYNAMIC_TY),
             db: &self.db,
         }
@@ -227,13 +236,16 @@ impl DocumentState {
             }
         }
         let token = self.tokens.iter().find(|t| t.offset == offset)?;
-        if let Some((sid, _)) = self.db.resolve_at(&token.lexeme, token.offset) {
+        if let Some((sid, _)) = self.db.resolve_at(self.lexeme(token), token.offset) {
             return Some(sid);
         }
-        let atom = self.db.bind.interner.get(&token.lexeme);
-        if let Some(sid) =
-            atom.and_then(|a| self.db.arena.find_id_by_name_and_line(a, token.line + 1))
-        {
+        let atom = self.db.bind.interner.get(self.lexeme(token));
+        if let Some(sid) = atom.and_then(|a| {
+            self.db
+                .bind
+                .arena
+                .find_id_by_name_and_line(a, token.line + 1)
+        }) {
             return Some(sid);
         }
 
@@ -241,10 +253,10 @@ impl DocumentState {
     }
 
     pub fn symbol_target_for_id(&self, id: varn_checker::SymbolId) -> Option<SymbolTarget> {
-        if id >= self.db.arena.len() {
+        if id >= self.db.bind.arena.len() {
             return None;
         }
-        let sym = self.db.arena.get(id);
+        let sym = self.db.bind.arena.get(id);
         let name = self.name(sym.name).to_owned();
         if let Some(origin_mod) = sym.origin_module.map(|a| self.name(a)) {
             let canonical_name = sym
@@ -268,6 +280,7 @@ impl DocumentState {
 
         let is_global = self
             .db
+            .bind
             .scopes
             .get(self.db.global_scope)
             .bindings
@@ -307,63 +320,5 @@ impl DocumentState {
         }
         let sid = self.resolve_symbol_id_at_offset(offset)?;
         self.symbol_target_for_id(sid)
-    }
-
-    pub fn symbol_global_key_for_id(&self, id: varn_checker::SymbolId) -> Option<String> {
-        if id >= self.db.arena.len() {
-            return None;
-        }
-        let sym = self.db.arena.get(id);
-        let name = self.name(sym.name);
-        let kind = sym.kind;
-        let origin = sym.origin_module.map(|a| self.name(a));
-        let original_name = sym.original_name.map(|a| self.name(a));
-
-        if let Some(origin_mod) = origin {
-            let canonical_name = original_name.unwrap_or(name);
-            let origin_uri = if origin_mod.starts_with("file://")
-                || origin_mod.starts_with("std:")
-                || origin_mod.starts_with("core:")
-                || origin_mod.starts_with("runtime:")
-            {
-                origin_mod.to_owned()
-            } else {
-                varn_modules::resolver::path_to_uri(origin_mod)
-            };
-            return Some(format!("m:{}#{kind:?}:{}", origin_uri, canonical_name));
-        }
-
-        let is_global = self
-            .db
-            .scopes
-            .get(self.db.global_scope)
-            .bindings
-            .values()
-            .any(|&sid| sid == id);
-        let norm_uri = if self.uri.starts_with("file://")
-            || self.uri.starts_with("std:")
-            || self.uri.starts_with("core:")
-            || self.uri.starts_with("runtime:")
-        {
-            self.uri.to_owned()
-        } else {
-            varn_modules::resolver::path_to_uri(&self.uri)
-        };
-
-        if is_global {
-            Some(format!("m:{}#{kind:?}:{}", norm_uri, name))
-        } else {
-            Some(format!("u:{}#{kind:?}:{}", norm_uri, id))
-        }
-    }
-
-    pub fn token_global_key(&self, offset: u32) -> Option<String> {
-        if let Some(token) = self.tokens.iter().find(|t| t.offset == offset) {
-            if let Some((parent_name, member)) = self.member_at_pos(token.line, token.col) {
-                return Some(format!("member:{}:{}", parent_name, member.name));
-            }
-        }
-        let sid = self.resolve_symbol_id_at_offset(offset)?;
-        self.symbol_global_key_for_id(sid)
     }
 }

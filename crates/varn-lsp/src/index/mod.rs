@@ -7,9 +7,14 @@ use varn_checker::SymbolKind;
 #[derive(Debug, Clone)]
 pub struct ExportEntry {
     pub name: String,
-    pub global_key: String,
     pub kind: SymbolKind,
-    pub uri: String,
+    /// Un solo `Arc<str>` por archivo, compartido por sus N entradas: el uri
+    /// como `String` por entrada costaba N×len(uri) (H4).
+    pub uri: Arc<str>,
+    /// Owner type name for member entries; `None` for top-level symbols.
+    /// Replaces the formatted `member:{parent}:{member}` global key: member
+    /// identity is structural now, compared field-wise, never rendered.
+    pub parent: Option<Arc<str>>,
     pub line: u32,
     pub col: u32,
     pub type_str: String,
@@ -51,7 +56,7 @@ impl ProjectIndex {
     pub fn remove_file(&mut self, uri: &str) {
         self.module_exports.remove(uri);
         for entries in self.name_index.values_mut() {
-            entries.retain(|e| e.uri != uri);
+            entries.retain(|e| e.uri.as_ref() != uri);
         }
         self.name_index.retain(|_, v| !v.is_empty());
 

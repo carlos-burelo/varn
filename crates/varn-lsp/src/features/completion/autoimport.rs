@@ -47,8 +47,8 @@ pub fn build_autoimport_completions(
 
         let entry_opt = entries
             .iter()
-            .find(|e| e.uri != doc_uri && is_stdlib_uri(&e.uri))
-            .or_else(|| entries.iter().find(|e| e.uri != doc_uri));
+            .find(|e| e.uri.as_ref() != doc_uri && is_stdlib_uri(&e.uri))
+            .or_else(|| entries.iter().find(|e| e.uri.as_ref() != doc_uri));
 
         let Some(entry) = entry_opt else {
             continue;

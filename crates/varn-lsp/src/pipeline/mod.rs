@@ -8,46 +8,6 @@ use varn_checker::SymbolKind;
 use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
 
-pub(super) fn stable_global_key(
-    uri: &str,
-    name: &str,
-    kind: SymbolKind,
-    symbol_id: Option<usize>,
-    origin: Option<&str>,
-    original_name: Option<&str>,
-    is_global: bool,
-) -> String {
-    if let Some(origin_mod) = origin {
-        let canonical_name = original_name.unwrap_or(name);
-        let origin_uri = if origin_mod.starts_with("file://")
-            || origin_mod.starts_with("std:")
-            || origin_mod.starts_with("core:")
-            || origin_mod.starts_with("runtime:")
-        {
-            origin_mod.to_owned()
-        } else {
-            varn_modules::resolver::path_to_uri(origin_mod)
-        };
-        return format!("m:{}#{kind:?}:{}", origin_uri, canonical_name);
-    }
-    let norm_uri = if uri.starts_with("file://")
-        || uri.starts_with("std:")
-        || uri.starts_with("core:")
-        || uri.starts_with("runtime:")
-    {
-        uri.to_owned()
-    } else {
-        varn_modules::resolver::path_to_uri(uri)
-    };
-    if is_global {
-        return format!("m:{}#{kind:?}:{}", norm_uri, name);
-    }
-    if let Some(sid) = symbol_id {
-        return format!("u:{}#{kind:?}:{}", norm_uri, sid);
-    }
-    format!("u:{}#{kind:?}:{}", norm_uri, name)
-}
-
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
@@ -71,6 +31,15 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
+    // Inicios de línea una sola vez: el `rfind('\n')` por token re-escaneaba
+    // la línea desde cada token (O(tokens × largo-línea)). Con la tabla +
+    // búsqueda binaria cada token cuesta O(log líneas) y el scan total es O(n).
+    let mut line_starts: Vec<usize> = vec![0];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' {
+            line_starts.push(i + 1);
+        }
+    }
     let tokens: Vec<TokenRecord> = raw_tokens
         .iter()
         .filter(|t| {
@@ -84,17 +53,19 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             )
         })
         .map(|t| {
-            let lex = t.get_lexeme(&lexeme_buf);
             let start_byte = t.range.start.offset as usize;
             let end_byte = t.range.end.offset as usize;
-            let line_start_byte = source[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_idx = line_starts
+                .partition_point(|&s| s <= start_byte)
+                .saturating_sub(1);
+            let line_start_byte = line_starts.get(line_idx).copied().unwrap_or(0);
             TokenRecord {
                 kind: t.kind,
                 line: t.range.start.line.saturating_sub(1),
                 col: source[line_start_byte..start_byte].chars().count() as u32,
                 length: source[start_byte..end_byte].chars().count() as u32,
                 offset: t.range.start.offset,
-                lexeme: lex.to_string(),
+                end: t.range.end.offset,
             }
         })
         .collect();
@@ -181,9 +152,11 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         );
     }
 
-    // Ids and one type map, not twenty fields per symbol. The rule for the
-    // type is the one this used to bake into each record: the type recorded at
-    // the symbol's own offset when it is not `dynamic`, else the declared type.
+    // The one type map (Ley 6): the type recorded at the symbol's own offset
+    // when it is not `dynamic`, else the declared type. The checker's own
+    // `symbol_types` output is NOT merged: `Checker::check` already folded its
+    // finalize pass into `bind.arena` (`sym.ty`), so `recorded.or(sym.ty)`
+    // below carries it. Keeping the second map only doubled lookups.
     let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
         rustc_hash::FxHashMap::default();
     let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
@@ -207,7 +180,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     // Type-parameter names: the token scan, plus every `TypeParameter` the
     // checker bound. Feeds semantic tokens, which has no other way to know a
     // bare name in a type annotation is a parameter.
-    let (_type_param_map, mut type_param_names) = params::collect_type_params(&tokens);
+    let (_type_param_map, mut type_param_names) = params::collect_type_params(&source, &tokens);
     for &id in &all_symbols {
         let sym = result.bind.arena.get(id);
         if sym.kind == SymbolKind::TypeParameter {
@@ -218,12 +191,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let import_paths = collect_import_paths(&program.body, &ast_arena, &result.bind.interner);
 
     let global_scope = result.bind.global_scope;
-    // Looks like duplication with `db.arena`/`db.scopes` below if you only
-    // grep varn-lsp — but varn_checker::get_members_of_type and friends take
-    // `&BindResult` and read `bind.arena`/`bind.scopes` themselves, so `bind`
-    // needs its own live copies too. The clone is the real cost, not a bug.
-    let scopes = result.bind.scopes.clone();
-    let arena = result.bind.arena.clone();
 
     let spatial_index = crate::query::SpatialIndex::build(&program, &ast_arena);
 
@@ -232,9 +199,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         expr_types: result.expr_types,
         node_scopes: result.node_scopes,
         scope_spans: result.scope_spans,
-        symbol_types: result.symbol_types,
-        arena,
-        scopes,
+        symbol_types: resolved_types,
         global_scope,
         flattened_members: result
             .flattened_members
@@ -255,7 +220,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         uri,
         diagnostics,
         symbols: all_symbols,
-        resolved_types,
         tokens,
         trivia,
         symbol_map,

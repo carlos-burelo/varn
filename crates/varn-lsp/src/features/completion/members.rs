@@ -148,17 +148,17 @@ pub fn dot_receiver(
     if let Some(info) = state.expr_info_at_token(before) {
         let is_instance = !info
             .symbol_id
-            .filter(|s| *s < state.db.arena.len())
-            .is_some_and(|sid| names_a_type(state.db.arena.get(sid).kind));
+            .filter(|s| *s < state.db.bind.arena.len())
+            .is_some_and(|sid| names_a_type(state.db.bind.arena.get(sid).kind));
         return Some(ReceiverInfo {
             ty: state.db.non_null(&info.ty),
             is_instance,
         });
     }
 
-    if let Some((sid, ty)) = state.db.resolve_at(&before.lexeme, before.offset) {
-        if sid < state.db.arena.len() {
-            let is_instance = !names_a_type(state.db.arena.get(sid).kind);
+    if let Some((sid, ty)) = state.db.resolve_at(state.lexeme(before), before.offset) {
+        if sid < state.db.bind.arena.len() {
+            let is_instance = !names_a_type(state.db.bind.arena.get(sid).kind);
             return Some(ReceiverInfo { ty, is_instance });
         }
     }
@@ -215,9 +215,9 @@ fn dot_receiver_source_fallback(
     }
     let (sid, ty) = state
         .db
-        .resolve_at(&receiver_tok.lexeme, receiver_tok.offset)?;
-    if sid < state.db.arena.len() {
-        let sym = state.db.arena.get(sid);
+        .resolve_at(state.lexeme(receiver_tok), receiver_tok.offset)?;
+    if sid < state.db.bind.arena.len() {
+        let sym = state.db.bind.arena.get(sid);
         if names_a_type(sym.kind) {
             return Some(ReceiverInfo {
                 ty: state.db.named_type(state.name(sym.name)),

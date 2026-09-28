@@ -4,7 +4,7 @@ use varn_core::{TokenKind, Trivia, TriviaKind};
 use crate::document::{DocumentState, TokenRecord};
 
 pub fn build_folding_ranges(state: &DocumentState) -> Vec<FoldingRange> {
-    let mut ranges = fold_tokens(&state.tokens);
+    let mut ranges = fold_tokens(&state.source, &state.tokens);
     ranges.extend(fold_comments(&state.trivia));
     ranges
 }
@@ -57,7 +57,7 @@ fn push_comment_fold(ranges: &mut Vec<FoldingRange>, start_line: u32, end_line: 
     }
 }
 
-pub fn fold_tokens(tokens: &[TokenRecord]) -> Vec<FoldingRange> {
+pub fn fold_tokens(source: &str, tokens: &[TokenRecord]) -> Vec<FoldingRange> {
     let mut ranges = Vec::new();
     let mut brace_stack: Vec<(u32, usize)> = Vec::new();
     let mut bracket_stack: Vec<u32> = Vec::new();
@@ -70,7 +70,8 @@ pub fn fold_tokens(tokens: &[TokenRecord]) -> Vec<FoldingRange> {
             TokenKind::RBrace => {
                 if let Some((start, open_idx)) = brace_stack.pop() {
                     if tok.line > start {
-                        let kind = classify_brace_kind(tokens, open_idx, start, &import_lines);
+                        let kind =
+                            classify_brace_kind(source, tokens, open_idx, start, &import_lines);
                         ranges.push(fold(start, tok.line, kind));
                     }
                 }
@@ -91,6 +92,7 @@ pub fn fold_tokens(tokens: &[TokenRecord]) -> Vec<FoldingRange> {
 }
 
 fn classify_brace_kind(
+    source: &str,
     tokens: &[TokenRecord],
     open_idx: usize,
     brace_line: u32,
@@ -115,7 +117,8 @@ fn classify_brace_kind(
                     | TokenKind::Interface
                     | TokenKind::Namespace
                     | TokenKind::Enum
-            ) || (t.kind == TokenKind::Identifier && is_region_keyword(&t.lexeme))
+            ) || (t.kind == TokenKind::Identifier
+                && is_region_keyword(crate::document::token_lexeme(source, t)))
         });
 
     if trigger.is_some() {

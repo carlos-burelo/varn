@@ -85,13 +85,13 @@ pub fn resolve_token(
     }
 
     if let Some(info) = state.db.expr_types.get(&tok.offset) {
-        if let Some(sid) = info.symbol_id.filter(|s| *s < state.db.arena.len()) {
-            let sym = state.db.arena.get(sid);
+        if let Some(sid) = info.symbol_id.filter(|s| *s < state.db.bind.arena.len()) {
+            let sym = state.db.bind.arena.get(sid);
             // The symbol_id is only authoritative when it names this very token.
             // For some members the checker records the member's *type* symbol
             // (e.g. `arr.length` → the `int` class), which must not paint the
             // member as a class.
-            if state.name(sym.name) == tok.lexeme.as_str() {
+            if state.name(sym.name) == state.lexeme(tok) {
                 return Some(tt_from_symbol(state, sym.kind, &info.ty, prev_is_dot));
             }
             if prev_is_dot {
@@ -123,24 +123,24 @@ pub fn resolve_token(
     }
 
     // (3) Lexical scope resolution: locals, globals.
-    if let Some((sid, ty)) = state.db.resolve_at(&tok.lexeme, tok.offset) {
-        if sid < state.db.arena.len() {
+    if let Some((sid, ty)) = state.db.resolve_at(state.lexeme(tok), tok.offset) {
+        if sid < state.db.bind.arena.len() {
             return Some(tt_from_symbol(
                 state,
-                state.db.arena.get(sid).kind,
+                state.db.bind.arena.get(sid).kind,
                 &ty,
                 prev_is_dot,
             ));
         }
     }
 
-    if is_lang_type_name(&tok.lexeme) {
+    if is_lang_type_name(state.lexeme(tok)) {
         return Some(TT_TYPE);
     }
     // Type parameters: exposed by the checker as TypeParameter symbols, but
     // references inside type annotations are not recorded per-offset. The name
     // set is built from those symbols (checker-sourced), not a token scan.
-    if state.type_param_names.contains(tok.lexeme.as_str()) {
+    if state.type_param_names.contains(state.lexeme(tok)) {
         return Some(TT_TYPE_PARAMETER);
     }
     if tok.kind.is_keyword() {

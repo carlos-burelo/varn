@@ -78,7 +78,10 @@ pub fn build_call_argument_completions(
             push_constructor_params(state, state.name(name), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
-        if let Some(sym) = state.symbols().find(|s| s.name() == callee_tok.lexeme) {
+        if let Some(sym) = state
+            .symbols()
+            .find(|s| s.name() == state.lexeme(callee_tok))
+        {
             if let Some(f) = state.db.fn_shape(sym.ty()) {
                 fn_params.extend(
                     f.params
@@ -86,7 +89,7 @@ pub fn build_call_argument_completions(
                         .filter_map(|p| p.name.as_deref().map(str::to_owned)),
                 );
             } else if matches!(sym.kind(), varn_checker::SymbolKind::Class) {
-                push_constructor_params(state, &callee_tok.lexeme, &mut fn_params);
+                push_constructor_params(state, state.lexeme(callee_tok), &mut fn_params);
             }
         }
     }
@@ -102,7 +105,7 @@ pub fn build_call_argument_completions(
             && i + 1 < state.tokens.len()
             && state.tokens[i + 1].kind == TokenKind::Colon
         {
-            provided_named_args.insert(t.lexeme.clone());
+            provided_named_args.insert(state.lexeme(t).to_owned());
         }
     }
 

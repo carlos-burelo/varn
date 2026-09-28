@@ -1,7 +1,6 @@
 //! What the checker decided about a document, kept for the editor's queries.
 
 use rustc_hash::FxHashMap;
-use varn_checker::{ScopeArena, SymbolArena};
 
 pub struct SemanticDB {
     pub expr_table: FxHashMap<varn_core::ast::AstId, varn_checker::TypeEntry>,
@@ -9,12 +8,15 @@ pub struct SemanticDB {
     pub expr_types: FxHashMap<u32, varn_checker::ExprInfo>,
     pub node_scopes: FxHashMap<u32, varn_checker::ScopeId>,
     pub scope_spans: Vec<varn_checker::checker::ScopeSpan>,
+    /// THE type map (Ley 6): one entry per symbol the pipeline resolved, by
+    /// the recorded-else-declared rule. Readers fall back to `bind.arena`'s
+    /// `sym.ty` (which already carries the checker's finalize pass) and then
+    /// to dynamic — the chain lives once per reader, the table once here.
     pub symbol_types: FxHashMap<varn_checker::SymbolId, varn_checker::Type>,
 
-    pub arena: SymbolArena,
-
-    pub scopes: ScopeArena,
-
+    /// Sin copia propia de arenas: el dueño canónico es `bind` (una sola
+    /// `SymbolArena` + una sola `ScopeArena` por documento). El clon que hubo
+    /// aquí duplicaba ambas por archivo abierto.
     pub global_scope: varn_checker::ScopeId,
 
     pub flattened_members: FxHashMap<String, Vec<varn_checker::types::ClassMemberInfo>>,
@@ -62,14 +64,14 @@ impl SemanticDB {
         cursor_offset: u32,
     ) -> Option<(varn_checker::SymbolId, varn_checker::Type)> {
         let scope_id = self.scope_at_offset(cursor_offset);
-        let scope = self.scopes.get(scope_id);
+        let scope = self.bind.scopes.get(scope_id);
         let atom = self.bind.interner.get(name)?;
-        let sym_id = scope.resolve(atom, &self.scopes)?;
+        let sym_id = scope.resolve(atom, &self.bind.scopes)?;
         let ty = self
             .symbol_types
             .get(&sym_id)
             .cloned()
-            .or_else(|| self.arena.get(sym_id).ty)
+            .or_else(|| self.bind.arena.get(sym_id).ty)
             .unwrap_or_default();
         Some((sym_id, ty))
     }

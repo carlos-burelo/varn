@@ -16,10 +16,10 @@ pub fn prepare_call_hierarchy(
     col: u32,
 ) -> Option<Vec<CallHierarchyItem>> {
     let token = state.identifier_token_at(line, col)?;
-    let target_name = &token.lexeme;
+    let target_name = state.lexeme(token);
 
     for sym in state.symbols() {
-        if sym.name() == *target_name
+        if sym.name() == target_name
             && matches!(sym.kind(), SymbolKind::Function | SymbolKind::Method)
             && sym.line() != u32::MAX
         {
@@ -53,7 +53,10 @@ pub fn prepare_call_hierarchy(
                 uri: url,
                 range,
                 selection_range,
-                data: Some(serde_json::Value::String(sym.global_key(true))),
+                // Nada: `incoming/outgoing` resuelven por `(uri, name)`, nunca
+                // leen `data`. El `global_key` que viajaba aquí no tenía
+                // lector en ningún lado.
+                data: None,
             };
             return Some(vec![item]);
         }

@@ -84,9 +84,13 @@ fn memory_stats(workspace: &Workspace) -> serde_json::Value {
         let state = entry.value();
         source_bytes += state.source.len() as u64;
         token_count += state.tokens.len() as u64;
-        token_lexeme_bytes += state.tokens.iter().map(|t| t.lexeme.len() as u64).sum::<u64>();
-        symbol_count += state.db.arena.all().len() as u64;
-        scope_count += state.db.scopes.len() as u64;
+        token_lexeme_bytes += state
+            .tokens
+            .iter()
+            .map(|t| (t.end - t.offset) as u64)
+            .sum::<u64>();
+        symbol_count += state.db.bind.arena.all().len() as u64;
+        scope_count += state.db.bind.scopes.len() as u64;
         per_doc_interner_entries += state.db.bind.interner.len() as u64;
         let n = state.ast_arena.exprs().count() as u64;
         expr_node_count += n;

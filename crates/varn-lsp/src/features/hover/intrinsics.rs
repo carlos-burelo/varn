@@ -1,9 +1,9 @@
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 use varn_core::TokenKind;
 
-use crate::document::TokenRecord;
+use crate::document::{DocumentState, TokenRecord};
 
-pub fn intrinsic_or_keyword_hover(tok: &TokenRecord) -> Option<Hover> {
+pub fn intrinsic_or_keyword_hover(state: &DocumentState, tok: &TokenRecord) -> Option<Hover> {
     match tok.kind {
         TokenKind::True => Some(make_doc_hover(
             "true: bool",
@@ -41,7 +41,7 @@ pub fn intrinsic_or_keyword_hover(tok: &TokenRecord) -> Option<Hover> {
             "super",
             "Referencia a la clase base inmediata para invocar constructores o métodos heredados.",
         )),
-        TokenKind::Identifier => match tok.lexeme.as_str() {
+        TokenKind::Identifier => match state.lexeme(tok) {
             "int" => Some(make_doc_hover(
                 "type int",
                 "Entero de 64 bits con operaciones aritméticas nativas de hardware y desbordamiento controlado.",

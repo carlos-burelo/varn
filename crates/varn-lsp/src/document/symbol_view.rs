@@ -15,7 +15,6 @@ use super::SemanticDB;
 pub struct SymbolView<'a> {
     pub id: varn_checker::SymbolId,
     pub sym: &'a varn_checker::symbol::Symbol,
-    pub(super) uri: &'a str,
     pub(super) ty: &'a Type,
     /// The atom and type tables the symbol's names and type index into.
     pub(super) db: &'a SemanticDB,
@@ -136,16 +135,5 @@ impl<'a> SymbolView<'a> {
                 .join(", "),
             None => String::new(),
         }
-    }
-    pub fn global_key(&self, is_global: bool) -> String {
-        crate::pipeline::stable_global_key(
-            self.uri,
-            self.name(),
-            self.kind(),
-            Some(self.id),
-            self.origin(),
-            self.sym.original_name.map(|a| self.text(a)),
-            is_global,
-        )
     }
 }

@@ -9,15 +9,18 @@ use crate::document::{import::uri_to_path, DocumentState};
 use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
+    // Un solo `Arc<str>` por archivo: sus N entradas lo comparten en vez de
+    // clonar el uri en N `String`s (H4 medía N×len(uri) bytes).
+    let uri_shared: Arc<str> = Arc::from(uri);
     let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
         .filter(|s| is_indexable(s.kind(), s.line()))
         .map(|s| {
             Arc::new(ExportEntry {
                 name: s.name().to_owned(),
-                global_key: s.global_key(true),
                 kind: s.kind(),
-                uri: uri.to_owned(),
+                uri: Arc::clone(&uri_shared),
+                parent: None,
                 line: s.line(),
                 col: s.col(),
                 type_str: s.type_str(),
@@ -27,7 +30,7 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .collect();
 
     for sym in state.symbols().filter(|s| is_indexable(s.kind(), s.line())) {
-        collect_member_exports(state, uri, sym, &mut exports);
+        collect_member_exports(state, &uri_shared, sym, &mut exports);
     }
 
     for export in &exports {
@@ -84,17 +87,21 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
 /// source of its own, and an index entry pointing nowhere is worse than none.
 fn collect_member_exports(
     state: &crate::document::DocumentState,
-    uri: &str,
+    uri: &Arc<str>,
     sym: SymbolView<'_>,
     out: &mut Vec<Arc<ExportEntry>>,
 ) {
+    // `parent` perezoso: la mayoría de símbolos no tiene miembros indexables
+    // y no debe pagar ni un alloc por ellos.
+    let mut parent: Option<Arc<str>> = None;
     for m in state.members_of(sym) {
         let Some(line) = m.def_line else { continue };
+        let parent = parent.get_or_insert_with(|| Arc::from(sym.name()));
         out.push(Arc::new(ExportEntry {
             name: m.name.to_string(),
-            global_key: format!("member:{}:{}", sym.name(), m.name),
             kind: summary_to_symbol_kind(m.kind),
-            uri: uri.to_owned(),
+            uri: Arc::clone(uri),
+            parent: Some(Arc::clone(parent)),
             line: line.saturating_sub(1),
             col: m.def_col,
             type_str: state.ty_text(&m.ty),

@@ -13,10 +13,10 @@ pub fn build_scope_completions(state: &DocumentState, line: u32, col: u32) -> Ve
     let mut seen_names = std::collections::HashSet::new();
 
     loop {
-        let scope = state.db.scopes.get(scope_id);
+        let scope = state.db.bind.scopes.get(scope_id);
 
         for &symbol_id in &scope.ordered {
-            let sym = state.db.arena.get(symbol_id);
+            let sym = state.db.bind.arena.get(symbol_id);
             let name = state.name(sym.name);
             if seen_names.insert(name) {
                 let ty = state

@@ -136,10 +136,10 @@ impl DocumentState {
             let is_fn = matches!(self.db.ty_kind(&entry.ty), varn_core::TypeKind::Fn(_));
 
             if let Some(sid) = entry.symbol_id {
-                if sid < self.db.arena.len() {
-                    let sym = self.db.arena.get(sid);
+                if sid < self.db.bind.arena.len() {
+                    let sym = self.db.bind.arena.get(sid);
 
-                    let sid_matches = self.name(sym.name) == tok.lexeme.as_str();
+                    let sid_matches = self.name(sym.name) == self.lexeme(tok);
 
                     let is_member_kind = sid_matches
                         && matches!(
@@ -191,7 +191,7 @@ impl DocumentState {
                         let parent_name = self.resolve_receiver_type_name_at(tok);
                         return Some(ChainResult::Member {
                             member: summary_of(
-                                std::sync::Arc::from(tok.lexeme.as_str()),
+                                std::sync::Arc::from(self.lexeme(tok)),
                                 entry.ty,
                                 if is_fn {
                                     varn_checker::ResolvedMemberKind::Method
@@ -226,7 +226,7 @@ impl DocumentState {
                 }
                 return Some(ChainResult::Member {
                     member: summary_of(
-                        std::sync::Arc::from(tok.lexeme.as_str()),
+                        std::sync::Arc::from(self.lexeme(tok)),
                         entry.ty,
                         if is_fn {
                             varn_checker::ResolvedMemberKind::Method
@@ -271,9 +271,9 @@ impl DocumentState {
 
         let prev_tok = &self.tokens[tok_idx - 2];
         if prev_tok.kind == TokenKind::Identifier || prev_tok.kind.can_be_identifier() {
-            if let Some((sid, ty)) = self.db.resolve_at(&prev_tok.lexeme, prev_tok.offset) {
-                if sid < self.db.arena.len() {
-                    let sym = self.db.arena.get(sid);
+            if let Some((sid, ty)) = self.db.resolve_at(self.lexeme(prev_tok), prev_tok.offset) {
+                if sid < self.db.bind.arena.len() {
+                    let sym = self.db.bind.arena.get(sid);
                     if matches!(
                         sym.kind,
                         SymbolKind::Class
@@ -282,14 +282,14 @@ impl DocumentState {
                             | SymbolKind::Struct
                             | SymbolKind::Namespace
                     ) {
-                        return prev_tok.lexeme.clone();
+                        return self.lexeme(prev_tok).to_owned();
                     }
                 }
                 if let Some(name) = self.db.decl_name(&ty) {
                     return name;
                 }
             }
-            return prev_tok.lexeme.clone();
+            return self.lexeme(prev_tok).to_owned();
         }
 
         DYNAMIC.to_string()

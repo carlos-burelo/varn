@@ -46,9 +46,13 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
     let fn_tok = call_idx.checked_sub(1).and_then(|i| before.get(i))?;
 
     // 1. Direct Checker type info or lexical scope resolution on callee token
-    if let Some(resolved) =
-        resolve_callee_signature(state, fn_tok.line, fn_tok.col, &fn_tok.lexeme, active_param)
-    {
+    if let Some(resolved) = resolve_callee_signature(
+        state,
+        fn_tok.line,
+        fn_tok.col,
+        state.lexeme(fn_tok),
+        active_param,
+    ) {
         return Some(resolved);
     }
 
@@ -67,7 +71,7 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
                 None => (String::new(), state.ty_text(&member.ty)),
             },
         };
-        return build_signature_response(&fn_tok.lexeme, &params_str, &ret_str, active_param);
+        return build_signature_response(state.lexeme(fn_tok), &params_str, &ret_str, active_param);
     }
 
     None

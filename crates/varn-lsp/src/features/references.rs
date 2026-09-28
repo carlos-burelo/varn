@@ -16,7 +16,7 @@ pub fn build_references(
 
     let target = state.symbol_target_at_offset(token.offset)?;
     let target_name = match &target {
-        SymbolTarget::Local { .. } => token.lexeme.as_str(),
+        SymbolTarget::Local { .. } => state.lexeme(token),
         SymbolTarget::Global { canonical_name, .. } => canonical_name.as_str(),
         SymbolTarget::Member { member_name, .. } => member_name.as_str(),
     };
@@ -83,7 +83,7 @@ fn collect_references_in_document(
         if !(t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier()) {
             continue;
         }
-        if t.lexeme != target_name {
+        if file_state.lexeme(t) != target_name {
             continue;
         }
         if file_state.symbol_target_at_offset(t.offset).as_ref() != Some(target) {

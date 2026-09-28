@@ -76,7 +76,7 @@ pub fn build_goto_definition(
 
     // 3. ProjectIndex remains only as a cross-module fallback.
     if let Some(idx) = index {
-        let defs = idx.definitions_of(&token.lexeme);
+        let defs = idx.definitions_of(state.lexeme(token));
         let locs: Vec<Location> = defs
             .iter()
             .filter_map(|entry| entry_location(&entry.uri, entry.line, entry.col))
@@ -94,10 +94,10 @@ pub fn build_goto_definition(
 }
 
 fn resolve_symbol_location(state: &DocumentState, sid: SymbolId) -> Option<Location> {
-    if sid >= state.db.arena.len() {
+    if sid >= state.db.bind.arena.len() {
         return None;
     }
-    let sym = state.db.arena.get(sid);
+    let sym = state.db.bind.arena.get(sid);
 
     let url = if let Some(origin) = &sym.origin_module {
         resolve_origin_to_url(state.name(*origin))?
@@ -142,11 +142,11 @@ fn resolve_member_location(
 ) -> Option<Location> {
     let idx = index?;
     let entries = idx.definitions_of(member_name);
-    // Equality, not a prefix. The key used to carry a trailing symbol id that
-    // the lookup had to ignore, so it matched by prefix — a key with a
-    // component nobody could use is a key in the wrong shape.
-    let key = format!("member:{parent_name}:{member_name}");
-    let entry_opt = entries.iter().find(|entry| entry.global_key == key);
+    // Estructural, no textual: el parent vive en su propio campo, no
+    // renderizado dentro de una clave `member:{parent}:{member}`.
+    let entry_opt = entries
+        .iter()
+        .find(|entry| entry.name == member_name && entry.parent.as_deref() == Some(parent_name));
     if let Some(entry) = entry_opt {
         let url = Url::parse(&entry.uri).ok()?;
         let pos = Position {

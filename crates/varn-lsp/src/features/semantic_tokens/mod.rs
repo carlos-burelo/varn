@@ -99,7 +99,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
         let prev2_is_enum = prev_is_dot
             && i >= 2
             && matches!(
-                state.symbol_map.get(tokens[i - 2].lexeme.as_str()),
+                state.symbol_map.get(state.lexeme(&tokens[i - 2])),
                 Some(SymbolKind::Enum)
             );
 
@@ -143,8 +143,8 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 .expr_types
                 .get(&tok.offset)
                 .and_then(|info| info.symbol_id)
-                .filter(|s| *s < state.db.arena.len())
-                .map(|s| state.db.arena.get(s).kind)
+                .filter(|s| *s < state.db.bind.arena.len())
+                .map(|s| state.db.bind.arena.get(s).kind)
                 == Some(SymbolKind::Const)
         {
             MOD_READONLY

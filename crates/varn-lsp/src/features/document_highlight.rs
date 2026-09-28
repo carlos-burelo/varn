@@ -18,7 +18,7 @@ pub fn build_document_highlights(
         return Vec::new();
     };
 
-    let name = tok.lexeme.as_str();
+    let name = state.lexeme(tok);
 
     let target_sid = state
         .db
@@ -28,8 +28,8 @@ pub fn build_document_highlights(
 
     if let Some(target_sid) = target_sid {
         let mut decl_positions = HashSet::new();
-        if target_sid < state.db.arena.len() {
-            let sym = state.db.arena.get(target_sid);
+        if target_sid < state.db.bind.arena.len() {
+            let sym = state.db.bind.arena.get(target_sid);
 
             decl_positions.insert((sym.line.saturating_sub(1), sym.col));
         }
@@ -70,7 +70,8 @@ pub fn build_document_highlights(
         .tokens
         .iter()
         .filter(|t| {
-            (t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) && t.lexeme == name
+            (t.kind == TokenKind::Identifier || t.kind.can_be_identifier())
+                && state.lexeme(t) == name
         })
         .map(|t| {
             let kind = if decl_positions.contains(&(t.line, t.col)) || is_assignment_lhs(state, t) {
