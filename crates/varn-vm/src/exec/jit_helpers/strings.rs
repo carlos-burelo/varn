@@ -5,6 +5,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow(field = "str_concat")]
 pub(crate) extern "C" fn jit_str_concat(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -20,6 +21,7 @@ pub(crate) extern "C" fn jit_str_concat(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "str_slice")]
 pub(crate) extern "C" fn jit_str_slice(
     ctx: *mut ExecCtx,
     s_tag: u64,
@@ -38,6 +40,7 @@ pub(crate) extern "C" fn jit_str_slice(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "str_length")]
 pub(crate) extern "C" fn jit_str_length(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;

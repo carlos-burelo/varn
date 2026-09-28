@@ -13,7 +13,7 @@ use crate::value::VmValue;
 /// register to the stack, so all roots are visible and get reloaded after.
 /// v2 (§3.5): el colector arma `ctx.poll`; el código hace `test al,al;
 /// jnz slow` (un byte, branch predecible) en vez de comparar longitudes inline.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "gc_safepoint")]
 pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -21,7 +21,7 @@ pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     }
 }
 
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "assert_not_null")]
 pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
@@ -31,7 +31,7 @@ pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     }
 }
 
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "close_upvalue")]
 pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;

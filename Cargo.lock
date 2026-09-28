@@ -2263,6 +2263,7 @@ dependencies = [
  "rustc-hash 1.1.0",
  "varn-abi",
  "varn-core",
+ "varn-op-macros",
  "varn-types",
 ]
 

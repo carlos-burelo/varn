@@ -4,18 +4,15 @@
 //! This is an ABI surface, not VM logic — one wrong or missing field is a
 //! jump to a null address from generated code, so it lives on its own.
 //!
-//! The function-address half is NOT written out here: it is expanded from
-//! [`varn_jit::jit_helper_abi`], the same list `varn-jit` builds the struct
-//! from. Adding a helper is one line there plus the function itself — it is
-//! no longer possible to add a field and forget to fill it, because both
-//! sides come from the one list.
+//! The function-address half is generated from the `#[jit_slow(field)]`
+//! annotations in `exec::jit_helpers`, the same source `varn-jit` builds the
+//! struct fields from. A helper is registered once, at its function.
 
 use crate::exec::ctx;
+use varn_op_macros::jit_helper_table;
 
-/// Fills every function-address field from the shared list, then the tail
-/// that is not a plain `fn as usize`.
-macro_rules! fill_jit_helpers {
-    ( $( $(#[$_attr:meta])* $field:ident => $vm_fn:ident ),* $(,)? ) => {{
+macro_rules! fill_tail {
+    ( $( $field:ident : $path:path ),* $(,)? ) => {{
         let array_layout = crate::heap::Heap::jit_array_layout();
         // `ExecCtx.stack` is a BARE `Vec<VmValue>`, so its data-pointer word is
         // at the bare-`Vec` ptr offset — NOT `elems_ptr_off`, which since the
@@ -27,8 +24,8 @@ macro_rules! fill_jit_helpers {
         let stack_data_offset =
             std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.slots_ptr_off;
         varn_jit::JitHelpers {
-            $( $field: ctx::$vm_fn as *const () as usize, )*
-            resolve_native_op: resolve_native_op_target,
+            $( $field: $path as *const () as usize, )*
+        resolve_native_op: resolve_native_op_target,
             array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),
             str_layout: crate::heap::Heap::jit_str_layout(),
@@ -68,12 +65,8 @@ macro_rules! fill_jit_helpers {
     }};
 }
 
-/// Build the production `JitHelpers` table. All fields are static (function
-/// addresses + host-struct offsets + probed layouts) — no live `ExecCtx`
-/// needed — so both `compile_jit` and the `vn debug -p clif` inspection path
-/// share this single source of truth.
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
-    varn_jit::jit_helper_abi!(fill_jit_helpers)
+    jit_helper_table!(fill, "src/exec/jit_helpers")
 }
 
 /// Compile-time op-id resolution for `CallNativeOp` codegen.

@@ -15,6 +15,7 @@ pub struct JitClassMemberArgs {
     pub kind: u8,
 }
 
+#[varn_op_macros::jit_slow(field = "get_super")]
 pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -38,6 +39,7 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     }
 }
 
+#[varn_op_macros::jit_slow(field = "declare_field")]
 pub(crate) extern "C" fn jit_declare_field(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -61,6 +63,7 @@ pub(crate) extern "C" fn jit_declare_field(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "make_class")]
 pub(crate) extern "C" fn jit_make_class(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -84,6 +87,7 @@ pub(crate) extern "C" fn jit_make_class(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "inherit")]
 pub(crate) extern "C" fn jit_inherit(
     ctx: *mut ExecCtx,
     class_tag: u64,
@@ -101,6 +105,7 @@ pub(crate) extern "C" fn jit_inherit(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "class_member_op")]
 pub(crate) extern "C" fn jit_class_member_op(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

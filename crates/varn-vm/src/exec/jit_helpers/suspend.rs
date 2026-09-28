@@ -27,6 +27,7 @@ pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_
     crate::exec::ctx::my_longjmp(buf, 2)
 }
 
+#[varn_op_macros::jit_slow(field = "spawn")]
 pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_tag: u64, task_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -35,7 +36,7 @@ pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_tag: u64, task_payloa
     }
 }
 
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "await_helper")]
 pub(crate) extern "C" fn jit_await(
     ctx: *mut ExecCtx,
     fut_tag: u64,
@@ -65,7 +66,7 @@ pub(crate) extern "C" fn jit_await(
     }
 }
 
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "yield_helper")]
 pub(crate) extern "C" fn jit_yield(
     ctx: *mut ExecCtx,
     val_tag: u64,

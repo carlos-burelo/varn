@@ -16,13 +16,6 @@ use crate::linker::Linker;
 
 use super::VmSuspend;
 
-// The JIT helper entry points are named through `ctx::` by `jit::helpers` and
-// by the `jit_helper_abi!` list, which knows only bare fn names. A glob rather
-// than an explicit list: that list used to be a fourth place every new helper
-// had to be written down. A name collision between domain modules is still a
-// compile error, so nothing is silently shadowed.
-pub(crate) use super::jit_helpers::*;
-
 #[repr(C)]
 pub struct ExecCtx {
     pub stack: crate::frame_store::FrameStore,

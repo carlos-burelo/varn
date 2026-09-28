@@ -8,6 +8,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow(field = "get_property")]
 pub(crate) extern "C" fn jit_get_property(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -51,6 +52,7 @@ pub(crate) extern "C" fn jit_get_property(
 /// it with plain scalars instead of building a `JitGetPropertyArgs` struct in
 /// a stack slot. Same semantics (may run a getter, hence may GC).
 #[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "get_property_flat")]
 pub(crate) extern "C" fn jit_get_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -98,6 +100,7 @@ pub(crate) extern "C" fn jit_get_property_flat(
 /// Flat-argument shim over [`jit_set_property`] for the CLIF backend (may run
 /// a setter, hence may GC).
 #[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "set_property_flat")]
 pub(crate) extern "C" fn jit_set_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -121,6 +124,7 @@ pub(crate) extern "C" fn jit_set_property_flat(
     jit_set_property(ctx, closure, &args)
 }
 
+#[varn_op_macros::jit_slow(field = "set_property")]
 pub(crate) extern "C" fn jit_set_property(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -158,6 +162,7 @@ pub(crate) extern "C" fn jit_set_property(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "get_fixed_field")]
 pub(crate) extern "C" fn jit_get_fixed_field(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -192,6 +197,7 @@ pub(crate) extern "C" fn jit_get_fixed_field(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "set_fixed_field")]
 pub(crate) extern "C" fn jit_set_fixed_field(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -210,6 +216,7 @@ pub(crate) extern "C" fn jit_set_fixed_field(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "get_property_maybe")]
 pub(crate) extern "C" fn jit_get_property_maybe(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -228,6 +235,7 @@ pub(crate) extern "C" fn jit_get_property_maybe(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "get_symbol")]
 pub(crate) extern "C" fn jit_get_symbol(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -253,6 +261,7 @@ pub(crate) extern "C" fn jit_get_symbol(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "bind_method")]
 pub(crate) extern "C" fn jit_bind_method(
     ctx: *mut ExecCtx,
     obj_tag: u64,

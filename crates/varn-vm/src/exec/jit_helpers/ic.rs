@@ -6,6 +6,7 @@ use crate::value::VmValue;
 /// caller activation's homes; `exec_call_method_reg` reads them (base = act_id)
 /// and resolves the method through the class's virtual table
 /// (`usize::MAX` cache slot = no static inline cache).
+#[varn_op_macros::jit_slow(field = "invoke_virtual")]
 pub(crate) extern "C" fn jit_invoke_virtual(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -59,6 +60,7 @@ pub(crate) extern "C" fn jit_invoke_virtual(
 
 /// Flat-argument shim over [`jit_invoke_virtual`] for the CLIF backend.
 #[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "invoke_virtual_flat")]
 pub(crate) extern "C" fn jit_invoke_virtual_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

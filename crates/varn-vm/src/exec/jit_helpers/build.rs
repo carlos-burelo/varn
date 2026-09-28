@@ -4,6 +4,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow(field = "build_array")]
 pub(crate) extern "C" fn jit_build_array(
     ctx: *mut ExecCtx,
     base: usize,
@@ -20,6 +21,7 @@ pub(crate) extern "C" fn jit_build_array(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_map")]
 pub(crate) extern "C" fn jit_build_map(
     ctx: *mut ExecCtx,
     base: usize,
@@ -43,6 +45,7 @@ pub(crate) extern "C" fn jit_build_map(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_str")]
 pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmValue, count: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -59,6 +62,7 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
 /// from a boxed window staged on the caller's native stack. The SSA lowering has
 /// no contiguous home window for arbitrary elements, so it passes one; the
 /// helper is the window-taking sibling of `jit_build_array` (which reads homes).
+#[varn_op_macros::jit_slow(field = "build_array_window")]
 pub(crate) extern "C" fn jit_build_array_window(
     ctx: *mut ExecCtx,
     parts_ptr: *const VmValue,
@@ -73,6 +77,7 @@ pub(crate) extern "C" fn jit_build_array_window(
 
 /// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` — build a map
 /// from a boxed `[k0, v0, k1, v1, …]` window on the caller's native stack.
+#[varn_op_macros::jit_slow(field = "build_map_window")]
 pub(crate) extern "C" fn jit_build_map_window(
     ctx: *mut ExecCtx,
     pairs_ptr: *const VmValue,
@@ -94,6 +99,7 @@ pub(crate) extern "C" fn jit_build_map_window(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_object_with_shape")]
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
@@ -113,6 +119,7 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_record_with_shape")]
 pub(crate) extern "C" fn jit_build_record_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
@@ -152,6 +159,7 @@ unsafe fn build_shaped_from_ptr(
 /// is_record, may_hold_closure)` — build an object/record from a boxed window on
 /// the caller's native stack. The window-taking sibling of
 /// `jit_build_object_with_shape` (which reads homes).
+#[varn_op_macros::jit_slow(field = "build_object_window")]
 pub(crate) extern "C" fn jit_build_object_window(
     ctx: *mut ExecCtx,
     vals_ptr: *const VmValue,
@@ -176,6 +184,7 @@ pub(crate) extern "C" fn jit_build_object_window(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "range")]
 pub(crate) extern "C" fn jit_range(
     ctx: *mut ExecCtx,
     start_tag: u64,
@@ -201,6 +210,7 @@ pub(crate) extern "C" fn jit_range(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "wrap_spread")]
 pub(crate) extern "C" fn jit_wrap_spread(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -212,6 +222,7 @@ pub(crate) extern "C" fn jit_wrap_spread(ctx: *mut ExecCtx, val_tag: u64, val_pa
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_object")]
 pub(crate) extern "C" fn jit_build_object(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

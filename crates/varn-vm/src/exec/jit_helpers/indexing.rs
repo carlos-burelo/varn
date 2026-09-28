@@ -7,6 +7,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow(field = "get_index")]
 pub(crate) extern "C" fn jit_get_index(ctx: *mut ExecCtx, args: *const varn_jit::JitGetIndexArgs) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -22,6 +23,7 @@ pub(crate) extern "C" fn jit_get_index(ctx: *mut ExecCtx, args: *const varn_jit:
     }
 }
 
+#[varn_op_macros::jit_slow(field = "set_index")]
 pub(crate) extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSetIndexArgs) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -37,6 +39,7 @@ pub(crate) extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit:
     }
 }
 
+#[varn_op_macros::jit_slow(field = "jit_array_get_fast")]
 pub(crate) unsafe extern "C" fn jit_array_get_fast(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -99,6 +102,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "jit_array_set_fast")]
 pub(crate) unsafe extern "C" fn jit_array_set_fast(
     ctx: *mut ExecCtx,
     obj_tag: u64,
@@ -178,6 +182,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "array_length")]
 pub(crate) extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr_tag: u64, arr_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -189,6 +194,7 @@ pub(crate) extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr_tag: u64, arr_p
     }
 }
 
+#[varn_op_macros::jit_slow(field = "bytes_length")]
 pub(crate) extern "C" fn jit_bytes_length(ctx: *mut ExecCtx, tag: u64, payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -200,6 +206,7 @@ pub(crate) extern "C" fn jit_bytes_length(ctx: *mut ExecCtx, tag: u64, payload: 
     }
 }
 
+#[varn_op_macros::jit_slow(field = "array_push")]
 pub(crate) extern "C" fn jit_array_push(
     ctx: *mut ExecCtx,
     arr_tag: u64,
@@ -221,6 +228,7 @@ pub(crate) extern "C" fn jit_array_push(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "array_pop")]
 pub(crate) extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr_tag: u64, arr_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -232,6 +240,7 @@ pub(crate) extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr_tag: u64, arr_payl
     }
 }
 
+#[varn_op_macros::jit_slow(field = "array_extend")]
 pub(crate) extern "C" fn jit_array_extend(
     ctx: *mut ExecCtx,
     arr_tag: u64,

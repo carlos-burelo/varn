@@ -6,6 +6,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow(field = "negate")]
 pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -17,6 +18,7 @@ pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v_tag: u64, v_payload: u6
     }
 }
 
+#[varn_op_macros::jit_slow(field = "logical_not")]
 pub(crate) extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) -> u64 {
     let v = VmValue::from_raw_parts(v_tag, v_payload);
     if crate::exec::compare::logical_not(v).is_truthy() {
@@ -26,6 +28,7 @@ pub(crate) extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v_tag: u64, v_paylo
     }
 }
 
+#[varn_op_macros::jit_slow(field = "div")]
 pub(crate) extern "C" fn jit_div(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -44,6 +47,7 @@ pub(crate) extern "C" fn jit_div(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "modulo")]
 pub(crate) extern "C" fn jit_modulo(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -62,6 +66,7 @@ pub(crate) extern "C" fn jit_modulo(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "pow")]
 pub(crate) extern "C" fn jit_pow(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -80,6 +85,7 @@ pub(crate) extern "C" fn jit_pow(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "bit_and")]
 pub(crate) extern "C" fn jit_bitand(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -94,6 +100,7 @@ pub(crate) extern "C" fn jit_bitand(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "bit_or")]
 pub(crate) extern "C" fn jit_bitor(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -108,6 +115,7 @@ pub(crate) extern "C" fn jit_bitor(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "bit_xor")]
 pub(crate) extern "C" fn jit_bitxor(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -122,6 +130,7 @@ pub(crate) extern "C" fn jit_bitxor(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "shl")]
 pub(crate) extern "C" fn jit_shl(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -136,6 +145,7 @@ pub(crate) extern "C" fn jit_shl(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "shr")]
 pub(crate) extern "C" fn jit_shr(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -150,6 +160,7 @@ pub(crate) extern "C" fn jit_shr(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "ushr")]
 pub(crate) extern "C" fn jit_ushr(
     ctx: *mut ExecCtx,
     a_tag: u64,

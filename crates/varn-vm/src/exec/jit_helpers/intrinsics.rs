@@ -9,7 +9,7 @@ use crate::value::VmValue;
 /// Fase B: the compiled caller has flushed `[receiver, args...]` to the home
 /// slots of registers `reg_start..reg_start + arg_count` in activation
 /// `act_id`; this gathers them back through `FrameStore` and dispatches.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "dispatch_intrinsic")]
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
     ctx: *mut ExecCtx,
     wire_byte: usize,
@@ -41,7 +41,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
 /// An intrinsic out of the lowering from typed SSA: `[receiver, args...]`
 /// as a boxed `window` of `count` values, dispatched as the interpreter's
 /// `Intrinsic` dispatches them.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "intrinsic_window")]
 pub(crate) extern "C" fn jit_intrinsic_window(
     ctx: *mut ExecCtx,
     wire_byte: usize,
@@ -64,6 +64,7 @@ pub(crate) extern "C" fn jit_intrinsic_window(
 ///
 /// A negative `pos` is out of range, not position zero, as in the native
 /// `str.charCodeAt` the interpreter runs.
+#[varn_op_macros::jit_slow(field = "str_char_code_at")]
 pub(crate) extern "C" fn jit_str_char_code_at(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -110,6 +111,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "str_ascii_bytes")]
 pub(crate) extern "C" fn jit_str_ascii_bytes(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -124,6 +126,7 @@ pub(crate) extern "C" fn jit_str_ascii_bytes(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "str_ascii_len")]
 pub(crate) extern "C" fn jit_str_ascii_len(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -164,6 +167,7 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
 }
 
 /// Dedicated fast path for `startsWith(search)`.
+#[varn_op_macros::jit_slow(field = "str_starts_with")]
 pub(crate) extern "C" fn jit_str_starts_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -244,6 +248,7 @@ pub(crate) extern "C" fn jit_str_starts_with(
 }
 
 /// Dedicated fast path for `endsWith(search)`.
+#[varn_op_macros::jit_slow(field = "str_ends_with")]
 pub(crate) extern "C" fn jit_str_ends_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,

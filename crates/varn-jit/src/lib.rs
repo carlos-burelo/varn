@@ -1,6 +1,5 @@
 pub mod aot;
 pub mod clif;
-mod helper_abi;
 pub(crate) mod loop_hoist;
 pub mod mem;
 pub mod stats;
@@ -27,6 +26,7 @@ pub use cranelift_codegen::isa::OwnedTargetIsa;
 
 use std::any::Any;
 use std::rc::Rc;
+use varn_op_macros::jit_helper_table;
 use varn_types::FunctionProto;
 use varn_types::VmValue;
 
@@ -296,28 +296,24 @@ pub struct JitFrameLayout {
     pub alloc_bases_offset: usize,
 }
 
-/// Generates [`JitHelpers`] from the one shared list in
-/// [`crate::jit_helper_abi`]. Every entry there becomes a `usize` holding a
-/// host function address; the tail below is hand-written because those
-/// fields are not function addresses.
-macro_rules! define_jit_helpers {
-    ( $( $(#[$attr:meta])* $field:ident => $_vm_fn:ident ),* $(,)? ) => {
+macro_rules! define_tail {
+    ( $( $field:ident ),* $(,)? ) => {
         #[derive(Debug, Clone, Copy)]
         #[repr(C)]
         pub struct JitHelpers {
-            $( $(#[$attr])* pub $field: usize, )*
-        /// Compile-time op-id → native call target. See
-        /// [`varn_types::NativeOpTarget`] for what each field means and what a
-        /// zero in it implies.
-        ///
-        /// Resolved at LOWERING time and embedded in the generated code: the
-        /// op-id form pays a hash lookup on every runtime call, which on a hot
-        /// `arr.push(x)` is a large share of the call's whole cost.
-        ///
-        /// A function pointer rather than a direct call because `varn-jit` does
-        /// not depend on `varn-builtins` — this is the indirection that keeps
-        /// the op table on the VM side of the boundary.
-        pub resolve_native_op: fn(u64) -> varn_types::NativeOpTarget,
+            $( pub $field: usize, )*
+    /// Compile-time op-id → native call target. See
+    /// [`varn_types::NativeOpTarget`] for what each field means and what a
+    /// zero in it implies.
+    ///
+    /// Resolved at LOWERING time and embedded in the generated code: the
+    /// op-id form pays a hash lookup on every runtime call, which on a hot
+    /// `arr.push(x)` is a large share of the call's whole cost.
+    ///
+    /// A function pointer rather than a direct call because `varn-jit` does
+    /// not depend on `varn-builtins` — this is the indirection that keeps
+    /// the op table on the VM side of the boundary.
+    pub resolve_native_op: fn(u64) -> varn_types::NativeOpTarget,
         /// Probed heap/array layout for the inline array-read fast path.
         pub array_layout: JitArrayLayout,
         /// Probed object layout for the inline property get/set fast paths.
@@ -366,7 +362,7 @@ macro_rules! define_jit_helpers {
     };
 }
 
-crate::jit_helper_abi!(define_jit_helpers);
+jit_helper_table! { define, "../varn-vm/src/exec/jit_helpers" }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]

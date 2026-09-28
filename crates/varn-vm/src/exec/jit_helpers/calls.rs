@@ -17,6 +17,7 @@ pub(crate) const MAX_CALL_DEPTH: usize = 10000;
 /// what `exec_call_method_reg` reads, so this forwards to it and runs any
 /// frame it pushed to completion.
 #[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "call_method_flat")]
 pub(crate) extern "C" fn jit_call_method_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -81,7 +82,7 @@ pub(crate) extern "C" fn jit_call_method_flat(
 /// [`ExecCtx::call_method`] (one resolution, one inline cache) on those
 /// values and runs a VM method it pushes to completion. Every heap value in
 /// the window is also in its SSA value's home, a GC root, for the call.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_call_method_window")]
 pub(crate) extern "C" fn jit_call_method_window(
     ctx: *mut ExecCtx,
     name_idx: usize,
@@ -123,7 +124,7 @@ pub(crate) extern "C" fn jit_call_method_window(
 /// boxed en `ctx.jit_native_result` (el retorno directo `-> VmValue` llega con
 /// la convención por target, §3.1). Un call-site monomórfico caliente se
 /// recompila a estático directo; sin IC inlineado a mano por call-site.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "invoke_dynamic")]
 pub(crate) extern "C" fn jit_invoke_dynamic(
     ctx: *mut ExecCtx,
     callee_tag: u64,
@@ -150,7 +151,7 @@ pub(crate) extern "C" fn jit_invoke_dynamic(
 /// stack); this runs the callee through the SAME [`ExecCtx::invoke`] as
 /// `jit_invoke_dynamic`, so there is still one invocation, and writes the
 /// boxed result to `ctx.jit_native_result`.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_invoke_window")]
 pub(crate) extern "C" fn jit_invoke_window(
     ctx: *mut ExecCtx,
     callee_tag: u64,
@@ -205,6 +206,7 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// aún no leyó — la hazard documentada en `jit_finish_static_call` muere aquí.
 #[varn_op_macros::jit_slow]
 #[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "jit_prepare_static_call")]
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,
@@ -266,7 +268,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
 /// Pops the activation [`jit_prepare_static_call`] pushed and closes its
 /// upvalues. `callee_alloc` travels as an explicit argument (the CLIF call
 /// site's own out-param slot value).
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_finish_static_call")]
 pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -280,7 +282,7 @@ pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc:
 /// fresh activation for its OWN closure and copies the `argc` argument
 /// registers from its homes into the callee's, then runs it to completion.
 /// `act_id` is the caller's activation.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "clif_call_self")]
 pub(crate) extern "C" fn clif_call_self(
     ctx: *mut ExecCtx,
     act_id: usize,
@@ -299,7 +301,7 @@ pub(crate) extern "C" fn clif_call_self(
 /// placeholder first. The window lives on the native stack, which the
 /// collector does not see, and pushing a frame can collect, so it is copied
 /// into staging — a root — before anything else.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_call_self_window")]
 pub(crate) extern "C" fn jit_call_self_window(
     ctx: *mut ExecCtx,
     window: *const VmValue,

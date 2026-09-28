@@ -9,7 +9,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_is_native_fn")]
 pub(crate) extern "C" fn jit_is_native_fn(ctx: *mut ExecCtx, callee: VmValue) -> usize {
     unsafe {
         let ctx_ref = &*ctx;
@@ -35,7 +35,7 @@ pub(crate) extern "C" fn jit_is_native_fn(ctx: *mut ExecCtx, callee: VmValue) ->
 /// entry replaces the previous `jit_call_native_op` / `jit_call_native_fnptr`
 /// pair: both read the same window and only differed in how the callee was
 /// found.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_call_native")]
 pub(crate) extern "C" fn jit_call_native(
     ctx: *mut ExecCtx,
     fn_addr: usize,
@@ -56,7 +56,7 @@ pub(crate) extern "C" fn jit_call_native(
 /// in contiguous homes (the lowering from typed SSA): a boxed `window` of
 /// `total` values. Every heap value in it is also in its SSA value's home,
 /// a GC root, for the length of the call.
-#[varn_op_macros::jit_slow]
+#[varn_op_macros::jit_slow(field = "jit_call_native_window")]
 pub(crate) extern "C" fn jit_call_native_window(
     ctx: *mut ExecCtx,
     fn_addr: usize,

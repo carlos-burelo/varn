@@ -3,6 +3,7 @@ use crate::exec::jit_helpers::construct::jit_propagate_error;
 
 /// `LoadStaticFn` out of compiled code: the closure of the running closure's
 /// function constant `proto_idx`, which captures nothing.
+#[varn_op_macros::jit_slow(field = "load_static_fn")]
 pub(crate) extern "C" fn jit_load_static_fn(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
