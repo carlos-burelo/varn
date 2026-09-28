@@ -854,9 +854,26 @@ impl<'m> Builder<'m> {
                         },
                     },
                     _ if name.as_ref() == varn_core::MemberKey::Length.as_str() => {
-                        match self.value_ty(obj) {
-                            HirType::Str => InstKind::StrLength { operand: obj },
-                            HirType::Array(_) => InstKind::ArrayLength { operand: obj },
+                        // `s?.length` desugars to `IsNull(s) ? null : s.length`:
+                        // the field only runs when `s` is non-null, so look
+                        // through one `Nullable` to the inner `Str`/`Array`.
+                        // The length itself is always an `int`; the outer
+                        // `Select` coerces it back to `int?` at the join.
+                        let inner = match self.value_ty(obj) {
+                            HirType::Nullable(id) => self.ssa_types.get(id),
+                            t => t,
+                        };
+                        match inner {
+                            HirType::Str => {
+                                return Ok(
+                                    self.emit(InstKind::StrLength { operand: obj }, HirType::Int)
+                                )
+                            }
+                            HirType::Array(_) => {
+                                return Ok(
+                                    self.emit(InstKind::ArrayLength { operand: obj }, HirType::Int)
+                                )
+                            }
                             _ => InstKind::GetProperty {
                                 object: obj,
                                 name: name.clone(),
