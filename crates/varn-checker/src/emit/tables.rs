@@ -346,11 +346,15 @@ fn build_one_class(
 
 /// Append a signature for a method and hand back its id.
 ///
-/// Sub-phase 3 keeps only the arity: params and return are
-/// `Dynamic(NotYetSupported)`. Precise method-signature typing is its own
-/// sub-phase — an un-annotated method return reads as `Void` off the binder
-/// today, which would make every `return x` inside it fail coherence.
-fn intern_signature(
+/// Only the arity used to be precise here; params are now lowered too, with
+/// the same entry convention as free functions: an optional parameter may
+/// arrive unset (`null`), which only a `Dynamic`-classed register can
+/// represent, so it enters as `Nullable` (see `defaulted_param_mask` in
+/// `varn-compiler`). Return stays `Dynamic(NotYetSupported)` on purpose:
+/// precise method-signature typing is its own sub-phase — an un-annotated
+/// method return reads as `Void` off the binder today, which would make every
+/// `return x` inside it fail coherence.
+pub(crate) fn intern_signature(
     ty: &Type,
     table: &CheckerTyTable,
     interner: &AtomInterner,
@@ -364,7 +368,14 @@ fn intern_signature(
             let p_tys: Vec<BackendTy> = ft
                 .params
                 .iter()
-                .map(|p| lower_type(&Type(p.ty, false), table, interner, tt, names))
+                .map(|p| {
+                    let inner = lower_type(&Type(p.ty, false), table, interner, tt, names);
+                    match inner {
+                        BackendTy::Dynamic(_) | BackendTy::Nullable(_) => inner,
+                        _ if p.optional => BackendTy::Nullable(tt.intern(inner)),
+                        _ => inner,
+                    }
+                })
                 .collect();
             (p_tys, BackendTy::Dynamic(varn_tir::DynReason::Unannotated))
         }

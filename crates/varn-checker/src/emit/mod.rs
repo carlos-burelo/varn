@@ -322,7 +322,7 @@ pub fn emit_module(
                      signatures: &mut Vec<Signature>| {
         if let Some(class) = class_decl(decl).or_else(|| anon_class_of(decl, ast_arena)) {
             class_defs.push(emit_class(
-                class, ast_arena, &ctx, expr_table, types, signatures, functions,
+                class, ast_arena, bind, &ctx, expr_table, types, signatures, functions,
             ));
         } else if let Some(en) = enum_decl(decl) {
             class_defs.push(emit_enum(
@@ -1241,9 +1241,49 @@ fn lower_outer(
     em.lower_outer_expr(e)
 }
 
+/// Signature for a static method: statics are excluded from the vtable
+/// (`build_one_class` skips them — they dispatch through the class object,
+/// not instances), so `info_sig` misses and the method gets `fresh_sig`'s
+/// all-`Dynamic`. Look the member's `Fn` type up qualified by class instead.
+/// Params are real; return stays `Dynamic` per `intern_signature`'s
+/// documented policy. `None` keeps the old `fresh_sig` fallback.
+#[allow(clippy::too_many_arguments)]
+fn static_method_sig(
+    bind: &BindResult,
+    class_name: &str,
+    key: &str,
+    ctx: &MCtx,
+    types: &mut TyTable,
+    signatures: &mut Vec<Signature>,
+) -> Option<SigId> {
+    let members = &bind.type_members.classes.get(class_name)?.members;
+    let ty = members
+        .iter()
+        .filter(|m| {
+            m.is_static
+                && m.name.as_ref() == key
+                && matches!(
+                    m.kind,
+                    crate::types::ClassMemberKind::Method | crate::types::ClassMemberKind::Function
+                )
+        })
+        .find_map(|m| {
+            matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty.clone())
+        })?;
+    Some(tables::intern_signature(
+        &ty,
+        ctx.checker_table,
+        ctx.interner,
+        types,
+        ctx.names,
+        signatures,
+    ))
+}
+
 fn emit_class(
     class: &varn_core::ast::ClassDecl,
     ast_arena: &AstArena,
+    bind: &BindResult,
     ctx: &MCtx,
     expr_table: &FxHashMap<AstId, TypeEntry>,
     types: &mut TyTable,
@@ -1391,7 +1431,12 @@ fn emit_class(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = info_sig(key_str, params.len(), signatures);
+                let sig = if modifiers.is_static {
+                    static_method_sig(bind, &class_name, key_str, ctx, types, signatures)
+                        .unwrap_or_else(|| info_sig(key_str, params.len(), signatures))
+                } else {
+                    info_sig(key_str, params.len(), signatures)
+                };
                 let id = emit_member_fn(
                     Arc::from(format!("{class_name}.{key_str}")),
                     params,
