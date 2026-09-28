@@ -57,32 +57,3 @@ pub(crate) extern "C" fn jit_invoke_virtual(
         ctx_ref.stack.box_reg(base, args.dest)
     }
 }
-
-/// Flat-argument shim over [`jit_invoke_virtual`] for the CLIF backend.
-#[allow(clippy::too_many_arguments)]
-#[varn_op_macros::jit_slow(field = "invoke_virtual_flat")]
-pub(crate) extern "C" fn jit_invoke_virtual_flat(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    this_tag: u64,
-    this_payload: u64,
-    name_idx: usize,
-    arg_start: usize,
-    arg_count: usize,
-    dest: usize,
-    ip: usize,
-) {
-    let this_val = VmValue::from_raw_parts(this_tag, this_payload);
-    let args = varn_jit::JitInvokeVirtualArgs {
-        this_val,
-        name_idx,
-        arg_start,
-        arg_count,
-        dest,
-        ip,
-    };
-    let val = jit_invoke_virtual(ctx, closure, &args);
-    unsafe {
-        (*ctx).jit_native_result = val;
-    }
-}

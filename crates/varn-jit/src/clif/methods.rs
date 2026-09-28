@@ -248,6 +248,7 @@ pub(super) fn emit_invoke_virtual(
     flush_boxed(b, actx, state, &regs);
 
     let ni = b.ins().iconst(types::I64, name_idx as i64);
+    let no_cache = b.ins().iconst(types::I64, usize::MAX as i64);
     let ast = b.ins().iconst(types::I64, arg_start as i64);
     let ac = b.ins().iconst(types::I64, argc as i64);
     let de = b.ins().iconst(types::I64, dest as i64);
@@ -256,13 +257,15 @@ pub(super) fn emit_invoke_virtual(
     call_helper_void(
         b,
         actx.cc,
-        actx.helpers.invoke_virtual_flat,
+        actx.helpers.call_method_flat,
         &[
             actx.exec_ctx,
             actx.closure,
+            actx.base,
             this_tag,
             this_payload,
             ni,
+            no_cache,
             ast,
             ac,
             de,
