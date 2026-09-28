@@ -208,6 +208,7 @@ pub(super) fn try_emit(
         OpCode::Ushr => emit_binop(b, g, state, code, ip, h.ushr),
         OpCode::StrSlice => emit_binop(b, g, state, code, ip, h.str_slice),
         OpCode::StrLength => emit_str_length(b, g, state, code, ip, h.str_length),
+        OpCode::BytesLength => emit_unary(b, g, state, code, ip, h.bytes_length),
         OpCode::ArrayPop => emit_unary(b, g, state, code, ip, h.array_pop),
         OpCode::Negate => emit_unary(b, g, state, code, ip, h.negate),
         OpCode::Typeof => emit_unary(b, g, state, code, ip, h.typeof_val),

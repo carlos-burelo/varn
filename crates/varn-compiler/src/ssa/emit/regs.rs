@@ -148,6 +148,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 | InstKind::IsArray { .. }
                 | InstKind::StrLength { .. }
                 | InstKind::ArrayLength { .. }
+                | InstKind::BytesLength { .. }
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }

@@ -420,6 +420,15 @@ pub(crate) fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     Err(RuntimeError::new("OpArrayLength: not an array"))
 }
 
+pub(crate) fn bytes_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
+    if val.is_heap() {
+        if let Some(HeapObj::Buffer(b)) = heap.get(val.as_heap_idx()) {
+            return Ok(VmValue::from_i32(b.len() as i32));
+        }
+    }
+    Err(RuntimeError::new("OpBytesLength: not bytes"))
+}
+
 pub(crate) fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if arr.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {

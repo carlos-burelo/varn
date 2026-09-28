@@ -234,6 +234,7 @@ pub(super) fn emit_inst(
         | SsaOp::GetProperty { .. }
         | SsaOp::SetProperty { .. }
         | SsaOp::ArrayLength { .. }
+        | SsaOp::BytesLength { .. }
         | SsaOp::StrLength { .. }
         | SsaOp::GetFixedField { .. }
         | SsaOp::SetIndex { .. }

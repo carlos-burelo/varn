@@ -74,6 +74,7 @@ macro_rules! jit_helper_abi {
             typeof_val => jit_typeof_val,
             instanceof => jit_instanceof,
             array_length => jit_array_length,
+            bytes_length => jit_bytes_length,
             array_push => jit_array_push,
             array_pop => jit_array_pop,
             array_extend => jit_array_extend,

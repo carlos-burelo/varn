@@ -189,6 +189,17 @@ pub(crate) extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr_tag: u64, arr_p
     }
 }
 
+pub(crate) extern "C" fn jit_bytes_length(ctx: *mut ExecCtx, tag: u64, payload: u64) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let v = VmValue::from_raw_parts(tag, payload);
+        match ctx_ref.exec_bytes_length(v) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
 pub(crate) extern "C" fn jit_array_push(
     ctx: *mut ExecCtx,
     arr_tag: u64,

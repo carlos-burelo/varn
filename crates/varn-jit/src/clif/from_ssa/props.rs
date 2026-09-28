@@ -54,6 +54,24 @@ pub(super) fn emit_str_length(
     ))
 }
 
+/// `b.length` of `Bytes` — a boxed `int` result.
+pub(super) fn emit_bytes_length(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    operand: u32,
+) -> Result<Value, String> {
+    let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
+    let ectx = exec_ctx(ctx)?;
+    call_helper_void(b, ctx.cc, ctx.helpers.bytes_length, &[ectx, tag, payload]);
+    Ok(b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
 /// `arr.push(value)` — no result.
 pub(super) fn emit_array_push(
     b: &mut FunctionBuilder,

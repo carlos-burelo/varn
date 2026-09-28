@@ -195,6 +195,7 @@ pub(super) fn project_inst(
             name: name.as_ref().into(),
         },
         InstKind::ArrayLength { operand } => SsaOp::ArrayLength { operand: operand.0 },
+        InstKind::BytesLength { operand } => SsaOp::BytesLength { operand: operand.0 },
         InstKind::StrLength { operand } => SsaOp::StrLength { operand: operand.0 },
         InstKind::MethodCall { recv, name, args } => SsaOp::MethodCall {
             recv: recv.0,

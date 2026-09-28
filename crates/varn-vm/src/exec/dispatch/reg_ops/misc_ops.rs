@@ -187,6 +187,10 @@ impl ExecCtx {
         crate::exec::collections::array_length(arr, &self.heap)
     }
 
+    pub(crate) fn exec_bytes_length(&mut self, v: VmValue) -> VmResult<VmValue> {
+        crate::exec::collections::bytes_length(v, &self.heap)
+    }
+
     pub(crate) fn exec_array_push(&mut self, arr: VmValue, val: VmValue) -> VmResult<()> {
         crate::exec::collections::array_push(arr, val, &mut self.heap)
     }

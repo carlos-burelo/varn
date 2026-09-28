@@ -381,6 +381,7 @@ impl ExecCtx {
                     | OpCode::ObjectMerge
                     | OpCode::WrapSpread
                     | OpCode::ArrayLength
+                    | OpCode::BytesLength
                     | OpCode::ArrayPush
                     | OpCode::ArrayPop
                     | OpCode::ArrayExtend

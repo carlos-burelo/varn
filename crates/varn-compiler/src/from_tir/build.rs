@@ -857,8 +857,19 @@ impl<'m> Builder<'m> {
                         // `s?.length` desugars to `IsNull(s) ? null : s.length`:
                         // the field only runs when `s` is non-null, so look
                         // through one `Nullable` to the inner `Str`/`Array`.
+                        // `Bytes` never reaches `HirType` (it lowers to `Ref`,
+                        // an opaque heap value), so read it off the TIR type
+                        // instead — same guard, same `int` result.
                         // The length itself is always an `int`; the outer
                         // `Select` coerces it back to `int?` at the join.
+                        if matches!(
+                            object.ty.non_nullable(&self.tir.types),
+                            varn_tir::BackendTy::Bytes
+                        ) {
+                            return Ok(
+                                self.emit(InstKind::BytesLength { operand: obj }, HirType::Int)
+                            );
+                        }
                         let inner = match self.value_ty(obj) {
                             HirType::Nullable(id) => self.ssa_types.get(id),
                             t => t,

@@ -116,6 +116,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::ArrayLength
         | O::ArrayPop
         | O::StrLength
+        | O::BytesLength
         | O::GetEnumTag
         | O::Await
         | O::Spawn

@@ -384,6 +384,14 @@ impl ExecCtx {
                 self.stack.unbox_into_reg(base, first_reg, r)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::BytesLength => {
+                let src = hi(code[*ip]);
+                *ip += 1;
+                let v = self.stack.box_reg(base, src);
+                let r = self.exec_bytes_length(v)?;
+                self.stack.unbox_into_reg(base, first_reg, r)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::ArrayPush => {
                 let val_reg = hi(code[*ip]);
                 *ip += 1;

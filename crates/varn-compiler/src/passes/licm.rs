@@ -250,6 +250,7 @@ fn is_transparent(kind: &InstKind) -> bool {
             | InstKind::IsArray { .. }
             | InstKind::StrLength { .. }
             | InstKind::ArrayLength { .. }
+            | InstKind::BytesLength { .. }
             | InstKind::GetEnumTag { .. }
             | InstKind::MakeClosure { .. }
     )

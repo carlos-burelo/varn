@@ -433,6 +433,13 @@ pub enum InstKind {
         operand: Value,
     },
 
+    /// `b.length` on a receiver statically typed `Bytes`: an `int`. Buffers
+    /// are mutable, so like `ArrayLength` (and unlike `StrLength`) this is
+    /// transparent but not loop-invariant and has no CSE key.
+    BytesLength {
+        operand: Value,
+    },
+
     This,
 
     Range {

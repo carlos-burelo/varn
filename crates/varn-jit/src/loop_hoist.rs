@@ -181,6 +181,7 @@ pub fn is_alloc_free_op(op: OpCode) -> bool {
             | OpCode::GetIndex
             | OpCode::ArrayGetIndex
             | OpCode::ArrayLength
+            | OpCode::BytesLength
             | OpCode::SetIndex
             | OpCode::ArraySetIndex
     )

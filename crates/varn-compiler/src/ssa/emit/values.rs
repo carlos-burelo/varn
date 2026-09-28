@@ -449,6 +449,9 @@ pub(super) fn emit_value(
         InstKind::ArrayLength { operand } => {
             chunk.emit_rr(OpCode::ArrayLength, d, reg[operand.0 as usize], line);
         }
+        InstKind::BytesLength { operand } => {
+            chunk.emit_rr(OpCode::BytesLength, d, reg[operand.0 as usize], line);
+        }
 
         InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, line),
 

@@ -55,6 +55,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | IsArray { operand }
         | StrLength { operand }
         | ArrayLength { operand }
+        | BytesLength { operand }
         | ObjectKeys { operand }
         | Await { operand }
         | Spawn { operand }
@@ -218,6 +219,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | IsArray { operand }
         | StrLength { operand }
         | ArrayLength { operand }
+        | BytesLength { operand }
         | ObjectKeys { operand }
         | Await { operand }
         | Spawn { operand }

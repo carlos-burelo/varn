@@ -218,12 +218,16 @@ pub enum OpCode {
 
     /// `dst = convert(src)` per the `NumConv` in the next word (`as`).
     Convert,
+
+    /// `b.length` on a receiver statically typed `Bytes`: an `int`.
+    /// Appended last so every existing discriminant stays stable.
+    BytesLength,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::Convert as u8 {
+        if v <= OpCode::BytesLength as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

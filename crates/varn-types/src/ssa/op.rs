@@ -258,6 +258,11 @@ pub enum SsaOp {
         operand: u32,
     },
 
+    /// `b.length` of `Bytes` — an `int` result (no allocation).
+    BytesLength {
+        operand: u32,
+    },
+
     /// `recv.name(args)`: a method call through the runtime's one method
     /// resolution (inline cache slot `cs`); a boxed result.
     MethodCall {

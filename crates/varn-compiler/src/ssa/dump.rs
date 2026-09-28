@@ -213,6 +213,7 @@ pub fn inst_kind(kind: &InstKind) -> String {
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
         InstKind::StrLength { operand } => format!("strlen {}", val(*operand)),
         InstKind::ArrayLength { operand } => format!("arrlen {}", val(*operand)),
+        InstKind::BytesLength { operand } => format!("byteslen {}", val(*operand)),
         InstKind::This => "this".to_owned(),
         InstKind::Range {
             start,
