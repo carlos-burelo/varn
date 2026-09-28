@@ -4,13 +4,6 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// Maximum VM call depth before a graceful error is raised. Kept in sync with
-/// the interpreter guard (`exec::calls`). JIT'd calls recurse on the native
-/// Rust stack (the JIT invokes the callee's `jit_entry` directly), so without
-/// this guard deep recursion aborts the host process instead of producing a
-/// catchable runtime error.
-pub(crate) const MAX_CALL_DEPTH: usize = 10000;
-
 /// Flat-argument method call for the CLIF backend. The
 /// compiled caller flushed its args to the caller activation's homes
 /// (`base` = act_id, `arg_start` = first argument register), which is exactly

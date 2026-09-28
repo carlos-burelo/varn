@@ -14,36 +14,12 @@ use varn_op_macros::jit_helper_table;
 macro_rules! fill_tail {
     ( $( $field:ident : $path:path ),* $(,)? ) => {{
         let array_layout = crate::heap::Heap::jit_array_layout();
-        // `ExecCtx.stack` is a BARE `Vec<VmValue>`, so its data-pointer word is
-        // at the bare-`Vec` ptr offset — NOT `elems_ptr_off`, which since the
-        // `ArrayRepr` wrapping is measured relative to the `ArrayRepr` (tag +
-        // padding + `Vec`) and so includes the wrapper. `slots_ptr_off` is that
-        // bare offset (a `Vec`'s field layout is element-type-independent, so
-        // the `Vec<Option<HeapObj>>` probe yields the same ptr offset as a
-        // `Vec<VmValue>`).
-        let stack_data_offset =
-            std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.slots_ptr_off;
         varn_jit::JitHelpers {
             $( $field: $path as *const () as usize, )*
         resolve_native_op: resolve_native_op_target,
             array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),
             str_layout: crate::heap::Heap::jit_str_layout(),
-            open_upvalues_offset: {
-                let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
-                let dummy_ptr = dummy.as_ptr();
-                unsafe {
-                    (std::ptr::addr_of!((*dummy_ptr).open_upvalues) as usize) - (dummy_ptr as usize)
-                }
-            },
-            pending_constructors_offset: {
-                let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
-                let dummy_ptr = dummy.as_ptr();
-                unsafe {
-                    (std::ptr::addr_of!((*dummy_ptr).pending_constructors) as usize)
-                        - (dummy_ptr as usize)
-                }
-            },
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
@@ -58,9 +34,7 @@ macro_rules! fill_tail {
                 ic_entries
             ),
             poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
-            stack_data_offset,
             frame_layout: super::frame_layout::probe(),
-            max_call_depth: crate::exec::jit_helpers::calls::MAX_CALL_DEPTH,
         }
     }};
 }
