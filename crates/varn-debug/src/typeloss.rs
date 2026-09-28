@@ -58,22 +58,37 @@ struct Counts {
 }
 
 /// `-p typeloss`.
-pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags) {
-    eprintln!(
-        "\n{BOLD}{BLUE}TYPELOSS{R}{DIM} ─────────────────────────────── {}{R}",
-        proto.name.as_deref().unwrap_or("<top-level>")
-    );
-
+///
+/// `module` labels a non-entry module and is printed only when that module
+/// has generic opcodes, so a whole-program run reads as a punch list instead
+/// of a trail of clean banners. The entry call passes `None` and keeps the
+/// historical always-print behavior.
+pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<&str>) {
     let mut rows: Vec<(String, Counts)> = Vec::new();
     collect(proto, flags, &mut rows);
     rows.retain(|(_, c)| c.generic > 0);
     rows.sort_by(|a, b| b.1.generic.cmp(&a.1.generic));
 
     if rows.is_empty() {
+        if module.is_some() {
+            return;
+        }
+        eprintln!(
+            "\n{BOLD}{BLUE}TYPELOSS{R}{DIM} ─────────────────────────────── {}{R}",
+            proto.name.as_deref().unwrap_or("<top-level>")
+        );
         eprintln!("  {GREEN}cada opcode tipado que el emisor pudo elegir, lo eligió{R}");
         eprintln!("{DIM}── end: TYPELOSS ──{R}");
         return;
     }
+
+    if let Some(m) = module {
+        eprintln!("\n{DIM}=== {m} ==={R}");
+    }
+    eprintln!(
+        "\n{BOLD}{BLUE}TYPELOSS{R}{DIM} ─────────────────────────────── {}{R}",
+        proto.name.as_deref().unwrap_or("<top-level>")
+    );
 
     eprintln!(
         "\n  {DIM}{:<28} {:>8} {:>8}  {}{R}",

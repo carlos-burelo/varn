@@ -63,7 +63,7 @@ pub fn compile(
     }
 
     if debug.typeloss {
-        varn_debug::typeloss::debug_typeloss(&proto, debug);
+        varn_debug::typeloss::debug_typeloss(&proto, debug, None);
     }
 
     if debug.summary {
@@ -174,6 +174,21 @@ pub fn compile(
             }
             if debug.bails {
                 varn_debug::tiers::debug_bails(module_proto, debug, &helpers, Some(path));
+            }
+        }
+    }
+
+    // `typeloss` is a whole-program property like `bytecode`: the entry module
+    // of a multi-file program is usually just imports, so stopping at it
+    // reports a coverage that looks whole-program and is not. Paths are sorted
+    // for the same reason as the bytecode dump above: `FxHashMap` iteration is
+    // seeded per process, and module sections must come out in a stable order.
+    if debug.typeloss {
+        let mut paths: Vec<&String> = graph_build.modules.keys().collect();
+        paths.sort_unstable();
+        for path in paths {
+            if path != &graph_build.entry_path {
+                varn_debug::typeloss::debug_typeloss(&graph_build.modules[path], debug, Some(path));
             }
         }
     }
