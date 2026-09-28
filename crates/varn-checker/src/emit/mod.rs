@@ -1243,10 +1243,11 @@ fn lower_outer(
 
 /// Signature for a static method: statics are excluded from the vtable
 /// (`build_one_class` skips them — they dispatch through the class object,
-/// not instances), so `info_sig` misses and the method gets `fresh_sig`'s
-/// all-`Dynamic`. Look the member's `Fn` type up qualified by class instead.
-/// Params are real; return stays `Dynamic` per `intern_signature`'s
-/// documented policy. `None` keeps the old `fresh_sig` fallback.
+/// not instances, so there is no static vtable by design), so `info_sig`
+/// misses and the method gets `fresh_sig`'s all-`Dynamic`. Look the member's
+/// `Fn` type up qualified by class instead. Params and return follow
+/// `intern_signature` (precise when annotated/inferred, `Dynamic` when
+/// opaque). `None` keeps the old `fresh_sig` fallback.
 #[allow(clippy::too_many_arguments)]
 fn static_method_sig(
     bind: &BindResult,

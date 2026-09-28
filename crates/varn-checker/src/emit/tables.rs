@@ -346,14 +346,16 @@ fn build_one_class(
 
 /// Append a signature for a method and hand back its id.
 ///
-/// Only the arity used to be precise here; params are now lowered too, with
-/// the same entry convention as free functions: an optional parameter may
-/// arrive unset (`null`), which only a `Dynamic`-classed register can
-/// represent, so it enters as `Nullable` (see `defaulted_param_mask` in
-/// `varn-compiler`). Return stays `Dynamic(NotYetSupported)` on purpose:
-/// precise method-signature typing is its own sub-phase — an un-annotated
-/// method return reads as `Void` off the binder today, which would make every
-/// `return x` inside it fail coherence.
+/// Params are lowered with the same entry convention as free functions: an
+/// optional parameter may arrive unset (`null`), which only a
+/// `Dynamic`-classed register can represent, so it enters as `Nullable` (see
+/// `defaulted_param_mask` in `varn-compiler`). Return is the binder's `Fn`
+/// return lowered honestly: annotated or inferred precise types (after
+/// `enrich_call_returns`) publish as-is, opaque ones (`Task`, type params,
+/// unions) lower to `Dynamic` by construction. An un-annotated `void` method
+/// with no returned value stays `Void`, which is what `check_return_none`
+/// expects; the old all-`Dynamic` fallback only remains for non-`Fn` types
+/// (getters/setters, handled separately).
 pub(crate) fn intern_signature(
     ty: &Type,
     table: &CheckerTyTable,
@@ -377,7 +379,8 @@ pub(crate) fn intern_signature(
                     }
                 })
                 .collect();
-            (p_tys, BackendTy::Dynamic(varn_tir::DynReason::Unannotated))
+            let return_ty = lower_type(&Type(ft.return_type, false), table, interner, tt, names);
+            (p_tys, return_ty)
         }
         _ => (vec![], BackendTy::Dynamic(varn_tir::DynReason::Unannotated)),
     };

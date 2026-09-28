@@ -61,9 +61,7 @@ TirModule {
                     Unannotated,
                 ),
             ],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
+            return_ty: Void,
         },
         Signature {
             params: [],
@@ -77,8 +75,10 @@ TirModule {
                     Unannotated,
                 ),
             ],
-            return_ty: Dynamic(
-                Unannotated,
+            return_ty: Class(
+                ClassId(
+                    0,
+                ),
             ),
         },
         Signature {
@@ -233,9 +233,7 @@ TirModule {
                     Unannotated,
                 ),
             ],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
+            return_ty: Void,
             locals: [],
             body: [
                 Expr(
@@ -368,8 +366,10 @@ TirModule {
                     Unannotated,
                 ),
             ],
-            return_ty: Dynamic(
-                Unannotated,
+            return_ty: Class(
+                ClassId(
+                    0,
+                ),
             ),
             locals: [],
             body: [

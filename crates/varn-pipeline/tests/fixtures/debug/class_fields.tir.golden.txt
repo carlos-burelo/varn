@@ -63,9 +63,7 @@ TirModule {
             params: [
                 Float,
             ],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
+            return_ty: Void,
         },
         Signature {
             params: [],
@@ -117,9 +115,7 @@ TirModule {
             params: [
                 Float,
             ],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
+            return_ty: Void,
             locals: [],
             body: [
                 Expr(
