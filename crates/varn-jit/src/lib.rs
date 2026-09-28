@@ -37,15 +37,17 @@ pub type JitFn = unsafe extern "C" fn(
     exec_ctx: *mut std::ffi::c_void,
 ) -> VmValue;
 
-/// Byte offsets and probed layout facts that let emitted code walk from a
+/// Byte offsets and measured layout facts that let emitted code walk from a
 /// heap-tagged `VmValue` to an array element without any FFI call:
 ///
 /// `[ExecCtx + heap_field] → RcBox → HeapInner.objects (Vec words) → slot
 /// (Option<HeapObj>, tag byte + payload Rc) → RcBox → Vec<VmValue> words →
 /// data[idx]`.
 ///
-/// Rust does not guarantee `Vec`'s field order, so the ptr/len word offsets
-/// are PROBED at startup against vectors with known contents — stable for
+/// Two provenances, kept apart on purpose: offsets into OUR `repr(C)` types
+/// (`ArrayRepr::{DISC_OFF, ELEMS_PTR_OFF, ELEMS_LEN_OFF}`, `size_of`) are
+/// derived exacto (Ley 6); offsets through FOREIGN memory (`Vec` word order,
+/// `Option` niche, `RcBox` prefix) are measured once at startup — stable for
 /// the lifetime of one binary, which is exactly the lifetime of any JIT
 /// code that embeds them.
 #[derive(Debug, Clone, Copy)]
@@ -82,17 +84,17 @@ pub struct JitArrayLayout {
     pub elems_len_off: usize,
 }
 
-/// Probed layout facts for the JIT's inline property fast paths.
+/// Layout facts for the JIT's inline property fast paths.
 ///
 /// `[slot + object_payload_off] → ObjData` — the object's fields live in the
 /// same allocation as its header (a DST tail), so the field buffer is reached
 /// with a constant `lea` off the data pointer instead of loading a separate
 /// `Vec` pointer.
 ///
-/// Every offset here is PROBED against a real object at startup rather than
-/// hardcoded: the previous fast paths baked in `Vec`'s field order as the magic
-/// constants 32/40/48, which is exactly the kind of assumption that turns a
-/// representation change into a silent segfault.
+/// Offsets into OUR `repr(C)` types (`OBJ_*`, `INST_*`, `SHAPE_ID_OFF`) are
+/// derived exacto; the `Option` niche tag/payload and the `RcBox` prefix stay
+/// measured (foreign). The old word-scans over owned structs are gone —
+/// derivation plus tripwires, not searches.
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct JitObjectLayout {

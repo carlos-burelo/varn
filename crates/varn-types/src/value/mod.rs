@@ -26,7 +26,9 @@ pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};
 pub use instance::{InstanceData, InstanceRef, INST_CLASS_ID_OFF, INST_PAYLOAD_OFF};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
-pub use object::{nv_to_value, value_to_nv, ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF};
+pub use object::{
+    nv_to_value, value_to_nv, ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF,
+};
 pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
 pub use shape::{root_shape, Shape, SHAPE_ID_OFF};
 use std::rc::Rc;

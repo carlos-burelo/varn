@@ -27,8 +27,10 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
 /// Layout facts the JIT's inline instance paths address directly. Derived
 /// with `offset_of!` from this owned definition (exact by construction),
 /// never re-measured by a scan.
-pub const INST_CLASS_ID_OFF: usize = std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, class_id);
-pub const INST_PAYLOAD_OFF: usize = std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, payload);
+pub const INST_CLASS_ID_OFF: usize =
+    std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, class_id);
+pub const INST_PAYLOAD_OFF: usize =
+    std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, payload);
 
 const INSTANCE_HEADER_WORDS: usize = 1;
 

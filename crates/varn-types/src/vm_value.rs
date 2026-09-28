@@ -476,12 +476,10 @@ impl ArrayRepr {
     /// Byte offset of the `repr(C, u8)` discriminant: first by construction.
     /// Tripwire-verified in `varn-vm` (`jit_array_layout` reads it back).
     pub const DISC_OFF: usize = 0;
-    /// Byte offset of the element `Vec`'s data word: tag (1 B) + padding to
-    /// `Vec` alignment (8). The payload is one union of three `Vec`s, so the
-    /// words land identically in every variant.
-    pub const ELEMS_PTR_OFF: usize = 8;
-    /// Byte offset of the element `Vec`'s length word.
-    pub const ELEMS_LEN_OFF: usize = 16;
+    /// Byte offset where the element-`Vec` union opens: tag (1 B) + padding
+    /// to `Vec` alignment (8). Inside it rigen las palabras medidas del `Vec`
+    /// (`jit_array_layout` suma el word-offset probado una sola vez).
+    pub const ELEMS_UNION_OFF: usize = 8;
 
     /// The `repr(C, u8)` discriminant (0 = Boxed, 1 = I64, 2 = F64). Matches the byte the JIT reads at offset 0
     /// of the `ArrayRepr`.
@@ -510,13 +508,11 @@ impl ArrayRepr {
 }
 
 const _: () = {
-    // The payload union starts at the first 8-aligned offset past the 1-byte
-    // tag, and every variant is a `Vec` (ptr, len, cap): what the ELEMS_*
-    // consts above state. A representation change breaks loudly here, not in
-    // emitted code.
+    // La unión abre en el primer offset alineado a 8 tras el tag de 1 B.
+    // Si la representación cambia, el tripwire de `jit_array_layout` lo
+    // declara en voz alta en arranque, no el código emitido en caliente.
     assert!(std::mem::align_of::<ArrayRepr>() == 8);
-    assert!(ArrayRepr::ELEMS_PTR_OFF == 8);
-    assert!(ArrayRepr::ELEMS_LEN_OFF == 16);
+    assert!(ArrayRepr::ELEMS_UNION_OFF == 8);
     assert!(std::mem::size_of::<ArrayRepr>() % 8 == 0);
 };
 

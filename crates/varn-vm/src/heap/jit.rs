@@ -4,6 +4,11 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use varn_types::value::ObjRef;
 
+/// Prefijo control del `RcBox` (`strong` + `weak`): el `Rc` guarda el puntero
+/// control y `Rc::as_ptr` deriva el valor como control+16. Supuesto
+/// codebase-wide, validado contra el heap vivo en `ExecCtx::new`.
+const RCBOX_PREFIX: usize = 2 * std::mem::size_of::<usize>();
+
 impl Heap {
     pub(crate) fn nursery_len_byte_offset_from_rcbox() -> usize {
         2 * std::mem::size_of::<usize>()
@@ -41,12 +46,15 @@ impl Heap {
         for _ in 0..3 {
             slots_probe.push(None);
         }
-        let (slots_ptr_off, _slots_len_off) = vec_word_offsets(&slots_probe);
+        // Único hecho medido sobre `Vec` (memoria ajena): el orden de sus
+        // tres palabras. Vale para TODO `Vec<T>` del binario, incluido el de
+        // `ArrayRepr`: misma definición, mismo orden.
+        let (slots_ptr_off, vec_len_off) = vec_word_offsets(&slots_probe);
 
-        // Derivado, no escaneado: `ArrayRepr` es `repr(C, u8)` propio
-        // (`varn_types::vm_value::ArrayRepr::{DISC_OFF, ELEMS_PTR_OFF,
-        // ELEMS_LEN_OFF}`). El tripwire lee un valor real: si la
-        // representación cambia, falla aquí en voz alta, no en código emitido.
+        // Derivado, no escaneado: la carga útil de `ArrayRepr` es una unión
+        // de tres `Vec` que abre en el primer offset alineado a 8 tras el tag
+        // (`ELEMS_UNION_OFF`), y dentro de ella rigen las palabras medidas
+        // arriba. Tripwire sobre un valor real.
         let (disc_off, elems_ptr_off, elems_len_off) = {
             use varn_types::vm_value::ArrayRepr;
             let mut boxed_vec: Vec<VmValue> = Vec::with_capacity(7);
@@ -57,19 +65,21 @@ impl Heap {
             let repr = ArrayRepr::Boxed(boxed_vec);
             let base = &repr as *const _ as *const u8;
             let disc = unsafe { *base.add(ArrayRepr::DISC_OFF) };
-            assert_eq!(disc, 0, "ArrayRepr::Boxed discriminant must read 0 at DISC_OFF");
-            let probed_ptr =
-                unsafe { *(base.add(ArrayRepr::ELEMS_PTR_OFF) as *const usize) };
-            let probed_len =
-                unsafe { *(base.add(ArrayRepr::ELEMS_LEN_OFF) as *const usize) };
+            assert_eq!(
+                disc, 0,
+                "ArrayRepr::Boxed discriminant must read 0 at DISC_OFF"
+            );
+            let ptr_off = ArrayRepr::ELEMS_UNION_OFF + slots_ptr_off;
+            let len_off = ArrayRepr::ELEMS_UNION_OFF + vec_len_off;
+            let probed_ptr = unsafe { *(base.add(ptr_off) as *const usize) };
+            let probed_len = unsafe { *(base.add(len_off) as *const usize) };
             assert_eq!(
                 probed_ptr, vec_ptr,
-                "ELEMS_PTR_OFF tripwire: Boxed Vec ptr mismatch"
+                "elems tripwire: Boxed Vec ptr mismatch"
             );
-            assert_eq!(probed_len, 3, "ELEMS_LEN_OFF tripwire: Boxed Vec len mismatch");
+            assert_eq!(probed_len, 3, "elems tripwire: Boxed Vec len mismatch");
 
-            // La carga útil es una unión: I64/F64 comparten palabras con Boxed.
-            // Solo se verifica su tag en el mismo offset.
+            // La unión se comparte: I64/F64 solo verifican su tag.
             let i64_repr = ArrayRepr::I64(vec![0, 0, 0]);
             let i64_disc =
                 unsafe { *(&i64_repr as *const _ as *const u8).add(ArrayRepr::DISC_OFF) };
@@ -79,15 +89,11 @@ impl Heap {
                 unsafe { *(&f64_repr as *const _ as *const u8).add(ArrayRepr::DISC_OFF) };
             assert_eq!(f64_disc, 2, "ArrayRepr::F64 discriminant must read 2");
 
-            (
-                ArrayRepr::DISC_OFF,
-                ArrayRepr::ELEMS_PTR_OFF,
-                ArrayRepr::ELEMS_LEN_OFF,
-            )
+            (ArrayRepr::DISC_OFF, ptr_off, len_off)
         };
 
         let arr = varn_types::vm_value::VmArray::new(vec![VmValue::null()]);
-        let rcbox = Rc::as_ptr(&arr.0) as usize - 2 * std::mem::size_of::<usize>();
+        let rcbox = Rc::as_ptr(&arr.0) as usize - RCBOX_PREFIX;
         let slot: Option<HeapObj> = Some(HeapObj::Array(arr));
         let size = std::mem::size_of::<Option<HeapObj>>();
         let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
@@ -129,15 +135,16 @@ impl Heap {
             vec![VmValue::from_raw_parts(SENTINEL_FIELD, SENTINEL_FIELD); TAIL],
         );
 
-        let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
-        let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+        let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - RCBOX_PREFIX;
+        let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - RCBOX_PREFIX;
 
-        // Derivado, no escaneado: `ObjData`/`Shape` son `repr(C)` propios
-        // (`OBJ_VALUES_OFF`, `OBJ_SHAPE_OFF`, `OBJ_INLINE_LEN_OFF`,
+        // Derivado, no escaneado: el slot guarda el puntero CONTROL del `Rc`
+        // (`Rc::as_ptr` deriva el valor como control+16), así que el frame es
+        // rcbox-relativo: prefijo control + offset propio (`OBJ_*`,
         // `SHAPE_ID_OFF`). Tripwires sobre un valor real.
-        let values_off = varn_types::OBJ_VALUES_OFF;
-        let shape_off = varn_types::OBJ_SHAPE_OFF;
-        let len_off = varn_types::OBJ_INLINE_LEN_OFF;
+        let values_off = RCBOX_PREFIX + varn_types::OBJ_VALUES_OFF;
+        let shape_off = RCBOX_PREFIX + varn_types::OBJ_SHAPE_OFF;
+        let len_off = RCBOX_PREFIX + varn_types::OBJ_INLINE_LEN_OFF;
         let block = unsafe { std::slice::from_raw_parts(rcbox as *const u8, 80) };
         let word_at =
             |off: usize| -> u64 { u64::from_ne_bytes(block[off..off + 8].try_into().unwrap()) };
@@ -150,9 +157,13 @@ impl Heap {
             (word_at(len_off) & 0xFFFF_FFFF) as usize == TAIL && len_off != values_off,
             "OBJ_INLINE_LEN_OFF tripwire: inline_len not at derived offset"
         );
+        assert_eq!(
+            word_at(shape_off) as usize,
+            shape_ptr,
+            "OBJ_SHAPE_OFF tripwire: shape control not at derived offset"
+        );
 
-        let shape_id_off =
-            2 * std::mem::size_of::<usize>() + varn_types::SHAPE_ID_OFF;
+        let shape_id_off = RCBOX_PREFIX + varn_types::SHAPE_ID_OFF;
         assert_eq!(
             unsafe { *((shape_ptr + shape_id_off) as *const u32) },
             shape_id,
@@ -173,8 +184,7 @@ impl Heap {
         // Probe HeapObj::Instance layout facts
         let dummy_cls = varn_types::ClassObj::new_rc("__probe_class");
         let inst_ref = varn_types::value::InstanceRef::alloc(dummy_cls);
-        let inst_rcbox =
-            Rc::as_ptr(&inst_ref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+        let inst_rcbox = Rc::as_ptr(&inst_ref.0) as *const u8 as usize - RCBOX_PREFIX;
         let inst_slot: Option<HeapObj> = Some(HeapObj::Instance(inst_ref.clone()));
         let inst_bytes =
             unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
@@ -185,11 +195,10 @@ impl Heap {
             })
             .expect("instance payload probe failed");
 
-        let raw_payload_ptr = inst_ref.raw_payload_ptr() as usize;
-        let instance_values_off = raw_payload_ptr - inst_rcbox;
-        // `InstanceData { class_id: u32, payload_size: u32, payload }` — an
-        // 8-byte header immediately before the payload.
-        let instance_class_id_off = instance_values_off - 8;
+        // Derivado: prefijo control + offset propio (`INST_*`). Tripwire:
+        // class_id leído ahí debe coincidir.
+        let instance_values_off = RCBOX_PREFIX + varn_types::INST_PAYLOAD_OFF;
+        let instance_class_id_off = RCBOX_PREFIX + varn_types::INST_CLASS_ID_OFF;
         assert_eq!(
             unsafe { *((inst_rcbox + instance_class_id_off) as *const u32) },
             inst_ref.class_id,
@@ -208,5 +217,37 @@ impl Heap {
             shape_off,
             shape_id_off,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Los hechos derivados coinciden con lo medido: si un cambio de
+    /// representación mueve un offset propio, falla aquí (rápido) además del
+    /// tripwire en arranque JIT.
+    #[test]
+    fn layouts_match_derived_consts() {
+        use varn_types::vm_value::ArrayRepr;
+        let a = Heap::jit_array_layout();
+        assert_eq!(a.disc_off, ArrayRepr::DISC_OFF);
+        // Unión propia + palabras `Vec` medidas una vez: el frame coincide.
+        assert!(a.elems_ptr_off >= ArrayRepr::ELEMS_UNION_OFF);
+        assert!(a.elems_len_off >= ArrayRepr::ELEMS_UNION_OFF);
+        assert_ne!(a.elems_ptr_off, a.elems_len_off);
+        let o = Heap::jit_object_layout();
+        assert_eq!(o.values_off, RCBOX_PREFIX + varn_types::OBJ_VALUES_OFF);
+        assert_eq!(o.shape_off, RCBOX_PREFIX + varn_types::OBJ_SHAPE_OFF);
+        assert_eq!(o.len_off, RCBOX_PREFIX + varn_types::OBJ_INLINE_LEN_OFF);
+        assert_eq!(o.shape_id_off, RCBOX_PREFIX + varn_types::SHAPE_ID_OFF);
+        assert_eq!(
+            o.instance_values_off,
+            RCBOX_PREFIX + varn_types::INST_PAYLOAD_OFF
+        );
+        assert_eq!(
+            o.instance_class_id_off,
+            RCBOX_PREFIX + varn_types::INST_CLASS_ID_OFF
+        );
     }
 }
