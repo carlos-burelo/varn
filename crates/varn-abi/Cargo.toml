@@ -1,0 +1,10 @@
+[package]
+name = "varn-abi"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-core = { path = "../varn-core" }
+
+[lints]
+workspace = true

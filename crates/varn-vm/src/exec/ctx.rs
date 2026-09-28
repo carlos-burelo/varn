@@ -502,6 +502,9 @@ impl ExecCtx {
     /// so async liveness no longer defers collection. Only nested contexts
     /// (`gc_inhibited`) never initiate one — see that field's invariant.
     pub(crate) fn gc_backedge_safepoint(&mut self) {
+        // Verifica el contrato v2 en debug: rangos contiguos, topes >= bases.
+        // Costo cero en release.
+        debug_assert!(crate::frame_store_abi::debug_check_stacks(&self.stack));
         if self.gc_inhibited {
             return;
         }

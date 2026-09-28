@@ -217,6 +217,14 @@ macro_rules! jit_helper_abi {
             /// `exec_ctx`, and adding one there is what forces the whole
             /// function frame-aware, losing the direct clif→clif entry.
             current_exec_ctx => jit_current_exec_ctx,
+            /// `extern "C" fn(*mut ExecCtx, callee_tag, callee_payload,
+            /// act_id, arg_start, argc)` — camino dinámico ÚNICO v2 (§3.2):
+            /// métodos, closures, `dynamic`. Ventana contigua ya preparada por
+            /// el caller; resuelve, ejecuta y deja boxed en `jit_native_result`
+            /// (hasta migrar retorno directo por target). Cuando un call-site
+            /// se vuelve monomórfico caliente, el tiering lo recompila a
+            /// estático directo. Sustituye a la familia `call`/`invoke_virtual`/IC.
+            invoke_dynamic => jit_invoke_dynamic,
         }
     };
 }

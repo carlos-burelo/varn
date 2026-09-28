@@ -9,7 +9,9 @@
 //! stack walks (errors, debugger, GC) through an RBP chain plus a
 //! return-address side table.
 
-pub(crate) mod abi;
+/// Contrato de llamada v2 (firma única + side-table): público porque el
+/// unwinder de la VM lo consume. El resto del lowering sigue interno.
+pub mod abi;
 pub(crate) mod alloc;
 pub(crate) mod arrays;
 pub(crate) mod body;

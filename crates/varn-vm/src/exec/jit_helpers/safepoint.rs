@@ -11,6 +11,9 @@ use crate::value::VmValue;
 /// allocating loops don't overflow the nursery into the old generation.
 /// Takes no `VmValue` arguments by design — the caller has flushed every VM
 /// register to the stack, so all roots are visible and get reloaded after.
+/// v2 (§3.5): el colector arma `ctx.poll`; el código hace `test al,al;
+/// jnz slow` (un byte, branch predecible) en vez de comparar longitudes inline.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;

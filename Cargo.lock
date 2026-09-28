@@ -2130,6 +2130,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "varn-abi"
+version = "0.1.0"
+dependencies = [
+ "varn-core",
+]
+
+[[package]]
 name = "varn-builtins"
 version = "0.1.0"
 dependencies = [
@@ -2254,6 +2261,7 @@ dependencies = [
  "cranelift-native",
  "cranelift-object",
  "rustc-hash 1.1.0",
+ "varn-abi",
  "varn-core",
  "varn-types",
 ]
@@ -2398,10 +2406,12 @@ dependencies = [
  "ryu",
  "serde",
  "serde_json",
+ "varn-abi",
  "varn-builtins",
  "varn-core",
  "varn-jit",
  "varn-modules",
+ "varn-op-macros",
  "varn-runtime",
  "varn-types",
 ]

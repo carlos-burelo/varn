@@ -1,12 +1,16 @@
-//! The two calling conventions a compilation produces, and the wrapper that
-//! bridges them.
+//! Convenciones de llamada: v1 legado + v2 (§3 del spec).
 //!
-//! * RAW — unboxed, the shape the body is actually lowered against.
-//! * `JitFn` — the four fixed words every VM-side caller knows how to invoke.
+//! * v2 RAW — firma única `raw(ctx: *mut AbiCtx, frame: *mut AbiFrame)`.
+//!   Sin args en registros: el caller materializó el tramo del callee.
+//!   Retorno escalar unboxed en `rax`/`xmm0`, resto `void` + `ctx.result`.
+//!   JIT→JIT usa solo esta. Es el camino que en estado estable cuesta un
+//!   `call` directo con dirección horneada, cero stores.
+//! * `JitFn` (wrapper) — sobrevive SOLO como puerta VM→JIT (dispatch del
+//!   intérprete, top-level, OSR-entry). JIT→JIT nunca lo usa.
 //!
-//! Keeping both here means the ABI can be read in one place: `lower::body`
-//! consumes [`raw_signature`] and never restates the layout, and the wrapper
-//! is the only code that knows how a boxed argument becomes a raw one.
+//! La side-table `{pc → (resume, dest)}` sustituye los stores por llamada
+//! `jit_resume_ip`/`jit_call_dest`: se emite en compilación, la lee solo el
+//! unwinder en `throw` (frío).
 
 use cranelift_codegen::ir::{
     types, AbiParam, Function, InstBuilder, MemFlags, Signature, UserFuncName,
@@ -19,6 +23,59 @@ use varn_types::FunctionProto;
 use super::emit::retag_raw_return;
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
+
+pub use varn_abi::{AbiCtx, AbiFrame, CallSite};
+
+/// Firma única v2: `raw(ctx: *mut AbiCtx, frame: *mut AbiFrame)`.
+/// Retorno según `return_kind`: `Int`/`Bool` → `i64`, `Float` → `f64`,
+/// resto → `void` (boxed en `ctx.result`).
+pub fn raw_signature_v2(return_kind: SlotKind, isa: &OwnedTargetIsa) -> Signature {
+    let mut sig = Signature::new(isa.default_call_conv());
+    sig.params.push(AbiParam::new(types::I64)); // ctx
+    sig.params.push(AbiParam::new(types::I64)); // frame
+    match return_kind {
+        SlotKind::Int | SlotKind::Bool => {
+            sig.returns.push(AbiParam::new(types::I64));
+        }
+        SlotKind::Float => {
+            sig.returns.push(AbiParam::new(types::F64));
+        }
+        SlotKind::Ref | SlotKind::Str | SlotKind::Dynamic => {}
+    }
+    sig
+}
+
+/// Side-table por función (§3.3): `{pc_llamada → (resume_ip, dest)}`.
+/// Emitida en compilación, consultada solo por el unwinder. Orden de
+/// inserción = orden de emisión (determinista, Ley 4); búsqueda lineal en
+/// frío, sin hash.
+#[derive(Debug, Default)]
+pub struct CallSiteTable {
+    sites: Vec<CallSite>,
+}
+
+impl CallSiteTable {
+    pub fn new() -> Self {
+        Self { sites: Vec::new() }
+    }
+    pub fn record(&mut self, pc_offset: u32, resume_ip: u32, dest: u16) {
+        self.sites.push(CallSite {
+            pc_offset,
+            resume_ip,
+            dest,
+            _pad: 0,
+        });
+    }
+    pub fn lookup(&self, pc_offset: u32) -> Option<(u32, u16)> {
+        CallSite::lookup(&self.sites, pc_offset)
+    }
+    pub fn len(&self) -> usize {
+        self.sites.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.sites.is_empty()
+    }
+}
 
 /// Raw signature: `fn(exec_ctx, [base, closure], arg × nparams) -> i64`.
 /// Int-declared args arrive unboxed; everything else arrives as its boxed
@@ -58,13 +115,9 @@ pub(super) fn raw_signature(
     sig
 }
 
-/// Wrapper with the template `JitFn` ABI:
-/// `(stack_ptr, closure, base, exec_ctx) -> boxed VmValue`.
-///
-/// Kept for the OSR entry too, rather than exposing `raw` directly: the
-/// wrapper is what consumes the caller-prepush flag (every JIT prologue must)
-/// and what re-tags an unboxed int return. An OSR body returns through the
-/// same `Return` opcodes as any other, so it needs both.
+/// Wrapper con ABI `JitFn`: `(stack_ptr, closure, base, exec_ctx)`.
+/// Puerta VM→JIT SOLO (dispatch intérprete, top-level, OSR-entry).
+/// JIT→JIT nunca lo usa: ese camino es `raw_signature_v2` directo.
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,

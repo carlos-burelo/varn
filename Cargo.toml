@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/varn-abi",
     "crates/varn-core",
     "crates/varn-lexer",
     "crates/varn-parser",

@@ -15,6 +15,12 @@ pub use loop_hoist::{
     diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic,
 };
 
+/// Side-table y firma única para el unwinder / tiering de la VM.
+pub use clif::abi::{raw_signature_v2, CallSite, CallSiteTable};
+/// Contrato ABI v2: única fuente del layout caliente (spec §1-§2).
+/// `varn-jit` y `varn-vm` lo nombran desde aquí; ninguno lo redefine.
+pub use varn_abi;
+
 /// Re-exported so `varn-debug` can name the host ISA type (from
 /// `clif::shared_isa()`) without taking a direct `cranelift-codegen` dep.
 pub use cranelift_codegen::isa::OwnedTargetIsa;
