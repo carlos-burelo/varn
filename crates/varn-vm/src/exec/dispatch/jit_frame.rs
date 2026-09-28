@@ -73,7 +73,6 @@ unsafe fn execute_jit_frame(
         if is_outer {
             (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf;
         }
-        (*ctx).jit_frame_prepushed = 1;
         let val = (jit_fn)(
             std::ptr::null_mut(),
             closure_ptr as *const std::ffi::c_void,

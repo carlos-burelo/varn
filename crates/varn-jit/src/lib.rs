@@ -350,9 +350,6 @@ macro_rules! define_jit_helpers {
         /// register's `ctx.stack` home slot, so a stack reallocation can never
         /// leave a stale base.
         pub stack_data_offset: usize,
-        /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
-        /// frame handshake word (see its doc in varn-vm).
-        pub frame_prepushed_offset: usize,
         /// Byte offset of ExecCtx.jit_call_base — `jit_prepare_static_call`'s
         /// scratch output for the callee frame's `base`.
         pub jit_call_base_offset: usize,

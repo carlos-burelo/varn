@@ -9,8 +9,8 @@
 //! * the RAW function — unboxed `fn(i64 × nparams) -> i64`, the entire body
 //!   in native registers, recursion as a direct hardware call to its own
 //!   entry;
-//! * the WRAPPER — the template JIT's `JitFn` ABI. It clears the
-//!   caller-prepush flag (protocol: every JIT prologue consumes it), loads
+//! * the WRAPPER — the template JIT's `JitFn` ABI. The caller always pushed
+//!   the frame before entry (v2 §1, sin handshake), so the wrapper loads
 //!   the boxed args from the VM stack, unboxes their payloads, calls the raw
 //!   function and re-tags the result.
 //!

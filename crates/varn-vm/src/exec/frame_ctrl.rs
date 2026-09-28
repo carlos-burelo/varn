@@ -192,9 +192,9 @@ impl ExecCtx {
                 self.frames.push(frame);
                 self.pending_constructors
                     .push((ctor_frame_idx, instance_nv));
-                if self.jit_frame_prepushed != 0 {
-                    let _ = self.run_until(ctor_frame_idx)?;
-                }
+                // Sin handshake (v2 §1): el frame loop que llamó continúa y
+                // ejecuta el ctor; anidado bajo JIT lo ejecuta el `run_until`
+                // exterior ya en curso. Nunca se anida uno nuevo aquí.
             }
             PreparedCall::NativeImmediate(f, arg_count) => {
                 self.record_call_native(f, None);

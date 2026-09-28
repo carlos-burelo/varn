@@ -274,7 +274,6 @@ pub(crate) extern "C" fn jit_prepare_static_call(
         frame.return_reg = dest as u16;
         let closure_ptr = frame.closure_ptr as usize;
         ctx_ref.frames.push(frame);
-        ctx_ref.jit_frame_prepushed = 1;
         ctx_ref.jit_call_base = callee_alloc;
         ctx_ref.jit_call_closure_ptr = closure_ptr;
         jit_fn as usize

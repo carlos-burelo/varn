@@ -176,14 +176,9 @@ pub(super) fn build_wrapper(
         }
     };
 
-    // Protocol: every JIT prologue consumes the caller-prepush flag.
-    let zero32 = b.ins().iconst(types::I64, 0);
-    b.ins().store(
-        MemFlags::trusted(),
-        zero32,
-        exec_ctx,
-        helpers.frame_prepushed_offset as i32,
-    );
+    // El caller empuja siempre (v2 §1): sin handshake, sin flag que consumir.
+    // Cada entrada llega con su CallFrame ya empujado (dispatch intérprete,
+    // `jit_prepare_static_call`, OSR sobre frame vivo, CallSelf vía helper).
 
     // Args live in each parameter register's home slot (the frame is
     // partitioned, so there is no contiguous `stack[base + 1 + i]`).
