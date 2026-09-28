@@ -3,11 +3,8 @@
 //! Integer division/modulo/power and float modulo/power are not native ISA
 //! operations with Varn's exact semantics (division by zero, `int` overflow,
 //! `f64` rounding): the VM owns them as helpers over boxed `VmValue`s, writing
-//! the result into the live `ExecCtx`. A leaf has no `exec_ctx` parameter, so
-//! the live context is recovered through the same `current_exec_ctx` getter the
-//! bytecode lowering uses — the reason these ops can stay in the leaf lowering
-//! instead of forcing the function frame-aware. The getter is equally valid in
-//! a frame-aware body, so one path serves both.
+//! the result into the live `ExecCtx` (`ctx.exec_ctx`, real en leaf y
+//! frame-aware).
 
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -15,9 +12,7 @@ use varn_types::ssa::SsaBinOp;
 
 use super::Ctx;
 
-use super::super::emit::{
-    box_f64, box_int, call_helper, call_helper_void, unbox_f64_coerce, unbox_int,
-};
+use super::super::emit::{box_f64, box_int, call_helper_void, unbox_f64_coerce, unbox_int};
 
 /// Boxed-destination op: operands arrive native (`I64` for `Int*`, `F64` for
 /// `Float*`) and the result is returned native in the class `dest_float`
@@ -44,7 +39,7 @@ pub(super) fn emit_bin(
 
     let (a_tag, a_payload) = box_native(b, a, operand_float);
     let (b_tag, b_payload) = box_native(b, c, operand_float);
-    let live = call_helper(b, cc, helpers.current_exec_ctx, &[]);
+    let live = ctx.exec_ctx;
     call_helper_void(b, cc, helper, &[live, a_tag, a_payload, b_tag, b_payload]);
     let boxed = b.ins().load(
         types::I128,

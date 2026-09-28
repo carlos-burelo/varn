@@ -168,7 +168,6 @@ pub(super) fn lower_raw(
         eprintln!("ENTRYINIT done frame_aware={frame_aware}");
     }
 
-    let mut leaf_ctx = None;
     let mut entry_base = None;
     let (exec_ctx, alloc_env) = if frame_aware {
         let closure = b.block_params(entry)[1];
@@ -177,9 +176,8 @@ pub(super) fn lower_raw(
         entry_base = Some(base);
         (exec_ctx, Some((base, closure)))
     } else {
-        let dummy_ctx = b.ins().iconst(types::I64, 0);
-        leaf_ctx = Some(dummy_ctx);
-        (dummy_ctx, None)
+        // Leaf: param 0 es exec_ctx (siempre real, nunca placeholder).
+        (b.block_params(entry)[0], None)
     };
 
     let live = if alloc_env.is_some() {
@@ -213,7 +211,7 @@ pub(super) fn lower_raw(
     let reg_offset = 1;
     for i in 0..sig_nparams {
         let r = reg_offset + i;
-        let param_idx = if frame_aware { 4 + i } else { i };
+        let param_idx = if frame_aware { 4 + i } else { 1 + i };
         let p = b.block_params(entry)[param_idx];
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
             || meta_is_float(&proto.register_meta, r);
@@ -594,19 +592,6 @@ pub(super) fn lower_raw(
     b.seal_all_blocks();
     b.finalize();
 
-    // A leaf signature carries no `exec_ctx`, so the placeholder standing in
-    // for it must reach no instruction. If it did, the lowering would read the
-    // heap off a null pointer; ask for a frame-aware retry instead.
-    if let Some(dummy) = leaf_ctx {
-        for block in func.layout.blocks() {
-            for inst in func.layout.block_insts(block) {
-                if func.dfg.inst_values(inst).any(|v| v == dummy) {
-                    return Err(super::lower::NEEDS_EXEC_CTX.to_owned());
-                }
-            }
-        }
-    }
-
     super::debug::capture_ir(&mut debug, &func);
 
     let violations = super::invariants::check(
@@ -614,7 +599,6 @@ pub(super) fn lower_raw(
         &super::invariants::Context {
             frame_aware,
             caller_base: entry_base,
-            leaf_ctx,
         },
     );
     super::debug::capture_invariants(&mut debug, &violations);

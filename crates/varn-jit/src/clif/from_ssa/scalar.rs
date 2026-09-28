@@ -119,10 +119,12 @@ pub(super) fn emit_inst(
                     b, ctx, values, args,
                 )?)));
             }
-            let a: Vec<Value> = args
+            let mut a: Vec<Value> = args
                 .iter()
                 .map(|v| load_value(b, ctx, values, *v))
                 .collect::<Result<_, _>>()?;
+            // Leaf: el raw abre con exec_ctx; la recursión lo reenvía.
+            a.insert(0, ctx.exec_ctx);
             let call = b.ins().call(ctx.self_ref, &a);
             b.inst_results(call)[0]
         }
@@ -326,26 +328,12 @@ fn checked_int(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaBinOp, a: Value, c
             (r, o, helpers.mul)
         }
     };
-    // The `exec_ctx` argument is only read on the cold raise path, which
-    // recovers the live context through the getter instead; a leaf body has no
-    // real `exec_ctx` to pass, and this placeholder never reaches an
-    // instruction.
-    let dummy = b.ins().iconst(types::I64, 0);
-    guard_overflow(
-        b,
-        ctx.cc,
-        dummy,
-        Some(helpers.current_exec_ctx),
-        helper,
-        r,
-        ovf,
-        a,
-        c,
-    )
+    // `exec_ctx` es param 0 del raw: el raise lo usa directo.
+    guard_overflow(b, ctx.cc, ctx.exec_ctx, helper, r, ovf, a, c)
 }
 
 fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Result<Value, String> {
-    use super::super::emit::{box_int, call_helper, call_helper_void};
+    use super::super::emit::{box_int, call_helper_void};
     Ok(match op {
         SsaUnOp::NegInt => {
             let cc = ctx.cc;
@@ -356,10 +344,9 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
             let cont = b.create_block();
             b.ins().brif(fits, cont, &[], raise, &[]);
             b.switch_to_block(raise);
-            let live = call_helper(b, cc, helpers.current_exec_ctx, &[]);
             let boxed = box_int(b, a);
             let (tag, payload) = b.ins().isplit(boxed);
-            call_helper_void(b, cc, helpers.negate, &[live, tag, payload]);
+            call_helper_void(b, cc, helpers.negate, &[ctx.exec_ctx, tag, payload]);
             b.ins().jump(cont, &[]);
             b.switch_to_block(cont);
             neg

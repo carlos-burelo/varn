@@ -2,8 +2,8 @@
 //! bytecode's generic opcodes, for operands no type proves native. They run
 //! the same runtime helpers through the same lowering as the bytecode path
 //! (`clif::generic::{boxed_binop, boxed_compare}`), so an operator means the
-//! same thing compiled either way. The live `ExecCtx` comes from the frame, or
-//! from `current_exec_ctx` in a leaf body, which has no `exec_ctx` parameter.
+//! same thing compiled either way. The live `ExecCtx` es `ctx.exec_ctx`
+//! (entry param 0 en leaf, 3 en frame-aware).
 
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -14,14 +14,6 @@ use super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
 use super::super::generic::{boxed_binop, boxed_compare};
 use super::heap::boxed_parts;
 use super::{Ctx, Out};
-
-/// The live `ExecCtx`.
-fn exec_ctx(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Value {
-    match &ctx.frame {
-        Some(frame) => frame.exec_ctx,
-        None => call_helper(b, ctx.cc, ctx.helpers.current_exec_ctx, &[]),
-    }
-}
 
 /// A comparison's `0`/`1` as the destination holds it.
 fn bool_out(b: &mut FunctionBuilder, cond: Value, dest: Option<SlotKind>) -> Out {
@@ -43,7 +35,7 @@ pub(super) fn emit_bin(
     let h = ctx.helpers;
     let a = boxed_parts(b, ctx, values, lhs)?;
     let c = boxed_parts(b, ctx, values, rhs)?;
-    let ectx = exec_ctx(b, ctx);
+    let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
     let arith = |b: &mut FunctionBuilder, helper| {
         Out::Boxed(boxed_binop(b, ctx.cc, helper, ectx, result_off, a, c))
@@ -86,7 +78,7 @@ pub(super) fn emit_un(
 ) -> Result<Out, String> {
     let h = ctx.helpers;
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(b, ctx);
+    let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
     Ok(match op {
         DynUnOp::Neg => {

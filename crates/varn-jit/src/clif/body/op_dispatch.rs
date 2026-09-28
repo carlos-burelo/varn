@@ -186,24 +186,9 @@ pub(crate) fn dispatch_opcode(
                         (res, ovf, helpers.mul)
                     }
                 };
-                // `actx` is `None` exactly when this lowering is a leaf: its raw
-                // ABI carries no `exec_ctx`, so `exec_ctx` here is `body::leaf_ctx`'s
-                // placeholder, not a real pointer. Handing the raise helper a
-                // getter instead of the placeholder keeps the placeholder
-                // unreferenced, which is what keeps the function a leaf — see
-                // `guard_overflow`.
-                let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
-                let w = guard_overflow(
-                    b,
-                    cc,
-                    exec_ctx,
-                    leaf_ctx_helper,
-                    helper,
-                    r,
-                    overflow,
-                    s1,
-                    s2,
-                );
+                // `actx` is `None` exactly when this lowering is a leaf; `exec_ctx`
+                // es param 0 del raw en ambos casos, sin getters.
+                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s1, s2);
                 def_int_result(b, actx, &proto.register_meta, vars, first_reg, w);
             }
         }
@@ -317,21 +302,8 @@ pub(crate) fn dispatch_opcode(
                     let (res, ovf) = b.ins().ssub_overflow(s, imm_v);
                     (res, ovf, helpers.sub)
                 };
-                // See the AddInt/SubInt/MulInt arm above: `exec_ctx` is a
-                // placeholder in a leaf lowering, so the raise block must
-                // recover a real pointer through the getter instead.
-                let leaf_ctx_helper = actx.is_none().then_some(helpers.current_exec_ctx);
-                let w = guard_overflow(
-                    b,
-                    cc,
-                    exec_ctx,
-                    leaf_ctx_helper,
-                    helper,
-                    r,
-                    overflow,
-                    s,
-                    imm_v,
-                );
+                // `exec_ctx` es real en leaf y frame-aware: el raise lo usa directo.
+                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s, imm_v);
                 def_int_result(b, actx, &proto.register_meta, vars, first_reg, w);
             }
         }
@@ -485,6 +457,9 @@ pub(crate) fn dispatch_opcode(
                 args.push(stack_ptr);
                 args.push(closure_val);
                 args.push(base_val);
+                args.push(exec_ctx);
+            } else {
+                // Leaf: el raw abre con exec_ctx; la recursión lo reenvía.
                 args.push(exec_ctx);
             }
             for i in 0..nparams {

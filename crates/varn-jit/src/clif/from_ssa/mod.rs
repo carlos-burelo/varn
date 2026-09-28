@@ -18,7 +18,8 @@
 //!   it is correct first, and a later pass may hoist.
 //!
 //! Shapes admitted (see `docs/plans/2026-09-20-PLAN-PENDIENTE.md`):
-//! * **leaf** — only scalars, no `this`/upvalues/alloc: raw `(args…) -> scalar`;
+//! * **leaf** — only scalars, no `this`/upvalues/alloc: raw `(exec_ctx, args…)
+//!   -> scalar`;
 //! * **frame-aware** — the body has heap values, module globals or calls, so it
 //!   needs `(stack, closure, base, exec_ctx, args…)`.
 //!
@@ -100,6 +101,10 @@ pub(super) struct Ctx<'a> {
     /// Resolved constant pool of the proto, indexed like the bytecode's.
     pub constants: &'a [VmValue],
     pub self_ref: FuncRef,
+    /// Live `ExecCtx`, always real: entry param 0 in a leaf, param 3 in a
+    /// frame-aware body (same value `frame.exec_ctx` carries there). Ningún
+    /// camino lo recupera por thread-local.
+    pub exec_ctx: Value,
     /// `Some` iff this body is frame-aware (heap/globals/calls).
     pub frame: Option<FrameIo<'a>>,
     /// Whether the host rounds in one instruction (`floor`/`ceil`, SSE4.1).
@@ -198,7 +203,7 @@ pub(super) fn try_lower(
     let entry = ssa.entry as usize;
     let call_entry = osr.is_none().then_some(entry);
     let start = osr.map_or(entry, |h| h.block as usize);
-    let preamble = if frame_aware { 4 } else { 0 };
+    let preamble = if frame_aware { 4 } else { 1 };
     let mut blocks: Vec<Option<cranelift_codegen::ir::Block>> = vec![None; ssa.blocks.len()];
     let entry_blk = b.create_block();
     b.append_block_params_for_function_params(entry_blk);
@@ -233,7 +238,8 @@ pub(super) fn try_lower(
     b.switch_to_block(entry_blk);
     let views = views::Views::declare(&mut b, ssa);
 
-    // The frame-aware raw ABI prepends `stack, closure, base, exec_ctx`.
+    // The frame-aware raw ABI prepends `stack, closure, base, exec_ctx`; a leaf
+    // abre con `exec_ctx` (param 0). Ambos reales, sin getters.
     let frame = if frame_aware {
         let params = b.block_params(entry_blk);
         let abi_count = if osr.is_some() {
@@ -254,6 +260,7 @@ pub(super) fn try_lower(
     } else {
         None
     };
+    let entry_params = b.block_params(entry_blk).to_vec();
     let ctx = Ctx {
         cc,
         helpers,
@@ -261,6 +268,11 @@ pub(super) fn try_lower(
         proto,
         constants,
         self_ref,
+        exec_ctx: if frame_aware {
+            entry_params[3]
+        } else {
+            entry_params[0]
+        },
         frame,
         has_round: super::floats::has_round_support(isa),
         views,

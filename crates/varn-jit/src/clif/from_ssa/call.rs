@@ -81,12 +81,15 @@ pub(super) fn emit_call(
     b.ins().brif(take_direct, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
-    let arg_values: Vec<Value> = args
+    let mut arg_values: Vec<Value> = args
         .iter()
         .map(|v| load_value(b, ctx, values, *v))
         .collect::<Result<_, _>>()?;
+    // El callee leaf abre con exec_ctx: se antepone el propio.
+    arg_values.insert(0, ctx.exec_ctx);
     let direct = {
         let mut sig = Signature::new(ctx.cc);
+        sig.params.push(AbiParam::new(types::I64)); // exec_ctx
         for k in &target.param_kinds {
             sig.params.push(AbiParam::new(match k {
                 SlotKind::Float => types::F64,

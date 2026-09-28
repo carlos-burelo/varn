@@ -20,12 +20,10 @@ use super::super::emit::{
     box_bool, box_f64, box_int, call_helper, call_helper_void, unbox_f64_coerce, unbox_int,
 };
 
-/// The live `ExecCtx` of a frame-aware body; heap ops have no leaf form.
-pub(super) fn exec_ctx(ctx: &Ctx<'_>) -> Result<Value, String> {
-    ctx.frame
-        .as_ref()
-        .map(|f| f.exec_ctx)
-        .ok_or_else(|| "from_ssa: heap op without a frame".into())
+/// The live `ExecCtx`: entry param 0 in a leaf, param 3 in a frame-aware body.
+/// Siempre real — ningún camino lo recupera por thread-local.
+pub(super) fn exec_ctx(ctx: &Ctx<'_>) -> Value {
+    ctx.exec_ctx
 }
 
 /// A value as a boxed `VmValue` (`I128`): scalars are boxed by their class,
@@ -78,7 +76,7 @@ pub(super) fn emit_is_array(
     operand: u32,
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     Ok(call_helper(
         b,
         ctx.cc,
@@ -96,7 +94,7 @@ pub(super) fn emit_unary_boxed(
     helper: usize,
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(b, ctx.cc, helper, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
@@ -117,7 +115,7 @@ pub(super) fn emit_str_concat(
 ) -> Result<Value, String> {
     let (at, ap) = boxed_parts(b, ctx, values, lhs)?;
     let (bt, bp) = boxed_parts(b, ctx, values, rhs)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.str_concat, &[ectx, at, ap, bt, bp]);
     Ok(b.ins().load(
         types::I128,
@@ -203,7 +201,7 @@ pub(super) fn emit_build_object(
         .iter()
         .map(|v| boxed_value(b, ctx, values, *v))
         .collect::<Result<_, _>>()?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     let count = vals.len();
     let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
         cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
@@ -244,7 +242,7 @@ fn emit_window_boxed(
     vals: &[Value],
     count: usize,
 ) -> Result<Value, String> {
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
         cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
         (vals.len().max(1) * 16) as u32,

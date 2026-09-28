@@ -164,7 +164,9 @@ pub(crate) fn emit_call(
         return Ok(());
     };
 
-    let mut raw_args = Vec::with_capacity(t.param_kinds.len());
+    let mut raw_args = Vec::with_capacity(t.param_kinds.len() + 1);
+    // El callee leaf abre con exec_ctx: se antepone el propio.
+    raw_args.push(actx.exec_ctx);
     for (i, k) in t.param_kinds.iter().enumerate() {
         let r = arg_start + 1 + i;
         let v = if *k == SlotKind::Int {
@@ -211,6 +213,8 @@ pub(crate) fn emit_call(
     flush_boxed(b, actx, state, &regs);
     let raw_sig = {
         let mut s = cranelift_codegen::ir::Signature::new(actx.cc);
+        s.params
+            .push(cranelift_codegen::ir::AbiParam::new(types::I64)); // exec_ctx
         for k in &t.param_kinds {
             if *k == SlotKind::Float {
                 s.params

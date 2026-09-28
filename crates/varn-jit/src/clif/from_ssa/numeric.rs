@@ -22,7 +22,7 @@ use varn_types::ssa::SsaProto;
 use super::super::emit::{box_f64, call_helper_void};
 use super::{call, heap, load_value, Ctx, Out};
 
-fn exec_ctx(ctx: &Ctx<'_>) -> Result<Value, String> {
+fn exec_ctx(ctx: &Ctx<'_>) -> Value {
     heap::exec_ctx(ctx)
 }
 
@@ -69,7 +69,7 @@ pub(super) fn emit_intrinsic(
             }
         }
     }
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     let receiver = heap::boxed_value(b, ctx, values, object)?;
     let window = call::boxed_window(b, ctx, values, receiver, args)?;
     let wire_v = b.ins().iconst(types::I64, i64::from(wire));
@@ -100,7 +100,7 @@ pub(super) fn emit_convert(
         let a = load_value(b, ctx, values, operand)?;
         return Ok(Out::Native(b.ins().fcvt_from_sint(types::F64, a)));
     }
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     let (tag, payload) = heap::boxed_parts(b, ctx, values, operand)?;
     let conv_v = b.ins().iconst(types::I64, conv as i64);
     call_helper_void(

@@ -173,7 +173,7 @@ pub(super) fn emit_get(
     index: u32,
     dest: Option<u32>,
 ) -> Result<Out, String> {
-    let exec_ctx = heap::exec_ctx(ctx)?;
+    let exec_ctx = heap::exec_ctx(ctx);
     let want = Elem::of(dest.map_or(SlotKind::Dynamic, |d| ctx.ssa.value_ty(d)));
     let key = load_value(b, ctx, values, index)?;
 
@@ -250,7 +250,7 @@ pub(super) fn emit_set(
     index: u32,
     value: u32,
 ) -> Result<(), String> {
-    let exec_ctx = heap::exec_ctx(ctx)?;
+    let exec_ctx = heap::exec_ctx(ctx);
     let src = Elem::of(ctx.ssa.value_ty(value));
     let key = load_value(b, ctx, values, index)?;
 

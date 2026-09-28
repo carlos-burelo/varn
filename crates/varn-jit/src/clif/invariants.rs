@@ -9,7 +9,7 @@
 //! reports them; the lowering itself only records them, so a broken invariant
 //! can be inspected rather than turning every compile into a panic.
 
-use cranelift_codegen::ir::{instructions::InstructionData, types, Function, Inst, Opcode, Value};
+use cranelift_codegen::ir::{instructions::InstructionData, types, Function, Inst, Value};
 
 /// One violated invariant, addressed to whoever is reading `-p clif:check`.
 #[derive(Debug, Clone)]
@@ -26,9 +26,6 @@ pub struct Context {
     /// The entry block's `base` parameter, present only when frame-aware. A
     /// direct self-call must never forward it.
     pub caller_base: Option<Value>,
-    /// The placeholder a leaf lowering gets where a frame-aware one would have
-    /// `exec_ctx`. Present only when the lowering is a leaf.
-    pub leaf_ctx: Option<Value>,
 }
 
 /// Check every rule against a finished function. Cheap enough to run on every
@@ -38,7 +35,6 @@ pub fn check(func: &Function, ctx: &Context) -> Vec<Violation> {
     let mut out = Vec::new();
     for block in func.layout.blocks() {
         for inst in func.layout.block_insts(block) {
-            leaf_ctx_dereferenced(func, inst, ctx, &mut out);
             self_call_forwards_caller_frame(func, inst, ctx, &mut out);
             call_arg_types_match_signature(func, inst, &mut out);
             stack_store_of_pair(func, inst, &mut out);
@@ -46,48 +42,6 @@ pub fn check(func: &Function, ctx: &Context) -> Vec<Violation> {
     }
     out.dedup_by(|a, b| a.rule == b.rule && a.detail == b.detail);
     out
-}
-
-/// A leaf lowering dereferencing the placeholder that stands in for `exec_ctx`.
-///
-/// Reading the heap means loading its base off `exec_ctx`, and the leaf calling
-/// convention does not carry one — it passes a placeholder zero. A lowering
-/// that walks the heap without asking to be frame-aware turns that into
-/// `load [0 + 144]`, a null dereference the moment the function runs. It cost a
-/// segfault in `tests/09-control-flow.vn` and hours of reading IR by eye.
-///
-/// The rule names the placeholder rather than testing for a zero address,
-/// because a zero address is not by itself wrong: the array and object caches
-/// deliberately zero their base and guard every use with `icmp_imm ne base, 0`,
-/// so a load off a constant zero in a block the guard dominates is correct and
-/// ordinary. Only the placeholder is unguarded by construction.
-fn leaf_ctx_dereferenced(func: &Function, inst: Inst, ctx: &Context, out: &mut Vec<Violation>) {
-    let Some(placeholder) = ctx.leaf_ctx else {
-        return;
-    };
-    let opcode = func.dfg.insts[inst].opcode();
-    let addr = match opcode {
-        Opcode::Load
-        | Opcode::Uload8
-        | Opcode::Sload8
-        | Opcode::Uload16
-        | Opcode::Sload16
-        | Opcode::Uload32
-        | Opcode::Sload32 => func.dfg.inst_args(inst).first().copied(),
-        Opcode::Store | Opcode::Istore8 | Opcode::Istore16 | Opcode::Istore32 => {
-            func.dfg.inst_args(inst).get(1).copied()
-        }
-        _ => None,
-    };
-    if addr != Some(placeholder) {
-        return;
-    }
-    out.push(Violation {
-        rule: "leaf-ctx-dereferenced",
-        detail: format!(
-            "{opcode} addresses {placeholder}, the exec_ctx placeholder of a leaf lowering — this function walks the heap and must be lowered frame-aware"
-        ),
-    });
 }
 
 /// A direct self-call handing the callee the caller's own `base`.

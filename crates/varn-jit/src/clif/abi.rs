@@ -79,15 +79,18 @@ impl CallSiteTable {
     }
 }
 
-/// Raw signature: `fn(exec_ctx, [base, closure], arg × nparams) -> i64`.
-/// Int-declared args arrive unboxed; everything else arrives as its boxed
-/// VmValue bits. `exec_ctx` is only dereferenced by the heap-walking ops and
-/// the slow helpers. Frame-aware functions (they allocate and/or take a
-/// `this` receiver) carry two extra parameters: `base` (this frame's
-/// register-0 index into `ctx.stack`, for flushing heap-typed registers to
-/// their home slots at a safepoint and for reading the receiver from
-/// `stack[base+0]`) and `closure` (this function's `VmClosure*`, needed by
-/// shape-driven object construction).
+/// Raw signature: leaf `fn(exec_ctx, arg × nparams)`; frame-aware
+/// `fn(stack_ptr, closure, base, exec_ctx, arg × nparams)`.
+/// Todo raw recibe `exec_ctx` (v2 §3.1: el contexto viaja explícito): el leaf
+/// en param 0, el frame-aware en param 3 como antes — ningún camino recupera
+/// el contexto por thread-local. Int-declared args arrive unboxed; everything
+/// else arrives as its boxed VmValue bits. `exec_ctx` is only dereferenced by
+/// the heap-walking ops and the slow helpers. Frame-aware functions (they
+/// allocate and/or take a `this` receiver) además reciben `stack_ptr`
+/// (unused, kept for arity), `closure` (this function's `VmClosure*`, needed
+/// by shape-driven object construction) y `base` (this frame's register-0
+/// index into `ctx.stack`, for flushing heap-typed registers to their home
+/// slots at a safepoint and for reading the receiver from `stack[base+0]`).
 pub(super) fn raw_signature(
     proto: &FunctionProto,
     nparams: usize,
@@ -99,6 +102,10 @@ pub(super) fn raw_signature(
         for _ in 0..4 {
             sig.params.push(AbiParam::new(types::I64));
         }
+    } else {
+        // Leaf: solo ctx + args. El wrapper lo pasa siempre; la recursión
+        // directa lo reenvía; los call-sites directos lo anteponen.
+        sig.params.push(AbiParam::new(types::I64));
     }
     for i in 0..nparams {
         let is_float = proto.param_kinds.get(i) == Some(&SlotKind::Float)
@@ -194,6 +201,9 @@ pub(super) fn build_wrapper(
         args.push(stack_ptr);
         args.push(closure);
         args.push(base);
+        args.push(exec_ctx);
+    } else {
+        // Leaf: el raw abre con exec_ctx (param 0). El wrapper lo tiene.
         args.push(exec_ctx);
     }
     for i in 0..nparams {

@@ -24,7 +24,7 @@ pub(super) fn emit_array_length(
     operand: u32,
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.array_length, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
@@ -42,7 +42,7 @@ pub(super) fn emit_str_length(
     operand: u32,
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     Ok(super::super::strings::str_length_boxed(
         b,
         ctx.cc,
@@ -62,7 +62,7 @@ pub(super) fn emit_bytes_length(
     operand: u32,
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.bytes_length, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
@@ -82,7 +82,7 @@ pub(super) fn emit_array_push(
 ) -> Result<(), String> {
     let (at, ap) = boxed_parts(b, ctx, values, array)?;
     let (vt, vp) = boxed_parts(b, ctx, values, value)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.array_push, &[ectx, at, ap, vt, vp]);
     Ok(())
 }
@@ -97,7 +97,7 @@ pub(super) fn emit_get_index(
 ) -> Result<Value, String> {
     let (ot, op) = boxed_parts(b, ctx, values, object)?;
     let (kt, kp) = boxed_parts(b, ctx, values, index)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(
         b,
         ctx.cc,
@@ -124,7 +124,7 @@ pub(super) fn emit_set_index(
     let (ot, op) = boxed_parts(b, ctx, values, object)?;
     let (kt, kp) = boxed_parts(b, ctx, values, index)?;
     let (vt, vp) = boxed_parts(b, ctx, values, value)?;
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     call_helper_void(
         b,
         ctx.cc,
@@ -144,7 +144,7 @@ fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::fields::FieldIo<'a>, S
     Ok(super::super::fields::FieldIo {
         helpers: ctx.helpers,
         cc: ctx.cc,
-        exec_ctx: exec_ctx(ctx)?,
+        exec_ctx: exec_ctx(ctx),
     })
 }
 
@@ -173,7 +173,7 @@ pub(super) fn emit_get_fixed_field(
         ));
     }
     let (ot, op) = b.ins().isplit(obj);
-    let ectx = exec_ctx(ctx)?;
+    let ectx = exec_ctx(ctx);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
     call_helper_void(
         b,
