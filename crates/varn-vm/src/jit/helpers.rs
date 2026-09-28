@@ -73,24 +73,7 @@ macro_rules! fill_jit_helpers {
 /// needed — so both `compile_jit` and the `vn debug -p clif` inspection path
 /// share this single source of truth.
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
-    let mut h = varn_jit::jit_helper_abi!(fill_jit_helpers);
-    // Fase B (frame por clases): these helper bodies are still fase-A
-    // tripwires (`unreachable!`). Zeroing their address makes the lowering
-    // notice (`call_helper`'s disabled-helper flag) and bail the whole
-    // function, instead of emitting a call that would abort at runtime. Each
-    // one is removed from this list as its body is restored against
-    // `FrameStore`.
-    h.call = 0;
-    h.call_method = 0;
-    h.call_spread = 0;
-    h.jit_prepare_call = 0;
-    h.jit_push_self_frame = 0;
-    h.jit_post_call = 0;
-    h.jit_ensure_stack_capacity = 0;
-    h.invoke_virtual = 0;
-    h.get_property_ic_fast = 0;
-    h.get_property_maybe_ic_fast = 0;
-    h
+    varn_jit::jit_helper_abi!(fill_jit_helpers)
 }
 
 /// Compile-time op-id resolution for `CallNativeOp` codegen.

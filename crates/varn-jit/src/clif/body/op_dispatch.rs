@@ -826,8 +826,7 @@ pub(crate) fn dispatch_opcode(
             alloc::emit_wrap_spread(b, actx, state, code, ip);
         }
         OpCode::CallSpread => {
-            let actx = actx.ok_or("clif: CallSpread outside alloc fn")?;
-            alloc::emit_call_spread(b, actx, state, &proto.register_meta, code, ip);
+            return Err("clif: CallSpread runs interpreted".into());
         }
         OpCode::InvokeRuntimeStatic => {
             let actx = actx.ok_or("clif: InvokeRuntimeStatic outside alloc fn")?;

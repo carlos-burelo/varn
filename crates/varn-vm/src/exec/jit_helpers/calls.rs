@@ -1,11 +1,4 @@
 //! Calling VM code from compiled code.
-//!
-//! K3-faseA: TODO este archivo entero. Solo lo invoca código generado, que ya
-//! no existe (`FRAME_LAYOUT_V2_JIT_BAIL` impide compilar): cada helper que
-//! tocaba el layout `Vec<VmValue>` contiguo queda invalidado con un tripwire
-//! explícito. La fase B lo restaura de git junto con el lowering al layout
-//! por clases. Se conservan firmas, ABI y `MAX_CALL_DEPTH` para que la tabla
-//! de helpers (`jit::helpers`, `helper_abi`) siga enlazando.
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
@@ -18,30 +11,7 @@ use crate::value::VmValue;
 /// catchable runtime error.
 pub(crate) const MAX_CALL_DEPTH: usize = 10000;
 
-macro_rules! bailed {
-    () => {
-        unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL")
-    };
-}
-
-pub(crate) extern "C" fn jit_call(
-    ctx: *mut ExecCtx,
-    args: *const varn_jit::JitCallArgs,
-) -> VmValue {
-    let _ = (ctx, args);
-    bailed!()
-}
-
-pub(crate) extern "C" fn jit_call_method(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    args: *const varn_jit::JitCallMethodArgs,
-) -> VmValue {
-    let _ = (ctx, closure, args);
-    bailed!()
-}
-
-/// Flat-argument shim over [`jit_call_method`] for the CLIF backend. The
+/// Flat-argument method call for the CLIF backend. The
 /// compiled caller flushed its args to the caller activation's homes
 /// (`base` = act_id, `arg_start` = first argument register), which is exactly
 /// what `exec_call_method_reg` reads, so this forwards to it and runs any
@@ -383,9 +353,4 @@ unsafe fn call_running_closure(
         Ok(v) => ctx_ref.jit_native_result = v,
         Err(e) => jit_propagate_error(ctx_ref, e),
     }
-}
-
-pub(crate) extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) {
-    let _ = (ctx, args);
-    bailed!()
 }

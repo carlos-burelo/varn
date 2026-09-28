@@ -9,17 +9,6 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-macro_rules! bailed {
-    () => {
-        unreachable!("K3-faseA: helper de código compilado; ver FRAME_LAYOUT_V2_JIT_BAIL")
-    };
-}
-
-pub(crate) extern "C" fn jit_ensure_stack_capacity(ctx: *mut ExecCtx, required_len: usize) {
-    let _ = (ctx, required_len);
-    bailed!()
-}
-
 #[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_is_native_fn(ctx: *mut ExecCtx, callee: VmValue) -> usize {
     unsafe {

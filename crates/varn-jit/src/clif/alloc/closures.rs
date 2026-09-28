@@ -1,6 +1,5 @@
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
-use varn_types::register_meta::RegisterMeta;
 
 use super::super::emit::call_helper_void;
 use super::super::kinds::K;
@@ -120,67 +119,6 @@ pub(crate) fn emit_load_static_fn(
         &[actx.exec_ctx, actx.closure, idx_v],
     );
     reload_boxed(b, actx, state, &regs);
-    let res = b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_native_result_offset as i32,
-    );
-    def_result(b, actx, dest, res);
-}
-
-pub(crate) fn emit_call_spread(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    _meta: &[RegisterMeta],
-    code: &[u16],
-    ip: usize,
-) {
-    let w1 = code[ip + 1];
-    let w2 = code[ip + 2];
-    let dest = (w1 >> 8) as usize;
-    let callee_reg = (w1 & 0xFF) as usize;
-    let argc = (w2 >> 8) as usize;
-    let arg_start = (w2 & 0xFF) as usize;
-
-    let callee = box_or_load_home(b, actx, state, callee_reg);
-    let (callee_tag, callee_payload) = b.ins().isplit(callee);
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        48,
-        3,
-    ));
-
-    let arg_start_v = b.ins().iconst(types::I64, arg_start as i64);
-    let argc_v = b.ins().iconst(types::I64, argc as i64);
-    let dest_v = b.ins().iconst(types::I64, dest as i64);
-    let next_ip_v = b.ins().iconst(types::I64, (ip + 3) as i64);
-
-    b.ins().stack_store(callee_tag, slot, 0);
-    b.ins().stack_store(callee_payload, slot, 8);
-    b.ins().stack_store(arg_start_v, slot, 16);
-    b.ins().stack_store(argc_v, slot, 24);
-    b.ins().stack_store(dest_v, slot, 32);
-    b.ins().stack_store(next_ip_v, slot, 40);
-
-    let slot_addr = b.ins().stack_addr(types::I64, slot, 0);
-
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
-    for r in arg_start..(arg_start + argc).min(actx.nregs) {
-        store_home(b, actx, state, r);
-    }
-
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.call_spread,
-        &[actx.exec_ctx, slot_addr],
-    );
-
-    reload_boxed(b, actx, state, &regs);
-
     let res = b.ins().load(
         types::I128,
         MemFlags::trusted(),
