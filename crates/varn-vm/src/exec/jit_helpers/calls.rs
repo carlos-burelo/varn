@@ -223,6 +223,9 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// Returns `0` — nothing pushed — for a non-closure, async/generator/rest, or
 /// a callee with no compiled entry; the call site then falls back to
 /// `jit_invoke_dynamic`.
+/// `dest` (registro destino del caller) viaja explícito y se estampa como
+/// `return_reg` del callee — nunca por campo compartido (§3.3, cero stores
+/// por llamada).
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,
@@ -230,6 +233,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
     act_id: usize,
     arg_start: usize,
     arg_count: usize,
+    dest: usize,
 ) -> usize {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -267,7 +271,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
             );
         }
         let mut frame = crate::frame::CallFrame::new_owned(closure, callee_alloc);
-        frame.return_reg = ctx_ref.jit_call_dest as u16;
+        frame.return_reg = dest as u16;
         let closure_ptr = frame.closure_ptr as usize;
         ctx_ref.frames.push(frame);
         ctx_ref.jit_frame_prepushed = 1;

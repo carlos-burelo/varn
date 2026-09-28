@@ -186,7 +186,8 @@ macro_rules! jit_helper_abi {
             /// arguments are not in contiguous homes: a boxed window,
             /// placeholder first.
             jit_call_self_window => jit_call_self_window,
-            /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, arg_start, arg_count) -> usize`
+            /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, act_id,
+            /// arg_start, arg_count, dest) -> usize`
             /// — half of `invoke_dynamic`'s fast path, split so the call site
             /// makes the wrapper call itself instead of crossing back into
             /// Rust to do it. `0` = declined, take `invoke_dynamic`; non-zero

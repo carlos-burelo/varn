@@ -134,7 +134,7 @@ pub(crate) fn emit_call(
                 b.ins().jump(cont_blk, &[]);
 
                 b.switch_to_block(slow_blk);
-                let slow_res = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
+                let slow_res = emit_vm_call(b, actx, state, callee, arg_start, total, dest);
                 def_result(b, actx, dest, slow_res);
                 b.ins().jump(cont_blk, &[]);
 
@@ -159,7 +159,7 @@ pub(crate) fn emit_call(
     });
 
     let Some(t) = direct else {
-        let res = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
+        let res = emit_vm_call(b, actx, state, callee, arg_start, total, dest);
         def_result(b, actx, dest, res);
         return Ok(());
     };
@@ -249,7 +249,7 @@ pub(crate) fn emit_call(
     b.ins().jump(merge, &[boxed_fast.into()]);
 
     b.switch_to_block(slow);
-    let boxed_slow = emit_vm_call(b, actx, state, callee, arg_start, total, dest, ip + 3);
+    let boxed_slow = emit_vm_call(b, actx, state, callee, arg_start, total, dest);
     b.ins().jump(merge, &[boxed_slow.into()]);
 
     b.switch_to_block(merge);
@@ -269,11 +269,13 @@ pub(crate) fn emit_call(
 ///    (`ExecCtx::invoke`). Async/generator/rest closures, class
 ///    construction, native functions, or nothing compiled yet.
 ///
-/// `dest`/`next_ip` feed the exception-unwind protocol
-/// (`ExecCtx::jit_resume_ip`/`jit_call_dest`, see their docs in varn-vm):
-/// written before every tier, so a caught throw below this call can resume
-/// this (interpreted) caller from the right place.
-#[allow(clippy::too_many_arguments)]
+/// `dest` viaja explícito a `jit_prepare_static_call` (lo estampa como
+/// `return_reg` del callee). Cero stores por llamada (§3.3): el antiguo
+/// protocolo (`jit_resume_ip`/`jit_call_dest` escritos antes de cada tier)
+/// era write-only — ningún lector — y muere aquí. Si el resume interpretado
+/// de callers JIT aterriza algún día, su mapa `{pc → (resume, dest)}` es
+/// `CallSiteTable` (ya existe el tipo); hoy no hay consumidor y no se graba
+/// nada especulativo.
 fn emit_vm_call(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
@@ -282,7 +284,6 @@ fn emit_vm_call(
     arg_start: usize,
     total: usize,
     dest: usize,
-    next_ip: usize,
 ) -> cranelift_codegen::ir::Value {
     let (callee_tag, callee_payload) = b.ins().isplit(callee);
 
@@ -306,24 +307,6 @@ fn emit_vm_call(
         }
     }
 
-    // Exception-unwind protocol: a throw below this call that is caught below
-    // this (interpreted) caller resumes it from `next_ip`, and the callee's
-    // return lands in `dest`. See `ExecCtx::jit_resume_ip`/`jit_call_dest`.
-    let resume_ip_v = b.ins().iconst(types::I64, next_ip as i64);
-    b.ins().store(
-        MemFlags::trusted(),
-        resume_ip_v,
-        actx.exec_ctx,
-        actx.helpers.jit_resume_ip_offset as i32,
-    );
-    let dest_v = b.ins().iconst(types::I64, dest as i64);
-    b.ins().store(
-        MemFlags::trusted(),
-        dest_v,
-        actx.exec_ctx,
-        actx.helpers.jit_call_dest_offset as i32,
-    );
-
     // One canonical VM call: `invoke_dynamic` gathers the argument window
     // from the caller's home slots and runs the callee through
     // `ExecCtx::invoke` (prepare_call + run_until), which itself enters
@@ -336,7 +319,10 @@ fn emit_vm_call(
     // returns its compiled wrapper entry, so the call is direct
     // compiled→compiled. It declines (0) for a non-closure callee, an
     // async/generator/rest callee, or one with no compiled entry; the slow
-    // path runs the whole call through the VM.
+    // path runs the whole call through the VM. `dest` travels as an explicit
+    // argument (stamped as the callee's `return_reg`), never via a shared
+    // field — no store for the fast path to skip reading back.
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
     let wrapper_addr = call_helper(
         b,
         actx.cc,
@@ -348,6 +334,7 @@ fn emit_vm_call(
             actx.base,
             start_v,
             n,
+            dest_v,
         ],
     );
     let took_fast = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr, 0);

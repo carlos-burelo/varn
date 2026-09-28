@@ -63,8 +63,6 @@ macro_rules! fill_jit_helpers {
             poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
             stack_data_offset,
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
-            jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),
-            jit_call_dest_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_dest),
             jit_call_base_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_base),
             jit_call_closure_ptr_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_closure_ptr),
             frame_layout: super::frame_layout::probe(),

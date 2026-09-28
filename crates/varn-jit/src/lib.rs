@@ -353,13 +353,6 @@ macro_rules! define_jit_helpers {
         /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
         /// frame handshake word (see its doc in varn-vm).
         pub frame_prepushed_offset: usize,
-        /// Byte offset of ExecCtx.jit_resume_ip — the caller's post-call resume
-        /// ip, written before a fast JIT→JIT call so an exception unwinding
-        /// through this caller can resume it interpreted (see its doc in varn-vm).
-        pub jit_resume_ip_offset: usize,
-        /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
-        /// as the callee frame's return_reg for correct interpreted-resume returns.
-        pub jit_call_dest_offset: usize,
         /// Byte offset of ExecCtx.jit_call_base — `jit_prepare_static_call`'s
         /// scratch output for the callee frame's `base`.
         pub jit_call_base_offset: usize,

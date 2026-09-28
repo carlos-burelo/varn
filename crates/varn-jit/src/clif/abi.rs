@@ -8,9 +8,10 @@
 //! * `JitFn` (wrapper) — sobrevive SOLO como puerta VM→JIT (dispatch del
 //!   intérprete, top-level, OSR-entry). JIT→JIT nunca lo usa.
 //!
-//! La side-table `{pc → (resume, dest)}` sustituye los stores por llamada
-//! `jit_resume_ip`/`jit_call_dest`: se emite en compilación, la lee solo el
-//! unwinder en `throw` (frío).
+//! La side-table `{pc → (resume, dest)}` (§3.3) es el reemplazo designado de
+//! los stores por llamada del protocolo viejo (borrados: eran write-only).
+//! Se emitirá en compilación cuando el resume interpretado de callers JIT
+//! exista; hoy la lee nadie y no se graba nada especulativo.
 
 use cranelift_codegen::ir::{
     types, AbiParam, Function, InstBuilder, MemFlags, Signature, UserFuncName,
@@ -46,9 +47,10 @@ pub fn raw_signature_v2(return_kind: SlotKind, isa: &OwnedTargetIsa) -> Signatur
 }
 
 /// Side-table por función (§3.3): `{pc_llamada → (resume_ip, dest)}`.
-/// Emitida en compilación, consultada solo por el unwinder. Orden de
+/// Reemplazo designado de los stores por llamada (borrados). Orden de
 /// inserción = orden de emisión (determinista, Ley 4); búsqueda lineal en
-/// frío, sin hash.
+/// frío, sin hash. Su primer consumidor será el unwinder cuando exista el
+/// resume interpretado de callers JIT.
 #[derive(Debug, Default)]
 pub struct CallSiteTable {
     sites: Vec<CallSite>,
