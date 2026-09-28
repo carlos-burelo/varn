@@ -513,7 +513,7 @@ const _: () = {
     // declara en voz alta en arranque, no el código emitido en caliente.
     assert!(std::mem::align_of::<ArrayRepr>() == 8);
     assert!(ArrayRepr::ELEMS_UNION_OFF == 8);
-    assert!(std::mem::size_of::<ArrayRepr>() % 8 == 0);
+    assert!(std::mem::size_of::<ArrayRepr>().is_multiple_of(8));
 };
 
 /// A reference-counted, interior-mutable array whose element storage is one
