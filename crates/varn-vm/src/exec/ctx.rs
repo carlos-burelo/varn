@@ -328,6 +328,11 @@ impl ExecCtx {
             + self.modules.len()
             + self.module_exports.len()
             + self.static_closures.len()
+            + self
+                .proto_constants
+                .values()
+                .map(|(_, pool)| pool.len())
+                .sum::<usize>()
             + self.pending_constructors.len()
             + self.pending_setters.len()
             + 1;
@@ -358,6 +363,11 @@ impl ExecCtx {
         let static_closures_start = all_vals.len();
         for (_, v) in self.static_closures.values() {
             all_vals.push(*v);
+        }
+        let mut pool_ranges = Vec::new();
+        for (_, pool) in self.proto_constants.values() {
+            pool_ranges.push((all_vals.len(), pool.len()));
+            all_vals.extend_from_slice(pool);
         }
         let pending_ctors_start = all_vals.len();
         for (_, v) in &self.pending_constructors {
@@ -414,6 +424,13 @@ impl ExecCtx {
 
         for (si, (_, v)) in (static_closures_start..).zip(self.static_closures.values_mut()) {
             *v = all_vals[si];
+        }
+
+        for ((start, len), (_, pool)) in pool_ranges
+            .into_iter()
+            .zip(self.proto_constants.values_mut())
+        {
+            Rc::make_mut(pool).copy_from_slice(&all_vals[start..start + len]);
         }
 
         for (ci, (_, v)) in (pending_ctors_start..).zip(self.pending_constructors.iter_mut()) {
@@ -520,6 +537,13 @@ impl ExecCtx {
                 roots.push(v.as_heap_idx());
             }
         }
+        for (_, pool) in self.proto_constants.values() {
+            for v in pool.iter() {
+                if v.is_heap() {
+                    roots.push(v.as_heap_idx());
+                }
+            }
+        }
         for (_, v) in &self.pending_constructors {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
@@ -549,3 +573,41 @@ impl ExecCtx {
 }
 
 pub use crate::arch::{vm_longjmp as my_longjmp, vm_setjmp as my_setjmp, JmpBuf};
+
+#[cfg(test)]
+mod gc_pool_tests {
+    use super::*;
+    use std::rc::Rc;
+
+    #[test]
+    fn minor_gc_rewrites_cached_pools() {
+        let mut ctx = ExecCtx::new(
+            GlobalStore::default(),
+            crate::settings::ExecSettings::default(),
+        );
+        let s = ctx.heap.alloc_str_interned("pool-gc-probe-fresh-string");
+        let before = s.as_heap_idx();
+        let proto = Rc::new(varn_types::FunctionProto::default());
+        ctx.proto_constants
+            .insert(0x1234, (proto, Rc::new(vec![s])));
+        ctx.run_minor_gc();
+        let (_, pool) = &ctx.proto_constants[&0x1234];
+        let after = pool[0].as_heap_idx();
+        assert!(ctx.heap.get(after).is_some());
+        let _ = before;
+    }
+
+    #[test]
+    fn major_roots_cover_cached_pools() {
+        let mut ctx = ExecCtx::new(
+            GlobalStore::default(),
+            crate::settings::ExecSettings::default(),
+        );
+        let s = ctx.heap.alloc_str_interned("pool-gc-probe-major-string");
+        let proto = Rc::new(varn_types::FunctionProto::default());
+        ctx.proto_constants
+            .insert(0x1234, (proto, Rc::new(vec![s])));
+        let roots = ctx.major_roots();
+        assert!(roots.contains(&s.as_heap_idx()));
+    }
+}
