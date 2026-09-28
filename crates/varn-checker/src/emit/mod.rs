@@ -1958,13 +1958,21 @@ fn emit_function(
                 _ => inner,
             };
         }
-        return_ty = lower_type(
-            &crate::types::Type(ft.return_type, false),
-            ctx.checker_table,
-            ctx.interner,
-            types,
-            ctx.names,
-        );
+        return_ty = if ns.is_some() && f.return_type.is_none() {
+            // The binder defaults an un-annotated namespace return to `Void`,
+            // which is not what the body returns: publishing it would fail
+            // `check_return` coherence on valid programs. Keep `Dynamic`
+            // (the old behavior) until the binder infers it like top level.
+            BackendTy::Dynamic(DynReason::Unannotated)
+        } else {
+            lower_type(
+                &crate::types::Type(ft.return_type, false),
+                ctx.checker_table,
+                ctx.interner,
+                types,
+                ctx.names,
+            )
+        };
     }
 
     let sig = SigId(signatures.len() as u32);
