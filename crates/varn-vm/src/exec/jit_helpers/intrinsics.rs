@@ -9,6 +9,7 @@ use crate::value::VmValue;
 /// Fase B: the compiled caller has flushed `[receiver, args...]` to the home
 /// slots of registers `reg_start..reg_start + arg_count` in activation
 /// `act_id`; this gathers them back through `FrameStore` and dispatches.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
     ctx: *mut ExecCtx,
     wire_byte: usize,
@@ -40,6 +41,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
 /// An intrinsic out of the lowering from typed SSA: `[receiver, args...]`
 /// as a boxed `window` of `count` values, dispatched as the interpreter's
 /// `Intrinsic` dispatches them.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_intrinsic_window(
     ctx: *mut ExecCtx,
     wire_byte: usize,

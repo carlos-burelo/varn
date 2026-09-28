@@ -199,6 +199,7 @@ pub(crate) extern "C" fn jit_to_string(ctx: *mut ExecCtx, v_tag: u64, v_payload:
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_load_upvalue(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -211,6 +212,7 @@ pub(crate) extern "C" fn jit_load_upvalue(
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_store_upvalue(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

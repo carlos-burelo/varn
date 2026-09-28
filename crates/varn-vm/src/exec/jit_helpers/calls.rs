@@ -111,6 +111,7 @@ pub(crate) extern "C" fn jit_call_method_flat(
 /// [`ExecCtx::call_method`] (one resolution, one inline cache) on those
 /// values and runs a VM method it pushes to completion. Every heap value in
 /// the window is also in its SSA value's home, a GC root, for the call.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_call_method_window(
     ctx: *mut ExecCtx,
     name_idx: usize,
@@ -179,6 +180,7 @@ pub(crate) extern "C" fn jit_invoke_dynamic(
 /// stack); this runs the callee through the SAME [`ExecCtx::invoke`] as
 /// `jit_invoke_dynamic`, so there is still one invocation, and writes the
 /// boxed result to `ctx.jit_native_result`.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_invoke_window(
     ctx: *mut ExecCtx,
     callee_tag: u64,
@@ -226,6 +228,7 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// `dest` (registro destino del caller) viaja explícito y se estampa como
 /// `return_reg` del callee — nunca por campo compartido (§3.3, cero stores
 /// por llamada).
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,
@@ -284,6 +287,7 @@ pub(crate) extern "C" fn jit_prepare_static_call(
 /// upvalues. `callee_alloc` travels as an explicit argument (the CLIF call
 /// site's own captured value), never re-read from `jit_call_base` — a nested
 /// call in the wrapper can overwrite that shared field.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -297,6 +301,7 @@ pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc:
 /// fresh activation for its OWN closure and copies the `argc` argument
 /// registers from its homes into the callee's, then runs it to completion.
 /// `act_id` is the caller's activation.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn clif_call_self(
     ctx: *mut ExecCtx,
     act_id: usize,
@@ -315,6 +320,7 @@ pub(crate) extern "C" fn clif_call_self(
 /// placeholder first. The window lives on the native stack, which the
 /// collector does not see, and pushing a frame can collect, so it is copied
 /// into staging — a root — before anything else.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_call_self_window(
     ctx: *mut ExecCtx,
     window: *const VmValue,

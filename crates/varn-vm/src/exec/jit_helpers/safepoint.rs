@@ -21,6 +21,7 @@ pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
@@ -30,6 +31,7 @@ pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;

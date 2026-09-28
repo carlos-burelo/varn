@@ -4,6 +4,7 @@
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_reg: u32) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -17,6 +18,7 @@ pub(crate) extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_re
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -24,6 +26,7 @@ pub(crate) extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, err_tag: u64, err_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;

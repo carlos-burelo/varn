@@ -13,6 +13,7 @@ use crate::value::VmValue;
 /// an imported module that suspends on a top-level `await` leaves the import
 /// unfinished, so the frame rewinds to re-execute the load once the awaited
 /// task resolves — the same rewind `op_load_module` performs interpreted.
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_load_module(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -51,6 +52,7 @@ pub(crate) extern "C" fn jit_load_module(
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_load_module_slot(
     ctx: *mut ExecCtx,
     mod_tag: u64,
@@ -72,6 +74,7 @@ pub(crate) extern "C" fn jit_load_module_slot(
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_store_module_slot(
     ctx: *mut ExecCtx,
     slot_idx: usize,
@@ -105,6 +108,7 @@ pub(crate) extern "C" fn jit_store_module_slot(
     }
 }
 
+#[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_load_module_by_idx(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
