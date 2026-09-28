@@ -34,6 +34,16 @@ impl ProjectIndex {
     }
 
     pub fn update_file(&mut self, uri: &str, state: &DocumentState) {
+        // Fast path del scan inicial: cada archivo se indexa una vez y no hay
+        // nada que evictar. `remove_file` barre `name_index/reverse_deps`
+        // completos (O(total) por archivo → O(N²) en el workspace), así que
+        // saltarlo cuando el módulo es nuevo cambia el startup de cuadrático
+        // a lineal. Las tres tablas se escriben juntas, luego ausencia en
+        // `module_exports` implica ausencia en el resto.
+        if !self.module_exports.contains_key(uri) {
+            builder::index_file(self, uri, state);
+            return;
+        }
         self.remove_file(uri);
         builder::index_file(self, uri, state);
     }

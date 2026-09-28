@@ -46,6 +46,22 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .map(|p| p.to_path_buf());
 
     for specifier in &state.import_paths {
+        // `std:`/`core:`/`runtime:` resuelven igual desde cualquier archivo.
+        // Son los imports más repetidos (casi todo archivo trae std), y cada
+        // resolución cuesta `ModuleResolver::new()` + FS. Reutilizar el
+        // mapeo evita pagarla cientos de veces. Los relativos se resuelven
+        // siempre: la caché global por specifier no distingue base_dir y un
+        // `./x` significa algo distinto por directorio.
+        if is_stable_specifier(specifier) {
+            if let Some(cached) = index.module_cache.get(specifier) {
+                index
+                    .reverse_deps
+                    .entry(cached.clone())
+                    .or_default()
+                    .insert(uri.to_owned());
+                continue;
+            }
+        }
         let resolved_uri = resolve_specifier_to_uri(specifier, doc_dir.as_deref());
         if let Some(target_uri) = resolved_uri {
             index
@@ -120,6 +136,12 @@ fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) 
         }
         varn_core::ModuleId::Package { .. } => None,
     }
+}
+
+fn is_stable_specifier(specifier: &str) -> bool {
+    specifier.starts_with("std:")
+        || specifier.starts_with("core:")
+        || specifier.starts_with("runtime:")
 }
 
 fn is_indexable(kind: SymbolKind, line: u32) -> bool {

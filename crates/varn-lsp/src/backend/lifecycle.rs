@@ -53,25 +53,25 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         .await;
 
     let start = std::time::Instant::now();
-    let files = tokio::task::spawn_blocking(move || {
+    let mut files = tokio::task::spawn_blocking(move || {
         let mut files = Vec::new();
         walk_dir(&root, &mut files);
         files
     })
     .await
     .unwrap_or_default();
+    // Determinismo (Ley 4): el orden del walk depende del OS. Sin sort, el
+    // orden de bindeo/interning — y los logs de progreso — varía por corrida.
+    files.sort();
 
-    let total = files.len();
-    let progress = Progress::begin(
-        &client,
-        progress_supported,
-        "varn/index",
-        "Indexing Varn workspace",
-    )
-    .await;
-
-    for (idx, path) in files.into_iter().enumerate() {
-        let read = tokio::task::spawn_blocking(move || {
+    // Fase IO concurrente: `canonicalize+metadata+read` por archivo son
+    // syscalls independientes. Antes se hacían secuencialmente
+    // (`spawn_blocking+await` por archivo dentro del loop), sumando latencia
+    // de disco en serie al tiempo total del scan. El análisis sigue
+    // secuencial después (un solo hilo dueño del estado).
+    let mut read_set = tokio::task::JoinSet::new();
+    for path in files {
+        read_set.spawn_blocking(move || {
             let abs_path = std::fs::canonicalize(&path).ok()?;
             let size = std::fs::metadata(&abs_path).ok()?.len();
             if size > INDEX_SIZE_LIMIT_BYTES {
@@ -80,50 +80,67 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
             let uri = Url::from_file_path(&abs_path).ok()?;
             let source = std::fs::read_to_string(&abs_path).ok()?;
             Some(Ok((abs_path, uri, source)))
-        })
-        .await
-        .ok()
-        .flatten();
-
-        if let Some(Err((abs_path, size))) = &read {
-            client
-                .log_message(
-                    MessageType::INFO,
-                    format!(
-                        "[index] skipping {} ({} KB > {} KB startup-scan limit)",
-                        abs_path.display(),
-                        size / 1024,
-                        INDEX_SIZE_LIMIT_BYTES / 1024
-                    ),
-                )
-                .await;
+        });
+    }
+    let mut skipped: Vec<(std::path::PathBuf, u64)> = Vec::new();
+    let mut ready: Vec<(std::path::PathBuf, Url, String)> = Vec::new();
+    while let Some(joined) = read_set.join_next().await {
+        match joined.ok().flatten() {
+            Some(Ok(row)) => ready.push(row),
+            Some(Err((abs, size))) => skipped.push((abs, size)),
+            None => {}
         }
+    }
+    for (abs_path, size) in &skipped {
+        client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "[index] skipping {} ({} KB > {} KB startup-scan limit)",
+                    abs_path.display(),
+                    size / 1024,
+                    INDEX_SIZE_LIMIT_BYTES / 1024
+                ),
+            )
+            .await;
+    }
+    // Orden canónico antes de analizar: a igual input, mismo orden de
+    // bindeo aunque las lecturas terminaran en otro orden.
+    ready.sort_by(|a, b| a.0.cmp(&b.0));
 
-        if let Some(Ok((abs_path, uri, source))) = read {
-            let elapsed = analysis
-                .run_background(move |a| {
-                    let file_start = std::time::Instant::now();
-                    a.workspace.index_file(uri.to_string(), source);
-                    file_start.elapsed()
-                })
-                .await;
-            if let Some(elapsed) = elapsed {
-                if elapsed.as_millis() >= SLOW_REQUEST_MS {
-                    client
-                        .log_message(
-                            MessageType::WARNING,
-                            format!(
-                                "[perf] slow index {} ({}ms)",
-                                abs_path.display(),
-                                elapsed.as_millis()
-                            ),
-                        )
-                        .await;
-                }
+    let total = ready.len() + skipped.len();
+    let progress = Progress::begin(
+        &client,
+        progress_supported,
+        "varn/index",
+        "Indexing Varn workspace",
+    )
+    .await;
+
+    for (idx, (abs_path, uri, source)) in ready.into_iter().enumerate() {
+        let elapsed = analysis
+            .run_background(move |a| {
+                let file_start = std::time::Instant::now();
+                a.workspace.index_file(uri.to_string(), source);
+                file_start.elapsed()
+            })
+            .await;
+        if let Some(elapsed) = elapsed {
+            if elapsed.as_millis() >= SLOW_REQUEST_MS {
+                client
+                    .log_message(
+                        MessageType::WARNING,
+                        format!(
+                            "[perf] slow index {} ({}ms)",
+                            abs_path.display(),
+                            elapsed.as_millis()
+                        ),
+                    )
+                    .await;
             }
         }
 
-        let done = idx + 1;
+        let done = skipped.len() + idx + 1;
         if done % 25 == 0 || done == total {
             progress
                 .report(
