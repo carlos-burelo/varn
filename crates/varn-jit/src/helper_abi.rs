@@ -187,21 +187,19 @@ macro_rules! jit_helper_abi {
             /// placeholder first.
             jit_call_self_window => jit_call_self_window,
             /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, act_id,
-            /// arg_start, arg_count, dest) -> usize`
+            /// arg_start, arg_count, dest, out_closure: *mut usize,
+            /// out_base: *mut usize) -> usize`
             /// — half of `invoke_dynamic`'s fast path, split so the call site
             /// makes the wrapper call itself instead of crossing back into
             /// Rust to do it. `0` = declined, take `invoke_dynamic`; non-zero
-            /// = the callee's wrapper entry point, with a `CallFrame` already pushed and
-            /// `jit_call_base`/`jit_call_closure_ptr` holding what the wrapper
-            /// call needs. Always paired with `jit_finish_static_call` after.
+            /// = the callee's wrapper entry point, with a `CallFrame` already
+            /// pushed and the out-params holding what the wrapper call needs.
+            /// Always paired with `jit_finish_static_call` after.
             jit_prepare_static_call => jit_prepare_static_call,
             /// `extern "C" fn(*mut ExecCtx, callee_base: usize)` — pops the frame
             /// `jit_prepare_static_call` pushed and closes its upvalues.
-            /// `callee_base` is the call site's own SSA value from right after
-            /// `jit_prepare_static_call` returned (via `ctx.jit_call_base`), NOT
-            /// re-read from that field here — the wrapper call in between can
-            /// run arbitrarily deep nested calls through this same pair, which
-            /// would otherwise have overwritten it.
+            /// `callee_base` is the call site's own out-param value (slot
+            /// nativo, no campo compartido).
             jit_finish_static_call => jit_finish_static_call,
             /// `extern "C" fn(*mut ExecCtx, class_id: u32, payload_size: u32) -> u64`
             /// — Fast allocator for class instances returning heap index without interpreter frame overhead.

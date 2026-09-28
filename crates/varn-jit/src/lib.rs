@@ -350,12 +350,6 @@ macro_rules! define_jit_helpers {
         /// register's `ctx.stack` home slot, so a stack reallocation can never
         /// leave a stale base.
         pub stack_data_offset: usize,
-        /// Byte offset of ExecCtx.jit_call_base — `jit_prepare_static_call`'s
-        /// scratch output for the callee frame's `base`.
-        pub jit_call_base_offset: usize,
-        /// Byte offset of ExecCtx.jit_call_closure_ptr — `jit_prepare_static_call`'s
-        /// scratch output for the resolved `*const VmClosure`.
-        pub jit_call_closure_ptr_offset: usize,
         /// Probed layout for the fully-inlined frame-aware `Call` fast path.
         /// See [`JitFrameLayout`].
         pub frame_layout: JitFrameLayout,

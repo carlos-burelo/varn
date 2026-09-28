@@ -62,8 +62,6 @@ macro_rules! fill_jit_helpers {
             ),
             poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
             stack_data_offset,
-            jit_call_base_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_base),
-            jit_call_closure_ptr_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_closure_ptr),
             frame_layout: super::frame_layout::probe(),
             max_call_depth: crate::exec::jit_helpers::calls::MAX_CALL_DEPTH,
         }

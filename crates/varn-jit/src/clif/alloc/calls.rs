@@ -320,9 +320,17 @@ fn emit_vm_call(
     // compiled→compiled. It declines (0) for a non-closure callee, an
     // async/generator/rest callee, or one with no compiled entry; the slow
     // path runs the whole call through the VM. `dest` travels as an explicit
-    // argument (stamped as the callee's `return_reg`), never via a shared
-    // field — no store for the fast path to skip reading back.
+    // argument (stamped as the callee's `return_reg`); closure/base vuelven
+    // por out-params a un slot nativo del caller — nunca por campos scratch
+    // de `ExecCtx` (sin stores compartidos que un wrapper anidado pise).
     let dest_v = b.ins().iconst(types::I64, dest as i64);
+    let out_slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        16,
+        8,
+    ));
+    let out_closure = b.ins().stack_addr(types::I64, out_slot, 0);
+    let out_base = b.ins().stack_addr(types::I64, out_slot, 8);
     let wrapper_addr = call_helper(
         b,
         actx.cc,
@@ -335,6 +343,8 @@ fn emit_vm_call(
             start_v,
             n,
             dest_v,
+            out_closure,
+            out_base,
         ],
     );
     let took_fast = b.ins().icmp_imm(IntCC::NotEqual, wrapper_addr, 0);
@@ -345,18 +355,8 @@ fn emit_vm_call(
     b.ins().brif(took_fast, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
-    let closure_ptr = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_call_closure_ptr_offset as i32,
-    );
-    let callee_alloc = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        actx.exec_ctx,
-        actx.helpers.jit_call_base_offset as i32,
-    );
+    let closure_ptr = b.ins().stack_load(types::I64, out_slot, 0);
+    let callee_alloc = b.ins().stack_load(types::I64, out_slot, 8);
     let fast_res = emit_wrapper_call_and_finish(b, actx, wrapper_addr, closure_ptr, callee_alloc);
     b.ins().jump(merge, &[fast_res.into()]);
 

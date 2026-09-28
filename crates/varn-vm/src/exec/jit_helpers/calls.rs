@@ -208,16 +208,15 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// construction, native functions, or a closure with no compiled code (yet,
 /// or ever).
 ///
-/// On success, pushes a `CallFrame` and writes the frame's `base` and the
-/// resolved closure's address to `ctx.jit_call_base` /
-/// `ctx.jit_call_closure_ptr` (the call site cannot compute either ahead of
-/// the call: `base` is wherever `ctx.stack.len()` lands, the closure address
-/// needs a heap lookup) and returns the callee's wrapper entry point (a
-/// `JitFn`, as a raw address) for the call site to invoke directly. Returns
-/// `0` on decline; nothing is pushed, and the call site must fall back to
-/// `jit_invoke_dynamic`. A non-zero return always has a matching
-/// `jit_finish_static_call` after the wrapper call — the frame stays pushed
-/// until then.
+/// On success, pushes a `CallFrame`, writes the frame's `base` and the
+/// resolved closure's address to the out-params (the call site cannot compute
+/// either ahead of the call: `base` is wherever the stack lands, the closure
+/// address needs a heap lookup) and returns the callee's wrapper entry point
+/// (a `JitFn`, as a raw address) for the call site to invoke directly.
+/// Returns `0` on decline; nothing is pushed or written, and the call site
+/// must fall back to `jit_invoke_dynamic`. A non-zero return always has a
+/// matching `jit_finish_static_call` after the wrapper call — the frame stays
+/// pushed until then.
 /// Fase B: pushes a fresh `FrameStore` activation for the callee, copies the
 /// argument registers from the caller activation's homes with `mov_cross`,
 /// pushes its `CallFrame`, and returns the callee's compiled wrapper entry so
@@ -228,7 +227,14 @@ pub(crate) extern "C" fn jit_invoke_window(
 /// `dest` (registro destino del caller) viaja explícito y se estampa como
 /// `return_reg` del callee — nunca por campo compartido (§3.3, cero stores
 /// por llamada).
+///
+/// Salidas por out-params explícitos (slot de 16 B del caller nativo), nunca
+/// por campos scratch de `ExecCtx`: `out_closure`/`out_base` reciben el
+/// closure resuelto y la base del callee; el retorno es la entry del wrapper
+/// (`0` = declina). Un wrapper anidado ya no puede pisar lo que el exterior
+/// aún no leyó — la hazard documentada en `jit_finish_static_call` muere aquí.
 #[varn_op_macros::jit_slow]
+#[allow(clippy::too_many_arguments)]
 pub(crate) extern "C" fn jit_prepare_static_call(
     ctx: *mut ExecCtx,
     closure_tag: u64,
@@ -237,6 +243,8 @@ pub(crate) extern "C" fn jit_prepare_static_call(
     arg_start: usize,
     arg_count: usize,
     dest: usize,
+    out_closure: *mut usize,
+    out_base: *mut usize,
 ) -> usize {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -277,16 +285,17 @@ pub(crate) extern "C" fn jit_prepare_static_call(
         frame.return_reg = dest as u16;
         let closure_ptr = frame.closure_ptr as usize;
         ctx_ref.frames.push(frame);
-        ctx_ref.jit_call_base = callee_alloc;
-        ctx_ref.jit_call_closure_ptr = closure_ptr;
+        // Out-params al slot nativo del call-site (siempre válidos); solo se
+        // escriben en éxito — con `0` el call-site toma el lento sin leerlos.
+        out_closure.write(closure_ptr);
+        out_base.write(callee_alloc);
         jit_fn as usize
     }
 }
 
 /// Pops the activation [`jit_prepare_static_call`] pushed and closes its
 /// upvalues. `callee_alloc` travels as an explicit argument (the CLIF call
-/// site's own captured value), never re-read from `jit_call_base` — a nested
-/// call in the wrapper can overwrite that shared field.
+/// site's own out-param slot value).
 #[varn_op_macros::jit_slow]
 pub(crate) extern "C" fn jit_finish_static_call(ctx: *mut ExecCtx, callee_alloc: usize) {
     unsafe {
