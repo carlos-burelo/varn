@@ -317,6 +317,8 @@ Colateral: la clave de miembro perdió el sufijo de `symbol_id` que nadie podía
 
 `DocumentState.symbols` pasó de `Vec<SymbolRecord>` a `Vec<SymbolId>`, más un único `resolved_types` que preserva **exactamente** la regla original (el tipo registrado en el offset del símbolo si no es `dynamic`, si no el declarado). Ese detalle importaba: cambiarlo por `symbol_types` del checker habría alterado el tipo que reporta cada hover, y no era validable barato.
 
+> Estado: `resolved_types` se plegó en `SemanticDB.symbol_types` tras verificarlo barato — acuerdo de valores en la intersección (H3) más el hecho de que `Checker::check` ya escribe su finalize en `bind.arena` (`sym.ty`), que la regla consume. Una tabla, cobertura total del arena.
+
 `ResolvedMemberKind` ganó `NestedType(NestedTypeKind)` y `Constructor` porque `MemberKind` distinguía tipos anidados y el enum del checker los aplanaba a `Property` — el LSP recuperaba la distinción desde su enum paralelo, que es precisamente por lo que ese enum sobrevivía a la tabla a la que pertenecía.
 
 También cayó `inject_stdlib_symbols`: el pipeline recorre la arena, que ya contiene los símbolos importados. borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
@@ -324,6 +326,7 @@ También cayó `inject_stdlib_symbols`: el pipeline recorre la arena, que ya con
 **Invariante:** el LSP no construye estructuras semánticas. Proyecta `CheckResult` a tipos LSP en el momento de responder.
 
 - Identidad de símbolo: `SymbolRef(FileId, SymbolId)`, newtype `Copy`. **`global_key: String` desaparece**, y con él `stable_global_key`, `symbol_global_key_for_id` y el `starts_with("member:…")` de `features/definition.rs:176`.
+  > Estado: implementado a medio camino — `ExportEntry` lleva `parent: Option<Arc<str>>` estructural y `uri: Arc<str>` compartido por archivo (H4/H9); el `SymbolRef` tipado de frontera checker↔LSP sigue pendiente.
 - `type_str` / `params_str` se formatean al responder, nunca se precomputan ni se almacenan.
 - El checker expone API **tipada** para lo que el IDE necesita, en lugar de dejar que lo reconstruya. Aplicación directa de `<backend_principle>`:
 
