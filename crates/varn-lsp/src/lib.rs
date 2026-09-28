@@ -52,9 +52,10 @@ pub async fn run_server_tcp(addr: &str) {
         let (read, write) = stream.into_split();
         let (service, socket) =
             tower_lsp::LspService::new(|client| backend::Backend::new(client, std_error));
-        tower_lsp::Server::new(read, write, socket)
-            .serve(service)
-            .await;
-        eprintln!("LSP client disconnected: {client_addr}");
+        let service = tower_lsp::Server::new(read, write, socket).serve(service);
+        tokio::spawn(async move {
+            service.await;
+            eprintln!("LSP client disconnected: {client_addr}");
+        });
     }
 }
