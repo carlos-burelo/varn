@@ -20,6 +20,9 @@ pub struct Shape {
     transitions: RefCell<HashMap<RuntimeString, Rc<Shape>>>,
 }
 
+/// Offset of `Shape.id`, derived from the owned definition. First field.
+pub const SHAPE_ID_OFF: usize = std::mem::offset_of!(Shape, id);
+
 impl std::fmt::Debug for Shape {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Shape")

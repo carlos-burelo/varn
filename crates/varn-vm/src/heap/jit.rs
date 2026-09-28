@@ -43,92 +43,48 @@ impl Heap {
         }
         let (slots_ptr_off, _slots_len_off) = vec_word_offsets(&slots_probe);
 
+        // Derivado, no escaneado: `ArrayRepr` es `repr(C, u8)` propio
+        // (`varn_types::vm_value::ArrayRepr::{DISC_OFF, ELEMS_PTR_OFF,
+        // ELEMS_LEN_OFF}`). El tripwire lee un valor real: si la
+        // representación cambia, falla aquí en voz alta, no en código emitido.
         let (disc_off, elems_ptr_off, elems_len_off) = {
+            use varn_types::vm_value::ArrayRepr;
             let mut boxed_vec: Vec<VmValue> = Vec::with_capacity(7);
             for _ in 0..3 {
                 boxed_vec.push(VmValue::null());
             }
             let vec_ptr = boxed_vec.as_ptr() as usize;
-            let repr = varn_types::vm_value::ArrayRepr::Boxed(boxed_vec);
-            let repr_size = std::mem::size_of::<varn_types::vm_value::ArrayRepr>();
+            let repr = ArrayRepr::Boxed(boxed_vec);
             let base = &repr as *const _ as *const u8;
-            let word = std::mem::size_of::<usize>();
-
-            let disc = unsafe { *base };
-            assert_eq!(disc, 0, "ArrayRepr::Boxed discriminant must be 0");
-
-            let mut ptr_off = usize::MAX;
-            let mut len_off = usize::MAX;
-            let mut off = word;
-            while off + word <= repr_size {
-                let w = unsafe { *(base.add(off) as *const usize) };
-                if w == vec_ptr {
-                    ptr_off = off;
-                } else if w == 3 {
-                    len_off = off;
-                }
-                off += word;
-            }
-            assert!(
-                ptr_off != usize::MAX && len_off != usize::MAX,
-                "ArrayRepr::Boxed Vec layout probe failed"
-            );
-
-            let probed_ptr = unsafe { *(base.add(ptr_off) as *const usize) };
-            let probed_len = unsafe { *(base.add(len_off) as *const usize) };
+            let disc = unsafe { *base.add(ArrayRepr::DISC_OFF) };
+            assert_eq!(disc, 0, "ArrayRepr::Boxed discriminant must read 0 at DISC_OFF");
+            let probed_ptr =
+                unsafe { *(base.add(ArrayRepr::ELEMS_PTR_OFF) as *const usize) };
+            let probed_len =
+                unsafe { *(base.add(ArrayRepr::ELEMS_LEN_OFF) as *const usize) };
             assert_eq!(
                 probed_ptr, vec_ptr,
-                "elems_ptr_off probe read-back mismatch"
+                "ELEMS_PTR_OFF tripwire: Boxed Vec ptr mismatch"
             );
-            assert_eq!(probed_len, 3, "elems_len_off probe read-back mismatch");
+            assert_eq!(probed_len, 3, "ELEMS_LEN_OFF tripwire: Boxed Vec len mismatch");
 
-            (0usize, ptr_off, len_off)
+            // La carga útil es una unión: I64/F64 comparten palabras con Boxed.
+            // Solo se verifica su tag en el mismo offset.
+            let i64_repr = ArrayRepr::I64(vec![0, 0, 0]);
+            let i64_disc =
+                unsafe { *(&i64_repr as *const _ as *const u8).add(ArrayRepr::DISC_OFF) };
+            assert_eq!(i64_disc, 1, "ArrayRepr::I64 discriminant must read 1");
+            let f64_repr = ArrayRepr::F64(vec![0.0, 0.0, 0.0]);
+            let f64_disc =
+                unsafe { *(&f64_repr as *const _ as *const u8).add(ArrayRepr::DISC_OFF) };
+            assert_eq!(f64_disc, 2, "ArrayRepr::F64 discriminant must read 2");
+
+            (
+                ArrayRepr::DISC_OFF,
+                ArrayRepr::ELEMS_PTR_OFF,
+                ArrayRepr::ELEMS_LEN_OFF,
+            )
         };
-
-        {
-            let mut i64_vec: Vec<i64> = Vec::with_capacity(7);
-            i64_vec.extend([0, 0, 0]);
-            let i64_ptr = i64_vec.as_ptr() as usize;
-            let repr = varn_types::vm_value::ArrayRepr::I64(i64_vec);
-            let base = &repr as *const _ as *const u8;
-            let disc = unsafe { *base.add(disc_off) };
-            assert_eq!(
-                disc, 1,
-                "ArrayRepr::I64 discriminant must read as 1 at the probed disc_off"
-            );
-            let probed_ptr = unsafe { *(base.add(elems_ptr_off) as *const usize) };
-            let probed_len = unsafe { *(base.add(elems_len_off) as *const usize) };
-            assert_eq!(
-                probed_ptr, i64_ptr,
-                "ArrayRepr::I64 Vec ptr does not land at the Boxed-probed elems_ptr_off"
-            );
-            assert_eq!(
-                probed_len, 3,
-                "ArrayRepr::I64 Vec len does not land at the Boxed-probed elems_len_off"
-            );
-        }
-        {
-            let mut f64_vec: Vec<f64> = Vec::with_capacity(7);
-            f64_vec.extend([0.0, 0.0, 0.0]);
-            let f64_ptr = f64_vec.as_ptr() as usize;
-            let repr = varn_types::vm_value::ArrayRepr::F64(f64_vec);
-            let base = &repr as *const _ as *const u8;
-            let disc = unsafe { *base.add(disc_off) };
-            assert_eq!(
-                disc, 2,
-                "ArrayRepr::F64 discriminant must read as 2 at the probed disc_off"
-            );
-            let probed_ptr = unsafe { *(base.add(elems_ptr_off) as *const usize) };
-            let probed_len = unsafe { *(base.add(elems_len_off) as *const usize) };
-            assert_eq!(
-                probed_ptr, f64_ptr,
-                "ArrayRepr::F64 Vec ptr does not land at the Boxed-probed elems_ptr_off"
-            );
-            assert_eq!(
-                probed_len, 3,
-                "ArrayRepr::F64 Vec len does not land at the Boxed-probed elems_len_off"
-            );
-        }
 
         let arr = varn_types::vm_value::VmArray::new(vec![VmValue::null()]);
         let rcbox = Rc::as_ptr(&arr.0) as usize - 2 * std::mem::size_of::<usize>();
@@ -166,8 +122,8 @@ impl Heap {
 
         let shape = varn_types::Shape::create(None, rustc_hash::FxHashMap::default());
         let shape_id = shape.id;
-        // Both words carry the sentinel, so the word-stepping probe below
-        // lands on the FIRST word of the tail whichever half it scans first.
+        // Both words carry the sentinel, so the tripwire below lands on the
+        // tail whichever half it reads first.
         let oref = ObjRef::with_shape(
             Rc::clone(&shape),
             vec![VmValue::from_raw_parts(SENTINEL_FIELD, SENTINEL_FIELD); TAIL],
@@ -176,25 +132,27 @@ impl Heap {
         let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
         let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
 
+        // Derivado, no escaneado: `ObjData`/`Shape` son `repr(C)` propios
+        // (`OBJ_VALUES_OFF`, `OBJ_SHAPE_OFF`, `OBJ_INLINE_LEN_OFF`,
+        // `SHAPE_ID_OFF`). Tripwires sobre un valor real.
+        let values_off = varn_types::OBJ_VALUES_OFF;
+        let shape_off = varn_types::OBJ_SHAPE_OFF;
+        let len_off = varn_types::OBJ_INLINE_LEN_OFF;
         let block = unsafe { std::slice::from_raw_parts(rcbox as *const u8, 80) };
         let word_at =
             |off: usize| -> u64 { u64::from_ne_bytes(block[off..off + 8].try_into().unwrap()) };
-
-        let values_off = (0..=72)
-            .step_by(8)
-            .find(|&off| word_at(off) == SENTINEL_FIELD)
-            .expect("object tail probe failed: no sentinel field found");
-        let shape_off = (0..=72)
-            .step_by(8)
-            .find(|&off| word_at(off) as usize == shape_ptr)
-            .expect("object shape probe failed");
-        let len_off = (0..=72)
-            .step_by(8)
-            .find(|&off| (word_at(off) & 0xFFFF_FFFF) as usize == TAIL && off != values_off)
-            .expect("object inline_len probe failed");
+        assert_eq!(
+            word_at(values_off),
+            SENTINEL_FIELD,
+            "OBJ_VALUES_OFF tripwire: tail sentinel not at derived offset"
+        );
+        assert!(
+            (word_at(len_off) & 0xFFFF_FFFF) as usize == TAIL && len_off != values_off,
+            "OBJ_INLINE_LEN_OFF tripwire: inline_len not at derived offset"
+        );
 
         let shape_id_off =
-            2 * std::mem::size_of::<usize>() + std::mem::offset_of!(varn_types::Shape, id);
+            2 * std::mem::size_of::<usize>() + varn_types::SHAPE_ID_OFF;
         assert_eq!(
             unsafe { *((shape_ptr + shape_id_off) as *const u32) },
             shape_id,

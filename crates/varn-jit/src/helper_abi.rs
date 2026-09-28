@@ -1,21 +1,4 @@
-//! THE list of host entry points compiled code may call.
-//!
-//! One list, expanded twice: `varn-jit` turns it into the `JitHelpers`
-//! struct, `varn-vm` turns it into the table that fills that struct. Before
-//! this existed the same ~120 names were written out by hand in both places
-//! plus a re-export block, and a name missing from any one of them compiled
-//! fine and left a zero in the table — a jump to address 0 from generated
-//! code, at runtime, in whichever program first reached that opcode.
-//!
-//! Each entry is `struct_field => varn_vm_fn`. The two names differ often
-//! enough (`bit_and => jit_bitand`, `try_push => jit_push_try`) that the
-//! mapping cannot be derived and has to be written down once.
-//!
-//! Fields that are NOT a plain `fn as usize` — the probed layouts, the
-//! struct offsets, the two op-id resolvers — stay hand-written in the
-//! struct tail, because they carry types and provenance a name list cannot.
 
-/// Expands `$cb!` with the whole helper list. See the module docs.
 #[macro_export]
 macro_rules! jit_helper_abi {
     ($cb:ident) => {
@@ -37,9 +20,6 @@ macro_rules! jit_helper_abi {
             load_upvalue => jit_load_upvalue,
             store_upvalue => jit_store_upvalue,
             make_closure => jit_make_closure,
-            /// `extern "C" fn(*mut ExecCtx, closure, base, proto_idx, descs:
-            /// *const u64, count)` — `MakeClosure` out of the lowering from
-            /// typed SSA, its upvalue sources as a window of words.
             make_closure_window => jit_make_closure_window,
             load_static_fn => jit_load_static_fn,
             call => jit_call,
@@ -47,23 +27,14 @@ macro_rules! jit_helper_abi {
             call_method_flat => jit_call_method_flat,
             invoke_virtual_flat => jit_invoke_virtual_flat,
             get_property => jit_get_property,
-            /// Flat-args variant of `get_property` for the CLIF backend:
-            /// `fn(ctx, closure, obj, name_idx, cs_idx, dest, ip) -> VmValue`.
             get_property_flat => jit_get_property_flat,
             set_property => jit_set_property,
-            /// Flat-args variant of `set_property` for the CLIF backend:
-            /// `fn(ctx, closure, obj, val, name_idx, cs_idx, ip)`.
             set_property_flat => jit_set_property_flat,
             build_array => jit_build_array,
-            /// `extern "C" fn(*mut ExecCtx, parts: *const VmValue, count)` —
-            /// build an array from a boxed window on the caller's native stack.
             build_array_window => jit_build_array_window,
-            /// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` —
-            /// build a map from a boxed `[k,v,…]` window.
             build_map_window => jit_build_map_window,
-            /// `extern "C" fn(*mut ExecCtx, vals, count, shape, is_record,
-            /// may_hold_closure)` — object/record from a boxed window.
-            build_object_window => jit_build_object_window,            build_map => jit_build_map,
+            build_object_window => jit_build_object_window,
+            build_map => jit_build_map,
             build_str => jit_build_str,
             negate => jit_negate,
             logical_not => jit_logical_not,
@@ -99,15 +70,9 @@ macro_rules! jit_helper_abi {
             close_upvalue => jit_close_upvalue,
             get_enum_tag => jit_get_enum_tag,
             is_array => jit_is_array,
-            /// `extern "C" fn(*mut ExecCtx, closure, tag, meta_idx)` —
-            /// `MakeEnumVariant` out of the lowering from typed SSA.
             make_enum_variant_const => jit_make_enum_variant_const,
-            /// `extern "C" fn(*mut ExecCtx, conv, tag, payload)` — `as`.
             convert => jit_convert,
-            /// `extern "C" fn(*mut ExecCtx, wire_byte, window: *const VmValue,
-            /// count)` — an intrinsic out of the lowering from typed SSA.
             intrinsic_window => jit_intrinsic_window,
-            /// `extern "C" fn(tag, payload) -> u64` — `VmValue::is_truthy`.
             truthy => jit_truthy,
             wrap_spread => jit_wrap_spread,
             object_keys => jit_object_keys,
@@ -142,75 +107,20 @@ macro_rules! jit_helper_abi {
             jit_post_call => jit_post_call,
             jit_ensure_stack_capacity => jit_ensure_stack_capacity,
             dispatch_intrinsic => jit_dispatch_intrinsic,
-            /// `extern "C" fn(*mut ExecCtx, receiver, pos) -> VmValue` — direct
-            /// `charCodeAt` without the stack-window flush/reload overhead.
             str_char_code_at => jit_str_char_code_at,
-            /// `extern "C" fn(*mut ExecCtx, receiver: VmValue) -> *const u8` —
-            /// address of the receiver's bytes when it is a heap-allocated ASCII
-            /// string, `0` otherwise. Hoisted out of a loop by
-            /// `preheader::emit_str_caches`; only valid while the region
-            /// allocates nothing.
             str_ascii_bytes => jit_str_ascii_bytes,
-            /// `extern "C" fn(*mut ExecCtx, receiver: VmValue) -> i64` — byte
-            /// length of what `str_ascii_bytes` returned. Meaningless unless
-            /// that call answered non-zero for the same receiver.
             str_ascii_len => jit_str_ascii_len,
             jit_is_native_fn => jit_is_native_fn,
-            /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, act_id, reg_start,
-            /// total)` — the single native `CallNativeOp` entry. `fn_addr == 0`
-            /// resolves from `op_id` at run time. Both read the same
-            /// `[receiver, args...]` home window and share one marshal.
             jit_call_native => jit_call_native,
-            /// `extern "C" fn(*mut ExecCtx, fn_addr, op_id, window: *const
-            /// VmValue, total)` — `jit_call_native` for the lowering from typed
-            /// SSA: `[receiver, args...]` as a boxed window.
             jit_call_native_window => jit_call_native_window,
-            /// `extern "C" fn(*mut ExecCtx, name_idx, cs, window: *const
-            /// VmValue, total)` — a method call out of the lowering from typed
-            /// SSA: `[receiver, args...]` as a boxed window.
             jit_call_method_window => jit_call_method_window,
-            /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
             gc_safepoint => jit_gc_safepoint,
-            /// `extern "C" fn(*mut ExecCtx, callee_tag, callee_payload,
-            /// window: *const VmValue, argc)` — the SSA lowering's call fallback
-            /// when the caller has no VM activation to keep a window in. Runs
-            /// the callee through the same `ExecCtx::invoke`.
             jit_invoke_window => jit_invoke_window,
-            /// `extern "C" fn(*mut ExecCtx, src, argc)` — direct self-recursion
-            /// out of a frame-aware lowering, which cannot pass its own `base`
-            /// to the callee and has no boxed callee to route through
-            /// `invoke_dynamic`.
             clif_call_self => clif_call_self,
-            /// `extern "C" fn(*mut ExecCtx, window: *const VmValue, argc)` —
-            /// self-recursion out of the lowering from typed SSA, whose
-            /// arguments are not in contiguous homes: a boxed window,
-            /// placeholder first.
             jit_call_self_window => jit_call_self_window,
-            /// `extern "C" fn(*mut ExecCtx, closure_tag, closure_payload, act_id,
-            /// arg_start, arg_count, dest, out_closure: *mut usize,
-            /// out_base: *mut usize) -> usize`
-            /// — half of `invoke_dynamic`'s fast path, split so the call site
-            /// makes the wrapper call itself instead of crossing back into
-            /// Rust to do it. `0` = declined, take `invoke_dynamic`; non-zero
-            /// = the callee's wrapper entry point, with a `CallFrame` already
-            /// pushed and the out-params holding what the wrapper call needs.
-            /// Always paired with `jit_finish_static_call` after.
             jit_prepare_static_call => jit_prepare_static_call,
-            /// `extern "C" fn(*mut ExecCtx, callee_base: usize)` — pops the frame
-            /// `jit_prepare_static_call` pushed and closes its upvalues.
-            /// `callee_base` is the call site's own out-param value (slot
-            /// nativo, no campo compartido).
             jit_finish_static_call => jit_finish_static_call,
-            /// `extern "C" fn(*mut ExecCtx, class_id: u32, payload_size: u32) -> u64`
-            /// — Fast allocator for class instances returning heap index without interpreter frame overhead.
             alloc_instance_fast => jit_alloc_instance_fast,
-            /// `extern "C" fn(*mut ExecCtx, callee_tag, callee_payload,
-            /// act_id, arg_start, argc)` — camino dinámico ÚNICO v2 (§3.2):
-            /// métodos, closures, `dynamic`. Ventana contigua ya preparada por
-            /// el caller; resuelve, ejecuta y deja boxed en `jit_native_result`
-            /// (hasta migrar retorno directo por target). Cuando un call-site
-            /// se vuelve monomórfico caliente, el tiering lo recompila a
-            /// estático directo. Sustituye a la familia `call`/`invoke_virtual`/IC.
             invoke_dynamic => jit_invoke_dynamic,
         }
     };

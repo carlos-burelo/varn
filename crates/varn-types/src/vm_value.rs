@@ -473,6 +473,16 @@ pub enum ArrayRepr {
 }
 
 impl ArrayRepr {
+    /// Byte offset of the `repr(C, u8)` discriminant: first by construction.
+    /// Tripwire-verified in `varn-vm` (`jit_array_layout` reads it back).
+    pub const DISC_OFF: usize = 0;
+    /// Byte offset of the element `Vec`'s data word: tag (1 B) + padding to
+    /// `Vec` alignment (8). The payload is one union of three `Vec`s, so the
+    /// words land identically in every variant.
+    pub const ELEMS_PTR_OFF: usize = 8;
+    /// Byte offset of the element `Vec`'s length word.
+    pub const ELEMS_LEN_OFF: usize = 16;
+
     /// The `repr(C, u8)` discriminant (0 = Boxed, 1 = I64, 2 = F64). Matches the byte the JIT reads at offset 0
     /// of the `ArrayRepr`.
     #[inline(always)]
@@ -498,6 +508,17 @@ impl ArrayRepr {
         self.len() == 0
     }
 }
+
+const _: () = {
+    // The payload union starts at the first 8-aligned offset past the 1-byte
+    // tag, and every variant is a `Vec` (ptr, len, cap): what the ELEMS_*
+    // consts above state. A representation change breaks loudly here, not in
+    // emitted code.
+    assert!(std::mem::align_of::<ArrayRepr>() == 8);
+    assert!(ArrayRepr::ELEMS_PTR_OFF == 8);
+    assert!(ArrayRepr::ELEMS_LEN_OFF == 16);
+    assert!(std::mem::size_of::<ArrayRepr>() % 8 == 0);
+};
 
 /// A reference-counted, interior-mutable array whose element storage is one
 /// of three representations (see [`ArrayRepr`]). Identity is the `Rc` address;

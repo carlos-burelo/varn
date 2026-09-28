@@ -21,7 +21,7 @@ use std::sync::Arc;
 /// fast paths only know about the tail, so an overflowed slot fails their
 /// bounds check and falls back to the interpreter helper.
 ///
-/// `#[repr(C)]` pins the field order the JIT probes (`JitObjectLayout`).
+/// `#[repr(C)]` pins the field order the JIT derives (`JitObjectLayout`).
 #[repr(C)]
 pub struct ObjData<T: ?Sized = [Cell<VmValue>]> {
     shape: UnsafeCell<Rc<Shape>>,
@@ -30,6 +30,14 @@ pub struct ObjData<T: ?Sized = [Cell<VmValue>]> {
     overflow: UnsafeCell<Option<Box<Vec<VmValue>>>>,
     values: T,
 }
+
+/// Layout facts the JIT's inline property paths address directly. Derived
+/// with `offset_of!` from this owned definition (exact by construction),
+/// never re-measured by a scan. Field offsets before the tail are identical
+/// for every tail length, so the zero-length instantiation answers for all.
+pub const OBJ_SHAPE_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, shape);
+pub const OBJ_INLINE_LEN_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, inline_len);
+pub const OBJ_VALUES_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, values);
 
 /// Header words preceding the tail. Asserted against the real layout below.
 const HEADER_WORDS: usize = 3;
