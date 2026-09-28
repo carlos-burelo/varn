@@ -266,8 +266,32 @@ fn lower_union(
     let non_null: Vec<&crate::types::CheckerTyId> =
         member_ids.iter().filter(|id| !is_null(id)).collect();
 
+    // A union whose members all share one non-dynamic base (`"GET" | "POST"`,
+    // `200 | 404`) is that base: every inhabitant carries it, so member
+    // access and arithmetic stay typed instead of degrading to dynamic.
+    // Anything else (`int | str`, opaque params) stays honestly dynamic.
+    fn common_base(
+        non_null: &[&crate::types::CheckerTyId],
+        table: &CheckerTyTable,
+        interner: &AtomInterner,
+        tt: &mut TyTable,
+        names: &dyn NameResolver,
+    ) -> Option<BackendTy> {
+        let mut iter = non_null
+            .iter()
+            .map(|id| lower_type(&Type(**id, false), table, interner, tt, names));
+        let first = iter.next()?;
+        if matches!(first, BackendTy::Dynamic(_)) {
+            return None;
+        }
+        iter.all(|t| t == first).then_some(first)
+    }
+
     if non_null.len() == member_ids.len() {
         // No null in the union — non-discriminated.
+        if let Some(base) = common_base(&non_null, table, interner, tt, names) {
+            return base;
+        }
         return BackendTy::Dynamic(DynReason::Union);
     }
     match non_null.as_slice() {
@@ -277,7 +301,10 @@ fn lower_union(
             BackendTy::Nullable(tt.intern(inner))
         }
         // `A | B | null` — the payload itself is a non-discriminated union.
-        _ => BackendTy::Dynamic(DynReason::Union),
+        _ => match common_base(&non_null, table, interner, tt, names) {
+            Some(base) => BackendTy::Nullable(tt.intern(base)),
+            None => BackendTy::Dynamic(DynReason::Union),
+        },
     }
 }
 
@@ -350,6 +377,89 @@ mod tests {
         let int_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
         let str_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
         let list = ct.intern_list(&[int_id, str_id]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        assert_eq!(
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
+            BackendTy::Dynamic(DynReason::Union)
+        );
+    }
+
+    #[test]
+    fn union_of_str_literals_is_str() {
+        // `type Method = "GET" | "POST"`: every inhabitant is a `str`, so
+        // member access (`.length`) stays typed instead of going by name.
+        let (mut tt, mut ct, mut interner) = table();
+        let get = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Str(
+            interner.intern("GET"),
+        )));
+        let post = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Str(
+            interner.intern("POST"),
+        )));
+        let list = ct.intern_list(&[get, post]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        assert_eq!(
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
+            BackendTy::Str
+        );
+    }
+
+    #[test]
+    fn union_of_int_literals_is_int() {
+        // `200 | 404`: arithmetic stays `AddInt`, not generic `Add`.
+        let (mut tt, mut ct, interner) = table();
+        let a = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Int(200)));
+        let b = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Int(404)));
+        let list = ct.intern_list(&[a, b]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        assert_eq!(
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
+            BackendTy::Int
+        );
+    }
+
+    #[test]
+    fn mixed_literal_union_stays_dynamic_union() {
+        // `"GET" | 200`: no common base, honestly dynamic.
+        let (mut tt, mut ct, mut interner) = table();
+        let s = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Str(
+            interner.intern("GET"),
+        )));
+        let i = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Int(200)));
+        let list = ct.intern_list(&[s, i]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        assert_eq!(
+            lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
+            BackendTy::Dynamic(DynReason::Union)
+        );
+    }
+
+    #[test]
+    fn nullable_str_literal_union_is_nullable_str() {
+        // `"GET" | "POST" | null`: the payload is uniformly `str`.
+        let (mut tt, mut ct, mut interner) = table();
+        let get = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Str(
+            interner.intern("GET"),
+        )));
+        let post = ct.intern(TypeKind::Literal(varn_core::TypeLiteral::Str(
+            interner.intern("POST"),
+        )));
+        let null = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Null));
+        let list = ct.intern_list(&[get, post, null]);
+        let ty = intern(&mut ct, TypeKind::Union(list));
+        let BackendTy::Nullable(id) = lower_type(&ty, &ct, &interner, &mut tt, &NoNames) else {
+            panic!("expected Nullable");
+        };
+        assert_eq!(tt.get(id), BackendTy::Str);
+    }
+
+    #[test]
+    fn nullable_mixed_union_stays_dynamic_union() {
+        // `int | str | null`: heterogeneous payload, honestly dynamic.
+        let (mut tt, mut ct, interner) = table();
+        let int_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
+        let str_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
+        let null_id = ct.intern(TypeKind::Primitive(varn_core::LangPrimitive::Null));
+        let list = ct.intern_list(&[int_id, str_id, null_id]);
         let ty = intern(&mut ct, TypeKind::Union(list));
         assert_eq!(
             lower_type(&ty, &ct, &interner, &mut tt, &NoNames),
