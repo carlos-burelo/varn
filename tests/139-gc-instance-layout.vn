@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // The collector visits an instance through its class's GcLayout: only the
 // reference slots (compact `Ref` fields and boxed fields), never the scalar
 // ones. Every reference an instance holds must survive minor collections
@@ -43,10 +45,6 @@ function gcChurn(n: int): int {
 
 // Born holding young references, then churned through several collections.
 let gcMixed: GcMixed[] = []
-for (let i = 0; i < 2000; i = i + 1) {
-    gcMixed.push(new GcMixed(i))
-}
-gcChurn(60000)
 
 function gcMixedChecksum(xs: GcMixed[]): int {
     let acc = 0
@@ -59,24 +57,10 @@ function gcMixedChecksum(xs: GcMixed[]): int {
     return acc
 }
 // Per i: i + 2i + (i + 2) - i + 3i + 1 (label) = 6i + 3, plus 1 when i is even.
-assert("gc layout: instances born with young refs survive", gcMixedChecksum(gcMixed) === 6 * 1999000 + 3 * 2000 + 1000)
 
 // An old instance written with fresh references between collections: the
 // write barrier remembers it, the nursery rewrites its compact slots.
 let gcOld = new GcMixed(7)
-gcChurn(60000)
-for (let round = 0; round < 20; round = round + 1) {
-    gcOld.leaf = new GcLeaf(round)
-    gcOld.items = [round, round, round]
-    gcOld.label = "rewritten-label-long-enough-for-the-heap-" + round
-    gcOld.any = new GcLeaf(round * 10)
-    gcChurn(5000)
-}
-assert("gc layout: rewritten compact ref survives", gcOld.leaf.n === 19)
-assert("gc layout: rewritten array field survives", gcOld.items[1] === 19)
-assert("gc layout: rewritten boxed str survives", gcOld.label == "rewritten-label-long-enough-for-the-heap-19")
-assert("gc layout: rewritten dynamic field survives", (gcOld.any as GcLeaf).n === 190)
-assert("gc layout: scalar fields untouched", gcOld.a === 7 && gcOld.b === -7 && gcOld.f === 3.5 && !gcOld.flag)
 
 // A class with only scalar fields has an empty GcLayout.
 class GcScalars {
@@ -92,13 +76,44 @@ class GcScalars {
     }
 }
 let gcScalars: GcScalars[] = []
+let gcScalarSum = 0
+
+for (let i = 0; i < 2000; i = i + 1) {
+    gcMixed.push(new GcMixed(i))
+}
+gcChurn(60000)
+let gcMixedSum = gcMixedChecksum(gcMixed)
+gcChurn(60000)
+for (let round = 0; round < 20; round = round + 1) {
+    gcOld.leaf = new GcLeaf(round)
+    gcOld.items = [round, round, round]
+    gcOld.label = "rewritten-label-long-enough-for-the-heap-" + round
+    gcOld.any = new GcLeaf(round * 10)
+    gcChurn(5000)
+}
+let gcOldLeafN = gcOld.leaf.n
+let gcOldItem1 = gcOld.items[1]
+let gcOldLabel = gcOld.label
+let gcOldAnyN = (gcOld.any as GcLeaf).n
 for (let i = 0; i < 5000; i = i + 1) {
     gcScalars.push(new GcScalars(i))
 }
 gcChurn(60000)
-let gcScalarSum = 0
 for (const s of gcScalars) {
     gcScalarSum = gcScalarSum + s.a + s.b
 }
-assert("gc layout: scalar-only instances survive", gcScalarSum === 2 * 12497500 + 5000)
-print("[PASSED] 139. GC by instance layout")
+
+await describe("139 gc instance layout", async () => {
+    await it("mixed instances survive collections", async () => {
+        expect(gcMixedSum).toBe(6 * 1999000 + 3 * 2000 + 1000);
+        expect(gcOldLeafN).toBe(19);
+        expect(gcOldItem1).toBe(19);
+        expect(gcOldLabel == "rewritten-label-long-enough-for-the-heap-19").toBeTruthy();
+    });
+
+    await it("scalar instances and old writes", async () => {
+        expect(gcOldAnyN).toBe(190);
+        expect(gcOld.a === 7 && gcOld.b === -7 && gcOld.f === 3.5 && !gcOld.flag).toBeTruthy();
+        expect(gcScalarSum).toBe(2 * 12497500 + 5000);
+    });
+});

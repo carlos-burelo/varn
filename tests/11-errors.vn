@@ -1,129 +1,123 @@
+import { describe, it, expect } from "std:test";
 
+let finallyRan = false;
 function safeDivide(a: int, b: int): float {
     try {
-        if (b === 0) throw new RangeError("division by zero")
-        return (a as float) / (b as float)
+        if (b === 0) throw new RangeError("division by zero");
+        return (a as float) / (b as float);
     } catch (e) {
-        return -1
+        return -1;
     }
 }
-assert("try no error",      safeDivide(10, 2) === 5)
-assert("try catch returns", safeDivide(10, 0) === -1)
-
-let caughtName = ""
-try {
-    throw new TypeError("bad type")
-} catch (e) {
-    caughtName = e.name
-}
-assert("catch TypeError name", caughtName === "TypeError")
-
-let isRangeError = false
-try {
-    throw new RangeError("too big")
-} catch (e) {
-    isRangeError = e instanceof RangeError
-}
-assert("catch instanceof", isRangeError)
-
-let innerCaught = false
-let outerCaught = false
-try {
-    try {
-        throw new Error("inner")
-    } catch (e) {
-        innerCaught = true
-        throw e
-    }
-} catch (e) {
-    outerCaught = true
-}
-assert("nested try inner caught", innerCaught)
-assert("nested try rethrow",      outerCaught)
-
 class ValidationError extends Error {
     field: str
     constructor(field: str, msg: str) {
-        super(msg)
-        this.name = "ValidationError"
-        this.field = field
+        super(msg);
+        this.name = "ValidationError";
+        this.field = field;
     }
 }
-
-let ve: ValidationError | null = null
-try {
-    throw new ValidationError("email", "invalid format")
-} catch (e) {
-    if (e instanceof ValidationError) {
-        ve = e
-    }
-}
-assert("custom error name",    ve?.name === "ValidationError")
-assert("custom error message", ve?.message === "invalid format")
-assert("custom error field",   ve?.field === "email")
-assert("custom instanceof Error", ve instanceof Error)
-
-let finallyRan = false
 function withFinally(): int {
     try {
-        return 42
+        return 42;
     } finally {
-        finallyRan = true
+        finallyRan = true;
     }
 }
-const fres = withFinally()
-assert("finally return value", fres === 42)
-assert("finally ran",          finallyRan)
-// ── Errores nacidos en el RUNTIME, no lanzados con `throw` ───────
-// La búsqueda de handler vivía sólo en el brazo del opcode `Throw`, así que
-// todo `Err` del runtime salía del bucle sin mirar la tabla de excepciones:
-// una división por cero o un `JSON.parse` inválido terminaban el proceso
-// aunque estuvieran dentro de un `try`. El resto de este archivo no lo
-// detectaba porque comprueba `b === 0` y lanza a mano antes de dividir.
-
-let zeros: int[] = [0]
-
-let divCaught = false
-let divMsg = ""
-try {
-    let q = 10 / zeros[0]
-} catch (e) {
-    divCaught = true
-    divMsg = e.message
-}
-assert("runtime div by zero is catchable", divCaught)
-assert("runtime error carries message",    divMsg === "division by zero")
-
-let modCaught = false
-try {
-    let q = 10 % zeros[0]
-} catch (e) {
-    modCaught = true
-}
-assert("runtime mod by zero is catchable", modCaught)
-
 function divideOrDefault(a: int, b: int): int {
     try {
-        return a / b
+        return a / b;
     } catch (e) {
-        return -1
+        return -1;
     }
 }
-assert("catchable inside a function", divideOrDefault(10, 0) === -1)
-assert("float division by zero is IEEE, not an error", 10.0 / 0.0 === Infinity)
-
-// Un error nacido dentro de una llamada anidada tiene que desenrollar hasta
-// el `try` del llamador.
 function inner(): int {
-    let z: int[] = [0]
-    return 5 % z[0]
+    let z: int[] = [0];
+    return 5 % z[0];
 }
-let nestedCaught = false
-try {
-    let v = inner()
-} catch (e) {
-    nestedCaught = true
-}
-assert("catchable across a call frame", nestedCaught)
 
-print("[PASSED] 11. Error handling ")
+await describe("11 Errors", async () => {
+    await it("try catch basics", () => {
+        expect(safeDivide(10, 2)).toBe(5);
+        expect(safeDivide(10, 0)).toBe(-1);
+        let caughtName = "";
+        try {
+            throw new TypeError("bad type");
+        } catch (e) {
+            caughtName = e.name;
+        }
+        expect(caughtName).toBe("TypeError");
+        let isRangeError = false;
+        try {
+            throw new RangeError("too big");
+        } catch (e) {
+            isRangeError = e instanceof RangeError;
+        }
+        expect(isRangeError).toBeTruthy();
+    });
+
+    await it("nested and custom errors", () => {
+        let innerCaught = false;
+        let outerCaught = false;
+        try {
+            try {
+                throw new Error("inner");
+            } catch (e) {
+                innerCaught = true;
+                throw e;
+            }
+        } catch (e) {
+            outerCaught = true;
+        }
+        expect(innerCaught).toBeTruthy();
+        expect(outerCaught).toBeTruthy();
+        let ve: ValidationError | null = null;
+        try {
+            throw new ValidationError("email", "invalid format");
+        } catch (e) {
+            if (e instanceof ValidationError) {
+                ve = e;
+            }
+        }
+        expect(ve?.name).toBe("ValidationError");
+        expect(ve?.message).toBe("invalid format");
+        expect(ve?.field).toBe("email");
+        expect(ve instanceof Error).toBeTruthy();
+    });
+
+    await it("finally", () => {
+        const fres = withFinally();
+        expect(fres).toBe(42);
+        expect(finallyRan).toBeTruthy();
+    });
+
+    await it("runtime errors are catchable", () => {
+        let zeros: int[] = [0];
+        let divCaught = false;
+        let divMsg = "";
+        try {
+            let q = 10 / zeros[0];
+        } catch (e) {
+            divCaught = true;
+            divMsg = e.message;
+        }
+        expect(divCaught).toBeTruthy();
+        expect(divMsg).toBe("division by zero");
+        let modCaught = false;
+        try {
+            let q = 10 % zeros[0];
+        } catch (e) {
+            modCaught = true;
+        }
+        expect(modCaught).toBeTruthy();
+        expect(divideOrDefault(10, 0)).toBe(-1);
+        expect(10.0 / 0.0 === Infinity).toBeTruthy();
+        let nestedCaught = false;
+        try {
+            let v = inner();
+        } catch (e) {
+            nestedCaught = true;
+        }
+        expect(nestedCaught).toBeTruthy();
+    });
+});

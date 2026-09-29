@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // A GC safepoint spills live registers to their ctx.stack home slots so the
 // collector can root and rewrite them. `live_boxed` decides that set. This
 // file pins the set being narrow enough to be fast and wide enough to be
@@ -18,7 +21,6 @@ function spRefsSurviveConcat(n: int): int {
   if (last === "item-" + (n - 1)) { hits = hits + 1 }
   return hits
 }
-assert("safepoint: heap refs survive allocating concats", spRefsSurviveConcat(50000) === 50001)
 
 // Ints interleaved with heap refs: the ints are what the kind-narrowed flush
 // set stops flushing, so their values must still be exact after collections
@@ -33,7 +35,6 @@ function spIntsExactAcrossGc(n: int): int {
   if (s === "") { return -1 }
   return acc
 }
-assert("safepoint: ints exact across collections", spIntsExactAcrossGc(70000) === 210000)
 
 // An array of heap objects built under pressure: the array reference itself
 // is live across every push, and every element must survive.
@@ -44,7 +45,6 @@ function spArraySurvives(n: int): int {
   for (let i = 0; i < n; i = i + 1) { arr.push(new SpBox(i)); arr.push("s" + i) }
   return arr.length + arr[0].v + arr[(n - 1) * 2].v
 }
-assert("safepoint: array and elements survive", spArraySurvives(20000) === 40000 + 0 + 19999)
 
 // Nested: an outer heap ref live across an inner allocating loop.
 function spNested(outer: int, inner: int): int {
@@ -57,7 +57,6 @@ function spNested(outer: int, inner: int): int {
   }
   return total
 }
-assert("safepoint: outer ref survives inner allocating loop", spNested(500, 100) === 500)
 
 // ---------------------------------------------------------------------------
 // Helpers that read registers BY INDEX out of ctx.stack.
@@ -91,7 +90,6 @@ function spRangeUnderPressure(n: int): int {
   if (junk === "") { return -1 }
   return total
 }
-assert("safepoint: range bounds survive", spRangeUnderPressure(20000) === 140000)
 
 function spSum3(a: int, b: int, c: int): int { return a + b + c }
 function spSpreadUnderPressure(n: int): int {
@@ -105,7 +103,6 @@ function spSpreadUnderPressure(n: int): int {
   if (junk === "") { return -1 }
   return total
 }
-assert("safepoint: spread argument window survives", spSpreadUnderPressure(20000) === 119996)
 
 // `arr.push(x)` is a CallNativeOp: the receiver and argument are read out of
 // the home slots by register number, and the pushed value here is an int.
@@ -119,7 +116,6 @@ function spNativeOpUnderPressure(n: int): int {
   if (junk === "") { return -1 }
   return acc.length + acc[0] + acc[n - 1]
 }
-assert("safepoint: native op window survives", spNativeOpUnderPressure(20000) === 20001)
 
 enum SpTag { A(int), B(int) }
 function spEnumUnderPressure(n: int): int {
@@ -136,7 +132,6 @@ function spEnumUnderPressure(n: int): int {
   if (junk === "") { return -1 }
   return total
 }
-assert("safepoint: enum variant tag survives", spEnumUnderPressure(20000) === 30000)
 
 // An exception LEAVES compiled code entirely and resumes in the INTERPRETER at
 // the catch handler's bytecode ip, reading every register back from its home
@@ -167,6 +162,27 @@ function spTryUnderPressure(n: int): int {
   if (junk === "") { return -1 }
   return counter * 10000 + caught
 }
-assert("safepoint: registers survive an interpreter catch resume", spTryUnderPressure(20000) === 119845 * 10000 + 134)
+const rRefs = spRefsSurviveConcat(50000)
+const rInts = spIntsExactAcrossGc(70000)
+const rArray = spArraySurvives(20000)
+const rNested = spNested(500, 100)
+const rRange = spRangeUnderPressure(20000)
+const rSpread = spSpreadUnderPressure(20000)
+const rNative = spNativeOpUnderPressure(20000)
+const rEnum = spEnumUnderPressure(20000)
+const rTry = spTryUnderPressure(20000)
+await describe("65 safepoint roots", async () => {
+    await it("tests", async () => {
+        expect(rRefs).toBe(50001)
+        expect(rInts).toBe(210000)
+        expect(rArray).toBe(40000 + 0 + 19999)
+        expect(rNested).toBe(500)
+        expect(rRange).toBe(140000)
+        expect(rSpread).toBe(119996)
+        expect(rNative).toBe(20001)
+        expect(rEnum).toBe(30000)
+        expect(rTry).toBe(119845 * 10000 + 134)
 
-print("[PASSED] 65. Safepoint roots ")
+
+    });
+});

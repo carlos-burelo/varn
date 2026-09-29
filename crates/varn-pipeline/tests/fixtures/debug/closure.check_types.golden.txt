@@ -15,30 +15,30 @@
 12 | 13:14 | (n: int) => (a: int) => int
 13 | 13:24 | int
 14 | 13:14 | (a: int) => int
-15 | 14:1 | (label: str, cond: bool) => void
-16 | 14:8 | str
-17 | 14:24 | (a: int) => int
-18 | 14:29 | int
-19 | 14:24 | int
-20 | 14:36 | int
-21 | 14:24 | bool
-22 | 14:1 | void
+15 | 14:5 | (a: int) => int
+16 | 14:10 | int
+17 | 14:5 | int
+18 | 14:17 | int
+19 | 14:5 | bool
+20 | 14:30 | Error
+21 | 14:36 | str
+22 | 14:26 | Error
 23 | 15:17 | () => () => int
 24 | 15:17 | () => int
-25 | 16:1 | (label: str, cond: bool) => void
-26 | 16:8 | str
-27 | 16:29 | () => int
-28 | 16:29 | int
-29 | 16:43 | int
-30 | 16:29 | bool
-31 | 16:1 | void
-32 | 17:1 | (label: str, cond: bool) => void
-33 | 17:8 | str
-34 | 17:29 | () => int
-35 | 17:29 | int
-36 | 17:43 | int
-37 | 17:29 | bool
-38 | 17:1 | void
+25 | 16:5 | () => int
+26 | 16:5 | int
+27 | 16:19 | int
+28 | 16:5 | bool
+29 | 16:32 | Error
+30 | 16:38 | str
+31 | 16:28 | Error
+32 | 17:5 | () => int
+33 | 17:5 | int
+34 | 17:19 | int
+35 | 17:5 | bool
+36 | 17:32 | Error
+37 | 17:38 | str
+38 | 17:28 | Error
 39 | 18:1 | (...args: dynamic[]) => void
 40 | 18:7 | str
 41 | 18:1 | void

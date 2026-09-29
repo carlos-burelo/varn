@@ -1,3 +1,11 @@
+//! Tablas, secciones y avisos de los volcados `vn debug`.
+//!
+//! El render (ancho visible, truncado, relleno) y la escritura a stderr van
+//! por [`console`]: `measure_text_width` entiende ANSI + Unicode ancho
+//! (CJK/emoji), `pad_str`/`truncate_str` alinean sin romper secuencias, y
+//! `Term::stderr` habilita ANSI en Windows. La API pública (`Table`,
+//! `Section`, `log/warn/error/info`) no cambia.
+
 use crate::term::chalk::{chalk, Chalk};
 use std::fmt::Display;
 
@@ -63,12 +71,12 @@ impl Table {
             .map(|(i, h)| chalk(self.pad(i, h)).dim().to_string())
             .collect::<Vec<_>>()
             .join(" │ ");
-        eprintln!("  {header}");
-        eprintln!("  {}", self.rule_line());
+        write_line(format!("  {header}"));
+        write_line(format!("  {}", self.rule_line()));
 
         for line in &self.lines {
             match line {
-                Line::Rule => eprintln!("  {}", self.rule_line()),
+                Line::Rule => write_line(format!("  {}", self.rule_line())),
                 Line::Cells(row) => {
                     let line = row
                         .iter()
@@ -76,7 +84,7 @@ impl Table {
                         .map(|(i, cell)| self.pad(i, cell))
                         .collect::<Vec<_>>()
                         .join(" │ ");
-                    eprintln!("  {line}");
+                    write_line(format!("  {line}"));
                 }
             }
         }
@@ -89,11 +97,11 @@ impl Table {
             .copied()
             .unwrap_or_else(|| display_width(text));
         let align = self.aligns.get(col).copied().unwrap_or(Align::Left);
-        let fill = width.saturating_sub(display_width(text));
-        match align {
-            Align::Left => format!("{text}{}", " ".repeat(fill)),
-            Align::Right => format!("{}{text}", " ".repeat(fill)),
-        }
+        let console_align = match align {
+            Align::Left => console::Alignment::Left,
+            Align::Right => console::Alignment::Right,
+        };
+        console::pad_str(text, width, console_align, None).into_owned()
     }
 
     fn rule_line(&self) -> String {
@@ -105,21 +113,11 @@ impl Table {
     }
 }
 
+/// Ancho visible en terminal: ignora secuencias ANSI y cuenta los caracteres
+/// anchos (CJK/emoji) como 2. La versión anterior contaba `chars()` (todo = 1)
+/// y desalineaba tablas con contenido no ASCII.
 fn display_width(s: &str) -> usize {
-    let mut width = 0;
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            for esc in chars.by_ref() {
-                if esc.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        } else {
-            width += 1;
-        }
-    }
-    width
+    console::measure_text_width(s)
 }
 
 pub struct Section {
@@ -151,44 +149,70 @@ impl Section {
         let pad_len = (50_isize - self.title.len() as isize - 1).max(0) as usize;
         let padding = "─".repeat(pad_len);
         let title = (self.color)(chalk(&self.title));
-        eprintln!(
+        write_line(format!(
             "\n  {title} {}",
             chalk(format_args!("{padding} {}", self.subtitle)).dim()
-        );
+        ));
     }
 
     pub fn close(&self) {
-        eprintln!(
+        write_line(format!(
             "  {}",
             chalk(format_args!("── end: {} ──", self.title)).dim()
-        );
+        ));
+    }
+}
+
+/// Una línea a stderr. Va por `Term::stderr` para habilitar ANSI en Windows;
+/// si falla (stderr cerrado), cae a `eprintln!` para no perder el volcado.
+fn write_line(line: String) {
+    let term = console::Term::stderr();
+    if term.write_line(&line).is_err() {
+        eprintln!("{line}");
     }
 }
 
 pub fn log(msg: impl Display) {
-    eprintln!("{msg}");
+    write_line(msg.to_string());
 }
 
+/// Avisos humanos (no volcados): con detección automática de color.
+/// Respetan `NO_COLOR`, `CLICOLOR` y TTY; en tuberías salen sin ANSI.
 pub fn warn(msg: impl Display) {
-    eprintln!("  {} {msg}", chalk("warn").yellow().bold());
+    let tag = console::style("warn")
+        .yellow()
+        .bold()
+        .for_stderr()
+        .to_string();
+    write_line(format!("  {tag} {msg}"));
 }
 
 pub fn error(msg: impl Display) {
-    eprintln!("  {} {msg}", chalk("error").red().bold());
+    let tag = console::style("error")
+        .red()
+        .bold()
+        .for_stderr()
+        .to_string();
+    write_line(format!("  {tag} {msg}"));
 }
 
 pub fn info(msg: impl Display) {
-    eprintln!("  {} {msg}", chalk("info").cyan().dim());
+    let tag = console::style("info").cyan().dim().for_stderr().to_string();
+    write_line(format!("  {tag} {msg}"));
 }
 
 pub fn blank() {
-    eprintln!();
+    write_line(String::new());
 }
 
 pub fn tagged(tag: impl Display, msg: impl Display) {
-    eprintln!("[{}] {msg}", chalk(tag).dim());
+    let tag = console::style(tag.to_string())
+        .dim()
+        .for_stderr()
+        .to_string();
+    write_line(format!("[{tag}] {msg}"));
 }
 
 pub fn separator() {
-    eprintln!("  {}", "─".repeat(50));
+    write_line(format!("  {}", "─".repeat(50)));
 }

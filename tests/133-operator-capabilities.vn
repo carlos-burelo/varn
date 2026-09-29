@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 class Vec2 {
     x: int
     y: int
@@ -16,25 +18,35 @@ class Vec2 {
 const a = new Vec2(1, 2)
 const b = new Vec2(3, 4)
 const s = a + b
-assert("+ is add", s.x === 4 && s.y === 6)
-assert("- is sub", (b - a).x === 2)
-assert("* is mul with a scalar", (a * 3).y === 6)
-assert("/ is div", (b / 1).x === 3)
-assert("unary - is neg", (-a).x === -1)
-assert("% is rem", (b % 2).x === 1 && (b % 2).y === 0)
-assert("** is pow", (b ** 2).x === 9 && (b ** 2).y === 16)
-assert("chained", (a + b - a).equals(b))
-assert("== is equals", a + b == new Vec2(4, 6))
-assert("!= is not equals", a != b)
-assert("< via compare", a < b && !(b < a))
-assert("<= / >= via compare", a <= a && b >= a)
-assert("== null stays a null test", !(a == null))
 
 let maybe: Vec2? = null
-assert("nullable operand keeps null test", maybe == null)
 
 class Plain { v: int; constructor(v: int) { this.v = v } }
 const p = new Plain(1)
-assert("no equals: == is identity", p == p && !(p == new Plain(1)))
+await describe("133 operator capabilities", async () => {
+        await it("group 1 part 1", async () => {
+        expect(s.x === 4 && s.y).toBe(6);
+        expect((b - a).x).toBe(2);
+        expect((a * 3).y).toBe(6);
+        expect((b / 1).x).toBe(3);
+        expect((-a).x).toBe(-1);
+    });
 
-print("[PASSED] 133. Operator capabilities")
+    await it("group 1 part 2", async () => {
+        expect((b % 2).x === 1 && (b % 2).y).toBe(0);
+        expect((b ** 2).x === 9 && (b ** 2).y).toBe(16);
+        expect((a + b - a).equals(b)).toBeTruthy();
+        expect(a + b == new Vec2(4, 6)).toBeTruthy();
+        expect(a != b).toBeTruthy();
+    });
+
+    await it("group 1 part 3", async () => {
+        expect(a < b && !(b < a)).toBeTruthy();
+        expect(a <= a && b >= a).toBeTruthy();
+        expect(!(a == null)).toBeTruthy();
+        expect(maybe == null).toBeTruthy();
+        expect(p == p && !(p == new Plain(1))).toBeTruthy();
+    });
+
+
+});

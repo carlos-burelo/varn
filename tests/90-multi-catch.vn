@@ -1,6 +1,6 @@
-// Test Suite 90: Multi-Catch Error Handling in Varn
+import { describe, it, expect } from "std:test";
 
-import { describe, test, expect, assertEqual } from "std:test";
+// Test Suite 90: Multi-Catch Error Handling in Varn
 
 class CustomNetworkError extends Error {
     statusCode: int;
@@ -19,150 +19,145 @@ class CustomDatabaseError extends Error {
         this.dbCode = dbCode;
     }
 }
-
-describe("Multi-Catch Handling", () => {
-    test("Multiple distinct typed catch blocks", () => {
+await describe("90 multi catch", async () => {
+    await it("Multiple distinct typed catch blocks / Union type multi-catch: catch (e: A | ", async () => {
         function testHandler(mode: int): str {
-            try {
-                if (mode === 1) {
-                    throw new TypeError("bad type argument");
-                } else if (mode === 2) {
-                    throw new RangeError("index out of bounds");
-                } else if (mode === 3) {
-                    throw new CustomNetworkError(503, "service unavailable");
-                } else if (mode === 4) {
-                    throw new CustomDatabaseError("ERR_CONN", "db timeout");
-                } else {
-                    return "success";
-                }
-            } catch (e: TypeError) {
-                return `caught TypeError: ${e.message}`;
-            } catch (e: RangeError) {
-                return `caught RangeError: ${e.message}`;
-            } catch (e: CustomNetworkError) {
-                return `caught NetworkError ${e.statusCode}: ${e.message}`;
-            } catch (e: CustomDatabaseError) {
-                return `caught DatabaseError ${e.dbCode}: ${e.message}`;
-            } catch (e: Error) {
-                return `caught general Error: ${e.message}`;
-            }
+        try {
+        if (mode === 1) {
+        throw new TypeError("bad type argument");
+        } else if (mode === 2) {
+        throw new RangeError("index out of bounds");
+        } else if (mode === 3) {
+        throw new CustomNetworkError(503, "service unavailable");
+        } else if (mode === 4) {
+        throw new CustomDatabaseError("ERR_CONN", "db timeout");
+        } else {
+        return "success";
         }
+        } catch (e: TypeError) {
+        return `caught TypeError: ${e.message}`;
+        } catch (e: RangeError) {
+        return `caught RangeError: ${e.message}`;
+        } catch (e: CustomNetworkError) {
+        return `caught NetworkError ${e.statusCode}: ${e.message}`;
+        } catch (e: CustomDatabaseError) {
+        return `caught DatabaseError ${e.dbCode}: ${e.message}`;
+        } catch (e: Error) {
+        return `caught general Error: ${e.message}`;
+        }
+        }
+        expect(testHandler(0)).toBe("success");
+        expect(testHandler(1)).toBe("caught TypeError: bad type argument");
+        expect(testHandler(2)).toBe("caught RangeError: index out of bounds");
+        expect(testHandler(3)).toBe("caught NetworkError 503: service unavailable");
+        expect(testHandler(4)).toBe("caught DatabaseError ERR_CONN: db timeout");
+        
 
-        assertEqual(testHandler(0), "success");
-        assertEqual(testHandler(1), "caught TypeError: bad type argument");
-        assertEqual(testHandler(2), "caught RangeError: index out of bounds");
-        assertEqual(testHandler(3), "caught NetworkError 503: service unavailable");
-        assertEqual(testHandler(4), "caught DatabaseError ERR_CONN: db timeout");
-    });
-
-    test("Union type multi-catch: catch (e: A | B)", () => {
         function handleUnion(mode: int): str {
-            try {
-                if (mode === 1) {
-                    throw new TypeError("type fault");
-                } else if (mode === 2) {
-                    throw new RangeError("range fault");
-                } else {
-                    throw new CustomNetworkError(404, "not found");
-                }
-            } catch (e: TypeError | RangeError) {
-                return `caught TypeOrRange: ${e.name}`;
-            } catch (e: CustomNetworkError) {
-                return `caught Network: ${e.statusCode}`;
-            }
+        try {
+        if (mode === 1) {
+        throw new TypeError("type fault");
+        } else if (mode === 2) {
+        throw new RangeError("range fault");
+        } else {
+        throw new CustomNetworkError(404, "not found");
         }
-
-        assertEqual(handleUnion(1), "caught TypeOrRange: TypeError");
-        assertEqual(handleUnion(2), "caught TypeOrRange: RangeError");
-        assertEqual(handleUnion(3), "caught Network: 404");
+        } catch (e: TypeError | RangeError) {
+        return `caught TypeOrRange: ${e.name}`;
+        } catch (e: CustomNetworkError) {
+        return `caught Network: ${e.statusCode}`;
+        }
+        }
+        expect(handleUnion(1)).toBe("caught TypeOrRange: TypeError");
+        expect(handleUnion(2)).toBe("caught TypeOrRange: RangeError");
+        expect(handleUnion(3)).toBe("caught Network: 404");
+        
     });
 
-    test("Fallback catch-all after typed catches", () => {
+    await it("Fallback catch-all after typed catches / Catch block without parameter: catch {", async () => {
         function handleWithFallback(mode: int): str {
-            try {
-                if (mode === 1) {
-                    throw new TypeError("type fault");
-                } else {
-                    throw new CustomDatabaseError("SQL_ERR", "query failed");
-                }
-            } catch (e: TypeError) {
-                return "handled TypeError";
-            } catch (e) {
-                return `handled fallback: ${e.name}`;
-            }
+        try {
+        if (mode === 1) {
+        throw new TypeError("type fault");
+        } else {
+        throw new CustomDatabaseError("SQL_ERR", "query failed");
         }
+        } catch (e: TypeError) {
+        return "handled TypeError";
+        } catch (e) {
+        return `handled fallback: ${e.name}`;
+        }
+        }
+        expect(handleWithFallback(1)).toBe("handled TypeError");
+        expect(handleWithFallback(2)).toBe("handled fallback: CustomDatabaseError");
+        
 
-        assertEqual(handleWithFallback(1), "handled TypeError");
-        assertEqual(handleWithFallback(2), "handled fallback: CustomDatabaseError");
-    });
-
-    test("Catch block without parameter: catch { ... }", () => {
         let caught = false;
         try {
-            throw new Error("silent error");
+        throw new Error("silent error");
         } catch {
-            caught = true;
+        caught = true;
         }
-        assertEqual(caught, true);
+        expect(caught).toBe(true);
+        
     });
 
-    test("Automatic re-throw when no typed catch matches", () => {
+    await it("Automatic re-throw when no typed catch / Multi-catch with finally block executi", async () => {
         let outerCaught = "";
         try {
-            try {
-                throw new CustomDatabaseError("ERR_DEADLOCK", "deadlock detected");
-            } catch (e: TypeError) {
-                outerCaught = "wrongly caught by inner TypeError";
-            } catch (e: RangeError) {
-                outerCaught = "wrongly caught by inner RangeError";
-            }
-            // CustomDatabaseError does not match TypeError or RangeError, so it must be automatically rethrown!
-        } catch (e: CustomDatabaseError) {
-            outerCaught = `properly propagated to outer: ${e.dbCode}`;
+        try {
+        throw new CustomDatabaseError("ERR_DEADLOCK", "deadlock detected");
+        } catch (e: TypeError) {
+        outerCaught = "wrongly caught by inner TypeError";
+        } catch (e: RangeError) {
+        outerCaught = "wrongly caught by inner RangeError";
         }
 
-        assertEqual(outerCaught, "properly propagated to outer: ERR_DEADLOCK");
-    });
+        } catch (e: CustomDatabaseError) {
+        outerCaught = `properly propagated to outer: ${e.dbCode}`;
+        }
+        expect(outerCaught).toBe("properly propagated to outer: ERR_DEADLOCK");
+        
 
-    test("Multi-catch with finally block execution", () => {
         let finallyRan = false;
         let result = "";
-
         try {
-            try {
-                throw new CustomNetworkError(500, "internal server error");
-            } catch (e: TypeError) {
-                result = "TypeError";
-            } catch (e: CustomNetworkError) {
-                result = `NetworkError: ${e.statusCode}`;
-            } finally {
-                finallyRan = true;
-            }
-        } catch (e) {
-            result = "outer catch";
+        try {
+        throw new CustomNetworkError(500, "internal server error");
+        } catch (e: TypeError) {
+        result = "TypeError";
+        } catch (e: CustomNetworkError) {
+        result = `NetworkError: ${e.statusCode}`;
+        } finally {
+        finallyRan = true;
         }
-
-        assertEqual(result, "NetworkError: 500");
-        assertEqual(finallyRan, true);
+        } catch (e) {
+        result = "outer catch";
+        }
+        expect(result).toBe("NetworkError: 500");
+        expect(finallyRan).toBe(true);
+        
     });
 
-    test("Multi-catch with finally and automatic re-throw", () => {
+    await it("Multi-catch with finally and automatic", async () => {
         let finallyRan = false;
         let outerCaught = "";
-
         try {
-            try {
-                throw new CustomDatabaseError("ERR_AUTH", "bad credentials");
-            } catch (e: TypeError) {
-                outerCaught = "inner TypeError";
-            } finally {
-                finallyRan = true;
-            }
-        } catch (e: CustomDatabaseError) {
-            outerCaught = `outer caught after finally: ${e.dbCode}`;
+        try {
+        throw new CustomDatabaseError("ERR_AUTH", "bad credentials");
+        } catch (e: TypeError) {
+        outerCaught = "inner TypeError";
+        } finally {
+        finallyRan = true;
         }
-
-        assertEqual(finallyRan, true);
-        assertEqual(outerCaught, "outer caught after finally: ERR_AUTH");
+        } catch (e: CustomDatabaseError) {
+        outerCaught = `outer caught after finally: ${e.dbCode}`;
+        }
+        expect(finallyRan).toBe(true);
+        expect(outerCaught).toBe("outer caught after finally: ERR_AUTH");
+        
     });
+
+        
+
 });

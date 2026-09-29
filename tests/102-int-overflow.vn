@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // Un `int` desborda a i64, no a i48: la premisa que el JIT usaba para
 // saltarse el guard murió con el NaN-boxing. Si un tier envuelve en
 // silencio donde el otro lanza, es un bug de generación de código.
@@ -14,15 +16,6 @@ const MIN: int = 0 - 9223372036854775807 - 1
 // Calentar: el JIT sólo compila lo que se ejecuta lo suficiente.
 let sink: int = 0
 let i: int = 0
-while (i < 500000) {
-    sink = addHot(i, 1)
-    sink = subHot(i, 1)
-    sink = mulHot(i, 2)
-    sink = incHot(i)
-    sink = decHot(i)
-    i = i + 1
-}
-assert("warmup ran", sink !== 0)
 
 function overflows(f: () => int): bool {
     try {
@@ -33,15 +26,30 @@ function overflows(f: () => int): bool {
     }
 }
 
-assert("add overflow raises", overflows(() => addHot(MAX, 1)))
-assert("sub overflow raises", overflows(() => subHot(MIN, 1)))
-assert("mul overflow raises", overflows(() => mulHot(MAX, 2)))
-assert("inc overflow raises", overflows(() => incHot(MAX)))
-assert("dec overflow raises", overflows(() => decHot(MIN)))
-
 // El camino que NO desborda sigue dando el mismo resultado.
-assert("add still works", addHot(2, 3) === 5)
-assert("sub still works", subHot(9, 4) === 5)
-assert("mul still works", mulHot(6, 7) === 42)
+await describe("102 int overflow", async () => {
+        await it("group 1 part 1", async () => {
+        while (i < 500000) {
+        sink = addHot(i, 1)
+        sink = subHot(i, 1)
+        sink = mulHot(i, 2)
+        sink = incHot(i)
+        sink = decHot(i)
+        i = i + 1
+        }
+        expect(sink !== 0).toBeTruthy();
+        expect(overflows(() => addHot(MAX, 1))).toBeTruthy();
+        expect(overflows(() => subHot(MIN, 1))).toBeTruthy();
+        expect(overflows(() => mulHot(MAX, 2))).toBeTruthy();
+        expect(overflows(() => incHot(MAX))).toBeTruthy();
+    });
 
-print("[PASSED] 102. Int overflow across tiers ")
+    await it("group 1 part 2", async () => {
+        expect(overflows(() => decHot(MIN))).toBeTruthy();
+        expect(addHot(2, 3)).toBe(5);
+        expect(subHot(9, 4)).toBe(5);
+        expect(mulHot(6, 7)).toBe(42);
+    });
+
+
+});

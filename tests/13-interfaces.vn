@@ -1,3 +1,4 @@
+import { describe, it, expect } from "std:test";
 
 interface Printable {
     toString(): str
@@ -5,41 +6,42 @@ interface Printable {
 interface Serializable {
     serialize(): str
 }
-
 class Config implements Printable, Serializable {
     key: str
     value: int
     constructor(k: str, v: int) {
-        this.key = k
-        this.value = v
+        this.key = k;
+        this.value = v;
     }
-    toString(): str { return `${this.key}=${this.value}` }
-    serialize(): str { return `{"${this.key}":${this.value}}` }
+    toString(): str { return `${this.key}=${this.value}`; }
+    serialize(): str { return `{"${this.key}":${this.value}}`; }
 }
-
-const cfg = new Config("timeout", 30)
-assert("interface toString",   cfg.toString() === "timeout=30")
-assert("interface serialize",  cfg.serialize() === `{"timeout":30}`)
-
 function printThing(p: Printable): str {
-    return p.toString()
+    return p.toString();
 }
-assert("structural typing", printThing(cfg) === "timeout=30")
-
 interface Options {
     verbose?: bool
     maxRetries?: int
     tag: str
 }
 function runWith(opts: Options): str {
-    const v = opts.verbose ?? false
-    const r = opts.maxRetries ?? 3
-    return `${opts.tag}:v=${v}:r=${r}`
+    const v = opts.verbose ?? false;
+    const r = opts.maxRetries ?? 3;
+    return `${opts.tag}:v=${v}:r=${r}`;
 }
 
-const res = runWith({ tag: "job1" })
-assert("opts defaults", res === "job1:v=false:r=3")
-assert("opts partial",  runWith({ tag: "job2", verbose: true }) === "job2:v=true:r=3")
-assert("opts full",     runWith({ tag: "job3", verbose: false, maxRetries: 5 }) === "job3:v=false:r=5")
+await describe("13 Interfaces", async () => {
+    await it("implementation", () => {
+        const cfg = new Config("timeout", 30);
+        expect(cfg.toString()).toBe("timeout=30");
+        expect(cfg.serialize()).toBe(`{"timeout":30}`);
+        expect(printThing(cfg)).toBe("timeout=30");
+    });
 
-print("[PASSED] 13. Interfaces ")
+    await it("optional fields", () => {
+        const res = runWith({ tag: "job1" });
+        expect(res).toBe("job1:v=false:r=3");
+        expect(runWith({ tag: "job2", verbose: true })).toBe("job2:v=true:r=3");
+        expect(runWith({ tag: "job3", verbose: false, maxRetries: 5 })).toBe("job3:v=false:r=5");
+    });
+});

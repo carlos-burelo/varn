@@ -19,8 +19,8 @@ function identity<T>(v: T): T {
 }
 
 const intBox = new Box<int>(10)
-assert("generics get", intBox.get() === 10)
-assert("generics identity", identity<int>(42) === 42)
+if (intBox.get() !== 10) throw new Error("generics get")
+if (identity<int>(42) !== 42) throw new Error("generics identity")
 const strBox = intBox.map((n) => `value=${n}`)
-assert("generics map", strBox.get() === "value=10")
+if (strBox.get() !== "value=10") throw new Error("generics map")
 print("generics ok")

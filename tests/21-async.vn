@@ -1,100 +1,85 @@
-import { sleep, TaskGroup, spawn, parallel } from "std:task"
-
+import { describe, it, expect } from "std:test";
+import { sleep, TaskGroup, spawn, parallel } from "std:task";
 
 async function asyncAdd(a: int, b: int): int {
-    // await sleep(1)
-    return a + b
+    return a + b;
 }
-
 async function asyncChain(): str {
-    const x = await asyncAdd(3, 4)
-    const y = await asyncAdd(x, 10)
-    return `result=${y}`
+    const x = await asyncAdd(3, 4);
+    const y = await asyncAdd(x, 10);
+    return `result=${y}`;
 }
-
 async function asyncError(): str {
     try {
-        throw new Error("async fail")
+        throw new Error("async fail");
     } catch (e) {
-        return "caught:" + e.message
+        return "caught:" + e.message;
     }
 }
-
 async function asyncBoom(): int {
-    // await sleep(1)
-    throw new Error("boom")
+    throw new Error("boom");
 }
-
 async function asyncSquare(n: int): int {
-    // await sleep(1)
-    return n * n
+    return n * n;
 }
-
 async function runAsync(): void {
-    const r1 = await asyncAdd(5, 6)
-    assert("async add", r1 === 11)
-    
-    const r2 = await asyncChain()
-    assert("async chain", r2 === "result=17")
-    
-    const r3 = await asyncError()
-    assert("async catch", r3 === "caught:async fail")
-    
-    const h1 = spawn(asyncAdd(1, 2))
-    assert("spawn handle await", await h1 === 3)
-    
-    
+    const r1 = await asyncAdd(5, 6);
+    expect(r1).toBe(11);
+    const r2 = await asyncChain();
+    expect(r2).toBe("result=17");
+    const r3 = await asyncError();
+    expect(r3).toBe("caught:async fail");
+    const h1 = spawn(asyncAdd(1, 2));
+    expect(await h1).toBe(3);
     const all = await parallel([
         asyncSquare(2),
         asyncSquare(3),
         asyncSquare(4),
-    ])
-    assert("parallel len", all.length === 3)
-    assert("parallel[0]", all[0] === 4)
-    assert("parallel[1]", all[1] === 9)
-    assert("parallel[2]", all[2] === 16)
-    
-    using group = TaskGroup<int>()
-    const g1 = group.spawn(asyncAdd(7, 8))
-    const g2 = group.spawn(asyncAdd(9, 10))
-    const joined = await group.join()
-    assert("async group joined len", joined.length === 2)
-    assert("async group joined[0]", joined[0] === 15)
-    assert("async group joined[1]", joined[1] === 19)
-    assert("async group handle 1", await g1 === 15)
-    assert("async group handle 2", await g2 === 19)
-    
-    using failGroup = TaskGroup<int>()
-    failGroup.spawn(asyncAdd(2, 3))
-    failGroup.spawn(asyncBoom())
+    ]);
+    expect(all.length).toBe(3);
+    expect(all[0]).toBe(4);
+    expect(all[1]).toBe(9);
+    expect(all[2]).toBe(16);
+    using group = TaskGroup<int>();
+    const g1 = group.spawn(asyncAdd(7, 8));
+    const g2 = group.spawn(asyncAdd(9, 10));
+    const joined = await group.join();
+    expect(joined.length).toBe(2);
+    expect(joined[0]).toBe(15);
+    expect(joined[1]).toBe(19);
+    expect(await g1).toBe(15);
+    expect(await g2).toBe(19);
+    using failGroup = TaskGroup<int>();
+    failGroup.spawn(asyncAdd(2, 3));
+    failGroup.spawn(asyncBoom());
     try {
-        await failGroup.join()
-        assert("group join should fail", false)
+        await failGroup.join();
+        expect(false).toBeTruthy();
     } catch (e) {
-        assert("group join rejects", true)
+        expect(true).toBeTruthy();
     }
-
-    using cancelGroup = TaskGroup<int>()
-    const c1 = cancelGroup.spawn(asyncAdd(10, 20))
-    cancelGroup.cancel()
+    using cancelGroup = TaskGroup<int>();
+    const c1 = cancelGroup.spawn(asyncAdd(10, 20));
+    cancelGroup.cancel();
     try {
-        await c1
-        assert("cancel should reject", false)
+        await c1;
+        expect(false).toBeTruthy();
     } catch (e) {
-        assert("group cancel rejects handle", true)
+        expect(true).toBeTruthy();
     }
-    
-    using disposeGroup = TaskGroup<int>()
-    const d1 = disposeGroup.spawn(asyncAdd(30, 40))
-    await disposeGroup.disposeAsync()
+    using disposeGroup = TaskGroup<int>();
+    const d1 = disposeGroup.spawn(asyncAdd(30, 40));
+    await disposeGroup.disposeAsync();
     try {
-        await d1
-        assert("disposeAsync should reject", false)
+        await d1;
+        expect(false).toBeTruthy();
     } catch (e) {
-        assert("disposeAsync rejects handle", true)
+        expect(true).toBeTruthy();
     }
 }
 
-await runAsync()
-
-print("[PASSED] 21. Async / await ")
+await describe("21 Async", async () => {
+    await it("async runtime", async () => {
+        await runAsync();
+    });
+});

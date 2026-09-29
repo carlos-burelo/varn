@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+import { abs, sqrt, floor, ceil } from "std:math";
+
 // Math intrinsics that the JIT lowers to a single ISA instruction
 // (`abs`/`sqrt`/`floor`/`ceil` on float arguments — see
 // `clif::floats::emit_math_intrinsic_native`). The fast path is only taken
@@ -10,7 +13,6 @@
 // Every case runs inside a hot loop: the fast path only exists in compiled
 // code, so a test that never tiers up would pass while measuring nothing.
 // Run under both tiers (`VARN_NO_JIT=1`) to compare interpreter and JIT.
-import { abs, sqrt, floor, ceil } from "std:math";
 
 function near(a: float, b: float): bool {
     return a - b < 0.0000001 && b - a < 0.0000001;
@@ -61,11 +63,15 @@ function chained(iterations: int): float {
     }
     return r;
 }
-
-assert("math fastpath: float ops", floatOps(2000));
-assert("math fastpath: int args keep their values", near(intOps(2000), 19.0));
-// Same recurrence and iteration count as `tests/benchmarks/bench_math.vn`, whose
-// result is verified equal to the Bun twin's.
-assert("math fastpath: chained float accumulator", near(chained(500000), 706.6));
-
-print("[PASSED] 67. Math intrinsic fast path");
+await describe("67 math intrinsic fastpath", async () => {
+    await it("tests", async () => {
+        
+        expect(floatOps(2000)).toBeTruthy();
+        expect(near(intOps(2000), 19.0)).toBeTruthy();
+        // Same recurrence and iteration count as `tests/benchmarks/bench_math.vn`, whose
+        // result is verified equal to the Bun twin's.
+        expect(near(chained(500000), 706.6)).toBeTruthy();
+        
+        
+    });
+});

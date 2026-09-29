@@ -7,6 +7,6 @@ function scale(x: int): int {
 }
 
 const r = add(1, 2)
-assert("arith add", r === 3)
-assert("arith scale", scale(20) === 41)
+if (r !== 3) throw new Error("arith add")
+if (scale(20) !== 41) throw new Error("arith scale")
 print("arith ok")

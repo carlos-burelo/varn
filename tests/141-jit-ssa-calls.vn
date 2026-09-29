@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // Calls and storage classes in the JIT's lowering from typed SSA. Each
 // function below runs well past the tiering threshold, so it executes
 // compiled; every assertion compares against what the interpreter computes.
@@ -83,32 +85,39 @@ let sscLastDecorated = ""
 let sscBoxedSum = 0
 let sscLastJoined = ""
 let sscLengths = 0
-for (let i = 0; i < 3000; i = i + 1) {
-    sscLastDecorated = sscDecorated(i)
-    sscBoxedSum = sscBoxedSum + (sscBoxed(i) as int)
-    sscLastJoined = sscJoinCaller(i)
-    sscIgnore(1)
-    sscLengths = sscLengths + sscLabelLength(i)
-}
 let sscChainLast = ""
-for (let i = 0; i < 2000; i = i + 1) {
-    const parts: str[] = []
-    sscChainLast = sscChain("c", parts, 20)
-}
 const sscPoint = new SscPoint(7)
 const sscXs = [1, 2, 3]
 let sscParamSum = 0
-for (let i = 0; i < 3000; i = i + 1) {
+
+// 31 chars of prefix plus the digits of 0..2999: 10 + 90*2 + 900*3 + 2000*4.
+for (let sscI = 0; sscI < 3000; sscI = sscI + 1) {
+    sscLastDecorated = sscDecorated(sscI)
+    sscBoxedSum = sscBoxedSum + (sscBoxed(sscI) as int)
+    sscLastJoined = sscJoinCaller(sscI)
+    sscIgnore(1)
+    sscLengths = sscLengths + sscLabelLength(sscI)
+}
+for (let sscJ = 0; sscJ < 2000; sscJ = sscJ + 1) {
+    const sscParts: str[] = []
+    sscChainLast = sscChain("c", sscParts, 20)
+}
+for (let sscK = 0; sscK < 3000; sscK = sscK + 1) {
     sscParamSum = sscParamSum + sscHeapParams("abc", sscPoint, sscXs)
 }
+await describe("141 jit ssa calls", async () => {
+    await it("group 1 part 1", async () => {
+        expect(sscLastDecorated == "label-long-enough-for-the-heap-2999!").toBeTruthy();
+        expect(sscBoxedSum).toBe(4498500);
+        expect(sscLastJoined == "label-long-enough-for-the-heap-2999|right").toBeTruthy();
+        expect(sscHits).toBe(3000);
+    });
 
-assert("a heap call result lands in its home", sscLastDecorated == "label-long-enough-for-the-heap-2999!")
-assert("a scalar entering a dynamic is boxed", sscBoxedSum === 4498500)
-assert("heap arguments reach heap parameters", sscLastJoined == "label-long-enough-for-the-heap-2999|right")
-assert("a call whose result is discarded still runs", sscHits === 3000)
-// 31 chars of prefix plus the digits of 0..2999: 10 + 90*2 + 900*3 + 2000*4.
-assert("framed self-recursion keeps its heap arguments", sscChainLast == "c2019181716151413121110987654321" + "20")
-assert("heap parameters are read from their homes", sscParamSum === 3000 * (3 + 7 + 2 + 32))
-assert("str.length in a compiled body", sscLengths === 3000 * 31 + 10 + 180 + 2700 + 8000)
+    await it("group 1 part 2", async () => {
+        expect(sscChainLast == "c2019181716151413121110987654321" + "20").toBeTruthy();
+        expect(sscParamSum).toBe(3000 * (3 + 7 + 2 + 32));
+        expect(sscLengths).toBe(3000 * 31 + 10 + 180 + 2700 + 8000);
+    });
 
-print("[PASSED] 141. JIT calls from SSA")
+
+});

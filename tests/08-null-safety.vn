@@ -1,3 +1,4 @@
+import { describe, it, expect } from "std:test";
 
 interface Address {
     city: str
@@ -8,17 +9,23 @@ interface Profile {
     address?: Address
 }
 
-const p1: Profile? = { name: "Alice", address: { city: "NY" } }
-const p2: Profile? = { name: "Bob" }
-const p3: Profile? = null
+await describe("08 Null Safety", async () => {
+    await it("optional chaining", () => {
+        const p1: Profile? = { name: "Alice", address: { city: "NY" } };
+        const p2: Profile? = { name: "Bob" };
+        const p3: Profile? = null;
+        expect(p1?.address?.city).toBe("NY");
+        expect(p2?.address?.city).toBe(null);
+        expect(p3?.name).toBe(null);
+    });
 
-assert("?. non-null chain",   p1?.address?.city === "NY")
-assert("?. missing nested",   p2?.address?.city === null)
-assert("?. null root",        p3?.name === null)
-assert("?? left non-null",    (42 ?? 0) === 42)
-assert("?? left null",        (null ?? 99) === 99)
-assert("?. + ??",             (p3?.name ?? "anon") === "anon")
-assert("chain ?? fallback",   (p2?.address?.city ?? "dynamic") === "dynamic")
-assert("?? chained",          (null ?? null ?? 7) === 7)
-
-print("[PASSED] 8. Null safety ")
+    await it("nullish coalescing", () => {
+        const p2: Profile? = { name: "Bob" };
+        const p3: Profile? = null;
+        expect(42 ?? 0).toBe(42);
+        expect(null ?? 99).toBe(99);
+        expect(p3?.name ?? "anon").toBe("anon");
+        expect(p2?.address?.city ?? "dynamic").toBe("dynamic");
+        expect(null ?? null ?? 7).toBe(7);
+    });
+});

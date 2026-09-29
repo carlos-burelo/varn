@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 class Point {
     x: int
     y: int
@@ -7,18 +9,8 @@ class Point {
 }
 
 const names: Map<Point, str> = new Map()
-names.set(new Point(1, 2), "a")
-assert("equal instance finds the entry", names.get(new Point(1, 2)) === "a")
-assert("has by value", names.has(new Point(1, 2)) && !names.has(new Point(2, 1)))
-names.set(new Point(1, 2), "b")
-assert("equal key overwrites", names.size === 1 && names.get(new Point(1, 2)) === "b")
-assert("delete by value", names.delete(new Point(1, 2)) && names.size === 0)
 
 const seen: Set<Point> = new Set()
-seen.add(new Point(0, 0))
-seen.add(new Point(0, 0))
-seen.add(new Point(0, 1))
-assert("set dedups by equals", seen.size === 2 && seen.has(new Point(0, 1)))
 
 class Collide {
     v: int
@@ -27,15 +19,10 @@ class Collide {
     equals(o: Collide): bool { return this.v === o.v }
 }
 const c: Map<Collide, int> = new Map()
-c.set(new Collide(1), 10)
-c.set(new Collide(2), 20)
-assert("same hash, different keys", c.size === 2 && c.get(new Collide(2)) === 20)
 
 class Plain { v: int; constructor(v: int) { this.v = v } }
 const ids: Map<Plain, int> = new Map()
 const p = new Plain(1)
-ids.set(p, 1)
-assert("no capability: identity keys", ids.has(p) && !ids.has(new Plain(1)))
 
 function churn(): bool {
     const m: Map<Point, int> = new Map()
@@ -44,6 +31,38 @@ function churn(): bool {
     for (let i = 0; i < 20000; i = i + 1) { const t = [i, i + 1]; junk = junk + t.length }
     return m.size === 50 && m.get(new Point(49, 0)) === 1999
 }
-assert("representatives survive collection", churn())
+const churnOk = churn()
+await describe("134 hashable keys", async () => {
+        await it("group 1 part 1", async () => {
+        names.set(new Point(1, 2), "a")
+        expect(names.get(new Point(1, 2))).toBe("a");
+        expect(names.has(new Point(1, 2)) && !names.has(new Point(2, 1))).toBeTruthy();
+        names.set(new Point(1, 2), "b")
+        expect(names.size === 1 && names.get(new Point(1, 2)) === "b").toBeTruthy();
+        expect(names.delete(new Point(1, 2)) && names.size === 0).toBeTruthy();
+    });
 
-print("[PASSED] 134. Hashable keys")
+    await it("set dedup", async () => {
+        seen.add(new Point(0, 0));
+        seen.add(new Point(0, 0));
+        seen.add(new Point(0, 1));
+        expect(seen.size).toBe(2);
+        expect(seen.has(new Point(0, 1))).toBeTruthy();
+    });
+
+    await it("colliding hashes", async () => {
+        c.set(new Collide(1), 10);
+        c.set(new Collide(2), 20);
+        expect(c.size).toBe(2);
+        expect(c.get(new Collide(2))).toBe(20);
+    });
+
+    await it("identity keys and churn", async () => {
+        ids.set(p, 1);
+        expect(ids.has(p)).toBeTruthy();
+        expect(ids.has(new Plain(1))).toBeFalsy();
+        expect(churnOk).toBeTruthy();
+    });
+
+
+});

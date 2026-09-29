@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // `a?.b` is `null` whenever `a` is, so its type is the member's made
 // nullable: a compiled body must be able to hold `null` where the member is
 // an `int`, a `float` or a `bool`. Each function runs past the tiering
@@ -44,20 +46,27 @@ let counts = 0
 let ratios = 0.0
 let ons = 0
 let nulls = 0
-for (let i = 0; i < 2000; i = i + 1) {
-    const b = new OcBox()
-    if (i % 2 == 0) { b.leaf = new OcLeaf(i) }
-    counts = counts + ocCount(b)
-    ratios = ratios + ocRatio(b)
-    ons = ons + ocOn(b)
-    if (ocIsNull(b)) { nulls = nulls + 1 }
-}
 
 // Even i hold a leaf: sum of even i, and -1 for each of the 1000 odd ones.
-assert("an int member through ?.", counts === 999000 - 1000)
-assert("a float member through ?.", ratios == 999000 * 0.5 - 1000.0)
 // Even leaves are all `on` (1); empty boxes give 2.
-assert("a bool member through ?.", ons === 1000 * 1 + 1000 * 2)
-assert("?. on a null receiver is null", nulls === 1000)
+await describe("152 jit optional chains", async () => {
+        await it("group 1 part 1", async () => {
+        for (let i = 0; i < 2000; i = i + 1) {
+        const b = new OcBox()
+        if (i % 2 == 0) { b.leaf = new OcLeaf(i) }
+        counts = counts + ocCount(b)
+        ratios = ratios + ocRatio(b)
+        ons = ons + ocOn(b)
+        if (ocIsNull(b)) { nulls = nulls + 1 }
+        }
+        expect(counts).toBe(999000 - 1000);
+        expect(ratios == 999000 * 0.5 - 1000.0).toBeTruthy();
+    });
 
-print("[PASSED] 152. JIT optional chains")
+    await it("group 1 part 2", async () => {
+        expect(ons).toBe(1000 * 1 + 1000 * 2);
+        expect(nulls).toBe(1000);
+    });
+
+
+});

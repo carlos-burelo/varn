@@ -1,13 +1,13 @@
 
 [1mSUMMARY[0m[2m ── <module>[0m
   funciones                       6
-  bytecode (words)              194
-  constantes                     17
+  bytecode (words)              187
+  constantes                     16
   exports                         0
   fuera de clif por tamaño        0   [2msobre el gate de 8192 words[0m
 
   [2mtop-10 por tamaño[0m
-    <module>                            126 words
+    <module>                            119 words
     Box.map                              25 words
     <closure>                            15 words
     Box.constructor                      12 words

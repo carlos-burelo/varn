@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // A generator's body runs in its own ExecCtx, and two things about that
 // context were wrong.
 //
@@ -24,7 +27,6 @@ function bigEnoughNotToInline(n: int): int {
 function* callsAGlobal() {
     yield bigEnoughNotToInline(5)
 }
-assert("generator calls a non-inlined global", callsAGlobal().next().value === 25)
 
 let moduleCounter = 0
 function bumpCounter(): int {
@@ -35,28 +37,20 @@ function* touchesModuleState() {
     yield bumpCounter()
     yield bumpCounter()
 }
-const counted = touchesModuleState()
-assert("generator sees module state, first", counted.next().value === 1)
-assert("generator sees module state, second", counted.next().value === 2)
 
 // One generator per shape: mixing them makes the yield type a union, and the
 // point here is the value crossing out of the generator, not the union rules.
 function* yieldsStrings() {
     yield "a string"
 }
-assert("yielded string", yieldsStrings().next().value === "a string")
 
 function* yieldsArrays() {
     yield [1, 2, 3]
 }
-const yieldedArray = yieldsArrays().next().value
-assert("yielded array survives", yieldedArray.length === 3 && yieldedArray[1] === 2)
 
 function* yieldsObjects() {
     yield { a: 1, b: 2 }
 }
-const yieldedObject = yieldsObjects().next().value
-assert("yielded object survives", yieldedObject.a === 1 && yieldedObject.b === 2)
 
 function* inner() {
     yield 41
@@ -64,8 +58,6 @@ function* inner() {
 function* yieldsAGenerator() {
     yield inner()
 }
-const nested = yieldsAGenerator().next().value
-assert("generator yields a generator that still runs", nested.next().value === 41)
 
 // No return annotation on purpose: `Generator<T>` has one parameter, so a
 // generator's `return` value has nowhere to be declared, and annotating the
@@ -75,9 +67,24 @@ function* returnsAHeapValue() {
     yield [1]
     return [9, 9]
 }
-const returning = returnsAHeapValue()
-returning.next()
-const finalResult = returning.next()
-assert("returned heap value survives", finalResult.done && finalResult.value[0] === 9)
-
-print("[PASSED] 76. Generator values ")
+await describe("76 generator values", async () => {
+    await it("tests", async () => {
+        expect(callsAGlobal().next().value).toBe(25)
+        const counted = touchesModuleState()
+        expect(counted.next().value).toBe(1)
+        expect(counted.next().value).toBe(2)
+        expect(yieldsStrings().next().value).toBe("a string")
+        const yieldedArray = yieldsArrays().next().value
+        expect(yieldedArray.length === 3 && yieldedArray[1] === 2).toBeTruthy()
+        const yieldedObject = yieldsObjects().next().value
+        expect(yieldedObject.a === 1 && yieldedObject.b === 2).toBeTruthy()
+        const nested = yieldsAGenerator().next().value
+        expect(nested.next().value).toBe(41)
+        const returning = returnsAHeapValue()
+        returning.next()
+        const finalResult = returning.next()
+        expect(finalResult.done && finalResult.value[0] === 9).toBeTruthy()
+        
+        
+    });
+});

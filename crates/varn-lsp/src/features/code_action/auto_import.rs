@@ -33,7 +33,7 @@ const STDLIB_COMMON_EXPORTS: &[(&str, &str)] = &[
     ("sqrt", "std:math"),
     ("PI", "std:math"),
     ("E", "std:math"),
-    ("assert", "std:test"),
+    ("expect", "std:test"),
     ("assertEqual", "std:test"),
 ];
 

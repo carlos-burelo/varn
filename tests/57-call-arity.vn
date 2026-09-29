@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // Cross-function call arity, from compiled and from interpreted code.
 //
 // The regression this pins: the CLIF `Call` lowering handed its arguments to
@@ -42,17 +45,15 @@ function mixed(a: int, b: str, c: float, d: bool, e: int): str {
 }
 
 function checkAll(where: str) {
-    assert("call arity 1 (" + where + ")", arity1(7) === 7)
-    assert("call arity 2 (" + where + ")", arity2(1, 2) === 12)
-    assert("call arity 3 (" + where + ")", arity3(1, 2, 3) === 123)
-    assert("call arity 4 (" + where + ")", arity4(1, 2, 3, 4) === 1234)
-    assert("call arity 5 (" + where + ")", arity5(1, 2, 3, 4, 5) === 12345)
-    assert("call arity 6 (" + where + ")", arity6(1, 2, 3, 4, 5, 6) === 123456)
-    assert("call arity 8 (" + where + ")", arity8(1, 2, 3, 4, 5, 6, 7, 8) === 12345678)
-    assert("call mixed kinds (" + where + ")", mixed(1, "x", 2.5, true, 9) === "1x2.5t9")
+    expect(arity1(7)).toBe(7)
+    expect(arity2(1, 2)).toBe(12)
+    expect(arity3(1, 2, 3)).toBe(123)
+    expect(arity4(1, 2, 3, 4)).toBe(1234)
+    expect(arity5(1, 2, 3, 4, 5)).toBe(12345)
+    expect(arity6(1, 2, 3, 4, 5, 6)).toBe(123456)
+    expect(arity8(1, 2, 3, 4, 5, 6, 7, 8)).toBe(12345678)
+    expect(mixed(1, "x", 2.5, true, 9)).toBe("1x2.5t9")
 }
-
-checkAll("top level")
 
 // Run the same calls in a loop so the caller crosses the tiering threshold and
 // the later iterations execute compiled.
@@ -67,9 +68,16 @@ function driver(n: int): int {
     }
     return acc
 }
-
-// 123 + 1234 + 12345 + 123456 + 12345678 = 12482836 per iteration.
-assert("call arity in a compiled caller, 1 pass", driver(1) === 12482836)
-assert("call arity in a compiled caller, 64 passes", driver(64) === 12482836 * 64)
-
-checkAll("after tiering")
+await describe("57 call arity", async () => {
+    await it("tests", async () => {
+        
+        checkAll("top level")
+        
+        // 123 + 1234 + 12345 + 123456 + 12345678 = 12482836 per iteration.
+        expect(driver(1)).toBe(12482836)
+        expect(driver(64)).toBe(12482836 * 64)
+        
+        checkAll("after tiering")
+        
+    });
+});

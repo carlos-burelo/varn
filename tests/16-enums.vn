@@ -1,22 +1,27 @@
+import { describe, it, expect } from "std:test";
 
 enum Direction { North, South, East, West }
 enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
-
-const dir: Direction = Direction.North
-assert("enum value",       dir === Direction.North)
-assert("enum neq",         Direction.North !== Direction.South)
-assert("enum explicit",    HttpMethod.POST.rawValue === 1)
-assert("enum rawValue",    Direction.East.rawValue === 2)
-
 function describeDir(d: Direction): str {
     return match (d) {
         Direction.North => "going north",
         Direction.South => "going south",
         Direction.East  => "going east",
         Direction.West  => "going west"
-    }
+    };
 }
-assert("enum match N", describeDir(Direction.North) === "going north")
-assert("enum match W", describeDir(Direction.West) === "going west")
 
-print("[PASSED] 16. Enums ")
+await describe("16 Enums", async () => {
+    await it("values", () => {
+        const dir: Direction = Direction.North;
+        expect(dir === Direction.North).toBeTruthy();
+        expect(Direction.North !== Direction.South).toBeTruthy();
+        expect(HttpMethod.POST.rawValue).toBe(1);
+        expect(Direction.East.rawValue).toBe(2);
+    });
+
+    await it("match", () => {
+        expect(describeDir(Direction.North)).toBe("going north");
+        expect(describeDir(Direction.West)).toBe("going west");
+    });
+});

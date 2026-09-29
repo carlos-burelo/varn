@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // Salir de un `try { } catch { }` por `break`, `continue` o `return` debe
 // cerrar la región guardada.
 //
@@ -66,10 +69,6 @@ function capturaEnElSitioCorrecto(via: str): bool {
     return llego;
 }
 
-assert("break fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("break"))
-assert("continue fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("continue"))
-assert("return fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("return"))
-
 // El caso con `finally` ya funcionaba: sirve de control. Si éste fallara, el
 // fallo estaría en el mecanismo de salida entero y no en el `try/catch` pelado.
 function conBreakYFinally(): int {
@@ -85,8 +84,6 @@ function conBreakYFinally(): int {
     return pasos;
 }
 
-assert("control: try/catch/finally con break ejecuta sus finally", conBreakYFinally() === 2)
-
 // La región debe cerrarse, no quedarse abierta: tras salir por `break`, un
 // `throw` dentro del mismo bucle en una iteración posterior no existe, pero sí
 // debe poder lanzarse y capturarse con normalidad más adelante en la función.
@@ -100,8 +97,6 @@ function lanzaYCapturaTrasBreak(): bool {
     }
     return ok;
 }
-
-assert("tras salir por break, try/catch posterior sigue funcionando", lanzaYCapturaTrasBreak())
 
 // Bug hermano de éste, separado: una salida temprana (`break`/`return`, NO
 // `continue`) desde dentro de un `try` con un `catch { }` de cuerpo VACÍO,
@@ -127,8 +122,6 @@ function vacioConBreak(): int {
     return pasos;
 }
 
-assert("catch vacio + break dentro de bucle no revienta el verificador", vacioConBreak() === 2)
-
 function vacioConReturn(): int {
     let pasos = 0;
     for (let i = 0; i < 3; i = i + 1) {
@@ -139,8 +132,6 @@ function vacioConReturn(): int {
     }
     return -1;
 }
-
-assert("catch vacio + return dentro de bucle no revienta el verificador", vacioConReturn() === 2)
 
 function vacioConContinue(): int {
     let pasos = 0;
@@ -153,8 +144,6 @@ function vacioConContinue(): int {
     return pasos;
 }
 
-assert("catch vacio + continue dentro de bucle no revienta el verificador", vacioConContinue() === 2)
-
 // Control: fuera de bucle ya funcionaba (nunca dependió de `jump_forwarding`
 // vaciando preds de un bloque destino de bucle). Si este fallara, el fallo
 // estaría en otra parte del manejo de `catch` vacío, no en el CFG de bucles.
@@ -164,5 +153,24 @@ function retornaFueraDeBucle(): int {
     } catch (e) { }
     return -1;
 }
-
-assert("control: catch vacio + return fuera de bucle (ya funcionaba)", retornaFueraDeBucle() === 42)
+await describe("78 try early exit", async () => {
+    await it("tests", async () => {
+        
+        expect(capturaEnElSitioCorrecto("break")).toBeTruthy()
+        expect(capturaEnElSitioCorrecto("continue")).toBeTruthy()
+        expect(capturaEnElSitioCorrecto("return")).toBeTruthy()
+        
+        expect(conBreakYFinally()).toBe(2)
+        
+        expect(lanzaYCapturaTrasBreak()).toBeTruthy()
+        
+        expect(vacioConBreak()).toBe(2)
+        
+        expect(vacioConReturn()).toBe(2)
+        
+        expect(vacioConContinue()).toBe(2)
+        
+        expect(retornaFueraDeBucle()).toBe(42)
+        
+    });
+});

@@ -1,3 +1,4 @@
+import { describe, it, expect } from "std:test";
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
 import { List, Stack, Queue } from 'std:collections';
 import { Http } from 'std:http';
@@ -12,9 +13,9 @@ import { Path } from 'std:path';
 import { defineMetadata, getMetadata, hasMetadata, MetaKey } from 'std:reflect';
 import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 
+
 // Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable, Record
 // are now globally available (prelude) — no import needed.
-import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
 // Option/Result are core types: in scope with no import.
 
 class ResourceImpl implements Disposable {
@@ -28,107 +29,107 @@ async function runComprehensiveTest(): Task<void> {
 
     // 1. std:time
     let d = Duration.from("PT1H30M");
-    assert("Duration hours", d.hours === 1);
+    expect(d.hours).toBe(1);
     let dt = new PlainDateTime(2026, 4, 21, 10, 0, 0, 0);
-    assert("PlainDateTime year", dt.year === 2026);
+    expect(dt.year).toBe(2026);
     let t1 = nowInstant();
-    assert("Instant exists", t1.toString().length > 0);
+    expect(t1.toString().length > 0).toBeTruthy();
 
     // 2. std:math
-    assert("Math PI", mathPI > 3.14 && mathPI < 3.15);
-    assert("Math abs", mathAbs(-10.5) === 10.5);
-    assert("Math min", mathMin(5.0, 3.0, 8.0) === 3.0);
-    assert("Math max", mathMax(5.0, 3.0, 8.0) === 8.0);
+    expect(mathPI > 3.14 && mathPI < 3.15).toBeTruthy();
+    expect(mathAbs(-10.5)).toBe(10.5);
+    expect(mathMin(5.0, 3.0, 8.0)).toBe(3.0);
+    expect(mathMax(5.0, 3.0, 8.0)).toBe(8.0);
 
     // 3. std:crypto
     let uuidVal = uuid();
-    assert("Crypto UUID length", uuidVal.length === 36);
+    expect(uuidVal.length).toBe(36);
     let hash = sha256("Hello");
-    assert("Crypto SHA256", hash.length === 64);
+    expect(hash.length).toBe(64);
 
     // 4. std:json
     let serialized = JSON.stringify({ test: "json", value: 123 });
     let parsed = JSON.parse(serialized);
-    assert("JSON parse field", parsed["test"] === "json");
-    assert("JSON parse int", parsed["value"] === 123);
+    expect(parsed["test"]).toBe("json");
+    expect(parsed["value"]).toBe(123);
 
     
     // 5. std:collections
     let list = new List<str>(["A"]);
     list.add("B");
-    assert("List items", list.toArray()[1] === "B");
+    expect(list.toArray()[1]).toBe("B");
 
     let stack = new Stack<int>();
     stack.push(42);
-    assert("Stack peek", stack.peek() === 42);
-    assert("Stack pop", stack.pop() === 42);
+    expect(stack.peek()).toBe(42);
+    expect(stack.pop()).toBe(42);
 
     let queue = new Queue<str>();
     queue.enqueue("first");
-    assert("Queue peek", queue.peek() === "first");
-    assert("Queue dequeue", queue.dequeue() === "first");
+    expect(queue.peek()).toBe("first");
+    expect(queue.dequeue()).toBe("first");
 
     let mapInst = new Map<str, int>();
     mapInst.set("key", 100);
-    assert("Map has", mapInst.has("key"));
-    assert("Map get", mapInst.get("key") === 100);
+    expect(mapInst.has("key")).toBeTruthy();
+    expect(mapInst.get("key")).toBe(100);
 
     let rangeObj = Range.from(1, 5);
-    assert("Range start val", rangeObj.start === 1);
-    assert("Range contains 3", rangeObj.contains(3));
+    expect(rangeObj.start).toBe(1);
+    expect(rangeObj.contains(3)).toBeTruthy();
 
     // 6. std:fs
     let testFile = "./temp_test_file.txt";
     fsWrite(testFile, "Varn File System Test");
-    assert("FS exists after write", fsExists(testFile));
+    expect(fsExists(testFile)).toBeTruthy();
     let readContent = fsRead(testFile);
-    assert("FS read content match", readContent === "Varn File System Test");
+    expect(readContent).toBe("Varn File System Test");
 
     // 7. std:io
     ioWrite(""); 
     ioWriteln(""); 
 
     // 8. std:sys
-    assert("Sys platform exists", sysPlatform().length > 0);
-    assert("Sys cwd exists", sysCwd().length > 0);
+    expect(sysPlatform().length > 0).toBeTruthy();
+    expect(sysCwd().length > 0).toBeTruthy();
 
     // 9. std:net
-    assert("Net isIP true", netIsIP("127.0.0.1"));
-    assert("Net isIP false", !netIsIP("not-an-ip"));
+    expect(netIsIP("127.0.0.1")).toBeTruthy();
+    expect(!netIsIP("not-an-ip")).toBeTruthy();
     let urlObj = Url.parse("https://varn-lang.dev:8080/docs?q=1#main");
-    assert("URL protocol", urlObj.protocol === "https");
-    assert("URL host", urlObj.host === "varn-lang.dev");
-    assert("URL port", urlObj.port === 8080);
-    assert("URL path", urlObj.path === "/docs");
-    assert("URL query", urlObj.query.get("q") === "1");
-    assert("URL fragment", urlObj.fragment === "main");
+    expect(urlObj.protocol).toBe("https");
+    expect(urlObj.host).toBe("varn-lang.dev");
+    expect(urlObj.port).toBe(8080);
+    expect(urlObj.path).toBe("/docs");
+    expect(urlObj.query.get("q")).toBe("1");
+    expect(urlObj.fragment).toBe("main");
 
     // 10. std:path
     let isWindows = sysPlatform() === "windows";
     let expectedNormalize = isWindows ? "a\\c" : "a/c";
     let expectedJoin = isWindows ? "a\\b\\c" : "a/b/c";
-    assert("Path normalize", Path.normalize("a/b/../c") === expectedNormalize);
-    assert("Path dirname", Path.dirname("a/b/c") === "a/b");
-    assert("Path basename", Path.basename("a/b/file.txt") === "file.txt");
+    expect(Path.normalize("a/b/../c")).toBe(expectedNormalize);
+    expect(Path.dirname("a/b/c")).toBe("a/b");
+    expect(Path.basename("a/b/file.txt")).toBe("file.txt");
     let ext_res = Path.extname("file.txt");
-    assert("Path extname", ext_res === ".txt");
-    assert("Path join", Path.join("a", "b", "c") === expectedJoin);
+    expect(ext_res).toBe(".txt");
+    expect(Path.join("a", "b", "c")).toBe(expectedJoin);
 
     // 11. std:reflect
     defineMetadata("my_key", "my_val", list);
-    assert("Reflect getMetadata", getMetadata("my_key", list) === "my_val");
-    assert("Reflect hasMetadata", hasMetadata("my_key", list));
+    expect(getMetadata("my_key", list)).toBe("my_val");
+    expect(hasMetadata("my_key", list)).toBeTruthy();
 
     let mkey = MetaKey.create<str>();
-    assert("Reflect getMetadata", getMetadata("my_key", list) === "my_val");
-    assert("Reflect hasMetadata", hasMetadata("my_key", list));
+    expect(getMetadata("my_key", list)).toBe("my_val");
+    expect(hasMetadata("my_key", list)).toBeTruthy();
 
     // 12. std:http
-    assert("Http namespace", Http !== null);
+    expect(Http !== null).toBeTruthy();
     let clientTask = Http.fetch("http://%/");
     let clientRes = await clientTask;
-    assert("Http fetch status", clientRes.status === 200);
-    assert("Http fetch body", clientRes.body.length > 0);
+    expect(clientRes.status).toBe(200);
+    expect(clientRes.body.length > 0).toBeTruthy();
 
     // 13. std:task
     async function threeHundred(): Task<int> {
@@ -136,7 +137,7 @@ async function runComprehensiveTest(): Task<void> {
     }
     let h1 = spawn(threeHundred);
     let val = await h1;
-    assert("Spawn and await", val === 300);
+    expect(val).toBe(300);
 
     async function one(): Task<int> { return 1; }
     async function two(): Task<int> { return 2; }
@@ -144,7 +145,7 @@ async function runComprehensiveTest(): Task<void> {
         one(),
         two(),
     ]);
-    assert("Parallel results", all[0] === 1 && all[1] === 2);
+    expect(all[0] === 1 && all[1] === 2).toBeTruthy();
 
     using group = TaskGroup<int>();
     async function ten(): Task<int> { return 10; }
@@ -152,55 +153,55 @@ async function runComprehensiveTest(): Task<void> {
     let g1 = group.spawn(ten());
     let g2 = group.spawn(twenty());
     let joined = await group.join();
-    assert("TaskGroup joined", joined[0] === 10 && joined[1] === 20);
+    expect(joined[0] === 10 && joined[1] === 20).toBeTruthy();
 
     // 14. std:dispose
     let dispObj = new ResourceImpl();
     {
         using r = dispObj;
-        assert("Using bindings valid", r !== null);
-        assert("Disposable active inside block", dispObj.disposed === false);
+        expect(r !== null).toBeTruthy();
+        expect(dispObj.disposed).toBe(false);
     }
-    assert("Disposable triggered dispose on scope exit", dispObj.disposed === true);
+    expect(dispObj.disposed).toBe(true);
 
     // 15. std:result (Option) — the ADT, so `Some(x)` is a constructor and the
     // variants can be matched on, not a nullable in disguise.
     let optSome = Some<int>(99);
     let optNone = None;
-    assert("Option some isSome", optSome.isSome());
-    assert("Option none isSome", !optNone.isSome());
-    assert("Option none isNone", optNone.isNone());
-    assert("Option unwrap", optSome.unwrap() === 99);
-    assert("Option unwrapOr some", optSome.unwrapOr(50) === 99);
-    assert("Option unwrapOr none", optNone.unwrapOr(50) === 50);
+    expect(optSome.isSome()).toBeTruthy();
+    expect(!optNone.isSome()).toBeTruthy();
+    expect(optNone.isNone()).toBeTruthy();
+    expect(optSome.unwrap()).toBe(99);
+    expect(optSome.unwrapOr(50)).toBe(99);
+    expect(optNone.unwrapOr(50)).toBe(50);
     match (optSome) {
-        Some(v) => assert("Option Some matched", v === 99),
-        None => assert("Option Some mis-match", false),
+        Some(v) => expect(v).toBe(99),
+        None => expect(false).toBeTruthy(),
     }
 
     // 16. std:result (Result)
     let resOk = Ok<str, int>("success");
     let resErr = Err<str, int>(500);
     match (resOk) {
-        Ok(v) => assert("Result Ok matched", v === "success"),
-        Err(_) => assert("Result Ok mis-match", false),
+        Ok(v) => expect(v).toBe("success"),
+        Err(_) => expect(false).toBeTruthy(),
     }
     match (resErr) {
-        Ok(_) => assert("Result Err mis-match", false),
-        Err(e) => assert("Result Err matched", e === 500),
+        Ok(_) => expect(false).toBeTruthy(),
+        Err(e) => expect(e).toBe(500),
     }
     let resTry = Result.catching<int>(() => {
         return 888;
     });
     match (resTry) {
-        Ok(v) => assert("tryRun matched", v === 888),
-        Err(_) => assert("tryRun mis-match", false),
+        Ok(v) => expect(v).toBe(888),
+        Err(_) => expect(false).toBeTruthy(),
     }
 
     // 17. std:test
-    testAssert("std:test assert positive", true);
-    assertTrue(true, "std:test assertTrue positive");
-    assertEqual(777, 777, "std:test assertEqual positive");
+    expect(true).toBeTruthy();
+    expect(true).toBeTruthy();
+    expect(777).toBe(777);
 
     // 18. std:types
     let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
@@ -209,13 +210,17 @@ async function runComprehensiveTest(): Task<void> {
     let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
     let recordVar: { [key: str]: int } = { "tested": 100 };
 
-    assert("std:types partial compile value", partialVar.x === 42);
-    assert("std:types readonly compile value", readonlyVar.a === true);
-    assert("std:types required compile value", requiredVar.x === 10 && requiredVar.y === "yes");
-    assert("std:types mutable compile value", mutableVar.a === false);
-    assert("std:types map compile value", recordVar["tested"] === 100);
+    expect(partialVar.x).toBe(42);
+    expect(readonlyVar.a).toBe(true);
+    expect(requiredVar.x === 10 && requiredVar.y === "yes").toBeTruthy();
+    expect(mutableVar.a).toBe(false);
+    expect(recordVar["tested"]).toBe(100);
 }
-
-await runComprehensiveTest()
-
-print("[PASSED] 42. StdLib Comprehensive Test successfully tested all 18 standard library modules!")
+await describe("42 stdlib comprehensive test", async () => {
+    await it("tests", async () => {
+        
+        await runComprehensiveTest()
+        
+        
+    });
+});

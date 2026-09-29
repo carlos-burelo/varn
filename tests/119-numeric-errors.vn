@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 function mul(a: int, b: int): int { return a * b }
 function quo(a: int, b: int): int { return a % b }
 
@@ -12,38 +14,44 @@ function kindOf(f: () => int): str {
     }
 }
 
-assert("mul overflow is IntegerOverflow", kindOf(() => mul(4000000000, 4000000000)) === "IntegerOverflow")
-assert("mod zero is DivisionByZero", kindOf(() => quo(1, 0)) === "DivisionByZero")
-
 let caught: bool = false
-try {
-    mul(9223372036854775807, 2)
-} catch (e) {
-    caught = e instanceof Error && e.name === "IntegerOverflow"
-}
-assert("IntegerOverflow extends Error and has name", caught)
 
 function rem(a: int, b: int): int { return a % b }
 const MIN: int = 0 - 9223372036854775807 - 1
-assert("MIN % -1 is 0", rem(MIN, 0 - 1) === 0)
-assert("rem sign follows dividend", rem(0 - 7, 2) === 0 - 1)
 
 function mulDiscard(a: int, b: int): int { return a * b }
 let discardedCaught: bool = false
-try {
-    mulDiscard(4000000000, 4000000000)
-} catch (e) {
-    discardedCaught = e instanceof IntegerOverflow
-}
-assert("overflow is observable even when the result is unused", discardedCaught)
 
 function negDiscard(a: int): int { return -a }
 let negCaught: bool = false
-try {
-    negDiscard(0 - 9223372036854775807 - 1)
-} catch (e) {
-    negCaught = e instanceof IntegerOverflow
-}
-assert("negation overflow is observable", negCaught)
+await describe("119 numeric errors", async () => {
+        await it("group 1 part 1", async () => {
+        expect(kindOf(() => mul(4000000000, 4000000000))).toBe("IntegerOverflow");
+        expect(kindOf(() => quo(1, 0))).toBe("DivisionByZero");
+        try {
+        mul(9223372036854775807, 2)
+        } catch (e) {
+        caught = e instanceof Error && e.name === "IntegerOverflow"
+        }
+        expect(caught).toBeTruthy();
+        expect(rem(MIN, 0 - 1)).toBe(0);
+    });
 
-print("[PASSED] 119. Numeric errors")
+    await it("group 1 part 2", async () => {
+        expect(rem(0 - 7, 2)).toBe(0 - 1);
+        try {
+        mulDiscard(4000000000, 4000000000)
+        } catch (e) {
+        discardedCaught = e instanceof IntegerOverflow
+        }
+        expect(discardedCaught).toBeTruthy();
+        try {
+        negDiscard(0 - 9223372036854775807 - 1)
+        } catch (e) {
+        negCaught = e instanceof IntegerOverflow
+        }
+        expect(negCaught).toBeTruthy();
+    });
+
+
+});

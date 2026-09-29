@@ -1,56 +1,59 @@
+import { describe, it, expect } from "std:test";
+
 class Box<T> {
     value: T
-    constructor(v: T) { this.value = v }
-    get(): T { return this.value }
-    map<U>(f: (T) => U): Box<U> { return new Box<U>(f(this.value)) }
+    constructor(v: T) { this.value = v; }
+    get(): T { return this.value; }
+    map<U>(f: (T) => U): Box<U> { return new Box<U>(f(this.value)); }
 }
-
-
-function identity<T>(v: T): T { return v }
-assert("generic id int",  identity<int>(42) === 42)
-assert("generic id str",  identity<str>("hi") === "hi")
-assert("generic id bool", identity<bool>(true) === true)
-
-function swap<A, B>(a: A, b: B): B { return b }
-assert("generic swap", swap<int, str>(1, "x") === "x")
-
-const intBox = new Box<int>(10)
-assert("generic box get",  intBox.get() === 10)
-const strBox = intBox.map((n) => `value=${n}`)
-assert("generic box map",  strBox.get() === "value=10")
-
+function identity<T>(v: T): T { return v; }
+function swap<A, B>(a: A, b: B): B { return b; }
 class GenericStack<T> {
     private items: T[]
-    constructor() { this.items = [] }
-    push(item: T): void { this.items.push(item) }
+    constructor() { this.items = []; }
+    push(item: T): void { this.items.push(item); }
     pop(): T | null {
-        if (this.items.length === 0) return null
-        return this.items.pop()
+        if (this.items.length === 0) return null;
+        return this.items.pop();
     }
     peek(): T | null {
-        if (this.items.length === 0) return null
-        return this.items[this.items.length - 1]
+        if (this.items.length === 0) return null;
+        return this.items[this.items.length - 1];
     }
-    get size(): int { return this.items.length }
-    get isEmpty(): bool { return this.items.length === 0 }
+    get size(): int { return this.items.length; }
+    get isEmpty(): bool { return this.items.length === 0; }
 }
-
-const stk = new GenericStack<int>()
-assert("stack empty init", stk.isEmpty)
-stk.push(1)
-stk.push(2)
-stk.push(3)
-assert("stack size",     stk.size === 3)
-assert("stack peek",     stk.peek() === 3)
-assert("stack pop",      stk.pop() === 3)
-assert("stack size dec", stk.size === 2)
-
-const blockStrBox = intBox.map((n) => { return `val=${n}` })
-assert("generic box block map", blockStrBox.get() === "val=10")
-
 function applyFunc<T, U>(f: (T) => U, val: T): U {
-    return f(val)
+    return f(val);
 }
-assert("generic fn infer", applyFunc((x: int) => x.toString(), 123) === "123")
 
-print("[PASSED] 14. Generics ")
+await describe("14 Generics", async () => {
+    await it("generic functions", () => {
+        expect(identity<int>(42)).toBe(42);
+        expect(identity<str>("hi")).toBe("hi");
+        expect(identity<bool>(true)).toBe(true);
+        expect(swap<int, str>(1, "x")).toBe("x");
+        expect(applyFunc((x: int) => x.toString(), 123)).toBe("123");
+    });
+
+    await it("generic box", () => {
+        const intBox = new Box<int>(10);
+        expect(intBox.get()).toBe(10);
+        const strBox = intBox.map((n) => `value=${n}`);
+        expect(strBox.get()).toBe("value=10");
+        const blockStrBox = intBox.map((n) => { return `val=${n}`; });
+        expect(blockStrBox.get()).toBe("val=10");
+    });
+
+    await it("generic stack", () => {
+        const stk = new GenericStack<int>();
+        expect(stk.isEmpty).toBeTruthy();
+        stk.push(1);
+        stk.push(2);
+        stk.push(3);
+        expect(stk.size).toBe(3);
+        expect(stk.peek()).toBe(3);
+        expect(stk.pop()).toBe(3);
+        expect(stk.size).toBe(2);
+    });
+});

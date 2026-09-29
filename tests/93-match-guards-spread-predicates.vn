@@ -1,6 +1,6 @@
-// Test Suite 93: Match Guards, Object & Array Spread, Type Predicates, and Enum Casting
+import { describe, it, expect } from "std:test";
 
-import { describe, test, expect, assertEqual } from "std:test";
+// Test Suite 93: Match Guards, Object & Array Spread, Type Predicates, and Enum Casting
 
 enum HttpStatusCode {
     Ok = 200,
@@ -15,158 +15,146 @@ enum Color {
     Green,
     Blue
 }
+function isStr(val: dynamic): val is str {
+    return typeof val === "str";
+}
 
-describe("Match Guards (pattern if condition => body)", () => {
-    test("Integer categorization with match guards and fallthrough", () => {
+function isInt(val: dynamic): val is int {
+    return typeof val === "int";
+}
+
+function processValue(val: dynamic): str {
+    if (isStr(val)) {
+        return `string: ${val.toUpperCase()}`;
+    } else if (isInt(val)) {
+        return `int: ${val * 2}`;
+    } else {
+        return "other";
+    }
+}
+
+await describe("93 match guards spread predicates", async () => {
+    await it("Integer categorization with match guar / Match guard using external scope varia", async () => {
         function classifyNumber(n: int): str {
-            return match (n) {
-                x if x < 0 => "Negative",
-                x if x === 0 => "Zero",
-                x if x % 2 === 0 => "Positive Even",
-                _ => "Positive Odd"
-            };
+        return match (n) {
+        x if x < 0 => "Negative",
+        x if x === 0 => "Zero",
+        x if x % 2 === 0 => "Positive Even",
+        _ => "Positive Odd"
+        };
         }
+        expect(classifyNumber(-10)).toBe("Negative");
+        expect(classifyNumber(-1)).toBe("Negative");
+        expect(classifyNumber(0)).toBe("Zero");
+        expect(classifyNumber(2)).toBe("Positive Even");
+        expect(classifyNumber(42)).toBe("Positive Even");
+        expect(classifyNumber(3)).toBe("Positive Odd");
+        expect(classifyNumber(99)).toBe("Positive Odd");
+        
 
-        assertEqual(classifyNumber(-10), "Negative");
-        assertEqual(classifyNumber(-1), "Negative");
-        assertEqual(classifyNumber(0), "Zero");
-        assertEqual(classifyNumber(2), "Positive Even");
-        assertEqual(classifyNumber(42), "Positive Even");
-        assertEqual(classifyNumber(3), "Positive Odd");
-        assertEqual(classifyNumber(99), "Positive Odd");
-    });
-
-    test("Match guard using external scope variables and complex conditions", () => {
         const threshold = 100;
-
         function evaluateScore(score: int, isVip: bool): str {
-            return match (score) {
-                s if s >= threshold && isVip => "VIP High Score",
-                s if s >= threshold => "Standard High Score",
-                s if s >= 50 => "Passing",
-                _ => "Needs Improvement"
-            };
+        return match (score) {
+        s if s >= threshold && isVip => "VIP High Score",
+        s if s >= threshold => "Standard High Score",
+        s if s >= 50 => "Passing",
+        _ => "Needs Improvement"
+        };
         }
-
-        assertEqual(evaluateScore(150, true), "VIP High Score");
-        assertEqual(evaluateScore(120, false), "Standard High Score");
-        assertEqual(evaluateScore(75, true), "Passing");
-        assertEqual(evaluateScore(30, false), "Needs Improvement");
+        expect(evaluateScore(150, true)).toBe("VIP High Score");
+        expect(evaluateScore(120, false)).toBe("Standard High Score");
+        expect(evaluateScore(75, true)).toBe("Passing");
+        expect(evaluateScore(30, false)).toBe("Needs Improvement");
+        
     });
 
-    test("Match guard with multi-value patterns", () => {
+    await it("Match guard with multi-value patterns / Object spread merging and property ove", async () => {
         function describeHttpCode(code: int): str {
-            return match (code) {
-                200 | 201 => "Success",
-                400 | 404 if code === 404 => "Not Found",
-                400 | 404 => "Other Client Error",
-                500 => "Server Error",
-                _ => "Unknown"
-            };
+        return match (code) {
+        200 | 201 => "Success",
+        400 | 404 if code === 404 => "Not Found",
+        400 | 404 => "Other Client Error",
+        500 => "Server Error",
+        _ => "Unknown"
+        };
         }
+        expect(describeHttpCode(200)).toBe("Success");
+        expect(describeHttpCode(201)).toBe("Success");
+        expect(describeHttpCode(404)).toBe("Not Found");
+        expect(describeHttpCode(400)).toBe("Other Client Error");
 
-        assertEqual(describeHttpCode(200), "Success");
-        assertEqual(describeHttpCode(201), "Success");
-        assertEqual(describeHttpCode(404), "Not Found");
-        assertEqual(describeHttpCode(400), "Other Client Error");
-        assertEqual(describeHttpCode(500), "Server Error");
-        assertEqual(describeHttpCode(999), "Unknown");
-    });
-});
+        expect(describeHttpCode(500)).toBe("Server Error");
+        expect(describeHttpCode(999)).toBe("Unknown");
+        
 
-describe("Object & Array Spread", () => {
-    test("Object spread merging and property override", () => {
         const defaults = { host: "127.0.0.1", port: 8080, debug: false };
         const config = { ...defaults, port: 9000, secure: true };
-
-        assertEqual(config.host, "127.0.0.1");
-        assertEqual(config.port, 9000);
-        assertEqual(config.debug, false);
-        assertEqual(config.secure, true);
+        expect(config.host).toBe("127.0.0.1");
+        expect(config.port).toBe(9000);
+        expect(config.debug).toBe(false);
+        expect(config.secure).toBe(true);
+        
     });
 
-    test("Multiple object spreads merging in order", () => {
+    await it("Multiple object spreads merging in ord / Array spread element merging and cloni", async () => {
         const partA = { a: 1, shared: "fromA" };
         const partB = { b: 2, shared: "fromB" };
         const combined = { ...partA, ...partB, c: 3 };
+        expect(combined.a).toBe(1);
+        expect(combined.b).toBe(2);
+        expect(combined.shared).toBe("fromB");
+        expect(combined.c).toBe(3);
+        
 
-        assertEqual(combined.a, 1);
-        assertEqual(combined.b, 2);
-        assertEqual(combined.shared, "fromB");
-        assertEqual(combined.c, 3);
-    });
-
-    test("Array spread element merging and cloning", () => {
         const head = [1, 2];
         const tail = [4, 5];
         const fullList = [0, ...head, 3, ...tail, 6];
+        expect(fullList.length).toBe(7);
+        expect(fullList[0]).toBe(0);
+        expect(fullList[1]).toBe(1);
+        expect(fullList[2]).toBe(2);
+        expect(fullList[3]).toBe(3);
 
-        assertEqual(fullList.length, 7);
-        assertEqual(fullList[0], 0);
-        assertEqual(fullList[1], 1);
-        assertEqual(fullList[2], 2);
-        assertEqual(fullList[3], 3);
-        assertEqual(fullList[4], 4);
-        assertEqual(fullList[5], 5);
-        assertEqual(fullList[6], 6);
-    });
-});
-
-describe("User-Defined Type Predicates (param is Type)", () => {
-    function isStr(val: dynamic): val is str {
-        return typeof val === "str";
-    }
-
-    function isInt(val: dynamic): val is int {
-        return typeof val === "int";
-    }
-
-    test("Type predicate narrows dynamic in conditional branch", () => {
-        function processValue(val: dynamic): str {
-            if (isStr(val)) {
-                return `string: ${val.toUpperCase()}`;
-            } else if (isInt(val)) {
-                return `int: ${val * 2}`;
-            } else {
-                return "other";
-            }
-        }
-
-        assertEqual(processValue("varn"), "string: VARN");
-        assertEqual(processValue(21), "int: 42");
-        assertEqual(processValue(true), "other");
+        expect(fullList[4]).toBe(4);
+        expect(fullList[5]).toBe(5);
+        expect(fullList[6]).toBe(6);
+        
     });
 
-    test("Type predicate in ternary expressions", () => {
+    await it("Type predicate narrows dynamic in cond / Type predicate in ternary expressions", async () => {
+        expect(processValue("varn")).toBe("string: VARN");
+        expect(processValue(21)).toBe("int: 42");
+        expect(processValue(true)).toBe("other");
+        
+
         const itemA: dynamic = "test";
         const resA = isStr(itemA) ? itemA.length : 0;
-        assertEqual(resA, 4);
-
+        expect(resA).toBe(4);
         const itemB: dynamic = 123;
         const resB = isStr(itemB) ? itemB.length : -1;
-        assertEqual(resB, -1);
+        expect(resB).toBe(-1);
+        
     });
-});
 
-describe("Enum to int Cast (enumVal as int)", () => {
-    test("Cast custom enum variants to integer", () => {
+    await it("Cast custom enum variants to integer / Cast sequential zero-indexed enums to ", async () => {
         const okVal = HttpStatusCode.Ok;
         const notFoundVal = HttpStatusCode.NotFound;
-
         const codeOk = okVal as int;
         const codeNotFound = notFoundVal as int;
+        expect(codeOk).toBe(200);
+        expect(codeNotFound).toBe(404);
+        
 
-        assertEqual(codeOk, 200);
-        assertEqual(codeNotFound, 404);
-    });
-
-    test("Cast sequential zero-indexed enums to integer", () => {
         const r = Color.Red as int;
         const g = Color.Green as int;
         const b = Color.Blue as int;
-
-        assertEqual(r, 0);
-        assertEqual(g, 1);
-        assertEqual(b, 2);
+        expect(r).toBe(0);
+        expect(g).toBe(1);
+        expect(b).toBe(2);
+        
     });
+
+        
+
+
 });

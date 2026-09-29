@@ -10,12 +10,7 @@ use varn_types::{FunctionProto, PoolEntry};
 use crate::flags::DebugFlags;
 use crate::walk::constants_for_inspect;
 
-const BOLD: &str = "\x1b[1m";
-const BLUE: &str = "\x1b[34m";
-const GREEN: &str = "\x1b[32m";
-const RED: &str = "\x1b[31m";
-const DIM: &str = "\x1b[2m";
-const R: &str = "\x1b[0m";
+use varn_core::term::colors::{BLUE, BOLD, DIM, GREEN, R, RED};
 
 /// Entry point: render the clif views for `proto` and every nested proto.
 pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelpers) {

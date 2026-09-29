@@ -1,3 +1,12 @@
+//! Paleta única de los volcados `Plain`.
+//!
+//! Los bytes están congelados por los goldens (`vn debug` debe emitirlos
+//! haya o no TTY), así que las constantes se conservan tal cual: son la única
+//! fuente de verdad para la interpolación en `format!` (`"{GREEN}…{R}"`).
+//! Lo que cambia es el mecanismo: `header`/`footer` escriben por
+//! `console::Term` (ANSI en Windows) y `colored`/`Color` delegan en
+//! `console::Style` con estilo forzado (mismos bytes, sin código propio).
+
 pub const RESET: &str = "\x1b[0m";
 pub const BOLD: &str = "\x1b[1m";
 pub const DIM: &str = "\x1b[2m";
@@ -23,27 +32,23 @@ pub const C_CONSTS: &str = YELLOW;
 
 pub const R: &str = RESET;
 
+/// Cabecera de volcado (banners `Plain`). Bytes idénticos a los históricos;
+/// solo cambia el sumidero (`Term::stderr` habilita ANSI en Windows).
 pub fn header(color: &str, title: &str, path: &str) {
     let padding = "─".repeat((50_isize - title.len() as isize - 1).max(0) as usize);
-    eprintln!(
-        "\n {color}{title} {R}{DIM}{padding} {path}{RESET}",
-        color = color,
-        title = title,
-        R = R,
-        DIM = DIM,
-        padding = padding,
-        path = path,
-        RESET = RESET
-    );
+    let line = format!("\n {color}{title} {R}{DIM}{padding} {path}{RESET}");
+    let term = console::Term::stderr();
+    if term.write_line(&line).is_err() {
+        eprintln!("{line}");
+    }
 }
 
 pub fn footer(color: &str, msg: &str) {
-    eprintln!(
-        "  {color}-- {msg} {RESET}\n",
-        color = color,
-        msg = msg,
-        RESET = RESET
-    );
+    let line = format!("  {color}-- {msg} {RESET}\n");
+    let term = console::Term::stderr();
+    if term.write_line(&line).is_err() {
+        eprintln!("{line}");
+    }
 }
 
 use std::fmt::Display;
@@ -61,6 +66,20 @@ pub enum Color {
     Dim,
 }
 
+fn style_for(color: Color) -> console::Style {
+    match color {
+        Color::Red => console::Style::new().red(),
+        Color::Green => console::Style::new().green(),
+        Color::Yellow => console::Style::new().yellow(),
+        Color::Blue => console::Style::new().blue(),
+        Color::Magenta => console::Style::new().magenta(),
+        Color::Cyan => console::Style::new().cyan(),
+        Color::White => console::Style::new().white(),
+        Color::Bold => console::Style::new().bold(),
+        Color::Dim => console::Style::new().dim(),
+    }
+}
+
 impl Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let color_str = match self {
@@ -74,10 +93,16 @@ impl Display for Color {
             Color::Bold => BOLD,
             Color::Dim => DIM,
         };
-        write!(f, "{}", color_str)
+        write!(f, "{color_str}")
     }
 }
 
+/// Envuelve `text` con el color dado y reset. Forzado (mismos bytes que
+/// antes) porque se usa en volcados `Plain` deterministas.
 pub fn colored<D: Display>(text: D, color: Color) -> String {
-    format!("{}{}{}", color, text, RESET)
+    style_for(color)
+        .force_styling(true)
+        .for_stderr()
+        .apply_to(text.to_string())
+        .to_string()
 }

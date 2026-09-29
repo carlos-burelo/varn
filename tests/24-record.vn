@@ -1,17 +1,19 @@
-const scores: { [key: str]: int } = {
-    "alice": 95,
-    "bob": 87,
-    "charlie": 72
-}
-assert("map get alice",   scores["alice"] === 95)
-assert("map get bob",     scores["bob"] === 87)
-assert("map get charlie", scores["charlie"] === 72)
+import { describe, it, expect } from "std:test";
 
-scores["dave"] = 60
-assert("map set dave",    scores["dave"] === 60)
-
-const rec = #{ x: 10, y: 20 }
-assert("record prop x", rec.x === 10)
-assert("record prop y", rec.y === 20)
-
-print("[PASSED] 24. Index signatures and Record types")
+await describe("24 Record", async () => {
+    await it("index map and record", () => {
+        const scores: { [key: str]: int } = {
+            "alice": 95,
+            "bob": 87,
+            "charlie": 72
+        };
+        expect(scores["alice"]).toBe(95);
+        expect(scores["bob"]).toBe(87);
+        expect(scores["charlie"]).toBe(72);
+        scores["dave"] = 60;
+        expect(scores["dave"]).toBe(60);
+        const rec = #{ x: 10, y: 20 };
+        expect(rec.x).toBe(10);
+        expect(rec.y).toBe(20);
+    });
+});

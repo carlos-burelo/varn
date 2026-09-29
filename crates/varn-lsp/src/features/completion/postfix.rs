@@ -80,10 +80,10 @@ pub static POSTFIX_TEMPLATES: &[PostfixTemplate] = &[
         snippet_format: |expr| format!("!{expr}$0"),
     },
     PostfixTemplate {
-        name: "assert",
-        detail: "Postfix assert",
-        description: "Assert expression truthiness:\n```varn\nassert(expr);\n```",
-        snippet_format: |expr| format!("assert({expr});$0"),
+        name: "expect",
+        detail: "Postfix expect",
+        description: "Expect expression truthiness:\n```varn\nexpect(expr).toBeTruthy();\n```",
+        snippet_format: |expr| format!("expect({expr}).toBeTruthy();$0"),
     },
 ];
 

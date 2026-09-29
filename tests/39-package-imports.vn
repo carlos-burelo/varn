@@ -1,11 +1,17 @@
-// import { name, major, inc } from "pkg:somepackage"
-// import { add } from "pkg:somepackage/math/add"
-// import { plusTwo } from "pkg:consumerpkg"
+import { describe, it, expect } from "std:test";
 
-// assert("pkg base import name", name === "somepackage")
-// assert("pkg base import major", major === 1)
-// assert("pkg base import fn", inc(41) === 42)
-// assert("pkg subpath import fn", add(19, 23) === 42)
-// assert("pkg dependency semver constraint", plusTwo(40) === 42)
 
-print("[PASSED] 39. Package imports ")
+await describe("39 package imports", async () => {
+    await it("tests", async () => {
+        // import { name, major, inc } from "pkg:somepackage"
+        // import { add } from "pkg:somepackage/math/add"
+        // import { plusTwo } from "pkg:consumerpkg"
+        
+        // expect(name).toBe("somepackage")
+        // expect(major).toBe(1)
+        // expect(inc(41)).toBe(42)
+        // expect(add(19, 23)).toBe(42)
+        // expect(plusTwo(40)).toBe(42)
+        
+    });
+});

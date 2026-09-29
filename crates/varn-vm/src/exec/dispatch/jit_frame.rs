@@ -140,7 +140,7 @@ pub(super) unsafe fn run_compiled_frame(
         Ok(val) => val,
         Err(code) => {
             if code == 1 {
-                let handler = (*ctx).jit_panic_exception_handler.take();
+                let handler = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth);
                 let error = (*ctx)
                     .jit_panic_exception_error
                     .take()
@@ -148,20 +148,10 @@ pub(super) unsafe fn run_compiled_frame(
                 let err_obj = (*ctx).jit_panic_exception_err_obj.take();
 
                 if let Some(handler) = handler {
-                    if handler.frame_depth > depth {
-                        if let Err(e) = unwind_to_handler(&mut *ctx, handler, error) {
-                            return JitFrameOutcome::Failed(e);
-                        }
-                        return JitFrameOutcome::Continue;
-                    } else {
-                        (*ctx).jit_panic_exception_handler = Some(handler);
-                        (*ctx).jit_panic_exception_error = Some(error);
-                        let err = err_obj.unwrap_or_else(|| {
-                            crate::error::RuntimeError::new(format!("unhandled exception: {error}"))
-                        });
-                        (*ctx).jit_panic_exception_err_obj = Some(err.clone());
-                        return JitFrameOutcome::Failed(err);
+                    if let Err(e) = unwind_to_handler(&mut *ctx, handler, error) {
+                        return JitFrameOutcome::Failed(e);
                     }
+                    return JitFrameOutcome::Continue;
                 } else {
                     return JitFrameOutcome::Failed(err_obj.unwrap());
                 }

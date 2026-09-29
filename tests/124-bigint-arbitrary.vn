@@ -1,25 +1,12 @@
+import { describe, it, expect } from "std:test";
+
 const a: bigint = 10n
 const b: bigint = 5n
-assert("bigint add", a + b === 15n)
-assert("bigint sub", a - 20n === -10n)
-assert("bigint mul", a * b === 50n)
-assert("bigint div truncates", 7n / 2n === 3n)
-assert("bigint div negative truncates", -7n / 2n === -3n)
-assert("bigint rem sign of dividend", -7n % 2n === -1n)
-assert("bigint pow", 2n ** 100n === 1267650600228229401496703205376n)
-assert("bigint neg", -a === -10n)
-assert("bigint compare", a > b && b < a && a >= 10n)
 
 const huge: bigint = 170141183460469231731687303715884105728n
-assert("bigint beyond i128", (huge - 1n).toString() === "170141183460469231731687303715884105727")
 const big40: bigint = 1000000000000000000000000000000000000000n
-assert("bigint 40 digits", (big40 * big40).toString() === "1000000000000000000000000000000000000000000000000000000000000000000000000000000")
-assert("bigint hex literal", 0xffn === 255n)
 
 const i: int = 7
-assert("bigint with int operand", a + i === 17n)
-assert("int widens to bigint", (i as bigint) === 7n)
-assert("bigint as int in range", (b as int) === 5)
 
 function kind(f: () => bigint): str {
     try { f(); return "none" } catch (e) {
@@ -27,20 +14,45 @@ function kind(f: () => bigint): str {
         return "other"
     }
 }
-assert("bigint / 0 raises", kind(() => a / 0n) === "zero")
-assert("bigint % 0 raises", kind(() => a % 0n) === "zero")
 
-assert("bigint equality by value", huge === 170141183460469231731687303715884105728n)
 const s: Set<bigint> = new Set<bigint>()
-s.add(huge)
-assert("bigint set member by value", s.has(170141183460469231731687303715884105728n))
 
 const maxI: int = 9223372036854775807
 const widened: bigint = maxI
-assert("implicit int to bigint widens for real", (widened + widened).toString() === "18446744073709551614")
 function sq(x: bigint): bigint { return x * x }
-assert("int argument to bigint parameter widens", sq(maxI).toString() === "85070591730234615847396907784232501249")
 function asBig(x: int): bigint { return x }
-assert("int returned as bigint widens", (asBig(maxI) + 1n).toString() === "9223372036854775808")
+await describe("124 bigint arbitrary", async () => {
+        await it("group 1 part 1", async () => {
+        expect(a + b).toBe(15n);
+        expect(a - 20n).toBe(-10n);
+        expect(a * b).toBe(50n);
+        expect(7n / 2n).toBe(3n);
+        expect(-7n / 2n).toBe(-3n);
+        expect(-7n % 2n).toBe(-1n);
+        expect(2n ** 100n).toBe(1267650600228229401496703205376n);
+        expect(-a).toBe(-10n);
+    });
 
-print("[PASSED] 124. Arbitrary-precision bigint")
+    await it("group 1 part 2", async () => {
+        expect(a > b && b < a && a >= 10n).toBeTruthy();
+        expect((huge - 1n).toString()).toBe("170141183460469231731687303715884105727");
+        expect((big40 * big40).toString()).toBe("1000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        expect(0xffn).toBe(255n);
+        expect(a + i).toBe(17n);
+        expect((i as bigint)).toBe(7n);
+        expect((b as int)).toBe(5);
+        expect(kind(() => a / 0n)).toBe("zero");
+    });
+
+    await it("group 1 part 3", async () => {
+        expect(kind(() => a % 0n)).toBe("zero");
+        expect(huge).toBe(170141183460469231731687303715884105728n);
+        s.add(huge)
+        expect(s.has(170141183460469231731687303715884105728n)).toBeTruthy();
+        expect((widened + widened).toString()).toBe("18446744073709551614");
+        expect(sq(maxI).toString()).toBe("85070591730234615847396907784232501249");
+        expect((asBig(maxI) + 1n).toString()).toBe("9223372036854775808");
+    });
+
+
+});

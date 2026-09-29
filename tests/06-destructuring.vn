@@ -1,45 +1,45 @@
+import { describe, it, expect } from "std:test";
 
-const obj1 = { a: 1, b: 2, c: 3 }
-const { a, b } = obj1
-assert("obj destr basic", a === 1 && b === 2)
+await describe("06 Destructuring", async () => {
+    await it("object patterns", () => {
+        const obj1 = { a: 1, b: 2, c: 3 };
+        const { a, b } = obj1;
+        expect(a === 1 && b === 2).toBeTruthy();
+        const { a: renamed } = obj1;
+        expect(renamed).toBe(1);
+        const { name = "default", age = 0 } = { name: "Alice" };
+        expect(name).toBe("Alice");
+        expect(age).toBe(0);
+        const nested = { point: { x: 10, y: 20 } };
+        const { point: { x: nx, y: ny } } = nested;
+        expect(nx === 10 && ny === 20).toBeTruthy();
+    });
 
-const { a: renamed } = obj1
-assert("obj destr rename", renamed === 1)
+    await it("array patterns", () => {
+        const [f1, f2, f3] = [10, 20, 30];
+        expect(f1 === 10 && f3 === 30).toBeTruthy();
+        const [skip1, _, skip3] = [100, 200, 300];
+        expect(skip1 === 100 && skip3 === 300).toBeTruthy();
+        const [head, ...tail] = [1, 2, 3, 4];
+        expect(head).toBe(1);
+        expect(tail.length).toBe(3);
+        expect(tail[0]).toBe(2);
+        const data = { coords: [5, 6] };
+        const { coords: [cx, cy] } = data;
+        expect(cx === 5 && cy === 6).toBeTruthy();
+    });
 
-const { name = "default", age = 0 } = { name: "Alice" }
-assert("obj destr default name", name === "Alice")
-assert("obj destr default age",  age === 0)
-
-const nested = { point: { x: 10, y: 20 } }
-const { point: { x: nx, y: ny } } = nested
-assert("nested obj destr", nx === 10 && ny === 20)
-
-const [f1, f2, f3] = [10, 20, 30]
-assert("arr destr basic", f1 === 10 && f3 === 30)
-
-const [skip1, _, skip3] = [100, 200, 300]
-assert("arr destr skip", skip1 === 100 && skip3 === 300)
-
-const [head, ...tail] = [1, 2, 3, 4]
-assert("rest head",   head === 1)
-assert("rest tail",   tail.length === 3)
-assert("rest value",  tail[0] === 2)
-
-const data = { coords: [5, 6] }
-const { coords: [cx, cy] } = data
-assert("nested arr-in-obj", cx === 5 && cy === 6)
-
-const base = { x: 1, y: 2 }
-const ext  = { ...base, z: 3 }
-assert("obj spread x", ext.x === 1)
-assert("obj spread z", ext.z === 3)
-
-const fullObj = { alpha: 10, beta: 20, gamma: 30, delta: 40 }
-const { alpha, beta, ...restObj } = fullObj
-assert("obj rest prop alpha", alpha === 10)
-assert("obj rest prop beta",  beta === 20)
-assert("obj rest remainder gamma", restObj.gamma === 30)
-assert("obj rest remainder delta", restObj.delta === 40)
-assert("obj rest excluded alpha", restObj.alpha === null)
-
-print("[PASSED] 6. Destructuring ")
+    await it("spread and rest", () => {
+        const base = { x: 1, y: 2 };
+        const ext = { ...base, z: 3 };
+        expect(ext.x).toBe(1);
+        expect(ext.z).toBe(3);
+        const fullObj = { alpha: 10, beta: 20, gamma: 30, delta: 40 };
+        const { alpha, beta, ...restObj } = fullObj;
+        expect(alpha).toBe(10);
+        expect(beta).toBe(20);
+        expect(restObj.gamma).toBe(30);
+        expect(restObj.delta).toBe(40);
+        expect(restObj.alpha).toBe(null);
+    });
+});

@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // Task A0.3': evolving element-type inference for `let x = []` (empty
 // array literal, no annotation). These asserts must hold identically
 // whether the checker inferred `Array<int>` for `a` below or left it
@@ -203,28 +206,31 @@ function reprRoundTrip(): str {
     floats.push(-0.25)
     return `${ints[0]}${ints[1]}${ints[2]}${ints[3]}${alias.length}${floats[0] + floats[1]}`
 }
-
-if (!isIsolate) {
-    print("55 starting")
-    assert("evolve push-int sum",        evolvePushInt() === 6)
-    assert("evolve index-write sum",     evolveIndexWrite() === 20)
-    assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
-    assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
-    assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
-    assert("evolve matmul shape",        evolveMatmulShape() === 690)
-    assert("pattern-shadowed [a] un-governed", staleB() === 6.0)
-    assert("pattern-shadowed {a} un-governed", staleC() === 6.0)
-    assert("Array<int> and int[] agree",  genericSpelling() === suffixSpelling())
-    assert("Array<int> spelling value",   genericSpelling() === 37)
-    assert("Array<float> param spelling", genericSpellingParam([1.5, 2.5]) === 4.0)
-    assert("array repr round-trip",       reprRoundTrip() === "7-3s941.25")
-
-    // Compile the Rule-4 regression shapes without executing them (see above).
-    if (false) {
-        rule4ArgPosition()
-        rule4ReturnPosition()
-        rule4MemberExists()
-    }
-
-    print("[PASSED] 55. Array element-type inference")
-}
+await describe("55 array element inference", async () => {
+    await it("tests", async () => {
+        
+        if (!isIsolate) {
+            expect(evolvePushInt()).toBe(6)
+            expect(evolveIndexWrite()).toBe(20)
+            expect(evolveMixedStaysPermissive()).toBe("1-two")
+            expect(annotatedUnchanged()).toBe(30)
+            expect(evolveEscapeStaysPermissive()).toBe(6)
+            expect(evolveMatmulShape()).toBe(690)
+            expect(staleB()).toBe(6.0)
+            expect(staleC()).toBe(6.0)
+            expect(genericSpelling()).toBe(suffixSpelling())
+            expect(genericSpelling()).toBe(37)
+            expect(genericSpellingParam([1.5, 2.5])).toBe(4.0)
+            expect(reprRoundTrip()).toBe("7-3s941.25")
+        
+            // Compile the Rule-4 regression shapes without executing them (see above).
+            if (false) {
+                rule4ArgPosition()
+                rule4ReturnPosition()
+                rule4MemberExists()
+            }
+        
+        }
+        
+    });
+});

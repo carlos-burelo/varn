@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // 1. Basic Enums & Singleton Identity
 enum Direction {
     North,
@@ -6,22 +9,12 @@ enum Direction {
     West
 }
 
-const dir = Direction.North
-assert("basic enum name", dir.name === "North")
-assert("basic enum rawValue", dir.rawValue === 0)
-assert("singleton identity", Direction.North === Direction.North)
-assert("singleton inequality", Direction.North !== Direction.South)
-
 // 2. Explicit Raw Values
 enum Status {
     Pending,
     Success = 10,
     Error
 }
-
-assert("explicit pending rawValue", Status.Pending.rawValue === 0)
-assert("explicit success rawValue", Status.Success.rawValue === 10)
-assert("explicit error rawValue", Status.Error.rawValue === 11)
 
 // 3. Payload Variants & Construction (Positional & Named)
 enum Token {
@@ -31,28 +24,6 @@ enum Token {
     Plus,
     Minus
 }
-
-const t1 = Token.Number(123)
-const t2 = Token.Identifier(name: "hello")
-
-Token.Number(456) // Another instance of Number variant
-
-assert("positional payload name", t1.name === "Number")
-assert("positional payload value", t1.value === 123)
-assert("named payload name", t2.name === "hello")
-
-// Pattern matching on payload variants
-const v1 = match (t1) {
-    Number(val) => val,
-    _ => 0
-}
-assert("match positional", v1 === 123)
-
-const v2 = match (t2) {
-    Identifier(n) => n,
-    _ => "none"
-}
-assert("match named", v2 === "hello")
 
 // 4. Shared Fields & Constructors
 enum CustomHttpStatus {
@@ -68,13 +39,6 @@ enum CustomHttpStatus {
     }
 }
 
-print("CustomHttpStatus.Ok.code =", CustomHttpStatus.Ok.code)
-print("CustomHttpStatus.Ok.message =", CustomHttpStatus.Ok.message)
-assert("shared field code Ok", CustomHttpStatus.Ok.code === 200)
-assert("shared field message Ok", CustomHttpStatus.Ok.message === "OK")
-assert("shared field code NotFound", CustomHttpStatus.NotFound.code === 404)
-assert("shared field message NotFound", CustomHttpStatus.NotFound.message === "Not Found")
-
 // 5. Instance Methods with Pattern Matching on 'this'
 enum Shape {
     Circle(radius: float),
@@ -88,24 +52,11 @@ enum Shape {
     }
 }
 
-const circle = Shape.Circle(10.0)
-const rect = Shape.Rectangle(10.0, 20.0)
-
-assert("circle area", circle.area() === 314.159)
-assert("rect area", rect.area() === 200.0)
-
 // 6. Generic Enums
 enum Result<T, E> {
     Ok(value: T),
     Err(error: E)
 }
-
-const resOk = Result.Ok<int, str>(42)
-const valOk = match (resOk) {
-    Ok(val) => val,
-    Err(err) => 0
-}
-assert("generic enum Ok", valOk === 42)
 
 // 7. Interface Implementation
 interface Display {
@@ -120,7 +71,61 @@ enum CustomDisplay implements Display {
         return "CustomDisplay." + this.name
     }
 }
-
-assert("interface method implementation", CustomDisplay.A.toString() === "CustomDisplay.A")
-
-print("[PASSED] 41. Advanced Enums and ADTs")
+await describe("41 advanced enums", async () => {
+    await it("tests", async () => {
+        
+        const dir = Direction.North
+        expect(dir.name).toBe("North")
+        expect(dir.rawValue).toBe(0)
+        expect(Direction.North).toBe(Direction.North)
+        expect(Direction.North !== Direction.South).toBeTruthy()
+        
+        expect(Status.Pending.rawValue).toBe(0)
+        expect(Status.Success.rawValue).toBe(10)
+        expect(Status.Error.rawValue).toBe(11)
+        
+        const t1 = Token.Number(123)
+        const t2 = Token.Identifier(name: "hello")
+        
+        Token.Number(456) // Another instance of Number variant
+        
+        expect(t1.name).toBe("Number")
+        expect(t1.value).toBe(123)
+        expect(t2.name).toBe("hello")
+        
+        // Pattern matching on payload variants
+        const v1 = match (t1) {
+            Number(val) => val,
+            _ => 0
+        }
+        expect(v1).toBe(123)
+        
+        const v2 = match (t2) {
+            Identifier(n) => n,
+            _ => "none"
+        }
+        expect(v2).toBe("hello")
+        
+        expect(CustomHttpStatus.Ok.code).toBe(200)
+        expect(CustomHttpStatus.Ok.message).toBe("OK")
+        expect(CustomHttpStatus.NotFound.code).toBe(404)
+        expect(CustomHttpStatus.NotFound.message).toBe("Not Found")
+        
+        const circle = Shape.Circle(10.0)
+        const rect = Shape.Rectangle(10.0, 20.0)
+        
+        expect(circle.area()).toBe(314.159)
+        expect(rect.area()).toBe(200.0)
+        
+        const resOk = Result.Ok<int, str>(42)
+        const valOk = match (resOk) {
+            Ok(val) => val,
+            Err(err) => 0
+        }
+        expect(valOk).toBe(42)
+        
+        expect(CustomDisplay.A.toString()).toBe("CustomDisplay.A")
+        
+        
+    });
+});

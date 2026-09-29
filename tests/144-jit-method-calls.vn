@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // Method calls from a compiled body go through the runtime's one method
 // call — the same resolution, inline cache and fast paths as the
 // interpreter's `CallMethod`, with the arguments handed over as values
@@ -105,35 +107,42 @@ const mcSquare = new McSquare(3)
 const mcFailing = new McFailing()
 const mcObj: dynamic = { apply: (x: int) => x + 100 }
 const mcArr: dynamic = [1, 2]
-for (let i = 0; i < 3000; i = i + 1) {
-    mArea = mArea + mcArea(i % 2 == 0 ? mcShape : mcSquare, 2)
-    mText = mText + mcIntText(i).length
-    mStatic = mStatic + mcStatic(i)
-    const tok = mcVariant(i)
-    const num: int = match (tok) {
-        Number(v) => v,
-        Word(_) => 0
-    }
-    const wordLen: int = match (tok) {
-        Number(_) => 0,
-        Word(w) => w.length
-    }
-    mNumbers = mNumbers + num
-    mWords = mWords + wordLen
-    mDyn = mDyn + (mcDynArray(mcArr, i) as int)
-    mCb = mCb + (mcCallback(mcObj, i) as int)
-    mGuard = mGuard + mcGuarded(mcFailing, i)
-}
 
 // 9 * 2 + 3 = 21 for the shape, 10 * 2 + 3 = 23 for the square.
-assert("VM methods and overrides", mArea === 1500 * 21 + 1500 * 23)
 // Digits of 0..2999: 10 + 90 * 2 + 900 * 3 + 2000 * 4.
-assert("toString on an int", mText === 10 + 180 + 2700 + 8000)
-assert("a static method", mStatic === 2 * 4498500)
-assert("enum variants built as calls", mNumbers === 2248500 && mWords === 1500 + (5 + 45 * 2 + 450 * 3 + 1000 * 4))
-assert("push / pop on a dynamic array", mDyn === 4498500 && (mcArr as int[]).length === 2)
-assert("a function-valued property", mCb === 4498500 + 300000)
 // 429 multiples of 7 below 3000 (0 included) turn into -1.
-assert("a throwing method reaches the caller's catch", mGuard === 4498500 - (7 * 428 * 429 / 2) - 429)
+await describe("144 jit method calls", async () => {
+        await it("group 1 part 1", async () => {
+        for (let i = 0; i < 3000; i = i + 1) {
+        mArea = mArea + mcArea(i % 2 == 0 ? mcShape : mcSquare, 2)
+        mText = mText + mcIntText(i).length
+        mStatic = mStatic + mcStatic(i)
+        const tok = mcVariant(i)
+        const num: int = match (tok) {
+        Number(v) => v,
+        Word(_) => 0
+        }
+        const wordLen: int = match (tok) {
+        Number(_) => 0,
+        Word(w) => w.length
+        }
+        mNumbers = mNumbers + num
+        mWords = mWords + wordLen
+        mDyn = mDyn + (mcDynArray(mcArr, i) as int)
+        mCb = mCb + (mcCallback(mcObj, i) as int)
+        mGuard = mGuard + mcGuarded(mcFailing, i)
+        }
+        expect(mArea).toBe(1500 * 21 + 1500 * 23);
+        expect(mText).toBe(10 + 180 + 2700 + 8000);
+        expect(mStatic).toBe(2 * 4498500);
+        expect(mNumbers === 2248500 && mWords).toBe(1500 + (5 + 45 * 2 + 450 * 3 + 1000 * 4));
+    });
 
-print("[PASSED] 144. JIT method calls")
+    await it("group 1 part 2", async () => {
+        expect(mDyn === 4498500 && (mcArr as int[]).length).toBe(2);
+        expect(mCb).toBe(4498500 + 300000);
+        expect(mGuard).toBe(4498500 - (7 * 428 * 429 / 2) - 429);
+    });
+
+
+});

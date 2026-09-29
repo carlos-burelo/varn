@@ -1,17 +1,26 @@
+import { describe, it, expect } from "std:test";
+
 const t = #[1, "a", true]
-assert("tuple index 0", t[0] === 1)
-assert("tuple index 1", t[1] === "a")
-assert("tuple index 2", t[2] === true)
 
 function pair() { return #[7, "x"] }
 const p = pair()
-assert("tuple from fn", p[0] === 7 && p[1] === "x")
 
 const u = #[1, 2]
 const v = #[1, 2]
-assert("tuple structural eq", u == v)
 
 const r = #{ name: "x", age: 3, ok: true }
-assert("record with window", r.age === 3 && r.ok)
+await describe("117 tuples", async () => {
+        await it("group 1 part 1", async () => {
+        expect(t[0]).toBe(1);
+        expect(t[1]).toBe("a");
+        expect(t[2]).toBe(true);
+    });
 
-print("[PASSED] 117. Tuples")
+    await it("group 1 part 2", async () => {
+        expect(p[0] === 7 && p[1]).toBe("x");
+        expect(u == v).toBeTruthy();
+        expect(r.age === 3 && r.ok).toBeTruthy();
+    });
+
+
+});

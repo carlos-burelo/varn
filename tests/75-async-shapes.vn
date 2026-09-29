@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+import { asyncImportedMethod, importedAsyncFn, AsyncNs, ImportedAsyncBox } from "./75-async-shapes-lib.vn"
+
 // Varn has no explicit Promise wrapper: writing `async` is what makes the call
 // produce a task. So `async f(): int` declares a body returning `int` and a
 // value of type `Task<int>`, and `await` on that call must find something to
@@ -10,7 +13,6 @@
 // tests/golden/types/75-async-shapes.txt, which is where a regression would
 // show up — a wrong type here is a warning, not a runtime failure.
 
-import { asyncImportedMethod, importedAsyncFn, AsyncNs, ImportedAsyncBox } from "./75-async-shapes-lib.vn"
 
 class LocalBox {
     async method(): int { return 1 }
@@ -54,44 +56,48 @@ extension on LocalBox {
 async function runAsyncShapes() {
     const box = new LocalBox()
 
-    assert("local method", await box.method() === 1)
-    assert("local method, return type inferred", await box.noReturnType() === 2)
+    expect(await box.method()).toBe(1)
+    expect(await box.noReturnType()).toBe(2)
     await box.returnsVoid()
-    assert("local method returning an array", (await box.returnsArray())[0] === 3)
-    assert("declared Task is not wrapped twice", await box.alreadyTask() === 4)
+    expect((await box.returnsArray())[0]).toBe(3)
+    expect(await box.alreadyTask()).toBe(4)
 
-    assert("local function", await localFn() === 5)
-    assert("local function, return type inferred", await localFnInferred() === 6)
-    assert("async arrow", await localArrow() === 7)
-    assert("extension method", await box.extensionMethod() === 8)
+    expect(await localFn()).toBe(5)
+    expect(await localFnInferred()).toBe(6)
+    expect(await localArrow()).toBe(7)
+    expect(await box.extensionMethod()).toBe(8)
 
     // The four shapes below reach the checker through a module boundary or a
     // namespace, which is where the rule used to be missing entirely.
     const imported = new ImportedAsyncBox()
-    assert("imported class method", await imported.method() === 9)
-    assert("imported generic method", (await imported.all())[0] === 10)
-    assert("imported function", await importedAsyncFn() === 11)
-    assert("namespace function", await AsyncNs.fn() === 12)
-    assert("imported free method helper", await asyncImportedMethod() === 13)
+    expect(await imported.method()).toBe(9)
+    expect((await imported.all())[0]).toBe(10)
+    expect(await importedAsyncFn()).toBe(11)
+    expect(await AsyncNs.fn()).toBe(12)
+    expect(await asyncImportedMethod()).toBe(13)
 
     // Forms that could not even be written before: an `async function`
     // expression did not parse, an object literal dropped its methods, and an
     // interface could not carry `async` on a signature.
-    assert("async function expression", await localFnExpr() === 14)
-    assert("function expression keeps its signature", syncFnExpr(7) === 14)
-    assert("object literal async method", await literal.method() === 15)
-    assert("object literal plain method", literal.plainMethod(1) === 2)
+    expect(await localFnExpr()).toBe(14)
+    expect(syncFnExpr(7)).toBe(14)
+    expect(await literal.method()).toBe(15)
+    expect(literal.plainMethod(1)).toBe(2)
 
     const api: AsyncApi = new ApiImpl()
     // Held before awaiting on purpose: the golden records this as `Task<int>`,
     // which is the only place the interface's `async` is observable — a
     // missing wrap is a warning, and warnings do not fail a run.
     const pending = api.load()
-    assert("async through an interface", await pending === 16)
+    expect(await pending).toBe(16)
     await api.nothing()
-    assert("plain method through an interface", api.plain() === "p")
+    expect(api.plain()).toBe("p")
 }
-
-await runAsyncShapes()
-
-print("[PASSED] 75. Async shapes ")
+await describe("75 async shapes", async () => {
+    await it("tests", async () => {
+        
+        await runAsyncShapes()
+        
+        
+    });
+});

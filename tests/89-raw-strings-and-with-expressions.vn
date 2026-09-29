@@ -1,77 +1,63 @@
-// Test Suite 89: Raw String Literals ("""...""") and `with` Expressions
+import { describe, it, expect } from "std:test";
 
-import { describe, test, expect, assertEqual } from "std:test";
+// Test Suite 89: Raw String Literals ("""...""") and `with` Expressions
 
 class User(public id: int, public name: str, public role: str = "guest") {}
 
 class ServerNode(public host: str, public port: int, public isMaster: bool = false) {}
-
-describe("Raw String Literals (\"\"\"...\"\"\")", () => {
-    test("Raw string with unescaped quotes, backslashes and multiline content", () => {
+await describe("89 raw strings and with expressions", async () => {
+        await it("Raw string with unescaped quotes, backslashes and multiline content", async () => {
         let jsonStr = """{
-  "name": "Varn",
-  "path": "C:\Program Files\Varn",
-  "escapes": "\n \t \r"
-}""";
-
+        "name": "Varn",
+        "path": "C:\Program Files\Varn",
+        "escapes": "\n \t \r"
+        }""";
         expect(jsonStr.includes("\"name\": \"Varn\"")).toBe(true);
         expect(jsonStr.includes("C:\Program Files\Varn")).toBe(true);
         expect(jsonStr.includes("""\n \t \r""")).toBe(true);
-    });
-
-    test("Single-line raw string with double quotes", () => {
+        });
+        await it("Single-line raw string with double quotes", async () => {
         let text = """Hello "world" and 'quotes' without escapes!""";
-        assertEqual(text, "Hello \"world\" and 'quotes' without escapes!");
-    });
-});
-
-describe("`with` Expressions (Non-destructive Mutation)", () => {
-    test("`with` expression on Class instances", () => {
+        expect(text).toBe("Hello \"world\" and 'quotes' without escapes!");
+        });
+        
+        await it("`with` expression on Class instances", async () => {
         let u1 = new User(10, "Alice", "admin");
         let u2 = u1 with { name: "Bob", role: "editor" };
-
-        // u2 has modified fields + preserved base fields
-        assertEqual(u2.id, 10);
-        assertEqual(u2.name, "Bob");
-        assertEqual(u2.role, "editor");
-
-        // u1 remains strictly immutable
-        assertEqual(u1.id, 10);
-        assertEqual(u1.name, "Alice");
-        assertEqual(u1.role, "admin");
-    });
-
-    test("`with` expression on Plain Objects", () => {
+        expect(u2.id).toBe(10);
+        expect(u2.name).toBe("Bob");
+        expect(u2.role).toBe("editor");
+        expect(u1.id).toBe(10);
+        expect(u1.name).toBe("Alice");
+        expect(u1.role).toBe("admin");
+        });
+        await it("`with` expression on Plain Objects", async () => {
         let baseConfig = {
-            host: "localhost",
-            port: 3000,
-            debug: true
+        host: "localhost",
+        port: 3000,
+        debug: true
         };
-
         let prodConfig = baseConfig with {
-            port: 8080,
-            debug: false
+        port: 8080,
+        debug: false
         };
+        expect(prodConfig.host).toBe("localhost");
+        expect(prodConfig.port).toBe(8080);
+        expect(prodConfig.debug).toBe(false);
 
-        assertEqual(prodConfig.host, "localhost");
-        assertEqual(prodConfig.port, 8080);
-        assertEqual(prodConfig.debug, false);
-
-        // Original config preserved
-        assertEqual(baseConfig.port, 3000);
-        assertEqual(baseConfig.debug, true);
-    });
-
-    test("Chained or nested `with` expressions", () => {
+        expect(baseConfig.port).toBe(3000);
+        expect(baseConfig.debug).toBe(true);
+        });
+        await it("Chained or nested `with` expressions", async () => {
         let node1 = new ServerNode("10.0.0.1", 5000, false);
         let node2 = node1 with { port: 5001 };
         let node3 = node2 with { isMaster: true };
+        expect(node3.host).toBe("10.0.0.1");
+        expect(node3.port).toBe(5001);
+        expect(node3.isMaster).toBe(true);
+        expect(node1.port).toBe(5000);
+        expect(node1.isMaster).toBe(false);
+        });
+        
 
-        assertEqual(node3.host, "10.0.0.1");
-        assertEqual(node3.port, 5001);
-        assertEqual(node3.isMaster, true);
-
-        assertEqual(node1.port, 5000);
-        assertEqual(node1.isMaster, false);
-    });
 });

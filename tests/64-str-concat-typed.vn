@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // `+` with a statically-proven string operand now emits `StrConcat` instead
 // of the generic `Add`. That opcode was previously NEVER emitted — its
 // interpreter arm, its Cranelift lowering, its runtime helper and its
@@ -11,43 +14,21 @@
 // number.
 
 function scLeft(n: int): str { return "n=" + n }
-assert("strconcat: string on the left", scLeft(42) === "n=42")
 
 function scRight(n: int): str { return n + " items" }
-assert("strconcat: string on the right", scRight(7) === "7 items")
 
 function scBoth(a: str, b: str): str { return a + b }
-assert("strconcat: two declared str operands", scBoth("ab", "cd") === "abcd")
-assert("strconcat: two string literals", ("ab" + "cd") === "abcd")
 
 // Non-numeric right operands must stringify, not coerce.
 function scNull(): str { return "v=" + null }
-assert("strconcat: null stringifies", scNull() === "v=null")
 
 function scBool(): str { return "b=" + true }
-assert("strconcat: bool stringifies", scBool() === "b=true")
 
 function scFloat(): str { return "f=" + 1.5 }
-assert("strconcat: float stringifies", scFloat() === "f=1.5")
 
 // A float that happens to be integral prints without a fractional part —
 // pinned because `str_repr_into` has a dedicated branch for it.
 function scWholeFloat(): str { return "w=" + 3.0 }
-assert("strconcat: integral float stringifies", scWholeFloat() === "w=3")
-
-// Negative and zero through the itoa path.
-assert("strconcat: negative int", ("x" + -5) === "x-5")
-assert("strconcat: zero", ("x" + 0) === "x0")
-
-// Empty string operands.
-assert("strconcat: empty left", ("" + 9) === "9")
-assert("strconcat: empty right", ("9" + "") === "9")
-
-// Results crossing the small-string-optimization boundary: <=5 bytes stays
-// inline in the value, longer ones become heap strings. Both must compare and
-// concatenate the same.
-assert("strconcat: sso-sized result", ("a" + 1) === "a1")
-assert("strconcat: heap-sized result", ("abcdefgh" + 123456) === "abcdefgh123456")
 
 // Accumulation in a loop — the shape `str_concat`'s extensible-buffer fast
 // path exists for. Length is checked through a dynamic binding because the
@@ -57,33 +38,9 @@ function scAccum(n: int): int {
   for (let i = 0; i < n; i = i + 1) { s = s + "xy" }
   return s.length
 }
-assert("strconcat: accumulation stays exact", scAccum(1000) === 2000)
 
 // Chained concatenation mixing types, evaluated left to right.
 function scChain(n: int): str { return "a" + n + "b" + (n + 1) }
-assert("strconcat: chain mixes types left to right", scChain(1) === "a1b2")
-
-// The Cranelift fast path builds a small-string-optimized result inline and
-// falls back to the helper otherwise, so every boundary of "fits inline"
-// needs pinning: exactly at the limit, one past it, and non-ASCII (which the
-// SSO encoding refuses regardless of length).
-assert("strconcat: result exactly at the sso limit", ("ab" + 123) === "ab123")
-assert("strconcat: result one past the sso limit", ("ab" + 1234) === "ab1234")
-assert("strconcat: empty + empty", ("" + "") === "")
-assert("strconcat: non-ascii refuses the inline path", ("é" + 1) === "é1")
-assert("strconcat: non-ascii on the right", ("a" + "ñ") === "añ")
-assert("strconcat: multibyte stays correct", ("日本" + 5) === "日本5")
-
-// Byte-order inside the packed result: `a`'s bytes must land before `b`'s, and
-// an asymmetric pair is the only thing that catches them swapped. Both operands
-// vary in length so every (len_a, len_b) split up to the limit is exercised.
-assert("strconcat: order 1+1", ("x" + "y") === "xy")
-assert("strconcat: order 1+4", ("x" + "wxyz") === "xwxyz")
-assert("strconcat: order 4+1", ("wxyz" + "x") === "wxyzx")
-assert("strconcat: order 2+3", ("ab" + "cde") === "abcde")
-assert("strconcat: order 3+2", ("abc" + "de") === "abcde")
-assert("strconcat: empty left keeps right", ("" + "abcde") === "abcde")
-assert("strconcat: empty right keeps left", ("abcde" + "") === "abcde")
 
 // Inside a hot loop, where the fast path is actually reached: results stay
 // exact and comparable both to a literal and to a second concat.
@@ -95,7 +52,6 @@ function scFastLoop(n: int): int {
   }
   return hits
 }
-assert("strconcat: fast path exact in a loop", scFastLoop(50000) === 50000)
 
 // The same loop, but straddling: half the results fit inline and half do not,
 // so both arms are taken from one compiled body.
@@ -107,6 +63,57 @@ function scStraddle(n: int): int {
   }
   return hits
 }
-assert("strconcat: both arms from one body", scStraddle(50000) === 50000)
-
-print("[PASSED] 64. Typed string concat ")
+await describe("64 str concat typed", async () => {
+    await it("tests", async () => {
+        expect(scLeft(42)).toBe("n=42")
+        expect(scRight(7)).toBe("7 items")
+        expect(scBoth("ab", "cd")).toBe("abcd")
+        expect(("ab" + "cd")).toBe("abcd")
+        expect(scNull()).toBe("v=null")
+        expect(scBool()).toBe("b=true")
+        expect(scFloat()).toBe("f=1.5")
+        expect(scWholeFloat()).toBe("w=3")
+        
+        // Negative and zero through the itoa path.
+        expect(("x" + -5)).toBe("x-5")
+        expect(("x" + 0)).toBe("x0")
+        
+        // Empty string operands.
+        expect(("" + 9)).toBe("9")
+        expect(("9" + "")).toBe("9")
+        
+        // Results crossing the small-string-optimization boundary: <=5 bytes stays
+        // inline in the value, longer ones become heap strings. Both must compare and
+        // concatenate the same.
+        expect(("a" + 1)).toBe("a1")
+        expect(("abcdefgh" + 123456)).toBe("abcdefgh123456")
+        expect(scAccum(1000)).toBe(2000)
+        expect(scChain(1)).toBe("a1b2")
+        
+        // The Cranelift fast path builds a small-string-optimized result inline and
+        // falls back to the helper otherwise, so every boundary of "fits inline"
+        // needs pinning: exactly at the limit, one past it, and non-ASCII (which the
+        // SSO encoding refuses regardless of length).
+        expect(("ab" + 123)).toBe("ab123")
+        expect(("ab" + 1234)).toBe("ab1234")
+        expect(("" + "")).toBe("")
+        expect(("é" + 1)).toBe("é1")
+        expect(("a" + "ñ")).toBe("añ")
+        expect(("日本" + 5)).toBe("日本5")
+        
+        // Byte-order inside the packed result: `a`'s bytes must land before `b`'s, and
+        // an asymmetric pair is the only thing that catches them swapped. Both operands
+        // vary in length so every (len_a, len_b) split up to the limit is exercised.
+        expect(("x" + "y")).toBe("xy")
+        expect(("x" + "wxyz")).toBe("xwxyz")
+        expect(("wxyz" + "x")).toBe("wxyzx")
+        expect(("ab" + "cde")).toBe("abcde")
+        expect(("abc" + "de")).toBe("abcde")
+        expect(("" + "abcde")).toBe("abcde")
+        expect(("abcde" + "")).toBe("abcde")
+        expect(scFastLoop(50000)).toBe(50000)
+        expect(scStraddle(50000)).toBe(50000)
+        
+        
+    });
+});

@@ -2,7 +2,6 @@
 export {
     Expectation,
     expect,
-    assert,
     assertEqual,
     assertTrue,
     assertFalse,
@@ -29,7 +28,6 @@ export {
 } from "std:test/suite";
 
 import {
-    assert,
     assertEqual,
     assertTrue,
     assertFalse,
@@ -54,7 +52,6 @@ export function assertSummary(): void {
 }
 
 const testImpl = {
-    assert: assert,
     assertEqual: assertEqual,
     assertTrue: assertTrue,
     assertFalse: assertFalse,

@@ -1,56 +1,9 @@
 import { UdpSocket, UdpPacket } from "std:net";
 import { HttpResponse } from "std:http";
 import { AsyncReader } from "std:io";
-import { assertEqual, assertTrue, assertNotNull } from "std:test";
+import { describe, it, expect } from "std:test";
 
-print("=== Suite: UDP Sockets & HTTP Streaming Response ===");
 
-async function testUdpCommunication(): Task<void> {
-    let srvPort = 19881;
-    let cliPort = 19882;
-
-    let server = UdpSocket.bind(srvPort, "127.0.0.1");
-    let client = UdpSocket.bind(cliPort, "127.0.0.1");
-
-    assertTrue(server.isOpen);
-    assertTrue(client.isOpen);
-    assertEqual(server.localPort, srvPort);
-    assertEqual(client.localPort, cliPort);
-
-    // 1. Send text datagram
-    let sent1 = client.send("127.0.0.1", srvPort, "hello_udp_world");
-    assertTrue(sent1 > 0);
-
-    let pkt1 = await server.recv(1024);
-    assertNotNull(pkt1);
-    let packet1 = pkt1 as UdpPacket;
-    assertEqual(packet1.data.toString(), "hello_udp_world");
-    assertEqual(packet1.host, "127.0.0.1");
-    assertEqual(packet1.port, cliPort);
-
-    // 2. Send binary datagram (Bytes)
-    let binData = Bytes.alloc(4);
-    binData.setByte(0, 0xDE);
-    binData.setByte(1, 0xAD);
-    binData.setByte(2, 0xBE);
-    binData.setByte(3, 0xEF);
-
-    let sent2 = client.send("127.0.0.1", srvPort, binData);
-    assertTrue(sent2 > 0);
-
-    let pkt2 = await server.recv(1024);
-    assertNotNull(pkt2);
-    let packet2 = pkt2 as UdpPacket;
-    assertEqual(packet2.data.length, 4);
-    assertEqual(packet2.data.toHex(), "deadbeef");
-
-    server.close();
-    client.close();
-    assertTrue(!server.isOpen);
-    assertTrue(!client.isOpen);
-
-    print("  ✔ std:net (UdpSocket bind, send text/Bytes, recv, close)");
-}
 
 class MockChunkReader implements AsyncReader {
     private chunks: Bytes[];
@@ -76,16 +29,55 @@ function testHttpResponseStreamShape(): void {
         Bytes.fromString("second chunk\n")
     ];
     let reader = new MockChunkReader(mockChunks);
-
-    // Verify AsyncReader interface implementation
-    assertNotNull(reader);
-
-    // Verify HttpResponse has stream method declared
+    expect(reader).toBeNotNull();
     let res = new HttpResponse(1);
-    assertTrue(res.connId === 1);
-
-    print("  ✔ std:http (HttpResponse.stream interface contracts)");
+    expect(res.connId === 1).toBeTruthy();
 }
 
-await testUdpCommunication();
-testHttpResponseStreamShape();
+let srvPort = 19881;
+let cliPort = 19882;
+let server = UdpSocket.bind(srvPort, "127.0.0.1");
+let client = UdpSocket.bind(cliPort, "127.0.0.1");
+
+await describe("114 udp and http streaming", async () => {
+    await it("udp socket setup", async () => {
+        expect(server.isOpen).toBeTruthy();
+        expect(client.isOpen).toBeTruthy();
+        expect(server.localPort).toBe(srvPort);
+        expect(client.localPort).toBe(cliPort);
+    });
+
+    await it("1. Send text datagram", async () => {
+        let sent1 = client.send("127.0.0.1", srvPort, "hello_udp_world");
+        expect(sent1 > 0).toBeTruthy();
+        let pkt1 = await server.recv(1024);
+        expect(pkt1).toBeNotNull();
+        let packet1 = pkt1 as UdpPacket;
+        expect(packet1.data.toString()).toBe("hello_udp_world");
+        expect(packet1.host).toBe("127.0.0.1");
+        expect(packet1.port).toBe(cliPort);
+    });
+
+    await it("2. Send binary datagram (Bytes)", async () => {
+        let binData = Bytes.alloc(4);
+        binData.setByte(0, 0xDE);
+        binData.setByte(1, 0xAD);
+        binData.setByte(2, 0xBE);
+        binData.setByte(3, 0xEF);
+        let sent2 = client.send("127.0.0.1", srvPort, binData);
+        expect(sent2 > 0).toBeTruthy();
+        let pkt2 = await server.recv(1024);
+        expect(pkt2).toBeNotNull();
+        let packet2 = pkt2 as UdpPacket;
+        expect(packet2.data.length).toBe(4);
+        expect(packet2.data.toHex()).toBe("deadbeef");
+        server.close();
+        client.close();
+        expect(!server.isOpen).toBeTruthy();
+        expect(!client.isOpen).toBeTruthy();
+    });
+
+    await it("http response stream shape", async () => {
+        testHttpResponseStreamShape();
+    });
+});

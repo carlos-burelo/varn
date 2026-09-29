@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // Regression: minor-GC vtable corruption (2026-07-09).
 // value_heap_idx returned RAW old-gen indices for Class/VmClosure/Task-like
 // values; the minor GC misread them as nursery indices and stamped an
@@ -19,23 +22,28 @@ class GcVtB {
         this.y = y
     }
 }
-
-// Enough string allocations to force several minor GC cycles.
-let gcJunk:str[] = []
-for (let i = 0; i < 20000; i = i + 1) {
-    gcJunk.push("gc_" + i)
-}
-
-let gcAccA = 0
-let gcAccB = 0
-for (let i = 0; i < 5000; i = i + 1) {
-    let a = new GcVtA(i)
-    gcAccA = gcAccA + a.x
-    let b = new GcVtB(i)
-    gcAccB = gcAccB + b.y
-}
-
-assert("gc: first class ctor survives minor GC",  gcAccA === 12497500)
-assert("gc: second class ctor survives minor GC", gcAccB === 12497500)
-assert("gc: junk array intact after GC", gcJunk.length === 20000)
-assert("gc: junk content intact", gcJunk[19999] === "gc_19999")
+await describe("53 gc class vtable", async () => {
+    await it("tests", async () => {
+        
+        // Enough string allocations to force several minor GC cycles.
+        let gcJunk:str[] = []
+        for (let i = 0; i < 20000; i = i + 1) {
+            gcJunk.push("gc_" + i)
+        }
+        
+        let gcAccA = 0
+        let gcAccB = 0
+        for (let i = 0; i < 5000; i = i + 1) {
+            let a = new GcVtA(i)
+            gcAccA = gcAccA + a.x
+            let b = new GcVtB(i)
+            gcAccB = gcAccB + b.y
+        }
+        
+        expect(gcAccA).toBe(12497500)
+        expect(gcAccB).toBe(12497500)
+        expect(gcJunk.length).toBe(20000)
+        expect(gcJunk[19999]).toBe("gc_19999")
+        
+    });
+});

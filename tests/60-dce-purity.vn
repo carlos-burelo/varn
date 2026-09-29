@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // DCE may only delete an instruction whose result is unused when that
 // instruction is *pure*. `passes::dce` classified purity with a deny-list, so
 // every `InstKind` the list forgot counted as pure and was deletable.
@@ -38,23 +41,9 @@ function dropMethod(t: Ticker): int {
   return 42
 }
 
-const ticker = Ticker()
-
-assert("dce: getter call returns", dropGetter(ticker) === 42)
-assert("dce: unused getter still ran", getterRuns === 1)
-
-// Twice, so the evidence is a count and not a single edge.
-dropGetter(ticker)
-assert("dce: unused getter ran again", getterRuns === 2)
-
-assert("dce: method call returns", dropMethod(ticker) === 42)
-assert("dce: unused method still ran", methodRuns === 1)
-
 // A getter read that IS used must of course still run — this pins the
 // baseline the bug hid behind.
 function useGetter(t: Ticker): int { return t.tick }
-assert("dce: used getter returns", useGetter(ticker) === 1)
-assert("dce: used getter ran", getterRuns === 3)
 
 // The other half of the contract: provably pure instructions must STILL be
 // deletable, or the allow-list is just a rubber stamp. Nothing here is
@@ -69,8 +58,26 @@ function dropPure(a: int[], t: Ticker): int {
   const deadCompare = a.length > 1
   return 42
 }
-
-assert("dce: pure drops still correct", dropPure([1, 2, 3], ticker) === 42)
-assert("dce: pure drops ran no getter", getterRuns === 3)
-
-print("[PASSED] 60. DCE purity ")
+await describe("60 dce purity", async () => {
+    await it("tests", async () => {
+        
+        const ticker = Ticker()
+        
+        expect(dropGetter(ticker)).toBe(42)
+        expect(getterRuns).toBe(1)
+        
+        // Twice, so the evidence is a count and not a single edge.
+        dropGetter(ticker)
+        expect(getterRuns).toBe(2)
+        
+        expect(dropMethod(ticker)).toBe(42)
+        expect(methodRuns).toBe(1)
+        expect(useGetter(ticker)).toBe(1)
+        expect(getterRuns).toBe(3)
+        
+        expect(dropPure([1, 2, 3], ticker)).toBe(42)
+        expect(getterRuns).toBe(3)
+        
+        
+    });
+});

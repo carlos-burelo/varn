@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // A class is laid out after its parent whatever their names: `Zebra` sorts
 // after `Horse`, which extends it, and `Horse` must still inherit Zebra's
 // fields at Zebra's slots instead of re-declaring them as its own.
@@ -43,10 +45,17 @@ class Alpha extends Mid {
 }
 
 const horse = new Horse("h")
-assert("subclass sorting before its parent keeps its own field", horse.name == "h")
-assert("subclass sorting before its parent inherits the parent's field", horse.stripes === 0)
-assert("subclass sorting before its parent inherits methods", horse.describe() == "stripes 0")
 const alpha = new Alpha()
-assert("three-level chain sorting child first", alpha.a + alpha.m + alpha.o === 6)
+await describe("137 class build order", async () => {
+        await it("group 1 part 1", async () => {
+        expect(horse.name == "h").toBeTruthy();
+        expect(horse.stripes).toBe(0);
+    });
 
-print("[PASSED] 137. Class build order")
+    await it("group 1 part 2", async () => {
+        expect(horse.describe() == "stripes 0").toBeTruthy();
+        expect(alpha.a + alpha.m + alpha.o).toBe(6);
+    });
+
+
+});

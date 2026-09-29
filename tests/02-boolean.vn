@@ -1,13 +1,20 @@
-assert("and short-circuit", (false && (1/0 === 0)) === false)
-assert("or short-circuit",  true  || (1/0 === 0) === true)
-assert("not not",           !!true === true)
-assert("not false",         !false === true)
-assert("not true",          !true === false)
-assert("not eq",            !(1 === 2) === true)
-assert("not neq",           !(1 === 1) === false)
-assert("triple eq str",     "abc" === "abc")
-assert("triple neq str",    "abc" !== "def")
-assert("triple eq null",    null === null)
-assert("triple neq null",   null !== 0)
+import { describe, it, expect } from "std:test";
 
-print("[PASSED] 2. Boolean edge cases")
+await describe("02 Boolean", async () => {
+    await it("short-circuit and negation", () => {
+        expect((false && (1 / 0 === 0)) === false).toBeTruthy();
+        expect(true || (1 / 0 === 0) === true).toBeTruthy();
+        expect(!!true).toBe(true);
+        expect(!false).toBe(true);
+        expect(!true).toBe(false);
+        expect(!(1 === 2)).toBe(true);
+        expect(!(1 === 1)).toBe(false);
+    });
+
+    await it("strict equality", () => {
+        expect("abc").toBe("abc");
+        expect("abc" !== "def").toBeTruthy();
+        expect(null).toBe(null);
+        expect(null !== 0).toBeTruthy();
+    });
+});

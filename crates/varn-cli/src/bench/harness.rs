@@ -124,7 +124,9 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
                                 &machine.ctx.heap,
                                 &machine.ctx.frames,
                             );
-                            if let Some(handler) = machine.ctx.try_handlers.pop() {
+                            if let Some(handler) =
+                                machine.ctx.try_handlers.pop_if(|h| h.frame_depth > 0)
+                            {
                                 let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
                                 let _ = varn_vm::exec::frame_ctrl::unwind_to_handler(
                                     &mut machine.ctx,
@@ -161,6 +163,13 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
     Ok(())
 }
 
+fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {
+    varn_vm::varn_jit::stats::take_records()
+        .into_iter()
+        .map(|r| (r.name, r.words))
+        .collect()
+}
+
 /// Run `f` once untimed to warm caches, then `runs` timed iterations.
 pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
     f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
@@ -181,14 +190,17 @@ pub fn time_n_freq_setup_progress<T, S, F, P>(
     setup: S,
     f: F,
     progress: P,
-) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError>
+) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>, u64), CliError>
 where
     S: Fn() -> T,
     F: Fn(&mut T) -> Result<(), String>,
     P: Fn(usize, &[Duration]),
 {
+    varn_vm::varn_jit::stats::start_recording();
     let mut warm = setup();
     f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    let warmed = compiled_keys();
+    varn_vm::varn_jit::stats::start_recording();
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;
@@ -200,7 +212,8 @@ where
         peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
         progress(i + 1, &samples);
     }
-    Ok((samples, peak))
+    let tiered = compiled_keys().difference(&warmed).count() as u64;
+    Ok((samples, peak, tiered))
 }
 
 /// [`time_n`], sampling CPU frequency right after each run and keeping the
@@ -222,13 +235,16 @@ pub fn time_n_freq_setup<T, S, F>(
     runs: usize,
     setup: S,
     f: F,
-) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError>
+) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>, u64), CliError>
 where
     S: Fn() -> T,
     F: Fn(&mut T) -> Result<(), String>,
 {
+    varn_vm::varn_jit::stats::start_recording();
     let mut warm = setup();
     f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    let warmed = compiled_keys();
+    varn_vm::varn_jit::stats::start_recording();
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;
@@ -239,5 +255,6 @@ where
         samples.push(start.elapsed());
         peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
     }
-    Ok((samples, peak))
+    let tiered = compiled_keys().difference(&warmed).count() as u64;
+    Ok((samples, peak, tiered))
 }

@@ -133,7 +133,7 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
         };
         terminal::log(format!(
             "  {} {}  {}",
-            chalk("e2e").cyan().bold(),
+            chalk("e2e (cold)").cyan().bold(),
             chalk(fmt_dur(e.p50)).cyan(),
             chalk(format!(
                 "(medición independiente · {delta} vs suma de fases)"

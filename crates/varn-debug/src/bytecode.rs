@@ -5,13 +5,7 @@ use varn_core::term::terminal::Section;
 use varn_core::OpCode;
 use varn_types::PoolEntry;
 
-const R: &str = "\x1b[0m";
-const DIM: &str = "\x1b[2m";
-const YELLOW: &str = "\x1b[33m";
-const BLUE: &str = "\x1b[34m";
-const MAGENTA: &str = "\x1b[35m";
-const CYAN: &str = "\x1b[36m";
-const GREEN: &str = "\x1b[32m";
+use varn_core::term::colors::{BLUE, CYAN, DIM, GREEN, MAGENTA, R, YELLOW};
 
 fn op_color(op: OpCode) -> &'static str {
     use OpCode::*;

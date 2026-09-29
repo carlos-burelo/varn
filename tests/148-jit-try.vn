@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // `try` in a compiled body: the normal path runs compiled, and a throw —
 // from `throw` or from the runtime — resumes the interpreter at the catch
 // with every value the catch reads in place. Each function runs past the
@@ -95,29 +97,36 @@ let pinned = 0
 let nested = 0
 let caller = 0
 const fail = new TyFail()
-for (let i = 0; i < 2000; i = i + 1) {
-    reads = reads + tyReads(i, "ab")
-    helper = helper + tyHelper(fail, i)
-    pinned = pinned + tyPinned(i)
-    nested = nested + tyNested(i)
-    caller = caller + tyCaller(i)
-}
 
 // Without a throw r = 3i; with one (i % 5 == 0) it is 3i + 1000 or 2000 by
 // parity, plus the label's length.
 let expReads = 0
-for (let i = 0; i < 2000; i = i + 1) {
-    expReads = expReads + 3 * i
-    if (i % 5 == 0) { expReads = expReads + (i % 2 == 0 ? 1000 : 2000) + 2 }
-}
-assert("the catch reads the values from before the try", reads === expReads)
 // i % 4 == 0 gives 0 + 1, otherwise i + 1.
-assert("a helper's error is caught", helper === (1999000 - 4 * 124750) + 2000)
 // 667 multiples of 3 below 2000 end at 1011, the rest at 111.
-assert("a variable written in the try", pinned === 667 * 1011 + 1333 * 111)
 // Odd: 1; even not multiple of 4: 10; multiple of 4: 110.
-assert("nested try regions", nested === 1000 * 1 + 500 * 10 + 500 * 110)
 // Even i gives i / 2, odd gives -1.
-assert("the caller catches a throw from a compiled callee", caller === 499500 - 1000)
+await describe("148 jit try", async () => {
+        await it("group 1 part 1", async () => {
+        for (let i = 0; i < 2000; i = i + 1) {
+        reads = reads + tyReads(i, "ab")
+        helper = helper + tyHelper(fail, i)
+        pinned = pinned + tyPinned(i)
+        nested = nested + tyNested(i)
+        caller = caller + tyCaller(i)
+        }
+        for (let i = 0; i < 2000; i = i + 1) {
+        expReads = expReads + 3 * i
+        if (i % 5 == 0) { expReads = expReads + (i % 2 == 0 ? 1000 : 2000) + 2 }
+        }
+        expect(reads).toBe(expReads);
+        expect(helper).toBe((1999000 - 4 * 124750) + 2000);
+        expect(pinned).toBe(667 * 1011 + 1333 * 111);
+    });
 
-print("[PASSED] 148. JIT try")
+    await it("group 1 part 2", async () => {
+        expect(nested).toBe(1000 * 1 + 500 * 10 + 500 * 110);
+        expect(caller).toBe(499500 - 1000);
+    });
+
+
+});

@@ -1,5 +1,7 @@
+import { describe, it, expect } from "std:test";
 import { File, exists as fsExists, remove as fsRemove } from "std:fs";
 import { Reader, Writer } from "std:io";
+
 
 function runTest(): void {
     let testFile = "./temp_implicit_ext.txt";
@@ -12,7 +14,7 @@ function runTest(): void {
     }
 
     // Verificar que el archivo existe por el namespace normal
-    assert("File exists", fsExists(testFile));
+    expect(fsExists(testFile)).toBeTruthy();
 
     // 2. Leer del archivo usando el método de extensión implícito .readAll()
     let content = "";
@@ -22,7 +24,7 @@ function runTest(): void {
         // ¡Se autopropaga y funciona sin imports manuales de extensiones!
         content = file.readAll();
     }
-    assert("Content matches", content === "Maestría de Greenfield en Varn!");
+    expect(content).toBe("Maestría de Greenfield en Varn!");
 
     // 3. Copiar archivo usando el método de extensión implícito .pipeTo()
     {
@@ -38,12 +40,17 @@ function runTest(): void {
         using file: Reader = File.open(backupFile, "r");
         backupContent = file.readAll();
     }
-    assert("Backup content matches", backupContent === "Maestría de Greenfield en Varn!");
+    expect(backupContent).toBe("Maestría de Greenfield en Varn!");
 
     // Limpieza
     fsRemove(testFile);
     fsRemove(backupFile);
 
 }
-
-runTest();
+await describe("44 implicit extensions test", async () => {
+    await it("tests", async () => {
+        
+        runTest();
+        
+    });
+});

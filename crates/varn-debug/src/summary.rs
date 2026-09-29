@@ -9,9 +9,7 @@ use varn_types::{FunctionProto, PoolEntry};
 
 use crate::render::truncate;
 
-const BOLD: &str = "\x1b[1m";
-const DIM: &str = "\x1b[2m";
-const R: &str = "\x1b[0m";
+use varn_core::term::colors::{BOLD, DIM, R};
 
 const TOP_N: usize = 10;
 

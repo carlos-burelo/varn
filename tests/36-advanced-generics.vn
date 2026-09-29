@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 
 interface Comparable<T> {
     compareTo(other: T): int
@@ -20,19 +23,6 @@ class SortedPair<T> {
         return [this.first, this.second]
     }
 }
-
-const p = new SortedPair<int>(1, 2)
-assert("pair first",       p.first === 1)
-assert("pair second",      p.second === 2)
-const ps = p.swap()
-assert("pair swap first",  ps.first === 2)
-assert("pair swap second", ps.second === 1)
-const pm = p.map((x) => x * 10)
-assert("pair map first",   pm.first === 10)
-assert("pair map second",  pm.second === 20)
-const pa = p.toArray()
-assert("pair toArray len", pa.length === 2)
-assert("pair toArray[0]",  pa[0] === 1)
 
 // ── Nested generics ──────────────────────────────────────────────
 class Either<L, R> {
@@ -61,20 +51,8 @@ class Either<L, R> {
 }
 
 const left = Either.left<str, int>("error")
-assert("either isLeft",      left.isLeft())
-assert("either not isRight", !left.isRight())
-assert("either getLeft",     left.getLeft() === "error")
-assert("either getRight null", left.getRight() === null)
 
 const right = Either.right<str, int>(42)
-assert("either isRight",     right.isRight())
-assert("either getRight",    right.getRight() === 42)
-
-const mapped = right.mapRight((n) => n * 2)
-assert("either mapRight",    mapped.getRight() === 84)
-
-const leftMapped = left.mapRight((n) => n * 2)
-assert("either mapRight left pass-through", leftMapped.isLeft())
 
 // ── Generic recursive type (linked list) ─────────────────────────
 class Cons<T> {
@@ -105,11 +83,7 @@ class Cons<T> {
 }
 
 const list = new Cons<int>(1, new Cons<int>(2, new Cons<int>(3, null)))
-assert("cons length",       list.length() === 3)
 const arr = list.toArray()
-assert("cons toArray[0]",   arr[0] === 1)
-assert("cons toArray[1]",   arr[1] === 2)
-assert("cons toArray[2]",   arr[2] === 3)
 
 // ── Generic HOF (higher-order functions) ─────────────────────────
 function pipe<A, B, C>(f: (A) => B, g: (B) => C): (A) => C {
@@ -119,15 +93,6 @@ function pipe<A, B, C>(f: (A) => B, g: (B) => C): (A) => C {
 function flip<A, B, C>(f: (A, B) => C): (B, A) => C {
     return (b: B, a: A) => f(a, b)
 }
-
-const toStr = (n: int) => `${n}`
-const addBang = (s: str) => s + "!"
-const numToExclaim = pipe(toStr, addBang)
-assert("pipe result",       numToExclaim(42) === "42!")
-
-const sub = (a: int, b: int) => a - b
-const flippedSub = flip(sub)
-assert("flip result",       flippedSub(3, 10) === 7)
 
 // ── Generic memoize ──────────────────────────────────────────────
 function memoize<T>(f: (a:int) => T): (int) => T {
@@ -143,17 +108,6 @@ function memoize<T>(f: (a:int) => T): (int) => T {
     }
 }
 
-let callCount = 0
-const expensiveFib = memoize((n) => {
-    callCount = callCount + 1
-    if (n <= 1) return n
-    return n
-})
-expensiveFib(5)
-expensiveFib(5)
-expensiveFib(5)
-assert("memoize called once", callCount === 1)
-
 // ── Generic counter factory ───────────────────────────────────────
 function makeAccumulator<T>(init: T, combine: (T, T) => T): (v: T) => T {
     let state = init
@@ -162,17 +116,69 @@ function makeAccumulator<T>(init: T, combine: (T, T) => T): (v: T) => T {
         return state
     }
 }
-
-const sumAcc = makeAccumulator<int>(0, (a, b) => a + b)
-sumAcc(5)
-sumAcc(3)
-const total = sumAcc(2)
-assert("accumulator sum",    total === 10)
-
-const strAcc = makeAccumulator<str>("", (a, b) => a + b)
-strAcc("foo")
-strAcc("bar")
-const built = strAcc("!")
-assert("accumulator str",    built === "foobar!")
-
-print("[PASSED] 36. Advanced generics")
+await describe("36 advanced generics", async () => {
+    await it("tests", async () => {
+        
+        const p = new SortedPair<int>(1, 2)
+        expect(p.first).toBe(1)
+        expect(p.second).toBe(2)
+        const ps = p.swap()
+        expect(ps.first).toBe(2)
+        expect(ps.second).toBe(1)
+        const pm = p.map((x) => x * 10)
+        expect(pm.first).toBe(10)
+        expect(pm.second).toBe(20)
+        const pa = p.toArray()
+        expect(pa.length).toBe(2)
+        expect(pa[0]).toBe(1)
+        expect(left.isLeft()).toBeTruthy()
+        expect(!left.isRight()).toBeTruthy()
+        expect(left.getLeft()).toBe("error")
+        expect(left.getRight()).toBe(null)
+        expect(right.isRight()).toBeTruthy()
+        expect(right.getRight()).toBe(42)
+        
+        const mapped = right.mapRight((n) => n * 2)
+        expect(mapped.getRight()).toBe(84)
+        
+        const leftMapped = left.mapRight((n) => n * 2)
+        expect(leftMapped.isLeft()).toBeTruthy()
+        expect(list.length()).toBe(3)
+        expect(arr[0]).toBe(1)
+        expect(arr[1]).toBe(2)
+        expect(arr[2]).toBe(3)
+        
+        const toStr = (n: int) => `${n}`
+        const addBang = (s: str) => s + "!"
+        const numToExclaim = pipe(toStr, addBang)
+        expect(numToExclaim(42)).toBe("42!")
+        
+        const sub = (a: int, b: int) => a - b
+        const flippedSub = flip(sub)
+        expect(flippedSub(3, 10)).toBe(7)
+        
+        let callCount = 0
+        const expensiveFib = memoize((n) => {
+            callCount = callCount + 1
+            if (n <= 1) return n
+            return n
+        })
+        expensiveFib(5)
+        expensiveFib(5)
+        expensiveFib(5)
+        expect(callCount).toBe(1)
+        
+        const sumAcc = makeAccumulator<int>(0, (a, b) => a + b)
+        sumAcc(5)
+        sumAcc(3)
+        const total = sumAcc(2)
+        expect(total).toBe(10)
+        
+        const strAcc = makeAccumulator<str>("", (a, b) => a + b)
+        strAcc("foo")
+        strAcc("bar")
+        const built = strAcc("!")
+        expect(built).toBe("foobar!")
+        
+    });
+});

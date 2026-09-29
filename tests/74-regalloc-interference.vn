@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // Register coalescing must never alias two registers whose live ranges
 // overlap. The post-pass colourer used to fall back to the first callee
 // register when it ran out of legal colours, folding a value onto one that was
@@ -28,23 +31,23 @@ function readId(v: HasId): int {
 
 function twoFields() {
     const o = { id: 7, extra: "z" }
-    assert("inlined member + intrinsic, 2 fields", readId(o).toString() === "7")
+    expect(readId(o).toString()).toBe("7")
 }
 
 function threeFields() {
     const o = { id: 41, extra: "z", other: true }
-    assert("inlined member + intrinsic, 3 fields", readId(o).toString() === "41")
+    expect(readId(o).toString()).toBe("41")
 }
 
 function literalAtCallSite() {
-    assert("object literal at the call site", readId({ id: 5, extra: "q" }).toString() === "5")
+    expect(readId({ id: 5, extra: "q" }).toString()).toBe("5")
 }
 
 function receiverOutlivesTheCall() {
     const o = { id: 9, extra: "keep" }
     const text = readId(o).toString()
-    assert("receiver survives the call", o.id === 9)
-    assert("result survives the call", text === "9")
+    expect(o.id).toBe(9)
+    expect(text).toBe("9")
 }
 
 function addIds(a: HasId, b: HasId): int {
@@ -54,25 +57,30 @@ function addIds(a: HasId, b: HasId): int {
 function twoObjectsOneCall() {
     const left = { id: 3, extra: "l" }
     const right = { id: 4, extra: "r" }
-    assert("two multi-field objects across one call", addIds(left, right).toString() === "7")
+    expect(addIds(left, right).toString()).toBe("7")
 }
 
 function throughAnArray() {
     const ids = [{ id: 1, extra: "a" }, { id: 2, extra: "b" }]
-    assert("array of multi-field objects", readId(ids[1]).toString() === "2")
+    expect(readId(ids[1]).toString()).toBe("2")
 }
 
 function throughATuple() {
     const left = { id: 3, extra: "l" }
     const right = { id: 4, extra: "r" }
     const pair = #[readId(left), readId(right)]
-    assert("tuple of inlined results", pair[0] === 3 && pair[1] === 4)
+    expect(pair[0] === 3 && pair[1] === 4).toBeTruthy()
 }
-
-twoFields()
-threeFields()
-literalAtCallSite()
-receiverOutlivesTheCall()
-twoObjectsOneCall()
-throughAnArray()
-throughATuple()
+await describe("74 regalloc interference", async () => {
+    await it("tests", async () => {
+        
+        twoFields()
+        threeFields()
+        literalAtCallSite()
+        receiverOutlivesTheCall()
+        twoObjectsOneCall()
+        throughAnArray()
+        throughATuple()
+        
+    });
+});

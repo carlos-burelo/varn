@@ -37,23 +37,23 @@
 35 | 22:24 | int
 36 | 22:27 | int
 37 | 22:14 | int[]
-38 | 23:1 | (label: str, cond: bool) => void
-39 | 23:8 | str
-40 | 23:20 | (nums: int[]) => int
-41 | 23:24 | int[]
-42 | 23:20 | int
-43 | 23:34 | int
-44 | 23:20 | bool
-45 | 23:1 | void
-46 | 24:1 | (label: str, cond: bool) => void
-47 | 24:8 | str
-48 | 24:27 | (arr: int[], threshold: int) => int
-49 | 24:38 | int[]
-50 | 24:44 | int
-51 | 24:27 | int
-52 | 24:51 | int
-53 | 24:27 | bool
-54 | 24:1 | void
+38 | 23:5 | (nums: int[]) => int
+39 | 23:9 | int[]
+40 | 23:5 | int
+41 | 23:19 | int
+42 | 23:5 | bool
+43 | 23:33 | Error
+44 | 23:39 | str
+45 | 23:29 | Error
+46 | 24:5 | (arr: int[], threshold: int) => int
+47 | 24:16 | int[]
+48 | 24:22 | int
+49 | 24:5 | int
+50 | 24:29 | int
+51 | 24:5 | bool
+52 | 24:42 | Error
+53 | 24:48 | str
+54 | 24:38 | Error
 55 | 25:1 | (...args: dynamic[]) => void
 56 | 25:7 | str
 57 | 25:1 | void

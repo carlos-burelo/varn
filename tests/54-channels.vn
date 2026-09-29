@@ -1,11 +1,13 @@
+import { describe, it, expect } from "std:test";
 import { channel, ChannelClosed, spawnIsolate, Sender, Receiver } from "std:task";
+
 
 async function testBasics(): void {
     const ch = channel<int>(2)
     await ch.tx.send(1)
     await ch.tx.send(2)
-    assert("ch recv 1", await ch.rx.receive() === 1)
-    assert("ch recv 2", await ch.rx.receive() === 2)
+    expect(await ch.rx.receive()).toBe(1)
+    expect(await ch.rx.receive()).toBe(2)
 }
 
 async function testTypedClose(): void {
@@ -23,8 +25,8 @@ async function testTypedClose(): void {
     } catch (e) {
         sendClosed = e instanceof ChannelClosed
     }
-    assert("recv closed typed", typed)
-    assert("send closed typed", sendClosed)
+    expect(typed).toBeTruthy()
+    expect(sendClosed).toBeTruthy()
 }
 
 async function testForAwait(): void {
@@ -36,7 +38,7 @@ async function testForAwait(): void {
     for await (const v of ch.rx) {
         sum = sum + v
     }
-    assert("for-await drains then ends", sum === 30)
+    expect(sum).toBe(30)
 }
 
 async function testUsingDispose(): void {
@@ -46,10 +48,10 @@ async function testUsingDispose(): void {
         await tx.send(5)
     }
     // dispose cerró el canal: drena y termina
-    assert("drained after dispose", await ch.rx.receive() === 5)
+    expect(await ch.rx.receive()).toBe(5)
     let closed = false
     try { await ch.rx.receive() } catch (e) { closed = e instanceof ChannelClosed }
-    assert("closed after dispose", closed)
+    expect(closed).toBeTruthy()
 }
 
 // Runs in the child isolate: doubles each received value and echoes it back
@@ -68,12 +70,12 @@ async function testCrossIsolate(): void {
     const b = channel<int>(4)
     const handle = await spawnIsolate(echoWorker, [a.rx, b.tx])
     await a.tx.send(21)
-    assert("cross-isolate echo", await b.rx.receive() === 42)
+    expect(await b.rx.receive()).toBe(42)
     a.tx.close()
     await handle.join()
     let done = false
     try { await b.rx.receive() } catch (e) { done = e instanceof ChannelClosed }
-    assert("worker closed reply channel", done)
+    expect(done).toBeTruthy()
 }
 
 async function main(): void {
@@ -82,14 +84,18 @@ async function main(): void {
     await testForAwait()
     await testUsingDispose()
     await testCrossIsolate()
-    print("[PASSED] 54. Typed channels")
 }
-
-// Deviation from the brief's bare `main()`: async calls are lazy tasks in
-// Varn — an unawaited call never executes (probe-verified). Top-level await
-// matches the established pattern in tests/47-isolates-multithread.vn.
-// Guarded on `isIsolate`: the child worker re-loads this module to reach
-// `echoWorker`, and must NOT re-run the suite (which would spawn again).
-if (!isIsolate) {
-    await main()
-}
+await describe("54 channels", async () => {
+    await it("tests", async () => {
+        
+        // Deviation from the brief's bare `main()`: async calls are lazy tasks in
+        // Varn — an unawaited call never executes (probe-verified). Top-level await
+        // matches the established pattern in tests/47-isolates-multithread.vn.
+        // Guarded on `isIsolate`: the child worker re-loads this module to reach
+        // `echoWorker`, and must NOT re-run the suite (which would spawn again).
+        if (!isIsolate) {
+            await main()
+        }
+        
+    });
+});

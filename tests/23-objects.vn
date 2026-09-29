@@ -1,59 +1,61 @@
+import { describe, it, expect } from "std:test";
 
 class Builder {
     private parts: str[]
-    constructor() { this.parts = [] }
+    constructor() { this.parts = []; }
     add(s: str): Builder {
-        this.parts.push(s)
-        return this
+        this.parts.push(s);
+        return this;
     }
-    build(): str { return this.parts.join(" ") }
+    build(): str { return this.parts.join(" "); }
 }
-
-const result = new Builder().add("hello").add("from").add("builder").build()
-assert("builder pattern", result === "hello from builder")
-
 class Node<T> {
     value: T
     next: Node<T> | null
     constructor(v: T) {
-        this.value = v
-        this.next = null
+        this.value = v;
+        this.next = null;
     }
 }
-
 class LinkedList<T> {
     private head: Node<T> | null
     private _size: int
-    
     constructor() {
-        this.head = null
-        this._size = 0
+        this.head = null;
+        this._size = 0;
     }
     prepend(v: T): void {
-        const node = new Node<T>(v)
-        node.next = this.head
-        this.head = node
-        this._size = this._size + 1
+        const node = new Node<T>(v);
+        node.next = this.head;
+        this.head = node;
+        this._size = this._size + 1;
     }
-    get size(): int { return this._size }
+    get size(): int { return this._size; }
     toArray(): T[] {
-        const arr: T[] = []
-        let cur = this.head
+        const arr: T[] = [];
+        let cur = this.head;
         while (cur !== null) {
-            arr.push(cur.value)
-            cur = cur.next
+            arr.push(cur.value);
+            cur = cur.next;
         }
-        return arr
+        return arr;
     }
 }
 
-const list = new LinkedList<int>();
-list.prepend(3);
-list.prepend(2);
-list.prepend(1);
-assert("linked list size",  list.size === 3)
-const la = list.toArray()
-assert("linked list [0]",   la[0] === 1)
-assert("linked list [2]",   la[2] === 3)
+await describe("23 Objects", async () => {
+    await it("builder pattern", () => {
+        const result = new Builder().add("hello").add("from").add("builder").build();
+        expect(result).toBe("hello from builder");
+    });
 
-print("[PASSED] 23. Complex objects ")
+    await it("linked list", () => {
+        const list = new LinkedList<int>();
+        list.prepend(3);
+        list.prepend(2);
+        list.prepend(1);
+        expect(list.size).toBe(3);
+        const la = list.toArray();
+        expect(la[0]).toBe(1);
+        expect(la[2]).toBe(3);
+    });
+});

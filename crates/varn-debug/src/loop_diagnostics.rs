@@ -9,11 +9,7 @@ use varn_core::term::terminal;
 use varn_core::OpCode;
 use varn_jit::CacheSource;
 
-const DIM: &str = "\x1b[2m";
-const R: &str = "\x1b[0m";
-const GREEN: &str = "\x1b[32m";
-const RED: &str = "\x1b[31m";
-const YELLOW: &str = "\x1b[33m";
+use varn_core::term::colors::{DIM, GREEN, R, RED, YELLOW};
 
 /// The compiler emits the indexed global opcodes directly, so
 /// `is_alloc_free_op` already covers them. A name-keyed `LoadGlobal` /

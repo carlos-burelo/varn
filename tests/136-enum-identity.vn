@@ -1,8 +1,10 @@
+import { Shade as ShadeA } from "./helpers/shade-a.vn";
+import { Shade as ShadeB } from "./helpers/shade-b.vn";
+import { describe, it, expect } from "std:test";
+
 // An enum value belongs to the enum that declared it, not to its name: two
 // modules declaring `Shade`, and a local `Result`, never trade methods or
 // compare equal.
-import { Shade as ShadeA } from "./helpers/shade-a.vn";
-import { Shade as ShadeB } from "./helpers/shade-b.vn";
 
 enum Result<T, E> {
     Good(value: T),
@@ -11,29 +13,38 @@ enum Result<T, E> {
 
 const a = ShadeA.Light;
 const b = ShadeB.Light;
-assert("enum methods come from the declaring enum (a)", a.label() == "a");
-assert("enum methods come from the declaring enum (b)", b.label() == "b");
-assert("same-named enums from different modules differ", (a as dynamic) != (b as dynamic));
-assert("same enum and variant are equal", a == ShadeA.Light);
 
 // A local enum sharing the name, variants in the other order: a match on
 // the imported value must use the imported enum's tags.
 enum Shade { Dark, Light }
-const which = match (a) {
-    Light => "light",
-    Dark => "dark"
-};
-assert("an imported enum matches with its own tags", which == "light");
-assert("the local enum keeps its own tags", match (Shade.Light) { Dark => 0, Light => 1 } == 1);
 
-const local = Result.Good(1);
-const matched = match (local) {
-    Good(v) => v,
-    Bad(_) => 0
-};
-assert("a local Result shadows the core one", matched == 1);
+await describe("136 enum identity", async () => {
+        await it("group 1 part 1", async () => {
+        expect(a.label() == "a").toBeTruthy();
+        expect(b.label() == "b").toBeTruthy();
+        expect((a as dynamic) != (b as dynamic)).toBeTruthy();
+        expect(a == ShadeA.Light).toBeTruthy();
+    });
 
-const core: Option<int> = Some(2);
-assert("the core Option keeps its methods beside a local Result", core.unwrapOr(0) == 2);
+    await it("enum tag matching", async () => {
+        const which = match (a) {
+            Light => "light",
+            Dark => "dark"
+        };
+        expect(which).toBe("light");
+        expect(match (Shade.Light) { Dark => 0, Light => 1 }).toBe(1);
+    });
 
-print("[PASSED] 136. Enum identity");
+    await it("local result and option", async () => {
+        const local = Result.Good(1);
+        const matched = match (local) {
+            Good(v) => v,
+            Bad(_) => 0
+        };
+        const core: Option<int> = Some(2);
+        expect(matched).toBe(1);
+        expect(core.unwrapOr(0)).toBe(2);
+    });
+
+
+});

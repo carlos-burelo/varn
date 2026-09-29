@@ -1,6 +1,6 @@
 
 === TIR CHECK: <fixtures>/loop_array.vn ===
-nodes 73   static 35   by name 2   static 95%
-  unannotated        dynamic     5   by name     2
+nodes 73   static 33   by name 4   static 89%
+  unannotated        dynamic     7   by name     4
   from_tir(ssa): OK (3 ssa fn(s))
   from_tir(proto): OK

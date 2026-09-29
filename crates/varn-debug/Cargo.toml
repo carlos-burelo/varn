@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+console       = { workspace = true }
 varn-core     = { path = "../varn-core" }
 varn-checker  = { path = "../varn-checker" }
 varn-tir      = { path = "../varn-tir" }

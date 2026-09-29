@@ -1,101 +1,88 @@
-import { MetaKey, MethodContext, ClassRef } from "std:reflect"
+import { describe, it, expect } from "std:test";
+import { MetaKey, MethodContext, ClassRef } from "std:reflect";
 
-
-let deco_log: str[] = []
+let deco_log: str[] = [];
 function trackClass(cls: ClassRef): void {
-    deco_log.push(cls.name)
+    deco_log.push(cls.name);
 }
-
 @trackClass
 class DecoratedA {}
-
-assert("class deco called",      deco_log.length === 1)
-assert("class deco name",        deco_log[0] === "DecoratedA")
-
 function markDeco(label: str) {
     return (cls: ClassRef) => {
-        deco_log.push(label + ":" + cls.name)
-    }
+        deco_log.push(label + ":" + cls.name);
+    };
 }
-
 @markDeco("outer")
 @markDeco("inner")
 class DecoratedB {}
-
-assert("stacked deco inner first",  deco_log[1] === "inner:DecoratedB")
-assert("stacked deco outer second", deco_log[2] === "outer:DecoratedB")
-
 function addVersion(cls: ClassRef): ClassRef {
-    deco_log.push("versioned:" + cls.name)
-    return cls
+    deco_log.push("versioned:" + cls.name);
+    return cls;
 }
-
 @addVersion
 class DecoratedC { value: int = 7 }
-
-assert("replacement deco called",  deco_log[3] === "versioned:DecoratedC")
-assert("replacement class intact", (new DecoratedC()).value === 7)
-
-const RouteKey = MetaKey.create<str>()
-const RolesKey = MetaKey.create<str[]>()
-
+const RouteKey = MetaKey.create<str>();
+const RolesKey = MetaKey.create<str[]>();
 function routeDeco(path: str) {
-    return (cls: ClassRef) => { RouteKey.set(cls, path) }
+    return (cls: ClassRef) => { RouteKey.set(cls, path); };
 }
 function rolesDeco(...r: str[]) {
-    return (cls: ClassRef) => { RolesKey.set(cls, r) }
+    return (cls: ClassRef) => { RolesKey.set(cls, r); };
 }
-
-@routeDeco("/api/items")
-@rolesDeco("admin", "user")
-class ItemController {}
-
-const decoPerms: str[] = RolesKey.get(ItemController) ?? []
-assert("meta route",         RouteKey.get(ItemController) === "/api/items")
-assert("meta roles count",   decoPerms.length === 2)
-assert("meta roles[0]",      decoPerms[0] === "admin")
-assert("meta no cross-talk", RouteKey.get(DecoratedA) === null)
-
-const TagKey  = MetaKey.create<str>()
-const TagKey2 = MetaKey.create<str>()
-
-TagKey.set(DecoratedA, "tag-a")
-TagKey2.set(DecoratedA, "tag-b")
-
-assert("meta two keys no collide", TagKey.get(DecoratedA) === "tag-a")
-assert("meta second key",          TagKey2.get(DecoratedA) === "tag-b")
-
-let method_log: str[] = []
+const TagKey = MetaKey.create<str>();
+const TagKey2 = MetaKey.create<str>();
+let method_log: str[] = [];
 function logMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
-    const name = ctx.name
-    const isStatic = ctx.isStatic
+    const name = ctx.name;
+    const isStatic = ctx.isStatic;
     return (...args: int[]) => {
-        method_log.push(name + ":static=" + isStatic)
-        return fn(...args)
-    }
+        method_log.push(name + ":static=" + isStatic);
+        return fn(...args);
+    };
 }
-
 class DecoratedCalc {
     @logMethod
-    mul(a: int, b: int): int { return a * b }
+    mul(a: int, b: int): int { return a * b; }
 }
-
-const decoCalc = new DecoratedCalc()
-assert("method deco result",  decoCalc.mul(3, 5) === 15)
-assert("method deco called",  method_log.length === 1)
-assert("method deco name",    method_log[0] === "mul:static=false")
-
-decoCalc.mul(2, 2)
-decoCalc.mul(4, 4)
-assert("method deco multi-call", method_log.length === 3)
-
 function passthrough(fn: FunctionRef, ctx: MethodContext): void {}
-
 class DecoratedPassthrough {
     @passthrough
-    double(n: int): int { return n * 2 }
+    double(n: int): int { return n * 2; }
 }
 
-assert("passthrough deco",  (new DecoratedPassthrough()).double(6) === 12)
+await describe("27 Decorators", async () => {
+    await it("class decorators", () => {
+        expect(deco_log.length).toBe(4);
+        expect(deco_log[0]).toBe("DecoratedA");
+        expect(deco_log[1]).toBe("inner:DecoratedB");
+        expect(deco_log[2]).toBe("outer:DecoratedB");
+        expect(deco_log[3]).toBe("versioned:DecoratedC");
+        expect((new DecoratedC()).value).toBe(7);
+    });
 
-print("[PASSED] 27. Decorators ")
+    await it("metadata keys", () => {
+        @routeDeco("/api/items")
+        @rolesDeco("admin", "user")
+        class ItemController {}
+        const decoPerms: str[] = RolesKey.get(ItemController) ?? [];
+        expect(RouteKey.get(ItemController)).toBe("/api/items");
+        expect(decoPerms.length).toBe(2);
+        expect(decoPerms[0]).toBe("admin");
+        expect(RouteKey.get(DecoratedA)).toBe(null);
+        TagKey.set(DecoratedA, "tag-a");
+        TagKey2.set(DecoratedA, "tag-b");
+        expect(TagKey.get(DecoratedA)).toBe("tag-a");
+        expect(TagKey2.get(DecoratedA)).toBe("tag-b");
+    });
+
+    await it("method decorators", () => {
+        const decoCalc = new DecoratedCalc();
+        expect(decoCalc.mul(3, 5)).toBe(15);
+        expect(method_log.length).toBe(1);
+        expect(method_log[0]).toBe("mul:static=false");
+        decoCalc.mul(2, 2);
+        decoCalc.mul(4, 4);
+        expect(method_log.length).toBe(3);
+        expect((new DecoratedPassthrough()).double(6)).toBe(12);
+    });
+});

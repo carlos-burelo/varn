@@ -1,32 +1,40 @@
+import { describe, it, expect } from "std:test";
 
 function makeAdder(n: int): (a: int) => int {
-    return (x: int) => x + n
+    return (x: int) => x + n;
 }
-const add5 = makeAdder(5)
-const add10 = makeAdder(10)
-assert("closure add5",   add5(3) === 8)
-assert("closure add10",  add10(3) === 13)
-assert("closure independent", add5(0) !== add10(0))
-
 function makeCounter(): () => int {
-    let c = 0
+    let c = 0;
     return () => {
-        c = c + 1
-        return c
-    }
+        c = c + 1;
+        return c;
+    };
 }
-const cnt1 = makeCounter()
-const cnt2 = makeCounter()
-assert("counter1 first",  cnt1() === 1)
-assert("counter1 second", cnt1() === 2)
-assert("counter2 fresh",  cnt2() === 1)
-
-function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
-    return (x: A) => f(g(x))
+function compose<A, B, C>(f: (a: B) => C, g: (b: A) => B): (c: A) => C {
+    return (x: A) => f(g(x));
 }
-const double = (n: int) => n * 2
-const inc    = (n: int) => n + 1
-const doubleInc = compose(double, inc)
-assert("compose", doubleInc(4) === 10)
 
-print("[PASSED] 7. Closures ")
+await describe("07 Closures", async () => {
+    await it("adder factory", () => {
+        const add5 = makeAdder(5);
+        const add10 = makeAdder(10);
+        expect(add5(3)).toBe(8);
+        expect(add10(3)).toBe(13);
+        expect(add5(0) !== add10(0)).toBeTruthy();
+    });
+
+    await it("counter state", () => {
+        const cnt1 = makeCounter();
+        const cnt2 = makeCounter();
+        expect(cnt1()).toBe(1);
+        expect(cnt1()).toBe(2);
+        expect(cnt2()).toBe(1);
+    });
+
+    await it("composition", () => {
+        const double = (n: int) => n * 2;
+        const inc = (n: int) => n + 1;
+        const doubleInc = compose(double, inc);
+        expect(doubleInc(4)).toBe(10);
+    });
+});

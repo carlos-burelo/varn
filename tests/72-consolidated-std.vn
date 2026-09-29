@@ -2,10 +2,10 @@ import { DateTime, formatDurationMs } from "std:time";
 import { parseDotEnv } from "std:sys";
 import { parseArgs } from "std:cli";
 import { uuidV4, isValidUuid } from "std:crypto";
-import { describe, test, expect } from "std:test";
+import { describe, it, expect } from "std:test";
 
-describe("Consolidated StdLib Enrichments", () => {
-    test("std:time DateTime and formatDurationMs", () => {
+await describe("Consolidated StdLib Enrichments", () => {
+    await it("std:time DateTime and formatDurationMs", () => {
         const dt = DateTime.now();
         expect(dt.toMs > 0).toBeTruthy();
         expect(dt.toISOString().length > 10).toBeTruthy();
@@ -17,7 +17,7 @@ describe("Consolidated StdLib Enrichments", () => {
         expect(formatDurationMs(125000)).toBe("2m 5s");
     });
 
-    test("std:sys parseDotEnv and parseArgs", () => {
+    await it("std:sys parseDotEnv and parseArgs", () => {
         const dotenv = parseDotEnv("PORT=8080\nDB_HOST='localhost'\n# comment");
         expect(dotenv["PORT"]).toBe("8080");
         expect(dotenv["DB_HOST"]).toBe("localhost");
@@ -29,11 +29,9 @@ describe("Consolidated StdLib Enrichments", () => {
         expect(parsed.positionals[0]).toBe("server.vn");
     });
 
-    test("std:crypto uuidV4 and isValidUuid", () => {
+    await it("std:crypto uuidV4 and isValidUuid", () => {
         const id = uuidV4();
         expect(isValidUuid(id)).toBeTruthy();
         expect(id.length).toBe(36);
     });
 });
-
-print("[PASSED] 72. Consolidated StdLib Enrichments (std:time, std:sys, std:crypto, std:testing)");

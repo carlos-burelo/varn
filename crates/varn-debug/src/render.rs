@@ -8,15 +8,18 @@
 pub use varn_core::term::colors::*;
 pub use varn_core::term::terminal::Section;
 
-/// Truncate `s` to at most `width` characters, appending `…` when it does not
-/// fit. Canonical definition: the three copies in `summary`/`tiers`/`typeloss`
-/// were byte-identical.
+/// Truncate `s` to at most `width` terminal columns, appending `…` when it
+/// does not fit. Va por `console::truncate_str`: entiende ANSI y cuenta
+/// ancho visible (CJK/emoji = 2), así que alinear tablas con contenido no
+/// ASCII ya no las descoloca. Semántica histórica preservada para ASCII.
 pub fn truncate(s: &str, width: usize) -> String {
-    if s.chars().count() <= width {
+    if width == 0 {
+        return "…".to_owned();
+    }
+    if console::measure_text_width(s) <= width {
         return s.to_owned();
     }
-    let head: String = s.chars().take(width.saturating_sub(1)).collect();
-    format!("{head}…")
+    console::truncate_str(s, width, "…").into_owned()
 }
 
 /// Final path component (handles both `/` and `\`), for `Text` headers.

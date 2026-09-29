@@ -1,27 +1,29 @@
+import { describe, it, expect } from "std:test";
 import { fetch, HttpServer, server, Request, Response, Headers, json, redirect, error } from "std:http";
 import { isIP, isIPv4, isIPv6, encodeURIComponent, decodeURIComponent } from "std:net";
+
 
 async function runHttpVerification() {
     // 1. Test Client: Fetch GET
     let getTask = fetch("http://%/");
     let getRes = await getTask;
-    assert("Http client fetch GET status", getRes.status === 200);
-    assert("Http client fetch GET body", getRes.text().length > 0);
+    expect(getRes.status).toBe(200);
+    expect(getRes.text().length > 0).toBeTruthy();
 
     // 2. Test Client: Fetch POST with body & headers
     let postTask = fetch("http://%/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
     let postRes = await postTask;
-    assert("Http client fetch POST status", postRes.status === 200);
-    assert("Http client fetch POST body", postRes.text().length > 0);
+    expect(postRes.status).toBe(200);
+    expect(postRes.text().length > 0).toBeTruthy();
 
     // 3. Web Standard Headers
     let hdrs = new Headers({ "Content-Type": "application/json", "X-Varn-Engine": "v1" });
-    assert("Headers get case-insensitive", hdrs.get("content-type") === "application/json");
-    assert("Headers has", hdrs.has("x-varn-engine") === true);
+    expect(hdrs.get("content-type")).toBe("application/json");
+    expect(hdrs.has("x-varn-engine")).toBe(true);
     hdrs.set("Authorization", "Bearer token123");
-    assert("Headers get custom", hdrs.get("authorization") === "Bearer token123");
+    expect(hdrs.get("authorization")).toBe("Bearer token123");
     hdrs.delete("x-varn-engine");
-    assert("Headers deleted", hdrs.has("x-varn-engine") === false);
+    expect(hdrs.has("x-varn-engine")).toBe(false);
 
     // 4. Web Standard Request & Response
     let req = new Request("http://localhost:8080/api/users", {
@@ -29,26 +31,26 @@ async function runHttpVerification() {
         headers: { "Accept": "application/json" },
         body: '{"name":"Varn"}'
     });
-    assert("Request method", req.method === "POST");
-    assert("Request url", req.url === "http://localhost:8080/api/users");
-    assert("Request body text", req.text() === '{"name":"Varn"}');
+    expect(req.method).toBe("POST");
+    expect(req.url).toBe("http://localhost:8080/api/users");
+    expect(req.text()).toBe('{"name":"Varn"}');
 
     let resp = json({ success: true, count: 42 });
-    assert("Response json status", resp.status === 200);
-    assert("Response json ok", resp.ok === true);
-    assert("Response json body", resp.text().indexOf('"success":true') >= 0);
+    expect(resp.status).toBe(200);
+    expect(resp.ok).toBe(true);
+    expect(resp.text().indexOf('"success":true') >= 0).toBeTruthy();
 
     let redir = redirect("https://varn.dev", 301);
-    assert("Redirect status", redir.status === 301);
-    assert("Redirect header", redir.headers.get("location") === "https://varn.dev");
+    expect(redir.status).toBe(301);
+    expect(redir.headers.get("location")).toBe("https://varn.dev");
 
     let errResp = error(404, "Not Found");
-    assert("Error status", errResp.status === 404);
-    assert("Error ok is false", errResp.ok === false);
+    expect(errResp.status).toBe(404);
+    expect(errResp.ok).toBe(false);
 
     // 5. Test Server registration & routing configuration
     let app = server();
-    assert("Http server created successfully", app !== null);
+    expect(app !== null).toBeTruthy();
 
     app.get("/api/v1/users", (req: Request) => {
         return json({ users: ["alice", "bob"] });
@@ -61,16 +63,20 @@ async function runHttpVerification() {
     });
 
     // 6. Net helpers from std:net
-    assert("isIPv4 valid", isIPv4("127.0.0.1") === true);
-    assert("isIPv4 invalid", isIPv4("999.999.999.999") === false);
-    assert("isIPv6 valid", isIPv6("::1") === true);
-    assert("isIP valid", isIP("192.168.1.1") === true);
-    assert("encodeURIComponent", encodeURIComponent("hello world&foo=bar") === "hello%20world%26foo%3Dbar");
-    assert("decodeURIComponent", decodeURIComponent("hello%20world%26foo%3Dbar") === "hello world&foo=bar");
+    expect(isIPv4("127.0.0.1")).toBe(true);
+    expect(isIPv4("999.999.999.999")).toBe(false);
+    expect(isIPv6("::1")).toBe(true);
+    expect(isIP("192.168.1.1")).toBe(true);
+    expect(encodeURIComponent("hello world&foo=bar")).toBe("hello%20world%26foo%3Dbar");
+    expect(decodeURIComponent("hello%20world%26foo%3Dbar")).toBe("hello world&foo=bar");
 
-    print("[PASSED] 43. Varn Native HTTP Client and Server Config Verification");
 }
-
-if (!isIsolate) {
-    await runHttpVerification();
-}
+await describe("43 server client http", async () => {
+    await it("tests", async () => {
+        
+        if (!isIsolate) {
+            await runHttpVerification();
+        }
+        
+    });
+});

@@ -1,61 +1,6 @@
-// Tests for Phase 1 of varn-opt unsupported features parity
-// 1. Compound assignment operators (**=, >>>=)
-let x = 2;
-x **= 3;
-assert("compound **=", x === 8);
+import { describe, it, expect } from "std:test";
 
-let y = 16;
-y >>>= 2;
-assert("compound >>>=", y === 4);
 
-// 2. Logical compound assignments (&&=, ||=, ??=) on variables
-let a = true;
-a &&= false;
-assert("variable &&=", a === false);
-
-let b = false;
-b ||= true;
-assert("variable ||=", b === true);
-
-let c: dynamic = null;
-c ??= 42;
-assert("variable ??=", c === 42);
-
-// 3. Compound member and index assignments
-let obj = { prop: 10, arr: [20] };
-obj.prop += 5;
-assert("member compound +=", obj.prop === 15);
-
-obj.arr[0] *= 2;
-assert("index compound *=", obj.arr[0] === 40);
-
-// 4. Logical compound assignments on members and index targets
-let obj2 = { a: true, b: false, c: null as dynamic, arr: [true, false, null as dynamic] };
-obj2.a &&= false;
-assert("member &&=", obj2.a === false);
-
-obj2.b ||= true;
-assert("member ||=", obj2.b === true);
-
-obj2.c ??= 42;
-assert("member ??=", obj2.c === 42);
-
-obj2.arr[0] &&= false;
-assert("index &&=", obj2.arr[0] === false);
-
-obj2.arr[1] ||= true;
-assert("index ||=", obj2.arr[1] === true);
-
-obj2.arr[2] ??= true;
-assert("index ??=", obj2.arr[2] === true);
-
-// 5. Module-slot reads and assignments
-let topLevelVar = 100;
-topLevelVar = 200;
-assert("module slot assignment", topLevelVar === 200);
-
-topLevelVar += 50;
-assert("module slot compound assignment", topLevelVar === 250);
 
 // 6. Super property reads, method calls, and assignments
 class Parent {
@@ -69,13 +14,75 @@ class Parent {
 class Child extends Parent {
     constructor() { super(); }
     testSuper(): void {
-        assert("super method call", super.speak() === "hello");
+        expect(super.speak()).toBe("hello");
         super.setVal(30);
-        assert("super write via method", super.getVal() === 30);
+        expect(super.getVal()).toBe(30);
     }
 }
-
-const child = new Child();
-child.testSuper();
-
-print("[PASSED] 48. Phase 1 Unsupported Features Parity");
+await describe("48 opt unsupported phase1", async () => {
+    await it("tests", async () => {
+        // Tests for Phase 1 of varn-opt unsupported features parity
+        // 1. Compound assignment operators (**=, >>>=)
+        let x = 2;
+        x **= 3;
+        expect(x).toBe(8);
+        
+        let y = 16;
+        y >>>= 2;
+        expect(y).toBe(4);
+        
+        // 2. Logical compound assignments (&&=, ||=, ??=) on variables
+        let a = true;
+        a &&= false;
+        expect(a).toBe(false);
+        
+        let b = false;
+        b ||= true;
+        expect(b).toBe(true);
+        
+        let c: dynamic = null;
+        c ??= 42;
+        expect(c).toBe(42);
+        
+        // 3. Compound member and index assignments
+        let obj = { prop: 10, arr: [20] };
+        obj.prop += 5;
+        expect(obj.prop).toBe(15);
+        
+        obj.arr[0] *= 2;
+        expect(obj.arr[0]).toBe(40);
+        
+        // 4. Logical compound assignments on members and index targets
+        let obj2 = { a: true, b: false, c: null as dynamic, arr: [true, false, null as dynamic] };
+        obj2.a &&= false;
+        expect(obj2.a).toBe(false);
+        
+        obj2.b ||= true;
+        expect(obj2.b).toBe(true);
+        
+        obj2.c ??= 42;
+        expect(obj2.c).toBe(42);
+        
+        obj2.arr[0] &&= false;
+        expect(obj2.arr[0]).toBe(false);
+        
+        obj2.arr[1] ||= true;
+        expect(obj2.arr[1]).toBe(true);
+        
+        obj2.arr[2] ??= true;
+        expect(obj2.arr[2]).toBe(true);
+        
+        // 5. Module-slot reads and assignments
+        let topLevelVar = 100;
+        topLevelVar = 200;
+        expect(topLevelVar).toBe(200);
+        
+        topLevelVar += 50;
+        expect(topLevelVar).toBe(250);
+        
+        const child = new Child();
+        child.testSuper();
+        
+        
+    });
+});

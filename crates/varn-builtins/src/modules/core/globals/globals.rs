@@ -45,17 +45,6 @@ varn_contract! {
             Ok(())
         }
 
-        fn assert(_ctx: &mut dyn NativeCtx, label: &str, cond: bool) -> Result<(), String> {
-            if cond {
-                crate::modules::testing::inc_passed();
-                Ok(())
-            } else {
-                crate::modules::testing::inc_failed();
-                varn_core::term::terminal::error(format!("ASSERT FAIL: {label}"));
-                Err(label.to_string())
-            }
-        }
-
         fn assertSummary(ctx: &mut dyn NativeCtx) -> Result<(), String> {
             crate::modules::testing::summary(ctx, &[])?;
             Ok(())

@@ -1,9 +1,10 @@
+import { describe, it, expect } from "std:test";
+
+
 // 1. Generics
 function identity<T>(x: T): T {
     return x;
 }
-assert("generic identity int", identity<int>(123) === 123);
-assert("generic identity str", identity<str>("hello") === "hello");
 
 class Container<T> {
     val: T;
@@ -14,9 +15,6 @@ class Container<T> {
         return this.val;
     }
 }
-let container = new Container<int>(456);
-assert("generic class field read", container.val === 456);
-assert("generic class method call", container.getVal() === 456);
 
 // 5. Computed super compound assignment
 class Parent {
@@ -39,39 +37,11 @@ class Child extends Parent {
         super.setVal(super.getVal() + add);
     }
 }
-let child = new Child();
-child.mutateSuper(5);
-assert("super method mutation", child.getVal() === 15);
-// 2. Anonymous classes
-let AnonClass: dynamic = class {
-    x: int;
-    constructor(x: int) {
-        this.x = x;
-    }
-    getX(): int {
-        return this.x;
-    }
-};
-let anonInst = new AnonClass(789);
-assert("anon class field read", anonInst.x === 789);
-assert("anon class method call", anonInst.getX() === 789);
-
-// 3. Named function expressions
-let namedExpr: dynamic = function foo(x: int): int {
-    return x + 1;
-};
-assert("named function expression", namedExpr(10) === 11);
 
 // 4. Variant record matching
 enum VariantRecord {
     Point(x: int, y: int)
 }
-let pt = VariantRecord.Point(3, 4);
-let ptArea = match pt {
-    Point { x, y } => x * y,
-    _ => 0
-};
-assert("variant record matching", ptArea === 12);
 
 // 6. Extended enums (static blocks, methods, fields)
 enum ExtendedEnum {
@@ -86,8 +56,45 @@ enum ExtendedEnum {
         return ExtendedEnum.val;
     }
 }
-assert("extended enum static block & field", ExtendedEnum.val === 42);
-let inst = ExtendedEnum.A;
-assert("extended enum instance method", inst.getVal() === 42);
-
-print("[PASSED] 51. Phase 4 Unsupported Features Parity");
+let AnonClass: dynamic = class {
+    x: int;
+    constructor(x: int) {
+        this.x = x;
+    }
+    getX(): int {
+        return this.x;
+    }
+};
+let namedExpr: dynamic = function foo(x: int): int {
+    return x + 1;
+};
+await describe("51 opt unsupported phase4", async () => {
+    await it("tests", async () => {
+        expect(identity<int>(123)).toBe(123);
+        expect(identity<str>("hello")).toBe("hello");
+        let container = new Container<int>(456);
+        expect(container.val).toBe(456);
+        expect(container.getVal()).toBe(456);
+        let child = new Child();
+        child.mutateSuper(5);
+        expect(child.getVal()).toBe(15);
+        // 2. Anonymous classes
+        let anonInst = new AnonClass(789);
+        expect(anonInst.x).toBe(789);
+        expect(anonInst.getX()).toBe(789);
+        
+        // 3. Named function expressions
+        expect(namedExpr(10)).toBe(11);
+        let pt = VariantRecord.Point(3, 4);
+        let ptArea = match pt {
+            Point { x, y } => x * y,
+            _ => 0
+        };
+        expect(ptArea).toBe(12);
+        expect(ExtendedEnum.val).toBe(42);
+        let inst = ExtendedEnum.A;
+        expect(inst.getVal()).toBe(42);
+        
+        
+    });
+});

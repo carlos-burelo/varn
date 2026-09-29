@@ -19,8 +19,8 @@ class Temperature {
 }
 
 const t = new Temperature(100.0)
-assert("class getter", t.celsius === 100.0)
-assert("class derived", t.fahrenheit === 212.0)
+if (t.celsius !== 100.0) throw new Error("class getter")
+if (t.fahrenheit !== 212.0) throw new Error("class derived")
 t.celsius = 0.0
-assert("class setter", t.fahrenheit === 32.0)
+if (t.fahrenheit !== 32.0) throw new Error("class setter")
 print("class ok")

@@ -1,46 +1,9 @@
-// Tests for Phase 2: Updates on Members and Indices
+import { describe, it, expect } from "std:test";
 
-// 1. Member updates
-let obj = { x: 10, y: 20 };
-let r1 = obj.x++;
-assert("member update postfix inc val", r1 === 10);
-assert("member update postfix inc storage", obj.x === 11);
 
-let r2 = ++obj.x;
-assert("member update prefix inc val", r2 === 12);
-assert("member update prefix inc storage", obj.x === 12);
-
-let r3 = obj.y--;
-assert("member update postfix dec val", r3 === 20);
-assert("member update postfix dec storage", obj.y === 19);
-
-let r4 = --obj.y;
-assert("member update prefix dec val", r4 === 18);
-assert("member update prefix dec storage", obj.y === 18);
 
 // 2. Index updates
 let arr = [100, 200];
-let r5 = arr[0]++;
-assert("index update postfix inc val", r5 === 100);
-assert("index update postfix inc storage", arr[0] === 101);
-
-let r6 = ++arr[0];
-assert("index update prefix inc val", r6 === 102);
-assert("index update prefix inc storage", arr[0] === 102);
-
-let r7 = arr[1]--;
-assert("index update postfix dec val", r7 === 200);
-assert("index update postfix dec storage", arr[1] === 199);
-
-let r8 = --arr[1];
-assert("index update prefix dec val", r8 === 198);
-assert("index update prefix dec storage", arr[1] === 198);
-
-// 3. Nested updates
-let complex = { arr: [{ val: 5 }] };
-let r9 = complex.arr[0].val++;
-assert("nested update postfix inc val", r9 === 5);
-assert("nested update postfix inc storage", complex.arr[0].val === 6);
 
 // 4. Updates on instance fields in subclass (via `this`)
 class ParentClass {
@@ -58,20 +21,64 @@ class ChildClass extends ParentClass {
     }
     testInstanceUpdates(): void {
         let r10 = this.prop++;
-        assert("instance member update postfix inc val", r10 === 50);
-        assert("instance member update postfix inc storage", this.prop === 51);
+        expect(r10).toBe(50);
+        expect(this.prop).toBe(51);
 
         let r11 = ++this.prop;
-        assert("instance member update prefix inc val", r11 === 52);
-        assert("instance member update prefix inc storage", this.prop === 52);
+        expect(r11).toBe(52);
+        expect(this.prop).toBe(52);
 
         let r12 = this.arr[0]++;
-        assert("instance index update postfix inc val", r12 === 500);
-        assert("instance index update postfix inc storage", this.arr[0] === 501);
+        expect(r12).toBe(500);
+        expect(this.arr[0]).toBe(501);
     }
 }
-
-let c = new ChildClass();
-c.testInstanceUpdates();
-
-print("[PASSED] 49. Phase 2 Unsupported Features Parity");
+await describe("49 opt unsupported phase2", async () => {
+    await it("tests", async () => {
+        // Tests for Phase 2: Updates on Members and Indices
+        
+        // 1. Member updates
+        let obj = { x: 10, y: 20 };
+        let r1 = obj.x++;
+        expect(r1).toBe(10);
+        expect(obj.x).toBe(11);
+        
+        let r2 = ++obj.x;
+        expect(r2).toBe(12);
+        expect(obj.x).toBe(12);
+        
+        let r3 = obj.y--;
+        expect(r3).toBe(20);
+        expect(obj.y).toBe(19);
+        
+        let r4 = --obj.y;
+        expect(r4).toBe(18);
+        expect(obj.y).toBe(18);
+        let r5 = arr[0]++;
+        expect(r5).toBe(100);
+        expect(arr[0]).toBe(101);
+        
+        let r6 = ++arr[0];
+        expect(r6).toBe(102);
+        expect(arr[0]).toBe(102);
+        
+        let r7 = arr[1]--;
+        expect(r7).toBe(200);
+        expect(arr[1]).toBe(199);
+        
+        let r8 = --arr[1];
+        expect(r8).toBe(198);
+        expect(arr[1]).toBe(198);
+        
+        // 3. Nested updates
+        let complex = { arr: [{ val: 5 }] };
+        let r9 = complex.arr[0].val++;
+        expect(r9).toBe(5);
+        expect(complex.arr[0].val).toBe(6);
+        
+        let c = new ChildClass();
+        c.testInstanceUpdates();
+        
+        
+    });
+});

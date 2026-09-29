@@ -3,7 +3,11 @@
 
   [1m<module>[0m[2m (frame-aware)[0m
     [2mkinds (15 regs):[0m
-      block@0: [v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Int, v7:Ref, v8:Ref, v9:Str, v10:Ref, v11:Int, v13:Bool, v15:Ref, v16:Str, v19:Bool, v21:Ref, v22:Ref, v23:Ref, v24:Ref, v25:Str, v26:Ref, v27:Str, v28:Str, v29:Bool, v31:Ref, v32:Str]
+      block@0: [v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Int, v7:Ref, v8:Ref, v9:Int, v11:Bool]
+      block@1: [v12:Dynamic, v13:Str, v14:Dynamic]
+      block@2: [v21:Ref, v22:Ref, v23:Ref, v24:Ref, v25:Str, v26:Str, v27:Bool]
+      block@3: [v28:Dynamic, v29:Str, v30:Dynamic]
+      block@4: [v31:Ref, v32:Str]
 
   [1midentity[0m[2m (frame-aware)[0m
     [2mkinds (3 regs):[0m

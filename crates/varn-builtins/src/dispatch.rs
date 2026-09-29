@@ -332,7 +332,7 @@ pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc
 /// `GlobalStore::with_native_layout` builds, computed WITHOUT a heap so the
 /// compiler can emit `LoadNativeGlobalIdx` against it directly.
 ///
-/// Order: `["print", "assert"]` (only if registered) followed by every other
+/// Order: `"print"` (only if registered) followed by every other
 /// name sorted. The name set mirrors `register_globals_vm`: `isIsolate`, the
 /// `globals` module's own fields (the entry kinds `build_module` materialises),
 /// and `core` when a `core` module exists. Frozen on first call.
@@ -365,7 +365,7 @@ pub fn native_global_layout() -> &'static [&'static str] {
         names.dedup();
 
         let mut out: Vec<&'static str> = Vec::with_capacity(names.len());
-        for p in ["print", "assert"] {
+        for p in ["print"] {
             if let Some(pos) = names.iter().position(|n| *n == p) {
                 out.push(names.remove(pos));
             }

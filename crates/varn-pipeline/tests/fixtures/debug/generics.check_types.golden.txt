@@ -16,36 +16,36 @@
 16 | 21:20 | Box
 17 | 21:29 | int
 18 | 21:16 | Box<int>
-19 | 22:1 | (label: str, cond: bool) => void
-20 | 22:8 | str
-21 | 22:24 | Box<int>
-23 | 22:24 | () => int
-24 | 22:24 | int
-25 | 22:41 | int
-26 | 22:24 | bool
-27 | 22:1 | void
-28 | 23:1 | (label: str, cond: bool) => void
-29 | 23:8 | str
-30 | 23:29 | (v: T) => T
-31 | 23:43 | int
-32 | 23:29 | int
-33 | 23:51 | int
-34 | 23:29 | bool
-35 | 23:1 | void
+19 | 22:5 | Box<int>
+21 | 22:5 | () => int
+22 | 22:5 | int
+23 | 22:22 | int
+24 | 22:5 | bool
+25 | 22:36 | Error
+26 | 22:42 | str
+27 | 22:32 | Error
+28 | 23:5 | (v: T) => T
+29 | 23:19 | int
+30 | 23:5 | int
+31 | 23:27 | int
+32 | 23:5 | bool
+33 | 23:41 | Error
+34 | 23:47 | str
+35 | 23:37 | Error
 36 | 24:16 | Box<int>
 38 | 24:16 | (f: (_: int) => U) => Box<U>
 39 | 24:43 | int
 40 | 24:34 | str
 41 | 24:27 | (n: int) => str
 42 | 24:16 | Box<str>
-43 | 25:1 | (label: str, cond: bool) => void
-44 | 25:8 | str
-45 | 25:24 | Box<str>
-47 | 25:24 | () => str
-48 | 25:24 | str
-49 | 25:41 | str
-50 | 25:24 | bool
-51 | 25:1 | void
+43 | 25:5 | Box<str>
+45 | 25:5 | () => str
+46 | 25:5 | str
+47 | 25:22 | str
+48 | 25:5 | bool
+49 | 25:44 | Error
+50 | 25:50 | str
+51 | 25:40 | Error
 52 | 26:1 | (...args: dynamic[]) => void
 53 | 26:7 | str
 54 | 26:1 | void

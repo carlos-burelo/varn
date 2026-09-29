@@ -544,196 +544,208 @@ TirModule {
                     },
                 },
             ),
-            Expr(
-                TirExpr {
-                    kind: Call {
-                        callee: TirExpr {
-                            kind: Var,
+            If {
+                cond: TirExpr {
+                    kind: Binary {
+                        op: Ne,
+                        lhs: TirExpr {
+                            kind: Field {
+                                object: TirExpr {
+                                    kind: Var,
+                                    ty: Class(
+                                        ClassId(
+                                            0,
+                                        ),
+                                    ),
+                                    res: GlobalSlot(
+                                        1,
+                                    ),
+                                    span: Span {
+                                        start: 352,
+                                        end: 353,
+                                    },
+                                },
+                                name: "celsius",
+                            },
+                            ty: Float,
+                            res: ByName {
+                                name: "celsius",
+                                why: Unannotated,
+                            },
+                            span: Span {
+                                start: 352,
+                                end: 361,
+                            },
+                        },
+                        rhs: TirExpr {
+                            kind: FloatLit(
+                                100.0,
+                            ),
+                            ty: Float,
+                            res: None,
+                            span: Span {
+                                start: 366,
+                                end: 371,
+                            },
+                        },
+                    },
+                    ty: Bool,
+                    res: None,
+                    span: Span {
+                        start: 352,
+                        end: 371,
+                    },
+                },
+                then_body: [
+                    Throw(
+                        TirExpr {
+                            kind: Call {
+                                callee: TirExpr {
+                                    kind: Var,
+                                    ty: Dynamic(
+                                        Unannotated,
+                                    ),
+                                    res: NativeGlobal(
+                                        4,
+                                    ),
+                                    span: Span {
+                                        start: 383,
+                                        end: 388,
+                                    },
+                                },
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: StrLit(
+                                                "class getter",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 389,
+                                                end: 403,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
                             ty: Dynamic(
                                 Unannotated,
                             ),
-                            res: NativeGlobal(
-                                1,
-                            ),
+                            res: ByName {
+                                name: "<new>",
+                                why: Unannotated,
+                            },
                             span: Span {
-                                start: 348,
-                                end: 354,
+                                start: 379,
+                                end: 404,
                             },
                         },
-                        args: [
-                            Expr(
-                                TirExpr {
-                                    kind: StrLit(
-                                        "class getter",
-                                    ),
-                                    ty: Str,
-                                    res: None,
-                                    span: Span {
-                                        start: 355,
-                                        end: 369,
-                                    },
-                                },
-                            ),
-                            Expr(
-                                TirExpr {
-                                    kind: Binary {
-                                        op: Eq,
-                                        lhs: TirExpr {
-                                            kind: Field {
-                                                object: TirExpr {
-                                                    kind: Var,
-                                                    ty: Class(
-                                                        ClassId(
-                                                            0,
-                                                        ),
-                                                    ),
-                                                    res: GlobalSlot(
-                                                        1,
-                                                    ),
-                                                    span: Span {
-                                                        start: 371,
-                                                        end: 372,
-                                                    },
-                                                },
-                                                name: "celsius",
-                                            },
-                                            ty: Float,
-                                            res: ByName {
-                                                name: "celsius",
-                                                why: Unannotated,
-                                            },
-                                            span: Span {
-                                                start: 371,
-                                                end: 380,
-                                            },
-                                        },
-                                        rhs: TirExpr {
-                                            kind: FloatLit(
-                                                100.0,
-                                            ),
-                                            ty: Float,
-                                            res: None,
-                                            span: Span {
-                                                start: 385,
-                                                end: 390,
-                                            },
-                                        },
-                                    },
-                                    ty: Bool,
-                                    res: None,
-                                    span: Span {
-                                        start: 371,
-                                        end: 390,
-                                    },
-                                },
-                            ),
-                        ],
-                    },
-                    ty: Void,
-                    res: NativeGlobal(
-                        1,
                     ),
+                ],
+                else_body: [],
+            },
+            If {
+                cond: TirExpr {
+                    kind: Binary {
+                        op: Ne,
+                        lhs: TirExpr {
+                            kind: Field {
+                                object: TirExpr {
+                                    kind: Var,
+                                    ty: Class(
+                                        ClassId(
+                                            0,
+                                        ),
+                                    ),
+                                    res: GlobalSlot(
+                                        1,
+                                    ),
+                                    span: Span {
+                                        start: 409,
+                                        end: 410,
+                                    },
+                                },
+                                name: "fahrenheit",
+                            },
+                            ty: Float,
+                            res: ByName {
+                                name: "fahrenheit",
+                                why: Unannotated,
+                            },
+                            span: Span {
+                                start: 409,
+                                end: 421,
+                            },
+                        },
+                        rhs: TirExpr {
+                            kind: FloatLit(
+                                212.0,
+                            ),
+                            ty: Float,
+                            res: None,
+                            span: Span {
+                                start: 426,
+                                end: 431,
+                            },
+                        },
+                    },
+                    ty: Bool,
+                    res: None,
                     span: Span {
-                        start: 348,
-                        end: 391,
+                        start: 409,
+                        end: 431,
                     },
                 },
-            ),
-            Expr(
-                TirExpr {
-                    kind: Call {
-                        callee: TirExpr {
-                            kind: Var,
+                then_body: [
+                    Throw(
+                        TirExpr {
+                            kind: Call {
+                                callee: TirExpr {
+                                    kind: Var,
+                                    ty: Dynamic(
+                                        Unannotated,
+                                    ),
+                                    res: NativeGlobal(
+                                        4,
+                                    ),
+                                    span: Span {
+                                        start: 443,
+                                        end: 448,
+                                    },
+                                },
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: StrLit(
+                                                "class derived",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 449,
+                                                end: 464,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
                             ty: Dynamic(
                                 Unannotated,
                             ),
-                            res: NativeGlobal(
-                                1,
-                            ),
+                            res: ByName {
+                                name: "<new>",
+                                why: Unannotated,
+                            },
                             span: Span {
-                                start: 392,
-                                end: 398,
+                                start: 439,
+                                end: 465,
                             },
                         },
-                        args: [
-                            Expr(
-                                TirExpr {
-                                    kind: StrLit(
-                                        "class derived",
-                                    ),
-                                    ty: Str,
-                                    res: None,
-                                    span: Span {
-                                        start: 399,
-                                        end: 414,
-                                    },
-                                },
-                            ),
-                            Expr(
-                                TirExpr {
-                                    kind: Binary {
-                                        op: Eq,
-                                        lhs: TirExpr {
-                                            kind: Field {
-                                                object: TirExpr {
-                                                    kind: Var,
-                                                    ty: Class(
-                                                        ClassId(
-                                                            0,
-                                                        ),
-                                                    ),
-                                                    res: GlobalSlot(
-                                                        1,
-                                                    ),
-                                                    span: Span {
-                                                        start: 416,
-                                                        end: 417,
-                                                    },
-                                                },
-                                                name: "fahrenheit",
-                                            },
-                                            ty: Float,
-                                            res: ByName {
-                                                name: "fahrenheit",
-                                                why: Unannotated,
-                                            },
-                                            span: Span {
-                                                start: 416,
-                                                end: 428,
-                                            },
-                                        },
-                                        rhs: TirExpr {
-                                            kind: FloatLit(
-                                                212.0,
-                                            ),
-                                            ty: Float,
-                                            res: None,
-                                            span: Span {
-                                                start: 433,
-                                                end: 438,
-                                            },
-                                        },
-                                    },
-                                    ty: Bool,
-                                    res: None,
-                                    span: Span {
-                                        start: 416,
-                                        end: 438,
-                                    },
-                                },
-                            ),
-                        ],
-                    },
-                    ty: Void,
-                    res: NativeGlobal(
-                        1,
                     ),
-                    span: Span {
-                        start: 392,
-                        end: 439,
-                    },
-                },
-            ),
+                ],
+                else_body: [],
+            },
             Expr(
                 TirExpr {
                     kind: Assign {
@@ -750,8 +762,8 @@ TirModule {
                                         1,
                                     ),
                                     span: Span {
-                                        start: 440,
-                                        end: 441,
+                                        start: 466,
+                                        end: 467,
                                     },
                                 },
                                 name: "celsius",
@@ -762,8 +774,8 @@ TirModule {
                                 why: Unannotated,
                             },
                             span: Span {
-                                start: 440,
-                                end: 449,
+                                start: 466,
+                                end: 475,
                             },
                         },
                         value: TirExpr {
@@ -773,114 +785,120 @@ TirModule {
                             ty: Float,
                             res: None,
                             span: Span {
-                                start: 452,
-                                end: 455,
+                                start: 478,
+                                end: 481,
                             },
                         },
                     },
                     ty: Float,
                     res: None,
                     span: Span {
-                        start: 440,
-                        end: 455,
+                        start: 466,
+                        end: 481,
                     },
                 },
             ),
-            Expr(
-                TirExpr {
-                    kind: Call {
-                        callee: TirExpr {
-                            kind: Var,
+            If {
+                cond: TirExpr {
+                    kind: Binary {
+                        op: Ne,
+                        lhs: TirExpr {
+                            kind: Field {
+                                object: TirExpr {
+                                    kind: Var,
+                                    ty: Class(
+                                        ClassId(
+                                            0,
+                                        ),
+                                    ),
+                                    res: GlobalSlot(
+                                        1,
+                                    ),
+                                    span: Span {
+                                        start: 486,
+                                        end: 487,
+                                    },
+                                },
+                                name: "fahrenheit",
+                            },
+                            ty: Float,
+                            res: ByName {
+                                name: "fahrenheit",
+                                why: Unannotated,
+                            },
+                            span: Span {
+                                start: 486,
+                                end: 498,
+                            },
+                        },
+                        rhs: TirExpr {
+                            kind: FloatLit(
+                                32.0,
+                            ),
+                            ty: Float,
+                            res: None,
+                            span: Span {
+                                start: 503,
+                                end: 507,
+                            },
+                        },
+                    },
+                    ty: Bool,
+                    res: None,
+                    span: Span {
+                        start: 486,
+                        end: 507,
+                    },
+                },
+                then_body: [
+                    Throw(
+                        TirExpr {
+                            kind: Call {
+                                callee: TirExpr {
+                                    kind: Var,
+                                    ty: Dynamic(
+                                        Unannotated,
+                                    ),
+                                    res: NativeGlobal(
+                                        4,
+                                    ),
+                                    span: Span {
+                                        start: 519,
+                                        end: 524,
+                                    },
+                                },
+                                args: [
+                                    Expr(
+                                        TirExpr {
+                                            kind: StrLit(
+                                                "class setter",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 525,
+                                                end: 539,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
                             ty: Dynamic(
                                 Unannotated,
                             ),
-                            res: NativeGlobal(
-                                1,
-                            ),
+                            res: ByName {
+                                name: "<new>",
+                                why: Unannotated,
+                            },
                             span: Span {
-                                start: 456,
-                                end: 462,
+                                start: 515,
+                                end: 540,
                             },
                         },
-                        args: [
-                            Expr(
-                                TirExpr {
-                                    kind: StrLit(
-                                        "class setter",
-                                    ),
-                                    ty: Str,
-                                    res: None,
-                                    span: Span {
-                                        start: 463,
-                                        end: 477,
-                                    },
-                                },
-                            ),
-                            Expr(
-                                TirExpr {
-                                    kind: Binary {
-                                        op: Eq,
-                                        lhs: TirExpr {
-                                            kind: Field {
-                                                object: TirExpr {
-                                                    kind: Var,
-                                                    ty: Class(
-                                                        ClassId(
-                                                            0,
-                                                        ),
-                                                    ),
-                                                    res: GlobalSlot(
-                                                        1,
-                                                    ),
-                                                    span: Span {
-                                                        start: 479,
-                                                        end: 480,
-                                                    },
-                                                },
-                                                name: "fahrenheit",
-                                            },
-                                            ty: Float,
-                                            res: ByName {
-                                                name: "fahrenheit",
-                                                why: Unannotated,
-                                            },
-                                            span: Span {
-                                                start: 479,
-                                                end: 491,
-                                            },
-                                        },
-                                        rhs: TirExpr {
-                                            kind: FloatLit(
-                                                32.0,
-                                            ),
-                                            ty: Float,
-                                            res: None,
-                                            span: Span {
-                                                start: 496,
-                                                end: 500,
-                                            },
-                                        },
-                                    },
-                                    ty: Bool,
-                                    res: None,
-                                    span: Span {
-                                        start: 479,
-                                        end: 500,
-                                    },
-                                },
-                            ),
-                        ],
-                    },
-                    ty: Void,
-                    res: NativeGlobal(
-                        1,
                     ),
-                    span: Span {
-                        start: 456,
-                        end: 501,
-                    },
-                },
-            ),
+                ],
+                else_body: [],
+            },
             Expr(
                 TirExpr {
                     kind: Call {
@@ -893,8 +911,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 502,
-                                end: 507,
+                                start: 541,
+                                end: 546,
                             },
                         },
                         args: [
@@ -906,8 +924,8 @@ TirModule {
                                     ty: Str,
                                     res: None,
                                     span: Span {
-                                        start: 508,
-                                        end: 518,
+                                        start: 547,
+                                        end: 557,
                                     },
                                 },
                             ),
@@ -918,8 +936,8 @@ TirModule {
                         0,
                     ),
                     span: Span {
-                        start: 502,
-                        end: 519,
+                        start: 541,
+                        end: 558,
                     },
                 },
             ),

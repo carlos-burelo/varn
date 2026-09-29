@@ -1,47 +1,49 @@
 import { URLSearchParams, Query, Url, parseURL } from "std:net";
-import { assert, assertEqual, assertTrue, assertFalse } from "std:test";
+import { describe, it, expect } from "std:test";
 
-print("=== Suite: std:net URLSearchParams & Url.resolve ===");
 
 // 1. URLSearchParams basic operations
 let params = new URLSearchParams("foo=1&bar=2&foo=3");
-assertEqual(params.get("foo"), "1");
-assertEqual(params.get("bar"), "2");
-assertEqual(params.getAll("foo").length, 2);
-assertTrue(params.has("bar"));
-assertFalse(params.has("baz"));
-
-params.append("baz", "4");
-assertEqual(params.get("baz"), "4");
-
-params.set("foo", "single");
-assertEqual(params.getAll("foo").length, 1);
-assertEqual(params.get("foo"), "single");
-
-params.delete("bar");
-assertFalse(params.has("bar"));
-
-let strResult = params.toString();
-assertTrue(strResult.includes("foo=single"));
-assertTrue(strResult.includes("baz=4"));
-print("  ✔ URLSearchParams: get, getAll, set, append, has, delete, toString");
 
 // 2. URLSearchParams from object
 let paramsObj = new URLSearchParams({ page: "1", filter: ["a", "b"] });
-assertEqual(paramsObj.get("page"), "1");
-assertEqual(paramsObj.getAll("filter").length, 2);
-print("  ✔ URLSearchParams from object with array values");
 
 // 3. Url.resolve (Relativization)
 let base = "https://example.com/api/v1/users";
 let rel1 = Url.resolve(base, "123");
-assertEqual(rel1.toString(), "https://example.com/api/v1/123");
 
 let rel2 = Url.resolve(base, "/auth/login?redirect=dashboard#section");
-assertEqual(rel2.toString(), "https://example.com/auth/login?redirect=dashboard#section");
 
 let absUrl = Url.resolve(base, "http://other.org/test");
-assertEqual(absUrl.toString(), "http://other.org/test");
-print("  ✔ Url.resolve: relative paths, root-relative paths, and absolute overrides");
+await describe("99 stdlib net urlsearchparams", async () => {
+        await it("group 1 part 1", async () => {
+        expect(params.get("foo")).toBe("1");
+        expect(params.get("bar")).toBe("2");
+        expect(params.getAll("foo").length).toBe(2);
+        expect(params.has("bar")).toBeTruthy();
+        expect(params.has("baz")).toBeFalsy();
+        params.append("baz", "4");
+        expect(params.get("baz")).toBe("4");
+        params.set("foo", "single");
+    });
 
-print("[PASSED] 99. std:net URLSearchParams and Url.resolve (Web Standard URL compatibility)");
+    await it("group 1 part 2", async () => {
+        expect(params.getAll("foo").length).toBe(1);
+        expect(params.get("foo")).toBe("single");
+        params.delete("bar");
+        expect(params.has("bar")).toBeFalsy();
+        let strResult = params.toString();
+        expect(strResult.includes("foo=single")).toBeTruthy();
+        expect(strResult.includes("baz=4")).toBeTruthy();
+        expect(paramsObj.get("page")).toBe("1");
+    });
+
+    await it("group 1 part 3", async () => {
+        expect(paramsObj.getAll("filter").length).toBe(2);
+        expect(rel1.toString()).toBe("https://example.com/api/v1/123");
+        expect(rel2.toString()).toBe("https://example.com/auth/login?redirect=dashboard#section");
+        expect(absUrl.toString()).toBe("http://other.org/test");
+    });
+
+
+});

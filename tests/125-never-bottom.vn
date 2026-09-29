@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 function fail(msg: str): never { throw new Error(msg) }
 
 function asInt(ok: bool): int { if (ok) { return 1 } return fail("int") }
@@ -11,17 +13,10 @@ function raises(f: () => void): bool {
     try { f(); return false } catch (e) { return true }
 }
 
-assert("never flows into int", asInt(true) === 1)
-assert("never flows into str", asStr(true) === "s")
-assert("never flows into T?", asOpt(true) === null)
-assert("never flows into class", asBox(true).v === 1)
-assert("never-typed call raises", raises(() => { asInt(false) }))
-
 // A body that always throws has type never, so it fits any return type.
 function produce(make: () => int): int {
     return make()
 }
-assert("a throwing lambda is () => never", raises(() => { produce(() => { throw new Error("no") }) }))
 function unreachableEnd(flag: bool) {
     if (flag) {
         throw new Error("a")
@@ -29,4 +24,19 @@ function unreachableEnd(flag: bool) {
         throw new Error("b")
     }
 }
-assert("both branches throw: never", raises(() => { unreachableEnd(true) }))
+await describe("125 never bottom", async () => {
+        await it("group 1 part 1", async () => {
+        expect(asInt(true)).toBe(1);
+        expect(asStr(true)).toBe("s");
+        expect(asOpt(true)).toBe(null);
+        expect(asBox(true).v).toBe(1);
+    });
+
+    await it("group 1 part 2", async () => {
+        expect(raises(() => { asInt(false) })).toBeTruthy();
+        expect(raises(() => { produce(() => { throw new Error("no") }) })).toBeTruthy();
+        expect(raises(() => { unreachableEnd(true) })).toBeTruthy();
+    });
+
+
+});

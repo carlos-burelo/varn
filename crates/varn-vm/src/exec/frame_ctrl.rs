@@ -108,9 +108,9 @@ pub(crate) fn resolve_constructor_return(
 /// the catch block.
 ///
 /// `handler` is taken BY VALUE because every caller has already removed it from
-/// wherever it lived — `try_handlers` for the interpreter and task paths,
-/// `jit_panic_exception_handler` for compiled code, which `jit_propagate_error`
-/// pops on the way out. Taking it by value is what makes that non-negotiable.
+/// `try_handlers` — the interpreter, the task paths and the compiled-frame exit
+/// all pop with the same invocation-depth guard. Taking it by value is what
+/// makes that non-negotiable.
 ///
 /// Like [`resolve_constructor_return`], this is a language rule rather than a
 /// tier detail, and it had three byte-identical copies: the interpreter's

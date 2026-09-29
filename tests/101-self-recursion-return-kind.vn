@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // A self-recursive call returns in ITS OWN function's return convention.
 //
 // `emit_return_value` hands back a raw, unboxed i48 for a `SlotKind::Int`
@@ -57,25 +59,31 @@ let badFloat = 0
 let badBool = 0
 let badArr = 0
 let badNull = 0
-while (i < 300) {
-    if (repeatStr("ab", 3) !== "ababab") { badStr = badStr + 1 }
-    if (countDown(10) !== 55) { badInt = badInt + 1 }
-    if (halve(8.0, 3) !== 1.0) { badFloat = badFloat + 1 }
-    if (isEvenDepth(4) !== true) { badBool = badBool + 1 }
-    if (collect(3).length !== 3) { badArr = badArr + 1 }
-    if (findDeep(5) !== "bottom") { badNull = badNull + 1 }
-    i = i + 1
-}
-
-assert("self-recursion returning str stays a str", badStr === 0)
-assert("self-recursion returning int stays an int", badInt === 0)
-assert("self-recursion returning float stays a float", badFloat === 0)
-assert("self-recursion returning bool stays a bool", badBool === 0)
-assert("self-recursion returning an array stays an array", badArr === 0)
-assert("self-recursion returning a nullable stays a str", badNull === 0)
 
 // The exact shape that failed: the recursive result feeding a string concat,
 // which is where `box_or_pass` turned the heap index into a number.
-assert("recursive result concatenates as a string", ("x" + repeatStr("y", 2)) === "xyy")
+await describe("101 self recursion return kind", async () => {
+        await it("group 1 part 1", async () => {
+        while (i < 300) {
+        if (repeatStr("ab", 3) !== "ababab") { badStr = badStr + 1 }
+        if (countDown(10) !== 55) { badInt = badInt + 1 }
+        if (halve(8.0, 3) !== 1.0) { badFloat = badFloat + 1 }
+        if (isEvenDepth(4) !== true) { badBool = badBool + 1 }
+        if (collect(3).length !== 3) { badArr = badArr + 1 }
+        if (findDeep(5) !== "bottom") { badNull = badNull + 1 }
+        i = i + 1
+        }
+        expect(badStr).toBe(0);
+        expect(badInt).toBe(0);
+        expect(badFloat).toBe(0);
+        expect(badBool).toBe(0);
+    });
 
-print("[PASSED] 101. self-recursive calls return in their own return convention")
+    await it("group 1 part 2", async () => {
+        expect(badArr).toBe(0);
+        expect(badNull).toBe(0);
+        expect(("x" + repeatStr("y", 2))).toBe("xyy");
+    });
+
+
+});

@@ -1,33 +1,37 @@
+import { describe, it, expect } from "std:test";
 
-const r1 = 0..5
-const r2 = 1..=5
+await describe("18 Ranges", async () => {
+    await it("bounds", () => {
+        const r1 = 0..5;
+        const r2 = 1..=5;
+        expect(r1.start).toBe(0);
+        expect(r1.end).toBe(5);
+        expect(r1.length).toBe(5);
+        expect(r2.length).toBe(5);
+        expect(r1.contains(3)).toBeTruthy();
+        expect(!r1.contains(5)).toBeTruthy();
+        expect(r2.contains(5)).toBeTruthy();
+    });
 
-assert("range start",          r1.start === 0)
-assert("range end excl",       r1.end === 5)
-assert("range length excl",    r1.length === 5)
-assert("range incl length",    r2.length === 5)
-assert("range contains true",  r1.contains(3))
-assert("range contains false", !r1.contains(5))
-assert("range incl contains",  r2.contains(5))
+    await it("conversion", () => {
+        const arr2 = (0..4).toArray();
+        expect(arr2.length).toBe(4);
+        expect(arr2[0]).toBe(0);
+        expect(arr2[3]).toBe(3);
+        const stepped = (0..10).step(3);
+        expect(stepped.length).toBe(4);
+        expect(stepped[1]).toBe(3);
+        expect(stepped.toArray().join(",")).toBe("0,3,6,9");
+    });
 
-const arr2 = (0..4).toArray()
-assert("toArray len",   arr2.length === 4)
-assert("toArray first", arr2[0] === 0)
-assert("toArray last",  arr2[3] === 3)
-
-const stepped = (0..10).step(3)
-assert("step len",   stepped.length === 4)
-assert("step value", stepped[1] === 3)
-assert("step is a range", stepped.toArray().join(",") === "0,3,6,9")
-
-let rangeSum = 0
-for (const i of 1..=10) {
-    rangeSum = rangeSum + i
-}
-assert("range for-of sum", rangeSum === 55)
-
-const r3 = Range.from(5, 10)
-assert("Range.from start", r3.start === 5)
-assert("Range.from end",   r3.end === 10)
-
-print("[PASSED] 18. Ranges ")
+    await it("iteration and from", () => {
+        let rangeSum = 0;
+        for (const i of 1..=10) {
+            rangeSum = rangeSum + i;
+        }
+        expect(rangeSum).toBe(55);
+        const r3 = Range.from(5, 10);
+        expect(r3.start).toBe(5);
+        expect(r3.end).toBe(10);
+    });
+});

@@ -352,15 +352,13 @@ fn emit_super_call(
     for a in args {
         vals.push(boxed_value(b, ctx, values, *a)?);
     }
-    let w = stage_value(b, ctx, ctor, &vals);
+    let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
+    for (i, v) in vals.iter().enumerate() {
+        b.ins()
+            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+    }
     let (ct, cp) = b.ins().isplit(ctor);
-    Ok(super::call::emit_invoke(
-        b,
-        ctx,
-        w,
-        (ct, cp),
-        vals.len() + 1,
-    ))
+    Ok(super::call::emit_invoke(b, ctx, addr, (ct, cp), vals.len()))
 }
 
 /// Native-stack window with `callee` first, then `args`, in the shared

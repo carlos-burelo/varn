@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // A constructor's parameters have the types they declare: an `int`
 // parameter is an `int` in the body, not `dynamic`.
 
@@ -25,10 +27,16 @@ class CtorChild extends CtorNeg {
     }
 }
 
-assert("int constructor parameter negates", new CtorNeg(3).b === -3)
 const mixed = new CtorMixed(2, 0.5, "ok")
-assert("typed constructor parameters", mixed.total === 2.5 && mixed.label == "OK")
 const child = new CtorChild(4, 5)
-assert("subclass constructor parameters are typed", child.b === -4 && child.c === -5)
+await describe("138 constructor signature", async () => {
+    await it("negation in constructor", async () => {
+        expect(new CtorNeg(3).b).toBe(-3);
+    });
 
-print("[PASSED] 138. Constructor signature")
+    await it("mixed params and inheritance", async () => {
+        expect(mixed.total === 2.5 && mixed.label == "OK").toBeTruthy();
+        expect(child.b === -4 && child.c === -5).toBeTruthy();
+    });
+
+});

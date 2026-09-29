@@ -1,24 +1,6 @@
-// Extreme Nullable Type Edge Cases & Disambiguation
+import { describe, it, expect } from "std:test";
 
-// 1. Declarations with Type? syntax
-const a: str? = null
-const b: str? = "test"
-const c: bool? = true
 
-assert("scalar nullable a", a === null)
-assert("scalar nullable b", b === "test")
-assert("scalar nullable c", c === true)
-
-// 2. Arrays and Multidimensional arrays
-const arr1: int?[] = [1, null, 3]
-const arr2: int[]? = null
-const arr3: int?[]? = null
-const arr4: int?[]?[]? = [[1, null], null]
-
-assert("arr1 elem 1", arr1[1] === null)
-assert("arr2 is null", arr2 === null)
-assert("arr3 is null", arr3 === null)
-assert("arr4 elem 0", arr4 !== null && arr4[0][1] === null)
 
 // 3. Optional fields of nullable types in Interfaces
 interface ExtremeProfile {
@@ -26,55 +8,80 @@ interface ExtremeProfile {
     score: int?
 }
 
-const p1: ExtremeProfile = { score: null }
-const p2: ExtremeProfile = { nickname: "nick", score: 42 }
-const p3: ExtremeProfile = { nickname: null, score: null }
-
-assert("p1 nickname", p1.nickname === null)
-assert("p2 score", p2.score === 42)
-assert("p3 nickname", p3.nickname === null)
-
 // 4. Function signatures with optional parameters & nullable types
 function process(x?: int?, y: str? = null): int? {
     if (x === null) return null
     return x
 }
-
-assert("process default", process() === null)
-assert("process null", process(null) === null)
-assert("process 42", process(42) === 42)
-
-// 5. Critical Cast and Ternary Disambiguation
-const val: int = 42
-
-// a) Cast to nullable type T?
-const cast1 = val as int?
-assert("cast1 type is nullable", cast1 === 42)
-
-// b) Cast to non-nullable type followed by a ternary
-// Under lookahead, 'val as int ? 100 : 200' must parse as (val as int) ? 100 : 200
-const ternary1 = val as int ? 100 : 200
-assert("ternary1 value", ternary1 === 100)
-
-// c) Cast to nullable type followed by a ternary
-// Under lookahead, 'val as int? ? 300 : 400' must parse as (val as int?) ? 300 : 400
-const ternary2 = val as int? ? 300 : 400
-assert("ternary2 value", ternary2 === 300)
-
-// d) Cast to nullable type in ternary branch
-const cond = true
-const ternary3 = cond ? val as int? : null
-assert("ternary3 value", ternary3 === 42)
-
-// e) Nested nullable cast and ternaries
-const result = cond ? (val as int? ? "yes" : "no") : "never"
-assert("nested ternary result", result === "yes")
-
-// 6. Generic Types with nullable arguments
-const list: Array<int?> = [1, null, 3]
-assert("generic nullable elem 1", list[1] === null)
-
-const optList: Array<int>? = null
-assert("nullable generic is null", optList === null)
-
-print("[PASSED] 46. Extreme Nullable Edge Cases")
+await describe("46 extreme nullable edgecases", async () => {
+    await it("tests", async () => {
+        // Extreme Nullable Type Edge Cases & Disambiguation
+        
+        // 1. Declarations with Type? syntax
+        const a: str? = null
+        const b: str? = "test"
+        const c: bool? = true
+        
+        expect(a).toBe(null)
+        expect(b).toBe("test")
+        expect(c).toBe(true)
+        
+        // 2. Arrays and Multidimensional arrays
+        const arr1: int?[] = [1, null, 3]
+        const arr2: int[]? = null
+        const arr3: int?[]? = null
+        const arr4: int?[]?[]? = [[1, null], null]
+        
+        expect(arr1[1]).toBe(null)
+        expect(arr2).toBe(null)
+        expect(arr3).toBe(null)
+        expect(arr4 !== null && arr4[0][1] === null).toBeTruthy()
+        
+        const p1: ExtremeProfile = { score: null }
+        const p2: ExtremeProfile = { nickname: "nick", score: 42 }
+        const p3: ExtremeProfile = { nickname: null, score: null }
+        
+        expect(p1.nickname).toBe(null)
+        expect(p2.score).toBe(42)
+        expect(p3.nickname).toBe(null)
+        
+        expect(process()).toBe(null)
+        expect(process(null)).toBe(null)
+        expect(process(42)).toBe(42)
+        
+        // 5. Critical Cast and Ternary Disambiguation
+        const val: int = 42
+        
+        // a) Cast to nullable type T?
+        const cast1 = val as int?
+        expect(cast1).toBe(42)
+        
+        // b) Cast to non-nullable type followed by a ternary
+        // Under lookahead, 'val as int ? 100 : 200' must parse as (val as int) ? 100 : 200
+        const ternary1 = val as int ? 100 : 200
+        expect(ternary1).toBe(100)
+        
+        // c) Cast to nullable type followed by a ternary
+        // Under lookahead, 'val as int? ? 300 : 400' must parse as (val as int?) ? 300 : 400
+        const ternary2 = val as int? ? 300 : 400
+        expect(ternary2).toBe(300)
+        
+        // d) Cast to nullable type in ternary branch
+        const cond = true
+        const ternary3 = cond ? val as int? : null
+        expect(ternary3).toBe(42)
+        
+        // e) Nested nullable cast and ternaries
+        const result = cond ? (val as int? ? "yes" : "no") : "never"
+        expect(result).toBe("yes")
+        
+        // 6. Generic Types with nullable arguments
+        const list: Array<int?> = [1, null, 3]
+        expect(list[1]).toBe(null)
+        
+        const optList: Array<int>? = null
+        expect(optList).toBe(null)
+        
+        
+    });
+});

@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 
 // ── Closure capturing mutable state ─────────────────────────────
 function makeStateMachine(initial: str): {
@@ -19,15 +22,7 @@ function makeStateMachine(initial: str): {
 }
 
 const sm = makeStateMachine("idle")
-assert("sm initial",        sm.state() === "idle")
-sm.transition("start")
-assert("sm after start",    sm.state() === "idle→start")
-sm.transition("run")
-assert("sm after run",      sm.state() === "idle→start→run")
 const h = sm.history()
-assert("sm history len",    h.length === 3)
-assert("sm history[0]",     h[0] === "idle")
-assert("sm history[2]",     h[2] === "idle→start→run")
 
 // ── Closure sharing state between siblings ───────────────────────
 function makeSharedCounter(): { inc: () => void, dec: () => void, get: () => int } {
@@ -38,13 +33,6 @@ function makeSharedCounter(): { inc: () => void, dec: () => void, get: () => int
         get: () => n,
     }
 }
-
-const sc = makeSharedCounter()
-sc.inc()
-sc.inc()
-sc.inc()
-sc.dec()
-assert("shared counter",    sc.get() === 2)
 
 // ── Recursive closure via self-reference ─────────────────────────
 function makeRecursiveFib(): (n: int) => int {
@@ -60,12 +48,6 @@ function makeRecursiveFib(): (n: int) => int {
     return fib
 }
 
-const recFib = makeRecursiveFib()
-assert("recursive fib 0",   recFib(0) === 0)
-assert("recursive fib 1",   recFib(1) === 1)
-assert("recursive fib 10",  recFib(10) === 55)
-assert("recursive fib 15",  recFib(15) === 610)
-
 // ── Closure over loop variable (capture by binding) ──────────────
 function makeMultipliers(count: int): ((n: int) => int)[] {
     const fns: ((n: int) => int)[] = []
@@ -76,24 +58,14 @@ function makeMultipliers(count: int): ((n: int) => int)[] {
     return fns
 }
 
-const mults = makeMultipliers(5)
-assert("multiplier[0](3)",  mults[0](3) === 3)
-assert("multiplier[1](3)",  mults[1](3) === 6)
-assert("multiplier[4](3)",  mults[4](3) === 15)
-
 // ── Partial application ──────────────────────────────────────────
 function partial<A, B, C>(f: (A, B) => C, a: A): (b: B) => C {
     return (b: B) => f(a, b)
 }
 
 function add3(x: int, y: int): int { return x + y }
-const add10 = partial(add3, 10)
-assert("partial add",       add10(5) === 15)
-assert("partial add 0",     add10(0) === 10)
 
 function concat(a: str, b: str): str { return a + b }
-const greet = partial(concat, "Hello, ")
-assert("partial concat",    greet("World") === "Hello, World")
 
 // ── Curried function ─────────────────────────────────────────────
 function curry<A, B, C>(f: (A, B) => C): (a: A) => (b: B) => C {
@@ -101,11 +73,6 @@ function curry<A, B, C>(f: (A, B) => C): (a: A) => (b: B) => C {
 }
 
 function mul(x: int, y: int): int { return x * y }
-const curriedMul = curry(mul)
-const triple = curriedMul(3)
-assert("curried 3*4",       triple(4) === 12)
-assert("curried 3*0",       triple(0) === 0)
-assert("curried fresh",     curriedMul(5)(7) === 35)
 
 // ── Closure capturing class instance ─────────────────────────────
 class EventBus {
@@ -115,17 +82,56 @@ class EventBus {
         for (const h of this.handlers) h(data)
     }
 }
-
-const bus = new EventBus()
-const received: str[] = []
-bus.subscribe((d) => { received.push(d) })
-bus.subscribe((d) => { received.push(d + "!") })
-bus.emit("hello")
-bus.emit("world")
-assert("event bus count",   received.length === 4)
-assert("event bus[0]",      received[0] === "hello")
-assert("event bus[1]",      received[1] === "hello!")
-assert("event bus[2]",      received[2] === "world")
-assert("event bus[3]",      received[3] === "world!")
-
-print("[PASSED] 37. Complex closures")
+await describe("37 complex closures", async () => {
+    await it("tests", async () => {
+        expect(sm.state()).toBe("idle")
+        sm.transition("start")
+        expect(sm.state()).toBe("idle→start")
+        sm.transition("run")
+        expect(sm.state()).toBe("idle→start→run")
+        expect(h.length).toBe(3)
+        expect(h[0]).toBe("idle")
+        expect(h[2]).toBe("idle→start→run")
+        
+        const sc = makeSharedCounter()
+        sc.inc()
+        sc.inc()
+        sc.inc()
+        sc.dec()
+        expect(sc.get()).toBe(2)
+        
+        const recFib = makeRecursiveFib()
+        expect(recFib(0)).toBe(0)
+        expect(recFib(1)).toBe(1)
+        expect(recFib(10)).toBe(55)
+        expect(recFib(15)).toBe(610)
+        
+        const mults = makeMultipliers(5)
+        expect(mults[0](3)).toBe(3)
+        expect(mults[1](3)).toBe(6)
+        expect(mults[4](3)).toBe(15)
+        const add10 = partial(add3, 10)
+        expect(add10(5)).toBe(15)
+        expect(add10(0)).toBe(10)
+        const greet = partial(concat, "Hello, ")
+        expect(greet("World")).toBe("Hello, World")
+        const curriedMul = curry(mul)
+        const triple = curriedMul(3)
+        expect(triple(4)).toBe(12)
+        expect(triple(0)).toBe(0)
+        expect(curriedMul(5)(7)).toBe(35)
+        
+        const bus = new EventBus()
+        const received: str[] = []
+        bus.subscribe((d) => { received.push(d) })
+        bus.subscribe((d) => { received.push(d + "!") })
+        bus.emit("hello")
+        bus.emit("world")
+        expect(received.length).toBe(4)
+        expect(received[0]).toBe("hello")
+        expect(received[1]).toBe("hello!")
+        expect(received[2]).toBe("world")
+        expect(received[3]).toBe("world!")
+        
+    });
+});

@@ -110,33 +110,41 @@
   [2m105  [0m │ 23:24      │ [35mComma               [0m │ [33m","[0m
   [2m106  [0m │ 23:26      │ [35mIntegerLiteral      [0m │ [33m"5"[0m
   [2m107  [0m │ 23:27      │ [35mRBracket            [0m │ [33m"]"[0m
-  [2m108  [0m │ 24:0       │ [35mIdentifier          [0m │ [33m"assert"[0m
-  [2m109  [0m │ 24:6       │ [35mLParen              [0m │ [33m"("[0m
-  [2m110  [0m │ 24:7       │ [35mStr                 [0m │ [33m"loop sum"[0m
-  [2m111  [0m │ 24:17      │ [35mComma               [0m │ [33m","[0m
-  [2m112  [0m │ 24:19      │ [35mIdentifier          [0m │ [33m"sum"[0m
-  [2m113  [0m │ 24:22      │ [35mLParen              [0m │ [33m"("[0m
-  [2m114  [0m │ 24:23      │ [35mIdentifier          [0m │ [33m"nums"[0m
-  [2m115  [0m │ 24:27      │ [35mRParen              [0m │ [33m")"[0m
-  [2m116  [0m │ 24:29      │ [35mEqEq                [0m │ [33m"==="[0m
-  [2m117  [0m │ 24:33      │ [35mIntegerLiteral      [0m │ [33m"14"[0m
-  [2m118  [0m │ 24:35      │ [35mRParen              [0m │ [33m")"[0m
-  [2m119  [0m │ 25:0       │ [35mIdentifier          [0m │ [33m"assert"[0m
-  [2m120  [0m │ 25:6       │ [35mLParen              [0m │ [33m"("[0m
-  [2m121  [0m │ 25:7       │ [35mStr                 [0m │ [33m"loop firstAbove"[0m
-  [2m122  [0m │ 25:24      │ [35mComma               [0m │ [33m","[0m
-  [2m123  [0m │ 25:26      │ [35mIdentifier          [0m │ [33m"firstAbove"[0m
-  [2m124  [0m │ 25:36      │ [35mLParen              [0m │ [33m"("[0m
-  [2m125  [0m │ 25:37      │ [35mIdentifier          [0m │ [33m"nums"[0m
-  [2m126  [0m │ 25:41      │ [35mComma               [0m │ [33m","[0m
-  [2m127  [0m │ 25:43      │ [35mIntegerLiteral      [0m │ [33m"3"[0m
-  [2m128  [0m │ 25:44      │ [35mRParen              [0m │ [33m")"[0m
-  [2m129  [0m │ 25:46      │ [35mEqEq                [0m │ [33m"==="[0m
-  [2m130  [0m │ 25:50      │ [35mIntegerLiteral      [0m │ [33m"4"[0m
-  [2m131  [0m │ 25:51      │ [35mRParen              [0m │ [33m")"[0m
-  [2m132  [0m │ 26:0       │ [35mIdentifier          [0m │ [33m"print"[0m
-  [2m133  [0m │ 26:5       │ [35mLParen              [0m │ [33m"("[0m
-  [2m134  [0m │ 26:6       │ [35mStr                 [0m │ [33m"loop ok"[0m
-  [2m135  [0m │ 26:15      │ [35mRParen              [0m │ [33m")"[0m
-  [2m136  [0m │ 27:0       │ [35mEOF                 [0m │ [33m""[0m
+  [2m108  [0m │ 24:0       │ [35mIf                  [0m │ [33m"if"[0m
+  [2m109  [0m │ 24:3       │ [35mLParen              [0m │ [33m"("[0m
+  [2m110  [0m │ 24:4       │ [35mIdentifier          [0m │ [33m"sum"[0m
+  [2m111  [0m │ 24:7       │ [35mLParen              [0m │ [33m"("[0m
+  [2m112  [0m │ 24:8       │ [35mIdentifier          [0m │ [33m"nums"[0m
+  [2m113  [0m │ 24:12      │ [35mRParen              [0m │ [33m")"[0m
+  [2m114  [0m │ 24:14      │ [35mBangEq              [0m │ [33m"!=="[0m
+  [2m115  [0m │ 24:18      │ [35mIntegerLiteral      [0m │ [33m"14"[0m
+  [2m116  [0m │ 24:20      │ [35mRParen              [0m │ [33m")"[0m
+  [2m117  [0m │ 24:22      │ [35mThrow               [0m │ [33m"throw"[0m
+  [2m118  [0m │ 24:28      │ [35mNew                 [0m │ [33m"new"[0m
+  [2m119  [0m │ 24:32      │ [35mIdentifier          [0m │ [33m"Error"[0m
+  [2m120  [0m │ 24:37      │ [35mLParen              [0m │ [33m"("[0m
+  [2m121  [0m │ 24:38      │ [35mStr                 [0m │ [33m"loop sum"[0m
+  [2m122  [0m │ 24:48      │ [35mRParen              [0m │ [33m")"[0m
+  [2m123  [0m │ 25:0       │ [35mIf                  [0m │ [33m"if"[0m
+  [2m124  [0m │ 25:3       │ [35mLParen              [0m │ [33m"("[0m
+  [2m125  [0m │ 25:4       │ [35mIdentifier          [0m │ [33m"firstAbove"[0m
+  [2m126  [0m │ 25:14      │ [35mLParen              [0m │ [33m"("[0m
+  [2m127  [0m │ 25:15      │ [35mIdentifier          [0m │ [33m"nums"[0m
+  [2m128  [0m │ 25:19      │ [35mComma               [0m │ [33m","[0m
+  [2m129  [0m │ 25:21      │ [35mIntegerLiteral      [0m │ [33m"3"[0m
+  [2m130  [0m │ 25:22      │ [35mRParen              [0m │ [33m")"[0m
+  [2m131  [0m │ 25:24      │ [35mBangEq              [0m │ [33m"!=="[0m
+  [2m132  [0m │ 25:28      │ [35mIntegerLiteral      [0m │ [33m"4"[0m
+  [2m133  [0m │ 25:29      │ [35mRParen              [0m │ [33m")"[0m
+  [2m134  [0m │ 25:31      │ [35mThrow               [0m │ [33m"throw"[0m
+  [2m135  [0m │ 25:37      │ [35mNew                 [0m │ [33m"new"[0m
+  [2m136  [0m │ 25:41      │ [35mIdentifier          [0m │ [33m"Error"[0m
+  [2m137  [0m │ 25:46      │ [35mLParen              [0m │ [33m"("[0m
+  [2m138  [0m │ 25:47      │ [35mStr                 [0m │ [33m"loop firstAbove"[0m
+  [2m139  [0m │ 25:64      │ [35mRParen              [0m │ [33m")"[0m
+  [2m140  [0m │ 26:0       │ [35mIdentifier          [0m │ [33m"print"[0m
+  [2m141  [0m │ 26:5       │ [35mLParen              [0m │ [33m"("[0m
+  [2m142  [0m │ 26:6       │ [35mStr                 [0m │ [33m"loop ok"[0m
+  [2m143  [0m │ 26:15      │ [35mRParen              [0m │ [33m")"[0m
+  [2m144  [0m │ 27:0       │ [35mEOF                 [0m │ [33m""[0m
   [2m── end: tokens ──[0m

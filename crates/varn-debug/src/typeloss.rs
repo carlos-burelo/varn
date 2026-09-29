@@ -21,12 +21,7 @@ use crate::render::truncate;
 
 use crate::flags::DebugFlags;
 
-const BOLD: &str = "\x1b[1m";
-const BLUE: &str = "\x1b[34m";
-const GREEN: &str = "\x1b[32m";
-const YELLOW: &str = "\x1b[33m";
-const DIM: &str = "\x1b[2m";
-const R: &str = "\x1b[0m";
+use varn_core::term::colors::{BLUE, BOLD, DIM, GREEN, R, YELLOW};
 
 /// A typed opcode and the generic one it replaces. The pair is the unit of
 /// measurement: `Add` alone says nothing, `Add` next to `AddInt` says the

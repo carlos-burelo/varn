@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // Element access on proven arrays in a compiled body: inline by element
 // representation, through a view (buffer, length, representation) cached
 // until something could move or reshape an array, and loop counters whose
@@ -112,33 +114,40 @@ let downMin = 0
 let overflows = 0
 const ints: int[] = [1, 2, 3, 4, 5]
 const bools: bool[] = [true, false, true]
-for (let i = 0; i < 1200; i = i + 1) {
-    sum = sum + arSum(ints, 5)
-    scaled = arScale([1.0, 2.0, 3.0], 2.0)
-    flags = flags + arFlags(bools)
-    const shared: dynamic[] = [1, 2]
-    reshaped = reshaped + arReshape(shared, shared)
-    grown = grown + arGrow(10)
-    const fresh: int[] = [1]
-    stale = stale + arStale(fresh, 40) + fresh[0]
-    alloc = alloc + arAlloc(20)
-    upMax = upMax + arUpToMax(9223372036854775807 - 3)
-    downMin = downMin + arDownToMin(-9223372036854775807 + 1)
-    overflows = overflows + arOverflows(9223372036854775807 - 2)
-}
 
-assert("int elements read inline", sum === 1200 * 15)
-assert("float elements read and written inline", scaled == 12.0)
 // The flags flip every call: 2 then 1 set.
-assert("bool elements", flags === 600 * 2 + 600 * 1)
 // 1 + 2, then 0.5 + 2 after the reshape.
-assert("a reshaped array through an alias", reshaped == 1200 * (3.0 + 2.5))
-assert("push inside the loop", grown === 1200 * 11)
-assert("a store after the buffer moved", stale === 1200 * (41 + 101))
 // "item-" plus the digits of 0..19.
-assert("an allocating loop", alloc === 1200 * (5 * 20 + 10 + 20))
-assert("a counter up to INT_MAX", upMax === 1200 * 3)
-assert("a counter down to INT_MIN", downMin === 1200 * 2)
-assert("an unproven step still overflows", overflows === 1200 * -3)
+await describe("150 jit arrays", async () => {
+        await it("group 1 part 1", async () => {
+        for (let i = 0; i < 1200; i = i + 1) {
+        sum = sum + arSum(ints, 5)
+        scaled = arScale([1.0, 2.0, 3.0], 2.0)
+        flags = flags + arFlags(bools)
+        const shared: dynamic[] = [1, 2]
+        reshaped = reshaped + arReshape(shared, shared)
+        grown = grown + arGrow(10)
+        const fresh: int[] = [1]
+        stale = stale + arStale(fresh, 40) + fresh[0]
+        alloc = alloc + arAlloc(20)
+        upMax = upMax + arUpToMax(9223372036854775807 - 3)
+        downMin = downMin + arDownToMin(-9223372036854775807 + 1)
+        overflows = overflows + arOverflows(9223372036854775807 - 2)
+        }
+        expect(sum).toBe(1200 * 15);
+        expect(scaled == 12.0).toBeTruthy();
+        expect(flags).toBe(600 * 2 + 600 * 1);
+        expect(reshaped == 1200 * (3.0 + 2.5)).toBeTruthy();
+        expect(grown).toBe(1200 * 11);
+    });
 
-print("[PASSED] 150. JIT arrays")
+    await it("group 1 part 2", async () => {
+        expect(stale).toBe(1200 * (41 + 101));
+        expect(alloc).toBe(1200 * (5 * 20 + 10 + 20));
+        expect(upMax).toBe(1200 * 3);
+        expect(downMin).toBe(1200 * 2);
+        expect(overflows).toBe(1200 * -3);
+    });
+
+
+});

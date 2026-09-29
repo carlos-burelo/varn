@@ -33,8 +33,6 @@ pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, err_tag: u64, err_payload:
         let error = VmValue::from_raw_parts(err_tag, err_payload);
         let err =
             crate::exec::exceptions::build_thrown_error(error, &ctx_ref.heap, &ctx_ref.frames);
-        let handler = ctx_ref.try_handlers.pop();
-        ctx_ref.jit_panic_exception_handler = handler;
         ctx_ref.jit_panic_exception_error = Some(err.thrown.unwrap_or(VmValue::null()));
         ctx_ref.jit_panic_exception_err_obj = Some(err);
 

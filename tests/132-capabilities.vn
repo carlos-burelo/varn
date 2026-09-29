@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 class Money {
     cents: int
     constructor(c: int) { this.cents = c }
@@ -12,31 +14,38 @@ class Money {
 }
 
 function same<T>(a: Equatable<T>, b: T): bool { return a.equals(b) }
-assert("Equatable is structural", same(new Money(1), new Money(1)))
 
 const c: Comparable<Money> = new Money(5)
-assert("Comparable", c.compare(new Money(3)) > 0)
 
 const h: Hashable = new Money(5)
 const k: Cloneable<Money> = new Money(9)
 const d: Display = new Money(7)
 const g: Debug = new Money(7)
-assert("Hashable / Cloneable", h.hash() === 5 && k.clone().cents === 9)
-assert("Display / Debug", d.toString() === "$7" && g.debug() === "Money(7)")
 
 const plus: Add<Money, Money> = new Money(1)
 const minus: Neg<Money> = new Money(2)
-assert("Add / Neg", plus.add(new Money(2)).cents === 3 && minus.neg().cents === -2)
 
 class Box { v: int; constructor(v: int) { this.v = v } get(key: int): int? { return key === 0 ? this.v : null } }
 const ix: Indexable<int, int> = new Box(4)
-assert("Indexable", ix.get(0) === 4 && ix.get(1) === null)
 
 class Settings {
     retries: int = 3
     static default(): Settings { return new Settings() }
 }
 function make<T>(factory: Default<T>): T { return factory.default() }
-assert("Default via the class's static factory", make(Settings).retries === 3)
+await describe("132 capabilities", async () => {
+        await it("group 1 part 1", async () => {
+        expect(same(new Money(1), new Money(1))).toBeTruthy();
+        expect(c.compare(new Money(3)) > 0).toBeTruthy();
+        expect(h.hash() === 5 && k.clone().cents).toBe(9);
+        expect(d.toString() === "$7" && g.debug()).toBe("Money(7)");
+    });
 
-print("[PASSED] 132. Capabilities")
+    await it("group 1 part 2", async () => {
+        expect(plus.add(new Money(2)).cents === 3 && minus.neg().cents).toBe(-2);
+        expect(ix.get(0) === 4 && ix.get(1)).toBe(null);
+        expect(make(Settings).retries).toBe(3);
+    });
+
+
+});

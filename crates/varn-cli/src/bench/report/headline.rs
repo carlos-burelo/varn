@@ -186,6 +186,7 @@ pub struct Headline<'a> {
     #[allow(dead_code)]
     pub coverage_scope: &'a str,
     pub top_blocker: Option<(String, String)>,
+    pub tiered_during_window: u64,
     pub cpu: Option<crate::cpu_freq::CpuFreq>,
     /// All pipeline phases — renders individual proportional bars.
     pub phases: Option<&'a [PhaseStats]>,
@@ -249,7 +250,7 @@ impl Headline<'_> {
 
                 let bar_str = proportional_bar(share, BAR_W);
                 let colored_bar = (phase.color_fn)(chalk(bar_str.as_str())).to_string();
-                let name_plain = format!("{:<10}", phase.name);
+                let name_plain = format!("{:<14}", phase.name);
                 let colored_name = (phase.color_fn)(chalk(name_plain.as_str()))
                     .bold()
                     .to_string();
@@ -257,7 +258,7 @@ impl Headline<'_> {
                 let pct_str = format!("{:>5}", fmt_pct(share));
 
                 // For execute: show JIT compile note inline if it fits.
-                let compile_note = if phase.name == "execute" {
+                let compile_note = if phase.name == "execute (warm)" {
                     self.split
                         .as_ref()
                         .map(|s| {
@@ -337,6 +338,13 @@ impl Headline<'_> {
                     let tiering = jit.never_compiled_frames();
                     let note = format!("{} entradas de calentamiento (tiering)", fmt_num(tiering));
                     terminal::log(box_line(&chalk(note).dim().to_string()));
+                }
+                if self.tiered_during_window > 0 {
+                    let note = format!(
+                        "{} fns compiladas durante la ventana (tiering)",
+                        fmt_num(self.tiered_during_window)
+                    );
+                    terminal::log(box_line(&chalk(note).yellow().to_string()));
                 }
             }
         } else if show_jit_section {

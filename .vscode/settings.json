@@ -8,6 +8,8 @@
   "Varn.buildMode": "debug",
   "editor.semanticHighlighting.enabled": true,
   "[varn]": {
-    "editor.semanticHighlighting.enabled": true
-  }
+    "editor.semanticHighlighting.enabled": true,
+    "editor.inlayHints.enabled": "off"
+  },
+  "Varn.inlayHints.enabled": false
 }

@@ -249,7 +249,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     };
 
     const PROG_BAR: usize = 32;
-    let (exec_samples, cpu_freq) = time_n_freq_setup_progress(
+    let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup_progress(
         runs,
         || {
             varn_builtins::reset_testing_counters();
@@ -330,7 +330,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         run_vm_to_completion(&mut machine, closure)
     })?;
 
-    let e2e_stats = PhaseStats::from_samples("e2e", |c| c.cyan(), &e2e_samples);
+    let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![
         PhaseStats::from_samples("read", |c| c.white(), &read_samples),
         PhaseStats::from_samples("lex", |c| c.yellow(), &lex_samples),
@@ -338,10 +338,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         PhaseStats::from_samples("check", |c| c.red(), &check_samples),
         PhaseStats::from_samples("compile", |c| c.magenta(), &compile_only_samples),
         PhaseStats::from_samples("optimize", |c| c.yellow(), &optimize_samples),
-        PhaseStats::from_samples("execute", |c| c.blue(), &exec_samples),
+        PhaseStats::from_samples("execute (warm)", |c| c.blue(), &exec_samples),
     ];
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
-    let execute = phases.iter().find(|p| p.name == "execute");
+    let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
     // One instrumented run supplies every JIT figure. Taking them from the
     // timed window instead would mix per-run quantities (compile time, which
@@ -374,6 +374,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         jit: Some(&exec_jit),
         coverage_scope: "programa completo",
         top_blocker: top_blocker(&records),
+        tiered_during_window,
         cpu: cpu_freq,
         phases: Some(&phases),
         e2e_samples: Some(&e2e_samples),

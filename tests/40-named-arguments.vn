@@ -1,23 +1,14 @@
+import { describe, it, expect } from "std:test";
+
+
 // 40-named-arguments.Varn
 
-function describe(name: str, age: int, city: str | null = null): str {
+function describePerson(name: str, age: int, city: str | null = null): str {
     if (city == null) {
         city = "Unknown";
     }
     return name + " is " + age.toString() + " years old and lives in " + city;
 }
-
-// 1. Basic usage - in order
-assert("Basic in-order", describe(name: "Alice", age: 30, city: "London") == "Alice is 30 years old and lives in London");
-
-// 2. Out of order
-assert("Out of order", describe(age: 25, name: "Bob") == "Bob is 25 years old and lives in Unknown");
-
-// 3. Mixed positional and named
-assert("Mixed positional and named", describe("Charlie", age: 40) == "Charlie is 40 years old and lives in Unknown");
-
-// 4. Using default values with named args
-assert("Default values", describe(name: "Diana", age: 35) == "Diana is 35 years old and lives in Unknown");
 
 // 5. Named arguments in methods
 class Person {
@@ -31,16 +22,32 @@ class Person {
     }
 }
 
-const p = new Person("Eve");
-assert("Method named args", p.greet(greeting: "Hello", formal: true) == "Hello, Eve");
-assert("Method default args", p.greet(greeting: "Hi") == "Hi Eve");
-
 // 6. Generic functions with named args
 function identity<T>(value: T, label: str): T {
 
     return value;
 }
-
-assert("Generic function named args", identity<int>(value: 42, label: "Answer") == 42);
-
-print("[PASSED] 40. Named arguments ")
+await describe("40 named arguments", async () => {
+    await it("tests", async () => {
+        
+        // 1. Basic usage - in order
+        expect(describePerson(name: "Alice", age: 30, city: "London") == "Alice is 30 years old and lives in London").toBeTruthy();
+        
+        // 2. Out of order
+        expect(describePerson(age: 25, name: "Bob") == "Bob is 25 years old and lives in Unknown").toBeTruthy();
+        
+        // 3. Mixed positional and named
+        expect(describePerson("Charlie", age: 40) == "Charlie is 40 years old and lives in Unknown").toBeTruthy();
+        
+        // 4. Using default values with named args
+        expect(describePerson(name: "Diana", age: 35) == "Diana is 35 years old and lives in Unknown").toBeTruthy();
+        
+        const p = new Person("Eve");
+        expect(p.greet(greeting: "Hello", formal: true) == "Hello, Eve").toBeTruthy();
+        expect(p.greet(greeting: "Hi") == "Hi Eve").toBeTruthy();
+        
+        expect(identity<int>(value: 42, label: "Answer") == 42).toBeTruthy();
+        
+        
+    });
+});

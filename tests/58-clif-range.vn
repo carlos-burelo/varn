@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // `a..b` under Cranelift.
 //
 // The regression: `0..5` lowers to `InvokeRuntimeStatic`, whose helper takes
@@ -14,19 +17,19 @@
 
 function rangeExcl(): int {
     let r = 0..5
-    assert("clif range start", r.start === 0)
-    assert("clif range end", r.end === 5)
-    assert("clif range length", r.length === 5)
-    assert("clif range contains", r.contains(3))
-    assert("clif range excludes end", !r.contains(5))
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(5)
+    expect(r.length).toBe(5)
+    expect(r.contains(3)).toBeTruthy()
+    expect(!r.contains(5)).toBeTruthy()
     return r.end
 }
 
 function rangeIncl(): int {
     let r = 1..=5
-    assert("clif range incl end", r.end === 5)
-    assert("clif range incl length", r.length === 5)
-    assert("clif range incl bound", r.contains(5))
+    expect(r.end).toBe(5)
+    expect(r.length).toBe(5)
+    expect(r.contains(5)).toBeTruthy()
     return r.end
 }
 
@@ -34,19 +37,24 @@ function rangeIncl(): int {
 // the expression left them in.
 function rangeComputed(lo: int, hi: int): int {
     let r = (lo + 1)..(hi * 2)
-    assert("clif range computed start", r.start === 3)
-    assert("clif range computed end", r.end === 8)
+    expect(r.start).toBe(3)
+    expect(r.end).toBe(8)
     return r.length
 }
 
 function rangeToArray(): int {
     let a = (0..4).toArray()
-    assert("clif range toArray len", a.length === 4)
-    assert("clif range toArray last", a[3] === 3)
+    expect(a.length).toBe(4)
+    expect(a[3]).toBe(3)
     return a.length
 }
-
-assert("clif range excl returns", rangeExcl() === 5)
-assert("clif range incl returns", rangeIncl() === 5)
-assert("clif range computed len", rangeComputed(2, 4) === 5)
-assert("clif range toArray", rangeToArray() === 4)
+await describe("58 clif range", async () => {
+    await it("tests", async () => {
+        
+        expect(rangeExcl()).toBe(5)
+        expect(rangeIncl()).toBe(5)
+        expect(rangeComputed(2, 4)).toBe(5)
+        expect(rangeToArray()).toBe(4)
+        
+    });
+});

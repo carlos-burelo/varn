@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // Classes and enums declared inside a function body: each is one module-wide
 // nominal type, built where its declaration first runs.
 
@@ -49,15 +51,21 @@ function ltSame(): LtBase {
 let dirs = 0
 let shapes = ""
 let counts = 0
-for (let i = 0; i < 2000; i = i + 1) {
-    dirs = dirs + ltEnum(i)
-    shapes = ltShapes(i)
-    counts = counts + ltCounter(4)
-}
+await describe("153 local types", async () => {
+        await it("group 1 part 1", async () => {
+        for (let i = 0; i < 2000; i = i + 1) {
+        dirs = dirs + ltEnum(i)
+        shapes = ltShapes(i)
+        counts = counts + ltCounter(4)
+        }
+        expect(dirs).toBe(1000);
+        expect(shapes == "kid1999" && ltShapes(2) == "kid20").toBeTruthy();
+    });
 
-assert("a local enum", dirs === 1000)
-assert("a local payload enum and a local subclass", shapes == "kid1999" && ltShapes(2) == "kid20")
-assert("a local class using a local enum", counts === 2000 * 6)
-assert("a local class declared again on a later call", ltSame().hello() == "base" && ltSame().hello() == "base")
+    await it("group 1 part 2", async () => {
+        expect(counts).toBe(2000 * 6);
+        expect(ltSame().hello() == "base" && ltSame().hello() == "base").toBeTruthy();
+    });
 
-print("[PASSED] 153. Local classes and enums")
+
+});

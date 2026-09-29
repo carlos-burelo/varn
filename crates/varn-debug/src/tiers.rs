@@ -18,12 +18,7 @@ use crate::walk::constants_for_inspect;
 
 use crate::flags::DebugFlags;
 
-const BOLD: &str = "\x1b[1m";
-const GREEN: &str = "\x1b[32m";
-const YELLOW: &str = "\x1b[33m";
-const RED: &str = "\x1b[31m";
-const DIM: &str = "\x1b[2m";
-const R: &str = "\x1b[0m";
+use varn_core::term::colors::{BOLD, DIM, GREEN, R, RED, YELLOW};
 
 /// Why a function is not compiled, in the order production decides it.
 #[derive(PartialEq, Eq)]

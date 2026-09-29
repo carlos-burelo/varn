@@ -1,4 +1,6 @@
+import { describe, it, expect } from "std:test";
 import { spawnIsolate, sleep, channel, Sender, Receiver, ChannelClosed } from "std:task";
+
 
 enum Msg { Val(int), Exit }
 
@@ -7,17 +9,17 @@ type ValueMsg = { value: int }
 // 1. ping-pong básico
 export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
     const data = await rx.receive();
-    assert("msg in child", data.value === 10);
+    expect(data.value).toBe(10);
     await tx.send(data.value * 2);
 }
 
 // 2. args múltiples de inicio (sin canal de entrada)
 export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Array<int>, obj: { x: str }) {
-    assert("num arg", num === 42);
-    assert("text arg", text === "hello");
-    assert("arr arg length", arr.length === 3);
-    assert("arr arg item", arr[1] === 2);
-    assert("obj arg item", obj.x === "nested");
+    expect(num).toBe(42);
+    expect(text).toBe("hello");
+    expect(arr.length).toBe(3);
+    expect(arr[1]).toBe(2);
+    expect(obj.x).toBe("nested");
     await tx.send("args_ok");
 }
 
@@ -50,27 +52,27 @@ async function testIsolates() {
     const out1 = channel<int>(1)
     const h1 = await spawnIsolate(workerMain, [in1.rx, out1.tx])
     await in1.tx.send({ value: 10 })
-    assert("response from basic worker", await out1.rx.receive() === 20)
+    expect(await out1.rx.receive()).toBe(20)
     await h1.join()
 
     // ---- 2 ----
     const out2 = channel<str>(1)
     await spawnIsolate(workerArgs, [out2.tx, 42, "hello", [1, 2, 3], { x: "nested" }])
-    assert("response from args worker", await out2.rx.receive() === "args_ok")
+    expect(await out2.rx.receive()).toBe("args_ok")
 
     // ---- 3 ----
     const in3 = channel<Msg>(2)
     const out3 = channel<int>(2)
     const h3 = await spawnIsolate(workerDialog, [in3.rx, out3.tx])
     await in3.tx.send(Msg.Val(1))
-    assert("dialog 1", await out3.rx.receive() === 2)
+    expect(await out3.rx.receive()).toBe(2)
     await in3.tx.send(Msg.Val(100))
-    assert("dialog 2", await out3.rx.receive() === 101)
+    expect(await out3.rx.receive()).toBe(101)
     await in3.tx.send(Msg.Exit)
     await h3.join()
     let dialogClosed = false
     try { await out3.rx.receive() } catch (e) { dialogClosed = e instanceof ChannelClosed }
-    assert("dialog closed", dialogClosed)
+    expect(dialogClosed).toBeTruthy()
 
     // ---- 4 ----
     const c1 = channel<int>(1)
@@ -79,9 +81,9 @@ async function testIsolates() {
     await spawnIsolate(workerParallel, [c1.tx, 1, 2])
     await spawnIsolate(workerParallel, [c2.tx, 2, 0])
     await spawnIsolate(workerParallel, [c3.tx, 3, 1])
-    assert("w2 result", await c2.rx.receive() === 20)
-    assert("w3 result", await c3.rx.receive() === 30)
-    assert("w1 result", await c1.rx.receive() === 10)
+    expect(await c2.rx.receive()).toBe(20)
+    expect(await c3.rx.receive()).toBe(30)
+    expect(await c1.rx.receive()).toBe(10)
 
     // ---- 5/6: errores de spawn (igual que antes) ----
     let threwAnon = false
@@ -89,22 +91,26 @@ async function testIsolates() {
         await spawnIsolate((tx: Sender<str>) => {}, [])
     } catch (e) {
         threwAnon = true
-        assert("error message for anon function", e.message.indexOf("must be a function reference") >= 0)
+        expect(e.message.indexOf("must be a function reference") >= 0).toBeTruthy()
     }
-    assert("should throw for anon function", threwAnon)
+    expect(threwAnon).toBeTruthy()
 
     let threwUnexported = false
     try {
         await spawnIsolate(localUnexported, [])
     } catch (e) {
         threwUnexported = true
-        assert("error message for unexported function", e.message.indexOf("is not a top-level exported function") >= 0)
+        expect(e.message.indexOf("is not a top-level exported function") >= 0).toBeTruthy()
     }
-    assert("should throw for unexported function", threwUnexported)
+    expect(threwUnexported).toBeTruthy()
 
-    print("[PASSED] 47. Isolates + typed channels")
 }
-
-if (!isIsolate) {
-    await testIsolates();
-}
+await describe("47 isolates multithread", async () => {
+    await it("tests", async () => {
+        
+        if (!isIsolate) {
+            await testIsolates();
+        }
+        
+    });
+});

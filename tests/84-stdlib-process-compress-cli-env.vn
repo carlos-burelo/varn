@@ -3,15 +3,12 @@ import { Compress } from "std:compress";
 import { CLI } from "std:cli";
 import { Env } from "std:env";
 import { Path } from "std:path";
-import { assert, assertEqual } from "std:test";
+import { describe, it, expect } from "std:test";
 
 // ==========================================
 // 1. Process Execution (std:process)
 // ==========================================
 let procRes = Process.exec("echo VarnProcessTest");
-assertEqual(procRes.exitCode, 0);
-assertEqual(procRes.success, true);
-assert(procRes.stdout.includes("VarnProcessTest"));
 
 // ==========================================
 // 2. Compression & Decompression (std:compress)
@@ -20,51 +17,63 @@ let originalText = "Varn Language: Fast, Type-Safe, High-Performance Systems Lan
 
 // Gzip roundtrip
 let gzipped = Compress.gzip(originalText);
-assert(gzipped.length > 0);
 let unzipped = Compress.gunzip(gzipped);
-assertEqual(unzipped.toString(), originalText);
 
 // Deflate / Inflate roundtrip
 let deflated = Compress.deflate(originalText);
-assert(deflated.length > 0);
 let inflated = Compress.inflate(deflated);
-assertEqual(inflated.toString(), originalText);
 
 // ==========================================
 // 3. CLI Argument Parser (std:cli)
 // ==========================================
 let sampleArgs = ["--port=9000", "--host=localhost", "-d", "serve", "api/v1"];
 let parsed = CLI.parse(sampleArgs);
-assertEqual(parsed.flags["port"], "9000");
-assertEqual(parsed.flags["host"], "localhost");
-assertEqual(parsed.flags["d"], "true");
-assertEqual(parsed.positionals.length, 2);
-assertEqual(parsed.positionals[0], "serve");
-assertEqual(parsed.positionals[1], "api/v1");
 
 // ==========================================
 // 4. Environment Variables (std:env)
 // ==========================================
-Env.set("VARN_TEST_PORT", "8080");
-assertEqual(Env.get("VARN_TEST_PORT"), "8080");
-assertEqual(Env.getInt("VARN_TEST_PORT", 3000), 8080);
-assertEqual(Env.getInt("VARN_NON_EXISTING_KEY", 5000), 5000);
-
-Env.set("VARN_DEBUG_FLAG", "true");
-assertEqual(Env.getBool("VARN_DEBUG_FLAG", false), true);
 
 let dotEnvContent = "# Configuration\nAPP_NAME=VarnServer\nPORT=4000\nDEBUG=true\n";
 let envMap = Env.parse(dotEnvContent);
-assertEqual(envMap["APP_NAME"], "VarnServer");
-assertEqual(envMap["PORT"], "4000");
-assertEqual(envMap["DEBUG"], "true");
 
 // ==========================================
 // 5. Canonical Path Namespace (std:path)
 // ==========================================
 let joinedPath = Path.join("src", "modules", "app.vn");
-assert(joinedPath.includes("src") && joinedPath.includes("app.vn"));
-assertEqual(Path.extname("archive.tar.gz"), ".gz");
-assertEqual(Path.extname("index.html"), ".html");
+await describe("84 stdlib process compress cli env", async () => {
+        await it("group 1 part 1", async () => {
+        expect(procRes.exitCode).toBe(0);
+        expect(procRes.success).toBe(true);
+        expect(procRes.stdout.includes("VarnProcessTest")).toBeTruthy();
+        expect(gzipped.length > 0).toBeTruthy();
+        expect(unzipped.toString()).toBe(originalText);
+        expect(deflated.length > 0).toBeTruthy();
+        expect(inflated.toString()).toBe(originalText);
+        expect(parsed.flags["port"]).toBe("9000");
+    });
 
-print("[PASSED] 84. Overhauled StdLib (std:process, std:compress, std:cli, std:env & Path namespace)");
+    await it("group 1 part 2", async () => {
+        expect(parsed.flags["host"]).toBe("localhost");
+        expect(parsed.flags["d"]).toBe("true");
+        expect(parsed.positionals.length).toBe(2);
+        expect(parsed.positionals[0]).toBe("serve");
+        expect(parsed.positionals[1]).toBe("api/v1");
+        Env.set("VARN_TEST_PORT", "8080");
+        expect(Env.get("VARN_TEST_PORT")).toBe("8080");
+        expect(Env.getInt("VARN_TEST_PORT", 3000)).toBe(8080);
+        expect(Env.getInt("VARN_NON_EXISTING_KEY", 5000)).toBe(5000);
+        Env.set("VARN_DEBUG_FLAG", "true");
+    });
+
+    await it("group 1 part 3", async () => {
+        expect(Env.getBool("VARN_DEBUG_FLAG", false)).toBe(true);
+        expect(envMap["APP_NAME"]).toBe("VarnServer");
+        expect(envMap["PORT"]).toBe("4000");
+        expect(envMap["DEBUG"]).toBe("true");
+        expect(joinedPath.includes("src") && joinedPath.includes("app.vn")).toBeTruthy();
+        expect(Path.extname("archive.tar.gz")).toBe(".gz");
+        expect(Path.extname("index.html")).toBe(".html");
+    });
+
+
+});

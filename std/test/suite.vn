@@ -4,28 +4,28 @@ function logLine(msg: str): void {
     write$(msg + "\n");
 }
 
-let beforeAllFns: Array<() => void> = [];
-let afterAllFns: Array<() => void> = [];
-let beforeEachFns: Array<() => void> = [];
-let afterEachFns: Array<() => void> = [];
+let beforeAllFns: Array<() => dynamic> = [];
+let afterAllFns: Array<() => dynamic> = [];
+let beforeEachFns: Array<() => dynamic> = [];
+let afterEachFns: Array<() => dynamic> = [];
 
-export function beforeAll(fn: () => void): void {
+export function beforeAll(fn: () => dynamic): void {
     beforeAllFns.push(fn);
 }
 
-export function afterAll(fn: () => void): void {
+export function afterAll(fn: () => dynamic): void {
     afterAllFns.push(fn);
 }
 
-export function beforeEach(fn: () => void): void {
+export function beforeEach(fn: () => dynamic): void {
     beforeEachFns.push(fn);
 }
 
-export function afterEach(fn: () => void): void {
+export function afterEach(fn: () => dynamic): void {
     afterEachFns.push(fn);
 }
 
-export function describe(suiteName: str, body: () => void): void {
+export async function describe(suiteName: str, body: () => dynamic): Task<void> {
     logLine("=== Suite: " + suiteName + " ===");
     let prevBeforeAll = beforeAllFns;
     let prevAfterAll = afterAllFns;
@@ -38,9 +38,9 @@ export function describe(suiteName: str, body: () => void): void {
     afterEachFns = [];
 
     try {
-        for (let fn of beforeAllFns) fn();
-        body();
-        for (let fn of afterAllFns) fn();
+        for (let fn of beforeAllFns) await fn();
+        await body();
+        for (let fn of afterAllFns) await fn();
     } finally {
         beforeAllFns = prevBeforeAll;
         afterAllFns = prevAfterAll;
@@ -49,15 +49,15 @@ export function describe(suiteName: str, body: () => void): void {
     }
 }
 
-export function suite(suiteName: str, body: () => void): void {
-    describe(suiteName, body);
+export async function suite(suiteName: str, body: () => dynamic): Task<void> {
+    await describe(suiteName, body);
 }
 
-export function test(testName: str, body: () => void): void {
+export async function test(testName: str, body: () => dynamic): Task<void> {
     try {
-        for (let fn of beforeEachFns) fn();
-        body();
-        for (let fn of afterEachFns) fn();
+        for (let fn of beforeEachFns) await fn();
+        await body();
+        for (let fn of afterEachFns) await fn();
         logLine("  ✔ " + testName);
     } catch (err) {
         logLine("  ✖ " + testName + ": " + err);
@@ -65,6 +65,6 @@ export function test(testName: str, body: () => void): void {
     }
 }
 
-export function it(testName: str, body: () => void): void {
-    test(testName, body);
+export async function it(testName: str, body: () => dynamic): Task<void> {
+    await test(testName, body);
 }

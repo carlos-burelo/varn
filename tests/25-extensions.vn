@@ -1,68 +1,68 @@
+import { describe, it, expect } from "std:test";
+
 extension StringUtils on str {
-    shout(): str { return this + "!" }
+    shout(): str { return this + "!"; }
     times(n: int): str {
-        let result = ""
-        let i = 0
-        while (i < n) { result = result + this; i = i + 1 }
-        return result
+        let result = "";
+        let i = 0;
+        while (i < n) { result = result + this; i = i + 1; }
+        return result;
     }
     wordCount(): int {
-        let count = 0
-        let inWord = false
-        let i = 0
+        let count = 0;
+        let inWord = false;
+        let i = 0;
         while (i < this.length) {
-            const ch = this[i]
-            if (ch !== " " && !inWord) { count = count + 1; inWord = true }
-            else if (ch === " ") { inWord = false }
-            i = i + 1
+            const ch = this[i];
+            if (ch !== " " && !inWord) { count = count + 1; inWord = true; }
+            else if (ch === " ") { inWord = false; }
+            i = i + 1;
         }
-        return count
+        return count;
     }
 }
-
-
-
 class Slot {
     value: int
-    constructor(v: int) { this.value = v }
+    constructor(v: int) { this.value = v; }
 }
-
 extension SlotOps on Slot {
-    doubled(): int { return this.value * 2 }
-    add(n: int): int { return this.value + n }
+    doubled(): int { return this.value * 2; }
+    add(n: int): int { return this.value + n; }
 }
-
 extension SlotAccessor on Slot {
-    get label(): str { return "Slot(" + this.value + ")" }
-    set label(s: str) { this.value = s.length }
+    get label(): str { return "Slot(" + this.value + ")"; }
+    set label(s: str) { this.value = s.length; }
 }
-
 extension IntUtils on int {
-    isEven(): bool { return this % 2 === 0 }
+    isEven(): bool { return this % 2 === 0; }
     clamp(lo: int, hi: int): int {
-        if (this < lo) { return lo }
-        if (this > hi) { return hi }
-        return this
+        if (this < lo) { return lo; }
+        if (this > hi) { return hi; }
+        return this;
     }
 }
 
+await describe("25 Extensions", async () => {
+    await it("str extensions", () => {
+        expect("hello".shout()).toBe("hello!");
+        expect("ab".times(3)).toBe("ababab");
+        expect("hello world foo".wordCount()).toBe(3);
+    });
 
-assert("str shout",          "hello".shout() === "hello!")
-assert("str times",          "ab".times(3) === "ababab")
-assert("str wordCount",      "hello world foo".wordCount() === 3)
+    await it("slot extensions", () => {
+        const slot = new Slot(5);
+        expect(slot.doubled()).toBe(10);
+        expect(slot.add(3)).toBe(8);
+        expect(slot.label).toBe("Slot(5)");
+        slot.label = "hello";
+        expect(slot.value).toBe(5);
+    });
 
-const slot = new Slot(5)
-assert("slot doubled",       slot.doubled() === 10)
-assert("slot add",           slot.add(3) === 8)
-
-assert("slot getter label",  slot.label === "Slot(5)")
-slot.label = "hello"
-assert("slot setter label",  slot.value === 5)
-
-assert("int isEven true",    (4).isEven() === true)
-assert("int isEven false",   (7).isEven() === false)
-assert("int clamp lo",       (2).clamp(5, 10) === 5)
-assert("int clamp hi",       (15).clamp(5, 10) === 10)
-assert("int clamp mid",      (7).clamp(5, 10) === 7)
-
-print("[PASSED] 25. Extensions ")
+    await it("int extensions", () => {
+        expect((4).isEven()).toBe(true);
+        expect((7).isEven()).toBe(false);
+        expect((2).clamp(5, 10)).toBe(5);
+        expect((15).clamp(5, 10)).toBe(10);
+        expect((7).clamp(5, 10)).toBe(7);
+    });
+});

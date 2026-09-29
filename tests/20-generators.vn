@@ -1,43 +1,47 @@
+import { describe, it, expect } from "std:test";
 
 function* range_gen(start: int, end: int) {
-    let i = start
+    let i = start;
     while (i < end) {
-        yield i
-        i = i + 1
+        yield i;
+        i = i + 1;
     }
 }
-
-const gen = range_gen(0, 5)
-const g0 = gen.next()
-assert("gen value 0",  g0.value === 0)
-assert("gen done 0",   !g0.done)
-gen.next()
-gen.next()
-const g3 = gen.next()
-assert("gen value 3",  g3.value === 3)
-const g4 = gen.next()
-assert("gen last",     g4.value === 4)
-const gend = gen.next()
-assert("gen done",     gend.done)
-
 function* fib_gen() {
-    let a = 0
-    let b = 1
+    let a = 0;
+    let b = 1;
     while (true) {
-        yield a
-        const tmp = a + b
-        a = b
-        b = tmp
+        yield a;
+        const tmp = a + b;
+        a = b;
+        b = tmp;
     }
 }
 
-const fib2 = fib_gen()
-const fibs: int[] = []
-for (let i = 0; i < 8; i = i + 1) {
-    fibs.push(fib2.next().value)
-}
-assert("fib gen [0]", fibs[0] === 0)
-assert("fib gen [1]", fibs[1] === 1)
-assert("fib gen [7]", fibs[7] === 13)
+await describe("20 Generators", async () => {
+    await it("range generator", () => {
+        const gen = range_gen(0, 5);
+        const g0 = gen.next();
+        expect(g0.value).toBe(0);
+        expect(!g0.done).toBeTruthy();
+        gen.next();
+        gen.next();
+        const g3 = gen.next();
+        expect(g3.value).toBe(3);
+        const g4 = gen.next();
+        expect(g4.value).toBe(4);
+        const gend = gen.next();
+        expect(gend.done).toBeTruthy();
+    });
 
-print("[PASSED] 20. Generators ")
+    await it("fibonacci generator", () => {
+        const fib2 = fib_gen();
+        const fibs: int[] = [];
+        for (let i = 0; i < 8; i = i + 1) {
+            fibs.push(fib2.next().value);
+        }
+        expect(fibs[0]).toBe(0);
+        expect(fibs[1]).toBe(1);
+        expect(fibs[7]).toBe(13);
+    });
+});

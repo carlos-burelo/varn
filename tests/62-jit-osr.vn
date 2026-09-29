@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // OSR enters compiled code MID-FRAME, so the interpreter's boxed frame slots
 // must be converted into exactly the representation the target block expects
 // (the kind-flow state at the loop header, NOT register_meta). Getting that
@@ -13,14 +16,12 @@ function osrIntCounter(n: int): int {
   for (let i: int = 0; i < n; i = i + 1) { s = s + (i % 7) }
   return s
 }
-assert("osr: int counter terminates and is exact", osrIntCounter(20000) === 59997)
 
 function osrFloatAccum(n: int): float {
   let s: float = 0.0
   for (let i: int = 0; i < n; i = i + 1) { s = s + 0.5 }
   return s
 }
-assert("osr: float accumulator", osrFloatAccum(20000) === 10000.0)
 
 // Mixed int/float registers across the OSR boundary.
 function osrMixed(n: int): float {
@@ -29,7 +30,6 @@ function osrMixed(n: int): float {
   for (let i: int = 0; i < n; i = i + 1) { k = k + 1; if (i % 2 === 0) { f = f + 0.25 } }
   return f + (k as float)
 }
-assert("osr: mixed int/float", osrMixed(20000) === 22501.0)
 
 // A loop whose body allocates: forces flush/reload safepoints under OSR.
 class OsrBox {
@@ -41,7 +41,6 @@ function osrAlloc(n: int): int {
   for (let i: int = 0; i < n; i = i + 1) { const b = new OsrBox(i % 3); s = s + b.v }
   return s
 }
-assert("osr: allocating loop", osrAlloc(20000) === 19999)
 
 // Nested loops — the inner back edge is hot first; only one OSR variant is
 // built, so the outer loop must keep working through the inner one's entry.
@@ -52,7 +51,6 @@ function osrNested(n: int): int {
   }
   return s
 }
-assert("osr: nested loops", osrNested(5000) === 50000)
 
 // Early return out of an OSR'd loop: the compiled body must return through
 // the wrapper's retag path like any other exit.
@@ -60,6 +58,15 @@ function osrEarlyReturn(n: int): int {
   for (let i: int = 0; i < n; i = i + 1) { if (i === 15000) { return i } }
   return -1
 }
-assert("osr: early return", osrEarlyReturn(20000) === 15000)
-
-print("[PASSED] 62. JIT OSR ")
+await describe("62 jit osr", async () => {
+    await it("tests", async () => {
+        expect(osrIntCounter(20000)).toBe(59997)
+        expect(osrFloatAccum(20000)).toBe(10000.0)
+        expect(osrMixed(20000)).toBe(22501.0)
+        expect(osrAlloc(20000)).toBe(19999)
+        expect(osrNested(5000)).toBe(50000)
+        expect(osrEarlyReturn(20000)).toBe(15000)
+        
+        
+    });
+});

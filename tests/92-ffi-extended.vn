@@ -1,13 +1,9 @@
-import { describe, test, Expectation } from "std:test";
+import { describe, it, expect } from "std:test";
 import { FFI, DynamicLibrary, Pointer, FfiType } from "std:ffi";
 import { platform } from "std:sys";
 
-function expect<T>(val: T): Expectation<T> {
-    return new Expectation<T>(val);
-}
-
-describe("Extended FFI API", () => {
-    test("Memory allocation and pointer integer read/write", () => {
+await describe("Extended FFI API", async () => {
+    await it("Memory allocation and pointer integer read/write", () => {
         let ptr = FFI.alloc(64);
         expect(ptr.isNull()).toBe(false);
 
@@ -29,7 +25,7 @@ describe("Extended FFI API", () => {
         ptr.free();
     });
 
-    test("Memory allocation and pointer float read/write", () => {
+    await it("Memory allocation and pointer float read/write", () => {
         let ptr = FFI.alloc(32);
         ptr.writeF64(123.456, 0);
         let val = ptr.readF64(0);
@@ -42,7 +38,7 @@ describe("Extended FFI API", () => {
         ptr.free();
     });
 
-    test("CString allocation, reading and freeing", () => {
+    await it("CString allocation, reading and freeing", () => {
         let text = "Varn Foreign Function Interface v2";
         let cstr = FFI.cStr(text);
         expect(cstr.isNull()).toBe(false);
@@ -56,7 +52,7 @@ describe("Extended FFI API", () => {
         cstr.free();
     });
 
-    test("Dynamic library loading, binding and calling native functions", () => {
+    await it("Dynamic library loading, binding and calling native functions", () => {
         let os = platform();
         let libName = os == "windows" ? "kernel32.dll"
                     : os == "macos"   ? "libSystem.B.dylib"

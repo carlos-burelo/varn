@@ -75,7 +75,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         proto: Rc::new(optimized_proto),
     };
 
-    let (exec_samples, cpu_freq) = time_n_freq_setup(
+    let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
         runs,
         || {
             varn_builtins::reset_testing_counters();
@@ -86,10 +86,10 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
 
     let phases = vec![
         PhaseStats::from_samples("load", |c| c.white(), &load_samples),
-        PhaseStats::from_samples("execute", |c| c.blue(), &exec_samples),
+        PhaseStats::from_samples("execute (warm)", |c| c.blue(), &exec_samples),
     ];
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
-    let execute = phases.iter().find(|p| p.name == "execute");
+    let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
     // One instrumented run supplies every JIT figure, so compile time stays
     // comparable to a single execute p50. See `source.rs` for why averaging a
@@ -121,6 +121,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         jit: Some(&exec_jit),
         coverage_scope: "bundle .vnc",
         top_blocker: top_blocker(&records),
+        tiered_during_window,
         cpu: cpu_freq,
         phases: Some(&phases),
         e2e_samples: None,

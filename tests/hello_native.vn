@@ -1,1 +1,7 @@
-print("Hola desde binario nativo puro x86-64 de Varn!");
+import { describe, it, expect } from "std:test";
+
+await describe("hello native", async () => {
+    await it("module loads", () => {
+        expect("hello").toBe("hello");
+    });
+});

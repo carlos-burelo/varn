@@ -1,3 +1,5 @@
+import { describe, it, expect } from "std:test";
+
 // A compiled branch whose condition is not a `bool` takes the interpreter's
 // truthiness rule (`VmValue::is_truthy`), not "the boxed value is
 // non-zero": a boxed `false`, `0` or `0.0` has a non-zero tag. Each function
@@ -20,16 +22,22 @@ function btMethod(v: dynamic): int {
 let truthy = 0
 let arrays = 0
 const probes: dynamic[] = ["1", "", [1, 2], 0, 7, 0.0, 2.5, null, false, true, { a: 1 }]
-for (let i = 0; i < 2200; i = i + 1) {
-    const p = probes[i % 11]
-    truthy = truthy + btDynamic(p)
-    arrays = arrays + btMethod(p)
-}
 
 // Only null, false, 0 and 0.0 are falsy: "1", "", [1, 2], 7, 2.5, true and
 // { a: 1 } are truthy.
-assert("branches follow the interpreter's truthiness", truthy === 200 * 7)
 // One array among the 11 probes, 200 rounds.
-assert("a method's dynamic bool in a branch", arrays === 200 * (100 + 10 * 10))
+await describe("146 jit branch truthiness", async () => {
+    await it("truthiness loop", async () => {
+        for (let i = 0; i < 2200; i = i + 1) {
+        const p = probes[i % 11]
+        truthy = truthy + btDynamic(p)
+        arrays = arrays + btMethod(p)
+        }
+    });
 
-print("[PASSED] 146. JIT branch truthiness")
+    await it("truthiness counts", async () => {
+        expect(truthy).toBe(200 * 7);
+        expect(arrays).toBe(200 * (100 + 10 * 10));
+    });
+
+});

@@ -1,24 +1,33 @@
+import { describe, it, expect } from "std:test";
+
 function fdiv(a: float, b: float): float { return a / b }
 function fmod(a: float, b: float): float { return a % b }
 
 const inf: float = fdiv(1.0, 0.0)
-assert("1/0 is +Infinity", inf === Infinity)
-assert("-1/0 is -Infinity", fdiv(0.0 - 1.0, 0.0) === 0.0 - Infinity)
 const nan: float = fdiv(0.0, 0.0)
-assert("0/0 is NaN", nan !== nan)
 const modNan: float = fmod(1.0, 0.0)
-assert("1 % 0 is NaN", modNan !== modNan)
 
 const negZero: float = 0.0 * (0.0 - 1.0)
-assert("-0 equals +0", negZero === 0.0)
-assert("1/-0 is -Infinity", fdiv(1.0, negZero) === 0.0 - Infinity)
 
 const tiny: float = 5e-324
-assert("subnormal survives", tiny > 0.0 && tiny / 2.0 === 0.0)
 
 let i = 0
 let hotInf = 0.0
-while (i < 500) { hotInf = fdiv(1.0, 0.0); i = i + 1 }
-assert("compiled 1/0 is +Infinity", hotInf === Infinity)
+await describe("121 float ieee", async () => {
+        await it("group 1 part 1", async () => {
+        expect(inf).toBe(Infinity);
+        expect(fdiv(0.0 - 1.0, 0.0)).toBe(0.0 - Infinity);
+        expect(nan !== nan).toBeTruthy();
+        expect(modNan !== modNan).toBeTruthy();
+    });
 
-print("[PASSED] 121. Float IEEE")
+    await it("group 1 part 2", async () => {
+        expect(negZero).toBe(0.0);
+        expect(fdiv(1.0, negZero)).toBe(0.0 - Infinity);
+        expect(tiny > 0.0 && tiny / 2.0).toBe(0.0);
+        while (i < 500) { hotInf = fdiv(1.0, 0.0); i = i + 1 }
+        expect(hotInf).toBe(Infinity);
+    });
+
+
+});

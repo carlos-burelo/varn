@@ -1,6 +1,8 @@
-// Test suite for the core Result/Option ADTs and extensions
+import { describe, it, expect } from "std:test";
 import { sha256 } from "std:crypto";
 import { Base64 } from "std:encoding";
+
+// Test suite for the core Result/Option ADTs and extensions
 
 extension StringExtensions on str {
     sha256(): str {
@@ -21,52 +23,56 @@ extension IntExtensions on int {
         return this * 60000;
     }
 }
-
-// 1. Result ADT with match and helper functions
-const okRes: Result<int, str> = Ok(42);
-const errRes: Result<int, str> = Err("something went wrong");
-
-assert("isOk true", okRes.isOk());
-assert("isOk false", !errRes.isOk());
-assert("isErr true", errRes.isErr());
-assert("unwrap ok", okRes.unwrap() === 42);
-assert("unwrapOr default", errRes.unwrapOr(100) === 100);
-
-const matchedVal = match (okRes) {
-    Ok(val) => val,
-    Err(_) => 0
-};
-assert("match Ok payload", matchedVal === 42);
-
-// 2. Option ADT
-const someOpt: Option<str> = Some("varn");
-const noneOpt: Option<str> = None;
-
-assert("isSome true", someOpt.isSome());
-assert("isNone true", noneOpt.isNone());
-
-// 3. Failure paths
-const caught = Result.catching<int>(() => {
-    throw new TypeError("boom");
+await describe("70 result extensions", async () => {
+    await it("tests", async () => {
+        
+        // 1. Result ADT with match and helper functions
+        const okRes: Result<int, str> = Ok(42);
+        const errRes: Result<int, str> = Err("something went wrong");
+        
+        expect(okRes.isOk()).toBeTruthy();
+        expect(!errRes.isOk()).toBeTruthy();
+        expect(errRes.isErr()).toBeTruthy();
+        expect(okRes.unwrap()).toBe(42);
+        expect(errRes.unwrapOr(100)).toBe(100);
+        
+        const matchedVal = match (okRes) {
+            Ok(val) => val,
+            Err(_) => 0
+        };
+        expect(matchedVal).toBe(42);
+        
+        // 2. Option ADT
+        const someOpt: Option<str> = Some("varn");
+        const noneOpt: Option<str> = None;
+        
+        expect(someOpt.isSome()).toBeTruthy();
+        expect(noneOpt.isNone()).toBeTruthy();
+        
+        // 3. Failure paths
+        const caught = Result.catching<int>(() => {
+            throw new TypeError("boom");
+        });
+        expect(caught.isErr()).toBeTruthy();
+        const caughtMessage = match (caught) {
+            Ok(_) => "",
+            Err(e) => e.message
+        };
+        expect(caughtMessage).toBe("boom");
+        
+        let unwrapNoneThrew = false;
+        try {
+            noneOpt.unwrap();
+        } catch (e) {
+            unwrapNoneThrew = true;
+        }
+        expect(unwrapNoneThrew).toBeTruthy();
+        
+        // 4. Extension methods
+        expect("hello".sha256().length).toBe(64);
+        expect(5.seconds()).toBe(5000);
+        expect(2.minutes()).toBe(120000);
+        
+        
+    });
 });
-assert("catching turns a throw into Err", caught.isErr());
-const caughtMessage = match (caught) {
-    Ok(_) => "",
-    Err(e) => e.message
-};
-assert("catching keeps the error", caughtMessage === "boom");
-
-let unwrapNoneThrew = false;
-try {
-    noneOpt.unwrap();
-} catch (e) {
-    unwrapNoneThrew = true;
-}
-assert("unwrap on None throws", unwrapNoneThrew);
-
-// 4. Extension methods
-assert("str.sha256 extension", "hello".sha256().length === 64);
-assert("int.seconds extension", 5.seconds() === 5000);
-assert("int.minutes extension", 2.minutes() === 120000);
-
-print("[PASSED] 70. Result/Option ADTs and extensions");

@@ -97,62 +97,74 @@
   [2m92   [0m │ 22:27      │ [35mLParen              [0m │ [33m"("[0m
   [2m93   [0m │ 22:28      │ [35mIntegerLiteral      [0m │ [33m"10"[0m
   [2m94   [0m │ 22:30      │ [35mRParen              [0m │ [33m")"[0m
-  [2m95   [0m │ 23:0       │ [35mIdentifier          [0m │ [33m"assert"[0m
-  [2m96   [0m │ 23:6       │ [35mLParen              [0m │ [33m"("[0m
-  [2m97   [0m │ 23:7       │ [35mStr                 [0m │ [33m"generics get"[0m
-  [2m98   [0m │ 23:21      │ [35mComma               [0m │ [33m","[0m
-  [2m99   [0m │ 23:23      │ [35mIdentifier          [0m │ [33m"intBox"[0m
-  [2m100  [0m │ 23:29      │ [35mDot                 [0m │ [33m"."[0m
-  [2m101  [0m │ 23:30      │ [35mGet                 [0m │ [33m"get"[0m
-  [2m102  [0m │ 23:33      │ [35mLParen              [0m │ [33m"("[0m
-  [2m103  [0m │ 23:34      │ [35mRParen              [0m │ [33m")"[0m
-  [2m104  [0m │ 23:36      │ [35mEqEq                [0m │ [33m"==="[0m
-  [2m105  [0m │ 23:40      │ [35mIntegerLiteral      [0m │ [33m"10"[0m
-  [2m106  [0m │ 23:42      │ [35mRParen              [0m │ [33m")"[0m
-  [2m107  [0m │ 24:0       │ [35mIdentifier          [0m │ [33m"assert"[0m
-  [2m108  [0m │ 24:6       │ [35mLParen              [0m │ [33m"("[0m
-  [2m109  [0m │ 24:7       │ [35mStr                 [0m │ [33m"generics identity"[0m
-  [2m110  [0m │ 24:26      │ [35mComma               [0m │ [33m","[0m
-  [2m111  [0m │ 24:28      │ [35mIdentifier          [0m │ [33m"identity"[0m
-  [2m112  [0m │ 24:36      │ [35mLAngle              [0m │ [33m"<"[0m
-  [2m113  [0m │ 24:37      │ [35mIdentifier          [0m │ [33m"int"[0m
-  [2m114  [0m │ 24:40      │ [35mRAngle              [0m │ [33m">"[0m
-  [2m115  [0m │ 24:41      │ [35mLParen              [0m │ [33m"("[0m
-  [2m116  [0m │ 24:42      │ [35mIntegerLiteral      [0m │ [33m"42"[0m
-  [2m117  [0m │ 24:44      │ [35mRParen              [0m │ [33m")"[0m
-  [2m118  [0m │ 24:46      │ [35mEqEq                [0m │ [33m"==="[0m
-  [2m119  [0m │ 24:50      │ [35mIntegerLiteral      [0m │ [33m"42"[0m
-  [2m120  [0m │ 24:52      │ [35mRParen              [0m │ [33m")"[0m
-  [2m121  [0m │ 25:0       │ [35mConst               [0m │ [33m"const"[0m
-  [2m122  [0m │ 25:6       │ [35mIdentifier          [0m │ [33m"strBox"[0m
-  [2m123  [0m │ 25:13      │ [35mEq                  [0m │ [33m"="[0m
-  [2m124  [0m │ 25:15      │ [35mIdentifier          [0m │ [33m"intBox"[0m
-  [2m125  [0m │ 25:21      │ [35mDot                 [0m │ [33m"."[0m
-  [2m126  [0m │ 25:22      │ [35mIdentifier          [0m │ [33m"map"[0m
-  [2m127  [0m │ 25:25      │ [35mLParen              [0m │ [33m"("[0m
-  [2m128  [0m │ 25:26      │ [35mLParen              [0m │ [33m"("[0m
-  [2m129  [0m │ 25:27      │ [35mIdentifier          [0m │ [33m"n"[0m
-  [2m130  [0m │ 25:28      │ [35mRParen              [0m │ [33m")"[0m
-  [2m131  [0m │ 25:30      │ [35mFatArrow            [0m │ [33m"=>"[0m
-  [2m132  [0m │ 25:33      │ [35mTemplateHead        [0m │ [33m"`value=${"[0m
-  [2m133  [0m │ 25:42      │ [35mIdentifier          [0m │ [33m"n"[0m
-  [2m134  [0m │ 25:44      │ [35mTemplateTail        [0m │ [33m"}`"[0m
-  [2m135  [0m │ 25:45      │ [35mRParen              [0m │ [33m")"[0m
-  [2m136  [0m │ 26:0       │ [35mIdentifier          [0m │ [33m"assert"[0m
-  [2m137  [0m │ 26:6       │ [35mLParen              [0m │ [33m"("[0m
-  [2m138  [0m │ 26:7       │ [35mStr                 [0m │ [33m"generics map"[0m
-  [2m139  [0m │ 26:21      │ [35mComma               [0m │ [33m","[0m
-  [2m140  [0m │ 26:23      │ [35mIdentifier          [0m │ [33m"strBox"[0m
-  [2m141  [0m │ 26:29      │ [35mDot                 [0m │ [33m"."[0m
-  [2m142  [0m │ 26:30      │ [35mGet                 [0m │ [33m"get"[0m
-  [2m143  [0m │ 26:33      │ [35mLParen              [0m │ [33m"("[0m
-  [2m144  [0m │ 26:34      │ [35mRParen              [0m │ [33m")"[0m
-  [2m145  [0m │ 26:36      │ [35mEqEq                [0m │ [33m"==="[0m
-  [2m146  [0m │ 26:40      │ [35mStr                 [0m │ [33m"value=10"[0m
-  [2m147  [0m │ 26:50      │ [35mRParen              [0m │ [33m")"[0m
-  [2m148  [0m │ 27:0       │ [35mIdentifier          [0m │ [33m"print"[0m
-  [2m149  [0m │ 27:5       │ [35mLParen              [0m │ [33m"("[0m
-  [2m150  [0m │ 27:6       │ [35mStr                 [0m │ [33m"generics ok"[0m
-  [2m151  [0m │ 27:19      │ [35mRParen              [0m │ [33m")"[0m
-  [2m152  [0m │ 28:0       │ [35mEOF                 [0m │ [33m""[0m
+  [2m95   [0m │ 23:0       │ [35mIf                  [0m │ [33m"if"[0m
+  [2m96   [0m │ 23:3       │ [35mLParen              [0m │ [33m"("[0m
+  [2m97   [0m │ 23:4       │ [35mIdentifier          [0m │ [33m"intBox"[0m
+  [2m98   [0m │ 23:10      │ [35mDot                 [0m │ [33m"."[0m
+  [2m99   [0m │ 23:11      │ [35mGet                 [0m │ [33m"get"[0m
+  [2m100  [0m │ 23:14      │ [35mLParen              [0m │ [33m"("[0m
+  [2m101  [0m │ 23:15      │ [35mRParen              [0m │ [33m")"[0m
+  [2m102  [0m │ 23:17      │ [35mBangEq              [0m │ [33m"!=="[0m
+  [2m103  [0m │ 23:21      │ [35mIntegerLiteral      [0m │ [33m"10"[0m
+  [2m104  [0m │ 23:23      │ [35mRParen              [0m │ [33m")"[0m
+  [2m105  [0m │ 23:25      │ [35mThrow               [0m │ [33m"throw"[0m
+  [2m106  [0m │ 23:31      │ [35mNew                 [0m │ [33m"new"[0m
+  [2m107  [0m │ 23:35      │ [35mIdentifier          [0m │ [33m"Error"[0m
+  [2m108  [0m │ 23:40      │ [35mLParen              [0m │ [33m"("[0m
+  [2m109  [0m │ 23:41      │ [35mStr                 [0m │ [33m"generics get"[0m
+  [2m110  [0m │ 23:55      │ [35mRParen              [0m │ [33m")"[0m
+  [2m111  [0m │ 24:0       │ [35mIf                  [0m │ [33m"if"[0m
+  [2m112  [0m │ 24:3       │ [35mLParen              [0m │ [33m"("[0m
+  [2m113  [0m │ 24:4       │ [35mIdentifier          [0m │ [33m"identity"[0m
+  [2m114  [0m │ 24:12      │ [35mLAngle              [0m │ [33m"<"[0m
+  [2m115  [0m │ 24:13      │ [35mIdentifier          [0m │ [33m"int"[0m
+  [2m116  [0m │ 24:16      │ [35mRAngle              [0m │ [33m">"[0m
+  [2m117  [0m │ 24:17      │ [35mLParen              [0m │ [33m"("[0m
+  [2m118  [0m │ 24:18      │ [35mIntegerLiteral      [0m │ [33m"42"[0m
+  [2m119  [0m │ 24:20      │ [35mRParen              [0m │ [33m")"[0m
+  [2m120  [0m │ 24:22      │ [35mBangEq              [0m │ [33m"!=="[0m
+  [2m121  [0m │ 24:26      │ [35mIntegerLiteral      [0m │ [33m"42"[0m
+  [2m122  [0m │ 24:28      │ [35mRParen              [0m │ [33m")"[0m
+  [2m123  [0m │ 24:30      │ [35mThrow               [0m │ [33m"throw"[0m
+  [2m124  [0m │ 24:36      │ [35mNew                 [0m │ [33m"new"[0m
+  [2m125  [0m │ 24:40      │ [35mIdentifier          [0m │ [33m"Error"[0m
+  [2m126  [0m │ 24:45      │ [35mLParen              [0m │ [33m"("[0m
+  [2m127  [0m │ 24:46      │ [35mStr                 [0m │ [33m"generics identity"[0m
+  [2m128  [0m │ 24:65      │ [35mRParen              [0m │ [33m")"[0m
+  [2m129  [0m │ 25:0       │ [35mConst               [0m │ [33m"const"[0m
+  [2m130  [0m │ 25:6       │ [35mIdentifier          [0m │ [33m"strBox"[0m
+  [2m131  [0m │ 25:13      │ [35mEq                  [0m │ [33m"="[0m
+  [2m132  [0m │ 25:15      │ [35mIdentifier          [0m │ [33m"intBox"[0m
+  [2m133  [0m │ 25:21      │ [35mDot                 [0m │ [33m"."[0m
+  [2m134  [0m │ 25:22      │ [35mIdentifier          [0m │ [33m"map"[0m
+  [2m135  [0m │ 25:25      │ [35mLParen              [0m │ [33m"("[0m
+  [2m136  [0m │ 25:26      │ [35mLParen              [0m │ [33m"("[0m
+  [2m137  [0m │ 25:27      │ [35mIdentifier          [0m │ [33m"n"[0m
+  [2m138  [0m │ 25:28      │ [35mRParen              [0m │ [33m")"[0m
+  [2m139  [0m │ 25:30      │ [35mFatArrow            [0m │ [33m"=>"[0m
+  [2m140  [0m │ 25:33      │ [35mTemplateHead        [0m │ [33m"`value=${"[0m
+  [2m141  [0m │ 25:42      │ [35mIdentifier          [0m │ [33m"n"[0m
+  [2m142  [0m │ 25:44      │ [35mTemplateTail        [0m │ [33m"}`"[0m
+  [2m143  [0m │ 25:45      │ [35mRParen              [0m │ [33m")"[0m
+  [2m144  [0m │ 26:0       │ [35mIf                  [0m │ [33m"if"[0m
+  [2m145  [0m │ 26:3       │ [35mLParen              [0m │ [33m"("[0m
+  [2m146  [0m │ 26:4       │ [35mIdentifier          [0m │ [33m"strBox"[0m
+  [2m147  [0m │ 26:10      │ [35mDot                 [0m │ [33m"."[0m
+  [2m148  [0m │ 26:11      │ [35mGet                 [0m │ [33m"get"[0m
+  [2m149  [0m │ 26:14      │ [35mLParen              [0m │ [33m"("[0m
+  [2m150  [0m │ 26:15      │ [35mRParen              [0m │ [33m")"[0m
+  [2m151  [0m │ 26:17      │ [35mBangEq              [0m │ [33m"!=="[0m
+  [2m152  [0m │ 26:21      │ [35mStr                 [0m │ [33m"value=10"[0m
+  [2m153  [0m │ 26:31      │ [35mRParen              [0m │ [33m")"[0m
+  [2m154  [0m │ 26:33      │ [35mThrow               [0m │ [33m"throw"[0m
+  [2m155  [0m │ 26:39      │ [35mNew                 [0m │ [33m"new"[0m
+  [2m156  [0m │ 26:43      │ [35mIdentifier          [0m │ [33m"Error"[0m
+  [2m157  [0m │ 26:48      │ [35mLParen              [0m │ [33m"("[0m
+  [2m158  [0m │ 26:49      │ [35mStr                 [0m │ [33m"generics map"[0m
+  [2m159  [0m │ 26:63      │ [35mRParen              [0m │ [33m")"[0m
+  [2m160  [0m │ 27:0       │ [35mIdentifier          [0m │ [33m"print"[0m
+  [2m161  [0m │ 27:5       │ [35mLParen              [0m │ [33m"("[0m
+  [2m162  [0m │ 27:6       │ [35mStr                 [0m │ [33m"generics ok"[0m
+  [2m163  [0m │ 27:19      │ [35mRParen              [0m │ [33m")"[0m
+  [2m164  [0m │ 28:0       │ [35mEOF                 [0m │ [33m""[0m
   [2m── end: tokens ──[0m

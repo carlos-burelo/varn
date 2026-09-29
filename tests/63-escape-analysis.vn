@@ -1,3 +1,6 @@
+import { describe, it, expect } from "std:test";
+
+
 // `passes::escape` deletes a class instance that never escapes, answering
 // every `getfixed` on it from the constructor's argument instead. The whole
 // optimization rests on a compile-time claim — "this global still holds the
@@ -20,29 +23,23 @@ function eaSum(n: int): int {
   for (let i = 0; i < n; i = i + 1) { const p = new EaPoint(i, i + 1); s = s + p.x + p.y }
   return s
 }
-assert("ea: non-escaping instance is exact", eaSum(1000) === 1000000)
 
 // Argument order must survive: reading slot 1 has to yield the SECOND
 // argument, not whichever the summary happened to visit first.
 function eaOrder(): int { const p = new EaPoint(7, 11); return p.y * 100 + p.x }
-assert("ea: slots map to the right arguments", eaOrder() === 1107)
 
 // --- the instance escapes: the allocation must stay ---------------------
 
 function eaEscapeReturn(v: int): EaPoint { return new EaPoint(v, v) }
-const eaKept = eaEscapeReturn(3)
-assert("ea: returned instance survives", eaKept.x === 3 && eaKept.y === 3)
 
 function eaEscapeArray(n: int): int {
   const acc = []
   for (let i = 0; i < n; i = i + 1) { acc.push(new EaPoint(i, i)) }
   return acc.length + acc[0].x + acc[4].y
 }
-assert("ea: instance stored in an array survives", eaEscapeArray(5) === 9)
 
 function eaTakes(p: EaPoint): int { return p.x + p.y }
 function eaEscapeArg(v: int): int { return eaTakes(new EaPoint(v, v)) }
-assert("ea: instance passed as an argument survives", eaEscapeArg(6) === 12)
 
 // Identity is observable: `===` on objects is the address, so two separately
 // constructed instances must stay distinct even with identical fields.
@@ -51,7 +48,6 @@ function eaIdentity(): bool {
   const b = new EaPoint(1, 2)
   return a === b
 }
-assert("ea: identity of two equal instances is still false", eaIdentity() === false)
 
 // --- shapes the summary must refuse -------------------------------------
 
@@ -61,7 +57,6 @@ class EaComputed {
   constructor(v: int) { this.v = v * 2 + 1 }
 }
 function eaComputedSum(): int { const c = new EaComputed(10); return c.v }
-assert("ea: computing constructor is not scalar-replaced", eaComputedSum() === 21)
 
 // A field the constructor never assigns reads null, not the argument.
 class EaPartial {
@@ -70,8 +65,6 @@ class EaPartial {
   constructor(a: int) { this.a = a }
 }
 function eaPartialB(): bool { const p = new EaPartial(4); return p.b === null }
-assert("ea: unassigned field still reads null", eaPartialB() === true)
-assert("ea: assigned field of a partial class", (new EaPartial(4)).a === 4)
 
 // Inheritance brings a super constructor whose effects are not in this body.
 class EaBase {
@@ -83,7 +76,6 @@ class EaDerived extends EaBase {
   constructor(a: int, b: int) { super(a); this.b = b }
 }
 function eaDerivedSum(): int { const d = new EaDerived(3, 4); return d.a + d.b }
-assert("ea: derived class keeps its super call", eaDerivedSum() === 7)
 
 // A getter gives the name behaviour a raw slot read does not have.
 class EaGetter {
@@ -92,7 +84,6 @@ class EaGetter {
   get doubled(): int { return this.v * 2 }
 }
 function eaGetterRead(): int { const g = new EaGetter(21); return g.doubled }
-assert("ea: class with an accessor is left alone", eaGetterRead() === 42)
 
 // --- the reassignment guard ---------------------------------------------
 //
@@ -115,9 +106,7 @@ class EaSwapB extends EaSwapped {
     this.v = v * 1000
   }
 }
-EaSwapped = EaSwapB
 function eaSwappedRead(n: int): int { const s = new EaSwapped(n); return s.v }
-assert("ea: reassigned class binding is not resolved at compile time", eaSwappedRead(5) === 5000)
 
 // The same, but the rebinding sits inside a nested block — the scan has to
 // descend into statement bodies, not just the top level.
@@ -131,9 +120,27 @@ class EaNestedSwap extends EaNested {
     this.v = v * 1000
   }
 }
-let eaFlag = true
-if (eaFlag) { EaNested = EaNestedSwap }
 function eaNestedRead(n: int): int { const s = new EaNested(n); return s.v }
-assert("ea: rebinding inside a nested block is still seen", eaNestedRead(7) === 7000)
-
-print("[PASSED] 63. Escape analysis ")
+await describe("63 escape analysis", async () => {
+    await it("tests", async () => {
+        expect(eaSum(1000)).toBe(1000000)
+        expect(eaOrder()).toBe(1107)
+        const eaKept = eaEscapeReturn(3)
+        expect(eaKept.x === 3 && eaKept.y === 3).toBeTruthy()
+        expect(eaEscapeArray(5)).toBe(9)
+        expect(eaEscapeArg(6)).toBe(12)
+        expect(eaIdentity()).toBe(false)
+        expect(eaComputedSum()).toBe(21)
+        expect(eaPartialB()).toBe(true)
+        expect((new EaPartial(4)).a).toBe(4)
+        expect(eaDerivedSum()).toBe(7)
+        expect(eaGetterRead()).toBe(42)
+        EaSwapped = EaSwapB
+        expect(eaSwappedRead(5)).toBe(5000)
+        let eaFlag = true
+        if (eaFlag) { EaNested = EaNestedSwap }
+        expect(eaNestedRead(7)).toBe(7000)
+        
+        
+    });
+});

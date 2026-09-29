@@ -1,48 +1,60 @@
+import { describe, it, expect } from "std:test";
 
-const s = "  Hello, World!  "
-assert("trim",           s.trim() === "Hello, World!")
-assert("trimStart",      s.trimStart() === "Hello, World!  ")
-assert("trimEnd",        s.trimEnd() === "  Hello, World!")
-assert("toUpperCase",    "hello".toUpperCase() === "HELLO")
-assert("toLowerCase",    "WORLD".toLowerCase() === "world")
-assert("includes",       "typescript".includes("script"))
-assert("not includes",   !"typescript".includes("java"))
-assert("startsWith",     "hello world".startsWith("hello"))
-assert("endsWith",       "hello world".endsWith("world"))
-assert("indexOf found",  "abcabc".indexOf("c") === 2)
-assert("indexOf none",   "abcabc".indexOf("z") === -1)
-assert("slice",          "hello world".slice(6, 11) === "world")
-assert("slice neg",      "hello world".slice(-5) === "world")
-assert("replace",        "foo bar foo".replace("foo", "baz") === "baz bar foo")
-assert("replaceAll",     "foo bar foo".replaceAll("foo", "baz") === "baz bar baz")
-assert("split",          "a,b,c".split(",").length === 3)
-assert("split parts",    "a,b,c".split(",")[1] === "b")
-assert("repeat",         "ab".repeat(3) === "ababab")
-assert("padStart",       "5".padStart(3, "0") === "005")
-assert("padEnd",         "5".padEnd(3, "0") === "500")
-assert("length",         "hello".length === 5)
-assert("charAt",         "hello".at(1) === "e")
-assert("charCode A",     "A".charCode() === 65)
-assert("concat",         "Hello".concat(" World") === "Hello World")
-assert("substr 2 3",     "abcdef".substr(2, 3) === "cde")
-assert("substr 1",       "abcdef".substr(1) === "bcdef")
-assert("isEmpty true",   "".isEmpty())
-assert("isEmpty false",  !"hi".isEmpty())
-assert("isBlank true",   "   ".isBlank())
-assert("isBlank false",  !"hi".isBlank())
-assert("isDigit true",   "7".isDigit())
-assert("isDigit false",  !"a".isDigit())
-assert("isLetter true",  "z".isLetter())
-assert("isLetter false", !" ".isLetter())
-assert("reverse",        "abc".reverse() === "cba")
-assert("capitalize",     "hello".capitalize() === "Hello")
-assert("lines",          "a\nb\nc".lines().length === 3)
-assert("words",          "  foo bar  ".words().length === 2)
-assert("str.from int",   str.from(42) === "42")
-assert("str.from bool",  str.from(true) === "true")
-assert("str.EMPTY",      str.EMPTY === "")
-assert("str.fromCharCode", str.fromCharCode(72, 105) === "Hi")
-assert("str.join sep",   str.join(["a", "b", "c"], "-") === "a-b-c")
-assert("str.join empty", str.join([], ",") === "")
+await describe("03 Strings", async () => {
+    await it("trim and case", () => {
+        const s = "  Hello, World!  ";
+        expect(s.trim()).toBe("Hello, World!");
+        expect(s.trimStart()).toBe("Hello, World!  ");
+        expect(s.trimEnd()).toBe("  Hello, World!");
+        expect("hello".toUpperCase()).toBe("HELLO");
+        expect("WORLD".toLowerCase()).toBe("world");
+    });
 
-print("[PASSED] 3. String methods ")
+    await it("search and slice", () => {
+        expect("typescript".includes("script")).toBeTruthy();
+        expect(!"typescript".includes("java")).toBeTruthy();
+        expect("hello world".startsWith("hello")).toBeTruthy();
+        expect("hello world".endsWith("world")).toBeTruthy();
+        expect("abcabc".indexOf("c")).toBe(2);
+        expect("abcabc".indexOf("z")).toBe(-1);
+        expect("hello world".slice(6, 11)).toBe("world");
+        expect("hello world".slice(-5)).toBe("world");
+        expect("foo bar foo".replace("foo", "baz")).toBe("baz bar foo");
+        expect("foo bar foo".replaceAll("foo", "baz")).toBe("baz bar baz");
+        expect("a,b,c".split(",").length).toBe(3);
+        expect("a,b,c".split(",")[1]).toBe("b");
+    });
+
+    await it("padding and char inspection", () => {
+        expect("ab".repeat(3)).toBe("ababab");
+        expect("5".padStart(3, "0")).toBe("005");
+        expect("5".padEnd(3, "0")).toBe("500");
+        expect("hello".length).toBe(5);
+        expect("hello".at(1)).toBe("e");
+        expect("A".charCode()).toBe(65);
+        expect("Hello".concat(" World")).toBe("Hello World");
+        expect("abcdef".substr(2, 3)).toBe("cde");
+        expect("abcdef".substr(1)).toBe("bcdef");
+    });
+
+    await it("predicates and str helpers", () => {
+        expect("".isEmpty()).toBeTruthy();
+        expect(!"hi".isEmpty()).toBeTruthy();
+        expect("   ".isBlank()).toBeTruthy();
+        expect(!"hi".isBlank()).toBeTruthy();
+        expect("7".isDigit()).toBeTruthy();
+        expect(!"a".isDigit()).toBeTruthy();
+        expect("z".isLetter()).toBeTruthy();
+        expect(!" ".isLetter()).toBeTruthy();
+        expect("abc".reverse()).toBe("cba");
+        expect("hello".capitalize()).toBe("Hello");
+        expect("a\nb\nc".lines().length).toBe(3);
+        expect("  foo bar  ".words().length).toBe(2);
+        expect(str.from(42)).toBe("42");
+        expect(str.from(true)).toBe("true");
+        expect(str.EMPTY).toBe("");
+        expect(str.fromCharCode(72, 105)).toBe("Hi");
+        expect(str.join(["a", "b", "c"], "-")).toBe("a-b-c");
+        expect(str.join([], ",")).toBe("");
+    });
+});
