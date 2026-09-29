@@ -1014,7 +1014,24 @@ impl<'m> Builder<'m> {
                     .map(|ci| ci.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
                 let cv = self.emit(self.global_load(&name), HirType::Ref);
-                self.lower_call(cv, args, ty)
+                // Spread construction keeps the generic spread call; only a
+                // plain argument list carries the class identity forward as
+                // `NewInstance`.
+                if args
+                    .iter()
+                    .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+                {
+                    self.lower_call(cv, args, ty)
+                } else {
+                    let argv = self.lower_args(args)?;
+                    Ok(self.emit(
+                        InstKind::NewInstance {
+                            callee: cv,
+                            args: argv,
+                        },
+                        ty,
+                    ))
+                }
             }
             TirExprKind::MakeVariant { args } => {
                 // `E.V` -> the variant static on the enum global; `E.V(a, b)`
@@ -2319,9 +2336,10 @@ mod tests {
             vec![],
         );
         let f = build_function(&m, &m.top_level, None).unwrap();
+        // Class identity rides a dedicated op now (same convention as Call).
         assert!(f.blocks[0]
             .insts
             .iter()
-            .any(|i| matches!(i.kind, InstKind::Call { .. })));
+            .any(|i| matches!(i.kind, InstKind::NewInstance { .. })));
     }
 }

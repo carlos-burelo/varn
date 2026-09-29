@@ -106,7 +106,7 @@ pub(super) fn emit_value(
             chunk.write(Chunk::pack(d, *uv as u8), line);
         }
 
-        InstKind::Call { callee, args } => {
+        InstKind::Call { callee, args } | InstKind::NewInstance { callee, args } => {
             emit_call_args(chunk, reg, call_base, args, line);
             let total = (args.len() + 1) as u8;
             chunk.emit(OpCode::Call, line);

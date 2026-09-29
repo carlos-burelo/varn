@@ -173,6 +173,7 @@ pub(super) fn scratch_max(ssa: &SsaProto) -> usize {
                 | SsaOp::SuperMethodCall { args, .. }
                 | SsaOp::ExtensionCall { args, .. } => args.len() + 1,
                 SsaOp::CallSpread { args, .. } => args.len(),
+                SsaOp::New { args, .. } => args.len(),
                 SsaOp::IterCall { .. } => 2,
                 SsaOp::Dispose { .. } => 1,
                 SsaOp::IntrinsicCall { args, .. } => args.len() + 1,
@@ -202,6 +203,46 @@ pub(super) fn scratch_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, count: usize)
         4,
     ));
     b.ins().stack_addr(types::I64, slot, 0)
+}
+
+/// `new Class(...args)`: the class identity rides the callee value into a
+/// dedicated helper that builds trivial instances inline (no constructor
+/// frame) and runs anything else through the canonical construction both
+/// tiers share. The boxed result.
+pub(super) fn emit_new(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    callee: u32,
+    _callee_global: Option<u32>,
+    args: &[u32],
+    _dest: Option<u32>,
+) -> Result<Out, String> {
+    let frame = ctx.frame.as_ref().ok_or("from_ssa: new without a frame")?;
+    let callee_v = load_value(b, ctx, values, callee)?;
+    let (ct, cp) = b.ins().isplit(callee_v);
+    let mut vals = Vec::with_capacity(args.len());
+    for a in args {
+        vals.push(heap::boxed_value(b, ctx, values, *a)?);
+    }
+    let addr = scratch_addr(b, ctx, vals.len().max(1));
+    for (i, v) in vals.iter().enumerate() {
+        b.ins()
+            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+    }
+    let argc = b.ins().iconst(types::I64, vals.len() as i64);
+    call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.jit_new_window,
+        &[frame.exec_ctx, ct, cp, addr, argc],
+    );
+    Ok(Out::Boxed(b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    )))
 }
 
 /// The boxed `[callee, args…]` window on the native stack.

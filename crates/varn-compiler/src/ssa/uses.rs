@@ -153,7 +153,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
             args.iter().for_each(|a| f(*a))
         }
-        Call { callee, args } => {
+        Call { callee, args } | NewInstance { callee, args } => {
             f(*callee);
             args.iter().for_each(|a| f(*a));
         }
@@ -314,7 +314,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
             args.iter_mut().for_each(f)
         }
-        Call { callee, args } => {
+        Call { callee, args } | NewInstance { callee, args } => {
             f(callee);
             args.iter_mut().for_each(f);
         }

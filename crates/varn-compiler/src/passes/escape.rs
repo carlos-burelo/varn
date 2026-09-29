@@ -55,8 +55,14 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
     let mut sites: FxHashMap<u32, (Vec<Value>, &Vec<SlotInit>)> = FxHashMap::default();
     for block in &func.blocks {
         for inst in &block.insts {
-            let (Some(dest), InstKind::Call { callee, args }) = (inst.dest, &inst.kind) else {
+            let (Some(dest), inst) = (inst.dest, &inst.kind) else {
                 continue;
+            };
+            let (callee, args) = match inst {
+                InstKind::Call { callee, args } | InstKind::NewInstance { callee, args } => {
+                    (callee, args)
+                }
+                _ => continue,
             };
             let Some(slots) = globals.get(&callee.0).and_then(|n| summaries.get(*n)) else {
                 continue;
@@ -158,7 +164,7 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
         .collect();
     for block in &mut func.blocks {
         block.insts.retain(|inst| match (inst.dest, &inst.kind) {
-            (Some(d), InstKind::Call { .. }) => !dead.contains(&d.0),
+            (Some(d), InstKind::Call { .. } | InstKind::NewInstance { .. }) => !dead.contains(&d.0),
             _ => true,
         });
     }

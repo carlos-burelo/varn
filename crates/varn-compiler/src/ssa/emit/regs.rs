@@ -56,7 +56,9 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
     for block in &ssa.blocks {
         for inst in &block.insts {
             let t = match &inst.kind {
-                InstKind::Call { args, .. } => args.len() as u32 + 1,
+                InstKind::Call { args, .. } | InstKind::NewInstance { args, .. } => {
+                    args.len() as u32 + 1
+                }
                 InstKind::SelfCall { args } => args.len() as u32 + 1,
                 InstKind::MethodCall { args, .. } => args.len() as u32,
 

@@ -165,6 +165,21 @@ pub(super) fn emit_inst(
                 dest,
             )?))
         }
+        SsaOp::New {
+            callee,
+            callee_global,
+            args,
+        } => {
+            return Ok(Some(call::emit_new(
+                b,
+                ctx,
+                values,
+                *callee,
+                *callee_global,
+                args,
+                dest,
+            )?))
+        }
 
         SsaOp::MakeClosure { proto, upvalues } => {
             return Ok(Some(Out::Boxed(closures::emit_make_closure(

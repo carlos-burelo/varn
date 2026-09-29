@@ -48,6 +48,11 @@ pub(super) fn project_inst(
             callee_global: global_of.get(callee.0 as usize).copied().flatten(),
             args: args.iter().map(|v| v.0).collect(),
         },
+        InstKind::NewInstance { callee, args } => SsaOp::New {
+            callee: callee.0,
+            callee_global: global_of.get(callee.0 as usize).copied().flatten(),
+            args: args.iter().map(|v| v.0).collect(),
+        },
         InstKind::Binary { op, lhs, rhs, ty } => {
             let lhs_ty = value_tys.get(lhs.0 as usize).copied();
             let rhs_ty = value_tys.get(rhs.0 as usize).copied();
