@@ -28,13 +28,27 @@ impl ICKind {
     pub const INSTANCE_FIELD: u8 = 10;
 }
 
-#[derive(Clone, Copy, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
 #[repr(C)]
 pub struct CacheEntry {
     pub id: u32,
     pub slot: u16,
     pub is_class: u8,
     pub vtable_ver: u8,
+    /// Owning pointer to the class this entry was recorded against, present
+    /// only for vtable kinds (`CLASS_METHOD`, `CLASS_GETTER`,
+    /// `CLASS_SETTER`, `NATIVE_VTABLE_METHOD`, `VM_VTABLE_METHOD`). Lets
+    /// generated code go from entry to vtable without touching the class
+    /// registry: the `Rc` keeps the class alive exactly as long as the site
+    /// that cached it, so the pointer can never dangle. Shape/instance-field
+    /// and length kinds carry `None` — their fast paths key off the shape id
+    /// or class id alone and never read a vtable.
+    ///
+    /// Appended last on purpose: the JIT bakes the offsets of the first four
+    /// fields (`id`@0, `slot`@4, `is_class`@6, `vtable_ver`@7) and must not
+    /// shift when this grows.
+    #[serde(skip)]
+    pub class: Option<std::rc::Rc<crate::value::ClassObj>>,
 }
 
 impl CacheEntry {
@@ -57,9 +71,8 @@ pub struct PolyICSlot {
 }
 
 /// `size_of::<PolyICSlot>()` — the stride the JIT uses to reach slot `cs`.
-/// `[CacheEntry; 8]` is 64 bytes (`CacheEntry` is 8, align 4); the two trailing
-/// `u8`s pad the struct to 68.
-pub const POLY_IC_SLOT_SIZE: usize = 68;
+/// 8 entries of 16 bytes plus the two trailing `u8`s, padded to alignment 8.
+pub const POLY_IC_SLOT_SIZE: usize = 136;
 
 impl Default for PolyICSlot {
     fn default() -> Self {
@@ -70,8 +83,16 @@ impl Default for PolyICSlot {
 impl PolyICSlot {
     pub fn new() -> Self {
         const _: () = assert!(std::mem::size_of::<PolyICSlot>() == POLY_IC_SLOT_SIZE);
+        // JIT-baked entry offsets (see `CacheEntry::class`): id@0, slot@4,
+        // is_class@6, vtable_ver@7, class@8. If a field moves, the inline
+        // guards in `varn-jit` read garbage — fail here, not in production.
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, id) == 0);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, slot) == 4);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, is_class) == 6);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, vtable_ver) == 7);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, class) == 8);
         Self {
-            entries: [CacheEntry::default(); 8],
+            entries: std::array::from_fn(|_| CacheEntry::default()),
             next: 0,
             last_hit: 0,
         }
@@ -137,5 +158,54 @@ impl FeedbackVector {
         if let Some(site) = self.sites.get_mut(site_idx) {
             site.observe(id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Contrato del consumidor JIT: offsets horneados + stride + puntero de
+    /// clase en entradas vtable. Si esto falla, los guards inline leen basura.
+    #[test]
+    fn jit_entry_contract() {
+        assert_eq!(std::mem::offset_of!(CacheEntry, id), 0);
+        assert_eq!(std::mem::offset_of!(CacheEntry, slot), 4);
+        assert_eq!(std::mem::offset_of!(CacheEntry, is_class), 6);
+        assert_eq!(std::mem::offset_of!(CacheEntry, vtable_ver), 7);
+        assert_eq!(std::mem::offset_of!(CacheEntry, class), 8);
+        assert_eq!(std::mem::size_of::<CacheEntry>(), 16);
+        assert_eq!(std::mem::size_of::<PolyICSlot>(), POLY_IC_SLOT_SIZE);
+
+        // Una entrada vtable retiene su clase; una de shape no carga ninguna.
+        let cls = std::rc::Rc::new(crate::value::ClassObj::new("Probe"));
+        let mut slot = PolyICSlot::new();
+        slot.find_or_insert(CacheEntry {
+            id: cls.id,
+            slot: 3,
+            is_class: ICKind::VM_VTABLE_METHOD,
+            vtable_ver: 1,
+            class: Some(cls.clone()),
+        });
+        slot.find_or_insert(CacheEntry {
+            id: 99,
+            slot: 0,
+            is_class: ICKind::SHAPE_PROP,
+            vtable_ver: 0,
+            class: None,
+        });
+        let hit = slot
+            .entries
+            .iter()
+            .find(|e| e.id == cls.id && e.is_class == ICKind::VM_VTABLE_METHOD)
+            .expect("vtable entry recorded");
+        assert_eq!(hit.slot, 3);
+        assert!(std::rc::Rc::ptr_eq(hit.class.as_ref().unwrap(), &cls));
+        let shape = slot
+            .entries
+            .iter()
+            .find(|e| e.is_class == ICKind::SHAPE_PROP)
+            .expect("shape entry recorded");
+        assert!(shape.class.is_none());
     }
 }

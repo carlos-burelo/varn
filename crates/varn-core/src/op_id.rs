@@ -81,6 +81,16 @@ pub fn str_slice_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "slice"))
 }
 
+pub fn str_index_of_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "indexOf"))
+}
+
+pub fn str_split_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "split"))
+}
+
 /// Op-id de `str::charCodeAt` / `str::codePointAt`. El lowering los inlinea
 /// (byte-load sobre una vista de bytes hoistada de la región) en vez de cruzar
 /// la frontera nativa, y el scan de regiones los trata como no-alloc.

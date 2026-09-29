@@ -213,7 +213,9 @@ impl ExecCtx {
     }
 
     /// Native method `f` called on `this_val`, counted for the profile.
-    fn call_native_method(
+    /// `pub(crate)` for the JIT's cached lane, which dispatches a
+    /// version-checked vtable hit without re-resolving.
+    pub(crate) fn call_native_method(
         &mut self,
         f: varn_types::NativeFn,
         this_val: VmValue,

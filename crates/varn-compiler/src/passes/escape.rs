@@ -150,7 +150,23 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
         return false;
     }
 
-    for (dest, value) in forwards {
+    // Chained forwards resolve transitively (a constructor argument can be
+    // another forwarded field read whose call is deleted below — capturing it
+    // stale would leave a use of an undefined value; same hazard as
+    // `fixed_fields`, same fix).
+    let mut fwd_map: FxHashMap<Value, Value> = forwards.into_iter().collect();
+    let keys: Vec<Value> = fwd_map.keys().copied().collect();
+    for k in keys {
+        let mut v = fwd_map[&k];
+        loop {
+            match fwd_map.get(&v) {
+                Some(&w) if w != v => v = w,
+                _ => break,
+            }
+        }
+        fwd_map.insert(k, v);
+    }
+    for (dest, value) in fwd_map {
         func.replace_all_uses(dest, value);
     }
 

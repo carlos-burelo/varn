@@ -96,6 +96,10 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::StoreCaptured { .. }
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::GetFixedField { .. }
+        | SsaOp::ArrayLength { .. }
+        | SsaOp::StrLength { .. }
+        | SsaOp::BytesLength { .. }
         | SsaOp::LoadGlobal(_)
         | SsaOp::StoreGlobal { .. }
         | SsaOp::AssertNotNull { .. }

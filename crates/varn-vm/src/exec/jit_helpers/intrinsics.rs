@@ -329,3 +329,179 @@ pub(crate) extern "C" fn jit_str_ends_with(
         )
     }
 }
+
+/// Dedicated fast path for `indexOf(search)`: the contract's own body (`0`
+/// for an empty pattern, byte search then character translation, `-1` when
+/// absent), reached directly because the op-id already proved both sides.
+#[varn_op_macros::jit_slow(field = "str_index_of")]
+pub(crate) extern "C" fn jit_str_index_of(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> i64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            use varn_types::str_util::{byte_to_char_idx, find_bytes};
+            if n.is_empty() {
+                return 0;
+            }
+            let ascii = s.is_ascii();
+            return find_bytes(s, n)
+                .map(|b| byte_to_char_idx(s, ascii, b))
+                .unwrap_or(-1);
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("indexOf: receiver and argument must be strings"),
+        )
+    }
+}
+
+/// Dedicated fast path for `split(separator?)`: the contract's own body.
+/// `argc` is 0 (no separator) or 1; the separator halves are ignored when 0.
+#[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "str_split")]
+pub(crate) extern "C" fn jit_str_split(
+    ctx: *mut ExecCtx,
+    s_tag: u64,
+    s_payload: u64,
+    argc: u64,
+    sep_tag: u64,
+    sep_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let mut buf = [0u8; 5];
+        let s_val = VmValue::from_raw_parts(s_tag, s_payload);
+        let Some(text) = borrow_str_fast(s_val, &ctx_ref.heap, &mut buf) else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("split: receiver must be a string"),
+            );
+        };
+        // The text borrows the heap; copy it out before interning pieces.
+        let text = text.to_owned();
+        let sep: Option<String> = if argc == 0 {
+            None
+        } else {
+            let sep_val = VmValue::from_raw_parts(sep_tag, sep_payload);
+            let mut sbuf = [0u8; 5];
+            match borrow_str_fast(sep_val, &ctx_ref.heap, &mut sbuf) {
+                Some(sep) => Some(sep.to_owned()),
+                None => jit_propagate_error(
+                    ctx_ref,
+                    crate::error::RuntimeError::new("split: separator must be a string"),
+                ),
+            }
+        };
+        let mut out = Vec::new();
+        match sep.as_deref() {
+            Some(sep) if sep.len() == 1 => {
+                let byte = sep.as_bytes()[0];
+                for p in text.split(byte as char) {
+                    out.push(ctx_ref.heap.alloc_str(p));
+                }
+            }
+            Some(sep) => {
+                for p in text.split(sep) {
+                    out.push(ctx_ref.heap.alloc_str(p));
+                }
+            }
+            None => {
+                let mut cbuf = [0u8; 4];
+                for c in text.chars() {
+                    out.push(ctx_ref.heap.alloc_str(c.encode_utf8(&mut cbuf)));
+                }
+            }
+        }
+        let arr = varn_types::VmArray::new(out);
+        ctx_ref.jit_native_result =
+            VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Array(arr)));
+    }
+}
+
+/// Dedicated fast path for the native `slice(start, end?)`: negative
+/// normalization, ASCII fast path, character translation otherwise — the
+/// contract's body over the shared `str_util` primitives. `has_end` selects
+/// the one- and two-argument forms.
+#[allow(clippy::too_many_arguments)]
+#[varn_op_macros::jit_slow(field = "str_slice_range")]
+pub(crate) extern "C" fn jit_str_slice_range(
+    ctx: *mut ExecCtx,
+    s_tag: u64,
+    s_payload: u64,
+    start_tag: u64,
+    start_payload: u64,
+    has_end: u64,
+    end_tag: u64,
+    end_payload: u64,
+) {
+    use varn_types::str_util::{char_len, char_range_to_bytes};
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let mut buf = [0u8; 5];
+        let s_val = VmValue::from_raw_parts(s_tag, s_payload);
+        let start_val = VmValue::from_raw_parts(start_tag, start_payload);
+        let end_val = VmValue::from_raw_parts(end_tag, end_payload);
+        let text = match borrow_str_fast(s_val, &ctx_ref.heap, &mut buf) {
+            Some(t) => t.to_owned(),
+            None => jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: receiver must be a string"),
+            ),
+        };
+        let Some(start) = start_val.is_int().then(|| start_val.as_int()) else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: bounds must be ints"),
+            );
+        };
+        let end: Option<i64> = if has_end == 0 {
+            None
+        } else if end_val.is_int() {
+            Some(end_val.as_int())
+        } else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: bounds must be ints"),
+            );
+        };
+        let out = if text.is_ascii() {
+            let len = text.len() as i64;
+            let si = normalize_idx(start, len).min(text.len());
+            let ei = normalize_idx(end.unwrap_or(len), len)
+                .min(text.len())
+                .max(si);
+            text[si..ei].to_owned()
+        } else {
+            let len = char_len(&text, false);
+            let si = normalize_idx(start, len as i64).min(len);
+            let ei = normalize_idx(end.unwrap_or(len as i64), len as i64)
+                .min(len)
+                .max(si);
+            let (bs, be) = char_range_to_bytes(&text, false, si, ei);
+            text[bs..be].to_owned()
+        };
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str(&out);
+    }
+}
+
+/// Negative-index normalization shared with the native `slice` contract.
+#[inline]
+fn normalize_idx(idx: i64, len: i64) -> usize {
+    if idx < 0 {
+        (len + idx).max(0) as usize
+    } else {
+        idx as usize
+    }
+}

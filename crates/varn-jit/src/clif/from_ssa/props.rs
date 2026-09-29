@@ -8,7 +8,7 @@
 //! because the lowering refuses `Try`, so this frame is never resumed
 //! interpreted at a bytecode offset.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::heap::{boxed_parts, exec_ctx};
@@ -289,9 +289,19 @@ pub(super) fn emit_set_fixed_field(
     Ok(())
 }
 
-/// `obj.name` — dynamic property read. The helper writes the boxed result into
-/// the destination's home (`dest_reg`), so the value is rooted before any
-/// getter runs; the caller then unboxes it for a scalar dest.
+/// `obj.name` — dynamic property read. Monomorphic/polymorphic shape fast
+/// path inline, generic helper as fallback.
+///
+/// Fast path: when the receiver is a heap `Object` whose shape id matches a
+/// `SHAPE_PROP` entry of this site's inline cache, the field is one `I128`
+/// load from the object's inline tail — no string lookup, no heap extract,
+/// no FFI. Anything else (non-object receiver, shape miss, overflowed slot,
+/// getter/method) takes the `get_property_flat` helper, which owns the full
+/// semantics and populates the cache for next time.
+///
+/// GC safety: the fast path performs only reads (no allocation, no call), so
+/// no collection can run under it; the value is written to the destination
+/// home before rejoining, exactly as the helper does.
 pub(super) fn emit_get_property(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -308,6 +318,118 @@ pub(super) fn emit_get_property(
         .ok_or("from_ssa: property access without a frame")?;
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
+
+    let slow = b.create_block();
+    b.set_cold_block(slow);
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I128);
+
+    let m = MemFlags::trusted();
+    let olay = &ctx.helpers.object_layout;
+    let alay = &ctx.helpers.array_layout;
+    let heap_off = ctx.helpers.heap_field_offset;
+
+    // 1. Heap-tag check; non-heap receivers take the helper.
+    let kind = b.ins().band_imm(ot, super::super::emit::KIND_MASK);
+    let is_heap = b
+        .ins()
+        .icmp_imm(IntCC::Equal, kind, super::super::emit::HEAP_KIND);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], slow, &[]);
+    b.switch_to_block(chk);
+
+    // 2. Heap index + generation select → slot address.
+    let raw = b.ins().band_imm(op, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let base = b.ins().select(old_bit, base_old, base_nur);
+    let idx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let slot_addr = b.ins().iadd(base, byte_off);
+
+    // 3. Slot must be a heap `Object` (records/instances/methods → helper).
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let ok = b.create_block();
+    b.ins().brif(is_obj, ok, &[], slow, &[]);
+    b.switch_to_block(ok);
+
+    // 4. Payload → data pointer → shape id, inline length, values base.
+    let data_ptr = b
+        .ins()
+        .load(types::I64, m, slot_addr, olay.payload_off as i32);
+    let shape_ctl = b.ins().load(types::I64, m, data_ptr, olay.shape_off as i32);
+    let shape_id32 = b
+        .ins()
+        .load(types::I32, m, shape_ctl, olay.shape_id_off as i32);
+    let shape_id = b.ins().uextend(types::I64, shape_id32);
+    let len32 = b.ins().load(types::I32, m, data_ptr, olay.len_off as i32);
+    let inline_len = b.ins().uextend(types::I64, len32);
+    let values_base = b.ins().iadd_imm(data_ptr, olay.values_off as i64);
+
+    // 5. Probe the site's 8 cache entries for a SHAPE_PROP hit on this shape.
+    // Each entry is 8 bytes: id u32 @0, slot u16 @4, is_class u8 @6.
+    let ic_base = b.ins().load(
+        types::I64,
+        m,
+        frame.closure,
+        ctx.helpers.closure_ic_entries_offset as i32,
+    );
+    let slot_base = b.ins().iadd_imm(
+        ic_base,
+        (cs as i64) * (ctx.helpers.poly_ic_slot_size as i64),
+    );
+    let mut next = b.create_block();
+    // First check branches out of the resolve block; the rest chain.
+    b.ins().jump(next, &[]);
+    for i in 0..8 {
+        b.switch_to_block(next);
+        next = b.create_block();
+        let hit = b.create_block();
+        let entry = b.ins().iadd_imm(slot_base, (i * 8) as i64);
+        let id32 = b.ins().load(types::I32, m, entry, 0);
+        let id = b.ins().uextend(types::I64, id32);
+        let kc = b.ins().uload8(types::I64, m, entry, 6);
+        let id_eq = b.ins().icmp(IntCC::Equal, id, shape_id);
+        let kind_ok = b.ins().icmp_imm(
+            IntCC::Equal,
+            kc,
+            varn_types::chunk::ICKind::SHAPE_PROP as i64,
+        );
+        let matched = b.ins().band(id_eq, kind_ok);
+        b.ins().brif(matched, hit, &[], next, &[]);
+
+        b.switch_to_block(hit);
+        let slot16 = b.ins().uload16(types::I64, m, entry, 4);
+        let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, slot16, inline_len);
+        let hok = b.create_block();
+        b.ins().brif(in_bounds, hok, &[], slow, &[]);
+        b.switch_to_block(hok);
+        let off = b.ins().ishl_imm(slot16, 4);
+        let addr = b.ins().iadd(values_base, off);
+        let val = b.ins().load(types::I128, m, addr, 0);
+        super::store::def_heap(b, ctx, dest_reg, val)?;
+        super::store::drop_home_addrs(ctx);
+        b.ins().jump(merge, &[val.into()]);
+    }
+    // No entry matched → generic helper.
+    b.switch_to_block(next);
+    b.ins().jump(slow, &[]);
+
+    b.switch_to_block(slow);
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
     let cs_v = b.ins().iconst(types::I64, cs as i64);
     let dest_v = b.ins().iconst(types::I64, dest_reg as i64);
@@ -332,10 +454,23 @@ pub(super) fn emit_get_property(
     // reallocate the home vectors: drop any memoized address before reading
     // the value it just wrote.
     super::store::drop_home_addrs(ctx);
-    use_heap(b, ctx, dest_reg)
+    let slow_val = use_heap(b, ctx, dest_reg)?;
+    super::store::drop_home_addrs(ctx);
+    b.ins().jump(merge, &[slow_val.into()]);
+
+    b.switch_to_block(merge);
+    Ok(b.block_params(merge)[0])
 }
 
-/// `obj.name = value` — dynamic property write (may run a setter, hence GC).
+/// `obj.name = value` — dynamic property write. Nursery-only shape fast
+/// path inline, generic helper as fallback.
+///
+/// Fast path: heap `Object` in the nursery whose shape id matches a
+/// `SHAPE_PROP` entry of this site's cache gets one `I128` store into the
+/// inline tail. Nursery-only keeps the store barrier-free, the same rule
+/// `store_compact` uses: an old-generation receiver (or a miss, an
+/// overflowed slot, a transition, a setter) takes `set_property_flat`, which
+/// owns the full semantics and populates the cache.
 pub(super) fn emit_set_property(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -346,13 +481,116 @@ pub(super) fn emit_set_property(
     cs: u16,
 ) -> Result<(), String> {
     let (ot, op) = boxed_parts(b, ctx, values, object)?;
-    let (vt, vp) = boxed_parts(b, ctx, values, value)?;
+    let val = super::heap::boxed_value(b, ctx, values, value)?;
     let frame = ctx
         .frame
         .as_ref()
         .ok_or("from_ssa: property write without a frame")?;
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
+
+    let slow = b.create_block();
+    b.set_cold_block(slow);
+    let cont = b.create_block();
+
+    let m = MemFlags::trusted();
+    let olay = &ctx.helpers.object_layout;
+    let alay = &ctx.helpers.array_layout;
+    let heap_off = ctx.helpers.heap_field_offset;
+
+    // 1. Heap-tag check.
+    let kind = b.ins().band_imm(ot, super::super::emit::KIND_MASK);
+    let is_heap = b
+        .ins()
+        .icmp_imm(IntCC::Equal, kind, super::super::emit::HEAP_KIND);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], slow, &[]);
+    b.switch_to_block(chk);
+
+    // 2. Nursery-only: old-generation stores need the write barrier the
+    // helper carries.
+    let raw = b.ins().band_imm(op, 0xFFFF_FFFF);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let is_nursery = b.ins().icmp_imm(IntCC::Equal, old_bit, 0);
+    let res = b.create_block();
+    b.ins().brif(is_nursery, res, &[], slow, &[]);
+    b.switch_to_block(res);
+
+    // 3. Slot address (nursery base) + Object tag check.
+    let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let byte_off = b.ins().imul_imm(raw, alay.slot_size as i64);
+    let slot_addr = b.ins().iadd(base_nur, byte_off);
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let ok = b.create_block();
+    b.ins().brif(is_obj, ok, &[], slow, &[]);
+    b.switch_to_block(ok);
+
+    // 4. Shape id, inline length, values base.
+    let data_ptr = b
+        .ins()
+        .load(types::I64, m, slot_addr, olay.payload_off as i32);
+    let shape_ctl = b.ins().load(types::I64, m, data_ptr, olay.shape_off as i32);
+    let shape_id32 = b
+        .ins()
+        .load(types::I32, m, shape_ctl, olay.shape_id_off as i32);
+    let shape_id = b.ins().uextend(types::I64, shape_id32);
+    let len32 = b.ins().load(types::I32, m, data_ptr, olay.len_off as i32);
+    let inline_len = b.ins().uextend(types::I64, len32);
+    let values_base = b.ins().iadd_imm(data_ptr, olay.values_off as i64);
+
+    // 5. Probe the 8 entries for a SHAPE_PROP hit; each hit stores inline.
+    let ic_base = b.ins().load(
+        types::I64,
+        m,
+        frame.closure,
+        ctx.helpers.closure_ic_entries_offset as i32,
+    );
+    let slot_base = b.ins().iadd_imm(
+        ic_base,
+        (cs as i64) * (ctx.helpers.poly_ic_slot_size as i64),
+    );
+    let mut next = b.create_block();
+    b.ins().jump(next, &[]);
+    for i in 0..8 {
+        b.switch_to_block(next);
+        next = b.create_block();
+        let hit = b.create_block();
+        let entry = b.ins().iadd_imm(slot_base, (i * 8) as i64);
+        let id32 = b.ins().load(types::I32, m, entry, 0);
+        let id = b.ins().uextend(types::I64, id32);
+        let kc = b.ins().uload8(types::I64, m, entry, 6);
+        let id_eq = b.ins().icmp(IntCC::Equal, id, shape_id);
+        let kind_ok = b.ins().icmp_imm(
+            IntCC::Equal,
+            kc,
+            varn_types::chunk::ICKind::SHAPE_PROP as i64,
+        );
+        let matched = b.ins().band(id_eq, kind_ok);
+        b.ins().brif(matched, hit, &[], next, &[]);
+
+        b.switch_to_block(hit);
+        let slot16 = b.ins().uload16(types::I64, m, entry, 4);
+        let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, slot16, inline_len);
+        let hok = b.create_block();
+        b.ins().brif(in_bounds, hok, &[], slow, &[]);
+        b.switch_to_block(hok);
+        let off = b.ins().ishl_imm(slot16, 4);
+        let addr = b.ins().iadd(values_base, off);
+        b.ins().store(MemFlags::trusted(), val, addr, 0);
+        b.ins().jump(cont, &[]);
+    }
+    b.switch_to_block(next);
+    b.ins().jump(slow, &[]);
+
+    b.switch_to_block(slow);
+    let (vt, vp) = b.ins().isplit(val);
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
     let cs_v = b.ins().iconst(types::I64, cs as i64);
     let ip_v = b.ins().iconst(types::I64, 0);
@@ -362,6 +600,12 @@ pub(super) fn emit_set_property(
         ctx.helpers.set_property_flat,
         &[ectx, frame.closure, ot, op, vt, vp, name_v, cs_v, ip_v],
     );
+    // May run a setter / push frames: any memoized home address is stale.
+    // This op returns nothing, so clearing is enough (no reload).
+    super::store::drop_home_addrs(ctx);
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
     Ok(())
 }
 

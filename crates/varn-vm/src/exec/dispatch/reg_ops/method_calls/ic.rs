@@ -103,6 +103,7 @@ pub(super) fn record(
             slot: slot as u16,
             is_class: kind,
             vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
+            class: Some(cls.clone()),
         };
         closure.ic_cache.borrow_mut()[site.cs].find_or_insert(entry);
         closure.feedback.borrow_mut().observe(site.cs, cls.id);
