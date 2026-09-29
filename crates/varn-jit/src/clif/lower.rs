@@ -277,21 +277,23 @@ pub fn try_compile(
         return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
     }
 
-    // Fase B subset gate: call/exception/suspension-heavy protos stay
-    // interpreted until their helpers are migrated to `FrameStore`.
+    super::emit::reset_disabled_helper_hit();
+
+    // Declared generators/async keep the interpreter: their calling
+    // convention is a state machine the compiled wrapper does not speak, and
+    // no body lowering can fix that. This gate stays ahead of the SSA attempt
+    // so they never count as an SSA bail. Top-level `await` (a non-async
+    // `<module>` body) is unaffected and lowers from SSA below.
     if proto.is_generator || proto.is_async {
         return Err("clif: generator/async not JIT-able in fase B".into());
     }
-    if let Some(op) = uses_disabled_opcode(proto) {
-        return Err(format!("clif: opcode {op} disabled in fase B"));
-    }
-    super::emit::reset_disabled_helper_hit();
 
-    // Sibling lowering: consume the portable typed SSA where the compiler
-    // attached it, for a call entry or an OSR entry alike. `debug.is_none()`
-    // keeps the inspection paths on the bytecode lowering so `vn debug -p clif`
-    // still shows the bytecode-derived IR. Any `Err` falls through to the
-    // bytecode path below, so correctness never depends on this succeeding.
+    // Primary lowering: the portable typed SSA, which covers the whole
+    // instruction family (scalars, aggregates, calls, modules, suspension).
+    // `debug.is_none()` keeps the inspection paths on the bytecode lowering so
+    // `vn debug -p clif` still shows the bytecode-derived IR. Any `Err` falls
+    // through to the bytecode path below, so correctness never depends on this
+    // succeeding. The fase-B gates below apply to the bytecode fallback only.
     if debug.is_none() {
         if let Some(why) = proto.ssa.unavailable() {
             if super::trace() {
@@ -327,6 +329,12 @@ pub fn try_compile(
                 }
             }
         }
+    }
+
+    // Bytecode fallback gate: suspension-heavy opcodes stay interpreted here;
+    // the SSA path above already handled them.
+    if let Some(op) = uses_disabled_opcode(proto) {
+        return Err(format!("clif: opcode {op} disabled in fase B"));
     }
 
     let nparams = proto.arity.saturating_sub(1);

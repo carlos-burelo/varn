@@ -88,3 +88,30 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
         }
     }
 }
+
+/// `extern "C" fn(ctx, obj_tag, obj_payload, keys: *const VmValue, nkeys)` —
+/// the SSA lowering's `ObjectRest`: `keys[0..nkeys]` are boxed strings staged
+/// on the caller's native stack (the bytecode form reads them from code).
+#[varn_op_macros::jit_slow(field = "object_rest_window")]
+pub(crate) extern "C" fn jit_object_rest_window(
+    ctx: *mut ExecCtx,
+    obj_tag: u64,
+    obj_payload: u64,
+    keys: *const VmValue,
+    nkeys: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
+        let keys = std::slice::from_raw_parts(keys, nkeys);
+        let mut skip = Vec::with_capacity(nkeys);
+        for &k in keys {
+            skip.push(ctx_ref.heap.str_val(k).unwrap_or_default());
+        }
+        let owned: Vec<String> = skip.iter().map(|s| s.to_string()).collect();
+        match crate::exec::collections::object_rest(obj, &owned, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}

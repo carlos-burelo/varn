@@ -1,13 +1,14 @@
 //! CLIF lowering from the portable typed SSA (`varn_types::ssa`).
 //!
-//! The second, sibling lowering of the same SSA the interpreter runs: each
+//! The primary lowering of the same SSA the interpreter runs: each
 //! [`varn_types::ssa::SsaValue`] becomes one CLIF `Value` of its declared
 //! physical type, and each typed `SsaOp` becomes the native instruction the
 //! checker already proved — no re-derivation from operand types, no flow
-//! lattice. It is intentionally a *strict subset*: anything outside the
-//! admitted families returns `Err`, and [`super::lower::try_compile`] falls
-//! back to the bytecode lowering for that function. The fallback is a missing
-//! optimization, never a wrong result (Ley 10).
+//! lattice. It covers the whole portable family (scalars, aggregates, calls,
+//! modules, suspension); anything still outside it returns `Err`, and
+//! [`super::lower::try_compile`] falls back to the bytecode lowering for that
+//! function. The fallback is a missing optimization, never a wrong result
+//! (Ley 10).
 //!
 //! Storage model (one rule, no re-derivation):
 //! * **scalar** values (`Int`/`Float`/`Bool`) live in CLIF registers;
@@ -38,6 +39,8 @@
 //! * [`exceptions`] — `try` regions (resumed interpreted) and `throw`;
 //! * [`views`] — array views cached between safepoints;
 //! * [`induction`] — loop counters whose step cannot overflow;
+//! * [`extra`] — full-family ops outside the scalar/heap core (spreads,
+//!   names, super/extension, modules, suspension, disposal);
 //! * [`osr`] — resuming a running frame at a loop header;
 //! * [`term`] — terminators and the branch/jump argument windows.
 
@@ -64,6 +67,7 @@ mod classops;
 mod closures;
 mod dynop;
 mod exceptions;
+mod extra;
 mod globals;
 mod heap;
 mod heapvalue;
@@ -289,10 +293,20 @@ pub(super) fn try_lower(
         osr::emit_entry(&mut b, &ctx, &mut values, h, header)?;
     }
 
-    for i in rpo {
+    for (n, i) in rpo.iter().enumerate() {
+        let i = *i;
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
-        b.switch_to_block(cb);
+        // `Views::declare` above already emitted the initial clear into the
+        // entry block, so on the first iteration the builder is both current
+        // and partial there: re-switching to it trips Cranelift's
+        // "fill your block before switching" (debug-only, but the release
+        // build silently keeps the stray instructions). A self-switch is a
+        // no-op anyway, so it is skipped; every later switch leaves a block
+        // its terminator just filled.
+        if !(n == 0 && Some(i) == call_entry) {
+            b.switch_to_block(cb);
+        }
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
         let is_call_entry = Some(i) == call_entry;
@@ -390,6 +404,32 @@ fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
             | SsaOp::IntrinsicCall { .. }
             | SsaOp::ArrayGetIndex { .. }
             | SsaOp::ArraySetIndex { .. }
+            | SsaOp::LoadGlobal(_)
+            | SsaOp::StoreGlobal { .. }
+            | SsaOp::BuildTuple { .. }
+            | SsaOp::BuildArraySpread { .. }
+            | SsaOp::BuildObjectSpread { .. }
+            | SsaOp::ObjectMerge { .. }
+            | SsaOp::ObjectRest { .. }
+            | SsaOp::GetPropertyMaybe { .. }
+            | SsaOp::AssertNotNull { .. }
+            | SsaOp::BindMethod { .. }
+            | SsaOp::ArrayExtend { .. }
+            | SsaOp::WrapSpread { .. }
+            | SsaOp::Range { .. }
+            | SsaOp::GetSymbol { .. }
+            | SsaOp::IterCall { .. }
+            | SsaOp::SuperCall { .. }
+            | SsaOp::SuperMethodCall { .. }
+            | SsaOp::ExtensionCall { .. }
+            | SsaOp::CallSpread { .. }
+            | SsaOp::LoadModule { .. }
+            | SsaOp::ModuleSlot { .. }
+            | SsaOp::StoreModuleSlot { .. }
+            | SsaOp::Await { .. }
+            | SsaOp::Spawn { .. }
+            | SsaOp::Yield { .. }
+            | SsaOp::Dispose { .. }
     ) || matches!(op, SsaOp::Convert { operand, conv }
         if !numeric::is_inline_convert(ssa, *operand, *conv))
 }

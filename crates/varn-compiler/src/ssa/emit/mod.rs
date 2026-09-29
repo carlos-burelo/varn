@@ -78,6 +78,19 @@ pub fn emit_function_meta(
     let mut chunk = Chunk::new();
     chunk.source_file = Arc::from(source_file.as_ref());
     let mut block_offset = vec![usize::MAX; n];
+    // Bytecode offset of each instruction (before it) and of its successor
+    // (right after it): suspension points (`Await`/`Yield`/`LoadModule`) resume
+    // the interpreter at an exact offset, so the portable SSA carries it.
+    let mut inst_off: Vec<Vec<usize>> = ssa
+        .blocks
+        .iter()
+        .map(|b| vec![usize::MAX; b.insts.len()])
+        .collect();
+    let mut inst_next: Vec<Vec<usize>> = ssa
+        .blocks
+        .iter()
+        .map(|b| vec![usize::MAX; b.insts.len()])
+        .collect();
 
     let mut fixups: Vec<(usize, BlockId)> = Vec::new();
 
@@ -94,6 +107,7 @@ pub fn emit_function_meta(
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for (idx, inst) in insts.iter().enumerate() {
+            inst_off[b][idx] = chunk.code.len();
             emit_inst(
                 &mut chunk,
                 inst,
@@ -108,6 +122,7 @@ pub fn emit_function_meta(
                 &imms,
                 &mut closure_consts[b][idx],
             )?;
+            inst_next[b][idx] = chunk.code.len();
         }
         ssa.blocks[b].insts = insts;
         let term = ssa.blocks[b].term.clone();
@@ -158,6 +173,8 @@ pub fn emit_function_meta(
         ic: &ic,
         closure_consts: &closure_consts,
         block_offset: &block_offset,
+        inst_off: &inst_off,
+        inst_next: &inst_next,
         liveness: &liveness,
     };
     let ssa_proto = match super::portable::project(&ssa, &emitted, f.has_this, &f.name) {

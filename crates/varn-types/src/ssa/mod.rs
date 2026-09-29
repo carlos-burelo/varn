@@ -1,12 +1,10 @@
 //! Portable, serializable typed SSA: the contract the JIT lowers from.
 //!
-//! Today the JIT consumes bytecode and rebuilds the type of every register
-//! with a flow lattice over `register_meta`. That reconstruction is a second
-//! source of truth for "what is this value" and it can disagree with the
-//! checker (the value-flow bugs C1 chased: a `str` arriving as `heap[46]`, a
-//! `Bool` branch on a raw pair). This module carries the OTHER source: each
-//! value's physical class, decided once by the compiler, with the same
-//! typed operations it already emits as opcodes.
+//! The JIT lowers from this SSA directly: each value's physical class,
+//! decided once by the compiler, with the same typed operations it already
+//! emits as opcodes. The old flow-lattice reconstruction over `register_meta`
+//! survives only as the bytecode fallback for the few protos without portable
+//! SSA (declared generators/async) and for the debug inspectors.
 //!
 //! Design rules (Ley 2/6/8):
 //!
@@ -18,10 +16,11 @@
 //!   [`SsaBinOp`] variant, not something the backend re-derives from operand
 //!   types. `Serde`-stable and `postcard`-friendly (no `Arc`, no `Rc`, no
 //!   cell): the artifact must round-trip through `.vnc` unchanged.
-//! * **Extensible by family.** Only the scalar/arith family is modelled here;
-//!   a function whose body uses anything else simply does not get an
-//!   [`SsaProto`] and keeps the bytecode lowering (the fallback is a missing
-//!   SSA, never a wrong one).
+//! * **Extensible by family.** The op set mirrors the compiler SSA families the
+//!   JIT lowers (scalars, aggregates, properties, classes, closures, calls,
+//!   modules, suspension). A function the projection cannot carry simply does
+//!   not get an [`SsaProto`] and keeps the bytecode lowering (the fallback is
+//!   a missing SSA, never a wrong one).
 //!
 //! A proto is attached **after regalloc**, so [`SsaProto::regs`] maps every
 //! value to the VM register the interpreter holds it in; a lowering that keeps
@@ -35,7 +34,7 @@ use crate::register_meta::{SlotClass, SlotKind};
 mod op;
 mod operators;
 
-pub use op::{SsaOp, SsaUpvalue, UPVALUE_LOCAL};
+pub use op::{SsaObjectSpreadPart, SsaOp, SsaSpread, SsaUpvalue, UPVALUE_LOCAL};
 pub use operators::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
 /// The static kind of a value, exactly the checker's proof projected onto the

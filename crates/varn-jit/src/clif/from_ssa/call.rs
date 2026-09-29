@@ -261,7 +261,12 @@ pub(super) fn emit_call_native_op(
 
 /// The canonical invocation of a boxed window (`ExecCtx::invoke`); the
 /// result is the boxed `VmValue` the helper left in `jit_native_result`.
-fn emit_invoke(b: &mut FunctionBuilder, ctx: &Ctx<'_>, window: Value, argc: usize) -> Value {
+pub(super) fn emit_invoke(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    window: Value,
+    argc: usize,
+) -> Value {
     let frame = ctx.frame.as_ref().expect("a call has a frame");
     let callee = b.ins().load(types::I128, MemFlags::trusted(), window, 0);
     let (ctag, cpayload) = b.ins().isplit(callee);

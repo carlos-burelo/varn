@@ -337,6 +337,183 @@ pub enum SsaOp {
     GetSuper {
         name: Box<str>,
     },
+
+    /// Name-keyed global read (unresolved at compile time) — a heap result.
+    /// Lowered through a runtime helper; the indexed forms above stay fast.
+    LoadGlobal(Box<str>),
+
+    /// Name-keyed global write; no result.
+    StoreGlobal {
+        name: Box<str>,
+        value: u32,
+    },
+
+    /// Tuple literal from `elements`; a heap array result (same layout as
+    /// `BuildArray`, distinct opcode in bytecode).
+    BuildTuple {
+        elements: Vec<u32>,
+    },
+
+    /// Array literal with spreads: `elements` in order, `spread[i]` telling
+    /// whether `elements[i]` spreads (`ArrayExtend`) or pushes (`ArrayPush`).
+    BuildArraySpread {
+        elements: Vec<SsaSpread>,
+    },
+
+    /// Object literal with spreads: `Some(key)` sets a property, `None`
+    /// merges (`ObjectMerge`). `cs_base` is the first inline-cache slot the
+    /// compiler numbered for the keyed parts (consecutive, one per `Some`).
+    BuildObjectSpread {
+        parts: Vec<SsaObjectSpreadPart>,
+        cs_base: u16,
+    },
+
+    /// `ObjectMerge target source` (`{...a, ...b}` tail); no result.
+    ObjectMerge {
+        target: u32,
+        source: u32,
+    },
+
+    /// `ObjectRest object skip_keys` (`const {a, ...rest}`); heap result.
+    ObjectRest {
+        object: u32,
+        skip_keys: Vec<Box<str>>,
+    },
+
+    /// `obj?.name` — a heap result.
+    GetPropertyMaybe {
+        object: u32,
+        name: Box<str>,
+    },
+
+    /// `x!` non-null assertion; no result (traps on null).
+    AssertNotNull {
+        operand: u32,
+    },
+
+    /// Bound method (`obj::method`); a heap closure result.
+    BindMethod {
+        object: u32,
+        name: Box<str>,
+    },
+
+    /// `arr.extend(src)`; no result.
+    ArrayExtend {
+        array: u32,
+        source: u32,
+    },
+
+    /// Spread marker for a call element; a heap wrapper result.
+    WrapSpread {
+        operand: u32,
+    },
+
+    /// `start..end` / `start..=end`; a heap range result.
+    Range {
+        start: u32,
+        end: u32,
+        inclusive: bool,
+    },
+
+    /// Iterator/async-iterator symbol of `object`; a heap result.
+    GetSymbol {
+        object: u32,
+        is_async: bool,
+    },
+
+    /// Iterator protocol call `callee.recv`; a heap result.
+    IterCall {
+        callee: u32,
+        recv: u32,
+    },
+
+    /// `super(...args)` constructor call; a heap result.
+    SuperCall {
+        args: Vec<u32>,
+    },
+
+    /// `super.name(...args)`; a heap result.
+    SuperMethodCall {
+        name: Box<str>,
+        args: Vec<u32>,
+    },
+
+    /// Extension-function call `func(recv, ...args)`; a heap result.
+    /// `slot` is the callee's module-global slot when numbered.
+    ExtensionCall {
+        func: Box<str>,
+        slot: Option<u32>,
+        recv: u32,
+        args: Vec<u32>,
+    },
+
+    /// Spread call `callee(...args)`; a heap result.
+    CallSpread {
+        callee: u32,
+        args: Vec<SsaSpread>,
+    },
+
+    /// `import source`; a heap module-namespace result (may suspend).
+    /// `own_ip` is the bytecode offset of the emitting instruction: a suspend
+    /// rewinds the frame to re-execute the load once the import resolves.
+    LoadModule {
+        source: Box<str>,
+        own_ip: u32,
+    },
+
+    /// `module[slot]` namespace read; a heap result.
+    ModuleSlot {
+        object: u32,
+        slot: u16,
+    },
+
+    /// Namespace write; no result.
+    StoreModuleSlot {
+        slot: u16,
+        value: u32,
+    },
+
+    /// `await operand`; its value (may suspend, resumes interpreted at
+    /// `resume_ip`, the bytecode offset of the next instruction).
+    Await {
+        operand: u32,
+        resume_ip: u32,
+    },
+
+    /// `spawn operand`; a heap task handle (never suspends the caller).
+    Spawn {
+        operand: u32,
+    },
+
+    /// `yield operand`; its value (suspends, resumes interpreted at
+    /// `resume_ip`, the bytecode offset of the next instruction).
+    Yield {
+        operand: u32,
+        resume_ip: u32,
+    },
+
+    /// `using`/`await using` disposal of captured variable `var`; no result.
+    /// `cs` is the `CallMethod` cache slot the compiler numbered for the
+    /// `dispose`/`disposeAsync` call.
+    Dispose {
+        var: u32,
+        is_await: bool,
+        cs: u16,
+    },
+}
+
+/// One call/array element that may spread.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsaSpread {
+    pub value: u32,
+    pub spread: bool,
+}
+
+/// One object-spread part: `Some(key)` sets, `None` merges.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsaObjectSpreadPart {
+    pub key: Option<Box<str>>,
+    pub value: u32,
 }
 
 /// Where a closure's upvalue comes from.

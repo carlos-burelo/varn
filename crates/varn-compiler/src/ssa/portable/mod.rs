@@ -1,13 +1,14 @@
 //! Project the compiler's internal SSA onto the portable, serializable
 //! [`varn_types::ssa::SsaProto`] that rides inside a `FunctionProto`.
 //!
-//! This is a *lossy by design* projection: it carries only the scalar/arith
-//! family the JIT can lower directly, and returns `None` for a body that uses
-//! anything else. A `None` is not an error — it is the fallback contract: the
-//! function keeps its bytecode lowering, which is the pre-existing path. The
-//! projection is deliberately conservative because a wrong SSA (a value whose
-//! class disagrees with the bytecode) would be a miscompile, while a missing
-//! SSA is only a missed optimization (Ley 10: no gain without correctness).
+//! The projection covers the whole instruction family: scalars, aggregates,
+//! properties, classes, closures, calls (including spread/super/extension),
+//! modules, suspension (`await`/`yield`/`spawn`) and disposal. A `None` is not
+//! an error — it is the fallback contract for a body the JIT cannot lower yet
+//! (a missing cache slot, closure constant or landing pad, or an operator with
+//! no portable form): the function keeps its bytecode lowering. A wrong SSA
+//! would be a miscompile, while a missing SSA is only a missed optimization
+//! (Ley 10: no gain without correctness).
 
 use std::sync::Arc;
 
@@ -34,6 +35,10 @@ pub(crate) struct Emitted<'a> {
     pub closure_consts: &'a [Vec<Option<u16>>],
     /// The bytecode offset each block was emitted at.
     pub block_offset: &'a [usize],
+    /// The bytecode offset of each instruction (before it).
+    pub inst_off: &'a [Vec<usize>],
+    /// The bytecode offset right after each instruction (its successor).
+    pub inst_next: &'a [Vec<usize>],
     /// The liveness the registers were assigned by.
     pub liveness: &'a Liveness,
 }
@@ -97,6 +102,18 @@ pub(crate) fn project(
     for (b, block) in ssa.blocks.iter().enumerate() {
         let mut insts = Vec::with_capacity(block.insts.len());
         for (i, inst) in block.insts.iter().enumerate() {
+            let own = emitted
+                .inst_off
+                .get(b)
+                .and_then(|v| v.get(i))
+                .copied()
+                .unwrap_or(usize::MAX);
+            let next = emitted
+                .inst_next
+                .get(b)
+                .and_then(|v| v.get(i))
+                .copied()
+                .unwrap_or(usize::MAX);
             let site = Site {
                 ic_slot: emitted.ic.of(b, i),
                 closure_const: emitted
@@ -114,6 +131,8 @@ pub(crate) fn project(
                     }
                     _ => None,
                 },
+                own_ip: u32::try_from(own).unwrap_or(u32::MAX),
+                next_ip: u32::try_from(next).unwrap_or(u32::MAX),
             };
             let projected = project_inst(inst, &value_tys, &global_of, site, &mut captured)
                 .ok_or_else(|| why_not(&inst.kind, &value_tys))?;
@@ -197,6 +216,10 @@ struct Site<'a> {
     closure_const: Option<u16>,
     /// A `Try`'s landing pad: its bytecode offset and the values live into it.
     landing: Option<(u32, &'a FxHashSet<u32>)>,
+    /// This instruction's own bytecode offset.
+    own_ip: u32,
+    /// The bytecode offset right after it (a suspension's resume point).
+    next_ip: u32,
 }
 
 fn project_term(term: &Terminator) -> SsaTerm {

@@ -32,6 +32,9 @@ pub(super) fn emit_inst(
     if let Some(out) = heapvalue::emit(b, ctx, values, op, dest)? {
         return Ok(out);
     }
+    if let Some(out) = super::extra::try_emit(b, ctx, values, op, dest)? {
+        return Ok(out);
+    }
 
     let dest_ty = dest.map(|d| ctx.ssa.value_ty(d));
     let v = match op {
@@ -212,7 +215,7 @@ pub(super) fn emit_inst(
             return Ok(None);
         }
 
-        // Handled by `heapvalue` above.
+        // Handled by `heapvalue` or `extra` above.
         SsaOp::ConstNull
         | SsaOp::ConstStr(_)
         | SsaOp::ConstChar(_)
@@ -245,8 +248,34 @@ pub(super) fn emit_inst(
         | SsaOp::MakeClass { .. }
         | SsaOp::DeclareField { .. }
         | SsaOp::DefineMethod { .. }
-        | SsaOp::GetSuper { .. } => {
-            unreachable!("heap ops are emitted by heapvalue")
+        | SsaOp::GetSuper { .. }
+        | SsaOp::LoadGlobal(_)
+        | SsaOp::StoreGlobal { .. }
+        | SsaOp::BuildTuple { .. }
+        | SsaOp::BuildArraySpread { .. }
+        | SsaOp::BuildObjectSpread { .. }
+        | SsaOp::ObjectMerge { .. }
+        | SsaOp::ObjectRest { .. }
+        | SsaOp::GetPropertyMaybe { .. }
+        | SsaOp::AssertNotNull { .. }
+        | SsaOp::BindMethod { .. }
+        | SsaOp::ArrayExtend { .. }
+        | SsaOp::WrapSpread { .. }
+        | SsaOp::Range { .. }
+        | SsaOp::GetSymbol { .. }
+        | SsaOp::IterCall { .. }
+        | SsaOp::SuperCall { .. }
+        | SsaOp::SuperMethodCall { .. }
+        | SsaOp::ExtensionCall { .. }
+        | SsaOp::CallSpread { .. }
+        | SsaOp::LoadModule { .. }
+        | SsaOp::ModuleSlot { .. }
+        | SsaOp::StoreModuleSlot { .. }
+        | SsaOp::Await { .. }
+        | SsaOp::Spawn { .. }
+        | SsaOp::Yield { .. }
+        | SsaOp::Dispose { .. } => {
+            unreachable!("heap/extra ops are emitted above")
         }
     };
     Ok(Some(Out::Native(v)))

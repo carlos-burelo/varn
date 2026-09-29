@@ -1,10 +1,9 @@
 //! Value-level helpers: constants, upvalues, closures, and the arithmetic and
 //! comparison operators compiled code cannot inline.
 //!
-//! Globals are absent on purpose: `clif::globals` emits the indexed load and
-//! store inline off `ExecCtx.globals`, and the compiler emits those indexed
-//! forms directly — a name-keyed `LoadGlobal` only survives for a genuinely
-//! dynamic name, which bails.
+//! Name-keyed globals live here too: the indexed forms stay inline off
+//! `ExecCtx.globals`, and a genuinely dynamic name (unresolved at compile
+//! time) lowers through these helpers instead of bailing to the interpreter.
 //!
 //! Everything here is a pure value operation over the running `ExecCtx` —
 //! no frame is pushed and no call is made.
@@ -289,6 +288,58 @@ pub(crate) extern "C" fn jit_make_closure_window(
         match ctx_ref.make_closure(closure_ref, proto_idx, base, upvalues) {
             Ok(val) => ctx_ref.jit_native_result = val,
             Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// Name-keyed global read for the SSA lowering: `name_idx` names the
+/// constant-pool string. A genuinely dynamic name the checker could not
+/// number; the indexed forms stay inline. Missing names read as `null`, as
+/// the interpreter's `exec_variable_op` does.
+#[varn_op_macros::jit_slow(field = "load_global_by_name")]
+pub(crate) extern "C" fn jit_load_global_by_name(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    name_idx: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let name_nv = closure_ref
+            .constants
+            .get(name_idx)
+            .copied()
+            .unwrap_or(VmValue::null());
+        let name = ctx_ref.heap.str_val(name_nv).unwrap_or_default();
+        ctx_ref.jit_native_result = ctx_ref
+            .globals
+            .get_by_name(&name)
+            .unwrap_or(VmValue::null());
+    }
+}
+
+/// Name-keyed global write for the SSA lowering. Unknown names define a new
+/// global, as the interpreter does.
+#[varn_op_macros::jit_slow(field = "store_global_by_name")]
+pub(crate) extern "C" fn jit_store_global_by_name(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    name_idx: usize,
+    val_tag: u64,
+    val_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let val = VmValue::from_raw_parts(val_tag, val_payload);
+        let name_nv = closure_ref
+            .constants
+            .get(name_idx)
+            .copied()
+            .unwrap_or(VmValue::null());
+        let name = ctx_ref.heap.str_val(name_nv).unwrap_or_default();
+        if !ctx_ref.globals.set_by_name(&name, val) {
+            ctx_ref.globals.define(&name, val);
         }
     }
 }

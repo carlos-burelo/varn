@@ -284,8 +284,117 @@ pub(super) fn project_inst(
         }
         InstKind::PopTry => SsaOp::PopTry,
         InstKind::CatchParam { try_val } => SsaOp::CatchParam { try_val: try_val.0 },
-        // Calls, heap ops, closures, classes, suspension: outside the family.
-        _ => return None,
+        InstKind::LoadGlobal(name) => SsaOp::LoadGlobal(name.as_ref().into()),
+        InstKind::StoreGlobal { name, value } => SsaOp::StoreGlobal {
+            name: name.as_ref().into(),
+            value: value.0,
+        },
+        InstKind::BuildTuple { elements } => SsaOp::BuildTuple {
+            elements: elements.iter().map(|v| v.0).collect(),
+        },
+        InstKind::BuildArraySpread { elements } => SsaOp::BuildArraySpread {
+            elements: elements
+                .iter()
+                .map(|(v, s)| varn_types::ssa::SsaSpread {
+                    value: v.0,
+                    spread: *s,
+                })
+                .collect(),
+        },
+        InstKind::BuildObjectSpread { parts } => SsaOp::BuildObjectSpread {
+            parts: parts
+                .iter()
+                .map(|(k, v)| varn_types::ssa::SsaObjectSpreadPart {
+                    key: k.as_ref().map(|s| s.as_ref().into()),
+                    value: v.0,
+                })
+                .collect(),
+            cs_base: u16::from(site.ic_slot?),
+        },
+        InstKind::ObjectMerge { target, source } => SsaOp::ObjectMerge {
+            target: target.0,
+            source: source.0,
+        },
+        InstKind::ObjectRest { object, skip_keys } => SsaOp::ObjectRest {
+            object: object.0,
+            skip_keys: skip_keys.iter().map(|k| k.as_ref().into()).collect(),
+        },
+        InstKind::GetPropertyMaybe { object, name } => SsaOp::GetPropertyMaybe {
+            object: object.0,
+            name: name.as_ref().into(),
+        },
+        InstKind::AssertNotNull { operand } => SsaOp::AssertNotNull { operand: operand.0 },
+        InstKind::Range {
+            start,
+            end,
+            inclusive,
+        } => SsaOp::Range {
+            start: start.0,
+            end: end.0,
+            inclusive: *inclusive,
+        },
+        InstKind::GetSymbol { object, is_async } => SsaOp::GetSymbol {
+            object: object.0,
+            is_async: *is_async,
+        },
+        InstKind::IterCall { callee, recv } => SsaOp::IterCall {
+            callee: callee.0,
+            recv: recv.0,
+        },
+        InstKind::SuperCall { args } => SsaOp::SuperCall {
+            args: args.iter().map(|v| v.0).collect(),
+        },
+        InstKind::SuperMethodCall { name, args } => SsaOp::SuperMethodCall {
+            name: name.as_ref().into(),
+            args: args.iter().map(|v| v.0).collect(),
+        },
+        InstKind::ExtensionCall {
+            func,
+            slot,
+            recv,
+            args,
+        } => SsaOp::ExtensionCall {
+            func: func.as_ref().into(),
+            slot: *slot,
+            recv: recv.0,
+            args: args.iter().map(|v| v.0).collect(),
+        },
+        InstKind::CallSpread { callee, args } => SsaOp::CallSpread {
+            callee: callee.0,
+            args: args
+                .iter()
+                .map(|(v, s)| varn_types::ssa::SsaSpread {
+                    value: v.0,
+                    spread: *s,
+                })
+                .collect(),
+        },
+        InstKind::LoadModule { source } => SsaOp::LoadModule {
+            source: source.as_ref().into(),
+            own_ip: site.own_ip,
+        },
+        InstKind::ModuleSlot { object, slot } => SsaOp::ModuleSlot {
+            object: object.0,
+            slot: *slot,
+        },
+        InstKind::StoreModuleSlot { value, slot } => SsaOp::StoreModuleSlot {
+            slot: *slot,
+            value: value.0,
+        },
+        InstKind::Await { operand } => SsaOp::Await {
+            operand: operand.0,
+            resume_ip: site.next_ip,
+        },
+        InstKind::Spawn { operand } => SsaOp::Spawn { operand: operand.0 },
+        InstKind::Yield { operand } => SsaOp::Yield {
+            operand: operand.0,
+            resume_ip: site.next_ip,
+        },
+        InstKind::Dispose { target, is_await } => SsaOp::Dispose {
+            var: captured.index(crate::ssa::ir::VarId::Local(*target)),
+            is_await: *is_await,
+            cs: u16::from(site.ic_slot?),
+        },
     };
     Some(SsaInst {
         dest: inst.dest.map(|v| v.0),

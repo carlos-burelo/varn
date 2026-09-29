@@ -75,6 +75,16 @@ pub(crate) extern "C" fn jit_build_array_window(
     }
 }
 
+/// Empty object for spread literals (`{...a}` with no keyed prefix): the SSA
+/// lowering then sets/merges each part through the property helpers.
+#[varn_op_macros::jit_slow(field = "build_empty_object")]
+pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_object();
+    }
+}
+
 /// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` — build a map
 /// from a boxed `[k0, v0, k1, v1, …]` window on the caller's native stack.
 #[varn_op_macros::jit_slow(field = "build_map_window")]
