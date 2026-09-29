@@ -134,7 +134,7 @@ pub(super) fn build_wrapper(
     frame_aware: bool,
     osr: bool,
 ) -> Result<CompiledPiece, String> {
-    // Mirrors `lower_raw`: the OSR raw takes no arguments, so the wrapper
+    // Mirrors the raw body: the OSR raw takes no arguments, so the wrapper
     // imports that signature and loads none from the stack.
     let nparams = if osr {
         0

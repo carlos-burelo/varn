@@ -55,9 +55,6 @@ pub struct SubModes {
     pub clif_asm: bool,
     pub clif_check: bool,
 
-    pub roots_diff: bool,
-    pub roots_summary: bool,
-
     pub tir_check: bool,
     pub check_types: bool,
     pub symbols_all: bool,

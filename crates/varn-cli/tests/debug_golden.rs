@@ -35,7 +35,7 @@ const PHASES: &[&str] = &[
 ];
 
 #[cfg(target_arch = "x86_64")]
-const JIT_PHASES: &[&str] = &["tiers", "bails", "roots", "clif:route", "clif:kinds"];
+const JIT_PHASES: &[&str] = &["tiers", "bails", "clif:route", "clif:kinds"];
 
 const FIXTURES: &[&str] = &["arith", "loop_array", "class_fields", "generics", "closure"];
 

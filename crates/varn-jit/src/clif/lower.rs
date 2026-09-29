@@ -43,10 +43,8 @@ use varn_types::{FunctionProto, VmValue};
 
 use super::abi::build_wrapper;
 use super::alloc;
-use super::body::lower_raw;
 use super::debug::ClifDebugSink;
 use super::emit::patch_rel32;
-use super::floats;
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
@@ -118,7 +116,7 @@ pub trait ClifLinker {
     }
     /// The VM epoch THIS compilation is happening under, baked into the
     /// lowered body as an `iconst` for the inline frame-aware `Call` fast
-    /// path's callee-epoch guard (see `AllocCtx::caller_epoch`'s doc). `0` —
+    /// path's callee-epoch guard. `0` —
     /// the default, and `NoLinker`'s only answer — can never match a real
     /// callee's `jit_epoch` (a published `jit_entry` always stamps a nonzero
     /// one), so a linker with no real epoch to report just makes that guard
@@ -136,35 +134,13 @@ impl ClifLinker for NoLinker {
     }
 }
 
-/// `lower_raw` reports this when a leaf lowering turned out to need the
 /// Whether a proto's ABI forces a frame. Only the SIGNATURE matters: a boxed
 /// parameter cannot be passed in the raw `i64`-per-arg ABI, and a boxed return
 /// cannot be delivered without `exec_ctx` (the raw entry returns `i64`).
-///
-/// Boxed LOCALS do not force a frame. The leaf lowering handles a `Dyn`
-/// variable as an `I128` pair. Functions with calls/allocating ops are already
-/// frame-aware through `has_alloc`, so this does not open a hole there.
-/// Every raw — leaf or frame-aware — receives a real `exec_ctx` (leaf param 0),
-/// so no lowering ever retries for lack of one.
-pub(super) fn has_boxed_slots(proto: &FunctionProto) -> bool {
+fn boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
     proto.param_kinds.iter().any(|k| !scalar(k)) || !scalar(&proto.return_kind)
-}
-
-/// The opening guess at the calling convention, and the single authority the
-/// raw body and its wrapper both import their signature from — the two must
-/// never compute it apart.
-pub(super) fn is_frame_aware(proto: &FunctionProto, has_alloc: bool, osr: bool) -> bool {
-    osr || proto.has_this
-        || has_alloc
-        || proto.upvalue_count > 0
-        || proto.is_generator
-        || proto.is_async
-        // Any boxed slot (Ref/Dyn) needs `exec_ctx` and its home slots: a
-        // `Ref` register is an I128 pair whose home is authoritative for
-        // `null`, and even a leaf must read its params from there.
-        || has_boxed_slots(proto)
 }
 
 /// Why a lowering came out frame-aware, in the order the flag tests them,
@@ -186,7 +162,7 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     if alloc::has_alloc(code, pool).unwrap_or(true) {
         r.push("alloc");
     }
-    if has_boxed_slots(proto) {
+    if boxed_slots(proto) {
         r.push("boxed");
     }
     if proto.upvalue_count > 0 {
@@ -218,41 +194,27 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     r
 }
 
-/// Fase B: opcodes whose lowering reaches a helper that is still a fase-A
-/// tripwire, or that need call/exception/suspension machinery not yet migrated.
-/// A proto containing any of them is left to the interpreter. Belt to
-/// `call_helper`'s disabled-helper flag: this catches the paths that invoke a
-/// disabled helper directly (clif→clif / wrapper calls) rather than through
-/// `call_helper`.
-fn uses_disabled_opcode(proto: &FunctionProto) -> Option<&'static str> {
-    let code = &proto.chunk.code;
-    let pool = &proto.chunk.constants;
-    let mut ip = 0usize;
-    while ip < code.len() {
-        let Some(info) = decode(code, ip, pool) else {
-            break;
-        };
-        let name = match OpCode::from_u8(code[ip] as u8) {
-            // Class setup ops now have native lowerings + registered helpers,
-            // and (since fields are inline-compact) a class-heavy MODULE can
-            // JIT its hot top-level loops.
-            Some(OpCode::CallSpread) => "CallSpread",
-            Some(OpCode::GetSymbol) => "GetSymbol",
-            Some(OpCode::Yield) => "Yield",
-            Some(OpCode::Await) => "Await",
-            Some(OpCode::Spawn) => "Spawn",
-            Some(OpCode::LoadModule) => "LoadModule",
-            Some(OpCode::LoadModuleSlot) => "LoadModuleSlot",
-            Some(OpCode::StoreModuleSlot) => "StoreModuleSlot",
-            Some(OpCode::InvokeRuntimeStatic) => "InvokeRuntimeStatic",
-            _ => {
-                ip += info.len;
-                continue;
-            }
-        };
-        return Some(name);
+/// Why the size gate refused `proto`, or `None` when it is admitted. The
+/// single authority on the gate: production (`try_compile` below) and the
+/// debug passes (`-p tiers`, `-p bails`, `-p roots`) all ask here, so the
+/// threshold and the leaf-safe exception cannot drift apart.
+pub fn gate_reason(proto: &FunctionProto) -> Option<String> {
+    let words = proto.chunk.code.len();
+    if words > crate::SIZE_GATE_WORDS && !leaf_safe(proto) {
+        return Some(format!("too large (>{} words)", crate::SIZE_GATE_WORDS));
     }
     None
+}
+
+/// Whether an oversized function may still compile: it cannot nest a clif
+/// frame under another (no calls or allocations a throw could unwind
+/// through, no suspension points) and it is not a coroutine. An undecodable
+/// body counts as unsafe and stays gated.
+fn leaf_safe(proto: &FunctionProto) -> bool {
+    if proto.is_generator || proto.is_async {
+        return false;
+    }
+    !alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants).unwrap_or(true)
 }
 
 /// Lower `proto`. `osr_ip` selects the ENTRY, not the body: `None` builds the
@@ -271,13 +233,39 @@ pub fn try_compile(
 ) -> Result<ClifArtifact, String> {
     // The single choke point for the lowering: `jit::compile` reaches it and
     // so does `clif::debug::inspect` (`vn debug -p tiers` / `-p clif`), which
-    // compiles without executing. Gating only the former left the debug passes
-    // walking into the `unimplemented!` encoding primitives.
+    // compiles without executing.
     if crate::PAIR_MIGRATION_PENDING {
         return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
     }
 
     super::emit::reset_disabled_helper_hit();
+
+    // NOT a compile-time budget: the size gate fires before anything is
+    // asked, so a rejected function shows up in neither `CLIF BAIL` nor
+    // `compile_fail`. Counting "0 bails" without it overstates coverage.
+    if let Some(reason) = gate_reason(proto) {
+        if super::trace() {
+            eprintln!("CLIF GATE  {:?}: {reason}", proto.name);
+        }
+        crate::stats::JIT_STATS
+            .gate_rejected
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        crate::stats::record(|| crate::stats::CompileRecord {
+            name: crate::fn_name(proto),
+            words: proto.chunk.code.len(),
+            outcome: crate::stats::CompileOutcome::Gated(reason.clone()),
+            compile_ns: 0,
+            code_bytes: 0,
+        });
+        return Err("JIT Bailout: function too large".to_owned());
+    }
+    if proto.chunk.code.len() > crate::SIZE_GATE_WORDS && super::trace() {
+        eprintln!(
+            "CLIF GATE  {:?}: large but leaf-safe, admitted ({} words)",
+            proto.name,
+            proto.chunk.code.len()
+        );
+    }
 
     // Declared generators/async keep the interpreter: their calling
     // convention is a state machine the compiled wrapper does not speak, and
@@ -288,95 +276,63 @@ pub fn try_compile(
         return Err("clif: generator/async not JIT-able in fase B".into());
     }
 
-    // Primary lowering: the portable typed SSA, which covers the whole
+    // The one lowering: the portable typed SSA, which covers the whole
     // instruction family (scalars, aggregates, calls, modules, suspension).
-    // `debug.is_none()` keeps the inspection paths on the bytecode lowering so
-    // `vn debug -p clif` still shows the bytecode-derived IR. Any `Err` falls
-    // through to the bytecode path below, so correctness never depends on this
-    // succeeding. The fase-B gates below apply to the bytecode fallback only.
-    if debug.is_none() {
-        if let Some(why) = proto.ssa.unavailable() {
-            if super::trace() {
-                eprintln!(
-                    "clif: from_ssa unavailable {}: {why}",
-                    proto.name.as_deref().unwrap_or("<module>")
-                );
-            }
+    // The debug sink threads through for `-p clif` capture; production passes
+    // `None`. An `Err` leaves the function to the interpreter — the fallback
+    // is a missing optimization, never a wrong result (Ley 10).
+    if let Some(why) = proto.ssa.unavailable() {
+        if super::trace() {
+            eprintln!(
+                "clif: from_ssa unavailable {}: {why}",
+                proto.name.as_deref().unwrap_or("<module>")
+            );
         }
-        if let Some(ssa) = proto.ssa.get() {
-            match super::from_ssa::try_lower(proto, ssa, constants, helpers, isa, linker, osr_ip) {
-                Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
-                    if super::trace() {
-                        eprintln!(
-                            "clif: from_ssa {}{}{}",
-                            proto.name.as_deref().unwrap_or("<module>"),
-                            osr_ip.map_or(String::new(), |ip| format!(" osr@{ip}")),
-                            if frame_aware { " (frame-aware)" } else { "" }
-                        );
-                    }
-                    let wrapper =
-                        build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
-                    return finish_artifact(raw, wrapper, frame_aware, None);
-                }
-                Ok(_) => {}
-                Err(reason) => {
-                    if super::trace() {
-                        eprintln!(
-                            "clif: from_ssa bail {}: {reason}",
-                            proto.name.as_deref().unwrap_or("<module>")
-                        );
-                    }
-                }
-            }
-        }
+        return Err(format!("clif: from_ssa unavailable: {why}"));
     }
-
-    // Bytecode fallback gate: suspension-heavy opcodes stay interpreted here;
-    // the SSA path above already handled them.
-    if let Some(op) = uses_disabled_opcode(proto) {
-        return Err(format!("clif: opcode {op} disabled in fase B"));
-    }
-
-    let nparams = proto.arity.saturating_sub(1);
-    if proto.param_kinds.len() != nparams {
-        return Err("clif: missing param kinds".into());
-    }
-    floats::check_float_writes(
-        &proto.chunk.code,
-        &proto.chunk.constants,
-        &proto.register_meta,
-    )?;
-
-    let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
-    // OSR resumes a frame that already exists, and reads every register out of
-    // that frame's `ctx.stack` home slots — so it needs `base` and `closure`
-    // whatever the normal heuristic decided. Forcing the flag also keeps the
-    // OSR `raw` out of `clif_raw`: `compile` publishes a direct clif→clif
-    // entry only for non-frame-aware lowerings, and a raw that resumes
-    // mid-loop is the last thing a call site should reach.
-    let frame_aware = is_frame_aware(proto, has_alloc, osr_ip.is_some());
-    let raw = lower_raw(
+    let Some(ssa) = proto.ssa.get() else {
+        return Err("clif: from_ssa unavailable".into());
+    };
+    match super::from_ssa::try_lower(
         proto,
+        ssa,
         constants,
         helpers,
         isa,
         linker,
-        has_alloc,
-        frame_aware,
         osr_ip,
         debug.as_deref_mut(),
-    )?;
-    if super::emit::disabled_helper_hit() {
-        return Err("clif: uses a helper disabled in fase B".into());
+    ) {
+        Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
+            if super::trace() {
+                eprintln!(
+                    "clif: from_ssa {}{}{}",
+                    proto.name.as_deref().unwrap_or("<module>"),
+                    osr_ip.map_or(String::new(), |ip| format!(" osr@{ip}")),
+                    if frame_aware { " (frame-aware)" } else { "" }
+                );
+            }
+            let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
+            return finish_artifact(raw, wrapper, frame_aware, debug);
+        }
+        Ok(_) => {
+            return Err("clif: uses a helper disabled in fase B".into());
+        }
+        Err(reason) => {
+            if super::trace() {
+                eprintln!(
+                    "clif: from_ssa bail {}: {reason}",
+                    proto.name.as_deref().unwrap_or("<module>")
+                );
+            }
+            return Err(reason);
+        }
     }
-    let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
-    finish_artifact(raw, wrapper, frame_aware, debug)
 }
 
 /// Concatenate the two pieces (raw at 0, wrapper 16-aligned after it), resolve
 /// the only two relocation targets admitted (self-recursion inside raw and the
-/// wrapper's call to raw) by hand, and hand back the executable artifact. This
-/// is the one place both lowerings converge, so neither owns the layout.
+/// wrapper's call to raw) by hand, and hand back the executable artifact.
 fn finish_artifact(
     raw: super::piece::CompiledPiece,
     wrapper: super::piece::CompiledPiece,

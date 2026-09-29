@@ -19,6 +19,7 @@ struct FnSize {
     name: String,
     words: usize,
     constants: usize,
+    gated: bool,
 }
 
 fn collect(proto: &FunctionProto, out: &mut Vec<FnSize>) {
@@ -26,6 +27,7 @@ fn collect(proto: &FunctionProto, out: &mut Vec<FnSize>) {
         name: proto.name.as_deref().unwrap_or("<module>").to_owned(),
         words: proto.chunk.code.len(),
         constants: proto.chunk.constants.len(),
+        gated: varn_jit::clif::lower::gate_reason(proto).is_some(),
     });
     for entry in &proto.chunk.constants {
         if let PoolEntry::Function(f) = entry {
@@ -40,10 +42,7 @@ pub fn debug_summary(proto: &FunctionProto) {
 
     let total_words: usize = fns.iter().map(|f| f.words).sum();
     let total_consts: usize = fns.iter().map(|f| f.constants).sum();
-    let over_gate = fns
-        .iter()
-        .filter(|f| f.words > varn_jit::SIZE_GATE_WORDS)
-        .count();
+    let over_gate = fns.iter().filter(|f| f.gated).count();
 
     eprintln!(
         "\n{BOLD}SUMMARY{R}{DIM} ── {}{R}",
@@ -63,11 +62,7 @@ pub fn debug_summary(proto: &FunctionProto) {
     fns.sort_by_key(|b| std::cmp::Reverse(b.words));
     eprintln!("\n  {DIM}top-{TOP_N} por tamaño{R}");
     for f in fns.iter().take(TOP_N) {
-        let flag = if f.words > varn_jit::SIZE_GATE_WORDS {
-            "  ← excede el gate"
-        } else {
-            ""
-        };
+        let flag = if f.gated { "  ← excede el gate" } else { "" };
         eprintln!(
             "    {:<32} {:>6} words{}",
             truncate(&f.name, 32),

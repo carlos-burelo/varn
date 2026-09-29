@@ -45,7 +45,7 @@ pub trait Phase: Sync {
     }
 
     /// `false` for sweep/exec-only phases that are members of views but not of
-    /// `-p all` (tir, tir:check, check:types, roots, typeloss, gc, clif:check).
+    /// `-p all` (tir, tir:check, check:types, typeloss, gc, clif:check).
     fn in_all(&self) -> bool {
         true
     }

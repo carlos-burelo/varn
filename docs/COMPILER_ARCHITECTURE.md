@@ -28,6 +28,7 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
   - [Asignación de Registros Nativos (`regalloc_post`)](#asignación-de-registros-nativos-regalloc_post)
   - [Inferidor de Tipos de Slot (`slot_kinds`)](#inferidor-de-tipos-de-slot-slot_kinds)
 - [7. Frontend y Lowering Semántico](#7-frontend-y-lowering-semántico)
+- [8. Lowering JIT y brechas abiertas](#8-lowering-jit-y-brechas-abiertas)
 
 ---
 
@@ -222,4 +223,25 @@ Inspecciona los tipos asignados a cada registro (`Float`, `Int`, `ObjectRef`, `A
 
 ### 7.2 Orden Determinista de Inicialización de Constructores
 En `varn-compiler` (`hir/lower/decl/functions.rs`), la inicialización de campos de clases por defecto (`field_inits`) se compila e inyecta **estrictamente antes** del cuerpo del constructor. Esto garantiza que todos los campos declarados con valores iniciales (`field: Type = default_val`) existan y no sean `null` si el código del constructor invoca métodos de la propia instancia (`this.method()`).
+
+---
+
+## 8. Lowering JIT y brechas abiertas
+
+El JIT baja desde el SSA portable (`varn-types::ssa`), no desde bytecode: cada valor trae su clase física decidida por el compilador y cada `SsaOp` es la instrucción nativa ya probada (`varn-jit/src/clif/from_ssa/`). El lowering desde bytecode se borró; el único fallback es el intérprete. Lo fija `crates/varn-cli/tests/jit_ssa_coverage.rs` (cero funciones fuera de SSA en `tests/main.vn`).
+
+### 8.1 Generadores y `async` declarados: por qué siguen interpretados
+
+No es falta de `Yield`/`Await` en el SSA — esos ops existen, se proyectan con `resume_ip` exacto y bajan (`from_ssa/extra.rs`: spill a homes + helper + reanuda interpretado; un top-level `await` en `<module>` no-async sí compila). La puerta es el **protocolo de llamada**, no el cuerpo:
+
+- Llamar un generador debe retornar el objeto generador **sin ejecutar una instrucción** (`varn-vm/src/exec/frame_ctrl.rs:150-162`, `exec/calls.rs:199-202` vía `describe_generator:152-179`, que drena args y congela upvalues sin crear frame). Llamar un `async` debe retornar la `LazyTask` pendiente (`exec/calls.rs:204-241`). El wrapper JIT (`varn-jit/src/clif/abi.rs:130-254`) ejecuta el cuerpo hasta `Return` y retorna el valor final: semántica opuesta.
+- Reanudar exige restaurar `ip` + registros desde un estado con tracing de GC (`exec/generator.rs:28-139` `NanGenDriver`, `149-240` tracing), inyectar input en `resume_dest` y correr hasta el próximo `Yield`/`Return`; `async function*` además asienta `Await` interno (`exec/ctx_tasks.rs:27-67`).
+- `Yield`/`Await` compilados aparcan por el buffer **exterior** (`exec/jit_helpers/suspend.rs:40-97`, `exec/dispatch/jit_frame.rs:60-95`); un frame clif intermedio no puede aparcar en mitad de una llamada nativa, y el tiering prohíbe OSR de generadores (`varn-vm/src/jit/tiering.rs:311-328`).
+- El SSA portable ni modela la corrutina: `SsaProto` no lleva `is_generator`/`state_size` (solo el `proto` los conoce) y no hay ops de protocolo (alloc-estado/poll/next). La máquina de estados del compilador (`passes/state_machine`) ya produce el dato, pero el JIT lo ignora por puerta temprana (`clif/lower.rs` + `from_ssa/mod.rs` + vía rápida en `exec/calls.rs:93-116`, `dispatch/reg_ops/calls.rs`, `jit_helpers/calls.rs:268`).
+
+Llevarlo a JIT requiere investigación propia, no incremental: entrada que retorne objeto sin correr cuerpo (reserva vía `state_size`), estado reanudable con GC tracing, `next()` compilado, salidas laterales por frame, OSR a `resume_ip` arbitrario y publicación `jit_entry`/`clif_raw` por variante sin que un call-site alcance un prólogo de resume.
+
+### 8.2 Gate de tamaño con excepción leaf-safe
+
+`SIZE_GATE_WORDS = 8192` (`varn-jit/src/lib.rs`) no es presupuesto de compilación: impide marcos clif anidados no reanudables. `throw` entre frames ya funciona (jump buffer por frame); la mitad abierta es **suspensión**, que aparca por el buffer exterior. Una función sin calls/alocs (conservador: `alloc::has_alloc`), sin puntos de suspensión y no corrutina se admite a cualquier tamaño (`leaf_safe`): lo que puede hacer (aritmética chequeada, self-recursión que aborta por profundidad como las pequeñas) no necesita reanudabilidad.
 

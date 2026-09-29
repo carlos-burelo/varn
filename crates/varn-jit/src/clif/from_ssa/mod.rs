@@ -140,6 +140,7 @@ pub(super) fn try_lower(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
     osr_ip: Option<usize>,
+    mut debug: Option<&mut super::debug::ClifDebugSink>,
 ) -> Result<(CompiledPiece, bool), String> {
     let osr = match osr_ip {
         None => None,
@@ -377,6 +378,8 @@ pub(super) fn try_lower(
 
     b.seal_all_blocks();
     b.finalize();
+    super::debug::capture_ir(&mut debug, &func);
+    super::debug::capture_kinds_ssa(&mut debug, ssa);
     Ok((compile_piece(func, isa)?, frame_aware))
 }
 

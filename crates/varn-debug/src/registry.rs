@@ -170,19 +170,10 @@ static BAILS: Info = Info {
     in_all: true,
     groups: &[],
 };
-static ROOTS: Info = Info {
-    id: "roots",
-    aliases: &[],
-    title: "conjunto de raíces GC por safepoint",
-    stage: Stage::Compile,
-    per_module: PerModule::Graph,
-    in_all: false,
-    groups: &[],
-};
 static CLIF: Info = Info {
     id: "clif",
     aliases: &[],
-    title: "lowering Cranelift (route, kinds, ir, asm, check)",
+    title: "lowering Cranelift desde SSA (route, kinds, ir, asm, check)",
     stage: Stage::Compile,
     per_module: PerModule::No,
     in_all: true,
@@ -214,7 +205,6 @@ pub static ALL: &[&dyn Phase] = &[
     &TIR,
     &TIERS,
     &BAILS,
-    &ROOTS,
     &CLIF,
     &GC,
 ];
@@ -274,7 +264,7 @@ mod tests {
     #[test]
     fn all_membership_excludes_sweep_and_exec_phases() {
         let in_all: HashSet<&str> = in_all().map(|p| p.id()).collect();
-        for excluded in ["tir", "check:types", "roots", "typeloss", "gc"] {
+        for excluded in ["tir", "check:types", "typeloss", "gc"] {
             assert!(!in_all.contains(excluded), "{excluded} must not be in all");
         }
         for included in ["tokens", "ast", "bytecode", "symbols", "summary", "clif"] {

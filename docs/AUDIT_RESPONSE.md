@@ -10,11 +10,11 @@ Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusi
 > - **JIT activo y con par de valor único (C1).** `Ref`+`Dyn` bajan como par
 >   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
 >   1233/0 en JIT y `VARN_NO_JIT=1`.
-> - **Bala 9 (JIT baja de bytecode): PARCIALMENTE RESUELTA.** El JIT **ya baja de
->   SSA tipado** (`varn_types::ssa` + `clif/from_ssa/`) para el subconjunto
->   escalar/heap/agregados/campos/calls; el bytecode es el fallback. Falta
->   método/nativa/`Try`/OSR para poder borrar `clif/kinds.rs` y el lowering desde
->   bytecode (F5/F6 del plan único).
+> - **Bala 9 (JIT baja de bytecode): RESUELTA.** El JIT baja **todo** de SSA
+>   portable (`varn_types::ssa` + `clif/from_ssa/`); el lowering desde bytecode
+>   (`clif/body/*`, lattice, safepoint maps) está borrado y el único fallback
+>   es el intérprete. Quedan interpretados los generadores/async declarados
+>   (protocolo state-machine, §8.1 de `COMPILER_ARCHITECTURE.md`).
 > - **Bala 11 (arrays angostos migran a Boxed en escritura):** `set_vm`/`push_vm`
 >   ya escriben en los 9 reprs angostos sin migrar (solo un valor de tipo
 >   incompatible migra, que es correcto).
@@ -37,7 +37,7 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 | # | Ítem | Estado |
 |---|---|---|
 | 1 | Frame/args/rets/upvalues universales `Vec<VmValue>` → clases GPR/FPR/REF/DYN | **DONE** — `FrameStore` particionado; intérprete con fast-path `reg_class==Gpr` sin tag-check (`ops_math_cmp.rs:144`); GPR/FPR fuera del scan GC (`live_boxed` por clase) |
-| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **PARCIAL** — el JIT ya baja de SSA tipado (`varn_types::ssa` + `clif/from_ssa/`) para escalar/heap/agregados/campos/`Call`; falta método/nativa/`Try`/OSR (F5) para borrar el lowering desde bytecode (F6). Ver `docs/plans/2026-09-20-PLAN-PENDIENTE.md` |
+| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **DONE** — el JIT baja todo de SSA portable (`varn_types::ssa` + `clif/from_ssa/extra.rs`); el lowering desde bytecode (`clif/body/*`, lattice `K`, safepoint maps) está borrado y `-p clif/tiers/bails` inspeccionan la vía SSA. Quedan interpretados los generadores/async declarados (protocolo state-machine, ver `COMPILER_ARCHITECTURE.md` §8.1) |
 | 3 | Meet-a-`Dynamic` + skip de `Float` en regalloc_post | **DONE** (Anexo K2) |
 | 4 | Colapsos `Char→Dynamic`, `Nullable→Dynamic` | **PARCIAL** — `Char→Ref` honesto (K1), anchos (K4); `Nullable→Dynamic` sigue (`ssa/emit/mod.rs:270`) |
 | 5 | `ArrayRepr` mínimo `{Boxed,I64,F64}` | **DONE** (K5) |

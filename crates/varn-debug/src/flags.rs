@@ -47,10 +47,10 @@ pub struct DebugFlags {
     pub clif_kinds: bool,
     pub clif_ir: bool,
     pub clif_asm: bool,
-    /// `clif:check` — lowering invariants Cranelift's verifier cannot express.
-    /// Reports only violations, so silence is the healthy answer. Deliberately
-    /// NOT part of `clif:all`: the other sub-phases are for reading one
-    /// function, this one is for sweeping a module.
+    /// `clif:check` — reports only functions that refuse to route, so silence
+    /// is the healthy answer. Deliberately NOT part of `clif:all`: the other
+    /// sub-phases are for reading one function, this one is for sweeping a
+    /// module.
     pub clif_check: bool,
 
     pub tiers: bool,
@@ -60,12 +60,6 @@ pub struct DebugFlags {
     /// opcodes that had a typed counterpart, and member reads the checker typed
     /// but never published a slot for.
     pub typeloss: bool,
-
-    pub roots: bool,
-    /// Only safepoints where the two root answers disagree.
-    pub roots_diff: bool,
-    /// Counts only, no per-safepoint rows.
-    pub roots_summary: bool,
 
     /// `gc` — post-mortem nursery/old-gen/interner snapshot, printed once the
     /// program finishes running. Unlike every other phase, this one needs an
@@ -118,7 +112,6 @@ pub fn print_phases() {
     eprintln!("  check:types  (volcado determinista y diffeable: tabla de tipos + anotaciones)");
     eprintln!("  tir:check    (verifica el TIR emitido e informa cobertura sobre el módulo)");
     eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:check  clif:all");
-    eprintln!("  roots:diff  roots:summary  roots:all");
     eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
     eprintln!("  lsp:symbols  lsp:colorize  lsp:hints  lsp:all");
     eprintln!("\nFiltros:");
@@ -217,21 +210,6 @@ impl DebugFlags {
                             return Err(CliError::usage(format!(
                                 "unknown lsp debug sub-phase: '{unknown}'\n\
                                  Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, hints, all"
-                            )));
-                        }
-                    }
-                }
-            } else if let Some(sub) = phase.strip_prefix("roots:") {
-                flags.roots = true;
-                for sub_part in sub.split('+') {
-                    match sub_part {
-                        "diff" => flags.roots_diff = true,
-                        "summary" => flags.roots_summary = true,
-                        "all" => {}
-                        unknown => {
-                            return Err(CliError::usage(format!(
-                                "unknown roots debug sub-phase: '{unknown}'\n\
-                                 Valid sub-phases: diff, summary, all"
                             )));
                         }
                     }
@@ -370,7 +348,6 @@ fn apply_registered(flags: &mut DebugFlags, id: &str) {
         "tir" => flags.tir = true,
         "tiers" => flags.tiers = true,
         "bails" => flags.bails = true,
-        "roots" => flags.roots = true,
         "clif" => flags.clif_all_on(),
         "gc" => flags.gc = true,
         _ => {}
@@ -437,15 +414,13 @@ mod tests {
             assert!(on);
         }
         assert!(f.symbols_all && f.types_all && f.lsp_hovers);
-        for off in [f.roots, f.typeloss, f.gc, f.tir, f.check_types] {
+        for off in [f.typeloss, f.gc, f.tir, f.check_types] {
             assert!(!off);
         }
     }
 
     #[test]
     fn submodes_parse() {
-        let f = DebugFlags::parse("roots:diff").unwrap();
-        assert!(f.roots && f.roots_diff && !f.roots_summary);
         let f = DebugFlags::parse("tir:check").unwrap();
         assert!(f.tir_check);
         let f = DebugFlags::parse("symbols:all").unwrap();

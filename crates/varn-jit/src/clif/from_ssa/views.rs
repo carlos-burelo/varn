@@ -80,6 +80,11 @@ impl Views {
 /// compiled code. An element store's own slow path clears the views itself
 /// (a cross-typed write reshapes the buffer); an overflowing `int` op throws
 /// and never returns.
+///
+/// The extra-family arms below are each decided, not defaulted: only ops
+/// whose helper neither allocates on the Varn heap nor runs user code keep
+/// views. `StoreGlobal`'s define path pushes a Rust `Vec` (no collection);
+/// `ModuleSlot` and `LoadGlobal` only read; `AssertNotNull` only traps.
 pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
     match op {
         SsaOp::ConstInt(_)
@@ -90,7 +95,11 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::LoadCaptured { .. }
         | SsaOp::StoreCaptured { .. }
         | SsaOp::ArrayGetIndex { .. }
-        | SsaOp::ArraySetIndex { .. } => true,
+        | SsaOp::ArraySetIndex { .. }
+        | SsaOp::LoadGlobal(_)
+        | SsaOp::StoreGlobal { .. }
+        | SsaOp::AssertNotNull { .. }
+        | SsaOp::ModuleSlot { .. } => true,
         // Native arithmetic, comparisons and bitwise ops; an `int` overflow
         // throws. Division, modulo and power run a helper, a concatenation
         // allocates, a `Dyn` operator runs the generic runtime one.

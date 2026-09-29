@@ -5,13 +5,12 @@
 //! [`varn_jit::clif::debug::inspect`] without executing the program, so it
 //! answers "would this route" rather than "did this run".
 //!
-//! The size gate is applied here explicitly. It lives in `varn_jit::compile`,
-//! outside `try_compile`, so `inspect` alone would happily report a 400-word
-//! function as routed when production never offers it to Cranelift at all.
+//! The size gate is asked through `lower::gate_reason`, the same authority
+//! production compiles through, so the two cannot disagree.
 
 use varn_jit::clif::debug::inspect;
-use varn_jit::clif::lower::NoLinker;
-use varn_jit::{JitHelpers, SIZE_GATE_WORDS};
+use varn_jit::clif::lower::{gate_reason, NoLinker};
+use varn_jit::JitHelpers;
 use varn_types::{FunctionProto, PoolEntry};
 
 use crate::render::truncate;
@@ -91,11 +90,11 @@ fn walk(
     let words = proto.chunk.code.len();
 
     // Mirror production order: the gate fires before Cranelift is consulted.
-    if words > SIZE_GATE_WORDS {
+    if let Some(reason) = gate_reason(proto) {
         out.push(TierRow {
             name,
             words,
-            tier: Tier::Gate(format!("too large (>{SIZE_GATE_WORDS} words)")),
+            tier: Tier::Gate(reason),
             frame_aware: false,
             fa_reasons: Vec::new(),
         });

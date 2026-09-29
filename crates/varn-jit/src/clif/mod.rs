@@ -13,29 +13,16 @@
 /// unwinder de la VM lo consume. El resto del lowering sigue interno.
 pub mod abi;
 pub(crate) mod alloc;
-pub(crate) mod arrays;
-pub(crate) mod body;
-pub(crate) mod classes;
 pub mod debug;
 pub(crate) mod emit;
 pub(crate) mod fields;
 pub(crate) mod floats;
 pub(crate) mod from_ssa;
 pub(crate) mod generic;
-pub(crate) mod globals;
 pub(crate) mod homes;
-pub mod invariants;
-pub(crate) mod kinds;
-pub(crate) mod liveness;
 pub mod lower;
-pub(crate) mod methods;
-pub(crate) mod osr;
 pub(crate) mod piece;
-pub(crate) mod preheader;
-pub(crate) mod scan;
-pub(crate) mod strconcat;
 pub(crate) mod strings;
-pub(crate) mod vars;
 
 use cranelift_codegen::control::ControlPlane;
 use cranelift_codegen::ir::Function;
@@ -56,12 +43,6 @@ pub fn enabled() -> bool {
 pub fn trace() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
-}
-
-/// `VARN_HOME_TRACE`, read once: the lowering asks it for every instruction.
-pub(crate) fn home_trace() -> bool {
-    static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VARN_HOME_TRACE").is_some())
 }
 
 /// The host ISA is immutable for the process lifetime; build it once.

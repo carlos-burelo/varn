@@ -303,7 +303,9 @@ use std::sync::atomic::Ordering;
 use stats::record;
 
 /// Bytecode length, in words, above which a function is refused before
-/// Cranelift is asked. See the gate in [`compile`] for why it exists.
+/// Cranelift is asked — unless it is leaf-safe (no nesting possible).
+/// Enforced once, inside `clif::lower::try_compile`, so production and the
+/// debug passes gate identically; see `lower::gate_reason`.
 pub const SIZE_GATE_WORDS: usize = 8192;
 
 fn fn_name(proto: &FunctionProto) -> String {
@@ -363,6 +365,11 @@ pub(crate) const PAIR_MIGRATION_BAIL: &str =
 /// compiled without waiting for a second entry that may never come. Such a
 /// lowering is always frame-aware, so [`Compiled::raw`] comes back `0` and no
 /// call site can reach the resume prologue.
+///
+/// Gating (size, coroutines) and the lowering itself both live in
+/// `clif::lower::try_compile`, which this and the debug passes reach through
+/// the same choke point — including the `PAIR_MIGRATION_PENDING` gate, which
+/// is NOT repeated here for that reason.
 pub fn compile(
     proto: &FunctionProto,
     constants: &[VmValue],
@@ -370,44 +377,6 @@ pub fn compile(
     linker: &dyn clif::lower::ClifLinker,
     osr_ip: Option<usize>,
 ) -> Result<Compiled, String> {
-    // The `PAIR_MIGRATION_PENDING` gate is NOT repeated here: it lives in
-    // `clif::lower::try_compile`, which this and the debug passes both reach.
-
-    // NOT a compile-time budget: this cap is what keeps module top-levels
-    // (and other long functions) out of clif, and with them the only shapes
-    // that put one clif frame underneath another.
-    //
-    // A clif frame is not resumable — it has no bytecode `ip` of its own — and
-    // `execute_jit_frame` installs a single `setjmp` for the OUTERMOST clif
-    // frame only. So a `throw` inside a nested clif call unwinds the native
-    // stack of every clif frame in between while their `CallFrame`s stay live
-    // with `ip == 0`, and the frame loop re-enters them from the top: an
-    // endless re-execution (`assert(safeDivide(10, 0) === -1)` in
-    // tests/11-errors.vn hangs allocating). Suspension (`Await`, `Yield`) has
-    // the same hole, minus the loop.
-    //
-    // Lifting this cap therefore means making clif frames resumable (a
-    // per-frame jump buffer for exceptions plus a side-exit ip for
-    // suspension), not just raising the number.
-    let words = proto.chunk.code.len();
-    if words > SIZE_GATE_WORDS {
-        // Traced like a lowering bail: this gate fires BEFORE clif is asked, so
-        // a function rejected here shows up in neither `CLIF BAIL` nor
-        // `compile_fail`. Counting "0 bails" without it overstates coverage.
-        if clif::trace() {
-            eprintln!("CLIF GATE  {:?}: too large ({words} words)", proto.name);
-        }
-        JIT_STATS.gate_rejected.fetch_add(1, Ordering::Relaxed);
-        record(|| CompileRecord {
-            name: fn_name(proto),
-            words,
-            outcome: CompileOutcome::Gated(format!("too large (>{SIZE_GATE_WORDS} words)")),
-            compile_ns: 0,
-            code_bytes: 0,
-        });
-        return Err("JIT Bailout: function too large".to_owned());
-    }
-
     // Everything routes through the Cranelift backend; a bail leaves the
     // function to the interpreter.
     if clif::enabled() {
@@ -416,6 +385,7 @@ pub fn compile(
             let res =
                 clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_ip, None);
             let elapsed = start.elapsed().as_nanos() as u64;
+            let words = proto.chunk.code.len();
             match res {
                 Ok(art) => {
                     if clif::trace() {

@@ -3,22 +3,20 @@
 
   [1m<module>[0m[2m (frame-aware)[0m
     [2mkinds (17 regs):[0m
-      block@0: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed]
+      block@0: [v0:Ref, v1:Ref, v2:Int, v3:Int, v4:Int, v6:Int, v7:Ref, v8:Ref, v9:Str, v10:Ref, v11:Ref, v12:Int, v13:Int, v14:Bool, v16:Ref, v17:Str, v18:Ref, v19:Ref, v21:Int, v23:Bool, v25:Ref, v26:Str]
 
   [1msum[0m[2m (frame-aware)[0m
     [2mkinds (8 regs):[0m
-      block@0: [Boxed, Boxed, Int, Int, Boxed, Int, Int, Boxed]
-      block@8: [Boxed, Boxed, Int, Int, Boxed, Int, Int, Boxed]
-      block@17: [Boxed, Boxed, Int, Int, Boxed, Int, Int, Boxed]
-      block@28: [Boxed, Boxed, Int, Int, Boxed, Int, Int, Boxed]
+      block@0: [v0:Ref, v1:Int, v2:Int]
+      block@1: [v4:Int, v11:Int, v5:Int, v6:Int, v8:Int, v9:Bool]
+      block@2: [v10:Int, v12:Int]
 
   [1mfirstAbove[0m[2m (frame-aware)[0m
     [2mkinds (9 regs):[0m
-      block@0: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@2: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@9: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@16: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@23: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@30: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
-      block@32: [Boxed, Boxed, Int, Int, Int, Int, Boxed, Int, Boxed]
+      block@0: [v0:Ref, v1:Int, v2:Int, v4:Int]
+      block@1: [v5:Int, v7:Int, v8:Bool]
+      block@2: [v9:Int, v11:Bool]
+      block@3: [v15:Int]
+      block@4: [v12:Int]
+      block@5: [v13:Int, v14:Int]
 [2m── end: CLIF ──[0m

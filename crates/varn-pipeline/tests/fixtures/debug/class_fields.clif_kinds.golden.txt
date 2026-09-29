@@ -3,21 +3,21 @@
 
   [1m<module>[0m[2m (frame-aware)[0m
     [2mkinds (12 regs):[0m
-      block@0: [Boxed, Boxed, Boxed, Float, Boxed, Float, Boxed, Boxed, Boxed, Boxed, Boxed, Boxed]
+      block@0: [v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Float, v7:Ref, v8:Ref, v9:Str, v10:Ref, v11:Float, v13:Bool, v15:Ref, v16:Str, v17:Ref, v18:Float, v19:Float, v20:Bool, v22:Float, v23:Ref, v24:Ref, v25:Str, v26:Ref, v27:Float, v28:Float, v29:Bool, v31:Ref, v32:Str]
 
   [1mTemperature.constructor[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [Boxed, Float, Boxed, Boxed]
+      block@0: [v0:Float, v1:Ref]
 
   [1mTemperature.get celsius[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [Boxed, Boxed, Float, Boxed]
+      block@0: [v0:Ref, v1:Float]
 
   [1mTemperature.set celsius[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [Boxed, Boxed, Boxed, Boxed]
+      block@0: [v0:Dynamic, v1:Ref]
 
   [1mTemperature.get fahrenheit[0m[2m (frame-aware)[0m
     [2mkinds (6 regs):[0m
-      block@0: [Boxed, Boxed, Float, Float, Float, Boxed]
+      block@0: [v0:Ref, v1:Float, v2:Float, v3:Float, v4:Float, v5:Float]
 [2m── end: CLIF ──[0m
