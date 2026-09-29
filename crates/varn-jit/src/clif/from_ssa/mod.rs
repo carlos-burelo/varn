@@ -5,18 +5,18 @@
 //! physical type, and each typed `SsaOp` becomes the native instruction the
 //! checker already proved — no re-derivation from operand types, no flow
 //! lattice. It covers the whole portable family (scalars, aggregates, calls,
-//! modules, suspension); anything still outside it returns `Err`, and
-//! [`super::lower::try_compile`] falls back to the bytecode lowering for that
-//! function. The fallback is a missing optimization, never a wrong result
-//! (Ley 10).
+//! modules, suspension); anything still outside it returns `Err`, and the
+//! function runs interpreted. The fallback is a missing optimization, never
+//! a wrong result (Ley 10).
 //!
 //! Storage model (one rule, no re-derivation):
 //! * **scalar** values (`Int`/`Float`/`Bool`) live in CLIF registers;
 //! * **heap** values (`Str`/`Ref`/`Dyn`) live in their VM **home** slot, and
 //!   every read loads from the home. Homes are the roots the GC knows about,
 //!   so a heap value survives an allocation or a call by construction — this
-//!   is the interpreter's own model, not a new one. The cost is home traffic;
-//!   it is correct first, and a later pass may hoist.
+//!   is the interpreter's own model, not a new one. A home's *address* is
+//!   memoized per register and reused until something may push a frame (see
+//!   [`store::home_addr`]); only the *value* is reloaded per read.
 //!
 //! Shapes admitted (see `docs/plans/2026-09-20-PLAN-PENDIENTE.md`):
 //! * **leaf** — only scalars, no `this`/upvalues/alloc: raw `(exec_ctx, args…)
@@ -81,7 +81,7 @@ mod store;
 mod term;
 mod views;
 
-use store::{clif_ty, def_heap, is_heap, land, load_value, use_heap, Out};
+use store::{clif_ty, def_heap, drop_home_addrs, is_heap, land, load_value, use_heap, Out};
 
 /// Frame resources a frame-aware body needs for global access, calls and home
 /// storage. `base` is the activation id (raw ABI param 2).
@@ -121,6 +121,13 @@ pub(super) struct Ctx<'a> {
     /// resumed body also redefines, each held in a Cranelift variable so the
     /// header merges the entry's value with the body's (see [`store`]).
     pub carried: std::collections::HashMap<u32, cranelift_frontend::Variable>,
+    /// Memoized home-slot addresses by VM register (see
+    /// [`store::home_addr`]). The driver clears it at each block and after
+    /// any instruction that may push a frame; everything else leaves
+    /// FrameStore vectors (hence every home address) in place.
+    pub home_addrs: std::cell::RefCell<std::collections::HashMap<u32, Value>>,
+    /// One reusable native-stack staging window (see [`call::ScratchWin`]).
+    pub scratch: Option<call::ScratchWin>,
 }
 
 /// Attempt the SSA lowering. `Err` is the fallback signal, not a failure: the
@@ -266,6 +273,7 @@ pub(super) fn try_lower(
         None
     };
     let entry_params = b.block_params(entry_blk).to_vec();
+    let scratch = call::ScratchWin::create(&mut b, call::scratch_max(ssa));
     let ctx = Ctx {
         cc,
         helpers,
@@ -282,6 +290,8 @@ pub(super) fn try_lower(
         has_round: super::floats::has_round_support(isa),
         views,
         in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
+        home_addrs: Default::default(),
+        scratch,
         carried: match osr {
             Some(h) => osr::carried(&mut b, ssa, h, &reached),
             None => Default::default(),
@@ -308,6 +318,11 @@ pub(super) fn try_lower(
         if !(n == 0 && Some(i) == call_entry) {
             b.switch_to_block(cb);
         }
+        // Home addresses memoize per block only: reusing an address across
+        // blocks needs a dominance proof the map does not carry (a use
+        // reachable around the defining block reads garbage). Within one
+        // block every definition textually precedes its uses.
+        drop_home_addrs(&ctx);
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
         let is_call_entry = Some(i) == call_entry;
@@ -358,6 +373,9 @@ pub(super) fn try_lower(
             if !views::keeps_views(ssa, &inst.op) {
                 ctx.views.clear(&mut b);
             }
+            if may_push_frame(&ctx, &inst.op) {
+                drop_home_addrs(&ctx);
+            }
         }
         // A back edge polls the collector only when its loop can allocate.
         let polls = |target: u32| {
@@ -381,6 +399,40 @@ pub(super) fn try_lower(
     super::debug::capture_ir(&mut debug, &func);
     super::debug::capture_kinds_ssa(&mut debug, ssa);
     Ok((compile_piece(func, isa)?, frame_aware))
+}
+
+/// Whether `op` can push a VM frame (a real call, a module load, suspension
+/// or user code behind a dynamic access): after it, memoized home addresses
+/// are stale. Pure heap allocation does NOT push — the FrameStore vectors
+/// only reallocate on frame push — so builders and readers stay cached
+/// across it. Conservative on doubt: `CallNativeOp` stays `true` because a
+/// higher-order native could call back, and every dynamic access may run
+/// user code.
+fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
+    match op {
+        SsaOp::Call { .. }
+        | SsaOp::CallNativeOp { .. }
+        | SsaOp::MethodCall { .. }
+        | SsaOp::IterCall { .. }
+        | SsaOp::SuperCall { .. }
+        | SsaOp::SuperMethodCall { .. }
+        | SsaOp::ExtensionCall { .. }
+        | SsaOp::CallSpread { .. }
+        | SsaOp::Dispose { .. }
+        | SsaOp::GetProperty { .. }
+        | SsaOp::SetProperty { .. }
+        | SsaOp::GetIndex { .. }
+        | SsaOp::SetIndex { .. }
+        | SsaOp::GetPropertyMaybe { .. }
+        | SsaOp::GetSymbol { .. }
+        | SsaOp::BuildObjectSpread { .. }
+        | SsaOp::Spawn { .. }
+        | SsaOp::LoadModule { .. }
+        | SsaOp::Await { .. }
+        | SsaOp::Yield { .. } => true,
+        SsaOp::SelfCall { .. } => ctx.frame.is_some(),
+        _ => false,
+    }
 }
 
 /// Whether `op` reaches the activation, the running closure or the runtime

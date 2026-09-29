@@ -129,6 +129,34 @@ fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String>
     })
 }
 
+/// Drop every memoized home address. Required whenever emission leaves the
+/// straight-line flow for an arm that does not dominate the join: an
+/// address memoized inside a slow/miss arm is garbage everywhere the arm
+/// does not dominate, and the verifier rejects the use (debug) or the
+/// backend miscompiles it (release). Main-flow entries are unaffected —
+/// they dominate everything below them — so this is only called where a
+/// join can be reached around the fill.
+pub(super) fn drop_home_addrs(ctx: &Ctx<'_>) {
+    ctx.home_addrs.borrow_mut().clear();
+}
+
+/// Machine address of `reg`'s home, memoized within the current block: the
+/// FrameStore vectors only reallocate when a frame is pushed (a real call),
+/// so between may-push points the same address Value serves every access
+/// and Cranelift folds what recomputation kept separate. Keyed by register,
+/// not value: a register's home never moves under a value that lives in it.
+/// The driver clears the map at each block (cross-block reuse would need a
+/// dominance proof) and after any instruction that may push a frame (see
+/// [`super::may_push_frame`]).
+fn home_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
+    if let Some(&a) = ctx.home_addrs.borrow().get(&reg) {
+        return Ok(a);
+    }
+    let a = homes(ctx)?.addr(b, reg as usize);
+    ctx.home_addrs.borrow_mut().insert(reg, a);
+    Ok(a)
+}
+
 /// Write a boxed heap value to `reg`'s home (the GC root).
 pub(super) fn def_heap(
     b: &mut FunctionBuilder,
@@ -136,13 +164,17 @@ pub(super) fn def_heap(
     reg: u32,
     boxed: Value,
 ) -> Result<(), String> {
-    homes(ctx)?.store(b, reg as usize, boxed);
+    let h = homes(ctx)?;
+    let addr = home_addr(b, ctx, reg)?;
+    h.store_at(b, addr, reg as usize, boxed);
     Ok(())
 }
 
 /// Read a boxed heap value back from `reg`'s home.
 pub(super) fn use_heap(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
-    Ok(homes(ctx)?.load(b, reg as usize))
+    let h = homes(ctx)?;
+    let addr = home_addr(b, ctx, reg)?;
+    Ok(h.load_at(b, addr, reg as usize))
 }
 
 /// CLIF type of an SSA value. `Bool` is a raw `I64` 0/1; `Ref`/`Dyn`/`Str` is a

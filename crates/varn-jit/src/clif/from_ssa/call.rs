@@ -15,6 +15,7 @@ use cranelift_codegen::ir::{
 };
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
+use varn_types::ssa::SsaProto;
 use varn_types::vm_value::KIND_HEAP;
 
 use super::{heap, load_value, Ctx, Out};
@@ -55,7 +56,14 @@ pub(super) fn emit_call(
         });
     let Some(target) = direct else {
         let window = boxed_window(b, ctx, values, callee_v, args)?;
-        return Ok(Out::Boxed(emit_invoke(b, ctx, window, args.len() + 1)));
+        let (ctag, cpayload) = b.ins().isplit(callee_v);
+        return Ok(Out::Boxed(emit_invoke(
+            b,
+            ctx,
+            window,
+            (ctag, cpayload),
+            args.len() + 1,
+        )));
     };
     let dest_ty = dest_ty.expect("filtered to a scalar destination");
     let merge_ty = match dest_ty {
@@ -108,12 +116,92 @@ pub(super) fn emit_call(
 
     b.switch_to_block(slow);
     let window = boxed_window(b, ctx, values, callee_v, args)?;
-    let res = emit_invoke(b, ctx, window, args.len() + 1);
+    let res = emit_invoke(b, ctx, window, (ctag, cpayload), args.len() + 1);
     let fallback = heap::unbox_dest(b, dest_ty, res)?;
+    // Addresses memoized while staging the window were computed inside this
+    // arm, which does not dominate the merge (see `super::store`).
+    super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[fallback.into()]);
 
     b.switch_to_block(merge);
     Ok(Out::Native(b.block_params(merge)[0]))
+}
+
+/// One reusable native-stack window per function, sized to the largest
+/// call/aggregate window the body needs (see [`scratch_max`]). Every helper
+/// that takes a staged window reads it synchronously and copies what it
+/// keeps into GC-visible staging first, so sequential uses never overlap:
+/// one slot replaces one slot per call-site, and the frame shrinks by the
+/// sum of the rest.
+pub(crate) struct ScratchWin {
+    addr: Value,
+    max: usize,
+}
+
+impl ScratchWin {
+    /// The shared window for `max` slots, or `None` when the body stages
+    /// nothing. Emitted in the entry block, which dominates every use.
+    pub(crate) fn create(b: &mut FunctionBuilder, max: usize) -> Option<ScratchWin> {
+        if max == 0 {
+            return None;
+        }
+        let slot = b.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            (max * 16) as u32,
+            4,
+        ));
+        Some(ScratchWin {
+            addr: b.ins().stack_addr(types::I64, slot, 0),
+            max,
+        })
+    }
+}
+
+/// Largest window any instruction of `ssa` stages: call windows hold
+/// `[callee, args…]`, aggregate windows their parts.
+pub(super) fn scratch_max(ssa: &SsaProto) -> usize {
+    use varn_types::ssa::SsaOp;
+    let mut max = 0usize;
+    for blk in &ssa.blocks {
+        for inst in &blk.insts {
+            let need = match &inst.op {
+                SsaOp::Call { args, .. }
+                | SsaOp::SelfCall { args }
+                | SsaOp::SuperCall { args }
+                | SsaOp::MethodCall { args, .. } => args.len() + 1,
+                SsaOp::CallNativeOp { args, .. }
+                | SsaOp::SuperMethodCall { args, .. }
+                | SsaOp::ExtensionCall { args, .. } => args.len() + 1,
+                SsaOp::CallSpread { args, .. } => args.len(),
+                SsaOp::IterCall { .. } => 2,
+                SsaOp::Dispose { .. } => 1,
+                SsaOp::IntrinsicCall { args, .. } => args.len() + 1,
+                SsaOp::BuildStr { parts } | SsaOp::BuildTuple { elements: parts } => parts.len(),
+                SsaOp::BuildArray { elements } => elements.len(),
+                SsaOp::BuildMap { pairs } => pairs.len() * 2,
+                SsaOp::ObjectRest { skip_keys, .. } => skip_keys.len(),
+                _ => 0,
+            };
+            max = max.max(need);
+        }
+    }
+    max
+}
+
+/// Address of a `count`-slot staged window: the shared one when it fits, a
+/// private slot otherwise (defensive; the max above covers every op).
+pub(super) fn scratch_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, count: usize) -> Value {
+    if let Some(s) = &ctx.scratch {
+        if count <= s.max {
+            return s.addr;
+        }
+    }
+    let slot = b.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        (count.max(1) * 16) as u32,
+        4,
+    ));
+    b.ins().stack_addr(types::I64, slot, 0)
 }
 
 /// The boxed `[callee, args…]` window on the native stack.
@@ -124,13 +212,7 @@ pub(super) fn boxed_window(
     callee: Value,
     args: &[u32],
 ) -> Result<Value, String> {
-    let argc = args.len() + 1;
-    let slot = b.create_sized_stack_slot(StackSlotData::new(
-        StackSlotKind::ExplicitSlot,
-        (argc * 16) as u32,
-        4,
-    ));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
+    let addr = scratch_addr(b, ctx, args.len() + 1);
     b.ins().store(MemFlags::trusted(), callee, addr, 0);
     for (i, v) in args.iter().enumerate() {
         let boxed = heap::boxed_value(b, ctx, values, *v)?;
@@ -261,15 +343,17 @@ pub(super) fn emit_call_native_op(
 
 /// The canonical invocation of a boxed window (`ExecCtx::invoke`); the
 /// result is the boxed `VmValue` the helper left in `jit_native_result`.
+/// Takes the callee pre-split: every caller already holds it boxed and
+/// splitting twice was pure waste.
 pub(super) fn emit_invoke(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     window: Value,
+    callee: (Value, Value),
     argc: usize,
 ) -> Value {
     let frame = ctx.frame.as_ref().expect("a call has a frame");
-    let callee = b.ins().load(types::I128, MemFlags::trusted(), window, 0);
-    let (ctag, cpayload) = b.ins().isplit(callee);
+    let (ctag, cpayload) = callee;
     let argc_v = b.ins().iconst(types::I64, argc as i64);
     call_helper_void(
         b,

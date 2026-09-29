@@ -105,7 +105,7 @@ pub(super) fn try_emit(
                     |l| matches!(l, varn_types::Literal::Str(t) if t.as_ref() == k.as_ref()),
                 )?);
             }
-            let (addr, n) = stage(b, &keys);
+            let (addr, n) = stage(b, ctx, &keys);
             call_helper_void(b, ctx.cc, h.object_rest_window, &[ectx, ot, op_, addr, n]);
             return Ok(Some(Some(Out::Boxed(native(b)))));
         }
@@ -184,8 +184,9 @@ pub(super) fn try_emit(
         SsaOp::IterCall { callee, recv } => {
             frame()?;
             let c = load_value(b, ctx, values, *callee)?;
+            let (ct, cp) = b.ins().isplit(c);
             let w = super::call::boxed_window(b, ctx, values, c, &[*recv])?;
-            let r = super::call::emit_invoke(b, ctx, w, 2);
+            let r = super::call::emit_invoke(b, ctx, w, (ct, cp), 2);
             return Ok(Some(Some(Out::Boxed(r))));
         }
         SsaOp::SuperCall { args } => {
@@ -201,8 +202,9 @@ pub(super) fn try_emit(
             for a in args {
                 vals.push(boxed_value(b, ctx, values, *a)?);
             }
-            let w = stage_value(b, m, &vals);
-            let r = super::call::emit_invoke(b, ctx, w, vals.len() + 1);
+            let w = stage_value(b, ctx, m, &vals);
+            let (mt, mp) = b.ins().isplit(m);
+            let r = super::call::emit_invoke(b, ctx, w, (mt, mp), vals.len() + 1);
             return Ok(Some(Some(Out::Boxed(r))));
         }
         SsaOp::ExtensionCall {
@@ -226,7 +228,8 @@ pub(super) fn try_emit(
             full.push(*recv);
             full.extend_from_slice(args);
             let w = super::call::boxed_window(b, ctx, values, callee, &full)?;
-            let r = super::call::emit_invoke(b, ctx, w, full.len() + 1);
+            let (ct, cp) = b.ins().isplit(callee);
+            let r = super::call::emit_invoke(b, ctx, w, (ct, cp), full.len() + 1);
             return Ok(Some(Some(Out::Boxed(r))));
         }
         SsaOp::CallSpread { callee, args } => {
@@ -243,7 +246,7 @@ pub(super) fn try_emit(
                     vals.push(v);
                 }
             }
-            let (addr, _) = stage(b, &vals);
+            let (addr, _) = stage(b, ctx, &vals);
             let argc = b.ins().iconst(types::I64, vals.len() as i64);
             call_helper_void(
                 b,
@@ -349,18 +352,21 @@ fn emit_super_call(
     for a in args {
         vals.push(boxed_value(b, ctx, values, *a)?);
     }
-    let w = stage_value(b, ctor, &vals);
-    Ok(super::call::emit_invoke(b, ctx, w, vals.len() + 1))
+    let w = stage_value(b, ctx, ctor, &vals);
+    let (ct, cp) = b.ins().isplit(ctor);
+    Ok(super::call::emit_invoke(
+        b,
+        ctx,
+        w,
+        (ct, cp),
+        vals.len() + 1,
+    ))
 }
 
-/// Native-stack window with `callee` first, then `args`.
-fn stage_value(b: &mut FunctionBuilder, callee: Value, args: &[Value]) -> Value {
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        ((args.len() + 1).max(1) * 16) as u32,
-        4,
-    ));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
+/// Native-stack window with `callee` first, then `args`, in the shared
+/// scratch window.
+fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Value]) -> Value {
+    let addr = super::call::scratch_addr(b, ctx, args.len() + 1);
     b.ins().store(MemFlags::trusted(), callee, addr, 0);
     for (i, v) in args.iter().enumerate() {
         b.ins()
@@ -372,7 +378,7 @@ fn stage_value(b: &mut FunctionBuilder, callee: Value, args: &[Value]) -> Value 
 /// Spread-free array build shared by `BuildTuple`.
 fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[Value]) -> Value {
     let ectx = exec_ctx(ctx);
-    let (addr, n) = stage(b, vals);
+    let (addr, n) = stage(b, ctx, vals);
     call_helper_void(b, ctx.cc, helper, &[ectx, addr, n]);
     b.ins().load(
         types::I128,
@@ -382,14 +388,10 @@ fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[
     )
 }
 
-/// Native-stack window of boxed values: `(addr, count)`.
-fn stage(b: &mut FunctionBuilder, vals: &[Value]) -> (Value, Value) {
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        (vals.len().max(1) * 16) as u32,
-        4,
-    ));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
+/// Native-stack window of boxed values: `(addr, count)`, staged in the
+/// function's shared scratch window (see [`super::call::ScratchWin`]).
+fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Value) {
+    let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
         b.ins()
             .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
@@ -482,6 +484,9 @@ fn emit_object_spread(
                     h.set_property_flat,
                     &[ectx, frame.closure, ot, op_, vt, vp, niv, csv, ipv],
                 );
+                // Setters are user code: frames may have moved underneath
+                // the next part's home reads.
+                super::store::drop_home_addrs(ctx);
                 keyed += 1;
             }
             None => {

@@ -234,7 +234,8 @@ pub(super) fn emit_build_object(
 }
 
 /// Call a `helper(ctx, ptr, count)` void helper with `vals` staged as a boxed
-/// window, returning its `jit_native_result`.
+/// window, returning its `jit_native_result`. Stages in the function's
+/// shared scratch window (see [`super::call::ScratchWin`]).
 fn emit_window_boxed(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -243,12 +244,7 @@ fn emit_window_boxed(
     count: usize,
 ) -> Result<Value, String> {
     let ectx = exec_ctx(ctx);
-    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        (vals.len().max(1) * 16) as u32,
-        4,
-    ));
-    let addr = b.ins().stack_addr(types::I64, slot, 0);
+    let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
         b.ins()
             .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);

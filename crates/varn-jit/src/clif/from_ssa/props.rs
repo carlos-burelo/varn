@@ -148,9 +148,10 @@ fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::fields::FieldIo<'a>, S
     })
 }
 
-/// `obj.field` — a class field at its compact offset, inline (the same
-/// lowering as the bytecode path), or an object/record/enum-payload field by
-/// slot through the helper. The boxed value.
+/// `obj.field` — a class field at its compact offset, inline, or an
+/// object/record/enum-payload field by slot through the helper. A scalar
+/// destination with a matching scalar field class comes back native (no
+/// box/unbox round trip); everything else comes back boxed.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
@@ -160,16 +161,34 @@ pub(super) fn emit_get_fixed_field(
     slot: u16,
     offset: u32,
     access: varn_core::FieldAccess,
-) -> Result<Value, String> {
+    dest: Option<u32>,
+) -> Result<super::store::Out, String> {
+    use varn_types::layout::{ScalarRepr, TypeLayout};
+    use varn_types::register_meta::SlotKind;
     let obj = super::heap::boxed_value(b, ctx, values, object)?;
+    if let (Some(d), varn_core::FieldAccess::Compact(tag)) = (dest, access) {
+        let native = matches!(
+            (ctx.ssa.value_ty(d), TypeLayout::of_field(tag).repr),
+            (SlotKind::Int, ScalarRepr::I64)
+                | (SlotKind::Float, ScalarRepr::F64)
+                | (SlotKind::Bool, ScalarRepr::Bool)
+        );
+        if native {
+            let v =
+                emit_get_fixed_field_native(b, ctx, obj, offset, tag, slot, ctx.ssa.value_ty(d))?;
+            return Ok(super::store::Out::Native(v));
+        }
+    }
     if let varn_core::FieldAccess::Compact(kind) = access {
-        return Ok(super::super::fields::load_compact(
-            b,
-            &field_io(ctx)?,
-            obj,
-            offset,
-            kind,
-            slot as usize,
+        return Ok(super::store::Out::Boxed(
+            super::super::fields::load_compact(
+                b,
+                &field_io(ctx)?,
+                obj,
+                offset,
+                kind,
+                slot as usize,
+            ),
         ));
     }
     let (ot, op) = b.ins().isplit(obj);
@@ -181,12 +200,74 @@ pub(super) fn emit_get_fixed_field(
         ctx.helpers.get_fixed_field,
         &[ectx, ot, op, slot_v],
     );
-    Ok(b.ins().load(
+    Ok(super::store::Out::Boxed(b.ins().load(
         types::I128,
         MemFlags::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
-    ))
+    )))
+}
+
+/// Native-classed read of a compact field: the same inline guard as
+/// [`load_compact`][super::super::fields::load_compact], but the fast path
+/// lands the raw payload and the slow path unboxes the helper's boxed
+/// result — never a box/unbox round trip.
+fn emit_get_fixed_field_native(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    obj: Value,
+    offset: u32,
+    tag: Option<varn_core::RuntimeKind>,
+    slot: u16,
+    dest: varn_types::register_meta::SlotKind,
+) -> Result<Value, String> {
+    use varn_types::layout::{ScalarRepr, TypeLayout};
+    let h = ctx.helpers;
+    let ectx = exec_ctx(ctx);
+    let merge_ty = match dest {
+        varn_types::register_meta::SlotKind::Float => types::F64,
+        _ => types::I64,
+    };
+    let slow = b.create_block();
+    let cont = b.create_block();
+    b.append_block_param(cont, merge_ty);
+    let data_base = super::super::emit::emit_object_data_base(
+        b,
+        ectx,
+        obj,
+        &h.object_layout,
+        &h.array_layout,
+        h.heap_field_offset,
+        slow,
+    );
+    let off = offset as i32;
+    let m = MemFlags::trusted();
+    let v = match TypeLayout::of_field(tag).repr {
+        ScalarRepr::I64 => b.ins().load(types::I64, m, data_base, off),
+        ScalarRepr::F64 => b.ins().load(types::F64, m, data_base, off),
+        ScalarRepr::Bool => {
+            let b8 = b.ins().load(types::I8, m, data_base, off);
+            b.ins().uextend(types::I64, b8)
+        }
+        _ => {
+            return Err("from_ssa: native field read of a non-scalar repr".into());
+        }
+    };
+    b.ins().jump(cont, &[v.into()]);
+    b.switch_to_block(slow);
+    let (ot, op) = b.ins().isplit(obj);
+    let slot_v = b.ins().iconst(types::I64, slot as i64);
+    call_helper_void(b, ctx.cc, h.get_fixed_field, &[ectx, ot, op, slot_v]);
+    let boxed = b.ins().load(
+        types::I128,
+        MemFlags::trusted(),
+        ectx,
+        h.jit_native_result_offset as i32,
+    );
+    let back = super::heap::unbox_dest(b, dest, boxed)?;
+    b.ins().jump(cont, &[back.into()]);
+    b.switch_to_block(cont);
+    Ok(b.block_params(cont)[0])
 }
 
 /// `obj.field = value` — a class field at its compact offset, inline for a
@@ -247,6 +328,10 @@ pub(super) fn emit_get_property(
             ip_v,
         ],
     );
+    // The helper above runs user getters, which may push frames and
+    // reallocate the home vectors: drop any memoized address before reading
+    // the value it just wrote.
+    super::store::drop_home_addrs(ctx);
     use_heap(b, ctx, dest_reg)
 }
 

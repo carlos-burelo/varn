@@ -118,6 +118,9 @@ fn view(
     b.def_var(v.data, d);
     b.def_var(v.len, l);
     b.def_var(v.disc, di);
+    // The re-box above memoized an address inside this arm; it must not
+    // leak past the join (see `store::drop_home_addrs`).
+    super::store::drop_home_addrs(ctx);
     b.ins().jump(ready, &[d.into(), l.into(), di.into()]);
 
     b.switch_to_block(ready);
@@ -231,6 +234,9 @@ pub(super) fn emit_get(
         ctx.helpers.jit_native_result_offset as i32,
     );
     let r = want.from_boxed(b, r);
+    // Home addresses memoized while re-boxing above live in this arm only
+    // (see `super::store::drop_home_addrs`).
+    super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[r.into()]);
 
     b.switch_to_block(merge);
@@ -304,6 +310,9 @@ pub(super) fn emit_set(
     );
     // The runtime's accessor may have reshaped this array or any alias of it.
     ctx.views.clear(b);
+    // Same arm-locality rule as above: the re-boxing memoized addresses
+    // this join is reachable around.
+    super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[]);
 
     b.switch_to_block(merge);

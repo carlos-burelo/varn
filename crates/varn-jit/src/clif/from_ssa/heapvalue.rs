@@ -158,9 +158,7 @@ pub(super) fn emit(
             slot,
             offset,
             access,
-        } => Out::Boxed(props::emit_get_fixed_field(
-            b, ctx, values, *object, *slot, *offset, *access,
-        )?),
+        } => props::emit_get_fixed_field(b, ctx, values, *object, *slot, *offset, *access, dest)?,
         SsaOp::GetProperty { object, name, cs } => {
             let d = dest.ok_or("from_ssa: get_property without dest")?;
             let dest_reg = ctx.ssa.reg(d);

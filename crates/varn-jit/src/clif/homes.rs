@@ -36,7 +36,7 @@ impl Homes<'_> {
     }
 
     /// Machine address of register `reg`'s home slot.
-    fn addr(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
+    pub(crate) fn addr(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
         let idx = self.layout.idx_of(reg);
         let fl = self.offsets;
@@ -57,13 +57,13 @@ impl Homes<'_> {
         b.ins().iadd(ptr, off)
     }
 
-    /// Write `value` to `reg`'s home, converted to the home's class. `value`
+    /// Write `value` to the precomputed home address `home` (see
+    /// [`addr`][Self::addr]), converted to the home's class. `value`
     /// is a boxed `VmValue` (`I128`), or a bare `I64` payload: an `int` for a
     /// `Gpr`/`Dyn` home, a heap index for a `Ref` one, raw `f64` bits for an
     /// `Fpr` one.
-    pub(crate) fn store(&self, b: &mut FunctionBuilder, reg: usize, value: Value) {
+    pub(crate) fn store_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize, value: Value) {
         let class = self.layout.class_of(reg);
-        let home = self.addr(b, reg);
         let m = MemFlags::trusted();
         let boxed = b.func.dfg.value_type(value) == types::I128;
         match class {
@@ -113,8 +113,13 @@ impl Homes<'_> {
 
     /// Read `reg`'s home as a boxed `VmValue` (`I128`).
     pub(crate) fn load(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
-        let class = self.layout.class_of(reg);
         let home = self.addr(b, reg);
+        self.load_at(b, home, reg)
+    }
+
+    /// [`load`] from a precomputed [`addr`][Self::addr].
+    pub(crate) fn load_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize) -> Value {
+        let class = self.layout.class_of(reg);
         let m = MemFlags::trusted();
         match class {
             SlotClass::Gpr => {
