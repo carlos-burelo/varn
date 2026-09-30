@@ -74,6 +74,7 @@ mod heapvalue;
 mod induction;
 mod numeric;
 mod osr;
+mod pinned;
 mod pool;
 mod props;
 mod scalar;
@@ -303,6 +304,21 @@ pub(super) fn try_lower(
         let header = blocks[h.block as usize].expect("block created");
         osr::emit_entry(&mut b, &ctx, &mut values, h, header)?;
     }
+    let pins = match osr {
+        Some(_) => std::collections::BTreeMap::new(),
+        None => pinned::compute(ssa, &preds, &rpo_pos, &reached),
+    };
+    if super::trace() && !pins.is_empty() {
+        let mut flat: Vec<String> = Vec::new();
+        for (pre, objs) in &pins {
+            flat.push(format!("{pre}:{objs:?}"));
+        }
+        eprintln!(
+            "clif: pins {} [{}]",
+            proto.name.as_deref().unwrap_or("<module>"),
+            flat.join(" ")
+        );
+    }
 
     for (n, i) in rpo.iter().enumerate() {
         let i = *i;
@@ -382,6 +398,9 @@ pub(super) fn try_lower(
             rpo_pos[target as usize] <= rpo_pos[i]
                 && cfg::loop_may_collect(ssa, &preds, target as usize, i)
         };
+        if let Some(objects) = pins.get(&i) {
+            arrays::prefill(&mut b, &ctx, &values, objects)?;
+        }
         term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
     }
 

@@ -318,3 +318,27 @@ pub(super) fn emit_set(
     b.switch_to_block(merge);
     Ok(())
 }
+
+pub(super) fn prefill(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    objects: &[u32],
+) -> Result<Block, String> {
+    let exec_ctx = heap::exec_ctx(ctx);
+    let done = b.create_block();
+    let mut slows = Vec::with_capacity(objects.len());
+    for object in objects {
+        let slow = b.create_block();
+        b.set_cold_block(slow);
+        slows.push(slow);
+        let _ = view(b, ctx, values, exec_ctx, *object, slow)?;
+    }
+    b.ins().jump(done, &[]);
+    for slow in slows {
+        b.switch_to_block(slow);
+        b.ins().jump(done, &[]);
+    }
+    b.switch_to_block(done);
+    Ok(done)
+}

@@ -72,7 +72,7 @@ pub(super) fn in_range_steps(
         if !in_header || !blk.params.contains(&k) {
             continue;
         }
-        let body = loop_body(preds, rpo_pos, reached, header);
+        let body = super::cfg::loop_body(preds, rpo_pos, reached, header);
         if body.is_empty()
             || !body.contains(&(*then_blk as usize))
             || body.contains(&(*else_blk as usize))
@@ -98,45 +98,4 @@ pub(super) fn in_range_steps(
         }
     }
     steps
-}
-
-/// The natural loop headed by `header`: the header and every reached block
-/// that reaches one of its back edges' latches without passing it. Empty
-/// when no back edge enters `header`, or when the body has another entry — a
-/// block other than the header with a predecessor outside it — since the
-/// guard then no longer covers every path into the body.
-fn loop_body(
-    preds: &[Vec<usize>],
-    rpo_pos: &[usize],
-    reached: &[bool],
-    header: usize,
-) -> HashSet<usize> {
-    let live = |p: &usize| reached[*p];
-    let latches: Vec<usize> = preds[header]
-        .iter()
-        .filter(|p| live(p))
-        .copied()
-        .filter(|&p| rpo_pos[header] <= rpo_pos[p])
-        .collect();
-    let mut body = HashSet::new();
-    if latches.is_empty() {
-        return body;
-    }
-    body.insert(header);
-    let mut stack = latches;
-    while let Some(b) = stack.pop() {
-        if body.insert(b) {
-            stack.extend(preds[b].iter().filter(|p| live(p)).copied());
-        }
-    }
-    let single_entry = body.iter().filter(|&&b| b != header).all(|&b| {
-        preds[b]
-            .iter()
-            .filter(|p| live(p))
-            .all(|p| body.contains(p))
-    });
-    if !single_entry {
-        body.clear();
-    }
-    body
 }

@@ -14,7 +14,7 @@
 //!
 //! A cleared view is a zero buffer pointer, which a live array never has.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -30,14 +30,14 @@ pub(crate) struct View {
 
 /// Every array receiver's view.
 pub(crate) struct Views {
-    by_value: HashMap<u32, View>,
+    by_value: BTreeMap<u32, View>,
 }
 
 impl Views {
     /// Declare a view for every receiver of an element access in `ssa`,
     /// cleared. The builder must be in the entry block.
     pub(super) fn declare(b: &mut FunctionBuilder, ssa: &SsaProto) -> Self {
-        let mut by_value = HashMap::new();
+        let mut by_value = BTreeMap::new();
         for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
             let object = match &inst.op {
                 SsaOp::ArrayGetIndex { object, .. } | SsaOp::ArraySetIndex { object, .. } => {

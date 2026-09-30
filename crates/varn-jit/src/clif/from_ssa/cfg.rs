@@ -132,3 +132,39 @@ pub(super) fn check_block_args(ssa: &SsaProto) -> Result<(), String> {
     }
     Ok(())
 }
+
+pub(super) fn loop_body(
+    preds: &[Vec<usize>],
+    rpo_pos: &[usize],
+    reached: &[bool],
+    header: usize,
+) -> std::collections::HashSet<usize> {
+    let live = |p: &usize| reached[*p];
+    let latches: Vec<usize> = preds[header]
+        .iter()
+        .filter(|p| live(p))
+        .copied()
+        .filter(|&p| rpo_pos[header] <= rpo_pos[p])
+        .collect();
+    let mut body = std::collections::HashSet::new();
+    if latches.is_empty() {
+        return body;
+    }
+    body.insert(header);
+    let mut stack = latches;
+    while let Some(b) = stack.pop() {
+        if body.insert(b) {
+            stack.extend(preds[b].iter().filter(|p| live(p)).copied());
+        }
+    }
+    let single_entry = body.iter().filter(|&&b| b != header).all(|&b| {
+        preds[b]
+            .iter()
+            .filter(|p| live(p))
+            .all(|p| body.contains(p))
+    });
+    if !single_entry {
+        body.clear();
+    }
+    body
+}

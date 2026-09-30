@@ -80,6 +80,7 @@ impl Key {
 }
 
 pub fn run(func: &mut SsaFunc) -> bool {
+    crate::ssa::verify::recompute_preds(func);
     let mut rewrites: FxHashMap<Value, Value> = FxHashMap::default();
 
     for block in &func.blocks {
@@ -110,6 +111,61 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
+    replace_uses_with_map(func, &rewrites)
+}
+
+pub fn run_global(func: &mut SsaFunc) -> bool {
+    crate::ssa::verify::recompute_preds(func);
+    let dom = super::cfg::dominators(func);
+    let mut uses: Vec<Vec<u32>> = vec![Vec::new(); func.values.len()];
+    for (b, block) in func.blocks.iter().enumerate() {
+        let mut push = |v: crate::ssa::ir::Value| {
+            if let Some(slot) = uses.get_mut(v.0 as usize) {
+                if slot.last() != Some(&(b as u32)) {
+                    slot.push(b as u32);
+                }
+            }
+        };
+        for inst in &block.insts {
+            crate::ssa::uses::visit_uses(&inst.kind, &mut push);
+        }
+        crate::ssa::uses::visit_term_uses(&block.term, &mut push);
+    }
+    let mut seen: FxHashMap<Key, (Value, usize)> = FxHashMap::default();
+    let mut rewrites: FxHashMap<Value, Value> = FxHashMap::default();
+    for b in 0..func.blocks.len() {
+        for inst in &func.blocks[b].insts {
+            let Some(dest) = inst.dest else { continue };
+            if !super::dce::is_pure(&inst.kind) {
+                continue;
+            }
+            let Some(key) = key_of(&inst.kind, &|v| resolve(&rewrites, v)) else {
+                continue;
+            };
+            if key.reads_memory() {
+                continue;
+            }
+            if !matches!(key, Key::Binary(..) | Key::Unary(..)) {
+                continue;
+            }
+            match seen.get(&key) {
+                Some((existing, def)) => {
+                    let dominated = uses
+                        .get(dest.0 as usize)
+                        .is_some_and(|bs| bs.iter().all(|u| super::cfg::dominates(&dom, *def, *u as usize)));
+                    if dominated {
+                        rewrites.insert(dest, *existing);
+                    }
+                }
+                None => {
+                    seen.insert(key, (dest, b));
+                }
+            }
+        }
+    }
+    if rewrites.is_empty() {
+        return false;
+    }
     replace_uses_with_map(func, &rewrites)
 }
 

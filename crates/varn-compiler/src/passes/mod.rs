@@ -64,4 +64,9 @@ pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
         }
         iterations += 1;
     }
+
+    crate::ssa::verify::recompute_preds(func);
+    if cse::run_global(func) {
+        dce::run(func);
+    }
 }
