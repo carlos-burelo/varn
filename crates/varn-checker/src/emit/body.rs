@@ -26,6 +26,8 @@ pub(super) struct ModuleCtx<'a> {
 
     pub fns: &'a FxHashMap<Atom, (u32, u32)>,
 
+    pub decorated_fns: &'a FxHashSet<Atom>,
+
     pub call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
 
     pub desugar: &'a crate::checker::Desugarings,
@@ -233,7 +235,7 @@ impl<'a> FnEmitter<'a> {
         id
     }
 
-    fn hoist(&mut self, e: TirExpr) -> TirExpr {
+    pub fn hoist(&mut self, e: TirExpr) -> TirExpr {
         let ty = e.ty;
         let span = e.span;
         let local = self.fresh_local(ty);
@@ -2390,6 +2392,110 @@ impl<'a> FnEmitter<'a> {
             }
             ExprKind::Assign { op, target, value }
                 if matches!(
+                    &self.ast_arena.expr(*target).kind,
+                    ExprKind::Member {
+                        computed: true,
+                        optional: false,
+                        ..
+                    }
+                ) =>
+            {
+                let (target, value) = (*target, *value);
+                let ExprKind::Member {
+                    object, property, ..
+                } = &self.ast_arena.expr(target).kind
+                else {
+                    unreachable!()
+                };
+                let (object, property) = (*object, *property);
+                let op = *op;
+                let obj = self.lower_expr(object);
+                let index = self.lower_expr(property);
+                let v = self.lower_expr(value);
+                let node_ty = match obj.ty.non_nullable(self.tt) {
+                    BackendTy::Array(el) => self.tt.get(el),
+                    BackendTy::Map(_, val) => self.tt.get(val),
+                    _ => v.ty,
+                };
+                let index_target = |object: TirExpr, index: TirExpr| TirExpr {
+                    kind: TirExprKind::Index {
+                        object: Box::new(object),
+                        index: Box::new(index),
+                    },
+                    ty: node_ty,
+                    res: Resolution::None,
+                    span,
+                };
+                let plain = matches!(assign_bin_op(op), Ok(None));
+                let obj_w = if plain || Self::is_pure(self.ast_arena, object) {
+                    obj
+                } else {
+                    self.hoist(obj)
+                };
+                let index_w = if plain || Self::is_pure(self.ast_arena, property) {
+                    index
+                } else {
+                    self.hoist(index)
+                };
+                let rhs = match assign_bin_op(op) {
+                    Ok(None) => v,
+                    Ok(Some(bop)) => {
+                        let read = index_target(obj_w.clone(), index_w.clone());
+                        let (lhs, rhs, nty) = self.coerce_binary_operands(bop, read, v, node_ty);
+                        TirExpr {
+                            kind: TirExprKind::Binary {
+                                op: bop,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            },
+                            ty: nty,
+                            res: Resolution::None,
+                            span,
+                        }
+                    }
+                    Err(()) => {
+                        use varn_core::ast::operators::AssignOp as A;
+                        let read = index_target(obj_w.clone(), index_w.clone());
+                        let cond = match op {
+                            A::NullishAssign => TirExpr {
+                                kind: TirExprKind::Unary {
+                                    op: TirUnOp::IsNull,
+                                    operand: Box::new(read.clone()),
+                                },
+                                ty: BackendTy::Bool,
+                                res: Resolution::None,
+                                span,
+                            },
+                            _ => self.cast_to(read.clone(), BackendTy::Bool),
+                        };
+                        let (then_val, else_val) = match op {
+                            A::OrAssign => (read.clone(), v),
+                            _ => (v, read.clone()),
+                        };
+                        TirExpr {
+                            kind: TirExprKind::Select {
+                                cond: Box::new(cond),
+                                then_val: Box::new(then_val),
+                                else_val: Box::new(else_val),
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        }
+                    }
+                };
+                return TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(index_target(obj_w, index_w)),
+                        value: Box::new(rhs),
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+            }
+            ExprKind::Assign { op, target, value }
+                if matches!(
                     self.ast_arena.expr(*target).kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
                 ) && Self::is_pure(self.ast_arena, *target) =>
@@ -2454,6 +2560,103 @@ impl<'a> FnEmitter<'a> {
                 };
             }
 
+            ExprKind::Update {
+                op,
+                operand,
+                prefix,
+            } if matches!(
+                &self.ast_arena.expr(*operand).kind,
+                ExprKind::Member {
+                    computed: true,
+                    optional: false,
+                    ..
+                }
+            ) =>
+            {
+                use varn_core::ast::operators::UpdateOp;
+                let operand = *operand;
+                let prefix = *prefix;
+                let ExprKind::Member {
+                    object, property, ..
+                } = &self.ast_arena.expr(operand).kind
+                else {
+                    unreachable!()
+                };
+                let (object, property) = (*object, *property);
+                let obj = self.lower_expr(object);
+                let index = self.lower_expr(property);
+                let node_ty = match obj.ty.non_nullable(self.tt) {
+                    BackendTy::Array(el) => self.tt.get(el),
+                    BackendTy::Map(_, val) => self.tt.get(val),
+                    _ => ty,
+                };
+                let obj_h = if Self::is_pure(self.ast_arena, object) {
+                    obj
+                } else {
+                    self.hoist(obj)
+                };
+                let index_h = if Self::is_pure(self.ast_arena, property) {
+                    index
+                } else {
+                    self.hoist(index)
+                };
+                let read = TirExpr {
+                    kind: TirExprKind::Index {
+                        object: Box::new(obj_h.clone()),
+                        index: Box::new(index_h.clone()),
+                    },
+                    ty: node_ty,
+                    res: Resolution::None,
+                    span,
+                };
+                let bop = match op {
+                    UpdateOp::Increment => TirBinOp::Add,
+                    UpdateOp::Decrement => TirBinOp::Sub,
+                };
+                let step = if node_ty == BackendTy::Float {
+                    self.cast_to(int_lit(1), BackendTy::Float)
+                } else {
+                    int_lit(1)
+                };
+                let old = if prefix {
+                    read.clone()
+                } else {
+                    self.hoist(read.clone())
+                };
+                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, old.clone(), step, node_ty);
+                let stepped = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: bop,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    ty: nty,
+                    res: Resolution::None,
+                    span,
+                };
+                let assign = TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(TirExpr {
+                            kind: TirExprKind::Index {
+                                object: Box::new(obj_h),
+                                index: Box::new(index_h),
+                            },
+                            ty: node_ty,
+                            res: Resolution::None,
+                            span,
+                        }),
+                        value: Box::new(stepped),
+                    },
+                    ty: nty,
+                    res: Resolution::None,
+                    span,
+                };
+                if prefix {
+                    return assign;
+                }
+                self.pending.push(TirStmt::Expr(assign));
+                return old;
+            }
             ExprKind::Update {
                 op,
                 operand,
@@ -3634,7 +3837,11 @@ impl<'a> FnEmitter<'a> {
             let targs = self.lower_call_args(call_id, args);
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
             let res = match self.m.fns.get(name) {
-                Some(&(fn_id, arity)) if all_positional && arity as usize == targs.len() => {
+                Some(&(fn_id, arity))
+                    if all_positional
+                        && arity as usize == targs.len()
+                        && !self.m.decorated_fns.contains(name) =>
+                {
                     Resolution::DirectFn(varn_tir::FnId(fn_id))
                 }
                 // A `std:math` import (`abs`, `sqrt`, …) the JIT lowers to a

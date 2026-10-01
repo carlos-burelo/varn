@@ -1,0 +1,54 @@
+export class StdError extends Error {
+    code: str;
+    message: str;
+
+    constructor(code: str, message: str) {
+        super(message);
+        this.name = "StdError";
+        this.code = code;
+        this.message = message;
+    }
+}
+
+export const E_FS_NOT_FOUND: str = "E_FS_NOT_FOUND";
+export const E_FS_DENIED: str = "E_FS_DENIED";
+export const E_FS_EXISTS: str = "E_FS_EXISTS";
+export const E_FS_IO: str = "E_FS_IO";
+export const E_FS_BAD_FD: str = "E_FS_BAD_FD";
+export const E_FS_BAD_ARG: str = "E_FS_BAD_ARG";
+export const E_FS_ENCODING: str = "E_FS_ENCODING";
+export const E_IO: str = "E_IO";
+export const E_IO_READ: str = "E_IO_READ";
+export const E_IO_FLUSH: str = "E_IO_FLUSH";
+export const E_WS_IO: str = "E_WS_IO";
+export const E_WS_DENIED: str = "E_WS_DENIED";
+export const E_WS_CONNECT: str = "E_WS_CONNECT";
+export const E_WS_SEND: str = "E_WS_SEND";
+export const E_WS_READ: str = "E_WS_READ";
+export const E_WS_BINARY: str = "E_WS_BINARY";
+export const E_WS_CLOSED: str = "E_WS_CLOSED";
+export const E_WS_BAD_ARG: str = "E_WS_BAD_ARG";
+export const E_WS_HANDSHAKE: str = "E_WS_HANDSHAKE";
+export const E_WS_PROTOCOL: str = "E_WS_PROTOCOL";
+export const E_PATH_IO: str = "E_PATH_IO";
+export const E_PATH_BAD_ARG: str = "E_PATH_BAD_ARG";
+
+export function stdError(code: str, message: str): StdError {
+    return new StdError(code, message);
+}
+
+export function toStdError(e: Error, fallback: str): StdError {
+    if (e instanceof StdError) {
+        return e;
+    }
+    let msg = e.message;
+    let sep = msg.indexOf("|");
+    if (sep < 0) {
+        return new StdError(fallback, msg);
+    }
+    let code = msg.slice(0, sep);
+    if (!code.startsWith("E_")) {
+        return new StdError(fallback, msg);
+    }
+    return new StdError(code, msg.slice(sep + 1));
+}

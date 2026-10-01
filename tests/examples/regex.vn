@@ -1,0 +1,36 @@
+import { describe, it, expect, summary } from "std:test";
+import { Regex } from "std:regex";
+
+await describe("example std:regex", async () => {
+    await it("tests patterns", () => {
+        let digits = new Regex("\\d+");
+        expect(digits.test("abc123")).toBe(true);
+        expect(digits.test("no digits")).toBe(false);
+        expect(Regex.compile("foo", "i").test("FOO")).toBe(true);
+    });
+
+    await it("execs first match with groups", () => {
+        let found = new Regex("(\\w+)@(\\w+)").exec("user@host");
+        expect(found !== null).toBe(true);
+        expect(found!!.match).toBe("user@host");
+        expect(found!!.groups[0]).toBe("user");
+        expect(found!!.groups[1]).toBe("host");
+        expect(new Regex("zzz").exec("abc") === null).toBe(true);
+    });
+
+    await it("finds all matches", () => {
+        let all = new Regex("\\d+").findAll("a1 b22 c333");
+        expect(all.length).toBe(3);
+        expect(all[0].match).toBe("1");
+        expect(all[2].index).toBe(8);
+    });
+
+    await it("replaces and splits", () => {
+        expect(new Regex("\\d+").replace("a1 b2", "X")).toBe("aX bX");
+        let parts = new Regex(",\\s*").split("a, b,c");
+        expect(parts.length).toBe(3);
+        expect(parts[1]).toBe("b");
+    });
+});
+
+summary();

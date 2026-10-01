@@ -265,8 +265,6 @@ mod tests {
             entry: BlockId(0),
             blocks: vec![entry, body],
             values: vec![ValueDef { ty: HirType::Int }; 5],
-            pinned_vars: Default::default(),
-            nlocals: 0,
             is_async: false,
             is_generator: false,
         };
@@ -337,8 +335,6 @@ mod tests {
             entry: BlockId(0),
             blocks: vec![body],
             values: vec![ValueDef { ty: HirType::Int }; 13],
-            pinned_vars: Default::default(),
-            nlocals: 0,
             is_async: false,
             is_generator: false,
         };

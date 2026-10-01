@@ -1,5 +1,3 @@
-// runtime:fs — low-level host filesystem operations.
-
 export interface RawStats {
     size: int;
     isDir: bool;
@@ -14,6 +12,13 @@ export declare function writeFd$(fd: int, data: str): int;
 export declare function writeFdBytes$(fd: int, data: Bytes): int;
 export declare function readFileBytes$(path: str): Bytes;
 export declare function writeFileBytes$(path: str, data: Bytes): void;
+export declare function readFileText$(path: str): str;
+export declare function writeFileText$(path: str, data: str): void;
+export declare function appendFileText$(path: str, data: str): void;
+export declare function copyFile$(from: str, to: str): void;
+export declare function readLines$(path: str): str[];
+export declare function readFdAll$(fd: int): str;
+export declare function readFdAllBytes$(fd: int): Bytes;
 export declare function seek$(fd: int, offset: int, whence: int): int;
 export declare function close$(fd: int): void;
 export declare function exists$(path: str): bool;

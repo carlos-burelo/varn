@@ -391,20 +391,18 @@ pub fn compile(
                     if clif::trace() {
                         eprintln!("CLIF ROUTE {:?}", proto.name);
                     }
-                    let code_bytes = art.buffer.size() as u64;
                     JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
                     JIT_STATS
                         .total_compile_time_ns
                         .fetch_add(elapsed, Ordering::Relaxed);
                     JIT_STATS
                         .total_code_size_bytes
-                        .fetch_add(code_bytes, Ordering::Relaxed);
+                        .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
                     record(|| CompileRecord {
                         name: fn_name(proto),
                         words,
                         outcome: CompileOutcome::Routed,
                         compile_ns: elapsed,
-                        code_bytes,
                     });
                     let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
                     let raw = if art.frame_aware { 0 } else { art.raw as usize };
@@ -427,7 +425,6 @@ pub fn compile(
                         words,
                         outcome: CompileOutcome::Bailed(e.clone()),
                         compile_ns: elapsed,
-                        code_bytes: 0,
                     });
                     return Err(e);
                 }
@@ -436,28 +433,6 @@ pub fn compile(
     }
 
     Err("JIT disabled or unsupported proto".into())
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct JitCallArgs {
-    pub callee: VmValue,
-    pub arg_start: usize,
-    pub arg_count: usize,
-    pub dest: usize,
-    pub ip: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct JitCallMethodArgs {
-    pub this_val: VmValue,
-    pub name_idx: usize,
-    pub cs: usize,
-    pub arg_start: usize,
-    pub arg_count: usize,
-    pub dest: usize,
-    pub ip: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

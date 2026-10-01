@@ -1,4 +1,4 @@
-pub use varn_types::chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
+pub use varn_types::chunk::FunctionProto;
 
 /// Varn typed-IR-to-bytecode compilation pipeline.
 pub mod from_tir;

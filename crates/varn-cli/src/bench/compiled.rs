@@ -119,12 +119,10 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         total_p50,
         split: execute.and_then(|e| ExecSplit::from_single_run(e.p50, &exec_jit)),
         jit: Some(&exec_jit),
-        coverage_scope: "bundle .vnc",
         top_blocker: top_blocker(&records),
         tiered_during_window,
         cpu: cpu_freq,
         phases: Some(&phases),
-        e2e_samples: None,
     }
     .print();
 

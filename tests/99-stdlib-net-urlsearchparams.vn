@@ -1,12 +1,12 @@
-import { URLSearchParams, Query, Url, parseURL } from "std:net";
+import { Query, Url } from "std:net";
 import { describe, it, expect } from "std:test";
 
 
-// 1. URLSearchParams basic operations
-let params = new URLSearchParams("foo=1&bar=2&foo=3");
+// 1. Query basic operations
+let params = new Query("foo=1&bar=2&foo=3");
 
-// 2. URLSearchParams from object
-let paramsObj = new URLSearchParams({ page: "1", filter: ["a", "b"] });
+// 2. Query from object
+let paramsObj = new Query({ page: "1", filter: ["a", "b"] });
 
 // 3. Url.resolve (Relativization)
 let base = "https://example.com/api/v1/users";

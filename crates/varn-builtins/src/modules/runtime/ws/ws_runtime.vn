@@ -1,6 +1,5 @@
-// runtime:ws — low-level host WebSocket operations.
-
-export declare function wsConnect$(url: str): int;
-export declare function wsSend$(wsId: int, message: str): bool;
-export declare function wsRead$(wsId: int): str?;
-export declare function wsClose$(wsId: int): bool;
+export declare function wsKey$(): str;
+export declare function wsAcceptResponse$(request: str): str;
+export declare function wsValidateResponse$(head: str, key: str): void;
+export declare function wsFrameBytes$(payload: Bytes, opcode: int): Bytes;
+export declare function wsParseFrame$(data: Bytes): dynamic;

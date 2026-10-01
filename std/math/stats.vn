@@ -1,0 +1,87 @@
+import { sqrt } from "std:math/intrinsics";
+
+function sortedCopy(values: float[]): float[] {
+    let out = values.slice();
+    for (let i = 1; i < out.length; i = i + 1) {
+        let key = out[i];
+        let j = i - 1;
+        while (j >= 0 && out[j] > key) {
+            out[j + 1] = out[j];
+            j = j - 1;
+        }
+        out[j + 1] = key;
+    }
+    return out;
+}
+
+export namespace Stats {
+    export function sum(values: float[]): float {
+        let total = 0.0;
+        for (let v of values) {
+            total = total + v;
+        }
+        return total;
+    }
+
+    export function mean(values: float[]): float {
+        if (values.length === 0) {
+            throw new Error("Stats.mean requires at least one value");
+        }
+        return sum(values) / (values.length as float);
+    }
+
+    export function min(values: float[]): float {
+        if (values.length === 0) {
+            throw new Error("Stats.min requires at least one value");
+        }
+        let best = values[0];
+        for (let v of values) {
+            if (v < best) {
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    export function max(values: float[]): float {
+        if (values.length === 0) {
+            throw new Error("Stats.max requires at least one value");
+        }
+        let best = values[0];
+        for (let v of values) {
+            if (v > best) {
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    export function variance(values: float[]): float {
+        if (values.length === 0) {
+            throw new Error("Stats.variance requires at least one value");
+        }
+        let avg = mean(values);
+        let total = 0.0;
+        for (let v of values) {
+            let d = v - avg;
+            total = total + d * d;
+        }
+        return total / (values.length as float);
+    }
+
+    export function stddev(values: float[]): float {
+        return sqrt(variance(values));
+    }
+
+    export function median(values: float[]): float {
+        if (values.length === 0) {
+            throw new Error("Stats.median requires at least one value");
+        }
+        let ordered = sortedCopy(values);
+        let mid = ordered.length >> 1;
+        if (ordered.length % 2 === 1) {
+            return ordered[mid];
+        }
+        return (ordered[mid - 1] + ordered[mid]) / 2.0;
+    }
+}

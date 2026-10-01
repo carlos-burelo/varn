@@ -1,5 +1,5 @@
 
-=== TIR: <fixtures>/closure.vn ===
+  [35mtir[0m [2m────────────────────────────────────────────── <fixtures>/closure.vn[0m
 TirModule {
     source_file: "<fixtures>/closure.vn",
     imports: [],
@@ -807,3 +807,4 @@ TirModule {
         has_rest: false,
     },
 }
+  [2m── end: tir ──[0m

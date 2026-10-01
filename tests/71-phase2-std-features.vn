@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 import { HttpStatus } from "std:http";
-import { readLines, write as fsWrite, remove as fsRemove } from "std:fs";
+import { readLines, writeText as fsWrite, remove as fsRemove } from "std:fs";
 import { getSystemInfo } from "std:sys";
 
 await describe("71 phase2 std features", async () => {

@@ -1,0 +1,66 @@
+const TYPES: { [key: str]: str } = {
+    "html": "text/html",
+    "htm": "text/html",
+    "css": "text/css",
+    "js": "text/javascript",
+    "mjs": "text/javascript",
+    "json": "application/json",
+    "xml": "application/xml",
+    "txt": "text/plain",
+    "md": "text/markdown",
+    "csv": "text/csv",
+    "tsv": "text/tab-separated-values",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "avif": "image/avif",
+    "svg": "image/svg+xml",
+    "ico": "image/x-icon",
+    "bmp": "image/bmp",
+    "mp3": "audio/mpeg",
+    "ogg": "audio/ogg",
+    "wav": "audio/wav",
+    "weba": "audio/webm",
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "ogv": "video/ogg",
+    "pdf": "application/pdf",
+    "zip": "application/zip",
+    "tar": "application/x-tar",
+    "gz": "application/gzip",
+    "wasm": "application/wasm",
+    "woff": "font/woff",
+    "woff2": "font/woff2",
+    "ttf": "font/ttf",
+    "otf": "font/otf",
+    "eot": "application/vnd.ms-fontobject",
+    "map": "application/json",
+    "toml": "application/toml",
+    "yaml": "application/yaml",
+    "yml": "application/yaml",
+    "bin": "application/octet-stream"
+};
+
+export namespace Mime {
+    export function lookup(ext: str): str {
+        let key = ext.toLowerCase();
+        if (key.startsWith(".")) {
+            key = key.slice(1);
+        }
+        let found = TYPES[key];
+        if (found !== null) {
+            return found as str;
+        }
+        return "application/octet-stream";
+    }
+
+    export function detect(path: str): str {
+        let dot = path.lastIndexOf(".");
+        if (dot < 0) {
+            return "application/octet-stream";
+        }
+        return lookup(path.slice(dot + 1));
+    }
+}

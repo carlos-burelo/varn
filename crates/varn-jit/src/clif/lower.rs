@@ -255,7 +255,6 @@ pub fn try_compile(
             words: proto.chunk.code.len(),
             outcome: crate::stats::CompileOutcome::Gated(reason.clone()),
             compile_ns: 0,
-            code_bytes: 0,
         });
         return Err("JIT Bailout: function too large".to_owned());
     }
@@ -313,10 +312,10 @@ pub fn try_compile(
                 );
             }
             let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
-            return finish_artifact(raw, wrapper, frame_aware, debug);
+            finish_artifact(raw, wrapper, frame_aware, debug)
         }
         Ok(_) => {
-            return Err("clif: uses a helper disabled in fase B".into());
+            Err("clif: uses a helper disabled in fase B".into())
         }
         Err(reason) => {
             if super::trace() {
@@ -325,7 +324,7 @@ pub fn try_compile(
                     proto.name.as_deref().unwrap_or("<module>")
                 );
             }
-            return Err(reason);
+            Err(reason)
         }
     }
 }

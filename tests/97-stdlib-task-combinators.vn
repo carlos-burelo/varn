@@ -33,7 +33,7 @@ await describe("97 stdlib task combinators", async () => {
     });
 
     await it("4. TaskGroup concurrency and lifecycle hooks", async () => {
-        let tg = TaskGroup();
+        let tg = new TaskGroup<int>();
         tg.finally(() => {
         trackerArray[0] = true;
         });

@@ -3,7 +3,8 @@ import {
     sha512$,
     randomBytesBuffer$,
     randomHex$,
-    hmac$
+    hmac$,
+    hmacBytes$
 } from "runtime:crypto";
 
 export function sha256(data: str): str {
@@ -24,4 +25,8 @@ export function randomHex(size: int): str {
 
 export function hmac(algo: str, key: str, data: str): str {
     return hmac$(algo, key, data);
+}
+
+export function hmacBytes(algo: str, key: Bytes | str, data: Bytes | str): Bytes {
+    return hmacBytes$(algo, key, data);
 }

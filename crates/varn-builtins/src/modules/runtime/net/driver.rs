@@ -57,8 +57,6 @@ pub struct IoDriver {
     registry: Arc<Mutex<IoRegistry>>,
     cmd_tx: Sender<DriverCommand>,
     waker: Arc<Waker>,
-    #[allow(dead_code)]
-    is_running: Arc<AtomicBool>,
 }
 
 static DRIVER: OnceLock<IoDriver> = OnceLock::new();
@@ -91,7 +89,6 @@ impl IoDriver {
             registry,
             cmd_tx,
             waker,
-            is_running,
         })
     }
 

@@ -1,0 +1,70 @@
+import { describe, it, expect, summary } from "std:test";
+import { writeText, readText, appendText, exists, stat, mkdirAll, readDir, remove, removeAll, rename, copy, readLines, glob, tempDir, File } from "std:fs";
+import { join } from "std:path";
+
+function clean(path: str): void {
+    if (exists(path)) {
+        removeAll(path);
+    }
+}
+
+await describe("example std:fs", async () => {
+    await it("writes, reads and stats a file", () => {
+        let base = join(tempDir(), "ex-fs");
+        clean(base);
+        mkdirAll(base);
+        let file = join(base, "hello.txt");
+        writeText(file, "hola");
+        appendText(file, " mundo");
+        expect(readText(file)).toBe("hola mundo");
+        expect(exists(file)).toBe(true);
+        expect(stat(file).isFile).toBe(true);
+        expect(stat(file).size).toBe(10);
+        expect(stat(base).isDir).toBe(true);
+        clean(base);
+        expect(exists(base)).toBe(false);
+    });
+
+    await it("lists directories and globs", () => {
+        let base = join(tempDir(), "ex-fs-glob");
+        clean(base);
+        mkdirAll(join(base, "sub"));
+        writeText(join(base, "a.vn"), "1");
+        writeText(join(base, "sub", "b.vn"), "2");
+        writeText(join(base, "c.txt"), "3");
+        expect(readDir(base).length).toBe(3);
+        expect(glob(join(base, "*.vn")).length).toBe(1);
+        clean(base);
+    });
+
+    await it("renames and copies", () => {
+        let base = join(tempDir(), "ex-fs-mv");
+        clean(base);
+        mkdirAll(base);
+        writeText(join(base, "orig.txt"), "data");
+        rename(join(base, "orig.txt"), join(base, "moved.txt"));
+        expect(exists(join(base, "moved.txt"))).toBe(true);
+        copy(join(base, "moved.txt"), join(base, "dupe.txt"));
+        expect(readText(join(base, "dupe.txt"))).toBe("data");
+        remove(join(base, "dupe.txt"));
+        expect(exists(join(base, "dupe.txt"))).toBe(false);
+        clean(base);
+    });
+
+    await it("reads lines and streams a file", () => {
+        let base = join(tempDir(), "ex-fs-lines");
+        clean(base);
+        mkdirAll(base);
+        let file = join(base, "lines.txt");
+        writeText(file, "one\ntwo\nthree\n");
+        let lines = readLines(file);
+        expect(lines.length).toBe(3);
+        expect(lines[1]).toBe("two");
+        let handle = new File(file, "r");
+        expect(handle.readAll()).toBe("one\ntwo\nthree\n");
+        handle.close();
+        clean(base);
+    });
+});
+
+summary();

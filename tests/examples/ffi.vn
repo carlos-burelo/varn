@@ -1,0 +1,46 @@
+import { describe, it, expect, summary } from "std:test";
+import { Ffi, FfiType, Pointer } from "std:ffi";
+
+await describe("example std:ffi", async () => {
+    await it("allocates and reads/writes integers", () => {
+        let ptr = Ffi.alloc(16);
+        expect(ptr.isNull()).toBe(false);
+        ptr.writeI64(42);
+        expect(ptr.readI64()).toBe(42);
+        ptr.writeI32(7, 8);
+        expect(ptr.readI32(8)).toBe(7);
+        ptr.writeI8(9, 12);
+        expect(ptr.readI8(12)).toBe(9);
+        ptr.free();
+    });
+
+    await it("offsets address within a block", () => {
+        let ptr = Ffi.alloc(16);
+        let second = ptr.offset(8);
+        second.writeI64(99);
+        expect(ptr.readI64(8)).toBe(99);
+        ptr.free();
+    });
+
+    await it("roundtrips c strings", () => {
+        let str = Ffi.cStr("hello-ffi");
+        expect(Ffi.readCString(str)).toBe("hello-ffi");
+        expect(str.readCString()).toBe("hello-ffi");
+        Ffi.free(str);
+    });
+
+    await it("reads/writes doubles", () => {
+        let ptr = Ffi.alloc(8);
+        ptr.writeF64(3.5);
+        expect(ptr.readF64()).toBe(3.5);
+        ptr.free();
+    });
+
+    await it("exposes the type enum", () => {
+        expect(FfiType.Int as int).toBe(1);
+        expect(FfiType.Str as int).toBe(3);
+        expect(FfiType.Ptr as int).toBe(4);
+    });
+});
+
+summary();

@@ -57,8 +57,6 @@ pub struct CompileRecord {
     pub outcome: CompileOutcome,
     /// Zero for gated functions: no lowering ran.
     pub compile_ns: u64,
-    /// Zero unless routed.
-    pub code_bytes: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -86,16 +84,6 @@ pub struct JitStatsSnapshot {
 }
 
 impl JitStatsSnapshot {
-    /// Frame entries that ENTERED through compiled code.
-    ///
-    /// Not the same question as "did this frame run as machine code": a frame
-    /// rescued by OSR entered on the interpreter and finished compiled, and it
-    /// is counted in `interp_runs`, not here. Use [`Self::machine_code_frames`]
-    /// for coverage and this one only where the ENTRY tier is the subject.
-    pub fn clif_frames(&self) -> u64 {
-        self.jit_runs
-    }
-
     /// Total frame entries observed, compiled plus interpreted.
     pub fn total_frames(&self) -> u64 {
         self.jit_runs + self.interp_runs
@@ -122,12 +110,6 @@ impl JitStatsSnapshot {
     /// [`Self::machine_code_frames`] over [`Self::total_frames`].
     pub fn never_compiled_frames(&self) -> u64 {
         self.interp_runs.saturating_sub(self.osr_entries)
-    }
-
-    /// Share of frame entries that entered through compiled code, 0.0..=1.0.
-    /// See [`Self::clif_frames`] for why this is not the coverage figure.
-    pub fn clif_frame_ratio(&self) -> f64 {
-        self.frame_share_of(self.jit_runs)
     }
 
     /// Share of frame entries that executed machine code, 0.0..=1.0.

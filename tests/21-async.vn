@@ -40,7 +40,7 @@ async function runAsync(): void {
     expect(all[0]).toBe(4);
     expect(all[1]).toBe(9);
     expect(all[2]).toBe(16);
-    using group = TaskGroup<int>();
+    using group = new TaskGroup<int>();
     const g1 = group.spawn(asyncAdd(7, 8));
     const g2 = group.spawn(asyncAdd(9, 10));
     const joined = await group.join();
@@ -49,7 +49,7 @@ async function runAsync(): void {
     expect(joined[1]).toBe(19);
     expect(await g1).toBe(15);
     expect(await g2).toBe(19);
-    using failGroup = TaskGroup<int>();
+    using failGroup = new TaskGroup<int>();
     failGroup.spawn(asyncAdd(2, 3));
     failGroup.spawn(asyncBoom());
     try {
@@ -58,7 +58,7 @@ async function runAsync(): void {
     } catch (e) {
         expect(true).toBeTruthy();
     }
-    using cancelGroup = TaskGroup<int>();
+    using cancelGroup = new TaskGroup<int>();
     const c1 = cancelGroup.spawn(asyncAdd(10, 20));
     cancelGroup.cancel();
     try {
@@ -67,7 +67,7 @@ async function runAsync(): void {
     } catch (e) {
         expect(true).toBeTruthy();
     }
-    using disposeGroup = TaskGroup<int>();
+    using disposeGroup = new TaskGroup<int>();
     const d1 = disposeGroup.spawn(asyncAdd(30, 40));
     await disposeGroup.disposeAsync();
     try {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { JSON } from "std:encoding";
+import { Json } from "std:encoding";
 
 
 // A loop long enough to be compiled and then rescued by OSR, which is what
@@ -33,7 +33,7 @@ await describe("73 str charcode json shape", async () => {
         // 2. The CLIF lowering serves `charCodeAt` from a byte pointer hoisted out of
         //    the loop when the receiver is a heap ASCII string, and from a helper
         //    otherwise. Both arms must agree, in both tiers, for every receiver shape.
-        // 3. `JSON.stringify` matched heap objects by tag and destructured only two of
+        // 3. `Json.stringify` matched heap objects by tag and destructured only two of
         //    the four variants those tags cover, so a tuple serialized as `[]` and a
         //    record as `{}` — well-formed JSON with the contents dropped.
         
@@ -85,22 +85,22 @@ await describe("73 str charcode json shape", async () => {
         const uhay = "日本語needle"
         expect(uhay.indexOf("needle")).toBe(3)
         
-        // ------------------------------------------------------------ JSON.stringify
+        // ------------------------------------------------------------ Json.stringify
         
-        expect(JSON.stringify({ a: 1, b: "x" })).toBe("{\"a\":1,\"b\":\"x\"}")
-        expect(JSON.stringify([1, 2, 3])).toBe("[1,2,3]")
-        expect(JSON.stringify({ id: 1, tags: ["a", "b"] })).toBe("{\"id\":1,\"tags\":[\"a\",\"b\"]}")
+        expect(Json.stringify({ a: 1, b: "x" })).toBe("{\"a\":1,\"b\":\"x\"}")
+        expect(Json.stringify([1, 2, 3])).toBe("[1,2,3]")
+        expect(Json.stringify({ id: 1, tags: ["a", "b"] })).toBe("{\"id\":1,\"tags\":[\"a\",\"b\"]}")
         
         // Field order is declaration order, not hash order — the property that lets
         // the shape carry an ordered name list at all.
-        expect(JSON.stringify({ z: 1, a: 2, m: 3 })).toBe("{\"z\":1,\"a\":2,\"m\":3}")
+        expect(Json.stringify({ z: 1, a: 2, m: 3 })).toBe("{\"z\":1,\"a\":2,\"m\":3}")
         
         // Tuples and records: these used to come out as `[]` and `{}`.
         const tup = #[1, "two", true]
-        expect(JSON.stringify(tup as dynamic)).toBe("[1,\"two\",true]")
+        expect(Json.stringify(tup as dynamic)).toBe("[1,\"two\",true]")
         
         const rec = #{ x: 3, y: 4 }
-        expect(JSON.stringify(rec as dynamic)).toBe("{\"x\":3,\"y\":4}")
+        expect(Json.stringify(rec as dynamic)).toBe("{\"x\":3,\"y\":4}")
         
         // Round trip through the parser's shape cache, with a NESTED object of the
         // same arity between two siblings: the inner object replaces the cache
@@ -108,11 +108,11 @@ await describe("73 str charcode json shape", async () => {
         // names. This passed before the cache was snapshotted per object too — it is
         // here to keep it passing, not as evidence that it once failed.
         const doc = "[{\"a\":1,\"b\":2},{\"a\":{\"c\":9,\"d\":8},\"b\":4},{\"a\":5,\"b\":6}]"
-        const back = JSON.parse(doc) as dynamic[]
+        const back = Json.parse(doc) as dynamic[]
         expect(back.length).toBe(3)
-        expect(JSON.stringify(back[0])).toBe("{\"a\":1,\"b\":2}")
-        expect(JSON.stringify(back[1])).toBe("{\"a\":{\"c\":9,\"d\":8},\"b\":4}")
-        expect(JSON.stringify(back[2])).toBe("{\"a\":5,\"b\":6}")
+        expect(Json.stringify(back[0])).toBe("{\"a\":1,\"b\":2}")
+        expect(Json.stringify(back[1])).toBe("{\"a\":{\"c\":9,\"d\":8},\"b\":4}")
+        expect(Json.stringify(back[2])).toBe("{\"a\":5,\"b\":6}")
         
     });
 });

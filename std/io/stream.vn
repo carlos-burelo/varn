@@ -1,4 +1,6 @@
 import { write$, writeln$, flush$, readLine$ } from "runtime:io";
+import { Task } from "std:task";
+import { toStdError, E_IO } from "std:error";
 
 export interface Writer {
     write(content: str): void;
@@ -10,24 +12,83 @@ export interface Reader {
     pipeTo(dst: Writer): void;
 }
 
+export interface AsyncReader {
+    read(size?: int): Task<Bytes?>;
+}
+
+export interface AsyncWriter {
+    write(data: Bytes): Task<int>;
+    flush(): Task<void>;
+    close(): void;
+}
+
+export interface BulkPump {
+    pumpTo(writer: AsyncWriter): Task<int>;
+}
+
+export class Stream {
+    static async pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize: int = 8192): Task<int> {
+        let fast = reader as dynamic;
+        if (typeof fast.pumpTo === "function") {
+            let pumped = await fast.pumpTo(writer);
+            return pumped as int;
+        }
+        let total = 0;
+        while (true) {
+            let chunk = await reader.read(bufferSize);
+            if (chunk === null) {
+                break;
+            }
+            let b = chunk as Bytes;
+            if (b.length === 0) {
+                break;
+            }
+            let written = await writer.write(b);
+            total = total + written;
+        }
+        await writer.flush();
+        return total;
+    }
+}
+
 export function write(...args: str[]): void {
-    write$(...args);
+    try {
+        write$(...args);
+    } catch (e) {
+        throw toStdError(e as Error, E_IO);
+    }
 }
 
 export function writeln(...args: str[]): void {
-    writeln$(...args);
+    try {
+        writeln$(...args);
+    } catch (e) {
+        throw toStdError(e as Error, E_IO);
+    }
 }
 
 export function print(...args: str[]): void {
-    writeln$(...args);
+    try {
+        writeln$(...args);
+    } catch (e) {
+        throw toStdError(e as Error, E_IO);
+    }
 }
 
 export function flush(): void {
-    flush$();
+    try {
+        flush$();
+    } catch (e) {
+        throw toStdError(e as Error, E_IO);
+    }
 }
 
 export function readLine(prompt: str = ""): str {
-    return readLine$(prompt);
+    try {
+        return readLine$(prompt);
+    } catch (e) {
+        throw toStdError(e as Error, E_IO);
+    }
 }
 
 export function readAll(): str {

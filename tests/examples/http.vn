@@ -1,0 +1,59 @@
+import { describe, it, expect, summary } from "std:test";
+import { HttpServer, get, json, redirect, error, Request, Response, Headers, Mime, Auth, Multipart } from "std:http";
+import { Process } from "std:process";
+import { delay } from "std:task";
+
+await describe("example std:http", async () => {
+    await it("headers are case-insensitive", () => {
+        let headers = new Headers({ "Content-Type": "application/json" });
+        expect(headers.get("content-type")).toBe("application/json");
+        headers.set("X-Token", "abc");
+        expect(headers.has("x-token")).toBe(true);
+        headers.delete("X-Token");
+        expect(headers.has("x-token")).toBe(false);
+    });
+
+    await it("builds requests and responses", () => {
+        let req = new Request("http://localhost:8080/items", {
+            method: "POST",
+            headers: { "Accept": "application/json" },
+            body: "{\"name\":\"Varn\"}"
+        });
+        expect(req.method).toBe("POST");
+        expect(req.text()).toBe("{\"name\":\"Varn\"}");
+        let res = json({ ok: true });
+        expect(res.status).toBe(200);
+        expect(res.ok).toBe(true);
+        expect(redirect("https://example.com", 301).status).toBe(301);
+        expect(error(404, "missing").ok).toBe(false);
+    });
+
+    await it("serves a live roundtrip via child server", async () => {
+        let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/examples/servers/http-server.vn"]);
+        await delay(800);
+        let res = await get("http://127.0.0.1:19882/hello");
+        expect(res.status).toBe(200);
+        expect(res.text().indexOf("world") >= 0).toBe(true);
+        proc.kill();
+    });
+
+    await it("registers routes with params", () => {
+        let app = new HttpServer();
+        app.get("/users/:id", (req: Request) => json({ id: req.params["id"] }));
+        app.post("/users", (req: Request) => json({ created: true }, 201));
+        expect(app.isListening).toBe(false);
+    });
+
+    await it("mime, auth and multipart helpers", () => {
+        expect(Mime.detect("photo.png")).toBe("image/png");
+        expect(Auth.bearer("Bearer abc123")).toBe("abc123");
+        expect(Auth.basic("Basic dXNlcjpwYXNz") !== null).toBe(true);
+        let boundary = Multipart.boundaryOf("multipart/form-data; boundary=----xyz");
+        expect(boundary).toBe("----xyz");
+        let parts = Multipart.parse("------xyz\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n------xyz--\r\n", "----xyz");
+        expect(parts.length).toBe(1);
+        expect(parts[0].body).toBe("v");
+    });
+});
+
+summary();

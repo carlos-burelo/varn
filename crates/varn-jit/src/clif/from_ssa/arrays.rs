@@ -65,7 +65,7 @@ impl Elem {
         }
     }
 
-    fn from_boxed(self, b: &mut FunctionBuilder, v: Value) -> Value {
+    fn unbox_elem(self, b: &mut FunctionBuilder, v: Value) -> Value {
         match self {
             Elem::Int => unbox_int(b, v),
             Elem::Float => unbox_f64_coerce(b, v),
@@ -73,7 +73,7 @@ impl Elem {
         }
     }
 
-    fn to_boxed(self, b: &mut FunctionBuilder, v: Value) -> Value {
+    fn box_elem(self, b: &mut FunctionBuilder, v: Value) -> Value {
         match self {
             Elem::Int => box_int(b, v),
             Elem::Float => box_f64(b, v),
@@ -212,7 +212,7 @@ pub(super) fn emit_get(
         let off = b.ins().ishl_imm(key, 4);
         let addr = b.ins().iadd(data, off);
         let raw = b.ins().load(types::I128, MemFlags::trusted(), addr, 0);
-        let v = want.from_boxed(b, raw);
+        let v = want.unbox_elem(b, raw);
         b.ins().jump(merge, &[v.into()]);
     }
 
@@ -233,7 +233,7 @@ pub(super) fn emit_get(
         exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     );
-    let r = want.from_boxed(b, r);
+    let r = want.unbox_elem(b, r);
     // Home addresses memoized while re-boxing above live in this arm only
     // (see `super::store::drop_home_addrs`).
     super::store::drop_home_addrs(ctx);
@@ -289,7 +289,7 @@ pub(super) fn emit_set(
         b.switch_to_block(boxed_arm);
         let off = b.ins().ishl_imm(key, 4);
         let addr = b.ins().iadd(data, off);
-        let boxed = src.to_boxed(b, raw);
+        let boxed = src.box_elem(b, raw);
         b.ins().store(MemFlags::trusted(), boxed, addr, 0);
         b.ins().jump(merge, &[]);
     } else {

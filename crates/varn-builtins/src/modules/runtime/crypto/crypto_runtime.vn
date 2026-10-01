@@ -12,5 +12,8 @@ export declare function randomHex$(size: int): str;
 export declare function base64Enc$(data: str): str;
 export declare function base64Dec$(data: str): str;
 export declare function hmac$(algo: str, key: str, data: str): str;
+export declare function hmacBytes$(algo: str, key: Bytes | str, data: Bytes | str): Bytes;
+export declare function base64EncBytes$(data: Bytes): str;
+export declare function base64DecBytes$(data: str): Bytes;
 export declare function pbkdf2$(password: str, salt: Bytes | str, iterations: int, keyLen: int): Bytes;
 export declare function timingSafeEqual$(a: Bytes | str, b: Bytes | str): bool;

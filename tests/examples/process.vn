@@ -1,0 +1,26 @@
+import { describe, it, expect, summary } from "std:test";
+import { Process } from "std:process";
+
+await describe("example std:process", async () => {
+    await it("execs and captures output", () => {
+        let result = Process.exec("echo VarnProcessTest");
+        expect(result.exitCode).toBe(0);
+        expect(result.success).toBe(true);
+        expect(result.stdout.trim()).toBe("VarnProcessTest");
+    });
+
+    await it("reports failing commands", () => {
+        let result = Process.exec("exit 3");
+        expect(result.success).toBe(false);
+        expect(result.exitCode === 0).toBe(false);
+    });
+
+    await it("spawns and waits for a child", () => {
+        let child = Process.spawn("target/debug/vn.exe", ["--version"]);
+        let status = child.wait();
+        expect(status.success).toBe(true);
+        expect(status.exitCode).toBe(0);
+    });
+});
+
+summary();

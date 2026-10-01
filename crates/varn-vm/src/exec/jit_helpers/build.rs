@@ -1,49 +1,7 @@
 //! Aggregate construction from compiled code: array and string literals.
 
-use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-#[varn_op_macros::jit_slow(field = "build_array")]
-pub(crate) extern "C" fn jit_build_array(
-    ctx: *mut ExecCtx,
-    base: usize,
-    start_reg: usize,
-    count: usize,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let mut elems = Vec::with_capacity(count);
-        for i in 0..count {
-            elems.push(ctx_ref.stack.box_reg(base, start_reg + i));
-        }
-        ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_vm(elems);
-    }
-}
-
-#[varn_op_macros::jit_slow(field = "build_map")]
-pub(crate) extern "C" fn jit_build_map(
-    ctx: *mut ExecCtx,
-    base: usize,
-    start_reg: usize,
-    count: usize,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        if count == 0 {
-            ctx_ref.jit_native_result = ctx_ref.heap.alloc_empty_map_vm();
-            return;
-        }
-        let mut map = varn_types::value::ValueMap::default();
-        for i in 0..count {
-            let k_nv = ctx_ref.stack.box_reg(base, start_reg + i * 2);
-            let v_nv = ctx_ref.stack.box_reg(base, start_reg + i * 2 + 1);
-            let key = ctx_ref.heap.canonical_map_key(k_nv);
-            map.insert(key, v_nv);
-        }
-        ctx_ref.jit_native_result = ctx_ref.heap.alloc_map_vm(map);
-    }
-}
 
 #[varn_op_macros::jit_slow(field = "build_str")]
 pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmValue, count: usize) {
@@ -59,9 +17,7 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
 }
 
 /// `extern "C" fn(*mut ExecCtx, parts: *const VmValue, count)` — build an array
-/// from a boxed window staged on the caller's native stack. The SSA lowering has
-/// no contiguous home window for arbitrary elements, so it passes one; the
-/// helper is the window-taking sibling of `jit_build_array` (which reads homes).
+/// from a boxed window staged on the caller's native stack.
 #[varn_op_macros::jit_slow(field = "build_array_window")]
 pub(crate) extern "C" fn jit_build_array_window(
     ctx: *mut ExecCtx,
@@ -229,48 +185,5 @@ pub(crate) extern "C" fn jit_wrap_spread(ctx: *mut ExecCtx, val_tag: u64, val_pa
         ctx_ref.jit_native_result = ctx_ref
             .heap
             .intern(varn_types::Value::Spread(Box::new(extracted)));
-    }
-}
-
-#[varn_op_macros::jit_slow(field = "build_object")]
-pub(crate) extern "C" fn jit_build_object(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    base: usize,
-    ip_before: usize,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let code = &closure_ref.proto.chunk.code;
-
-        let mut temp_ip = ip_before;
-        let w1 = code[temp_ip];
-        temp_ip += 1;
-        let count = (w1 & 0xFF) as usize;
-        let obj_nv = ctx_ref.heap.alloc_object();
-        for _ in 0..count {
-            let k_idx = code[temp_ip] as usize;
-            temp_ip += 1;
-            let w = code[temp_ip];
-            temp_ip += 1;
-            let val_reg = (w >> 8) as usize;
-            let key_nv = closure_ref.constants[k_idx];
-            let key = ctx_ref
-                .heap
-                .str_val(key_nv)
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| {
-                    closure_ref.proto.chunk.constants[k_idx]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_string()
-                });
-            let val = ctx_ref.stack.box_reg(base, val_reg);
-            if let Err(e) = crate::exec::props::set_property(obj_nv, &key, val, &mut ctx_ref.heap) {
-                jit_propagate_error(ctx_ref, e);
-            }
-        }
-        ctx_ref.jit_native_result = obj_nv;
     }
 }

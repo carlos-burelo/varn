@@ -2,10 +2,14 @@ import {
     uuid$,
     uuidV4$,
     uuidV7$,
-    uuidValidate$
+    uuidValidate$,
+    randomBytesBuffer$
 } from "runtime:crypto";
+import { nowMs$ } from "runtime:time";
 
-export namespace UUID {
+const ULID_ALPHABET: str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export namespace Uuid {
     export function v4(): str {
         return uuidV4$();
     }
@@ -17,16 +21,25 @@ export namespace UUID {
     export function isValid(s: str): bool {
         return uuidValidate$(s);
     }
+
+    export function ulid(timeMs?: int): str {
+        let t = timeMs ?? nowMs$();
+        let rand = randomBytesBuffer$(10);
+        let out = "";
+        for (let i = 0; i < 10; i = i + 1) {
+            out = out + ULID_ALPHABET[(t >> (45 - i * 5)) & 31];
+        }
+        for (let i = 0; i < 16; i = i + 1) {
+            let bitpos = i * 5;
+            let byteIdx = bitpos >> 3;
+            let b0 = rand.getByte(byteIdx);
+            let b1 = byteIdx + 1 < 10 ? rand.getByte(byteIdx + 1) : 0;
+            out = out + ULID_ALPHABET[(((b0 << 8) | b1) >> (11 - (bitpos & 7))) & 31];
+        }
+        return out;
+    }
 }
 
 export function uuid(): str {
     return uuid$();
-}
-
-export function uuidV4(): str {
-    return uuid$();
-}
-
-export function isValidUuid(s: str): bool {
-    return uuidValidate$(s);
 }

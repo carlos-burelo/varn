@@ -1,6 +1,8 @@
 
-[1mTIERS[0m[2m ── <module> · 3/3 ruteadas[0m
-  [2mfunción      words  tier   razón[0m
-  <module>       111  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
-  sum             33  [32mclif [0m  [2m (frame-aware: boxed)[0m
-  firstAbove      37  [32mclif [0m  [2m (frame-aware: boxed)[0m
+  [1mtiers[0m [2m──────────────────────────────────────────── <module> · 3/3 ruteadas[0m
+  [2mfunción   [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                      [0m
+  ───────────┼───────┼──────┼────────────────────────────
+  <module>   │   111 │ clif │  (frame-aware: alloc+boxed)
+  sum        │    33 │ clif │  (frame-aware: boxed)      
+  firstAbove │    37 │ clif │  (frame-aware: boxed)      
+  [2m── end: tiers ──[0m

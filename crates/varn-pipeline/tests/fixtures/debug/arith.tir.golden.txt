@@ -1,5 +1,5 @@
 
-=== TIR: <fixtures>/arith.vn ===
+  [35mtir[0m [2m────────────────────────────────────────────── <fixtures>/arith.vn[0m
 TirModule {
     source_file: "<fixtures>/arith.vn",
     imports: [],
@@ -518,3 +518,4 @@ TirModule {
         has_rest: false,
     },
 }
+  [2m── end: tir ──[0m

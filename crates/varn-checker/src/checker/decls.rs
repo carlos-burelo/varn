@@ -206,6 +206,73 @@ impl<'r> Checker<'r> {
                     match member {
                         ClassMember::Method {
                             key,
+                            body: Some(body),
+                            params,
+                            modifiers,
+                            range,
+                            ..
+                        } if modifiers.is_static
+                            && super::decorator_receiver::method_uses_receiver(
+                                self.ast_arena,
+                                params,
+                                *body,
+                            ) =>
+                        {
+                            let key_str = bind.interner.resolve(*key);
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::ThisOutsideInstance,
+                                    format!("static method '{key_str}' cannot use 'this' or 'super': no receiver"),
+                                )
+                                .with_range(*range),
+                            );
+                        }
+                        ClassMember::Method {
+                            key,
+                            decorators,
+                            body: Some(body),
+                            params,
+                            range,
+                            ..
+                        } if !decorators.is_empty() => {
+                            if super::decorator_receiver::method_uses_receiver(
+                                self.ast_arena,
+                                params,
+                                *body,
+                            ) {
+                                let key_str = bind.interner.resolve(*key);
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::InvalidDecoratorTarget,
+                                        format!("decorated method '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
+                                    )
+                                    .with_range(*range),
+                                );
+                            }
+                        }
+                        ClassMember::Property {
+                            key,
+                            decorators,
+                            range,
+                            ..
+                        } if !decorators.is_empty() => {
+                            let key_str = bind.interner.resolve(*key);
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::InvalidDecoratorTarget,
+                                    format!("decorators are not supported on property '{key_str}'"),
+                                )
+                                .with_range(*range),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+
+                for member in &c.body {
+                    match member {
+                        ClassMember::Method {
+                            key,
                             modifiers,
                             range,
                             ..

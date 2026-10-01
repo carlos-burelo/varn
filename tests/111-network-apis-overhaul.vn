@@ -1,5 +1,5 @@
 import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "std:net";
-import { HttpServer, Request, Response, HttpResponse, HttpStatus, json, http, fetch } from "std:http";
+import { HttpServer, Request, Response, HttpStatus, json, get, post, put, patch, del, fetch } from "std:http";
 import { WebSocket, WebSocketReadyState } from "std:ws";
 import { Process } from "std:process";
 import { delay, Task } from "std:task";
@@ -39,19 +39,19 @@ function testHttpServerAndClientApis(): void {
     let app = new HttpServer();
     app.cors("*", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
 
-    app.get("/api/items", (req: Request, res: HttpResponse) => {
+    app.get("/api/items", (req: Request) => {
         return json([{ id: 1, name: "Item1" }]);
     });
 
-    app.post("/api/items", (req: Request, res: HttpResponse) => {
+    app.post("/api/items", (req: Request) => {
         return json({ created: true });
     });
 
-    app.patch("/api/items/:id", (req: Request, res: HttpResponse) => {
+    app.patch("/api/items/:id", (req: Request) => {
         return json({ updated: req.params["id"] });
     });
 
-    app.delete("/api/items/:id", (req: Request, res: HttpResponse) => {
+    app.delete("/api/items/:id", (req: Request) => {
         return json({ deleted: req.params["id"] });
     });
 
@@ -59,13 +59,12 @@ function testHttpServerAndClientApis(): void {
         expect(app.port).toBe(0);;
         expect(app.isListening).toBeFalsy();;
 
-    // 3. http client namespace helpers
-        expect(http !== null).toBeTruthy();;
-        expect(http.get !== null).toBeTruthy();;
-        expect(http.post !== null).toBeTruthy();;
-        expect(http.put !== null).toBeTruthy();;
-        expect(http.patch !== null).toBeTruthy();;
-        expect(http.del !== null).toBeTruthy();;
+    // 3. http client free helpers
+        expect(get !== null).toBeTruthy();;
+        expect(post !== null).toBeTruthy();;
+        expect(put !== null).toBeTruthy();;
+        expect(patch !== null).toBeTruthy();;
+        expect(del !== null).toBeTruthy();;
 
 }
 

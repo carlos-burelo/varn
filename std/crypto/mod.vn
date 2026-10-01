@@ -1,9 +1,7 @@
 
 export {
-    UUID,
-    uuid,
-    uuidV4,
-    isValidUuid
+    Uuid,
+    uuid
 } from "std:crypto/uuid";
 
 export {
@@ -11,7 +9,8 @@ export {
     sha512,
     randomBytes,
     randomHex,
-    hmac
+    hmac,
+    hmacBytes
 } from "std:crypto/hash";
 
 export {
@@ -20,3 +19,6 @@ export {
     hashPassword,
     verifyPassword
 } from "std:crypto/password";
+
+export { Jwt } from "std:crypto/jwt";
+export { Totp } from "std:crypto/totp";

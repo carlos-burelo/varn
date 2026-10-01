@@ -32,8 +32,8 @@ use varn_core::ast::{
 };
 use varn_core::{Atom, AtomInterner, TypeKind};
 use varn_tir::{
-    BackendTy, DynReason, FnId, Resolution, SigId, Signature, Span, TirExpr, TirExprKind,
-    TirFunction, TirModule, TirObjectEntry, TirStmt, TyTable,
+    BackendTy, DynReason, FnId, Resolution, SigId, Signature, Span, TirArg, TirExpr, TirExprKind,
+    TirFunction, TirModule, TirObjectEntry, TirStmt, TirUnOp, TyTable,
 };
 
 /// Build the TIR for one module from the same four inputs
@@ -195,12 +195,24 @@ pub fn emit_module(
             .or_insert((i as u32, f.params.len() as u32));
     }
 
+    // Free functions carrying decorators resolve through their global (which
+    // the top-level application statements below overwrite with the decorated
+    // value) instead of `DirectFn` (which would bypass it). Namespace members
+    // stay out: they have no global to route through, and their namespace
+    // object already carries the decorated value.
+    let decorated_fns: FxHashSet<Atom> = free_fns
+        .iter()
+        .filter(|(f, ns)| ns.is_none() && !f.decorators.is_empty())
+        .map(|(f, _)| f.id)
+        .collect();
+
     let ctx = MCtx {
         names: &names,
         classes: &classes,
         enums: &enums,
         globals: &global_slots,
         fns: &fn_index,
+        decorated_fns: &decorated_fns,
         call_mappings,
         desugar,
         core_ops: &core_ops,
@@ -285,6 +297,11 @@ pub fn emit_module(
                     top_body.push(TirStmt::BuildClass(class_ord));
                     class_ord += 1;
                     top_body.extend(top.lower_stmt_as_block(stmt));
+                }
+                StmtKind::Decl(d) if free_function(d).is_some_and(|f| !f.decorators.is_empty()) => {
+                    if let Some(f) = free_function(d) {
+                        emit_fn_decorator_app(f, &global_slots, interner, &mut top, &mut top_body);
+                    }
                 }
                 StmtKind::Decl(d) if variable_decl(d).is_none() => {}
                 _ => top_body.extend(top.lower_stmt_as_block(stmt)),
@@ -438,6 +455,7 @@ struct MCtx<'a> {
     enums: &'a [varn_tir::EnumInfo],
     globals: &'a FxHashMap<Arc<str>, u32>,
     fns: &'a FxHashMap<Atom, (u32, u32)>,
+    decorated_fns: &'a FxHashSet<Atom>,
     call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
     desugar: &'a crate::checker::Desugarings,
     core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
@@ -455,6 +473,7 @@ impl<'a> MCtx<'a> {
             enums: self.enums,
             globals: self.globals,
             fns: self.fns,
+            decorated_fns: self.decorated_fns,
             call_mappings: self.call_mappings,
             desugar: self.desugar,
             core_ops: self.core_ops,
@@ -532,6 +551,84 @@ fn ns_nested_types(ns: &varn_core::ast::NamespaceDecl) -> Vec<&Decl> {
     out
 }
 
+/// Apply one decorator expression to the previous value: `deco(prev)`,
+/// keeping the previous value when the decorator returns null. The call is
+/// hoisted into a temp so it runs exactly once.
+fn apply_one_decorator(top: &mut FnEmitter, prev: TirExpr, deco: TirExpr) -> TirExpr {
+    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let applied = TirExpr {
+        kind: TirExprKind::Call {
+            callee: Box::new(deco),
+            args: vec![TirArg::Expr(prev.clone())],
+        },
+        ty: dyno(),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    };
+    let tmp = top.hoist(applied);
+    TirExpr {
+        kind: TirExprKind::Select {
+            cond: Box::new(TirExpr {
+                kind: TirExprKind::Unary {
+                    op: TirUnOp::IsNull,
+                    operand: Box::new(tmp.clone()),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }),
+            then_val: Box::new(prev),
+            else_val: Box::new(tmp),
+        },
+        ty: dyno(),
+        res: Resolution::None,
+        span: Span::EMPTY,
+    }
+}
+
+/// `@deco_n … @deco_1 function f` at top level: `f = deco_1(…(deco_n(f))…)`,
+/// keeping the previous value when a decorator returns null — the same
+/// null-semantics and innermost-first order as method decorators. Runs at
+/// declaration position. Direct calls route through the global (see
+/// `decorated_fns`) so every call site observes the decorated value.
+fn emit_fn_decorator_app(
+    f: &FunctionDecl,
+    global_slots: &FxHashMap<Arc<str>, u32>,
+    interner: &AtomInterner,
+    top: &mut FnEmitter,
+    top_body: &mut Vec<TirStmt>,
+) {
+    if f.decorators.is_empty() {
+        return;
+    }
+    let name = interner.resolve(f.id);
+    let Some(&slot) = global_slots.get(name) else {
+        return;
+    };
+    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let global_ref = || TirExpr {
+        kind: TirExprKind::Var,
+        ty: dyno(),
+        res: Resolution::GlobalSlot(slot),
+        span: Span::EMPTY,
+    };
+    let mut cur = global_ref();
+    for d in f.decorators.iter().rev() {
+        let deco = top.lower_expression(d.expression);
+        cur = apply_one_decorator(top, cur, deco);
+        top_body.extend(top.take_pending());
+    }
+    top_body.push(TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign {
+            target: Box::new(global_ref()),
+            value: Box::new(cur),
+        },
+        ty: BackendTy::Void,
+        res: Resolution::None,
+        span: Span::EMPTY,
+    }));
+}
+
 /// Emit the object global for `ns` (and, first, for every namespace nested in
 /// it). Only `export`ed members appear on the object: a function points at its
 /// free-function global, a class / enum / nested namespace at its qualified
@@ -576,14 +673,20 @@ fn emit_namespace_object(
         match inner {
             Decl::Function(f) => {
                 if let Some(&(fnid, _)) = fn_index.get(&f.id) {
+                    let mut value = TirExpr {
+                        kind: TirExprKind::Var,
+                        ty: dyno(),
+                        res: Resolution::DirectFn(FnId(fnid)),
+                        span: Span::EMPTY,
+                    };
+                    for d in f.decorators.iter().rev() {
+                        let deco = top.lower_expression(d.expression);
+                        value = apply_one_decorator(top, value, deco);
+                        top_body.extend(top.take_pending());
+                    }
                     entries.push(TirObjectEntry::Field {
                         name: Arc::from(interner.resolve(f.id)),
-                        value: TirExpr {
-                            kind: TirExprKind::Var,
-                            ty: dyno(),
-                            res: Resolution::DirectFn(FnId(fnid)),
-                            span: Span::EMPTY,
-                        },
+                        value,
                     });
                 }
             }
@@ -2066,20 +2169,19 @@ fn emit_function(
     }
 }
 
-#[allow(dead_code)]
-fn placeholder_stmt() -> TirStmt {
-    TirStmt::Expr(TirExpr {
-        kind: TirExprKind::NullLit,
-        ty: BackendTy::Dynamic(DynReason::Unannotated),
-        res: Resolution::None,
-        span: Span::EMPTY,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use varn_tir::{verify_module, Coverage};
+
+    fn placeholder_stmt() -> TirStmt {
+        TirStmt::Expr(TirExpr {
+            kind: TirExprKind::NullLit,
+            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            res: Resolution::None,
+            span: Span::EMPTY,
+        })
+    }
 
     fn stub_module() -> TirModule {
         TirModule {

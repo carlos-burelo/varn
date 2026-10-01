@@ -1,29 +1,34 @@
 
-[1m[34mCLIF[0m[2m ─────────────────────────────── <module>[0m
-
+  [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
   [1m<module>[0m[2m (frame-aware)[0m
     [2mkinds (13 regs):[0m
-      block@0: [v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Float, v7:Ref, v8:Ref, v9:Float, v11:Bool]
-      block@1: [v12:Dynamic, v13:Str, v14:Dynamic]
-      block@2: [v15:Ref, v16:Float, v17:Float, v18:Bool]
-      block@3: [v19:Dynamic, v20:Str, v21:Dynamic]
-      block@4: [v22:Float, v23:Ref, v24:Ref, v25:Float, v26:Float, v27:Bool]
-      block@5: [v28:Dynamic, v29:Str, v30:Dynamic]
-      block@6: [v31:Ref, v32:Str]
-
+  [2mblock  [0m │ [2mkinds                                                                                       [0m
+  ────────┼─────────────────────────────────────────────────────────────────────────────────────────────
+  block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Float, v7:Ref, v8:Ref, v9:Float, v11:Bool
+  block@1 │ v12:Dynamic, v13:Str, v14:Dynamic                                                           
+  block@2 │ v15:Ref, v16:Float, v17:Float, v18:Bool                                                     
+  block@3 │ v19:Dynamic, v20:Str, v21:Dynamic                                                           
+  block@4 │ v22:Float, v23:Ref, v24:Ref, v25:Float, v26:Float, v27:Bool                                 
+  block@5 │ v28:Dynamic, v29:Str, v30:Dynamic                                                           
+  block@6 │ v31:Ref, v32:Str                                                                            
   [1mTemperature.constructor[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [v0:Float, v1:Ref]
-
+  [2mblock  [0m │ [2mkinds           [0m
+  ────────┼─────────────────
+  block@0 │ v0:Float, v1:Ref
   [1mTemperature.get celsius[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [v0:Ref, v1:Float]
-
+  [2mblock  [0m │ [2mkinds           [0m
+  ────────┼─────────────────
+  block@0 │ v0:Ref, v1:Float
   [1mTemperature.set celsius[0m[2m (frame-aware)[0m
     [2mkinds (4 regs):[0m
-      block@0: [v0:Dynamic, v1:Ref]
-
+  [2mblock  [0m │ [2mkinds             [0m
+  ────────┼───────────────────
+  block@0 │ v0:Dynamic, v1:Ref
   [1mTemperature.get fahrenheit[0m[2m (frame-aware)[0m
     [2mkinds (6 regs):[0m
-      block@0: [v0:Ref, v1:Float, v2:Float, v3:Float, v4:Float, v5:Float]
-[2m── end: CLIF ──[0m
+  [2mblock  [0m │ [2mkinds                                                   [0m
+  ────────┼─────────────────────────────────────────────────────────
+  block@0 │ v0:Ref, v1:Float, v2:Float, v3:Float, v4:Float, v5:Float
+  [2m── end: clif ──[0m

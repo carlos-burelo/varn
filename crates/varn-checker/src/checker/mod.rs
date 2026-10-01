@@ -1,5 +1,6 @@
 pub(crate) mod compat;
 pub(crate) mod completion;
+pub(crate) mod decorator_receiver;
 mod foreign_enums;
 pub use foreign_enums::ForeignEnum;
 mod decls;

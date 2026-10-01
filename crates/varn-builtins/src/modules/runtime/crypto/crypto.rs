@@ -54,8 +54,26 @@ varn_contract! {
                 .map_err(|e| format!("crypto.base64_dec: {e}"))?;
             String::from_utf8(decoded).map_err(|e| format!("crypto.base64_dec: {e}"))
         }
+        fn base64EncBytes(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<String, String> {
+            let bytes = ctx
+                .buffer_to_bytes(data)
+                .ok_or_else(|| "crypto.base64EncBytes: expected Bytes".to_string())?;
+            Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+        }
+        fn base64DecBytes(ctx: &mut dyn NativeCtx, data: &str) -> Result<VmValue, String> {
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(data.as_bytes())
+                .map_err(|e| format!("crypto.base64_dec: {e}"))?;
+            Ok(ctx.alloc_buffer_from_bytes(&decoded))
+        }
         fn hmac(_ctx: &mut dyn NativeCtx, algo: &str, key: &str, data: &str) -> Result<String, String> {
             let digest = match algo.to_lowercase().as_str() {
+                "sha1" => {
+                    let mut mac = Hmac::<sha1::Sha1>::new_from_slice(key.as_bytes())
+                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                    mac.update(data.as_bytes());
+                    mac.finalize().into_bytes().to_vec()
+                }
                 "sha256" => {
                     let mut mac = Hmac::<Sha256>::new_from_slice(key.as_bytes())
                         .map_err(|e| format!("crypto.hmac: {e}"))?;
@@ -71,6 +89,45 @@ varn_contract! {
                 other => return Err(format!("crypto.hmac: unsupported algorithm '{other}'")),
             };
             Ok(hex::encode(digest))
+        }
+
+        fn hmacBytes(ctx: &mut dyn NativeCtx, algo: &str, key: VmValue, data: VmValue) -> Result<VmValue, String> {
+            let key_bytes = if let Some(b) = ctx.buffer_to_bytes(key) {
+                b
+            } else if let Some(s) = ctx.str_owned(key) {
+                s.into_bytes()
+            } else {
+                ctx.str_repr(key).into_bytes()
+            };
+            let data_bytes = if let Some(b) = ctx.buffer_to_bytes(data) {
+                b
+            } else if let Some(s) = ctx.str_owned(data) {
+                s.into_bytes()
+            } else {
+                ctx.str_repr(data).into_bytes()
+            };
+            let digest = match algo.to_lowercase().as_str() {
+                "sha1" => {
+                    let mut mac = Hmac::<sha1::Sha1>::new_from_slice(&key_bytes)
+                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                    mac.update(&data_bytes);
+                    mac.finalize().into_bytes().to_vec()
+                }
+                "sha256" => {
+                    let mut mac = Hmac::<Sha256>::new_from_slice(&key_bytes)
+                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                    mac.update(&data_bytes);
+                    mac.finalize().into_bytes().to_vec()
+                }
+                "sha512" => {
+                    let mut mac = Hmac::<Sha512>::new_from_slice(&key_bytes)
+                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                    mac.update(&data_bytes);
+                    mac.finalize().into_bytes().to_vec()
+                }
+                other => return Err(format!("crypto.hmac: unsupported algorithm '{other}'")),
+            };
+            Ok(ctx.alloc_buffer_from_bytes(&digest))
         }
 
         fn randomBytesBuffer(ctx: &mut dyn NativeCtx, size: i64) -> Result<VmValue, String> {

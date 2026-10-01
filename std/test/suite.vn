@@ -58,7 +58,6 @@ export async function test(testName: str, body: () => dynamic): Task<void> {
         for (let fn of beforeEachFns) await fn();
         await body();
         for (let fn of afterEachFns) await fn();
-        logLine("  ✔ " + testName);
     } catch (err) {
         logLine("  ✖ " + testName + ": " + err);
         throw err;

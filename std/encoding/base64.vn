@@ -1,4 +1,19 @@
-import { base64Enc$, base64Dec$ } from "runtime:crypto";
+import { base64Enc$, base64Dec$, base64EncBytes$, base64DecBytes$ } from "runtime:crypto";
+
+function toUrlSafe(s: str): str {
+    return s.replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function fromUrlSafe(s: str): str {
+    let out = s.replaceAll("-", "+").replaceAll("_", "/");
+    let rem = out.length % 4;
+    if (rem === 2) {
+        out = out + "==";
+    } else if (rem === 3) {
+        out = out + "=";
+    }
+    return out;
+}
 
 export namespace Base64 {
     export function encode(data: str): str {
@@ -8,12 +23,28 @@ export namespace Base64 {
     export function decode(data: str): str {
         return base64Dec$(data);
     }
-}
 
-export function base64Encode(data: str): str {
-    return Base64.encode(data);
-}
+    export function encodeUrl(data: str): str {
+        return toUrlSafe(base64Enc$(data));
+    }
 
-export function base64Decode(data: str): str {
-    return Base64.decode(data);
+    export function decodeUrl(data: str): str {
+        return base64Dec$(fromUrlSafe(data));
+    }
+
+    export function encodeBytes(data: Bytes): str {
+        return base64EncBytes$(data);
+    }
+
+    export function decodeBytes(data: str): Bytes {
+        return base64DecBytes$(data);
+    }
+
+    export function encodeUrlBytes(data: Bytes): str {
+        return toUrlSafe(base64EncBytes$(data));
+    }
+
+    export function decodeUrlBytes(data: str): Bytes {
+        return base64DecBytes$(fromUrlSafe(data));
+    }
 }

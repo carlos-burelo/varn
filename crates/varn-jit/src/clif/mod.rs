@@ -85,18 +85,6 @@ thread_local! {
     static CTX: std::cell::RefCell<Context> = std::cell::RefCell::new(Context::new());
 }
 
-/// Compile one self-contained CLIF function to machine code bytes.
-/// Relocation-bearing code (calls, global values) is out of scope for the
-/// spike and returns an error instead of silently mis-linking.
-pub fn compile_function(func: Function, isa: &dyn TargetIsa) -> Result<Vec<u8>, String> {
-    with_ctx(func, isa, |compiled| {
-        if !compiled.buffer.relocs().is_empty() {
-            return Err("clif compile: relocations not supported in the spike".to_string());
-        }
-        Ok(compiled.code_buffer().to_vec())
-    })
-}
-
 /// Compile `func` on the thread's reused `Context` and hand the result to
 /// `take` while the Context still owns it. Every Cranelift compilation in the
 /// crate goes through here: it is the one place that reuses the arenas and the

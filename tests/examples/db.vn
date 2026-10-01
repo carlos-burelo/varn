@@ -1,0 +1,24 @@
+import { describe, it, expect, summary } from "std:test";
+import { Redis } from "std:db";
+
+await describe("example std:db", async () => {
+    await it("redis set/get/incr/expire (skips without server)", async () => {
+        try {
+            let db = await Redis.connect("127.0.0.1", 6379);
+            expect(await db.ping()).toBe("PONG");
+            await db.set("ex:key", "ex-val");
+            expect(await db.get("ex:key")).toBe("ex-val");
+            await db.delete("ex:counter");
+            expect(await db.incr("ex:counter")).toBe(1);
+            expect(await db.incr("ex:counter")).toBe(2);
+            expect(await db.expire("ex:key", 60)).toBe(1);
+            expect(await db.exists("ex:key")).toBe(1);
+            expect(await db.delete("ex:key", "ex:counter")).toBe(2);
+            db.close();
+        } catch (e) {
+            print("skip: no redis server on 127.0.0.1:6379");
+        }
+    });
+});
+
+summary();

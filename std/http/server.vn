@@ -1,9 +1,10 @@
 import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
 import { Url } from "std:net";
-import { JSON, Json } from "std:encoding";
+import { Json } from "std:encoding";
 import { spawn } from "std:task";
 
-import { HttpStatus, Headers, Request, HttpResponse, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+import { HttpStatus, Headers, Request, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+import { AsyncReader } from "std:io";
 
 export class HttpServer {
     private _port: int = 0;
@@ -78,15 +79,23 @@ export class HttpServer {
     }
 
     cors(origin: str = "*", methods: str = "GET,POST,PUT,DELETE,PATCH,OPTIONS", headers: str = "*"): HttpServer {
-        this.use(async (req: Request, res: HttpResponse, next: () => Task<void>): Task<void> => {
-            res.header("Access-Control-Allow-Origin", origin);
-            res.header("Access-Control-Allow-Methods", methods);
-            res.header("Access-Control-Allow-Headers", headers);
+        this.use(async (req: Request, next: () => Task<Response?>): Task<Response?> => {
             if (req.method.toUpperCase() === "OPTIONS") {
-                res.status(204).send("");
-                return;
+                let res = new Response("", 204);
+                res.headers.set("Access-Control-Allow-Origin", origin);
+                res.headers.set("Access-Control-Allow-Methods", methods);
+                res.headers.set("Access-Control-Allow-Headers", headers);
+                return res;
             }
-            await next();
+            let res = await next();
+            if (res !== null) {
+                let r = res as Response;
+                r.headers.set("Access-Control-Allow-Origin", origin);
+                r.headers.set("Access-Control-Allow-Methods", methods);
+                r.headers.set("Access-Control-Allow-Headers", headers);
+                return r;
+            }
+            return res;
         });
         return this;
     }
@@ -133,8 +142,41 @@ export class HttpServer {
     }
 
     private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
+        let stream = responseObj.bodyStream;
+        if (stream !== null) {
+            await this._sendChunked(connId, responseObj, stream as AsyncReader);
+            return;
+        }
         let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
-        await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body);
+        await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body, responseObj.cookies);
+    }
+
+    private async _sendChunked(connId: int, responseObj: Response, reader: AsyncReader): Task<void> {
+        let head = "HTTP/1.1 " + responseObj.status.toString() + " " + responseObj.statusText + "\r\n";
+        let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
+        for (let name in hdrs) {
+            head = head + name + ": " + hdrs[name] + "\r\n";
+        }
+        for (let c of responseObj.cookies) {
+            head = head + "Set-Cookie: " + c + "\r\n";
+        }
+        head = head + "Transfer-Encoding: chunked\r\n\r\n";
+        await tcpWrite$(connId, head);
+        let reading = true;
+        while (reading) {
+            let chunk = await reader.read(8192);
+            if (chunk === null) {
+                reading = false;
+            } else if (chunk.length === 0) {
+                reading = false;
+            } else {
+                let hexLen = chunk.length.toHex();
+                await tcpWrite$(connId, hexLen + "\r\n");
+                await tcpWrite$(connId, chunk);
+                await tcpWrite$(connId, "\r\n");
+            }
+        }
+        await tcpWrite$(connId, "0\r\n\r\n");
     }
 
     private async _handleConnection(connId: int): Task<void> {
@@ -145,7 +187,7 @@ export class HttpServer {
                 rawReq = await readHttpRequest(connId, this._maxContentLength);
             } catch (err) {
                 let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
-                await sendHttpResponse$(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large");
+                await sendHttpResponse$(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large", []);
                 keepAlive = false;
                 break;
             }
@@ -215,33 +257,35 @@ export class HttpServer {
                 reqObj.query = queryObj;
                 reqObj.params = matchedParams;
                 
-                let resObj = new HttpResponse(connId);
-
                 let self = this;
-                let runPipeline = async (idx: int): Task<void> => {
+                let runPipeline = async (idx: int): Task<Response?> => {
                     if (idx < self._middlewares.length) {
                         let mw = self._middlewares[idx];
-                        let next = async (): Task<void> => {
-                            await runPipeline(idx + 1);
+                        let next = async (): Task<Response?> => {
+                            return await runPipeline(idx + 1);
                         };
-                        await mw(reqObj, resObj, next);
+                        return await mw(reqObj, next);
                     } else if (matchedHandler !== null) {
-                        let result = await matchedHandler(reqObj, resObj);
-                        if (result !== null && typeof result === "object" && !resObj.isSent) {
-                            let finalResp = result as Response;
-                            if (finalResp.status !== null) {
-                                await self._sendWebResponse(connId, finalResp);
-                                resObj.isSent = true;
-                            }
+                        let result = await matchedHandler(reqObj);
+                        if (result !== null && typeof result === "object") {
+                            return result as Response;
                         }
+                        if (result !== null) {
+                            return error(500, "Handler must return a Response");
+                        }
+                        return null;
                     } else {
-                        let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
-                        await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found");
-                        resObj.isSent = true;
+                        return null;
                     }
                 };
 
-                await runPipeline(0);
+                let finalResp = await runPipeline(0);
+                if (finalResp !== null) {
+                    await self._sendWebResponse(connId, finalResp as Response);
+                } else {
+                    let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
+                    await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found", []);
+                }
             } else {
                 keepAlive = false;
             }
@@ -250,7 +294,7 @@ export class HttpServer {
     }
 }
 
-export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
+export function serve(handlerOrOptions?: dynamic, port: int = 3000): HttpServer {
     let server = new HttpServer();
     if (typeof handlerOrOptions === "function") {
         server.all("*", handlerOrOptions);
@@ -265,10 +309,4 @@ export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
         server.listen(targetPort);
     }
     return server;
-}
-
-
-
-export function server(fetchHandler?: dynamic): HttpServer {
-    return serve(fetchHandler);
 }

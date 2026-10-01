@@ -1,6 +1,6 @@
 import { Process } from "std:process";
 import { Compress } from "std:compress";
-import { CLI } from "std:cli";
+import { Cli } from "std:cli";
 import { Env } from "std:env";
 import { Path } from "std:path";
 import { describe, it, expect } from "std:test";
@@ -27,7 +27,7 @@ let inflated = Compress.inflate(deflated);
 // 3. CLI Argument Parser (std:cli)
 // ==========================================
 let sampleArgs = ["--port=9000", "--host=localhost", "-d", "serve", "api/v1"];
-let parsed = CLI.parse(sampleArgs);
+let parsed = Cli.parse(sampleArgs);
 
 // ==========================================
 // 4. Environment Variables (std:env)

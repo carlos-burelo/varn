@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
+mod scaffold;
+
 /// Benchmark definition mapping canonical benchmark names to runtime-specific source files.
 #[derive(Debug, Clone)]
 struct BenchDef {
@@ -243,6 +245,7 @@ fn parse_option(
 fn print_help() {
     println!(
         r#"cargo xtask compare — High-precision runtime benchmark comparison harness
+cargo xtask std-scaffold <mod> [--class Name] [--dry-run] — New stdlib module scaffold
 
 USAGE:
     cargo xtask compare [OPTIONS]
@@ -369,16 +372,21 @@ struct RowResult {
 
 /// Extracted comparable signature from raw output.
 fn get_result_signature(raw: &str) -> String {
-    let re_drop =
-        Regex::new(r"(?i)elapsed|took|\btime\b|(?:^|[^a-z])ms\b|_ms\b|\bms\s*[=:]|\bbytes\b")
-            .unwrap();
+    let re_timing = Regex::new(r"(?i)elapsed|took|\btime\b").unwrap();
+    let re_ms = Regex::new(r"(?i)[a-z_]*ms\s*=\s*-?[\d.]+\b").unwrap();
+    let re_bytes = Regex::new(r"(?i)bytes\s*[=:]\s*-?[\d.]+\b|-?[\d.]+\s*bytes\b").unwrap();
     let mut nums = Vec::new();
 
     for line in raw.lines() {
-        if re_drop.is_match(line) {
+        if re_timing.is_match(line) {
             continue;
         }
-        let bytes = line.as_bytes();
+        let no_ms = re_ms.replace_all(line, " ").to_string();
+        let cleaned = re_bytes.replace_all(&no_ms, " ").to_string();
+        if cleaned.trim().is_empty() {
+            continue;
+        }
+        let bytes = cleaned.as_bytes();
         let len = bytes.len();
         let mut i = 0;
         while i < len {
@@ -395,7 +403,7 @@ fn get_result_signature(raw: &str) -> String {
                 }
                 let followed_by_dot = i < len && bytes[i] == b'.';
                 if !preceded_by_dot && !followed_by_dot {
-                    nums.push(line[start..i].to_string());
+                    nums.push(cleaned[start..i].to_string());
                 } else {
                     while i < len && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
                         i += 1;
@@ -437,7 +445,6 @@ struct Term {
     no_color: bool,
 }
 
-#[allow(dead_code)]
 impl Term {
     fn new(no_color: bool) -> Self {
         Self { no_color }
@@ -457,14 +464,8 @@ impl Term {
     fn bold_cyan(&self, s: &str) -> String {
         self.color("1;36", s)
     }
-    fn green(&self, s: &str) -> String {
-        self.color("32", s)
-    }
     fn bold_green(&self, s: &str) -> String {
         self.color("1;32", s)
-    }
-    fn red(&self, s: &str) -> String {
-        self.color("31", s)
     }
     fn bold_red(&self, s: &str) -> String {
         self.color("1;31", s)
@@ -524,6 +525,14 @@ struct JsonBenchRow {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw.first().is_some_and(|c| c == "std-scaffold") {
+        if let Err(e) = scaffold::run(&raw[1..]) {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     let opts = match parse_args() {
         Ok(o) => o,
         Err(e) => {
@@ -777,7 +786,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => Some(bench.ts),
             };
             if let Some(r) = rel {
-                let full = bench_dir.join(r);
+                let full = match rt.name.as_str() {
+                    "varn" | "varn-base" => bench_dir.join("vn").join(r),
+                    "python" => bench_dir.join(r),
+                    _ => bench_dir.join("ts").join(r),
+                };
                 if full.is_file() {
                     bench_files.insert(rt.name.clone(), full);
                 }
@@ -788,6 +801,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .filter(|r| bench_files.contains_key(&r.name))
             .collect();
+
+        if present_rts.is_empty() {
+            results.push(RowResult {
+                bench_name: bench.name.to_string(),
+                output_ok: false,
+                outputs_by_rt: HashMap::new(),
+                total_stats: HashMap::new(),
+                work_stats: HashMap::new(),
+                best_rival: None,
+                rival_work: None,
+                work_ratio: None,
+                resolved: false,
+            });
+            continue;
+        }
 
         let mut samples: HashMap<String, Vec<f64>> = HashMap::new();
         let mut last_outputs: HashMap<String, String> = HashMap::new();
@@ -811,14 +839,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let mut unique_sigs = std::collections::HashSet::new();
+        let mut empty_sig_rt = Vec::new();
         for rt in &present_rts {
             if let Some(sig) = last_sigs.get(&rt.name) {
                 if !sig.is_empty() {
                     unique_sigs.insert(sig.clone());
+                } else {
+                    empty_sig_rt.push(rt.name.clone());
                 }
             }
         }
-        let output_ok = unique_sigs.len() <= 1;
+        let output_ok = unique_sigs.len() <= 1 && empty_sig_rt.is_empty();
 
         let mut total_stats = HashMap::new();
         let mut work_stats = HashMap::new();
@@ -850,17 +881,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let varn_work = work_stats.get("varn").map(|w| w.median);
         let work_ratio = match (varn_work, best_rival_work) {
-            (Some(vw), Some(rw)) if vw > 0.0 => Some(round2(rw / vw)),
+            (Some(vw), Some(rw)) if vw >= 0.05 && rw >= 0.05 => Some(round2(rw / vw)),
             _ => None,
         };
 
         let resolved = if let (Some(rw_name), Some(_rw)) = (&best_rival, best_rival_work) {
-            let varn_w = &work_stats["varn"];
-            let rival_w = &work_stats[rw_name];
-            let non_overlapping = (varn_w.max < rival_w.min) || (rival_w.max < varn_w.min);
-            let significant_diff =
-                (varn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.08;
-            non_overlapping || significant_diff
+            match (work_stats.get("varn"), work_stats.get(rw_name)) {
+                (Some(varn_w), Some(rival_w)) => {
+                    let non_overlapping = (varn_w.max < rival_w.min) || (rival_w.max < varn_w.min);
+                    let significant_diff =
+                        (varn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.05;
+                    non_overlapping || significant_diff
+                }
+                _ => false,
+            }
         } else {
             false
         };

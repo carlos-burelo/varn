@@ -22,6 +22,10 @@ export function exit(code?: int): void {
     exit$(code);
 }
 
+export function now(): float {
+    return now$();
+}
+
 export type SystemInfoRecord = { platform: str, cwd: str, args: str[], now: float };
 
 export function getSystemInfo(): SystemInfoRecord {

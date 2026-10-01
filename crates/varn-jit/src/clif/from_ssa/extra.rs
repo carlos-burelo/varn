@@ -48,7 +48,7 @@ pub(super) fn try_emit(
             let ni = super::props::str_idx(ctx, name)? as i64;
             let niv = b.ins().iconst(types::I64, ni);
             call_helper_void(b, ctx.cc, h.load_global_by_name, &[ectx, f.closure, niv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::StoreGlobal { name, value } => {
             let f = frame()?;
@@ -63,7 +63,7 @@ pub(super) fn try_emit(
                 h.store_global_by_name,
                 &[ectx, f.closure, niv, t, p],
             );
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::BuildTuple { elements } => {
             let vals: Vec<Value> = elements
@@ -71,17 +71,17 @@ pub(super) fn try_emit(
                 .map(|v| boxed_value(b, ctx, values, *v))
                 .collect::<Result<_, _>>()?;
             let r = window_result(b, ctx, h.build_array_window, &vals);
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::BuildArraySpread { elements } => {
             frame()?;
             let r = emit_array_spread(b, ctx, values, elements)?;
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::BuildObjectSpread { parts, cs_base } => {
             frame()?;
             let r = emit_object_spread(b, ctx, values, parts, *cs_base)?;
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::ObjectMerge { target, source } => {
             let a = boxed_value(b, ctx, values, *target)?;
@@ -91,7 +91,7 @@ pub(super) fn try_emit(
             call_helper_void(b, ctx.cc, h.object_merge, &[ectx, at, ap, ct, cp]);
             let r = native(b);
             def_heap(b, ctx, ctx.ssa.reg(*target), r)?;
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::ObjectRest { object, skip_keys } => {
             let o = boxed_value(b, ctx, values, *object)?;
@@ -107,7 +107,7 @@ pub(super) fn try_emit(
             }
             let (addr, n) = stage(b, ctx, &keys);
             call_helper_void(b, ctx.cc, h.object_rest_window, &[ectx, ot, op_, addr, n]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::GetPropertyMaybe { object, name } => {
             let o = boxed_value(b, ctx, values, *object)?;
@@ -116,13 +116,13 @@ pub(super) fn try_emit(
                 .ins()
                 .iconst(types::I64, super::props::str_idx(ctx, name)? as i64);
             call_helper_void(b, ctx.cc, h.get_property_maybe, &[ectx, ot, op_, niv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::AssertNotNull { operand } => {
             let v = boxed_value(b, ctx, values, *operand)?;
             let (t, p) = b.ins().isplit(v);
             call_helper_void(b, ctx.cc, h.assert_not_null, &[ectx, t, p]);
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::BindMethod { object, name } => {
             let o = boxed_value(b, ctx, values, *object)?;
@@ -131,7 +131,7 @@ pub(super) fn try_emit(
                 .ins()
                 .iconst(types::I64, super::props::str_idx(ctx, name)? as i64);
             call_helper_void(b, ctx.cc, h.bind_method, &[ectx, ot, op_, niv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::ArrayExtend { array, source } => {
             let a = boxed_value(b, ctx, values, *array)?;
@@ -139,13 +139,13 @@ pub(super) fn try_emit(
             let (at, ap) = b.ins().isplit(a);
             let (st, sp) = b.ins().isplit(s);
             call_helper_void(b, ctx.cc, h.array_extend, &[ectx, at, ap, st, sp]);
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::WrapSpread { operand } => {
             let v = boxed_value(b, ctx, values, *operand)?;
             let (t, p) = b.ins().isplit(v);
             call_helper_void(b, ctx.cc, h.wrap_spread, &[ectx, t, p]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::Range {
             start,
@@ -158,7 +158,7 @@ pub(super) fn try_emit(
             let (ct, cp) = b.ins().isplit(c);
             let f = b.ins().iconst(types::I64, i64::from(*inclusive));
             call_helper_void(b, ctx.cc, h.range, &[ectx, at, ap, ct, cp, f]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::GetSymbol { object, is_async } => {
             let o = boxed_value(b, ctx, values, *object)?;
@@ -179,7 +179,7 @@ pub(super) fn try_emit(
                 .ok_or("from_ssa: iterator symbol not in pool")? as i64;
             let siv = b.ins().iconst(types::I64, idx);
             call_helper_void(b, ctx.cc, h.get_symbol, &[ectx, ot, op_, siv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::IterCall { callee, recv } => {
             frame()?;
@@ -187,13 +187,13 @@ pub(super) fn try_emit(
             let (ct, cp) = b.ins().isplit(c);
             let w = super::call::boxed_window(b, ctx, values, c, &[*recv])?;
             let r = super::call::emit_invoke(b, ctx, w, (ct, cp), 2);
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::SuperCall { args } => {
             frame()?;
             let ctor = super::classops::emit_get_super(b, ctx, "constructor")?;
             let r = emit_super_call(b, ctx, values, ctor, args)?;
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::SuperMethodCall { name, args } => {
             frame()?;
@@ -205,7 +205,7 @@ pub(super) fn try_emit(
             let w = stage_value(b, ctx, m, &vals);
             let (mt, mp) = b.ins().isplit(m);
             let r = super::call::emit_invoke(b, ctx, w, (mt, mp), vals.len() + 1);
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::ExtensionCall {
             func,
@@ -230,7 +230,7 @@ pub(super) fn try_emit(
             let w = super::call::boxed_window(b, ctx, values, callee, &full)?;
             let (ct, cp) = b.ins().isplit(callee);
             let r = super::call::emit_invoke(b, ctx, w, (ct, cp), full.len() + 1);
-            return Ok(Some(Some(Out::Boxed(r))));
+            Ok(Some(Some(Out::Boxed(r))))
         }
         SsaOp::CallSpread { callee, args } => {
             let c = load_value(b, ctx, values, *callee)?;
@@ -254,7 +254,7 @@ pub(super) fn try_emit(
                 h.jit_call_spread_window,
                 &[ectx, ct, cp, addr, argc],
             );
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::LoadModule { source, own_ip } => {
             let f = frame()?;
@@ -263,21 +263,21 @@ pub(super) fn try_emit(
             let siv = b.ins().iconst(types::I64, idx);
             let oiv = b.ins().iconst(types::I64, i64::from(*own_ip));
             call_helper_void(b, ctx.cc, h.load_module, &[ectx, f.closure, siv, oiv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::ModuleSlot { object, slot } => {
             let o = boxed_value(b, ctx, values, *object)?;
             let (ot, op_) = b.ins().isplit(o);
             let siv = b.ins().iconst(types::I64, i64::from(*slot));
             call_helper_void(b, ctx.cc, h.load_module_slot, &[ectx, ot, op_, siv]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::StoreModuleSlot { slot, value } => {
             let v = boxed_value(b, ctx, values, *value)?;
             let (t, p) = b.ins().isplit(v);
             let siv = b.ins().iconst(types::I64, i64::from(*slot));
             call_helper_void(b, ctx.cc, h.store_module_slot, &[ectx, siv, t, p]);
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::Await { operand, resume_ip } => {
             let d = dest.ok_or("from_ssa: await without dest")?;
@@ -291,13 +291,13 @@ pub(super) fn try_emit(
             // mid-block instruction — later instructions still need a home.
             // The block's own terminator closes it, as with any helper call.
             call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::Spawn { operand } => {
             let v = boxed_value(b, ctx, values, *operand)?;
             let (t, p) = b.ins().isplit(v);
             call_helper_void(b, ctx.cc, h.spawn, &[ectx, t, p]);
-            return Ok(Some(Some(Out::Boxed(native(b)))));
+            Ok(Some(Some(Out::Boxed(native(b)))))
         }
         SsaOp::Yield { operand, resume_ip } => {
             let d = dest.ok_or("from_ssa: yield without dest")?;
@@ -309,7 +309,7 @@ pub(super) fn try_emit(
             // No trap, as for `Await` above: a mid-block instruction must
             // leave the block open for its terminator.
             call_helper_void(b, ctx.cc, h.yield_helper, &[ectx, t, p, dv, rv]);
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         SsaOp::Dispose { var, is_await, cs } => {
             frame()?;
@@ -331,7 +331,7 @@ pub(super) fn try_emit(
                 h.jit_call_method_window,
                 &[ectx, niv, csv, w, total],
             );
-            return Ok(Some(None));
+            Ok(Some(None))
         }
         _ => Ok(None),
     }

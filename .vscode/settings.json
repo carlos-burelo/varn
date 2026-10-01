@@ -11,5 +11,5 @@
     "editor.semanticHighlighting.enabled": true,
     "editor.inlayHints.enabled": "off"
   },
-  "Varn.inlayHints.enabled": false
+  "Varn.inlayHints.enabled": false,
 }

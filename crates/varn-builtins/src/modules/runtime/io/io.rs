@@ -29,7 +29,7 @@ varn_contract! {
 
         fn flush(_ctx: &mut dyn NativeCtx) -> Result<(), String> {
             if !crate::modules::globals::is_print_silent() {
-                std::io::stdout().flush().map_err(|e| format!("io.flush: {e}"))?;
+                std::io::stdout().flush().map_err(|e| format!("E_IO_FLUSH|io.flush: {e}"))?;
             }
             Ok(())
         }
@@ -44,7 +44,7 @@ varn_contract! {
             let mut line = String::new();
             std::io::stdin()
                 .read_line(&mut line)
-                .map_err(|e| format!("io.read_line: {e}"))?;
+                .map_err(|e| format!("E_IO_READ|io.read_line: {e}"))?;
             Ok(line.trim_end_matches(['\r', '\n']).to_string())
         }
     }
@@ -60,6 +60,6 @@ pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, S
     let mut line = String::new();
     std::io::stdin()
         .read_line(&mut line)
-        .map_err(|e| format!("io.read_line: {e}"))?;
+        .map_err(|e| format!("E_IO_READ|io.read_line: {e}"))?;
     Ok(ctx.alloc_str_owned(line.trim_end_matches(['\r', '\n']).to_string()))
 }

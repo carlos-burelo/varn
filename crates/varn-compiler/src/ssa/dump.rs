@@ -418,8 +418,6 @@ fn binop(op: HirBinOp) -> &'static str {
         HirBinOp::Le => "le",
         HirBinOp::Gt => "gt",
         HirBinOp::Ge => "ge",
-        HirBinOp::And => "and",
-        HirBinOp::Or => "or",
         HirBinOp::BitAnd => "band",
         HirBinOp::BitOr => "bor",
         HirBinOp::BitXor => "bxor",

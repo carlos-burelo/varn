@@ -1,0 +1,59 @@
+const B32_ALPHABET: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function b32Val(ch: str): int {
+    let code = ch.charCodeAt(0);
+    if (code >= 65 && code <= 90) {
+        return code - 65;
+    }
+    if (code >= 50 && code <= 55) {
+        return code - 50 + 26;
+    }
+    return -1;
+}
+
+export namespace Base32 {
+    export function encode(data: Bytes): str {
+        let out = "";
+        let i = 0;
+        while (i < data.length) {
+            let b0 = data.getByte(i);
+            let b1 = i + 1 < data.length ? data.getByte(i + 1) : 0;
+            let b2 = i + 2 < data.length ? data.getByte(i + 2) : 0;
+            let b3 = i + 3 < data.length ? data.getByte(i + 3) : 0;
+            let b4 = i + 4 < data.length ? data.getByte(i + 4) : 0;
+            let remain = data.length - i;
+            out = out + B32_ALPHABET[b0 >> 3];
+            out = out + B32_ALPHABET[((b0 & 7) << 2) | (b1 >> 6)];
+            out = out + (remain > 1 ? B32_ALPHABET[((b1 & 63) >> 1)] : "=");
+            out = out + (remain > 1 ? B32_ALPHABET[((b1 & 1) << 4) | (b2 >> 4)] : "=");
+            out = out + (remain > 2 ? B32_ALPHABET[((b2 & 15) << 1) | (b3 >> 7)] : "=");
+            out = out + (remain > 3 ? B32_ALPHABET[((b3 & 127) >> 2)] : "=");
+            out = out + (remain > 3 ? B32_ALPHABET[((b3 & 3) << 3) | (b4 >> 5)] : "=");
+            out = out + (remain > 4 ? B32_ALPHABET[b4 & 31] : "=");
+            i = i + 5;
+        }
+        return out;
+    }
+
+    export function decode(text: str): Bytes {
+        let clean = text.replaceAll("=", "").toUpperCase();
+        let out = Bytes.alloc((clean.length * 5) >> 3);
+        let pos = 0;
+        let acc = 0;
+        let bits = 0;
+        for (let i = 0; i < clean.length; i = i + 1) {
+            let v = b32Val(clean[i]);
+            if (v < 0) {
+                continue;
+            }
+            acc = (acc << 5) | v;
+            bits = bits + 5;
+            if (bits >= 8) {
+                bits = bits - 8;
+                out.setByte(pos, (acc >> bits) & 255);
+                pos = pos + 1;
+            }
+        }
+        return out.slice(0, pos);
+    }
+}

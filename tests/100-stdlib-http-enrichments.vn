@@ -1,4 +1,4 @@
-import { HttpServer, Request, HttpResponse, Response, json, HttpStatus } from "std:http";
+import { HttpServer, Request, Response, json, HttpStatus } from "std:http";
 import { describe, it, expect } from "std:test";
 
 
@@ -35,17 +35,19 @@ await describe("100 stdlib http enrichments", async () => {
         expect(parsedJson.version).toBe(1);
         expect(parsedForm["user"]).toBe("alice");
         expect(parsedForm["action"]).toBe("login");
-        server.use(async (req: Request, res: HttpResponse, next: () => Task<void>) => {
+        server.use(async (req: Request, next: () => Task<Response?>) => {
         middlewareLog.push("mw1_before");
-        await next();
+        let res = await next();
         middlewareLog.push("mw1_after");
+        return res;
         });
-        server.use(async (req: Request, res: HttpResponse, next: () => Task<void>) => {
+        server.use(async (req: Request, next: () => Task<Response?>) => {
         middlewareLog.push("mw2_before");
-        await next();
+        let res = await next();
         middlewareLog.push("mw2_after");
+        return res;
         });
-        server.get("/test", (req: Request, res: HttpResponse) => {
+        server.get("/test", (req: Request) => {
         middlewareLog.push("handler");
         return json({ ok: true });
         });

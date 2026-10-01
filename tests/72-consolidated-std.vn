@@ -1,7 +1,7 @@
 import { DateTime, formatDurationMs } from "std:time";
-import { parseDotEnv } from "std:sys";
-import { parseArgs } from "std:cli";
-import { uuidV4, isValidUuid } from "std:crypto";
+import { Env } from "std:env";
+import { Cli } from "std:cli";
+import { Uuid } from "std:crypto";
 import { describe, it, expect } from "std:test";
 
 await describe("Consolidated StdLib Enrichments", () => {
@@ -17,21 +17,21 @@ await describe("Consolidated StdLib Enrichments", () => {
         expect(formatDurationMs(125000)).toBe("2m 5s");
     });
 
-    await it("std:sys parseDotEnv and parseArgs", () => {
-        const dotenv = parseDotEnv("PORT=8080\nDB_HOST='localhost'\n# comment");
+    await it("std:env parse and std:cli Cli.parse", () => {
+        const dotenv = Env.parse("PORT=8080\nDB_HOST='localhost'\n# comment");
         expect(dotenv["PORT"]).toBe("8080");
         expect(dotenv["DB_HOST"]).toBe("localhost");
 
-        const parsed = parseArgs(["--port=3000", "-v", "server.vn"]);
+        const parsed = Cli.parse(["--port=3000", "-v", "server.vn"]);
         expect(parsed.flags["port"]).toBe("3000");
         expect(parsed.flags["v"]).toBe("true");
         expect(parsed.positionals.length).toBe(1);
         expect(parsed.positionals[0]).toBe("server.vn");
     });
 
-    await it("std:crypto uuidV4 and isValidUuid", () => {
-        const id = uuidV4();
-        expect(isValidUuid(id)).toBeTruthy();
+    await it("std:crypto Uuid.v4 and Uuid.isValid", () => {
+        const id = Uuid.v4();
+        expect(Uuid.isValid(id)).toBeTruthy();
         expect(id.length).toBe(36);
     });
 });

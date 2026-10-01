@@ -1,6 +1,7 @@
 
-=== TIR CHECK: <fixtures>/closure.vn ===
+  [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/closure.vn[0m
 nodes 46   static 19   by name 6   static 76%
   unannotated        dynamic    18   by name     6
-  from_tir(ssa): OK (5 ssa fn(s))
-  from_tir(proto): OK
+  info from_tir(ssa): OK (5 ssa fn(s))
+  info from_tir(proto): OK
+  [2m── end: tir check ──[0m

@@ -1,6 +1,5 @@
 
-export { ParsedArgs, CLI, parseArgs } from "std:cli/args";
+export { ParsedArgs, Cli } from "std:cli/args";
 export { Color } from "std:cli/color";
 export { Table } from "std:cli/table";
-export { Prompt, prompt, confirm, password } from "std:cli/prompt";
-
+export { Prompt } from "std:cli/prompt";

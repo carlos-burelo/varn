@@ -6,7 +6,7 @@ export interface CsvOptions {
     trim?: bool;
 }
 
-export namespace CSV {
+export namespace Csv {
     export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {
         let delim = ",";
         let hasHeader = true;

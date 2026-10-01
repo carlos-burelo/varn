@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 use varn_checker::module_resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
-use std::io::Write as IoWrite;
 use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
@@ -248,7 +247,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         proto: Rc::new(optimized_proto),
     };
 
-    const PROG_BAR: usize = 32;
+    varn_core::term::log(format!("  running {runs} runs..."));
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup_progress(
         runs,
         || {
@@ -256,31 +255,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             factory.build()
         },
         |machine| run_vm_to_completion(machine, factory.closure()),
-        |done, samples| {
-            let filled = (done * PROG_BAR / runs.max(1)).min(PROG_BAR);
-            let bar = format!(
-                "\x1b[36m{}\x1b[2m{}\x1b[0m",
-                "█".repeat(filled),
-                "░".repeat(PROG_BAR - filled)
-            );
-            let mut sorted = samples.to_vec();
-            sorted.sort();
-            let p50_ns = sorted[sorted.len() / 2].as_nanos();
-            let p50_str = if p50_ns < 1_000 {
-                format!("{p50_ns}ns")
-            } else if p50_ns < 1_000_000 {
-                format!("{}µs", p50_ns / 1_000)
-            } else {
-                format!("{:.1}ms", p50_ns as f64 / 1_000_000.0)
-            };
-            print!(
-                "\r  \x1b[2mexecute\x1b[0m  [{bar}]  {done}/{runs}  \x1b[2mp50 {p50_str}\x1b[0m  "
-            );
-            let _ = std::io::stdout().flush();
-        },
+        |_done, _samples| {},
     )?;
-    print!("\r\x1b[2K");
-    let _ = std::io::stdout().flush();
 
     let e2e_samples = time_n(runs, || {
         let source = match eval {
@@ -372,12 +348,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         total_p50,
         split: execute.and_then(|e| ExecSplit::from_single_run(e.p50, &exec_jit)),
         jit: Some(&exec_jit),
-        coverage_scope: "programa completo",
         top_blocker: top_blocker(&records),
         tiered_during_window,
         cpu: cpu_freq,
         phases: Some(&phases),
-        e2e_samples: Some(&e2e_samples),
     }
     .print();
 

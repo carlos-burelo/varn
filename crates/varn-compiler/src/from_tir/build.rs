@@ -8,7 +8,6 @@
 
 //! (`emit_effect` and other core helpers are unused until the lowering below
 //! grows to cover calls, field stores and closures.)
-#![allow(dead_code)]
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -74,10 +73,6 @@ struct Builder<'m> {
 }
 
 impl<'m> Builder<'m> {
-    fn new(tir: &'m TirModule) -> Self {
-        Self::with_pinned(tir, FxHashSet::default())
-    }
-
     fn with_pinned(tir: &'m TirModule, pinned: FxHashSet<VarId>) -> Self {
         let mut b = Builder {
             tir,
@@ -975,6 +970,23 @@ impl<'m> Builder<'m> {
             }
             TirExprKind::MethodCall { recv, name, args } => {
                 let r = self.lower_expr(recv)?;
+                // Spread method call keeps the generic spread call: bind the
+                // method value, then `CallSpread` (which lowers spread args).
+                // Mirrors the `New` fallback above; the bound value carries
+                // the receiver, so `this` keeps working.
+                if args
+                    .iter()
+                    .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+                {
+                    let bound = self.emit(
+                        InstKind::GetProperty {
+                            object: r,
+                            name: name.clone(),
+                        },
+                        HirType::Ref,
+                    );
+                    return self.lower_call(bound, args, ty);
+                }
                 let argv = self.lower_args(args)?;
                 // A core-type method the checker resolved to a stable op-id:
                 // dispatch it directly, no name lookup, no inline cache.
@@ -2165,8 +2177,6 @@ fn build_inner(
         entry,
         blocks: b.blocks,
         values: b.values,
-        pinned_vars: pinned,
-        nlocals: func.locals.len() as u32,
         is_async: func.is_async,
         is_generator: func.is_generator,
     })

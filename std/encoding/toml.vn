@@ -106,7 +106,7 @@ function formatTomlValue(val: dynamic): str {
     return "\"" + val + "\"";
 }
 
-export namespace TOML {
+export namespace Toml {
     export function parse(content: str): { [key: str]: dynamic } {
         let root: { [key: str]: dynamic } = {};
         let currentSection = root;
@@ -175,13 +175,5 @@ export namespace TOML {
 
         return lines.join("\n");
     }
-}
-
-export function parseToml(content: str): { [key: str]: dynamic } {
-    return TOML.parse(content);
-}
-
-export function stringifyToml(value: { [key: str]: dynamic }): str {
-    return TOML.stringify(value);
 }
 

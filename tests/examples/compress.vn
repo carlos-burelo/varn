@@ -1,0 +1,49 @@
+import { describe, it, expect, summary } from "std:test";
+import { Compress, Tar, Zip } from "std:compress";
+import { writeText, mkdirAll, removeAll, readText, exists } from "std:fs";
+import { join } from "std:path";
+import { tempDir } from "std:fs";
+
+function clean(path: str): void {
+    if (exists(path)) {
+        removeAll(path);
+    }
+}
+
+await describe("example std:compress", async () => {
+    await it("gzip roundtrip", () => {
+        let gz = Compress.gzip("hello varn");
+        expect(Compress.gunzip(gz).toString()).toBe("hello varn");
+    });
+
+    await it("deflate roundtrip", () => {
+        let raw = Compress.deflate("payload-123");
+        expect(Compress.inflate(raw).toString()).toBe("payload-123");
+    });
+
+    await it("tar packs and unpacks a directory", () => {
+        let base = join(tempDir(), "ex-compress-tar");
+        clean(base);
+        mkdirAll(join(base, "data"));
+        mkdirAll(join(base, "out"));
+        writeText(join(base, "data", "a.txt"), "tar-content");
+        expect(Tar.create(join(base, "data"), join(base, "a.tar"))).toBe(true);
+        expect(Tar.extract(join(base, "a.tar"), join(base, "out"))).toBe(true);
+        expect(readText(join(base, "out", "a.txt"))).toBe("tar-content");
+        clean(base);
+    });
+
+    await it("zip packs and unpacks a directory", () => {
+        let base = join(tempDir(), "ex-compress-zip");
+        clean(base);
+        mkdirAll(join(base, "data"));
+        mkdirAll(join(base, "out"));
+        writeText(join(base, "data", "b.txt"), "zip-content");
+        expect(Zip.create(join(base, "data"), join(base, "b.zip"))).toBe(true);
+        expect(Zip.extract(join(base, "b.zip"), join(base, "out"))).toBe(true);
+        expect(readText(join(base, "out", "b.txt"))).toBe("zip-content");
+        clean(base);
+    });
+});
+
+summary();

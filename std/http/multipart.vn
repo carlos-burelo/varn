@@ -1,0 +1,87 @@
+export type FormPart = {
+    name: str,
+    filename: str?,
+    contentType?: str,
+    headers: { [key: str]: str },
+    body: str
+};
+
+function parsePartHeaders(block: str): { [key: str]: str } {
+    let out: { [key: str]: str } = {};
+    let lines = block.split("\r\n");
+    for (let line of lines) {
+        let colon = line.indexOf(":");
+        if (colon > 0) {
+            out[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+        }
+    }
+    return out;
+}
+
+function partField(headers: { [key: str]: str }, attr: str): str? {
+    let disp = headers["content-disposition"];
+    if (disp === null) {
+        return null;
+    }
+    let needle = attr + "=\"";
+    let idx = disp.indexOf(needle);
+    if (idx < 0) {
+        return null;
+    }
+    let rest = disp.slice(idx + needle.length);
+    let end = rest.indexOf("\"");
+    if (end < 0) {
+        return null;
+    }
+    return rest.slice(0, end);
+}
+
+export namespace Multipart {
+    export function parse(body: str, boundary: str): FormPart[] {
+        let parts: FormPart[] = [];
+        let sep = "--" + boundary;
+        let raw = body.split(sep);
+        for (let i = 1; i < raw.length; i = i + 1) {
+            let chunk = raw[i];
+            if (chunk.startsWith("--")) {
+                continue;
+            }
+            if (chunk.startsWith("\r\n")) {
+                chunk = chunk.slice(2);
+            }
+            if (chunk.endsWith("\r\n")) {
+                chunk = chunk.slice(0, chunk.length - 2);
+            }
+            let headEnd = chunk.indexOf("\r\n\r\n");
+            if (headEnd < 0) {
+                continue;
+            }
+            let headers = parsePartHeaders(chunk.slice(0, headEnd));
+            let content = chunk.slice(headEnd + 4);
+            parts.push(#{
+                name: partField(headers, "name") ?? "",
+                filename: partField(headers, "filename"),
+                contentType: headers["content-type"],
+                headers: headers,
+                body: content
+            });
+        }
+        return parts;
+    }
+
+    export function boundaryOf(contentType: str): str? {
+        let idx = contentType.indexOf("boundary=");
+        if (idx < 0) {
+            return null;
+        }
+        let rest = contentType.slice(idx + 9).trim();
+        if (rest.startsWith("\"") && rest.endsWith("\"") && rest.length >= 2) {
+            return rest.slice(1, rest.length - 1);
+        }
+        let semi = rest.indexOf(";");
+        if (semi >= 0) {
+            return rest.slice(0, semi).trim();
+        }
+        return rest;
+    }
+}

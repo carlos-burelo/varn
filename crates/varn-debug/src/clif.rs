@@ -10,25 +10,28 @@ use varn_types::{FunctionProto, PoolEntry};
 use crate::flags::DebugFlags;
 use crate::walk::constants_for_inspect;
 
-use varn_core::term::colors::{BLUE, BOLD, DIM, GREEN, R, RED};
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
+use varn_core::term::terminal::Section;
 
 /// Entry point: render the clif views for `proto` and every nested proto.
 pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelpers) {
-    eprintln!(
-        "\n{BOLD}{BLUE}CLIF{R}{DIM} ─────────────────────────────── {}{R}",
-        proto.name.as_deref().unwrap_or("<top-level>")
-    );
+    Section::new("clif")
+        .subtitle(proto.name.as_deref().unwrap_or("<top-level>"))
+        .color(|c| c.blue())
+        .print();
     let isa = match varn_jit::clif::shared_isa() {
         Ok(isa) => isa,
         Err(e) => {
-            eprintln!("  {RED}error{R} host ISA unavailable: {e}");
+            terminal::error(format!("host ISA unavailable: {e}"));
+            Section::new("clif").close();
             return;
         }
     };
     // Same shape production lowers — see `crate::resolved_copy`.
     let resolved = crate::resolved_copy(proto);
     render_recursive(&resolved, flags, helpers, isa);
-    eprintln!("{DIM}── end: CLIF ──{R}");
+    Section::new("clif").close();
 }
 
 fn render_recursive(
@@ -67,8 +70,8 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
         && !(flags.clif_route || flags.clif_kinds || flags.clif_ir || flags.clif_asm);
     if check_only {
         if let Err(reason) = &insp.route {
-            eprintln!("\n  {BOLD}{}{R}", insp.name);
-            eprintln!("    {RED}BAIL{R}  {reason}");
+            terminal::log(format!("  {}", chalk(&insp.name).bold()));
+            terminal::error(format!("BAIL  {reason}"));
         }
         return;
     }
@@ -78,36 +81,42 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
     } else {
         ""
     };
-    eprintln!("\n  {BOLD}{}{R}{DIM}{fa}{R}", insp.name);
+    terminal::log(format!(
+        "  {}{}",
+        chalk(&insp.name).bold(),
+        chalk(fa).dim()
+    ));
 
     if flags.clif_check {
         match &insp.route {
-            Ok(()) => eprintln!("    {GREEN}route ok{R}"),
-            Err(reason) => eprintln!("    {RED}BAIL{R}  {reason}"),
+            Ok(()) => terminal::info("route ok"),
+            Err(reason) => terminal::error(format!("BAIL  {reason}")),
         }
     }
 
     if flags.clif_route {
         match &insp.route {
-            Ok(()) => eprintln!("    {GREEN}ROUTE{R}"),
-            Err(reason) => eprintln!("    {RED}BAIL{R}  {reason}"),
+            Ok(()) => terminal::info("ROUTE"),
+            Err(reason) => terminal::error(format!("BAIL  {reason}")),
         }
     }
 
     if flags.clif_kinds {
         if let Some(k) = &insp.kinds {
-            eprintln!("    {DIM}kinds ({} regs):{R}", k.nregs);
+            terminal::log(format!("    {}", chalk(format!("kinds ({} regs):", k.nregs)).dim()));
+            let mut table = terminal::Table::new(["block", "kinds"]);
             for (start, ks) in &k.blocks {
-                eprintln!("      block@{start}: [{}]", ks.join(", "));
+                table.row([format!("block@{start}"), ks.join(", ")]);
             }
+            table.print();
         }
     }
 
     if flags.clif_ir {
         if let Some(ir) = &insp.clif_ir {
-            eprintln!("    {DIM}clif ir:{R}");
+            terminal::log(format!("    {}", chalk("clif ir:").dim()));
             for line in ir.lines() {
-                eprintln!("      {line}");
+                terminal::log(format!("      {line}"));
             }
         }
     }
@@ -121,16 +130,25 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
             let n = code.bytes.len();
             let raw_end = (code.raw_off + code.raw_len).min(n);
             let entry = code.entry_off.min(n);
-            eprintln!("    {DIM}machine code raw@{}:{R}", code.raw_off);
-            eprint!(
-                "{}",
-                disasm(
-                    &code.bytes[code.raw_off.min(n)..raw_end],
-                    code.raw_off as u64
-                )
-            );
-            eprintln!("    {DIM}machine code wrapper@{}:{R}", code.entry_off);
-            eprint!("{}", disasm(&code.bytes[entry..], entry as u64));
+            terminal::log(format!(
+                "    {}",
+                chalk(format!("machine code raw@{}:", code.raw_off)).dim()
+            ));
+            for line in disasm(
+                &code.bytes[code.raw_off.min(n)..raw_end],
+                code.raw_off as u64,
+            )
+            .lines()
+            {
+                terminal::log(line.to_string());
+            }
+            terminal::log(format!(
+                "    {}",
+                chalk(format!("machine code wrapper@{}:", code.entry_off)).dim()
+            ));
+            for line in disasm(&code.bytes[entry..], entry as u64).lines() {
+                terminal::log(line.to_string());
+            }
         }
     }
 }

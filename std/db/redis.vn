@@ -1,0 +1,158 @@
+import { TcpStream } from "std:net/socket";
+
+export type RedisValue = str | int | null | RedisValue[];
+
+function encodeCommand(args: str[]): Bytes {
+    let out = "*" + args.length.toString() + "\r\n";
+    for (let arg of args) {
+        out = out + "$" + arg.length.toString() + "\r\n" + arg + "\r\n";
+    }
+    return Bytes.fromString(out);
+}
+
+export class Redis {
+    private _stream: TcpStream;
+    private _buf: Bytes = Bytes.alloc(0);
+
+    constructor(stream: TcpStream) {
+        this._stream = stream;
+    }
+
+    static async connect(host: str = "127.0.0.1", port: int = 6379): Task<Redis> {
+        let stream = await TcpStream.connect(host, port);
+        return new Redis(stream);
+    }
+
+    private async _fill(): Task<void> {
+        let chunk = await this._stream.read(4096);
+        if (chunk === null) {
+            throw new Error("Redis: connection closed");
+        }
+        let bytes = chunk as Bytes;
+        if (bytes.length === 0) {
+            throw new Error("Redis: connection closed");
+        }
+        let next = Bytes.alloc(this._buf.length + bytes.length);
+        this._buf.copy(next, 0, 0, this._buf.length);
+        bytes.copy(next, this._buf.length, 0, bytes.length);
+        this._buf = next;
+    }
+
+    private async _takeLine(): Task<str> {
+        while (true) {
+            for (let i = 0; i + 1 < this._buf.length; i = i + 1) {
+                if (this._buf.getByte(i) === 13 && this._buf.getByte(i + 1) === 10) {
+                    let line = this._buf.slice(0, i).toString();
+                    this._buf = this._buf.slice(i + 2, this._buf.length);
+                    return line;
+                }
+            }
+            await this._fill();
+        }
+    }
+
+    private async _takeBytes(n: int): Task<Bytes> {
+        while (this._buf.length < n + 2) {
+            await this._fill();
+        }
+        let out = this._buf.slice(0, n);
+        this._buf = this._buf.slice(n + 2, this._buf.length);
+        return out;
+    }
+
+    private async _readReply(): Task<RedisValue> {
+        let line = await this._takeLine();
+        if (line.length === 0) {
+            throw new Error("Redis: empty reply");
+        }
+        let kind = line[0];
+        let rest = line.slice(1);
+        if (kind === "+") {
+            return rest;
+        }
+        if (kind === "-") {
+            throw new Error("Redis: " + rest);
+        }
+        if (kind === ":") {
+            return int.parse(rest);
+        }
+        if (kind === "$") {
+            let len = int.parse(rest);
+            if (len < 0) {
+                return null;
+            }
+            let data = await this._takeBytes(len);
+            return data.toString();
+        }
+        if (kind === "*") {
+            let count = int.parse(rest);
+            if (count < 0) {
+                return null;
+            }
+            let items: RedisValue[] = [];
+            for (let i = 0; i < count; i = i + 1) {
+                items.push(await this._readReply());
+            }
+            return items;
+        }
+        throw new Error("Redis: bad reply prefix '" + kind + "'");
+    }
+
+    async command(args: str[]): Task<RedisValue> {
+        await this._stream.writeAll(encodeCommand(args));
+        return await this._readReply();
+    }
+
+    async ping(): Task<str> {
+        let res = await this.command(["PING"]);
+        return res as str;
+    }
+
+    async get(key: str): Task<str?> {
+        let res = await this.command(["GET", key]);
+        if (res === null) {
+            return null;
+        }
+        return res as str;
+    }
+
+    async set(key: str, value: str, exSeconds?: int): Task<void> {
+        if (exSeconds !== null) {
+            await this.command(["SET", key, value, "EX", (exSeconds as int).toString()]);
+        } else {
+            await this.command(["SET", key, value]);
+        }
+    }
+
+    async delete(...keys: str[]): Task<int> {
+        let args: str[] = ["DEL"];
+        for (let k of keys) {
+            args.push(k);
+        }
+        let res = await this.command(args);
+        return res as int;
+    }
+
+    async exists(...keys: str[]): Task<int> {
+        let args: str[] = ["EXISTS"];
+        for (let k of keys) {
+            args.push(k);
+        }
+        let res = await this.command(args);
+        return res as int;
+    }
+
+    async expire(key: str, seconds: int): Task<int> {
+        let res = await this.command(["EXPIRE", key, seconds.toString()]);
+        return res as int;
+    }
+
+    async incr(key: str): Task<int> {
+        let res = await this.command(["INCR", key]);
+        return res as int;
+    }
+
+    close(): void {
+        this._stream.close();
+    }
+}

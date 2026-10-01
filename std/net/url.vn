@@ -159,7 +159,7 @@ export class Url {
     }
 }
 
-export function parseURL(url: str): Url {
+export function parseUrl(url: str): Url {
     return Url.parse(url);
 }
 

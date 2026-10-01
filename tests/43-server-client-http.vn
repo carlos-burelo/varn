@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { fetch, HttpServer, server, Request, Response, Headers, json, redirect, error } from "std:http";
+import { fetch, HttpServer, serve, Request, Response, Headers, json, redirect, error } from "std:http";
 import { isIP, isIPv4, isIPv6, encodeURIComponent, decodeURIComponent } from "std:net";
 
 
@@ -49,7 +49,7 @@ async function runHttpVerification() {
     expect(errResp.ok).toBe(false);
 
     // 5. Test Server registration & routing configuration
-    let app = server();
+    let app = serve();
     expect(app !== null).toBeTruthy();
 
     app.get("/api/v1/users", (req: Request) => {

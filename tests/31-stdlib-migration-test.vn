@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { List } from "std:collections";
-import { Http } from "std:http";
-import { JSON } from "std:encoding";
+import { fetch } from "std:http";
+import { Json } from "std:encoding";
 import { uuid, sha256 } from "std:crypto";
 import { Duration, PlainDateTime, nowInstant, Instant } from "std:time";
 
@@ -66,11 +66,11 @@ await describe("31 stdlib migration test", async () => {
         
         // ── std:json ──────────────────────────────────────────────────────
         let obj = { name: "Varn", version: 1 };
-        let json_str = JSON.stringify(obj);
+        let json_str = Json.stringify(obj);
         expect(json_str.length > 0).toBeTruthy()
         expect(json_str.includes("Varn")).toBeTruthy()
         
-        let back = JSON.parse(json_str);
+        let back = Json.parse(json_str);
         expect(back["name"]).toBe("Varn")
         expect(back["version"]).toBe(1)
         
@@ -95,7 +95,7 @@ await describe("31 stdlib migration test", async () => {
         expect(allHex).toBeTruthy()
         
         // ── std:http ──────────────────────────────────────────────────────
-        expect(Http !== null).toBeTruthy()
+        expect(fetch !== null).toBeTruthy()
         
     });
 });

@@ -1,7 +1,7 @@
 
 export {
-    sep,
-    delimiter,
+    SEP,
+    DELIMITER,
     normalize,
     dirname,
     basename,
@@ -12,8 +12,8 @@ export {
 } from "std:path/utils";
 
 import {
-    sep,
-    delimiter,
+    SEP,
+    DELIMITER,
     normalize,
     dirname,
     basename,
@@ -24,8 +24,8 @@ import {
 } from "std:path/utils";
 
 export namespace Path {
-    export const sep = sep;
-    export const delimiter = delimiter;
+    export const SEP = SEP;
+    export const DELIMITER = DELIMITER;
     export const normalize = normalize;
     export const dirname = dirname;
     export const basename = basename;

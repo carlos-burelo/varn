@@ -1,9 +1,20 @@
 import {
-    wsConnect$,
-    wsSend$,
-    wsRead$,
-    wsClose$
+    wsKey$,
+    wsValidateResponse$,
+    wsFrameBytes$,
+    wsParseFrame$
 } from "runtime:ws";
+
+import {
+    tcpConnect$,
+    tcpRead$,
+    tcpWrite$,
+    tcpClose$
+} from "runtime:net";
+
+import { Url } from "std:net";
+import { AsyncReader, AsyncWriter } from "std:io";
+import { toStdError, stdError, E_WS_IO, E_WS_CLOSED, E_WS_CONNECT } from "std:error";
 
 export enum WebSocketReadyState {
     Connecting = 0,
@@ -12,30 +23,94 @@ export enum WebSocketReadyState {
     Closed = 3
 }
 
-export class WebSocket {
-    private _id: int;
+export function bytesConcat(a: Bytes, b: Bytes): Bytes {
+    if (a.length === 0) {
+        return b;
+    }
+    if (b.length === 0) {
+        return a;
+    }
+    let out = Bytes.alloc(a.length + b.length);
+    a.copy(out, 0, 0, a.length);
+    b.copy(out, a.length, 0, b.length);
+    return out;
+}
+
+export async function readHttpHead(connId: int): Task<{ head: str, rest: Bytes }> {
+    let buf = Bytes.alloc(0);
+    while (true) {
+        let end = findHeadEnd(buf);
+        if (end >= 0) {
+            return #{ head: buf.slice(0, end).toString(), rest: buf.slice(end) };
+        }
+        let chunk = await tcpRead$(connId, 4096);
+        if (chunk === null) {
+            throw stdError(E_WS_CONNECT, "connection closed during handshake");
+        }
+        buf = bytesConcat(buf, chunk as Bytes);
+    }
+}
+
+function findHeadEnd(buf: Bytes): int {
+    let i = 0;
+    while (i + 3 < buf.length) {
+        if (buf.getByte(i) === 13 && buf.getByte(i + 1) === 10 && buf.getByte(i + 2) === 13 && buf.getByte(i + 3) === 10) {
+            return i + 4;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+export class WebSocket implements AsyncReader, AsyncWriter {
+    private _conn: int = -1;
     private _url: str;
-    private _readyState: WebSocketReadyState;
-    private _onOpenListeners: Array<() => void>;
-    private _onMessageListeners: Array<(data: str) => void>;
-    private _onErrorListeners: Array<(err: str) => void>;
-    private _onCloseListeners: Array<() => void>;
+    private _readyState: WebSocketReadyState = WebSocketReadyState.Connecting;
+    private _recvBuf: Bytes = Bytes.alloc(0);
+    private _fragBuf: Bytes? = null;
+    private _fragOp: int = -1;
+    private _onOpenListeners: Array<() => void> = [];
+    private _onMessageListeners: Array<(data: str) => void> = [];
+    private _onBytesListeners: Array<(data: Bytes) => void> = [];
+    private _onErrorListeners: Array<(err: str) => void> = [];
+    private _onCloseListeners: Array<() => void> = [];
 
-    constructor(url: str) {
+    constructor(connId: int, url: str) {
+        this._conn = connId;
         this._url = url;
-        this._onOpenListeners = [];
-        this._onMessageListeners = [];
-        this._onErrorListeners = [];
-        this._onCloseListeners = [];
+        this._readyState = WebSocketReadyState.Open;
+    }
 
-        this._readyState = WebSocketReadyState.Connecting;
-        let socketId = wsConnect$(url);
-        this._id = socketId;
-
-        if (socketId >= 0) {
-            this._readyState = WebSocketReadyState.Open;
-        } else {
-            this._readyState = WebSocketReadyState.Closed;
+    static async connect(url: str): Task<WebSocket> {
+        let parsed = Url.parse(url);
+        if (parsed.protocol !== "" && parsed.protocol !== "ws") {
+            throw stdError(E_WS_CONNECT, "only ws:// URLs are supported");
+        }
+        let port = parsed.port ?? 80;
+        let conn = await tcpConnect$(parsed.host, port);
+        if (conn < 0) {
+            throw stdError(E_WS_CONNECT, "could not connect to " + parsed.host + ":" + port.toString());
+        }
+        try {
+            let key = wsKey$();
+            let target = parsed.path;
+            let qs = parsed.query.toString();
+            if (qs.length > 0) {
+                target = target + "?" + qs;
+            }
+            if (target.length === 0) {
+                target = "/";
+            }
+            let req = "GET " + target + " HTTP/1.1\r\nHost: " + parsed.host + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\nSec-WebSocket-Version: 13\r\n\r\n";
+            await tcpWrite$(conn, req);
+            let head = await readHttpHead(conn);
+            wsValidateResponse$(head.head, key);
+            let ws = new WebSocket(conn, url);
+            ws.absorb(head.rest);
+            return ws;
+        } catch (e) {
+            tcpClose$(conn);
+            throw toStdError(e as Error, E_WS_IO);
         }
     }
 
@@ -51,10 +126,6 @@ export class WebSocket {
         return this._url;
     }
 
-    get id(): int {
-        return this._id;
-    }
-
     onOpen(handler: () => void): WebSocket {
         this._onOpenListeners.push(handler);
         if (this.isOpen) {
@@ -68,6 +139,11 @@ export class WebSocket {
         return this;
     }
 
+    onBytes(handler: (data: Bytes) => void): WebSocket {
+        this._onBytesListeners.push(handler);
+        return this;
+    }
+
     onError(handler: (err: str) => void): WebSocket {
         this._onErrorListeners.push(handler);
         return this;
@@ -78,41 +154,167 @@ export class WebSocket {
         return this;
     }
 
-    send(message: str | Bytes): bool {
-        if (!this.isOpen) {
-            return false;
-        }
-        let msgStr: str = typeof message === "str" ? (message as str) : (message as Bytes).toString();
-        return wsSend$(this._id, msgStr);
+    absorb(data: Bytes): void {
+        this._recvBuf = bytesConcat(this._recvBuf, data);
     }
 
-    receive(): str? {
+    private _notifyError(msg: str): void {
+        for (let i = 0; i < this._onErrorListeners.length; i = i + 1) {
+            this._onErrorListeners[i](msg);
+        }
+    }
+
+    private _dispatchText(text: str): void {
+        for (let i = 0; i < this._onMessageListeners.length; i = i + 1) {
+            this._onMessageListeners[i](text);
+        }
+    }
+
+    private _dispatchBytes(data: Bytes): void {
+        for (let i = 0; i < this._onBytesListeners.length; i = i + 1) {
+            this._onBytesListeners[i](data);
+        }
+    }
+
+    async send(message: str | Bytes): Task<int> {
         if (!this.isOpen) {
-            return null;
+            throw stdError(E_WS_CLOSED, "WebSocket is closed");
         }
-        let msg = wsRead$(this._id);
-        if (msg !== null) {
-            for (let i = 0; i < this._onMessageListeners.length; i = i + 1) {
-                let handler = this._onMessageListeners[i];
-                handler(msg as str);
+        try {
+            let data: Bytes;
+            let opcode: int;
+            if (typeof message === "str") {
+                data = Bytes.fromString(message as str);
+                opcode = 1;
+            } else {
+                data = message as Bytes;
+                opcode = 2;
             }
+            await tcpWrite$(this._conn, wsFrameBytes$(data, opcode));
+            return data.length;
+        } catch (e) {
+            let err = toStdError(e as Error, E_WS_IO);
+            this._notifyError(err.message);
+            throw err;
         }
-        return msg;
+    }
+
+    private async _pumpControl(kind: str, payload: Bytes): Task<void> {
+        if (kind === "ping") {
+            await tcpWrite$(this._conn, wsFrameBytes$(payload, 10));
+        } else if (kind === "close") {
+            await tcpWrite$(this._conn, wsFrameBytes$(payload.slice(0, 0), 8));
+            this.close();
+        }
+    }
+
+    async read(size?: int): Task<Bytes?> {
+        while (true) {
+            let frame = wsParseFrame$(this._recvBuf);
+            if (frame === null) {
+                if (!this.isOpen) {
+                    return null;
+                }
+                let chunk: Bytes?;
+                try {
+                    chunk = await tcpRead$(this._conn, 8192);
+                } catch (e) {
+                    let err = toStdError(e as Error, E_WS_IO);
+                    this._notifyError(err.message);
+                    throw err;
+                }
+                if (chunk === null) {
+                    this.close();
+                    return null;
+                }
+                this._recvBuf = bytesConcat(this._recvBuf, chunk as Bytes);
+                continue;
+            }
+            let f = frame as dynamic;
+            this._recvBuf = this._recvBuf.slice(f.consumed as int);
+            let kind = f.kind as str;
+            let payload = f.payload as Bytes;
+            if (kind === "ping" || kind === "close") {
+                try {
+                    await this._pumpControl(kind, payload);
+                } catch (e) {
+                    let err = toStdError(e as Error, E_WS_IO);
+                    this._notifyError(err.message);
+                    throw err;
+                }
+                if (!this.isOpen) {
+                    return null;
+                }
+                continue;
+            }
+            if (kind === "pong") {
+                continue;
+            }
+            if (kind === "continuation") {
+                if (this._fragBuf === null) {
+                    continue;
+                }
+                this._fragBuf = bytesConcat(this._fragBuf as Bytes, payload);
+                if (f.fin as bool) {
+                    let done = this._fragBuf as Bytes;
+                    let op = this._fragOp;
+                    this._fragBuf = null;
+                    this._fragOp = -1;
+                    return this._deliver(op, done);
+                }
+                continue;
+            }
+            if (f.fin as bool) {
+                return this._deliver(f.opcode as int, payload);
+            }
+            this._fragBuf = payload;
+            this._fragOp = f.opcode as int;
+        }
+    }
+
+    private _deliver(opcode: int, payload: Bytes): Bytes {
+        if (opcode === 1) {
+            this._dispatchText(payload.toString());
+        } else {
+            this._dispatchBytes(payload);
+        }
+        return payload;
+    }
+
+    async write(data: Bytes): Task<int> {
+        return await this.send(data);
+    }
+
+    async flush(): Task<void> {}
+
+    async listen(): Task<void> {
+        while (this.isOpen) {
+            await this.read();
+        }
     }
 
     close(): void {
         if (this._readyState !== WebSocketReadyState.Closed) {
             this._readyState = WebSocketReadyState.Closing;
-            if (this._id >= 0) {
-                wsClose$(this._id);
+            if (this._conn >= 0) {
+                try {
+                    tcpClose$(this._conn);
+                } catch (e) {}
             }
             this._readyState = WebSocketReadyState.Closed;
-            this._id = -1;
-
+            this._conn = -1;
             for (let i = 0; i < this._onCloseListeners.length; i = i + 1) {
-                let handler = this._onCloseListeners[i];
-                handler();
+                this._onCloseListeners[i]();
             }
+        }
+    }
+
+    async closeGracefully(): Task<void> {
+        if (this._readyState !== WebSocketReadyState.Closed) {
+            try {
+                await tcpWrite$(this._conn, wsFrameBytes$(Bytes.alloc(0), 8));
+            } catch (e) {}
+            this.close();
         }
     }
 }

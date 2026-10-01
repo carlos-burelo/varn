@@ -93,8 +93,6 @@ pub enum HirBinOp {
     Le,
     Gt,
     Ge,
-    And,
-    Or,
     BitAnd,
     BitOr,
     BitXor,

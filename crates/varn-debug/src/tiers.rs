@@ -18,7 +18,8 @@ use crate::walk::constants_for_inspect;
 
 use crate::flags::DebugFlags;
 
-use varn_core::term::colors::{BOLD, DIM, GREEN, R, RED, YELLOW};
+use varn_core::term::terminal;
+use varn_core::term::terminal::{Align, Section};
 
 /// Why a function is not compiled, in the order production decides it.
 #[derive(PartialEq, Eq)]
@@ -45,14 +46,6 @@ impl TierRow {
             Tier::Clif => "clif",
             Tier::Gate(_) => "gate",
             Tier::Bail(_) => "bail",
-        }
-    }
-
-    fn colour(&self) -> &'static str {
-        match self.tier {
-            Tier::Clif => GREEN,
-            Tier::Gate(_) => YELLOW,
-            Tier::Bail(_) => RED,
         }
     }
 
@@ -148,32 +141,32 @@ pub fn debug_tiers(
         .clamp(8, 32);
 
     if let Some(h) = header {
-        eprintln!("\n{DIM}=== {h} ==={R}");
+        terminal::tagged("module", h);
     }
-    eprintln!(
-        "\n{BOLD}TIERS{R}{DIM} ── {} · {routed}/{} ruteadas{R}",
-        proto.name.as_deref().unwrap_or("<module>"),
-        rows.len()
-    );
-    eprintln!(
-        "  {DIM}{:<name_w$}  {:>6}  {:<5}  razón{R}",
-        "función", "words", "tier"
-    );
+    Section::new("tiers")
+        .subtitle(format!(
+            "{} · {routed}/{} ruteadas",
+            proto.name.as_deref().unwrap_or("<module>"),
+            rows.len()
+        ))
+        .color(|c| c.bold())
+        .print();
+    let mut table = terminal::Table::new(["función", "words", "tier", "razón"])
+        .align([Align::Left, Align::Right, Align::Left, Align::Left]);
     for r in &rows {
-        let fa = if r.frame_aware {
-            format!(" (frame-aware: {})", r.fa_reasons.join("+"))
-        } else {
-            String::new()
-        };
-        eprintln!(
-            "  {:<name_w$}  {:>6}  {}{:<5}{R}  {DIM}{}{fa}{R}",
-            truncate(&r.name, name_w),
-            r.words,
-            r.colour(),
-            r.marker(),
-            r.reason(),
-        );
+        let mut detail = r.reason().to_string();
+        if r.frame_aware {
+            detail.push_str(&format!(" (frame-aware: {})", r.fa_reasons.join("+")));
+        }
+        table.row([
+            truncate(&r.name, name_w).to_string(),
+            r.words.to_string(),
+            r.marker().to_string(),
+            detail,
+        ]);
     }
+    table.print();
+    Section::new("tiers").close();
 }
 
 /// Only prints when something is blocked. A clean module producing no output
@@ -193,14 +186,14 @@ pub fn debug_bails(
     }
 
     if let Some(h) = header {
-        eprintln!("\n{DIM}=== {h} ==={R}");
+        terminal::tagged("module", h);
     }
-    eprintln!(
-        "\n{BOLD}BAILS{R}{DIM} ── {}{R}",
-        proto.name.as_deref().unwrap_or("<module>")
-    );
+    Section::new("bails")
+        .subtitle(proto.name.as_deref().unwrap_or("<module>"))
+        .color(|c| c.bold())
+        .print();
 
-    for (kind, colour) in [("gate", YELLOW), ("lowering", RED)] {
+    for kind in ["gate", "lowering"] {
         let group: Vec<&TierRow> = rows
             .iter()
             .filter(|r| match r.tier {
@@ -212,14 +205,17 @@ pub fn debug_bails(
         if group.is_empty() {
             continue;
         }
-        eprintln!("  {colour}{kind}{R} {DIM}({}){R}", group.len());
+        terminal::tagged(kind, format!("{} bloqueada(s)", group.len()));
+        let mut table = terminal::Table::new(["función", "words", "razón"])
+            .align([Align::Left, Align::Right, Align::Left]);
         for r in group {
-            eprintln!(
-                "    {:<32} {:>6} words   {DIM}{}{R}",
-                truncate(&r.name, 32),
-                r.words,
-                r.reason()
-            );
+            table.row([
+                truncate(&r.name, 32).to_string(),
+                format!("{} words", r.words),
+                r.reason().to_string(),
+            ]);
         }
+        table.print();
     }
+    Section::new("bails").close();
 }

@@ -1,0 +1,44 @@
+import { describe, it, expect, summary } from "std:test";
+import { StdError, stdError, toStdError, E_FS_IO, E_IO_READ, E_FS_NOT_FOUND } from "std:error";
+
+await describe("example std:error", async () => {
+    await it("constructs coded errors", () => {
+        let err = new StdError(E_FS_IO, "read failed");
+        expect(err.code).toBe(E_FS_IO);
+        expect(err.message).toBe("read failed");
+        expect(err instanceof StdError).toBe(true);
+        expect(err instanceof Error).toBe(true);
+    });
+
+    await it("factory builds the same shape", () => {
+        let err = stdError(E_IO_READ, "flush failed");
+        expect(err instanceof StdError).toBe(true);
+        expect(err.code).toBe(E_IO_READ);
+    });
+
+    await it("catches and translates foreign errors", () => {
+        let translated = "";
+        try {
+            throw new TypeError("bad type");
+        } catch (e) {
+            let wrapped = toStdError(e as Error, E_FS_NOT_FOUND);
+            translated = wrapped.code;
+            expect(wrapped instanceof StdError).toBe(true);
+        }
+        expect(translated).toBe(E_FS_NOT_FOUND);
+    });
+
+    await it("throw/catch preserves the code", () => {
+        let seen = "";
+        try {
+            throw new StdError(E_FS_IO, "boom");
+        } catch (e) {
+            if (e instanceof StdError) {
+                seen = e.code;
+            }
+        }
+        expect(seen).toBe(E_FS_IO);
+    });
+});
+
+summary();

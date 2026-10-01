@@ -27,15 +27,3 @@ export namespace Prompt {
         return readLine(message + ": ").trim();
     }
 }
-
-export function prompt(message: str, defaultValue?: str): str {
-    return Prompt.ask(message, defaultValue);
-}
-
-export function confirm(message: str, defaultValue: bool = false): bool {
-    return Prompt.confirm(message, defaultValue);
-}
-
-export function password(message: str): str {
-    return Prompt.password(message);
-}

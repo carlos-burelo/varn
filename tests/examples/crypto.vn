@@ -1,0 +1,41 @@
+import { describe, it, expect, summary } from "std:test";
+import { Uuid, uuid, sha256, hmac, randomHex, hashPassword, verifyPassword, Jwt, Totp } from "std:crypto";
+
+await describe("example std:crypto", async () => {
+    await it("hashes and hmac", () => {
+        expect(sha256("hello")).toBe("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+        expect(hmac("sha256", "key", "msg").length).toBe(64);
+        expect(randomHex(16).length).toBe(32);
+    });
+
+    await it("uuid v4/v7 roundtrip", () => {
+        let id = Uuid.v4();
+        expect(Uuid.isValid(id)).toBe(true);
+        expect(Uuid.isValid("not-a-uuid")).toBe(false);
+        expect(Uuid.isValid(Uuid.v7())).toBe(true);
+        expect(Uuid.isValid(uuid())).toBe(true);
+    });
+
+    await it("password hashing verifies", () => {
+        let hash = hashPassword("s3cret", 1000);
+        expect(verifyPassword("s3cret", hash)).toBe(true);
+        expect(verifyPassword("wrong", hash)).toBe(false);
+    });
+
+    await it("jwt signs and verifies", () => {
+        let token = Jwt.sign({ sub: "u1" }, "secret");
+        let payload = Jwt.verify(token, "secret");
+        expect(payload !== null).toBe(true);
+        expect(Jwt.verify(token, "other-secret") === null).toBe(true);
+    });
+
+    await it("totp generates and verifies", () => {
+        let secret = "JBSWY3DPEHPK3PXP";
+        let code = Totp.generate(secret);
+        expect(code.length).toBe(6);
+        expect(Totp.verify(secret, code)).toBe(true);
+        expect(Totp.verify(secret, "000000")).toBe(false);
+    });
+});
+
+summary();

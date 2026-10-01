@@ -1,5 +1,5 @@
 import { Regex } from "std:regex";
-import { UUID } from "std:crypto";
+import { Uuid } from "std:crypto";
 import { DateTime, Duration, Instant, PlainDateTime } from "std:time";
 import { describe, it, expect } from "std:test";
 
@@ -31,9 +31,9 @@ let reWord = Regex.compile("test");
 // 2. UUID (v4 & v7)
 // ==========================================
 
-let idV4 = UUID.v4();
+let idV4 = Uuid.v4();
 
-let idV7 = UUID.v7();
+let idV7 = Uuid.v7();
 
 
 // ==========================================
@@ -80,11 +80,11 @@ await describe("83 canonical types regex uuid time", async () => {
 
     await it("uuid generation", async () => {
         expect(idV4.length).toBe(36);
-        expect(UUID.isValid(idV4)).toBe(true);
+        expect(Uuid.isValid(idV4)).toBe(true);
         expect(idV7.length).toBe(36);
-        expect(UUID.isValid(idV7)).toBe(true);
-        expect(UUID.isValid("not-a-valid-uuid")).toBe(false);
-        expect(UUID.isValid("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
+        expect(Uuid.isValid(idV7)).toBe(true);
+        expect(Uuid.isValid("not-a-valid-uuid")).toBe(false);
+        expect(Uuid.isValid("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
     });
 
     await it("date time and durations", async () => {

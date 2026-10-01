@@ -21,7 +21,9 @@ use crate::render::truncate;
 
 use crate::flags::DebugFlags;
 
-use varn_core::term::colors::{BLUE, BOLD, DIM, GREEN, R, YELLOW};
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
+use varn_core::term::terminal::{Align, Section};
 
 /// A typed opcode and the generic one it replaces. The pair is the unit of
 /// measurement: `Add` alone says nothing, `Add` next to `AddInt` says the
@@ -68,27 +70,30 @@ pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<
         if module.is_some() {
             return;
         }
-        eprintln!(
-            "\n{BOLD}{BLUE}TYPELOSS{R}{DIM} ─────────────────────────────── {}{R}",
-            proto.name.as_deref().unwrap_or("<top-level>")
-        );
-        eprintln!("  {GREEN}cada opcode tipado que el emisor pudo elegir, lo eligió{R}");
-        eprintln!("{DIM}── end: TYPELOSS ──{R}");
+        Section::new("typeloss")
+            .subtitle(proto.name.as_deref().unwrap_or("<top-level>"))
+            .color(|c| c.blue())
+            .print();
+        terminal::info("cada opcode tipado que el emisor pudo elegir, lo eligió");
+        Section::new("typeloss").close();
         return;
     }
 
     if let Some(m) = module {
-        eprintln!("\n{DIM}=== {m} ==={R}");
+        terminal::tagged("module", m);
     }
-    eprintln!(
-        "\n{BOLD}{BLUE}TYPELOSS{R}{DIM} ─────────────────────────────── {}{R}",
-        proto.name.as_deref().unwrap_or("<top-level>")
-    );
+    Section::new("typeloss")
+        .subtitle(proto.name.as_deref().unwrap_or("<top-level>"))
+        .color(|c| c.blue())
+        .print();
 
-    eprintln!(
-        "\n  {DIM}{:<28} {:>8} {:>8}  {}{R}",
-        "función", "genérico", "tipado", "qué quedó genérico"
-    );
+    let mut table = terminal::Table::new([
+        "función",
+        "genérico",
+        "tipado",
+        "qué quedó genérico",
+    ])
+    .align([Align::Left, Align::Right, Align::Right, Align::Left]);
     for (name, c) in &rows {
         let mut detail = c
             .by_op
@@ -105,18 +110,23 @@ pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<
         if !c.members.is_empty() {
             let _ = write!(detail, "  ·  {}", c.members.join(" "));
         }
-        eprintln!(
-            "  {:<28} {YELLOW}{:>8}{R} {:>8}  {DIM}{detail}{R}",
-            truncate(name, 28),
-            c.generic,
-            c.typed
-        );
+        table.row([
+            truncate(name, 28).to_string(),
+            c.generic.to_string(),
+            c.typed.to_string(),
+            detail,
+        ]);
     }
-    eprintln!(
-        "\n  {DIM}El siguiente paso es `-p check:types` sobre uno de estos accesos: un\n  \
-         `cg=` sin `fixed_field` es la puerta de anotación, y sin `cg=` es inferencia.{R}"
-    );
-    eprintln!("{DIM}── end: TYPELOSS ──{R}");
+    table.print();
+    terminal::log(format!(
+        "  {}",
+        chalk(
+            "El siguiente paso es `-p check:types` sobre uno de estos accesos: un \
+             `cg=` sin `fixed_field` es la puerta de anotación, y sin `cg=` es inferencia."
+        )
+        .dim()
+    ));
+    Section::new("typeloss").close();
 }
 
 fn collect(proto: &FunctionProto, flags: &DebugFlags, out: &mut Vec<(String, Counts)>) {

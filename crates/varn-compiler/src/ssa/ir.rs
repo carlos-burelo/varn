@@ -29,8 +29,6 @@ pub struct SsaFunc {
     pub blocks: Vec<Block>,
 
     pub values: Vec<ValueDef>,
-    pub pinned_vars: rustc_hash::FxHashSet<VarId>,
-    pub nlocals: u32,
 
     // Forma DECLARADA de la función, propagada desde HIR (`is_async` e
     // `is_generator` debajo) — no dice si el cuerpo suspende de verdad. El
@@ -57,13 +55,6 @@ impl SsaFunc {
     #[inline]
     pub fn block_mut(&mut self, id: BlockId) -> &mut Block {
         &mut self.blocks[id.0 as usize]
-    }
-
-    #[inline]
-    pub fn alloc_value(&mut self, ty: HirType) -> Value {
-        let v = Value(self.values.len() as u32);
-        self.values.push(ValueDef { ty });
-        v
     }
 
     #[inline]

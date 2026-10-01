@@ -1,6 +1,6 @@
 import { parallel$ } from "runtime:task";
 
-async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
+async function wrapTask<T>(task: Task<T>, group: TaskGroup<T>): T {
     try {
         let res = await task;
         if (group.isCancelled) {
@@ -13,7 +13,7 @@ async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
     }
 }
 
-export class TaskGroupImpl<T> {
+export class TaskGroup<T> {
     tasks: Array<Task<T>>;
     isCancelled: bool;
     private _finallyCbs: Array<() => void>;
@@ -48,7 +48,7 @@ export class TaskGroupImpl<T> {
         }
     }
 
-    finally(cb: () => void): TaskGroupImpl<T> {
+    finally(cb: () => void): TaskGroup<T> {
         this._finallyCbs.push(cb);
         return this;
     }
@@ -73,14 +73,4 @@ export class TaskGroupImpl<T> {
         this.cancel();
         this._runFinally();
     }
-}
-
-export type TaskGroup<T> = TaskGroupImpl<T>;
-
-export function TaskGroup<T>(): TaskGroupImpl<T> {
-    return new TaskGroupImpl<T>();
-}
-
-export function task_group<T>(): TaskGroupImpl<T> {
-    return new TaskGroupImpl<T>();
 }

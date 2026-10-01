@@ -1,5 +1,5 @@
 import { UdpSocket, UdpPacket } from "std:net";
-import { HttpResponse } from "std:http";
+import { Response } from "std:http";
 import { AsyncReader } from "std:io";
 import { describe, it, expect } from "std:test";
 
@@ -30,8 +30,10 @@ function testHttpResponseStreamShape(): void {
     ];
     let reader = new MockChunkReader(mockChunks);
     expect(reader).toBeNotNull();
-    let res = new HttpResponse(1);
-    expect(res.connId === 1).toBeTruthy();
+    let res = new Response("first chunk\n", 200, { "Content-Type": "text/plain" });
+    res.stream(reader);
+    expect(res.status).toBe(200);
+    expect(res.bodyStream !== null).toBeTruthy();
 }
 
 let srvPort = 19881;

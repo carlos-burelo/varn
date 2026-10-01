@@ -1,7 +1,7 @@
 import { LogLevel } from "std:log/level";
 import { writeln } from "std:io";
 import { now, toISOString } from "std:time";
-import { JSON } from "std:encoding";
+import { Json } from "std:encoding";
 import { Color } from "std:cli/color";
 
 export class Logger {
@@ -73,7 +73,7 @@ export class Logger {
             if (meta !== null) {
                 record["meta"] = meta;
             }
-            outputLine = JSON.stringify(record);
+            outputLine = Json.stringify(record);
         } else {
             let tagStr = levelTag;
             if (this._useColors) {
@@ -81,7 +81,7 @@ export class Logger {
             }
             let metaSuffix = "";
             if (meta !== null) {
-                metaSuffix = " " + JSON.stringify(meta);
+                metaSuffix = " " + Json.stringify(meta);
             }
             outputLine = timestampStr + " [" + tagStr + "] (" + this._name + "): " + message + metaSuffix;
         }

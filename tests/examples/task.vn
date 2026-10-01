@@ -1,0 +1,79 @@
+import { describe, it, expect, summary } from "std:test";
+import { sleep, delay, parallel, spawn, channel, Task, TaskGroup, Mutex, Semaphore, WaitGroup, RateLimiter, Cron } from "std:task";
+
+async function work(value: int): Task<int> {
+    await sleep(10);
+    return value * 2;
+}
+
+await describe("example std:task", async () => {
+    await it("sleeps and delays", async () => {
+        await sleep(20);
+        await delay(20);
+        expect(true).toBe(true);
+    });
+
+    await it("spawns and joins handles", async () => {
+        let handle = spawn(work(21));
+        expect(await handle).toBe(42);
+    });
+
+    await it("runs tasks in parallel", async () => {
+        let results = await parallel([work(1), work(2), work(3)]);
+        expect(results.length).toBe(3);
+        expect(results[0]).toBe(2);
+        expect(results[2]).toBe(6);
+    });
+
+    await it("races and settles task sets", async () => {
+        let first = await Task.race([work(5), work(6)]);
+        expect(first === 10 || first === 12).toBe(true);
+        let all = await Task.all([work(1), work(2)]);
+        expect(all.length).toBe(2);
+        let settled = await Task.allSettled([work(1), work(2)]);
+        expect(settled.length).toBe(2);
+        expect(settled[0].status).toBe("fulfilled");
+    });
+
+    await it("passes messages through channels", async () => {
+        let pair = channel<str>(4);
+        await pair.tx.send("ping");
+        expect(await pair.rx.receive()).toBe("ping");
+        pair.tx.close();
+    });
+
+    await it("groups tasks and guards with a mutex", async () => {
+        let group = new TaskGroup<int>();
+        group.spawn(work(4));
+        group.spawn(work(5));
+        let joined = await group.join();
+        expect(joined.length).toBe(2);
+        let mutex = new Mutex();
+        let guarded = await mutex.withLock(async () => {
+            return 7;
+        });
+        expect(guarded).toBe(7);
+        let sem = new Semaphore(2);
+        await sem.withPermit(async () => {
+            return 1;
+        });
+        let wg = new WaitGroup();
+        wg.add(1);
+        spawn((async (): Task<void> => {
+            wg.done();
+        })());
+        await wg.wait();
+        expect(true).toBe(true);
+    });
+
+    await it("limits rates and parses cron", () => {
+        let limiter = new RateLimiter(2, 1.0);
+        expect(limiter.take()).toBe(true);
+        expect(limiter.take()).toBe(true);
+        expect(limiter.take()).toBe(false);
+        let spec = Cron.parse("*/5 * * * *");
+        expect(Cron.next(spec) > 0).toBe(true);
+    });
+});
+
+summary();

@@ -389,46 +389,6 @@ pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value))
     }
 }
 
-/// Where a value is defined. Block params have no defining instruction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Def {
-    /// `blocks[block].insts[index]`.
-    Inst { block: u32, index: u32 },
-    /// `blocks[block].params[index]`.
-    Param { block: u32, index: u32 },
-}
-
-/// Def site of every value id, indexed by `Value.0`.
-///
-/// `None` means the id has no reaching definition in the current shape of the
-/// function — either it was never materialized or its defining instruction has
-/// already been deleted. Callers must treat that as "unknown", never as a
-/// value they may move or fold.
-pub fn def_sites(func: &SsaFunc) -> Vec<Option<Def>> {
-    let mut defs = vec![None; func.values.len()];
-    for (b, block) in func.blocks.iter().enumerate() {
-        for (i, &p) in block.params.iter().enumerate() {
-            if let Some(slot) = defs.get_mut(p.0 as usize) {
-                *slot = Some(Def::Param {
-                    block: b as u32,
-                    index: i as u32,
-                });
-            }
-        }
-        for (i, inst) in block.insts.iter().enumerate() {
-            if let Some(d) = inst.dest {
-                if let Some(slot) = defs.get_mut(d.0 as usize) {
-                    *slot = Some(Def::Inst {
-                        block: b as u32,
-                        index: i as u32,
-                    });
-                }
-            }
-        }
-    }
-    defs
-}
-
 /// Applies many substitutions in a single traversal.
 ///
 /// The per-value [`SsaFunc::replace_all_uses`] walks every instruction in the

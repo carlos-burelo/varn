@@ -367,6 +367,37 @@ pub(crate) extern "C" fn jit_str_index_of(
     }
 }
 
+/// Dedicated fast path for `includes(search)`: the contract's own body
+/// (`find_bytes(...).is_some()`), reached directly because the op-id already
+/// proved both sides.
+#[varn_op_macros::jit_slow(field = "str_includes")]
+pub(crate) extern "C" fn jit_str_includes(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> u64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            use varn_types::str_util::find_bytes;
+            return if find_bytes(s, n).is_some() { 1 } else { 0 };
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("includes: receiver and argument must be strings"),
+        )
+    }
+}
+
 /// Dedicated fast path for `split(separator?)`: the contract's own body.
 /// `argc` is 0 (no separator) or 1; the separator halves are ignored when 0.
 #[allow(clippy::too_many_arguments)]

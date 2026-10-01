@@ -1,6 +1,6 @@
 import { tcpRead$, parseHttpRequest$ } from "runtime:net";
 import { Headers } from "std:http/headers";
-import { JSON, Json } from "std:encoding";
+import { Json, JsonValue } from "std:encoding";
 
 export class RawRequest {
     method: str = "";
@@ -123,9 +123,9 @@ export class Request {
         return this.body;
     }
 
-    json(): Json {
+    json(): JsonValue {
         if (this.body.length === 0) return null;
-        return JSON.parse(this.body);
+        return Json.parse(this.body);
     }
 
     formData(): { [key: str]: str } {

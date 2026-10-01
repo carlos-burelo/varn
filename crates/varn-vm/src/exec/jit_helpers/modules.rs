@@ -107,28 +107,3 @@ pub(crate) extern "C" fn jit_store_module_slot(
         }
     }
 }
-
-#[varn_op_macros::jit_slow(field = "load_module_by_idx")]
-pub(crate) extern "C" fn jit_load_module_by_idx(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    spec_idx: usize,
-) -> VmValue {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let spec_nv = closure_ref.constants[spec_idx];
-        let spec = match ctx_ref.heap.str_val(spec_nv) {
-            Some(s) => s,
-            None => return VmValue::null(),
-        };
-        // Same reasoning as `jit_load_module`: a failed import is a catchable
-        // Varn error, not a host abort. The `eprintln!` that used to accompany
-        // the panic went with it — the error now carries the specifier and
-        // reaches the user through the normal reporting path.
-        match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
-            Ok(v) => v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}

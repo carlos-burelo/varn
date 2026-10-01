@@ -1,0 +1,56 @@
+import { hmacBytes$ } from "runtime:crypto";
+import { Base64, Json, JsonValue } from "std:encoding";
+import { timingSafeEqual } from "std:crypto/password";
+
+function macName(algo: str): str {
+    if (algo === "HS256") {
+        return "sha256";
+    }
+    if (algo === "HS512") {
+        return "sha512";
+    }
+    throw new Error("Jwt: unsupported algorithm '" + algo + "'");
+}
+
+export namespace Jwt {
+    export function sign(payload: JsonValue, secret: str, algo: str = "HS256"): str {
+        let hdr = Base64.encodeUrlBytes(Bytes.fromString(Json.stringify({ alg: algo, typ: "JWT" })));
+        let body = Base64.encodeUrlBytes(Bytes.fromString(Json.stringify(payload)));
+        let input = hdr + "." + body;
+        let sig = Base64.encodeUrlBytes(hmacBytes$(macName(algo), secret, input));
+        return input + "." + sig;
+    }
+
+    export function decode(token: str): JsonValue? {
+        let parts = token.split(".");
+        if (parts.length !== 3) {
+            return null;
+        }
+        try {
+            return Json.parse(Base64.decodeUrlBytes(parts[1]).toString());
+        } catch (e) {
+            return null;
+        }
+    }
+
+    export function verify(token: str, secret: str, algo: str = "HS256"): JsonValue? {
+        let parts = token.split(".");
+        if (parts.length !== 3) {
+            return null;
+        }
+        let input = parts[0] + "." + parts[1];
+        let expected = Base64.encodeUrlBytes(hmacBytes$(macName(algo), secret, input));
+        if (!timingSafeEqual(expected, parts[2])) {
+            return null;
+        }
+        try {
+            let header = Json.parse(Base64.decodeUrlBytes(parts[0]).toString()) as dynamic;
+            if (header.alg !== algo) {
+                return null;
+            }
+            return Json.parse(Base64.decodeUrlBytes(parts[1]).toString());
+        } catch (e) {
+            return null;
+        }
+    }
+}

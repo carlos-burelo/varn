@@ -87,13 +87,9 @@ pub fn compile_to_object(
 
 /// External runtime helper function IDs, declared as imports so the linker
 /// resolves them against `varn-rt`.
-#[allow(dead_code)]
 struct RtHelpers {
     print: FuncId,
-    print_int: FuncId,
-    print_bool: FuncId,
     str_concat: FuncId,
-    panic_exit: FuncId,
 }
 
 fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
@@ -105,20 +101,6 @@ fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
     print_sig.params.push(AbiParam::new(types::I64)); // len
     let print = module
         .declare_function("varn_rt_print", Linkage::Import, &print_sig)
-        .map_err(map_err)?;
-
-    // void varn_rt_print_int(i64 val)
-    let mut pi_sig = module.make_signature();
-    pi_sig.params.push(AbiParam::new(types::I64));
-    let print_int = module
-        .declare_function("varn_rt_print_int", Linkage::Import, &pi_sig)
-        .map_err(map_err)?;
-
-    // void varn_rt_print_bool(i64 val)
-    let mut pb_sig = module.make_signature();
-    pb_sig.params.push(AbiParam::new(types::I64));
-    let print_bool = module
-        .declare_function("varn_rt_print_bool", Linkage::Import, &pb_sig)
         .map_err(map_err)?;
 
     // i64 varn_rt_str_concat(i64 a_ptr, i64 a_len, i64 b_ptr, i64 b_len) -> ptr,len packed
@@ -133,21 +115,7 @@ fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
         .declare_function("varn_rt_str_concat", Linkage::Import, &sc_sig)
         .map_err(map_err)?;
 
-    // void varn_rt_panic(const char* msg_ptr, usize msg_len)  [[noreturn]]
-    let mut pe_sig = module.make_signature();
-    pe_sig.params.push(AbiParam::new(types::I64));
-    pe_sig.params.push(AbiParam::new(types::I64));
-    let panic_exit = module
-        .declare_function("varn_rt_panic", Linkage::Import, &pe_sig)
-        .map_err(map_err)?;
-
-    Ok(RtHelpers {
-        print,
-        print_int,
-        print_bool,
-        str_concat,
-        panic_exit,
-    })
+    Ok(RtHelpers { print, str_concat })
 }
 
 /// Walk the top-level module bytecode and emit CLIF IR for each instruction.

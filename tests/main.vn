@@ -101,7 +101,6 @@ import "./101-self-recursion-return-kind.vn"
 import "./102-int-overflow.vn"
 import "./103-boxed-int-range.vn"
 import "./109-try-operator.vn"
-import "./class_field_layout.vn"
 import "./117-tuples.vn"
 import "./118-intersections.vn"
 import "./119-numeric-errors.vn"
@@ -138,8 +137,8 @@ import "./149-jit-numeric.vn"
 import "./150-jit-arrays.vn"
 import "./151-jit-osr.vn"
 import "./152-jit-optional-chains.vn"
-import { assertSummary } from "std:test";
+import { summary } from "std:test";
 import "./153-local-types.vn"
 
-assertSummary()
+summary()
 

@@ -18,16 +18,3 @@ pub(crate) unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::Run
     }
     panic!("JIT error: no jump buffer");
 }
-
-#[varn_op_macros::jit_slow(field = "alloc_instance_fast")]
-pub(crate) extern "C" fn jit_alloc_instance_fast(
-    ctx: *mut ExecCtx,
-    class_id: u32,
-    payload_size: u32,
-) -> u64 {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let inst = varn_types::value::InstanceRef::alloc_with_layout(class_id, payload_size);
-        ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)) as u64
-    }
-}

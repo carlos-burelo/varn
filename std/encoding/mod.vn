@@ -1,6 +1,8 @@
-export { Json, JSON } from "std:encoding/json";
-export { CsvOptions, CSV } from "std:encoding/csv";
-export { Base64, base64Encode, base64Decode } from "std:encoding/base64";
-export { Hex, hexEncode, hexDecode } from "std:encoding/hex";
-export { TOML, parseToml, stringifyToml } from "std:encoding/toml";
+export { JsonValue, Json } from "std:encoding/json";
+export { CsvOptions, Csv } from "std:encoding/csv";
+export { Base64 } from "std:encoding/base64";
+export { Base32 } from "std:encoding/base32";
+export { Hex } from "std:encoding/hex";
+export { Html } from "std:encoding/html";
+export { Toml } from "std:encoding/toml";
 export { MsgPack } from "std:encoding/msgpack";

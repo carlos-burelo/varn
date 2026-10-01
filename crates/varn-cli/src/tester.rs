@@ -1,11 +1,11 @@
 use crate::cli::TestArgs;
 use crate::error::CliError;
 use crate::pipeline;
-use std::io::Write as IoWrite;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use varn_core::term::{chalk, log, Section};
 use varn_pipeline::RunOpts;
 
 #[derive(Clone)]
@@ -51,23 +51,31 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
             .unwrap_or(4)
     });
 
-    println!(
-        "\n  \x1b[1;36mvarn test\x1b[0m · {} suite{} · {} worker{}\n",
-        total_suites,
-        if total_suites == 1 { "" } else { "s" },
-        num_workers,
-        if num_workers == 1 { "" } else { "s" }
-    );
+    Section::new("varn test")
+        .subtitle(format!(
+            "{total_suites} suite{} · {num_workers} worker{}",
+            if total_suites == 1 { "" } else { "s" },
+            if num_workers == 1 { "" } else { "s" }
+        ))
+        .color(|c| c.cyan())
+        .print();
 
-    let file_queue: std::sync::Mutex<Vec<(usize, PathBuf)>> =
-        std::sync::Mutex::new(filtered_files.into_iter().enumerate().collect());
+    let file_queue: Mutex<Vec<(usize, PathBuf)>> =
+        Mutex::new(filtered_files.into_iter().enumerate().collect());
     let file_queue = Arc::new(file_queue);
 
     let has_failure = Arc::new(AtomicBool::new(false));
     let suites_passed = Arc::new(AtomicUsize::new(0));
     let suites_failed = Arc::new(AtomicUsize::new(0));
-    let results: Arc<std::sync::Mutex<Vec<TestResult>>> =
-        Arc::new(std::sync::Mutex::new(Vec::with_capacity(total_suites)));
+    let results: Arc<Mutex<Vec<TestResult>>> =
+        Arc::new(Mutex::new(Vec::with_capacity(total_suites)));
+    let print_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+
+    let quiet = !args.verbose;
+    if quiet {
+        varn_builtins::set_print_silent(true);
+        varn_builtins::set_testing_silent(true);
+    }
 
     let mut handles = Vec::with_capacity(num_workers);
 
@@ -77,7 +85,9 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         let suites_passed_cnt = Arc::clone(&suites_passed);
         let suites_failed_cnt = Arc::clone(&suites_failed);
         let results_store = Arc::clone(&results);
+        let out_lock = Arc::clone(&print_lock);
         let fail_fast = args.fail_fast;
+        let verbose = args.verbose;
 
         handles.push(std::thread::spawn(move || loop {
             if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
@@ -120,111 +130,85 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
 
             results_store.lock().unwrap().push(TestResult {
                 idx,
-                display_name,
+                display_name: display_name.clone(),
                 passed,
                 duration: elapsed,
-                output,
+                output: output.clone(),
             });
+
+            let ms = elapsed.as_millis();
+            let _guard = out_lock.lock().unwrap();
+            if passed {
+                log(format!(
+                    "  {} {} {}",
+                    chalk("ok").green(),
+                    display_name,
+                    chalk(format_args!("({ms}ms)")).dim()
+                ));
+            } else {
+                log(format!(
+                    "  {} {} {}",
+                    chalk("FAILED").red(),
+                    display_name,
+                    chalk(format_args!("({ms}ms)")).dim()
+                ));
+                if verbose && !output.is_empty() {
+                    for line in output.lines() {
+                        log(format!("    {}", chalk(line).dim()));
+                    }
+                }
+            }
         }));
     }
-
-    // Progress bar thread — polls completed count and overwrites a single line.
-    let done_flag = Arc::new(AtomicBool::new(false));
-    let done_clone = Arc::clone(&done_flag);
-    let results_clone = Arc::clone(&results);
-
-    let progress_thread = std::thread::spawn(move || {
-        const BAR: usize = 40;
-        loop {
-            let n = results_clone.lock().unwrap().len();
-            let filled = (n * BAR / total_suites.max(1)).min(BAR);
-            let bar = format!(
-                "\x1b[36m{}\x1b[2m{}\x1b[0m",
-                "█".repeat(filled),
-                "░".repeat(BAR - filled)
-            );
-            print!("\r  [{bar}]  {n}/{total_suites}  ");
-            let _ = std::io::stdout().flush();
-
-            if done_clone.load(Ordering::Relaxed) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(80));
-        }
-        // Erase the progress line.
-        print!("\r\x1b[2K");
-        let _ = std::io::stdout().flush();
-    });
 
     for h in handles {
         let _ = h.join();
     }
-    done_flag.store(true, Ordering::Relaxed);
-    let _ = progress_thread.join();
+
+    if quiet {
+        varn_builtins::set_print_silent(false);
+        varn_builtins::set_testing_silent(false);
+    }
 
     let total_elapsed = start_time.elapsed();
     let passed_count = suites_passed.load(Ordering::SeqCst);
     let failed_count = suites_failed.load(Ordering::SeqCst);
 
-    // Sort results by original file order for a stable grid.
     let mut all_results = results.lock().unwrap().clone();
     all_results.sort_by_key(|r| r.idx);
 
-    // ── Block grid ────────────────────────────────────────────────────────
-    println!();
-    print_block_grid(&all_results, 66);
-    println!();
-
-    // ── Summary line ─────────────────────────────────────────────────────
     if failed_count == 0 {
-        println!(
-            "  \x1b[32m{passed_count} passed\x1b[0m  ·  \x1b[2m0 failed\x1b[0m  ·  \
-             {total_suites} suites  ·  {total_elapsed:.2?}"
-        );
+        Section::new("test result")
+            .subtitle(format!(
+                "{passed_count} passed · 0 failed · {total_suites} suites · {total_elapsed:.2?}"
+            ))
+            .color(|c| c.green())
+            .print();
     } else {
-        println!(
-            "  \x1b[32m{passed_count} passed\x1b[0m  ·  \x1b[31m{failed_count} failed\x1b[0m  \
-             ·  {total_suites} suites  ·  {total_elapsed:.2?}"
-        );
-        println!();
+        Section::new("test result")
+            .subtitle(format!(
+                "{passed_count} passed · {failed_count} failed · {total_suites} suites · {total_elapsed:.2?}"
+            ))
+            .color(|c| c.red())
+            .print();
         for r in all_results.iter().filter(|r| !r.passed) {
-            println!(
-                "  \x1b[31m✖\x1b[0m  {}  \x1b[2m({:.1?})\x1b[0m",
-                r.display_name, r.duration
-            );
+            log(format!(
+                "  {} {} {}",
+                chalk("✖").red(),
+                r.display_name,
+                chalk(format_args!("({:.1?})", r.duration)).dim()
+            ));
             if !r.output.is_empty() {
                 let first = r.output.lines().next().unwrap_or(&r.output);
-                println!("     \x1b[2m{first}\x1b[0m");
+                log(format!("    {}", chalk(first).dim()));
             }
         }
     }
-    println!();
 
     if failed_count > 0 {
         Err(CliError::fatal("Some test suites failed"))
     } else {
         Ok(())
-    }
-}
-
-fn print_block_grid(results: &[TestResult], cols: usize) {
-    let mut col = 0;
-    print!("  ");
-    for r in results {
-        if r.passed {
-            print!("\x1b[32m█\x1b[0m");
-        } else {
-            print!("\x1b[31m█\x1b[0m");
-        }
-        col += 1;
-        if col >= cols {
-            println!();
-            print!("  ");
-            col = 0;
-        }
-    }
-    if col > 0 {
-        println!();
     }
 }
 

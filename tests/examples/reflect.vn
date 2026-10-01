@@ -1,0 +1,40 @@
+import { describe, it, expect, summary } from "std:test";
+import { Reflect, MetaKey, defineMetadata, getMetadata, hasMetadata } from "std:reflect";
+
+await describe("example std:reflect", async () => {
+    await it("inspects objects", () => {
+        let keys = Reflect.keys({ a: 1, b: 2 });
+        expect(keys.length).toBe(2);
+        expect(Reflect.hasOwn({ x: 1 }, "x")).toBe(true);
+        expect(Reflect.hasOwn({ x: 1 }, "missing")).toBe(false);
+        expect(Reflect.values({ a: 7 }).length).toBe(1);
+        expect(Reflect.entries({ a: 7 })[0][1]).toBe(7);
+    });
+
+    await it("names runtime types", () => {
+        expect(Reflect.typeOf([1, 2])).toBe("Array");
+        expect(Reflect.typeOf("hi")).toBe("str");
+        expect(Reflect.typeOf(42)).toBe("int");
+        expect(Reflect.typeOf(true)).toBe("bool");
+        expect(Reflect.typeOf({ a: 1 })).toBe("Object");
+    });
+
+    await it("stores untyped metadata", () => {
+        let target = { name: "svc" };
+        defineMetadata("role", "admin", target);
+        expect(hasMetadata("role", target)).toBe(true);
+        expect(getMetadata("role", target)).toBe("admin");
+        expect(hasMetadata("missing", target)).toBe(false);
+    });
+
+    await it("scopes metadata with typed keys", () => {
+        let tag = MetaKey.create<str>();
+        let target = { id: 1 };
+        tag.set(target, "v1");
+        expect(tag.has(target)).toBe(true);
+        expect(tag.get(target)).toBe("v1");
+        expect(tag.get({ id: 2 }) === null).toBe(true);
+    });
+});
+
+summary();

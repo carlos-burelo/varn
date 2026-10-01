@@ -57,14 +57,6 @@ export namespace Task {
         }
         return await ch.rx.receive();
     }
-
-    export async function delay(ms: int): Task<void> {
-        await sleep$(ms);
-    }
-
-    export async function sleep(ms: int): Task<void> {
-        await sleep$(ms);
-    }
 }
 
 export async function delay(ms: int): Task<void> {

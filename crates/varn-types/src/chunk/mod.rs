@@ -10,8 +10,7 @@ mod pool;
 mod proto;
 
 pub use inline_cache::{
-    CacheEntry, FeedbackVector, ICKind, PolyICSlot, SiteProfile, INVALID_CACHE_SHAPE,
-    POLY_IC_SLOT_SIZE,
+    CacheEntry, FeedbackVector, ICKind, PolyICSlot, SiteProfile, POLY_IC_SLOT_SIZE,
 };
 pub use lines::{LineEntry, LineMapping};
 pub use literal::Literal;

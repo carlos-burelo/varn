@@ -35,7 +35,7 @@ impl ExecCtx {
         val: VmValue,
     ) -> VmResult<()> {
         if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag) {
-            if crate::exec::props::set_fixed_field_at(obj, offset as u32, kind, val, &self.heap)
+            if crate::exec::props::set_fixed_field_at(obj, offset as u32, kind, val, &mut self.heap)
                 .is_ok()
             {
                 return Ok(());

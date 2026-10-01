@@ -53,11 +53,3 @@ export namespace Hex {
         return toString$(fromBytes$(bytes));
     }
 }
-
-export function hexEncode(data: str): str {
-    return Hex.encode(data);
-}
-
-export function hexDecode(hexString: str): str {
-    return Hex.decode(hexString);
-}

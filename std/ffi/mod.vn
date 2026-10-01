@@ -1,4 +1,4 @@
 
 export { FfiType } from "std:ffi/types";
 export { Pointer } from "std:ffi/pointer";
-export { FfiFunction, DynamicLibrary, FFI } from "std:ffi/library";
+export { FfiFunction, DynamicLibrary, Ffi } from "std:ffi/library";

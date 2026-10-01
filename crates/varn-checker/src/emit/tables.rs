@@ -45,9 +45,6 @@ pub struct Tables {
     pub classes: Vec<ClassInfo>,
     pub enums: Vec<EnumInfo>,
     pub signatures: Vec<Signature>,
-    /// Consumed by the body emitter (sub-phase 4) to resolve `Named` types and
-    /// `New`; unused while bodies are still stubs.
-    #[allow(dead_code)]
     pub names: NameIndex,
 }
 

@@ -1,7 +1,0 @@
-import { describe, it, expect } from "std:test";
-
-await describe("hello native", async () => {
-    await it("module loads", () => {
-        expect("hello").toBe("hello");
-    });
-});

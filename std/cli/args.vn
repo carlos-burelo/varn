@@ -5,7 +5,7 @@ export interface ParsedArgs {
     positionals: str[];
 }
 
-export namespace CLI {
+export namespace Cli {
     export function parse(rawArgs?: str[]): ParsedArgs {
         let input = rawArgs !== null ? rawArgs : args$();
         let flags: { [key: str]: str } = {};
@@ -36,8 +36,4 @@ export namespace CLI {
             positionals: positionals
         };
     }
-}
-
-export function parseArgs(rawArgs?: str[]): ParsedArgs {
-    return CLI.parse(rawArgs);
 }

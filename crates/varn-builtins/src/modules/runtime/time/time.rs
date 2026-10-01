@@ -76,6 +76,7 @@ varn_contract! {
             set_int(ctx, obj, "minute", dt.minute() as i64);
             set_int(ctx, obj, "second", dt.second() as i64);
             set_int(ctx, obj, "millisecond", ms.rem_euclid(1000));
+            set_int(ctx, obj, "weekday", dt.weekday().num_days_from_sunday() as i64);
             Ok(obj)
         }
         fn partsToMs(ctx: &mut dyn NativeCtx, parts: VmValue) -> Result<i64, String> {

@@ -1,5 +1,5 @@
-import { JSON, Base64, Hex, TOML } from "std:encoding";
-import { Color, Table, CLI, Prompt, prompt, confirm, password } from "std:cli";
+import { Json, Base64, Hex, Toml } from "std:encoding";
+import { Color, Table, Cli, Prompt } from "std:cli";
 import { Mutex, Semaphore, WaitGroup, delay, spawn, Task } from "std:task";
 import { LogLevel, Logger, getLogger } from "std:log";
 import { PriorityQueue, LRUCache } from "std:collections";
@@ -25,7 +25,7 @@ function testCli(): void {
         expect(renderedTable.includes("+")).toBeTruthy();;
 
     // 3. CLI Args
-    let parsed = CLI.parse(["--env=production", "-v", "src/main.vn"]);
+    let parsed = Cli.parse(["--env=production", "-v", "src/main.vn"]);
         expect(parsed.flags["env"]).toBe("production");;
         expect(parsed.flags["v"]).toBe("true");;
         expect(parsed.positionals.length).toBe(1);;
@@ -33,9 +33,9 @@ function testCli(): void {
 
     // 4. Prompt exports
         expect(Prompt !== null).toBeTruthy();;
-        expect(prompt !== null).toBeTruthy();;
-        expect(confirm !== null).toBeTruthy();;
-        expect(password !== null).toBeTruthy();;
+        expect(Prompt.ask !== null).toBeTruthy();;
+        expect(Prompt.confirm !== null).toBeTruthy();;
+        expect(Prompt.password !== null).toBeTruthy();;
 
 }
 
@@ -73,7 +73,7 @@ function testLog(): void {
     jsonLogger.debug("testing json", { "ok": true });
         expect(logJsonLines.length).toBe(1);;
 
-    let parsedRecord = JSON.parse(logJsonLines[0]) as { [key: str]: dynamic };
+    let parsedRecord = Json.parse(logJsonLines[0]) as { [key: str]: dynamic };
         expect(parsedRecord["level"]).toBe("DEBUG");;
         expect(parsedRecord["target"]).toBe("jsonApp");;
         expect(parsedRecord["message"]).toBe("testing json");;
@@ -125,12 +125,12 @@ function testCollections(): void {
 }
 async function testEncoding(): Task<void> {
 let tomlSample = "[server]\nhost = \"localhost\"\nport = 8080\nenabled = true\n";
-let parsedToml = TOML.parse(tomlSample);
+let parsedToml = Toml.parse(tomlSample);
 let serverObj = parsedToml["server"] as { [key: str]: dynamic };
 expect(serverObj["host"]).toBe("localhost");
 expect(serverObj["port"]).toBe(8080);
 expect(serverObj["enabled"]).toBe(true);
-let stringifiedToml = TOML.stringify(parsedToml);
+let stringifiedToml = Toml.stringify(parsedToml);
 expect(stringifiedToml.includes("[server]")).toBeTruthy();
 expect(stringifiedToml.includes("host = \"localhost\"")).toBeTruthy();
 }

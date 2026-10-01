@@ -1,0 +1,60 @@
+import { hmacBytes$ } from "runtime:crypto";
+import { Base32 } from "std:encoding";
+import { now } from "std:time";
+import { timingSafeEqual } from "std:crypto/password";
+
+function macName(algo: str): str {
+    if (algo === "SHA1") {
+        return "sha1";
+    }
+    if (algo === "SHA256") {
+        return "sha256";
+    }
+    if (algo === "SHA512") {
+        return "sha512";
+    }
+    throw new Error("Totp: unsupported algorithm '" + algo + "'");
+}
+
+function hotpCode(key: Bytes, counter: int, digits: int, algo: str): str {
+    let msg = Bytes.alloc(8);
+    let c = counter;
+    for (let i = 7; i >= 0; i = i - 1) {
+        msg.setByte(i, c & 255);
+        c = c >> 8;
+    }
+    let mac = hmacBytes$(macName(algo), key, msg);
+    let offset = mac.getByte(mac.length - 1) & 15;
+    let code = ((mac.getByte(offset) & 127) << 24) | (mac.getByte(offset + 1) << 16) | (mac.getByte(offset + 2) << 8) | mac.getByte(offset + 3);
+    let mod = 1;
+    for (let i = 0; i < digits; i = i + 1) {
+        mod = mod * 10;
+    }
+    let text = (code % mod).toString();
+    while (text.length < digits) {
+        text = "0" + text;
+    }
+    return text;
+}
+
+export namespace Totp {
+    export function hotp(secret: str, counter: int, digits: int = 6, algo: str = "SHA1"): str {
+        return hotpCode(Base32.decode(secret), counter, digits, algo);
+    }
+
+    export function generate(secret: str, timeMs?: int, step: int = 30, digits: int = 6, algo: str = "SHA1"): str {
+        let counter = ((timeMs ?? now()) / 1000) / step;
+        return hotp(secret, counter, digits, algo);
+    }
+
+    export function verify(secret: str, code: str, timeMs?: int, step: int = 30, digits: int = 6, algo: str = "SHA1", window: int = 1): bool {
+        let counter = ((timeMs ?? now()) / 1000) / step;
+        let key = Base32.decode(secret);
+        for (let d = 0 - window; d <= window; d = d + 1) {
+            if (timingSafeEqual(hotpCode(key, counter + d, digits, algo), code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}

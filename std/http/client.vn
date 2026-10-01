@@ -1,7 +1,7 @@
 import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
 import { Url } from "std:net";
-import { JSON, Json } from "std:encoding";
-import { HttpStatus, Headers, Request, HttpResponse, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+import { Json } from "std:encoding";
+import { HttpStatus, Headers, Request, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
 
 async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key: str]: str }, body: str): Task<Response> {
     let requestStr = method + " " + parsedUrl.path;
@@ -120,28 +120,6 @@ export async function patch(url: str, body: str = "", headers: dynamic = {}): Ta
 
 export async function del(url: str, headers: dynamic = {}): Task<Response> {
     return await fetch(url, "DELETE", headers, "");
-}
-
-export namespace http {
-    export async function get(url: str, headers: dynamic = {}): Task<Response> {
-        return await fetch(url, "GET", headers, "");
-    }
-
-    export async function post(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
-        return await fetch(url, "POST", headers, body);
-    }
-
-    export async function put(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
-        return await fetch(url, "PUT", headers, body);
-    }
-
-    export async function patch(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
-        return await fetch(url, "PATCH", headers, body);
-    }
-
-    export async function del(url: str, headers: dynamic = {}): Task<Response> {
-        return await fetch(url, "DELETE", headers, "");
-    }
 }
 
 

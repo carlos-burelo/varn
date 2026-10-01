@@ -11,7 +11,7 @@ use super::Checker;
 use crate::binder::BindResult;
 use rustc_hash::FxHashSet;
 use varn_core::ast::{
-    ArrowBody, AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind,
+    AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind,
 };
 use varn_core::{Atom, Diagnostic, ErrorCode};
 
@@ -477,14 +477,5 @@ fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
             }
         }
         _ => {}
-    }
-}
-
-/// For an arrow body used as an expression source.
-#[allow(dead_code)]
-fn arrow_body_expr(b: &ArrowBody) -> Option<ExprId> {
-    match b {
-        ArrowBody::Expr(e) => Some(*e),
-        ArrowBody::Block(_) => None,
     }
 }

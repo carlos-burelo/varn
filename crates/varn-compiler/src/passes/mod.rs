@@ -9,25 +9,14 @@ pub mod licm;
 pub mod monomorphize;
 pub mod redundant_guards;
 pub mod state_machine;
-pub mod tco;
 
 use crate::from_tir::ctor_summary::CtorSummaries;
 use crate::ssa::ir::SsaFunc;
-
-/// Optimize without cross-function knowledge. `escape` needs constructor
-/// summaries and is simply skipped; every other pass is intra-function.
-pub fn optimize(func: &mut SsaFunc) {
-    optimize_with(func, &CtorSummaries::default())
-}
 
 pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
     let mut iterations = 0;
     loop {
         let mut changed = false;
-
-        // TCO converts self-tail-calls to jumps to entry_id without setting up phi arguments,
-        // which corrupts function emission. Disabled until proper loop-header lowering is in place.
-        // changed |= tco::run(func);
 
         changed |= const_fold::run(func);
 

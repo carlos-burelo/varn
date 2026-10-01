@@ -176,13 +176,6 @@ impl VmValue {
         Self::from_int(n)
     }
 
-    /// Every `i64` is representable, so this never fails. Kept so call sites
-    /// that already handle an `Option` need not change.
-    #[inline(always)]
-    pub fn from_int_checked(n: i64) -> Option<Self> {
-        Some(Self::from_int(n))
-    }
-
     #[inline(always)]
     pub fn from_i32(n: i32) -> Self {
         Self::from_int(n as i64)

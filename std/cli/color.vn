@@ -105,8 +105,4 @@ export namespace Color {
         }
         return true;
     }
-
-    export function isatty(): bool {
-        return isInteractive();
-    }
 }

@@ -117,13 +117,13 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             )))
         }
         Some(HeapObj::Object(o)) => {
-            o.set_field_nv(Arc::from(key), val);
+            o.set_field_str(key, val);
             heap.write_barrier(idx, val);
             Ok(())
         }
         Some(HeapObj::EnumVariant(ev)) => {
             if let Value::Object(o) = &ev.payload {
-                o.set_field_nv(Arc::from(key), val);
+                o.set_field_str(key, val);
                 heap.write_barrier(idx, val);
             }
             Ok(())
@@ -168,11 +168,12 @@ pub(crate) fn set_fixed_field_at(
     offset: u32,
     tag: Option<varn_core::RuntimeKind>,
     val: VmValue,
-    heap: &Heap,
+    heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
         if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
             if inst.write_field_at(offset, tag, val).is_ok() {
+                heap.write_barrier(obj.as_heap_idx(), val);
                 return Ok(());
             }
         }

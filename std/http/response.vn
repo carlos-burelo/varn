@@ -1,7 +1,6 @@
-import { tcpRead$, tcpWrite$, tcpClose$ } from "runtime:net";
+import { tcpRead$ } from "runtime:net";
 import { Headers } from "std:http/headers";
-import { JSON, Json } from "std:encoding";
-import { spawn } from "std:task";
+import { Json, JsonValue } from "std:encoding";
 import { AsyncReader } from "std:io";
 
 export class RawResponse {
@@ -79,143 +78,6 @@ export async function readHttpResponse(connId: int): Task<RawResponse?> {
     return resp;
 }
 
-export class HttpResponse {
-    connId: int;
-    isSent: bool = false;
-    private statusCode: int = 200;
-    private responseHeaders: { [key: str]: str } = {};
-    private responseContentType: str = "text/plain";
-    private setCookies: str[] = [];
-
-    constructor(connId: int) {
-        this.connId = connId;
-        this.responseHeaders = {};
-        this.setCookies = [];
-    }
-
-    status(code: int): HttpResponse {
-        this.statusCode = code;
-        return this;
-    }
-
-    header(name: str, value: str): HttpResponse {
-        this.responseHeaders[name] = value;
-        return this;
-    }
-
-    type(contentType: str): HttpResponse {
-        this.responseContentType = contentType;
-        return this;
-    }
-
-    setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): HttpResponse {
-        let cookieStr = name + "=" + value;
-        if (options !== null) {
-            if (options.maxAge !== null) {
-                cookieStr = cookieStr + "; Max-Age=" + options.maxAge;
-            }
-            if (options.path !== null) {
-                cookieStr = cookieStr + "; Path=" + options.path;
-            } else {
-                cookieStr = cookieStr + "; Path=/";
-            }
-            if (options.httpOnly) {
-                cookieStr = cookieStr + "; HttpOnly";
-            }
-            if (options.secure) {
-                cookieStr = cookieStr + "; Secure";
-            }
-            if (options.sameSite !== null) {
-                cookieStr = cookieStr + "; SameSite=" + options.sameSite;
-            }
-        }
-        this.setCookies.push(cookieStr);
-        return this;
-    }
-
-    send(body: str): void {
-        if (this.isSent) return;
-
-        let statusText = "OK";
-        if (this.statusCode === 404) statusText = "Not Found";
-        else if (this.statusCode === 201) statusText = "Created";
-        else if (this.statusCode === 204) statusText = "No Content";
-        else if (this.statusCode === 413) statusText = "Payload Too Large";
-        else if (this.statusCode === 500) statusText = "Internal Server Error";
-
-        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
-        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
-        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n";
-
-        for (let name in this.responseHeaders) {
-            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
-        }
-        for (let c of this.setCookies) {
-            responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
-        }
-
-        responseStr = responseStr + "\r\n" + body;
-
-        spawn(this._writeAndClose(responseStr));
-        this.isSent = true;
-    }
-
-    async stream(reader: AsyncReader): Task<void> {
-        if (this.isSent) return;
-        this.isSent = true;
-
-        let statusText = "OK";
-        if (this.statusCode === 404) statusText = "Not Found";
-        else if (this.statusCode === 201) statusText = "Created";
-        else if (this.statusCode === 204) statusText = "No Content";
-        else if (this.statusCode === 500) statusText = "Internal Server Error";
-
-        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
-        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
-        responseStr = responseStr + "Transfer-Encoding: chunked\r\n";
-
-        for (let name in this.responseHeaders) {
-            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
-        }
-        for (let c of this.setCookies) {
-            responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
-        }
-        responseStr = responseStr + "\r\n";
-
-        await tcpWrite$(this.connId, responseStr);
-
-        let reading = true;
-        while (reading) {
-            let chunk = await reader.read(8192);
-            if (chunk === null) {
-                reading = false;
-            } else if (chunk.length === 0) {
-                reading = false;
-            } else {
-                let hexLen = chunk.length.toHex();
-                await tcpWrite$(this.connId, hexLen + "\r\n");
-                await tcpWrite$(this.connId, chunk);
-                await tcpWrite$(this.connId, "\r\n");
-            }
-        }
-        await tcpWrite$(this.connId, "0\r\n\r\n");
-        tcpClose$(this.connId);
-    }
-
-    private async _writeAndClose(data: str): Task<void> {
-        await tcpWrite$(this.connId, data);
-        tcpClose$(this.connId);
-    }
-
-    json(data: Json): void {
-        this.type("application/json").send(JSON.stringify(data));
-    }
-
-    html(htmlContent: str): void {
-        this.type("text/html").send(htmlContent);
-    }
-}
-
 function getHttpStatusText(status: int): str {
     if (status === 200) return "OK";
     if (status === 201) return "Created";
@@ -242,6 +104,8 @@ export class Response {
     ok: bool = true;
     body: str = "";
     headers: Headers = new Headers({});
+    cookies: str[] = [];
+    bodyStream: AsyncReader? = null;
     url: str = "";
 
     constructor(body: str = "", status: int = 200, headers: { [key: str]: str } = {}) {
@@ -250,6 +114,8 @@ export class Response {
         this.statusText = getHttpStatusText(status);
         this.ok = status >= 200 && status < 300;
         this.headers = new Headers(headers);
+        this.cookies = [];
+        this.bodyStream = null;
     }
 
     text(): str {
@@ -260,13 +126,43 @@ export class Response {
         return Bytes.fromString(this.body);
     }
 
-    json(): Json {
-        return JSON.parse(this.body);
+    json(): JsonValue {
+        return Json.parse(this.body);
+    }
+
+    setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): Response {
+        let cookieStr = name + "=" + value;
+        if (options !== null) {
+            if (options.maxAge !== null) {
+                cookieStr = cookieStr + "; Max-Age=" + options.maxAge;
+            }
+            if (options.path !== null) {
+                cookieStr = cookieStr + "; Path=" + options.path;
+            } else {
+                cookieStr = cookieStr + "; Path=/";
+            }
+            if (options.httpOnly) {
+                cookieStr = cookieStr + "; HttpOnly";
+            }
+            if (options.secure) {
+                cookieStr = cookieStr + "; Secure";
+            }
+            if (options.sameSite !== null) {
+                cookieStr = cookieStr + "; SameSite=" + options.sameSite;
+            }
+        }
+        this.cookies.push(cookieStr);
+        return this;
+    }
+
+    stream(reader: AsyncReader): Response {
+        this.bodyStream = reader;
+        return this;
     }
 }
 
-export function json(data: Json, status: int = 200, headers: { [key: str]: str } = {}): Response {
-    let body = JSON.stringify(data);
+export function json(data: JsonValue, status: int = 200, headers: { [key: str]: str } = {}): Response {
+    let body = Json.stringify(data);
     let h = new Headers(headers);
     if (!h.has("content-type")) {
         h.set("Content-Type", "application/json");

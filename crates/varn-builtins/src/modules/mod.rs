@@ -22,6 +22,8 @@ pub mod json;
 pub mod math;
 #[path = "runtime/net/net.rs"]
 pub mod net;
+#[path = "runtime/path/path.rs"]
+pub mod path;
 
 #[path = "runtime/process/process.rs"]
 pub mod process;
@@ -79,6 +81,7 @@ pub fn force_link_builtins() -> usize {
     register_marker!(json, __VARN_LINK_MARKER_RUNTIME_JSON);
     register_marker!(math, __VARN_LINK_MARKER_RUNTIME_MATH);
     register_marker!(net, __VARN_LINK_MARKER_RUNTIME_NET);
+    register_marker!(path, __VARN_LINK_MARKER_RUNTIME_PATH);
     register_marker!(process, __VARN_LINK_MARKER_RUNTIME_PROCESS);
     register_marker!(reflect, __VARN_LINK_MARKER_RUNTIME_REFLECT);
     register_marker!(regex, __VARN_LINK_MARKER_RUNTIME_REGEX);

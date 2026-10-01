@@ -10,9 +10,7 @@ export {
 } from "std:task/channel";
 
 export {
-    TaskGroupImpl,
-    TaskGroup,
-    task_group
+    TaskGroup
 } from "std:task/group";
 
 export {
@@ -29,6 +27,9 @@ export {
 export {
     Mutex,
     Semaphore,
-    WaitGroup
+    WaitGroup,
+    RateLimiter
 } from "std:task/sync";
+
+export { Cron, CronSpec } from "std:task/cron";
 

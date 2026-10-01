@@ -405,7 +405,7 @@ pub(super) fn emit_method_call(
     // `url.indexOf` on a `dynamic`). Anything else — including a
     // user-defined method of the same name on another type — falls through
     // to the instance lane and the generic helper below, untouched.
-    if args.len() == 1 && (name == "startsWith" || name == "endsWith" || name == "indexOf") {
+    if args.len() == 1 && (name == "startsWith" || name == "endsWith" || name == "indexOf" || name == "includes") {
         let arg0 = b.ins().load(types::I128, m, window, 16);
         let (at, ap) = b.ins().isplit(arg0);
         let (rt0, rp0) = b.ins().isplit(receiver);
@@ -440,11 +440,13 @@ pub(super) fn emit_method_call(
             ctx.helpers.str_starts_with
         } else if name == "endsWith" {
             ctx.helpers.str_ends_with
+        } else if name == "includes" {
+            ctx.helpers.str_includes
         } else {
             ctx.helpers.str_index_of
         };
         let r = call_helper(b, ctx.cc, helper, &[ectx, rt0, rp0, at, ap]);
-        // `indexOf` answers `int`, the prefix tests answer 0/1.
+        // `indexOf` answers `int`, the other search tests answer 0/1.
         let boxed = if name == "indexOf" {
             box_int(b, r)
         } else {
@@ -647,6 +649,15 @@ pub(super) fn emit_call_native_op(
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
             );
             return Ok(box_int(b, r));
+        }
+        if op_id == varn_core::op_id::str_includes_op_id() {
+            let r = call_helper(
+                b,
+                ctx.cc,
+                ctx.helpers.str_includes,
+                &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
+            );
+            return Ok(box_bool(b, r));
         }
     }
     // `split(separator?)`: 0 or 1 argument, array result in

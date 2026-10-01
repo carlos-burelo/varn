@@ -1,9 +1,11 @@
 
-[1mTIERS[0m[2m ── <module> · 6/6 ruteadas[0m
-  [2mfunción           words  tier   razón[0m
-  <module>            119  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
-  identity              5  [32mclif [0m  [2m (frame-aware: boxed)[0m
-  Box.constructor      12  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
-  Box.get              11  [32mclif [0m  [2m (frame-aware: this+boxed)[0m
-  Box.map              25  [32mclif [0m  [2m (frame-aware: this+alloc+boxed)[0m
-  <closure>            15  [32mclif [0m  [2m (frame-aware: alloc+boxed)[0m
+  [1mtiers[0m [2m──────────────────────────────────────────── <module> · 6/6 ruteadas[0m
+  [2mfunción        [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                           [0m
+  ────────────────┼───────┼──────┼─────────────────────────────────
+  <module>        │   119 │ clif │  (frame-aware: alloc+boxed)     
+  identity        │     5 │ clif │  (frame-aware: boxed)           
+  Box.constructor │    12 │ clif │  (frame-aware: this+boxed)      
+  Box.get         │    11 │ clif │  (frame-aware: this+boxed)      
+  Box.map         │    25 │ clif │  (frame-aware: this+alloc+boxed)
+  <closure>       │    15 │ clif │  (frame-aware: alloc+boxed)     
+  [2m── end: tiers ──[0m

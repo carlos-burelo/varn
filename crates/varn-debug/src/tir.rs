@@ -9,6 +9,8 @@ use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
 use varn_checker::{BindResult, Desugarings, TypeEntry};
 use varn_core::ast::{AstArena, AstId, Program};
+use varn_core::term::terminal;
+use varn_core::term::terminal::Section;
 
 pub fn debug_tir(
     program: &Program,
@@ -29,39 +31,48 @@ pub fn debug_tir(
     );
 
     if flags.tir {
-        eprintln!("\n=== TIR: {} ===", module.source_file);
-        eprintln!("{module:#?}");
+        Section::new("tir")
+            .subtitle(module.source_file.clone())
+            .color(|c| c.magenta())
+            .print();
+        terminal::log(format!("{module:#?}"));
+        Section::new("tir").close();
     }
 
     if flags.tir_check {
-        eprintln!("\n=== TIR CHECK: {} ===", module.source_file);
+        Section::new("tir check")
+            .subtitle(module.source_file.clone())
+            .color(|c| c.magenta())
+            .print();
         match varn_tir::verify_module(&module) {
             Ok(()) => {}
             Err(errors) => {
                 for e in &errors {
-                    eprintln!(
-                        "  verify error @ {}..{}: {}",
+                    terminal::error(format!(
+                        "verify error @ {}..{}: {}",
                         e.span.start, e.span.end, e.message
-                    );
+                    ));
                 }
-                eprintln!("  {} verify error(s)", errors.len());
+                terminal::warn(format!("{} verify error(s)", errors.len()));
             }
         }
-        let coverage = varn_tir::Coverage::of(&module);
-        eprint!("{}", coverage.report());
+        for line in varn_tir::Coverage::of(&module).report().lines() {
+            terminal::log(line.to_string());
+        }
 
         // Stage 3: how far `from_tir` gets building SSA from this module.
         match varn_compiler::from_tir::build_module(&module) {
-            Ok(fns) => eprintln!("  from_tir(ssa): OK ({} ssa fn(s))", fns.len()),
-            Err(e) => eprintln!("  from_tir(ssa): {e:?}"),
+            Ok(fns) => terminal::info(format!("from_tir(ssa): OK ({} ssa fn(s))", fns.len())),
+            Err(e) => terminal::warn(format!("from_tir(ssa): {e:?}")),
         }
         // ...and compiling it all the way to a proto (panics are caught).
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             varn_compiler::from_tir::compile_module(&module, vec![])
         })) {
-            Ok(Ok(_)) => eprintln!("  from_tir(proto): OK"),
-            Ok(Err(e)) => eprintln!("  from_tir(proto): {e:?}"),
-            Err(_) => eprintln!("  from_tir(proto): PANIC"),
+            Ok(Ok(_)) => terminal::info("from_tir(proto): OK"),
+            Ok(Err(e)) => terminal::warn(format!("from_tir(proto): {e:?}")),
+            Err(_) => terminal::error("from_tir(proto): PANIC"),
         }
+        Section::new("tir check").close();
     }
 }

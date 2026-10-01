@@ -148,13 +148,6 @@ impl FrameStore {
         }
     }
 
-    /// Libera todo por encima de `id` (sin incluirlo) — unwind.
-    pub fn pop_above(&mut self, id: usize) {
-        while self.allocs.len() > id + 1 {
-            self.pop_frame();
-        }
-    }
-
     /// Asegura que la activación `id` direcciona `register_count` registros
     /// (extiende con defaults si un trailing nunca se escribió).
     pub fn ensure_frame_size(&mut self, id: usize, register_count: usize) {

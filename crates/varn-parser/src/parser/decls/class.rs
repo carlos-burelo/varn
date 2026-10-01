@@ -158,6 +158,9 @@ pub fn parse_class_member(
     mods.is_generator = is_generator;
 
     if mods.is_static && s.check(TokenKind::LBrace) {
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on static blocks".to_owned());
+        }
         let body = super::super::stmts::parse_block(s)?;
         let full_range = s.span_from(range);
         return Ok(ClassMember::StaticBlock {
@@ -168,6 +171,9 @@ pub fn parse_class_member(
 
     if s.check(TokenKind::Constructor) {
         s.advance();
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on constructors".to_owned());
+        }
         let params = super::super::patterns::parse_params(s)?;
         let body = if class_is_declare {
             if s.check(TokenKind::LBrace) {
@@ -187,6 +193,9 @@ pub fn parse_class_member(
     }
     if s.check(TokenKind::Destructor) {
         s.advance();
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on destructors".to_owned());
+        }
         let body = if class_is_declare {
             if s.check(TokenKind::LBrace) {
                 return Err("declare destructor cannot have a body".to_owned());
@@ -214,6 +223,9 @@ pub fn parse_class_member(
 
     if is_get {
         s.advance();
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on getters".to_owned());
+        }
         let key = member_key_name(s)?;
         s.expect(TokenKind::LParen)?;
         s.expect(TokenKind::RParen)?;
@@ -242,6 +254,9 @@ pub fn parse_class_member(
     }
     if is_set {
         s.advance();
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on setters".to_owned());
+        }
         let key = member_key_name(s)?;
         s.expect(TokenKind::LParen)?;
         let param = super::super::patterns::parse_single_param(s)?;
@@ -316,6 +331,9 @@ pub fn parse_class_member(
     };
     s.eat_semicolon();
     let full_range = s.span_from(range);
+    if !decorators.is_empty() {
+        return Err("decorators are not supported on properties".to_owned());
+    }
     Ok(ClassMember::Property {
         key: s.interner.intern(&key),
         type_ann,

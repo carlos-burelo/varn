@@ -1,13 +1,3 @@
-//! The `JitHelpers` table: every host entry point compiled code can call,
-//! plus the probed struct offsets it addresses fields through.
-//!
-//! This is an ABI surface, not VM logic — one wrong or missing field is a
-//! jump to a null address from generated code, so it lives on its own.
-//!
-//! The function-address half is generated from the `#[jit_slow(field)]`
-//! annotations in `exec::jit_helpers`, the same source `varn-jit` builds the
-//! struct fields from. A helper is registered once, at its function.
-
 use crate::exec::ctx;
 use varn_op_macros::jit_helper_table;
 
@@ -43,11 +33,7 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     jit_helper_table!(fill, "src/exec/jit_helpers")
 }
 
-/// Compile-time op-id resolution for `CallNativeOp` codegen.
-///
-/// See [`varn_types::NativeOpTarget`] for what each field means and what a zero
-/// in it implies. The whole op table lives in `varn-builtins`, which `varn-jit`
-/// deliberately does not depend on; this is the function pointer bridging that.
+
 fn resolve_native_op_target(op_id: u64) -> varn_types::NativeOpTarget {
     varn_builtins::find_native_op_entry(op_id).map_or(varn_types::NativeOpTarget::unknown(), |e| {
         varn_types::NativeOpTarget {

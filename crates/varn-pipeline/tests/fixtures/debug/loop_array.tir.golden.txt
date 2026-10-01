@@ -1,5 +1,5 @@
 
-=== TIR: <fixtures>/loop_array.vn ===
+  [35mtir[0m [2m────────────────────────────────────────────── <fixtures>/loop_array.vn[0m
 TirModule {
     source_file: "<fixtures>/loop_array.vn",
     imports: [],
@@ -1178,3 +1178,4 @@ TirModule {
         has_rest: false,
     },
 }
+  [2m── end: tir ──[0m

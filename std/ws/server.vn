@@ -1,0 +1,77 @@
+import {
+    tcpListen$,
+    tcpAccept$,
+    tcpWrite$,
+    tcpClose$,
+    tcpCloseListener$
+} from "runtime:net";
+
+import { wsAcceptResponse$ } from "runtime:ws";
+import { WebSocket, readHttpHead } from "std:ws/client";
+import { stdError, E_WS_IO, E_WS_HANDSHAKE } from "std:error";
+
+export class WsServer {
+    private _listener: int = -1;
+    private _port: int;
+    private _isListening: bool = false;
+
+    constructor(port: int) {
+        this._port = port;
+    }
+
+    static listen(port: int): WsServer {
+        let server = new WsServer(port);
+        let id = tcpListen$(port);
+        if (id < 0) {
+            throw stdError(E_WS_IO, "could not listen on port " + port.toString());
+        }
+        server._listener = id;
+        server._isListening = true;
+        return server;
+    }
+
+    get port(): int {
+        return this._port;
+    }
+
+    get isListening(): bool {
+        return this._isListening;
+    }
+
+    async accept(): Task<WebSocket> {
+        if (!this._isListening) {
+            throw stdError(E_WS_IO, "server is closed");
+        }
+        let conn = await tcpAccept$(this._listener);
+        if (conn < 0) {
+            throw stdError(E_WS_IO, "accept failed");
+        }
+        try {
+            let head = await readHttpHead(conn);
+            if (!head.head.toLowerCase().includes("upgrade")) {
+                tcpClose$(conn);
+                throw stdError(E_WS_HANDSHAKE, "not a websocket upgrade");
+            }
+            let res = wsAcceptResponse$(head.head);
+            await tcpWrite$(conn, res);
+            let ws = new WebSocket(conn, "");
+            ws.absorb(head.rest);
+            return ws;
+        } catch (e) {
+            try {
+                tcpClose$(conn);
+            } catch (ce) {}
+            throw e;
+        }
+    }
+
+    close(): void {
+        if (this._isListening) {
+            this._isListening = false;
+            if (this._listener >= 0) {
+                tcpCloseListener$(this._listener);
+                this._listener = -1;
+            }
+        }
+    }
+}

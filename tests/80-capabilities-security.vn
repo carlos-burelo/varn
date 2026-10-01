@@ -1,6 +1,7 @@
 import { describe, it, expect } from "std:test";
-import { read, write, remove, exists } from "std:fs";
-import { env, platform, cwd } from "std:sys";
+import { readText, writeText, remove, exists } from "std:fs";
+import { Env } from "std:env";
+import { platform, cwd } from "std:sys";
 
 await describe("80 capabilities security", async () => {
     await it("tests", async () => {
@@ -21,22 +22,22 @@ await describe("80 capabilities security", async () => {
         let cargo_exists = exists("Cargo.toml");
         expect(cargo_exists).toBe(true);
         
-        let content = read("Cargo.toml");
+        let content = readText("Cargo.toml");
         expect(content.length > 0).toBeTruthy();
         
         // 3. Comprobación de ciclo de vida seguro de escritura y borrado
         let temp_file = "test_cap_security.tmp";
-        write(temp_file, "security_payload_ok");
+        writeText(temp_file, "security_payload_ok");
         expect(exists(temp_file)).toBe(true);
         
-        let read_back = read(temp_file);
+        let read_back = readText(temp_file);
         expect(read_back).toBe("security_payload_ok");
         
         remove(temp_file);
         expect(exists(temp_file)).toBe(false);
         
         // 4. Comprobación de lectura de variables de entorno
-        let os_val = env("OS");
+        let os_val = Env.get("OS");
         // En Windows OS es "Windows_NT", en Unix puede ser vacío pero no debe crashear
         expect(typeof os_val).toBe("str");
         

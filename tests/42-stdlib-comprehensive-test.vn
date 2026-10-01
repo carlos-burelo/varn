@@ -1,10 +1,10 @@
 import { describe, it, expect } from "std:test";
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
 import { List, Stack, Queue } from 'std:collections';
-import { Http } from 'std:http';
-import { JSON } from 'std:encoding';
+import { fetch } from 'std:http';
+import { Json } from 'std:encoding';
 import { uuid, sha256 } from 'std:crypto';
-import { write as fsWrite, exists as fsExists, read as fsRead } from 'std:fs';
+import { writeText as fsWrite, exists as fsExists, readText as fsRead } from 'std:fs';
 import { write as ioWrite, writeln as ioWriteln } from 'std:io';
 import { PI as mathPI, abs as mathAbs, min as mathMin, max as mathMax } from 'std:math';
 import { platform as sysPlatform, cwd as sysCwd } from 'std:sys';
@@ -48,8 +48,8 @@ async function runComprehensiveTest(): Task<void> {
     expect(hash.length).toBe(64);
 
     // 4. std:json
-    let serialized = JSON.stringify({ test: "json", value: 123 });
-    let parsed = JSON.parse(serialized);
+    let serialized = Json.stringify({ test: "json", value: 123 });
+    let parsed = Json.parse(serialized);
     expect(parsed["test"]).toBe("json");
     expect(parsed["value"]).toBe(123);
 
@@ -125,8 +125,8 @@ async function runComprehensiveTest(): Task<void> {
     expect(hasMetadata("my_key", list)).toBeTruthy();
 
     // 12. std:http
-    expect(Http !== null).toBeTruthy();
-    let clientTask = Http.fetch("http://%/");
+    expect(fetch !== null).toBeTruthy();
+    let clientTask = fetch("http://%/");
     let clientRes = await clientTask;
     expect(clientRes.status).toBe(200);
     expect(clientRes.body.length > 0).toBeTruthy();
@@ -147,7 +147,7 @@ async function runComprehensiveTest(): Task<void> {
     ]);
     expect(all[0] === 1 && all[1] === 2).toBeTruthy();
 
-    using group = TaskGroup<int>();
+    using group = new TaskGroup<int>();
     async function ten(): Task<int> { return 10; }
     async function twenty(): Task<int> { return 20; }
     let g1 = group.spawn(ten());

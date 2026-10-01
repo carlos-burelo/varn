@@ -1,11 +1,10 @@
 
 export { Stats } from "std:fs/stats";
 export { File, FileStream } from "std:fs/file";
+export { glob } from "std:fs/glob";
 export {
-    read,
     readText,
     readBytes,
-    write,
     writeText,
     writeBytes,
     appendText,

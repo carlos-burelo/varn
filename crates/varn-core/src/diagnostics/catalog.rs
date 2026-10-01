@@ -97,6 +97,7 @@ pub enum ErrorCode {
     AmbiguousExtensionMethod = 4112,
     InvalidExtensionReceiver = 4113,
     SuperOutsideMethod = 4114,
+    ThisOutsideInstance = 4115,
 
     InvalidIsolateTransfer = 4201,
     ChannelClosedError = 4202,
@@ -220,6 +221,7 @@ impl ErrorCode {
             ErrorCode::AmbiguousExtensionMethod => "ambiguous-extension-method",
             ErrorCode::InvalidExtensionReceiver => "invalid-extension-receiver",
             ErrorCode::SuperOutsideMethod => "super-outside-method",
+            ErrorCode::ThisOutsideInstance => "this-outside-instance",
 
             ErrorCode::InvalidIsolateTransfer => "invalid-isolate-transfer",
             ErrorCode::ChannelClosedError => "channel-closed-error",

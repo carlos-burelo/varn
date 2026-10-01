@@ -1,7 +1,7 @@
 import { Database } from "std:sqlite";
 import { Compress, Tar, Zip } from "std:compress";
 import { WebSocket } from "std:ws";
-import { exists, mkdir, write, remove, removeAll } from "std:fs";
+import { exists, mkdir, writeText, remove, removeAll } from "std:fs";
 import { Path } from "std:path";
 import { describe, it, expect } from "std:test";
 
@@ -33,7 +33,7 @@ await describe("85 stdlib sqlite ws archive", async () => {
         if (!exists(testDir)) {
             mkdir(testDir);
         }
-        write(Path.join(testDir, "test.txt"), "Archive content 123");
+        writeText(Path.join(testDir, "test.txt"), "Archive content 123");
         let tarPath = "./tmp_test.tar";
         let tarCreated = Tar.create(testDir, tarPath);
         expect(tarCreated).toBe(true);

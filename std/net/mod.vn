@@ -23,14 +23,11 @@ export {
 } from "std:net/ip";
 
 export {
-    URLSearchParams,
-    Query,
-    parseQuery,
-    buildQuery
+    Query
 } from "std:net/query";
 
 export {
     Url,
-    parseURL,
+    parseUrl,
     appendQuery
 } from "std:net/url";

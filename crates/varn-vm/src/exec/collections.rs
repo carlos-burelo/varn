@@ -5,32 +5,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::{value::ObjRef, Value};
 
-/// Build an object literal from `count` frame registers using a pre-resolved
-/// shape (see `FunctionProto::resolved_shape`), avoiding the per-key
-/// shape-transition lookups of the generic `build_object` path. Values are
-/// read in slot order, which matches the shape's key order.
-#[allow(dead_code)]
-pub(crate) fn build_object_with_shape(
-    store: &crate::frame_store::FrameStore,
-    base: usize,
-    start_reg: usize,
-    shape: Rc<varn_types::Shape>,
-    heap: &mut Heap,
-) -> VmValue {
-    build_with_shape(store, base, start_reg, shape, heap, true, false)
-}
-
-#[allow(dead_code)]
-pub(crate) fn build_record_with_shape(
-    store: &crate::frame_store::FrameStore,
-    base: usize,
-    start_reg: usize,
-    shape: Rc<varn_types::Shape>,
-    heap: &mut Heap,
-) -> VmValue {
-    build_with_shape(store, base, start_reg, shape, heap, true, true)
-}
-
 /// `may_hold_closure` lo decide el sitio de llamada cuando puede: si el backend
 /// sabe que todos los campos son valores desboxados, ninguno es una closure y el
 /// barrido que cierra upvalues sobra. El intérprete no lo sabe y pasa `true`.
@@ -332,6 +306,38 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                 .lookup_map_key(key)
                 .and_then(|k| m.borrow().get(&k).copied());
             Ok(found.unwrap_or_else(VmValue::null))
+        }
+        Some(
+            HeapObj::Instance(_)
+            | HeapObj::Class(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_),
+        ) => {
+            let mut buf = [0u8; 5];
+            let key_str: String = if key.is_sso() {
+                key.sso_as_str(&mut buf).to_string()
+            } else if key.is_heap() {
+                match heap.get(key.as_heap_idx()) {
+                    Some(HeapObj::Str(s)) => s.as_str().to_string(),
+                    _ => heap.str_repr(key),
+                }
+            } else {
+                heap.str_repr(key)
+            };
+            match super::props::get_property(obj, &key_str, heap) {
+                Ok(v) if !v.is_null() => Ok(v),
+                _ => {
+                    match super::props::find_getter(obj, &key_str, heap) {
+                        Some(g) => {
+                            let receiver = heap.extract(obj);
+                            let bound =
+                                super::props::bind_method_to_receiver(receiver, g, None);
+                            Ok(heap.intern(bound))
+                        }
+                        None => Ok(VmValue::null()),
+                    }
+                }
+            }
         }
         _ => Err(RuntimeError::new("OpGetIndex: not indexable")),
     }

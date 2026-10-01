@@ -47,7 +47,6 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             Ushr => OpCode::Ushr,
             Instanceof => OpCode::Instanceof,
             In => OpCode::In,
-            And | Or => OpCode::Add,
         },
         HirType::Float => match op {
             Add => OpCode::AddFloat,
@@ -70,7 +69,6 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             Ushr => OpCode::Ushr,
             Instanceof => OpCode::Instanceof,
             In => OpCode::In,
-            And | Or => OpCode::Add,
         },
         _ => match op {
             Add => OpCode::Add,
@@ -93,7 +91,6 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             Ushr => OpCode::Ushr,
             Instanceof => OpCode::Instanceof,
             In => OpCode::In,
-            And | Or => OpCode::Add,
         },
     }
 }

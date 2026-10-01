@@ -1,6 +1,41 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
+struct ParallelState {
+    remaining: usize,
+    results: Vec<Value>,
+    error: Option<String>,
+}
+
+fn settle_parallel_one(
+    state: &std::sync::Mutex<ParallelState>,
+    output: &varn_types::AsyncTask,
+    idx: usize,
+    res: Result<Value, Value>,
+) {
+    let mut st = state.lock().unwrap();
+    if st.remaining == 0 {
+        return;
+    }
+    match res {
+        Ok(v) => st.results[idx] = v,
+        Err(e) => {
+            if st.error.is_none() {
+                st.error = Some(format!("{e}"));
+            }
+        }
+    }
+    st.remaining -= 1;
+    if st.remaining == 0 {
+        if let Some(msg) = st.error.take() {
+            output.reject_msg(msg);
+        } else {
+            let arr = varn_types::value::ArrayRef::new(std::mem::take(&mut st.results));
+            output.resolve(Value::Array(arr));
+        }
+    }
+}
+
 pub struct TaskRuntime;
 
 pub struct IsolateHandleImpl;
@@ -31,40 +66,27 @@ varn_contract! {
 
             use std::sync::{Arc, Mutex};
             let output = varn_types::AsyncTask::pending();
-            let pending_count = Arc::new(Mutex::new(handles.len()));
-            let results = Arc::new(Mutex::new(vec![Value::Null; handles.len()]));
+            let state = Arc::new(Mutex::new(ParallelState {
+                remaining: handles.len(),
+                results: vec![Value::Null; handles.len()],
+                error: None,
+            }));
 
             for (idx, handle_nv) in handles.iter().copied().enumerate() {
                 let handle_val = ctx.extract(handle_nv);
                 if let Value::TaskHandle(handle) = handle_val {
-                    let pending_count = Arc::clone(&pending_count);
-                    let results = Arc::clone(&results);
+                    let state = Arc::clone(&state);
                     let output_clone = output.clone();
                     handle.on_settle(move |res| {
-                        let val = match res {
-                            Ok(v) => v,
-                            Err(e) => {
-                                output_clone.reject_msg(format!("{e}"));
-                                return;
-                            }
-                        };
-                        let mut results_guard = results.lock().unwrap();
-                        results_guard[idx] = val;
-                        let mut count_guard = pending_count.lock().unwrap();
-                        *count_guard -= 1;
-                        if *count_guard == 0 {
-                            let arr = varn_types::value::ArrayRef::new(results_guard.clone());
-                            output_clone.resolve(Value::Array(arr));
-                        }
+                        settle_parallel_one(&state, &output_clone, idx, res);
                     });
                 } else {
-                    let mut count_guard = pending_count.lock().unwrap();
-                    *count_guard -= 1;
-                    if *count_guard == 0 {
-                        let results_guard = results.lock().unwrap();
-                        let arr = varn_types::value::ArrayRef::new(results_guard.clone());
-                        output.resolve(Value::Array(arr));
-                    }
+                    settle_parallel_one(
+                        &state,
+                        &output,
+                        idx,
+                        Ok(ctx.extract(handle_nv)),
+                    );
                 }
             }
 

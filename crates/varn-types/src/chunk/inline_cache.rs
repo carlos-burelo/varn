@@ -1,8 +1,6 @@
 //! Inline-cache slots and the per-site feedback the JIT reads: shape ids,
 //! polymorphic slots, and call-site profiles.
 
-pub const INVALID_CACHE_SHAPE: u32 = 0;
-
 /// Classification flags for Inline Cache (IC) slot entries (`CacheEntry.is_class`).
 pub struct ICKind;
 impl ICKind {

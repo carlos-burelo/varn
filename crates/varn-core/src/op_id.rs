@@ -86,6 +86,11 @@ pub fn str_index_of_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "indexOf"))
 }
 
+pub fn str_includes_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "includes"))
+}
+
 pub fn str_split_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "split"))

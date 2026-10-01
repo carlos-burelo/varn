@@ -1,4 +1,5 @@
 import { channel$, Channel } from "runtime:task";
+import { now } from "std:time";
 
 export class Mutex {
     private _lockChannel: Channel<bool>;
@@ -97,5 +98,42 @@ export class WaitGroup {
 
     private _notifyWaiters(): void {
         this._waiters.tx.send(true);
+    }
+}
+
+export class RateLimiter {
+    private _capacity: int;
+    private _tokens: float;
+    private _perMs: float;
+    private _last: int;
+
+    constructor(capacity: int, perSecond: float) {
+        if (capacity <= 0) {
+            throw new Error("RateLimiter capacity must be greater than zero");
+        }
+        if (perSecond <= 0.0) {
+            throw new Error("RateLimiter rate must be greater than zero");
+        }
+        this._capacity = capacity;
+        this._tokens = capacity as float;
+        this._perMs = perSecond / 1000.0;
+        this._last = now();
+    }
+
+    take(count: int = 1): bool {
+        let at = now();
+        let elapsed = at - this._last;
+        if (elapsed > 0) {
+            this._tokens = this._tokens + (elapsed as float) * this._perMs;
+            if (this._tokens > this._capacity as float) {
+                this._tokens = this._capacity as float;
+            }
+            this._last = at;
+        }
+        if (this._tokens >= count as float) {
+            this._tokens = this._tokens - (count as float);
+            return true;
+        }
+        return false;
     }
 }

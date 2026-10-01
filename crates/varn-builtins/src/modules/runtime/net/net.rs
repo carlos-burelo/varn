@@ -91,6 +91,7 @@ varn_contract! {
             status_text: &str,
             headers: VmValue,
             body: &str,
+            cookies: varn_types::VnArray,
         ) -> Result<VmValue, String> {
             use std::io::Write;
             let mut out = Vec::with_capacity(128 + body.len());
@@ -119,6 +120,15 @@ varn_contract! {
 
             if !has_content_length {
                 let _ = write!(&mut out, "Content-Length: {}\r\n", body.len());
+            }
+
+            let cookie_len = cookies.len(ctx);
+            for i in 0..cookie_len {
+                if let Some(v) = cookies.get(ctx, i) {
+                    if let Some(c) = ctx.str_owned(v) {
+                        let _ = write!(&mut out, "Set-Cookie: {c}\r\n");
+                    }
+                }
             }
 
             let _ = write!(&mut out, "\r\n");

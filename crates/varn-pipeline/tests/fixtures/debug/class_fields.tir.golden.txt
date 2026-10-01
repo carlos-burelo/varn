@@ -1,5 +1,5 @@
 
-=== TIR: <fixtures>/class_fields.vn ===
+  [35mtir[0m [2m────────────────────────────────────────────── <fixtures>/class_fields.vn[0m
 TirModule {
     source_file: "<fixtures>/class_fields.vn",
     imports: [],
@@ -949,3 +949,4 @@ TirModule {
         has_rest: false,
     },
 }
+  [2m── end: tir ──[0m

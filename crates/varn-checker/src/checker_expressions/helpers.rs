@@ -84,16 +84,35 @@ impl<'r> Checker<'r> {
         target: &str,
         bind: &crate::binder::BindResult,
     ) -> bool {
-        let mut current = candidate;
+        let mut visited: Vec<String> = Vec::new();
+        let mut current = candidate.to_string();
         loop {
             if current == target {
                 return true;
             }
-            match bind.get_class_parent(current) {
-                Some(parent) => current = parent,
+            if visited.iter().any(|v| v == &current) {
+                return false;
+            }
+            visited.push(current.clone());
+            match self.class_parent_step(&current, bind) {
+                Some(next) => current = next,
                 None => return false,
             }
         }
+    }
+
+    fn class_parent_step(&self, name: &str, bind: &crate::binder::BindResult) -> Option<String> {
+        if let Some(parent) = bind.get_class_parent(name) {
+            return Some(parent.to_string());
+        }
+        for spec in varn_modules::std_module_ids() {
+            if let Some(rb) = self.resolver.stdlib_bind(spec) {
+                if let Some(parent) = rb.class_parents.get(name) {
+                    return Some(parent.to_string());
+                }
+            }
+        }
+        None
     }
 
     /// A value may be thrown only when it is (or could be) an `Error`

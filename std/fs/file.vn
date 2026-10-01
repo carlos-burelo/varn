@@ -2,23 +2,30 @@ import {
     open$,
     readFd$,
     readFdBytes$,
+    readFdAll$,
+    readFdAllBytes$,
     writeFd$,
     writeFdBytes$,
     seek$,
     close$
 } from "runtime:fs";
 
-import { Writer, AsyncReader, AsyncWriter } from "std:io";
+import { Writer, AsyncReader, AsyncWriter, BulkPump } from "std:io";
+import { toStdError, E_FS_IO } from "std:error";
 
 export class File {
-    private _fd: int;
+    private _fd: int = -1;
     private _path: str;
     private _mode: str;
 
     constructor(path: str, mode: str = "r") {
-        this._fd = open$(path, mode);
         this._path = path;
         this._mode = mode;
+        try {
+            this._fd = open$(path, mode);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     static open(path: str, mode: str): File {
@@ -26,68 +33,98 @@ export class File {
     }
 
     write(content: str): int {
-        return writeFd$(this._fd, content);
+        try {
+            return writeFd$(this._fd, content);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     writeBytes(data: Bytes): int {
-        return writeFdBytes$(this._fd, data);
+        try {
+            return writeFdBytes$(this._fd, data);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     append(content: str): int {
-        let fd = open$(this._path, "a");
-        let written = writeFd$(fd, content);
-        close$(fd);
-        return written;
+        try {
+            let fd = open$(this._path, "a");
+            let written = writeFd$(fd, content);
+            close$(fd);
+            return written;
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     appendBytes(data: Bytes): int {
-        let fd = open$(this._path, "a");
-        let written = writeFdBytes$(fd, data);
-        close$(fd);
-        return written;
+        try {
+            let fd = open$(this._path, "a");
+            let written = writeFdBytes$(fd, data);
+            close$(fd);
+            return written;
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     read(size?: int): str {
-        let readSize = size ?? 4096;
-        return readFd$(this._fd, readSize);
+        try {
+            let readSize = size ?? 4096;
+            return readFd$(this._fd, readSize);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     readBytes(size?: int): Bytes {
-        let readSize = size ?? 4096;
-        return readFdBytes$(this._fd, readSize);
+        try {
+            let readSize = size ?? 4096;
+            return readFdBytes$(this._fd, readSize);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     readAll(): str {
-        let out = "";
-        let keepReading = true;
-        while (keepReading) {
-            let chunk = readFd$(this._fd, 8192);
-            if (chunk.length > 0) {
-                out = out + chunk;
-            } else {
-                keepReading = false;
-            }
+        try {
+            return readFdAll$(this._fd);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
         }
-        return out;
+    }
+
+    readAllBytes(): Bytes {
+        try {
+            return readFdAllBytes$(this._fd);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     seek(offset: int, whence: int): int {
-        return seek$(this._fd, offset, whence);
+        try {
+            return seek$(this._fd, offset, whence);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     close(): void {
-        close$(this._fd);
+        try {
+            close$(this._fd);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     pipeTo(dst: Writer): void {
-        let keepReading = true;
-        while (keepReading) {
-            let chunk = readFd$(this._fd, 8192);
-            if (chunk.length > 0) {
-                dst.write(chunk);
-            } else {
-                keepReading = false;
-            }
+        try {
+            dst.write(readFdAll$(this._fd));
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
         }
     }
 
@@ -100,15 +137,19 @@ export class File {
     }
 }
 
-export class FileStream implements AsyncReader, AsyncWriter {
-    private _fd: int;
+export class FileStream implements AsyncReader, AsyncWriter, BulkPump {
+    private _fd: int = -1;
     private _path: str;
     private _mode: str;
 
     constructor(path: str, mode: str = "r") {
-        this._fd = open$(path, mode);
         this._path = path;
         this._mode = mode;
+        try {
+            this._fd = open$(path, mode);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     static open(path: str, mode: str): FileStream {
@@ -116,21 +157,56 @@ export class FileStream implements AsyncReader, AsyncWriter {
     }
 
     async read(size?: int): Task<Bytes?> {
-        let readSize = size ?? 8192;
-        let b = readFdBytes$(this._fd, readSize);
-        if (b.length === 0) {
-            return null;
+        try {
+            let readSize = size ?? 8192;
+            let b = readFdBytes$(this._fd, readSize);
+            if (b.length === 0) {
+                return null;
+            }
+            return b;
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
         }
-        return b;
     }
 
     async write(data: Bytes): Task<int> {
-        return writeFdBytes$(this._fd, data);
+        try {
+            return writeFdBytes$(this._fd, data);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
+    }
+
+    async readAll(): Task<Bytes> {
+        try {
+            return readFdAllBytes$(this._fd);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
+    }
+
+    async pumpTo(writer: AsyncWriter): Task<int> {
+        try {
+            let data = readFdAllBytes$(this._fd);
+            if (data.length === 0) {
+                await writer.flush();
+                return 0;
+            }
+            let written = await writer.write(data);
+            await writer.flush();
+            return written;
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 
     async flush(): Task<void> {}
 
     close(): void {
-        close$(this._fd);
+        try {
+            close$(this._fd);
+        } catch (e) {
+            throw toStdError(e as Error, E_FS_IO);
+        }
     }
 }

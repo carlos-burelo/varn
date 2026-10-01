@@ -1,0 +1,40 @@
+import { Base64 } from "std:encoding";
+
+export type BasicCredentials = {
+    user: str,
+    pass: str
+};
+
+export namespace Auth {
+    export function bearer(header: str): str? {
+        if (header.startsWith("Bearer ")) {
+            return header.slice(7).trim();
+        }
+        return null;
+    }
+
+    export function basic(header: str): BasicCredentials? {
+        if (!header.startsWith("Basic ")) {
+            return null;
+        }
+        let decoded: str;
+        try {
+            decoded = Base64.decode(header.slice(6).trim());
+        } catch (e) {
+            return null;
+        }
+        let colon = decoded.indexOf(":");
+        if (colon < 0) {
+            return null;
+        }
+        return #{ user: decoded.slice(0, colon), pass: decoded.slice(colon + 1) };
+    }
+
+    export function basicChallenge(realm: str = "varn"): str {
+        return "Basic realm=\"" + realm + "\"";
+    }
+
+    export function bearerChallenge(realm: str = "varn"): str {
+        return "Bearer realm=\"" + realm + "\"";
+    }
+}

@@ -1,0 +1,17 @@
+import { Json } from "std:encoding";
+
+let items = [];
+for (let i = 0; i < 50000; i = i + 1) {
+    items.push({
+        id: i,
+        name: "Item_" + i,
+        active: (i % 2) === 0,
+        score: ((i % 100) as float) * 1.25
+    });
+}
+
+let jsonStr = Json.stringify(items);
+print("Stringify done, len: " + jsonStr.length);
+
+let parsed = Json.parse(jsonStr) as dynamic[];
+print("Parse done, len: " + parsed.length);

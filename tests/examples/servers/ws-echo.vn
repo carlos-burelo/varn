@@ -1,0 +1,14 @@
+import { WsServer } from "std:ws";
+
+async function main(): Task<void> {
+    let srv = WsServer.listen(19884);
+    let conn = await srv.accept();
+    let msg = await conn.read();
+    if (msg !== null) {
+        await conn.send("ECHO:" + (msg as Bytes).toString());
+    }
+    conn.close();
+    srv.close();
+}
+
+await main();

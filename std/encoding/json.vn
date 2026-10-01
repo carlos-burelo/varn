@@ -1,13 +1,13 @@
 import { parse$, stringify$ } from "runtime:json";
 
-export type Json = int | float | str | bool | null | Json[] | { [key: str]: Json };
+export type JsonValue = int | float | str | bool | null | JsonValue[] | { [key: str]: JsonValue };
 
-export namespace JSON {
-    export function parse<T = Json>(text: str): T {
+export namespace Json {
+    export function parse<T = JsonValue>(text: str): T {
         return parse$(text) as T;
     }
 
-    export function tryParse<T = Json>(text: str): T? {
+    export function tryParse<T = JsonValue>(text: str): T? {
         try {
             return parse$(text) as T;
         } catch {
