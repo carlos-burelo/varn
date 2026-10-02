@@ -15,9 +15,9 @@ pub mod resource;
 pub mod ssa;
 pub mod str_util;
 pub mod task;
-pub mod wake;
 pub mod value;
 pub mod vm_value;
+pub mod wake;
 pub use chunk::{
     Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
 };
@@ -33,7 +33,6 @@ pub use native_ctx::NativeFnResult;
 pub use native_error::NativeError;
 pub use resource::ResourceStore;
 pub use task::{reject_task, reject_value_task, resolve_task, AsyncTask, Poll, TaskState};
-pub use wake::{WakeQueue, WakeToken};
 pub use value::{
     find_method_with_owner, root_shape, ClassObj, Closure, LazyTask, ModuleObj, ObjData,
     ResultType, RuntimeArray, RuntimeString, Shape, Upvalue, UpvalueInner, Value, VmBuffer,
@@ -41,4 +40,5 @@ pub use value::{
     SHAPE_ID_OFF,
 };
 pub use value::{InstanceData, InstanceRef};
-pub use vm_value::{ArrayRepr, VmArray, VmValue, VmValueRef};
+pub use vm_value::{ArrayRepr, BoxedElems, VmArray, VmValue, VmValueRef};
+pub use wake::{WakeQueue, WakeToken};

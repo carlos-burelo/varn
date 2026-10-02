@@ -62,7 +62,7 @@ impl Heap {
                 boxed_vec.push(VmValue::null());
             }
             let vec_ptr = boxed_vec.as_ptr() as usize;
-            let repr = ArrayRepr::Boxed(boxed_vec);
+            let repr = ArrayRepr::Boxed(varn_types::BoxedElems::new(boxed_vec));
             let base = &repr as *const _ as *const u8;
             let disc = unsafe { *base.add(ArrayRepr::DISC_OFF) };
             assert_eq!(

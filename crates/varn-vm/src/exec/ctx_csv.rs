@@ -297,7 +297,7 @@ pub(crate) fn stringify_csv(
         Some(HeapObj::Array(arr)) => {
             let repr = arr.repr();
             let items = match repr {
-                varn_types::ArrayRepr::Boxed(v) => v,
+                varn_types::ArrayRepr::Boxed(v) => v.as_vec(),
                 _ => return Err("CSV stringify expects a boxed array".to_string()),
             };
 
@@ -403,6 +403,7 @@ pub(crate) fn stringify_csv(
                         if let Some(HeapObj::Array(row_arr)) = ctx.heap.get(item.as_heap_idx()) {
                             match row_arr.repr() {
                                 varn_types::ArrayRepr::Boxed(row_items) => {
+                                    let row_items = row_items.as_vec();
                                     for (i, &cell) in row_items.iter().enumerate() {
                                         if i > 0 {
                                             out.push(delim_char);

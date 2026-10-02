@@ -140,6 +140,7 @@ import "./152-jit-optional-chains.vn"
 import { summary } from "std:test";
 import "./153-local-types.vn"
 import "./154-task-gc-roots.vn"
+import "./155-array-remembered-prefix.vn"
 
 summary()
 

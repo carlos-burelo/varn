@@ -422,11 +422,7 @@ impl Nursery {
                 return;
             }
             Container::Array(arr) => {
-                if let Some(items) = arr.as_boxed_mut() {
-                    for v in items.iter_mut() {
-                        self.update_value(v, old_gen, worklist);
-                    }
-                }
+                arr.scan_dirty(|v| self.update_value(v, old_gen, worklist));
                 return;
             }
             Container::Instance(inst) => {

@@ -458,11 +458,48 @@ use crate::register_meta::SlotKind;
 pub enum ArrayRepr {
     /// str / object / heterogeneous / `Dynamic` elements — tag+payload
     /// `VmValue` elements.
-    Boxed(Vec<VmValue>) = 0,
+    Boxed(BoxedElems) = 0,
     /// `Array<int>` — raw `i64` buffer, holds no heap refs (GC skips it in A.2).
     I64(Vec<i64>) = 1,
     /// `Array<float>` — raw `f64` buffer, holds no heap refs.
     F64(Vec<f64>) = 2,
+}
+
+/// The element buffer of a `Boxed` array plus the length of its leading run
+/// known to hold no nursery reference. The collector reads that run to skip
+/// it: after a minor collection every element is old, and only a write below
+/// the run, a removal that shortens it, or a raw `&mut Vec` hand-out lowers
+/// it. `items` stays the first field so the JIT's raw reads of the `Vec`
+/// words keep their offsets.
+#[repr(C)]
+#[derive(Debug)]
+pub struct BoxedElems {
+    items: Vec<VmValue>,
+    clean_prefix: u32,
+}
+
+impl BoxedElems {
+    #[inline(always)]
+    pub fn new(items: Vec<VmValue>) -> Self {
+        Self {
+            items,
+            clean_prefix: 0,
+        }
+    }
+
+    #[inline(always)]
+    pub fn as_vec(&self) -> &Vec<VmValue> {
+        &self.items
+    }
+}
+
+impl std::ops::Deref for BoxedElems {
+    type Target = Vec<VmValue>;
+
+    #[inline(always)]
+    fn deref(&self) -> &Vec<VmValue> {
+        &self.items
+    }
 }
 
 impl ArrayRepr {
@@ -523,7 +560,9 @@ impl VmArray {
     /// current call site uses; it keeps building `Boxed` arrays.
     #[inline(always)]
     pub fn new(items: Vec<VmValue>) -> Self {
-        Self(Rc::new(UnsafeCell::new(ArrayRepr::Boxed(items))))
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::Boxed(BoxedElems::new(
+            items,
+        )))))
     }
 
     /// Empty `Boxed` array.
@@ -652,18 +691,22 @@ impl VmArray {
     #[inline(always)]
     pub fn as_boxed(&self) -> Option<&Vec<VmValue>> {
         match self.repr() {
-            ArrayRepr::Boxed(v) => Some(v),
+            ArrayRepr::Boxed(v) => Some(&v.items),
             _ => None,
         }
     }
 
-    /// Mutable Boxed-variant vector, or `None` for a typed repr.
-    #[inline(always)]
-    #[allow(clippy::mut_from_ref)]
-    pub fn as_boxed_mut(&self) -> Option<&mut Vec<VmValue>> {
-        match self.repr_mut() {
-            ArrayRepr::Boxed(v) => Some(v),
-            _ => None,
+    /// Visits every element of a `Boxed` array that may still hold a nursery
+    /// reference, then records the whole array as clean. For the collector
+    /// only: it must have made every visited reference old by the time `f`
+    /// returns for the last element.
+    pub fn scan_dirty(&self, mut f: impl FnMut(&mut VmValue)) {
+        if let ArrayRepr::Boxed(b) = self.repr_mut() {
+            let from = (b.clean_prefix as usize).min(b.items.len());
+            for v in &mut b.items[from..] {
+                f(v);
+            }
+            b.clean_prefix = b.items.len() as u32;
         }
     }
 
@@ -676,18 +719,8 @@ impl VmArray {
     #[inline(always)]
     pub fn borrow(&self) -> &Vec<VmValue> {
         match self.repr() {
-            ArrayRepr::Boxed(v) => v,
+            ArrayRepr::Boxed(v) => &v.items,
             _ => unreachable_typed("borrow"),
-        }
-    }
-
-    /// Mutable counterpart of [`Self::borrow`]; same Boxed-only contract.
-    #[inline(always)]
-    #[allow(clippy::mut_from_ref)]
-    pub fn borrow_mut(&self) -> &mut Vec<VmValue> {
-        match self.repr_mut() {
-            ArrayRepr::Boxed(v) => v,
-            _ => unreachable_typed("borrow_mut"),
         }
     }
 
@@ -716,8 +749,9 @@ impl VmArray {
         {
             match self.repr_mut() {
                 ArrayRepr::Boxed(v) => {
-                    return if idx < v.len() {
-                        v[idx] = val;
+                    return if idx < v.items.len() {
+                        v.items[idx] = val;
+                        v.clean_prefix = v.clean_prefix.min(idx as u32);
                         true
                     } else {
                         false
@@ -765,8 +799,8 @@ impl VmArray {
                 // Only a NON-empty Boxed array pushes boxed here; the empty
                 // case falls out to `push_repr_change` to specialize.
                 ArrayRepr::Boxed(v) => {
-                    if !v.is_empty() {
-                        v.push(val);
+                    if !v.items.is_empty() {
+                        v.items.push(val);
                         return;
                     }
                 }
@@ -802,7 +836,7 @@ impl VmArray {
                 *self.repr_mut() = ArrayRepr::F64(vec![val.as_f64()]);
             } else {
                 match self.repr_mut() {
-                    ArrayRepr::Boxed(v) => v.push(val),
+                    ArrayRepr::Boxed(v) => v.items.push(val),
                     _ => unreachable!("checked Boxed above"),
                 }
             }
@@ -816,7 +850,11 @@ impl VmArray {
     #[inline]
     pub fn pop_vm(&self) -> Option<VmValue> {
         match self.repr_mut() {
-            ArrayRepr::Boxed(v) => v.pop(),
+            ArrayRepr::Boxed(v) => {
+                let popped = v.items.pop();
+                v.clean_prefix = v.clean_prefix.min(v.items.len() as u32);
+                popped
+            }
             ArrayRepr::I64(v) => v.pop().map(VmValue::from_int),
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
         }
@@ -837,11 +875,14 @@ impl VmArray {
                     ArrayRepr::F64(v) => v.iter().map(|&f| VmValue::from_f64(f)).collect(),
                     ArrayRepr::Boxed(_) => unreachable!(),
                 };
-                *repr = ArrayRepr::Boxed(boxed);
+                *repr = ArrayRepr::Boxed(BoxedElems::new(boxed));
             }
         }
         match self.repr_mut() {
-            ArrayRepr::Boxed(v) => v,
+            ArrayRepr::Boxed(v) => {
+                v.clean_prefix = 0;
+                &mut v.items
+            }
             _ => unreachable!(),
         }
     }
