@@ -1,0 +1,87 @@
+import { describe, it, expect } from "std:test";
+
+// A literal array read only through constant in-bounds indices never escapes,
+// so each read is the element itself and the allocation disappears. Every
+// other use of the array must keep it: these pin the cases that must refuse.
+
+function alSum(n: int): int {
+    let s = 0
+    for (let i = 0; i < n; i = i + 1) {
+        const r: Array<int> = [i, i + 1, i + 2]
+        s = s + r[0] + r[2]
+    }
+    return s
+}
+
+function alFloatFromInts(): float {
+    const r: Array<float> = [1, 2, 3]
+    return r[0] / 2 + r[2]
+}
+
+function alOutOfBounds(): int | null {
+    const r: Array<int> = [1, 2, 3]
+    return r[5]
+}
+
+function alPushAfter(): int {
+    const r: Array<int> = [1, 2]
+    r.push(3)
+    return r[2] + r.length
+}
+
+function alWriteThenRead(): int {
+    const r: Array<int> = [1, 2, 3]
+    r[0] = 40
+    return r[0] + r[1]
+}
+
+function alAlias(): int {
+    const r: Array<int> = [1, 2]
+    const q = r
+    q[0] = 9
+    return r[0] + r[1]
+}
+
+function alBump(a: Array<int>): int {
+    a[1] = a[1] + 100
+    return a[1]
+}
+
+function alPassed(): int {
+    const r: Array<int> = [1, 2]
+    alBump(r)
+    return r[1]
+}
+
+function alDynamicIndex(k: int): int {
+    const r: Array<int> = [10, 20, 30]
+    return r[k]
+}
+
+function alMixed(i: int): int {
+    const r = [i, i * 2]
+    return r[1] - r[0]
+}
+
+await describe("156 array literal forwarding", async () => {
+    await it("1. constant reads of a non-escaping literal", async () => {
+        expect(alSum(1000)).toBe(1001000)
+        expect(alMixed(7)).toBe(7)
+    })
+
+    await it("2. a float array built from int literals keeps float arithmetic", async () => {
+        expect(alFloatFromInts()).toBe(3.5)
+    })
+
+    await it("3. an out-of-bounds constant read still yields null", async () => {
+        expect(alOutOfBounds() == null).toBe(true)
+    })
+
+    await it("4. any other use keeps the array observable", async () => {
+        expect(alPushAfter()).toBe(6)
+        expect(alWriteThenRead()).toBe(42)
+        expect(alAlias()).toBe(11)
+        expect(alPassed()).toBe(102)
+        expect(alDynamicIndex(2)).toBe(30)
+    })
+})

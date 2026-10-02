@@ -20,6 +20,14 @@
 //! `GetProperty` on it (call argument, store into another object, return,
 //! branch argument, `SetProperty`, ...) drops it from consideration, since
 //! such a use could add keys or let the object outlive our view of it.
+//!
+//! Array literals follow the same rule with constant in-bounds indices: a
+//! `BuildArray` read only through `GetIndex`/`ArrayGetIndex` with a literal
+//! index never escapes, grows or is written (`push`, `length`, `SetIndex` and
+//! every other use disqualify it), so each read is the element itself. The
+//! forward is skipped unless the element and the read share an SSA type, so
+//! a representation change on store (`Array<float>` holding an `int`
+//! literal) is never bypassed.
 
 use std::sync::Arc;
 
@@ -35,6 +43,8 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let mut obj_literals: FxHashMap<u32, Vec<(Arc<str>, Value)>> = FxHashMap::default();
     // Tuple-literal defs: SSA value -> elements in index order.
     let mut tuple_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
+    // Array-literal defs: SSA value -> elements in index order.
+    let mut array_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
 
     for block in &func.blocks {
         for inst in &block.insts {
@@ -54,13 +64,16 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     InstKind::BuildTuple { elements } => {
                         tuple_literals.insert(d.0, elements.clone());
                     }
+                    InstKind::BuildArray { elements } => {
+                        array_literals.insert(d.0, elements.clone());
+                    }
                     _ => {}
                 }
             }
         }
     }
 
-    if obj_literals.is_empty() && tuple_literals.is_empty() {
+    if obj_literals.is_empty() && tuple_literals.is_empty() && array_literals.is_empty() {
         return false;
     }
 
@@ -75,13 +88,12 @@ pub fn run(func: &mut SsaFunc) -> bool {
             if let InstKind::GetIndex { object, index }
             | InstKind::ArrayGetIndex { object, index } = &inst.kind
             {
-                if tuple_literals.contains_key(&object.0) {
-                    if let Some(&idx) = const_ints.get(&index.0) {
-                        if let Some(elems) = tuple_literals.get(&object.0) {
-                            if idx >= 0 && (idx as usize) < elems.len() {
-                                continue;
-                            }
-                        }
+                let elems = tuple_literals
+                    .get(&object.0)
+                    .or_else(|| array_literals.get(&object.0));
+                if let (Some(elems), Some(&idx)) = (elems, const_ints.get(&index.0)) {
+                    if idx >= 0 && (idx as usize) < elems.len() {
+                        continue;
                     }
                 }
             }
@@ -89,12 +101,14 @@ pub fn run(func: &mut SsaFunc) -> bool {
             for u in inst_uses(&inst.kind) {
                 obj_literals.remove(&u.0);
                 tuple_literals.remove(&u.0);
+                array_literals.remove(&u.0);
             }
         }
         match &block.term {
             Terminator::Return(Some(v)) | Terminator::Throw(v) => {
                 obj_literals.remove(&v.0);
                 tuple_literals.remove(&v.0);
+                array_literals.remove(&v.0);
             }
             Terminator::Branch {
                 cond,
@@ -104,22 +118,25 @@ pub fn run(func: &mut SsaFunc) -> bool {
             } => {
                 obj_literals.remove(&cond.0);
                 tuple_literals.remove(&cond.0);
+                array_literals.remove(&cond.0);
                 for a in then_args.iter().chain(else_args) {
                     obj_literals.remove(&a.0);
                     tuple_literals.remove(&a.0);
+                    array_literals.remove(&a.0);
                 }
             }
             Terminator::Jump { args, .. } => {
                 for a in args {
                     obj_literals.remove(&a.0);
                     tuple_literals.remove(&a.0);
+                    array_literals.remove(&a.0);
                 }
             }
             _ => {}
         }
     }
 
-    if obj_literals.is_empty() && tuple_literals.is_empty() {
+    if obj_literals.is_empty() && tuple_literals.is_empty() && array_literals.is_empty() {
         return false;
     }
 
@@ -152,6 +169,17 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     if let Some(&idx) = const_ints.get(&index.0) {
                         if idx >= 0 && (idx as usize) < elems.len() {
                             forwards.push((dest, elems[idx as usize]));
+                        }
+                    }
+                }
+                if let Some(elems) = array_literals.get(&object.0) {
+                    if let Some(&idx) = const_ints.get(&index.0) {
+                        if idx >= 0 && (idx as usize) < elems.len() {
+                            let elem = elems[idx as usize];
+                            if func.value_ty(elem) == func.value_ty(dest) {
+                                forwards.push((dest, elem));
+                                dead_reads.insert(dest);
+                            }
                         }
                     }
                 }
