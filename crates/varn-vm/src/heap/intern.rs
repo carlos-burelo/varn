@@ -77,6 +77,9 @@ impl HeapInner {
                     VmValue::from_heap_idx(idx)
                 } else {
                     let idx = self.alloc(HeapObj::Object(o.clone()));
+                    if crate::nursery::is_nursery_idx(idx) {
+                        self.young_interned.push((o.clone(), idx));
+                    }
                     self.object_interner.insert(o, idx);
                     VmValue::from_heap_idx(idx)
                 }

@@ -322,6 +322,18 @@ impl ClassObj {
         None
     }
 
+    /// Runs `f` on the cached constructor without cloning it out of the cache.
+    pub fn with_constructor<R>(&self, f: impl FnOnce(Option<&Value>) -> R) -> R {
+        let ver = self.vtable_version.load(Ordering::Relaxed);
+        if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {
+            if *cached_ver == ver {
+                return f(ctor.as_ref());
+            }
+        }
+        let ctor = self.constructor();
+        f(ctor.as_ref())
+    }
+
     /// Cached `find_method("constructor")`, invalidated by vtable_version.
     pub fn constructor(&self) -> Option<Value> {
         let ver = self.vtable_version.load(Ordering::Relaxed);

@@ -331,26 +331,24 @@ fn try_trivial_construct(
     argc: usize,
 ) -> Result<Option<VmValue>, crate::error::RuntimeError> {
     use varn_types::class_layout::FieldLayout;
-    let (plan, arity) = match cls.constructor() {
-        None => (None, None),
+    let resolved = cls.with_constructor(|ctor| match ctor {
+        None => Some((None, None)),
         Some(varn_types::Value::VmValue(payload)) => {
-            let Some(wrapper) = payload
+            let wrapper = payload
                 .as_any()
-                .downcast_ref::<crate::closure::VmClosurePayload>()
-            else {
-                return Ok(None);
-            };
+                .downcast_ref::<crate::closure::VmClosurePayload>()?;
             let proto = &wrapper.0.proto;
-            match proto.trivial_field_init_plan() {
-                Some(plan) => (Some(plan), Some(proto.arity.saturating_sub(1))),
-                None => return Ok(None),
-            }
+            let plan = proto.trivial_field_init_plan()?;
+            Some((Some(plan), Some(proto.arity.saturating_sub(1))))
         }
-        Some(_) => return Ok(None),
+        Some(_) => None,
+    });
+    let Some((plan, arity)) = resolved else {
+        return Ok(None);
     };
     let Some(plan) = plan else {
         // No constructor: the interpreter ignores the arguments.
-        if cls.constructor().is_none() {
+        if cls.with_constructor(|ctor| ctor.is_none()) {
             let inst = varn_types::value::InstanceRef::alloc(cls.clone());
             return Ok(Some(VmValue::from_heap_idx(
                 ctx.heap.alloc(crate::heap::HeapObj::Instance(inst)),
