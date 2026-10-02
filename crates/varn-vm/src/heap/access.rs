@@ -71,10 +71,7 @@ impl HeapInner {
             varn_types::Value::Class(c) => {
                 self.identity_index.get(&(Rc::as_ptr(c) as usize)).copied()
             }
-            varn_types::Value::Task(t) => {
-                self.identity_index.get(&(Rc::as_ptr(t) as usize)).copied()
-            }
-            varn_types::Value::TaskHandle(th) => self.identity_index.get(&th.identity()).copied(),
+            varn_types::Value::Task(_) | varn_types::Value::TaskHandle(_) => None,
             varn_types::Value::Generator(g) => self
                 .identity_index
                 .get(&(Rc::as_ptr(&g.0) as *const () as usize))

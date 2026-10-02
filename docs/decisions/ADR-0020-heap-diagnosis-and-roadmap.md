@@ -74,16 +74,24 @@ Implementado (cada paso es parte del diseño final, ninguno es un parche):
   (bordes: `Array<float>` con literales int, índice fuera de rango, `push`,
   escritura, alias, paso a función, índice dinámico). Se borra: nada.
 
+- **H4** Auditado quién consume `identity_index`: `intern` nunca deduplica
+  `Task` ni `TaskHandle` (siempre asigna slot nuevo), así que su entrada solo
+  servía para un marcado conservador del GC que no protegía nada (un valor
+  portable ya posee su `Rc`; los `VmValue` vivos son raíces). Se quitaron esas
+  dos entradas. `Class`, `Generator` y `VmClosure` conservan el índice: el GC
+  lo usa para pasar de un puntero crudo de closure a su slot, y un frame que no
+  posee su closure depende de ello. La idea original (guardar el slot en el
+  payload) queda descartada: el GC mueve objetos y habría que corregir la pista
+  en cada evacuación para ahorrar menos de lo que cuesta. Ganancia: 1M tareas ×
+  8 s pasa de 9.14 s / 1021 MB a 8.85 s / 957 MB, spawn 259 → 187 ms.
+  Verificación: matriz 4/4. Se borra: dos arms de `identity_key` y de
+  `value_heap_idx`.
+
 Propuesto, en este orden:
 - **H3 Frontera de arrays sin copia (baja prioridad).** Medir primero el
   paso de un array grande como argumento de una tarea async; si cuesta O(n),
   pasar el handle. Verificación: microbench de `spawn` con un array de 1M. Se
   borra: la rama `Array` de `extract`/`intern` salvo para isolates.
-- **H4 Identidad sin hash.** Guardar el slot dentro del payload
-  (`AsyncTask`, `LazyTask`, `VmClosure`) con corrección en el GC al mover, y
-  verificar por identidad al reutilizar. Ganancia: ~2 hashes y ~90 B por tarea.
-  Verificación: 1M tareas (pico y tiempo). Se borra: `identity_index`.
-  Riesgo: el GC mueve objetos; la pista debe actualizarse en cada evacuación.
 - **H5 Instancias nuevas sin malloc.** Reservar el payload compacto de una
   instancia joven en el propio nursery (bump) y copiarlo al promover. Ganancia
   objetivo: de ~57 ns a ~10 ns por `new` que escapa. Verificación: `retain`.
