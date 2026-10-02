@@ -3,7 +3,7 @@
 
 use super::ClassObj;
 use crate::class_layout::{ClassLayout, FieldLayout};
-use crate::layout::{ScalarRepr, COMPACT_REF_NULL};
+use crate::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 use crate::vm_value::VmValue;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
@@ -142,8 +142,7 @@ impl InstanceData {
         offset: u32,
         tag: Option<varn_core::RuntimeKind>,
     ) -> Option<VmValue> {
-        let f = FieldLayout::at(offset, tag);
-        self.read_field(&f)
+        self.read_scalar(offset, &TypeLayout::of_field(tag))
     }
 
     /// Write a field by its BAKED compact `(offset, tag)` — no runtime layout
@@ -155,8 +154,7 @@ impl InstanceData {
         tag: Option<varn_core::RuntimeKind>,
         val: VmValue,
     ) -> Result<(), &'static str> {
-        let f = FieldLayout::at(offset, tag);
-        self.write_field(&f, val)
+        self.write_scalar(offset, &TypeLayout::of_field(tag), val)
     }
 
     #[inline]
@@ -173,12 +171,19 @@ impl InstanceData {
     /// Reads one field by its representation (`TypeLayout`); a `Ref` slot
     /// decodes the `null` niche back to `null`, symmetric with the write.
     pub fn read_field(&self, f: &FieldLayout) -> Option<VmValue> {
-        let offset = f.offset as usize;
-        if offset + f.layout.size as usize > self.payload_size as usize {
+        self.read_scalar(f.offset, &f.layout)
+    }
+
+    /// The read behind [`Self::read_field`], keyed by the field's offset and
+    /// representation alone: baked accesses carry no name to build a
+    /// `FieldLayout` from.
+    pub fn read_scalar(&self, offset: u32, layout: &TypeLayout) -> Option<VmValue> {
+        let offset = offset as usize;
+        if offset + layout.size as usize > self.payload_size as usize {
             return None;
         }
         unsafe {
-            Some(match f.layout.repr {
+            Some(match layout.repr {
                 ScalarRepr::Bool => VmValue::from_bool(self.read_bool(offset)),
                 ScalarRepr::I64 => VmValue::from_int(self.read_i64(offset)),
                 ScalarRepr::F64 => VmValue::from_f64(self.read_f64(offset)),
@@ -205,12 +210,22 @@ impl InstanceData {
     /// wrong for the slot's class is a real type error, surfaced instead of
     /// silently reinterpreted.
     pub fn write_field(&self, f: &FieldLayout, val: VmValue) -> Result<(), &'static str> {
-        let offset = f.offset as usize;
-        if offset + f.layout.size as usize > self.payload_size as usize {
+        self.write_scalar(f.offset, &f.layout, val)
+    }
+
+    /// The write behind [`Self::write_field`]; see [`Self::read_scalar`].
+    pub fn write_scalar(
+        &self,
+        offset: u32,
+        layout: &TypeLayout,
+        val: VmValue,
+    ) -> Result<(), &'static str> {
+        let offset = offset as usize;
+        if offset + layout.size as usize > self.payload_size as usize {
             return Err("field offset exceeds instance payload");
         }
         unsafe {
-            match f.layout.repr {
+            match layout.repr {
                 ScalarRepr::Bool => {
                     if !val.is_bool() {
                         return Err("cannot store non-bool in a bool field");

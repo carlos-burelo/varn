@@ -330,7 +330,6 @@ fn try_trivial_construct(
     cls: &std::rc::Rc<varn_types::value::ClassObj>,
     argc: usize,
 ) -> Result<Option<VmValue>, crate::error::RuntimeError> {
-    use varn_types::class_layout::FieldLayout;
     let resolved = cls.with_constructor(|ctor| match ctor {
         None => Some((None, None)),
         Some(varn_types::Value::VmValue(payload)) => {
@@ -367,7 +366,7 @@ fn try_trivial_construct(
         let Some(&arg) = ctx.stage.get(1 + *param_idx) else {
             return Ok(None);
         };
-        inst.write_field(&FieldLayout::at(*offset, *tag), arg)
+        inst.write_field_at(*offset, *tag, arg)
             .map_err(crate::error::RuntimeError::new)?;
         ctx.heap.write_barrier(instance_nv.as_heap_idx(), arg);
     }

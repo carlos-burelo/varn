@@ -19,7 +19,7 @@ Se midió contra Node 24, Bun y Go en esta máquina (release, Windows x86-64):
 | :--- | :--- | :--- | :--- | :--- |
 | 20M `new P(i,1)` que no escapa (función) | 1253 ms | **12 ms** | 13 ms | 18 ms |
 | 20M `new P(i,1)` que no escapa (módulo) | 1281 ms | **34 ms** | 13 ms | 18 ms |
-| 3M objetos retenidos en un array | 481 ms · 502 MB | 412 ms · 502 MB | 255 ms · 324 MB | 120 ms · 255 MB |
+| 3M objetos retenidos en un array | 481 ms · 502 MB | **318 ms** · 502 MB | 255 ms · 324 MB | 120 ms · 255 MB |
 | GC menor promoviendo 49 152 objetos con el array grande en old gen | 3.5 ms | **1.09 ms** | — | — |
 | 3M arrays temporales + 1M retenidos | 216 ms · 172 MB | **81 ms** · 172 MB | 52 ms · 84 MB | 49 ms · 123 MB |
 | 500k claves string en un `Map` | 358 ms · 155 MB | 323 ms · 155 MB | 226 ms | 301 ms |
@@ -43,8 +43,12 @@ Se midió contra Node 24, Bun y Go en esta máquina (release, Windows x86-64):
    payload en malloc; `Task`, `TaskHandle`, `Class`, `Generator` y `VmClosure`
    además entran en `identity_index` (hash). Una tarea crea tres objetos así
    (~150 B cada uno), que es la brecha que queda frente a Node a 1M tareas.
-5. **Asignar un objeto que sí escapa cuesta ~57 ns** (`jit_new_window`: closure
-   del constructor, plan, `Rc`, slot, barrera) frente a ~2 ns de un bump.
+5. **Asignar un objeto que sí escapa costaba ~57 ns.** Medido con `rdtsc` por
+   sección de `jit_new_window`, ninguna parte dominaba salvo la escritura de
+   campos: `FieldLayout::at` construía `Arc::from("")` (un `malloc` y un `free`
+   por campo) solo para dar nombre a un layout que `write_field` no lee.
+   `read_field_at`/`write_field_at`, que usa el intérprete en cada acceso a un
+   campo fijo, pagaban lo mismo.
 6. Descartado: `update_interners_after_minor_gc` recorría las siete tablas en
    cada GC menor, pero solo `object_interner` puede contener índices de
    nursery; se sustituyó por una lista de entradas jóvenes. Sin ganancia
@@ -92,11 +96,17 @@ Propuesto, en este orden:
   paso de un array grande como argumento de una tarea async; si cuesta O(n),
   pasar el handle. Verificación: microbench de `spawn` con un array de 1M. Se
   borra: la rama `Array` de `extract`/`intern` salvo para isolates.
-- **H5 Instancias nuevas sin malloc.** Reservar el payload compacto de una
-  instancia joven en el propio nursery (bump) y copiarlo al promover. Ganancia
-  objetivo: de ~57 ns a ~10 ns por `new` que escapa. Verificación: `retain`.
-  Es el cambio con más riesgo: toca `InstanceRef` (hoy `Rc<InstanceData>`
-  compartido con `Value`), el JIT (`emit_nursery_alloc`) y la promoción.
+- **H5** El plan era reservar el payload de la instancia en el nursery. El
+  perfil lo desmintió: el `Rc` de la instancia son ~33 ciclos de ~150, y lo que
+  sobraba era la escritura de campos. `InstanceData::read_scalar` y
+  `write_scalar` leen y escriben por `(offset, TypeLayout)` sin construir un
+  `FieldLayout`; `read_field_at`, `write_field_at` y el camino trivial del JIT
+  los usan. Ganancia: `new` que escapa 57 → 33 ns, `retain` 412 → 318 ms, y
+  menos coste por acceso a campo fijo en el intérprete. Verificación: matriz
+  4/4. Se borra: la construcción de `FieldLayout` en los caminos baked. El
+  bump en el nursery queda descartado: ganaría ~10 ns con el cambio de más
+  riesgo del heap.
+
 Un heap con objetos de cabecera inline y copia generacional sin handles (el
 diseño de V8/JSC) resolvería H3–H5 a la vez, pero obliga a reescribir `Value`,
 los 521 usos de `HeapObj::` en 56 archivos, el JIT y los nativos. No se
