@@ -26,6 +26,7 @@ pub(crate) mod jit_helpers;
 pub(crate) mod method_args;
 pub(crate) mod modules;
 pub(crate) mod props;
+pub mod scheduler;
 pub(crate) mod strings;
 use crate::value::VmValue;
 pub use ctx::ExecCtx;

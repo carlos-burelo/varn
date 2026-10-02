@@ -185,8 +185,9 @@ impl ExecCtx {
     ) -> Result<varn_types::Value, String> {
         match callee {
             varn_types::Value::Task(t) => {
-                let handle = self.run_lazy_task_sync(t.as_ref());
-                return Ok(varn_types::Value::TaskHandle(handle));
+                let output = varn_types::AsyncTask::pending();
+                crate::exec::scheduler::enqueue_detached(self, t, output.clone());
+                return Ok(varn_types::Value::TaskHandle(output));
             }
             varn_types::Value::TaskHandle(f) => {
                 return Ok(varn_types::Value::TaskHandle(f));
@@ -199,8 +200,9 @@ impl ExecCtx {
         let value = self.heap.extract(result);
         match value {
             varn_types::Value::Task(t) => {
-                let handle = self.run_lazy_task_sync(t.as_ref());
-                return Ok(varn_types::Value::TaskHandle(handle));
+                let output = varn_types::AsyncTask::pending();
+                crate::exec::scheduler::enqueue_detached(self, t, output.clone());
+                return Ok(varn_types::Value::TaskHandle(output));
             }
             varn_types::Value::TaskHandle(f) => {
                 return Ok(varn_types::Value::TaskHandle(f));
@@ -250,7 +252,7 @@ pub(super) fn spawn_isolate(
             crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
         machine
             .ctx
-            .globals
+            .globals_mut()
             .define("isIsolate", VmValue::from_bool(true));
         if let Some(ld) = loader {
             machine = machine.with_loader(ld);
@@ -304,7 +306,7 @@ pub(super) fn spawn_isolate(
             Ok(res) => {
                 let val = machine.ctx.heap.extract(res);
                 if let varn_types::Value::Task(lazy) = val {
-                    let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                    let handle = machine.ctx.run_lazy_task_sync(lazy);
                     if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
                         done_t.reject(worker_error(&format!("{e}")));
                         return;

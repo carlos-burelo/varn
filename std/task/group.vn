@@ -1,4 +1,10 @@
-import { parallel$ } from "runtime:task";
+import { parallel$, sleep$ } from "runtime:task";
+import { cancel, spawn, Task } from "std:task/combinators";
+
+async function timeoutJoin<T>(ms: int): Task<T> {
+    await sleep$(ms);
+    throw new Error("TaskGroup.join timed out");
+}
 
 async function wrapTask<T>(task: Task<T>, group: TaskGroup<T>): T {
     try {
@@ -17,11 +23,15 @@ export class TaskGroup<T> {
     tasks: Array<Task<T>>;
     isCancelled: bool;
     private _finallyCbs: Array<() => void>;
+    private _inflight: Array<TaskHandle<Array<T>>>;
+    private _finalized: bool;
 
     constructor() {
         this.tasks = [];
         this.isCancelled = false;
         this._finallyCbs = [];
+        this._inflight = [];
+        this._finalized = false;
     }
 
     spawn(task: Task<T>): Task<T> {
@@ -33,10 +43,7 @@ export class TaskGroup<T> {
         return wrapped;
     }
 
-    async join(timeoutMs?: int): Task<Array<T>> {
-        if (this.isCancelled) {
-            throw new Error("TaskGroup is cancelled");
-        }
+    async runAll(): Task<Array<T>> {
         try {
             let res = await parallel$(this.tasks);
             this._runFinally();
@@ -48,12 +55,45 @@ export class TaskGroup<T> {
         }
     }
 
+    async joinInner(): Task<Array<T>> {
+        let driver = spawn(this.runAll());
+        this._inflight.push(driver);
+        try {
+            return await driver;
+        } catch (e) {
+            this.cancel();
+            this._runFinally();
+            throw e;
+        }
+    }
+
+    async join(timeoutMs?: int): Task<Array<T>> {
+        if (this.isCancelled) {
+            throw new Error("TaskGroup is cancelled");
+        }
+        if (timeoutMs === null) {
+            return await this.joinInner();
+        }
+        try {
+            let res = await Task.race([this.joinInner(), timeoutJoin<Array<T>>(timeoutMs)]);
+            this._cancelInflight();
+            return res;
+        } catch (e) {
+            this._cancelInflight();
+            throw e;
+        }
+    }
+
     finally(cb: () => void): TaskGroup<T> {
         this._finallyCbs.push(cb);
         return this;
     }
 
     private _runFinally(): void {
+        if (this._finalized) {
+            return;
+        }
+        this._finalized = true;
         for (let i = 0; i < this._finallyCbs.length; i = i + 1) {
             let cb = this._finallyCbs[i];
             cb();
@@ -67,6 +107,14 @@ export class TaskGroup<T> {
 
     cancel(): void {
         this.isCancelled = true;
+        this._cancelInflight();
+    }
+
+    private _cancelInflight(): void {
+        for (let i = 0; i < this._inflight.length; i = i + 1) {
+            cancel(this._inflight[i]);
+        }
+        this._inflight = [];
     }
 
     async disposeAsync(): Task<void> {

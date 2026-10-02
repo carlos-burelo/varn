@@ -107,7 +107,11 @@ fn test_workspace_indexing_memory_lifecycle() {
     {
         let idx = workspace.index.read().unwrap();
         let defs = idx.definitions_of("compute_something");
-        assert_eq!(defs.len(), 1, "ProjectIndex must retain definitions after close");
+        assert_eq!(
+            defs.len(),
+            1,
+            "ProjectIndex must retain definitions after close"
+        );
     }
 
     // 4. Deleting the file (remove_file) removes from both:

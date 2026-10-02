@@ -85,10 +85,7 @@ impl Headline<'_> {
         t.row(["runs".to_owned(), fmt_num(self.runs as u64)]);
         t.row(["profile".to_owned(), build.profile.to_owned()]);
         t.row(["backend".to_owned(), build.backend.to_owned()]);
-        t.row([
-            "commit".to_owned(),
-            build.commit.unwrap_or("—").to_owned(),
-        ]);
+        t.row(["commit".to_owned(), build.commit.unwrap_or("—").to_owned()]);
         t.print();
 
         let e2e_dur = self.e2e.map(|e| e.p50).unwrap_or(self.total_p50);
@@ -98,17 +95,16 @@ impl Headline<'_> {
         t.row(["e2e p50".to_owned(), fmt_dur(e2e_dur)]);
         t.row([("throughput".to_owned()), format!("{throughput:.1}/s")]);
         if self.source_lines > 0 {
-            t.row([
-                "source lines".to_owned(),
-                fmt_num(self.source_lines as u64),
-            ]);
+            t.row(["source lines".to_owned(), fmt_num(self.source_lines as u64)]);
             t.row(["tokens".to_owned(), fmt_num(self.tokens as u64)]);
         }
         t.row(["source bytes".to_owned(), fmt_bytes(self.source_bytes)]);
         t.print();
 
         if let Some(phases) = self.phases {
-            terminal::Section::new("phases").subtitle("p50 + share").print();
+            terminal::Section::new("phases")
+                .subtitle("p50 + share")
+                .print();
             let total_ns = self.total_p50.as_nanos() as f64;
             let mut t = terminal::Table::new(["phase", "p50", "share"]).align([Left, Right, Right]);
             for phase in phases {
@@ -154,9 +150,7 @@ impl Headline<'_> {
                 "top blocker".to_owned(),
                 self.top_blocker
                     .as_ref()
-                    .map(|(n, r)| {
-                        super::fmt::truncate_middle(&format!("{n}: {r}"), 60)
-                    })
+                    .map(|(n, r)| super::fmt::truncate_middle(&format!("{n}: {r}"), 60))
                     .unwrap_or_else(|| "—".to_owned()),
             ]);
             t.row([

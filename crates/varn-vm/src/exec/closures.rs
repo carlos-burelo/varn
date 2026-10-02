@@ -6,6 +6,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::rc::Rc;
+use varn_types::FunctionProto;
 
 /// Where one of a new closure's upvalues comes from.
 #[derive(Clone, Copy)]
@@ -41,6 +42,20 @@ impl UpvalueSrc {
 }
 
 impl ExecCtx {
+    pub(crate) fn shared_constants(&mut self, proto: &Rc<FunctionProto>) -> Rc<Vec<VmValue>> {
+        let key = Rc::as_ptr(proto) as usize;
+        Rc::clone(
+            &unsafe { &mut *self.proto_constants.get() }
+                .entry(key)
+                .or_insert_with(|| {
+                    let resolved =
+                        Rc::new(crate::exec::calls::resolve_constants(proto, &mut self.heap));
+                    (Rc::clone(proto), resolved)
+                })
+                .1,
+        )
+    }
+
     /// The closure of `parent`'s function constant `proto_idx`, capturing
     /// `upvalues` from activation `base` and `parent`. A closure without
     /// upvalues is created once per function and reused.
@@ -62,7 +77,7 @@ impl ExecCtx {
         let proto_ptr = Rc::as_ptr(&proto) as usize;
         let is_static = upvalues.len() == 0;
         if is_static {
-            if let Some(&(_, cached)) = self.static_closures.get(&proto_ptr) {
+            if let Some(&(_, cached)) = unsafe { &*self.static_closures.get() }.get(&proto_ptr) {
                 return Ok(cached);
             }
         }
@@ -72,25 +87,14 @@ impl ExecCtx {
                 UpvalueSrc::Inherited(idx) => parent.upvalues[idx].clone(),
             })
             .collect();
-        let constants = self
-            .proto_constants
-            .entry(proto_ptr)
-            .or_insert_with(|| {
-                let resolved = Rc::new(crate::exec::calls::resolve_constants(
-                    &proto,
-                    &mut self.heap,
-                ));
-                (proto.clone(), resolved)
-            })
-            .1
-            .clone();
+        let constants = self.shared_constants(&proto);
         let mut closure =
             VmClosure::with_upvalues(proto.clone(), captured, constants, self.settings);
         // A nested closure runs against its defining module's globals.
         closure.module_base = parent.module_base;
         let val = self.heap.alloc_vm_closure(Rc::new(closure));
         if is_static {
-            self.static_closures.insert(proto_ptr, (proto, val));
+            unsafe { &mut *self.static_closures.get() }.insert(proto_ptr, (proto, val));
         }
         Ok(val)
     }

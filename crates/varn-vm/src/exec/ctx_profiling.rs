@@ -194,7 +194,7 @@ impl ExecCtx {
     #[inline(always)]
     pub(crate) fn record_hotspot_global(&self, idx: usize) {
         if let Some(ref h) = self.hotspot_counters {
-            if let Some(name) = self.globals.idx_to_name.get(idx) {
+            if let Some(name) = self.globals_ref().idx_to_name.get(idx) {
                 h.borrow_mut().record_global_access(name.clone());
             }
         }

@@ -15,6 +15,7 @@ pub mod resource;
 pub mod ssa;
 pub mod str_util;
 pub mod task;
+pub mod wake;
 pub mod value;
 pub mod vm_value;
 pub use chunk::{
@@ -32,6 +33,7 @@ pub use native_ctx::NativeFnResult;
 pub use native_error::NativeError;
 pub use resource::ResourceStore;
 pub use task::{reject_task, reject_value_task, resolve_task, AsyncTask, Poll, TaskState};
+pub use wake::{WakeQueue, WakeToken};
 pub use value::{
     find_method_with_owner, root_shape, ClassObj, Closure, LazyTask, ModuleObj, ObjData,
     ResultType, RuntimeArray, RuntimeString, Shape, Upvalue, UpvalueInner, Value, VmBuffer,

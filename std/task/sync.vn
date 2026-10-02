@@ -3,17 +3,24 @@ import { now } from "std:time";
 
 export class Mutex {
     private _lockChannel: Channel<bool>;
+    private _locked: bool;
 
     constructor() {
         this._lockChannel = channel$<bool>(1);
         this._lockChannel.tx.send(true);
+        this._locked = false;
     }
 
     async lock(): Task<void> {
         await this._lockChannel.rx.receive();
+        this._locked = true;
     }
 
     unlock(): void {
+        if (!this._locked) {
+            throw new Error("Mutex is not locked");
+        }
+        this._locked = false;
         this._lockChannel.tx.send(true);
     }
 
@@ -33,12 +40,14 @@ export class Mutex {
 export class Semaphore {
     private _permitsChannel: Channel<bool>;
     private _capacity: int;
+    private _available: int;
 
     constructor(initialPermits: int) {
         if (initialPermits <= 0) {
             throw new Error("Semaphore capacity must be greater than zero");
         }
         this._capacity = initialPermits;
+        this._available = initialPermits;
         this._permitsChannel = channel$<bool>(initialPermits);
         for (let index = 0; index < initialPermits; index = index + 1) {
             this._permitsChannel.tx.send(true);
@@ -47,9 +56,14 @@ export class Semaphore {
 
     async acquire(): Task<void> {
         await this._permitsChannel.rx.receive();
+        this._available = this._available - 1;
     }
 
     release(): void {
+        if (this._available >= this._capacity) {
+            throw new Error("Semaphore released more permits than acquired");
+        }
+        this._available = this._available + 1;
         this._permitsChannel.tx.send(true);
     }
 
@@ -69,10 +83,12 @@ export class Semaphore {
 export class WaitGroup {
     private _counter: int;
     private _waiters: Channel<bool>;
+    private _waiterCount: int;
 
     constructor() {
         this._counter = 0;
         this._waiters = channel$<bool>(100);
+        this._waiterCount = 0;
     }
 
     add(delta: int = 1): void {
@@ -90,14 +106,20 @@ export class WaitGroup {
     }
 
     async wait(): Task<void> {
-        if (this._counter === 0) {
-            return;
+        while (this._counter !== 0) {
+            this._waiterCount = this._waiterCount + 1;
+            await this._waiters.rx.receive();
+            this._waiterCount = this._waiterCount - 1;
         }
-        await this._waiters.rx.receive();
     }
 
     private _notifyWaiters(): void {
-        this._waiters.tx.send(true);
+        let n = this._waiterCount;
+        let i = 0;
+        while (i < n) {
+            this._waiters.tx.send(true);
+            i = i + 1;
+        }
     }
 }
 

@@ -102,7 +102,7 @@ impl ExecCtx {
             return Ok(cached);
         }
 
-        if let Some(&cached) = self.modules.get(&resolved) {
+        if let Some(&cached) = unsafe { &*self.modules.get() }.get(&resolved) {
             if cached.is_heap() {
                 if let Some(HeapObj::FrozenModule(frozen)) = self.heap.get(cached.as_heap_idx()) {
                     let frozen = frozen.clone();
@@ -133,17 +133,20 @@ impl ExecCtx {
         };
         if let Some(nv) = builtin_nv {
             let converted = self.convert_to_module_obj(resolved.clone(), nv)?;
-            self.modules.insert(resolved.clone(), converted);
+            unsafe { &mut *self.modules.get() }.insert(resolved.clone(), converted);
             self.linker.set_done(resolved, converted);
             return Ok(converted);
         }
 
         if self.linker.is_evaluating(&resolved) {
-            return self.modules.get(&resolved).copied().ok_or_else(|| {
-                RuntimeError::new(format!(
-                    "E_BINDING_TDZ: circular dependency on '{specifier}'"
-                ))
-            });
+            return unsafe { &*self.modules.get() }
+                .get(&resolved)
+                .copied()
+                .ok_or_else(|| {
+                    RuntimeError::new(format!(
+                        "E_BINDING_TDZ: circular dependency on '{specifier}'"
+                    ))
+                });
         }
 
         if let Some(proto) = self.precompiled.get(&resolved).cloned() {
@@ -179,7 +182,7 @@ impl ExecCtx {
         // Reserve this module's own contiguous global-slot region. `module_base`
         // rides on the closure below; `LoadGlobalIdx` / `StoreGlobalIdx` are
         // relative to it. Every eval gets a fresh region in its own store.
-        let module_base = self.globals.reserve_region(proto.global_count);
+        let module_base = self.globals_mut().reserve_region(proto.global_count);
 
         debug_assert!(
             proto.export_names.windows(2).all(|w| w[0] <= w[1]),
@@ -194,7 +197,7 @@ impl ExecCtx {
         let mut module_obj = ModuleObj::new(resolved.clone(), proto.export_names.len());
         module_obj.export_map = export_map;
         let module_val = self.heap.alloc_module(std::rc::Rc::new(module_obj));
-        self.modules.insert(resolved.clone(), module_val);
+        unsafe { &mut *self.modules.get() }.insert(resolved.clone(), module_val);
 
         self.linker.set_evaluating(resolved.clone());
 
@@ -210,15 +213,18 @@ impl ExecCtx {
             Ok(v) => v,
             Err(e) => {
                 self.linker.cancel_evaluating(&resolved);
-                self.modules.remove(&resolved);
+                unsafe { &mut *self.modules.get() }.remove(&resolved);
                 return Err(e);
             }
         };
         if self.vm_suspend.is_some() {
             return Ok(module_val);
         }
-        let final_val = self.modules.get(&resolved).copied().unwrap_or(res);
-        self.modules.insert(resolved.clone(), final_val);
+        let final_val = unsafe { &*self.modules.get() }
+            .get(&resolved)
+            .copied()
+            .unwrap_or(res);
+        unsafe { &mut *self.modules.get() }.insert(resolved.clone(), final_val);
 
         self.linker.set_done(resolved, final_val);
         Ok(final_val)

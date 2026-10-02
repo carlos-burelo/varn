@@ -1,3 +1,8 @@
 import { serve, Request, json } from "std:http";
+import { sleep } from "std:task";
 
-serve((req: Request) => json({ hello: "world", path: req.path }), 19882);
+let app = serve((req: Request) => json({ hello: "world", path: req.path }), 19882);
+if (!app.isListening) {
+    throw new Error("example server failed to listen");
+}
+await sleep(30000);

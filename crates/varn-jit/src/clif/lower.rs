@@ -314,9 +314,7 @@ pub fn try_compile(
             let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
             finish_artifact(raw, wrapper, frame_aware, debug)
         }
-        Ok(_) => {
-            Err("clif: uses a helper disabled in fase B".into())
-        }
+        Ok(_) => Err("clif: uses a helper disabled in fase B".into()),
         Err(reason) => {
             if super::trace() {
                 eprintln!(

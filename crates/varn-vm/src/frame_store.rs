@@ -16,9 +16,8 @@
 //! paso, no este.
 //!
 //! La traducción registro → (clase, índice) la calcula [`FrameLayout`] una vez
-//! por proto (cacheado por dirección del `Rc`, reteniendo el `Rc` como hacen
-//! `proto_constants`: sin el `Rc` la dirección sería reutilizable tras `drop`
-//! y la caché mentiría). Cada activación reserva su tramo en los 4 vectores
+//! por proto y vive en el propio proto (`FunctionProto::frame_layout`): ningún
+//! almacén de frames la duplica. Cada activación reserva su tramo en los 4 vectores
 //! ([`FrameStore::push_frame`]) y lo libera al retornar ([`FrameStore::pop_frame`]).
 //!
 //! Todo movimiento entre clases pasa por [`FrameStore::mov`]: misma clase es
@@ -26,7 +25,6 @@
 //! el checker probó estático siempre trae su tag; si no, es `type mismatch`,
 //! no basura reinterpretada).
 
-use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
 use varn_types::FunctionProto;
@@ -84,7 +82,6 @@ pub struct FrameStore {
     /// del ABI (el lowering lee `allocs[act_id].bases[clase]`), por eso es
     /// `pub(crate)` en vez de privado.
     pub(crate) allocs: Vec<FrameAlloc>,
-    layouts: HashMap<usize, (Rc<FunctionProto>, Rc<FrameLayout>)>,
 }
 
 impl FrameStore {
@@ -95,25 +92,22 @@ impl FrameStore {
             refs: Vec::with_capacity(2048),
             dyn_: Vec::with_capacity(8192),
             allocs: Vec::with_capacity(512),
-            layouts: HashMap::default(),
         }
     }
 
-    /// Layout cacheado por proto (retiene el `Rc`: ver docs del módulo).
-    pub fn layout_for(&mut self, proto: &Rc<FunctionProto>) -> Rc<FrameLayout> {
-        let key = Rc::as_ptr(proto) as usize;
-        if let Some((_, layout)) = self.layouts.get(&key) {
-            return Rc::clone(layout);
+    pub fn new_for_task() -> Self {
+        Self {
+            gpr: Vec::new(),
+            fpr: Vec::new(),
+            refs: Vec::new(),
+            dyn_: Vec::new(),
+            allocs: Vec::new(),
         }
-        let layout = Rc::new(FrameLayout::for_proto(proto));
-        self.layouts
-            .insert(key, (Rc::clone(proto), Rc::clone(&layout)));
-        layout
     }
 
     /// Reserva una activación y devuelve su id (el nuevo `base`).
     pub fn push_frame(&mut self, proto: &Rc<FunctionProto>) -> usize {
-        let layout = self.layout_for(proto);
+        let layout = proto.frame_layout();
         let id = self.allocs.len();
         let mut bases = [0u32; 4];
         bases[SlotClass::Gpr.index()] = self.gpr.len() as u32;

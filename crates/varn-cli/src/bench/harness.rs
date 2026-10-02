@@ -48,17 +48,14 @@ impl VmFactory {
             varn_types::ModuleObj::new(self.module_id.clone(), self.proto.export_names.len());
         module_obj.export_map = export_map;
         let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
-        machine
-            .ctx
-            .modules
-            .insert(self.module_id.clone(), module_val);
+        unsafe { &mut *machine.ctx.modules.get() }.insert(self.module_id.clone(), module_val);
         machine.ctx.module_exports.insert(0, module_val);
 
         machine
     }
 
     pub fn closure(&self) -> Rc<Closure> {
-        Rc::new(Closure::new(self.proto.clone(), Vec::new(), Vec::new()))
+        Rc::new(Closure::new(self.proto.clone(), Vec::new()))
     }
 
     /// Build, run to completion, and hand the machine back for inspection.
@@ -78,7 +75,7 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
                 Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
                     let res_val = match value {
                         varn_types::Value::Task(lazy) => {
-                            let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                            let handle = machine.ctx.run_lazy_task_sync(lazy);
                             match handle.peek_state() {
                                 varn_types::TaskState::Resolved(v) => Ok(v),
                                 varn_types::TaskState::Rejected(e) => Err(e),
@@ -88,7 +85,14 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
                         varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                             varn_types::TaskState::Resolved(v) => Ok(v),
                             varn_types::TaskState::Rejected(e) => Err(e),
-                            _ => varn_vm::exec::ExecCtx::wait_task_handle_value(handle.clone()),
+                            _ => {
+                                machine.ctx.pump_until(&handle);
+                                match handle.peek_state() {
+                                    varn_types::TaskState::Resolved(v) => Ok(v),
+                                    varn_types::TaskState::Rejected(e) => Err(e),
+                                    _ => Ok(varn_types::Value::Null),
+                                }
+                            }
                         },
                         other => Ok(other),
                     };

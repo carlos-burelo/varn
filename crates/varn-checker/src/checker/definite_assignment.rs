@@ -10,9 +10,7 @@
 use super::Checker;
 use crate::binder::BindResult;
 use rustc_hash::FxHashSet;
-use varn_core::ast::{
-    AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind,
-};
+use varn_core::ast::{AstArena, Decl, ExprId, ExprKind, MatchBody, Program, StmtId, StmtKind};
 use varn_core::{Atom, Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]

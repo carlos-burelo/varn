@@ -150,9 +150,10 @@ pub fn run_global(func: &mut SsaFunc) -> bool {
             }
             match seen.get(&key) {
                 Some((existing, def)) => {
-                    let dominated = uses
-                        .get(dest.0 as usize)
-                        .is_some_and(|bs| bs.iter().all(|u| super::cfg::dominates(&dom, *def, *u as usize)));
+                    let dominated = uses.get(dest.0 as usize).is_some_and(|bs| {
+                        bs.iter()
+                            .all(|u| super::cfg::dominates(&dom, *def, *u as usize))
+                    });
                     if dominated {
                         rewrites.insert(dest, *existing);
                     }

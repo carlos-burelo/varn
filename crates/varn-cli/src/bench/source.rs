@@ -215,7 +215,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     let settings = varn_vm::ExecSettings::from_env(false);
     let mut init_vm = Vm::new(precompiled.clone(), settings).with_loader(loader.clone());
     for bp in &builtin_protos {
-        let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
+        let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new()));
         init_vm
             .run(closure)
             .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;
@@ -302,7 +302,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         varn_builtins::reset_testing_counters();
 
         let mut machine = factory.build();
-        let closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
+        let closure = Rc::new(Closure::new(Rc::new(proto), Vec::new()));
         run_vm_to_completion(&mut machine, closure)
     })?;
 

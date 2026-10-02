@@ -87,13 +87,8 @@ pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<
         .color(|c| c.blue())
         .print();
 
-    let mut table = terminal::Table::new([
-        "función",
-        "genérico",
-        "tipado",
-        "qué quedó genérico",
-    ])
-    .align([Align::Left, Align::Right, Align::Right, Align::Left]);
+    let mut table = terminal::Table::new(["función", "genérico", "tipado", "qué quedó genérico"])
+        .align([Align::Left, Align::Right, Align::Right, Align::Left]);
     for (name, c) in &rows {
         let mut detail = c
             .by_op

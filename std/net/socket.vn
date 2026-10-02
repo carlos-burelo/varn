@@ -24,6 +24,9 @@ export class TcpStream implements AsyncReader, AsyncWriter {
 
     static async connect(host: str, port: int): Task<TcpStream> {
         let connId = await tcpConnect$(host, port);
+        if (connId === -1) {
+            throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString());
+        }
         return new TcpStream(connId, host, port);
     }
 

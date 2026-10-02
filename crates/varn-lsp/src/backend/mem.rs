@@ -58,9 +58,7 @@ mod imp {
         // closing; `counters` is sized and zeroed to exactly what the ABI
         // expects, and `cb` tells the call its own size, which is how this
         // API validates the buffer it was handed.
-        let ok = unsafe {
-            GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb)
-        };
+        let ok = unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
         if ok == 0 {
             None
         } else {

@@ -326,17 +326,14 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             };
             match super::props::get_property(obj, &key_str, heap) {
                 Ok(v) if !v.is_null() => Ok(v),
-                _ => {
-                    match super::props::find_getter(obj, &key_str, heap) {
-                        Some(g) => {
-                            let receiver = heap.extract(obj);
-                            let bound =
-                                super::props::bind_method_to_receiver(receiver, g, None);
-                            Ok(heap.intern(bound))
-                        }
-                        None => Ok(VmValue::null()),
+                _ => match super::props::find_getter(obj, &key_str, heap) {
+                    Some(g) => {
+                        let receiver = heap.extract(obj);
+                        let bound = super::props::bind_method_to_receiver(receiver, g, None);
+                        Ok(heap.intern(bound))
                     }
-                }
+                    None => Ok(VmValue::null()),
+                },
             }
         }
         _ => Err(RuntimeError::new("OpGetIndex: not indexable")),

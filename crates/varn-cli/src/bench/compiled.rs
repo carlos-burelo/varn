@@ -48,7 +48,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let settings = varn_vm::ExecSettings::from_env(false);
     let mut init_vm = Vm::new(precompiled_base.clone(), settings).with_loader(loader.clone());
     for bp in &builtin_protos {
-        let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
+        let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new()));
         init_vm
             .run(closure)
             .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;

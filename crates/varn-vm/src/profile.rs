@@ -21,6 +21,47 @@ pub struct ProfileCounters {
     pub frame_pops: AtomicU64,
 }
 
+pub struct TaskStats {
+    pub parks: AtomicU64,
+    pub released: AtomicU64,
+    pub prune_hit: AtomicU64,
+    pub prune_miss: AtomicU64,
+    pub yields: AtomicU64,
+}
+
+impl TaskStats {
+    const fn new() -> Self {
+        Self {
+            parks: AtomicU64::new(0),
+            released: AtomicU64::new(0),
+            prune_hit: AtomicU64::new(0),
+            prune_miss: AtomicU64::new(0),
+            yields: AtomicU64::new(0),
+        }
+    }
+
+    pub fn snapshot(&self) -> TaskStatsSnapshot {
+        TaskStatsSnapshot {
+            parks: self.parks.load(Ordering::Relaxed),
+            released: self.released.load(Ordering::Relaxed),
+            prune_hit: self.prune_hit.load(Ordering::Relaxed),
+            prune_miss: self.prune_miss.load(Ordering::Relaxed),
+            yields: self.yields.load(Ordering::Relaxed),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TaskStatsSnapshot {
+    pub parks: u64,
+    pub released: u64,
+    pub prune_hit: u64,
+    pub prune_miss: u64,
+    pub yields: u64,
+}
+
+pub static TASK_STATS: TaskStats = TaskStats::new();
+
 impl ProfileCounters {
     pub(crate) fn new() -> Arc<Self> {
         Arc::new(Self {
@@ -121,6 +162,12 @@ pub struct VmProfile {
     pub nursery_allocs: u64,
     pub minor_gc_count: u64,
     pub minor_gc_promoted: u64,
+    pub task_parks: u64,
+    pub task_released: u64,
+    pub task_prune_hit: u64,
+    pub task_prune_miss: u64,
+    pub task_yields: u64,
+    pub timer_purged: u64,
 }
 
 impl VmProfile {
@@ -148,6 +195,12 @@ impl VmProfile {
             nursery_allocs: 0,
             minor_gc_count: 0,
             minor_gc_promoted: 0,
+            task_parks: 0,
+            task_released: 0,
+            task_prune_hit: 0,
+            task_prune_miss: 0,
+            task_yields: 0,
+            timer_purged: 0,
         }
     }
 }

@@ -1,9 +1,15 @@
 import { describe, it, expect, summary } from "std:test";
-import { sleep, delay, parallel, spawn, channel, Task, TaskGroup, Mutex, Semaphore, WaitGroup, RateLimiter, Cron } from "std:task";
+import { sleep, delay, parallel, spawn, channel, cancel, setTimeout, clearTimeout, Task, TaskGroup, Mutex, Semaphore, WaitGroup, RateLimiter, Cron } from "std:task";
+import { now } from "std:time";
 
 async function work(value: int): Task<int> {
     await sleep(10);
     return value * 2;
+}
+
+async function slowWork(value: int): Task<int> {
+    await sleep(500);
+    return value;
 }
 
 await describe("example std:task", async () => {
@@ -73,6 +79,91 @@ await describe("example std:task", async () => {
         expect(limiter.take()).toBe(false);
         let spec = Cron.parse("*/5 * * * *");
         expect(Cron.next(spec) > 0).toBe(true);
+    });
+
+    await it("cancels pending handles", async () => {
+        let slow = sleep(60000);
+        cancel(slow);
+        let cancelled = false;
+        try {
+            await slow;
+        } catch (e) {
+            cancelled = true;
+        }
+        expect(cancelled).toBe(true);
+    });
+
+    await it("cancels spawned work", async () => {
+        let handle = spawn(work(7));
+        cancel(handle);
+        let cancelled = false;
+        try {
+            await handle;
+        } catch (e) {
+            cancelled = true;
+        }
+        expect(cancelled).toBe(true);
+    });
+
+    await it("clearTimeout suppresses the callback", async () => {
+        let fired = false;
+        let timer = setTimeout(() => {
+            fired = true;
+        }, 50);
+        clearTimeout(timer);
+        await sleep(200);
+        expect(fired).toBe(false);
+    });
+
+    await it("race returns the fastest settlement", async () => {
+        let winner = await Task.race([work(5), work(1)]);
+        expect(winner === 10 || winner === 2).toBe(true);
+    });
+
+    await it("race rejects when the fastest rejects", async () => {
+        async function failFast(): Task<int> {
+            throw new Error("fast-boom");
+        }
+        let rejected = false;
+        try {
+            await Task.race([work(9), failFast()]);
+        } catch (e) {
+            rejected = true;
+        }
+        expect(rejected).toBe(true);
+    });
+
+    await it("join honors timeouts", async () => {
+        let group = new TaskGroup<int>();
+        group.spawn(slowWork(3));
+        let start = now();
+        let timedOut = false;
+        try {
+            await group.join(50);
+        } catch (e) {
+            timedOut = true;
+        }
+        let elapsed = now() - start;
+        expect(timedOut).toBe(true);
+        expect(elapsed < 400).toBe(true);
+    });
+
+    await it("cancel propagates through TaskGroup", async () => {
+        let group = new TaskGroup<int>();
+        group.spawn(slowWork(4));
+        let canceller = (async (): Task<Array<int>> => {
+            await sleep(50);
+            group.cancel();
+            return [];
+        })();
+        let cancelled = false;
+        try {
+            await parallel([group.join(), canceller]);
+        } catch (e) {
+            cancelled = true;
+        }
+        expect(cancelled).toBe(true);
+        expect(group.isCancelled).toBe(true);
     });
 });
 

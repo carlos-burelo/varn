@@ -263,7 +263,14 @@ macro_rules! define_tail {
         /// Nursery fill level at which the safepoint must run.
         pub nursery_threshold: usize,
         pub jit_native_result_offset: usize,
+        /// Byte offset of the `globals` field (an Rc, i.e. one pointer) inside
+        /// ExecCtx. The store itself is shared across task forks; chase it
+        /// with `globals_store_offset` (same two-link shape as the heap
+        /// RcBox in `emit_gc_poll`).
         pub globals_offset: usize,
+        /// Byte offset from the globals RcBox pointer to the `values` buffer:
+        /// Rc control prefix + `values` field + Vec buffer word.
+        pub globals_store_offset: usize,
         /// Byte offset of `module_base: u32` within `VmClosure`. A `LoadGlobalIdx`
         /// slot is relative to the running closure's module region; the lowering
         /// loads this from the closure param and adds it. `LoadNativeGlobalIdx`

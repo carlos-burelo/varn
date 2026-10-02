@@ -235,4 +235,13 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
     terminal::log(row("Move opcodes", fmt_num(profile.move_opcodes)));
     terminal::log(row("frame pushes", fmt_num(profile.frame_pushes)));
     terminal::log(row("frame pops", fmt_num(profile.frame_pops)));
+
+    terminal::blank();
+    terminal::log(chalk("Tasks").cyan().bold());
+    terminal::log(row("task parks", fmt_num(profile.task_parks)));
+    terminal::log(row("task released", fmt_num(profile.task_released)));
+    terminal::log(row("task prune hit", fmt_num(profile.task_prune_hit)));
+    terminal::log(row("task prune miss", fmt_num(profile.task_prune_miss)));
+    terminal::log(row("task yields", fmt_num(profile.task_yields)));
+    terminal::log(row("timer purged", fmt_num(profile.timer_purged)));
 }

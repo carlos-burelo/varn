@@ -405,7 +405,9 @@ pub(super) fn emit_method_call(
     // `url.indexOf` on a `dynamic`). Anything else — including a
     // user-defined method of the same name on another type — falls through
     // to the instance lane and the generic helper below, untouched.
-    if args.len() == 1 && (name == "startsWith" || name == "endsWith" || name == "indexOf" || name == "includes") {
+    if args.len() == 1
+        && (name == "startsWith" || name == "endsWith" || name == "indexOf" || name == "includes")
+    {
         let arg0 = b.ins().load(types::I128, m, window, 16);
         let (at, ap) = b.ins().isplit(arg0);
         let (rt0, rp0) = b.ins().isplit(receiver);

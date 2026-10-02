@@ -1,4 +1,4 @@
-use mio::net::{TcpListener, TcpStream};
+use mio::net::{TcpListener, TcpStream, UdpSocket as MioUdpSocket};
 use mio::{Events, Interest, Poll, Token, Waker};
 use rustc_hash::FxHashMap;
 use std::io::{ErrorKind, Read, Write};
@@ -14,6 +14,15 @@ static NEXT_SOCKET_ID: AtomicI64 = AtomicI64::new(1);
 
 pub fn next_socket_id() -> i64 {
     NEXT_SOCKET_ID.fetch_add(1, Ordering::SeqCst)
+}
+
+fn udp_packet_value(buf: &[u8], src: SocketAddr) -> Value {
+    let host_rc = std::sync::Arc::from(src.ip().to_string().as_str());
+    varn_types::value::new_array(vec![
+        Value::Buffer(varn_types::VmBuffer::from_bytes(buf)),
+        Value::Str(host_rc),
+        Value::Int(src.port() as i64),
+    ])
 }
 
 struct PendingRead {
@@ -40,17 +49,30 @@ struct ListenerState {
     pending_accepts: Vec<AsyncTask>,
 }
 
+struct PendingUdpRecv {
+    max_len: usize,
+    task: AsyncTask,
+}
+
+struct UdpState {
+    socket: MioUdpSocket,
+    pending_recvs: std::collections::VecDeque<PendingUdpRecv>,
+}
+
 enum DriverCommand {
     RegisterListener(i64),
     RegisterStream(i64),
+    RegisterUdp(i64),
     DeregisterListener(TcpListener),
     DeregisterStream(TcpStream),
+    DeregisterUdp(MioUdpSocket),
     Wake,
 }
 
 struct IoRegistry {
     listeners: FxHashMap<i64, ListenerState>,
     streams: FxHashMap<i64, StreamState>,
+    udps: FxHashMap<i64, UdpState>,
 }
 
 pub struct IoDriver {
@@ -65,6 +87,12 @@ pub fn driver() -> &'static IoDriver {
     DRIVER.get_or_init(|| IoDriver::new().expect("Failed to initialize mio IoDriver"))
 }
 
+fn wake_driver() {
+    let d = driver();
+    let _ = d.cmd_tx.send(DriverCommand::Wake);
+    let _ = d.waker.wake();
+}
+
 impl IoDriver {
     fn new() -> std::io::Result<Self> {
         let poll = Poll::new()?;
@@ -72,6 +100,7 @@ impl IoDriver {
         let registry = Arc::new(Mutex::new(IoRegistry {
             listeners: FxHashMap::default(),
             streams: FxHashMap::default(),
+            udps: FxHashMap::default(),
         }));
         let is_running = Arc::new(AtomicBool::new(true));
         let (cmd_tx, cmd_rx) = channel::<DriverCommand>();
@@ -80,10 +109,12 @@ impl IoDriver {
         let run_clone = Arc::clone(&is_running);
 
         std::thread::Builder::new()
-            .name("varn-mio-driver".into())
+            .name("varn-io-driver".into())
             .spawn(move || {
                 Self::run_event_loop(poll, cmd_rx, reg_clone, run_clone);
             })?;
+
+        varn_runtime::timer::set_waker(wake_driver);
 
         Ok(Self {
             registry,
@@ -124,8 +155,21 @@ impl IoDriver {
                             );
                         }
                     }
+                    DriverCommand::RegisterUdp(id) => {
+                        let mut reg = registry.lock().unwrap();
+                        if let Some(ustate) = reg.udps.get_mut(&id) {
+                            let _ = poll.registry().register(
+                                &mut ustate.socket,
+                                Token(id as usize),
+                                Interest::READABLE,
+                            );
+                        }
+                    }
                     DriverCommand::DeregisterListener(mut listener) => {
                         let _ = poll.registry().deregister(&mut listener);
+                    }
+                    DriverCommand::DeregisterUdp(mut socket) => {
+                        let _ = poll.registry().deregister(&mut socket);
                     }
                     DriverCommand::DeregisterStream(mut stream) => {
                         let _ = poll.registry().deregister(&mut stream);
@@ -134,7 +178,13 @@ impl IoDriver {
                 }
             }
 
-            if let Err(e) = poll.poll(&mut events, Some(Duration::from_millis(50))) {
+            let poll_timeout = match varn_runtime::timer::next_deadline() {
+                None => Duration::from_millis(50),
+                Some(deadline) => deadline
+                    .saturating_duration_since(std::time::Instant::now())
+                    .min(Duration::from_millis(50)),
+            };
+            if let Err(e) = poll.poll(&mut events, Some(poll_timeout)) {
                 if e.kind() == ErrorKind::Interrupted {
                     continue;
                 }
@@ -201,18 +251,20 @@ impl IoDriver {
                 }
 
                 // 2. Check Stream event
+                let mut deferred: Vec<(AsyncTask, Result<Value, Value>)> = Vec::new();
                 if let Some(stream_state) = reg.streams.get_mut(&id) {
                     // 2a. Pending Connect
                     if stream_state.is_connecting && (event.is_writable() || event.is_readable()) {
                         if let Some(task) = stream_state.pending_connect.take() {
                             stream_state.is_connecting = false;
-                            match stream_state.stream.peer_addr() {
-                                Ok(_) => task.settle(Ok(Value::Int(id))),
+                            let res = match stream_state.stream.peer_addr() {
+                                Ok(_) => Ok(Value::Int(id)),
                                 Err(_) => match stream_state.stream.take_error() {
-                                    Ok(None) => task.settle(Ok(Value::Int(id))),
-                                    _ => task.settle(Ok(Value::Int(-1))),
+                                    Ok(None) => Ok(Value::Int(id)),
+                                    _ => Ok(Value::Int(-1)),
                                 },
-                            }
+                            };
+                            deferred.push((task, res));
                         }
                     }
 
@@ -223,7 +275,7 @@ impl IoDriver {
                                 Ok(n) => {
                                     pw.written += n;
                                     if pw.written >= pw.data.len() {
-                                        pw.task.settle(Ok(Value::Int(pw.written as i64)));
+                                        deferred.push((pw.task, Ok(Value::Int(pw.written as i64))));
                                     } else {
                                         stream_state.pending_write = Some(pw);
                                     }
@@ -232,7 +284,7 @@ impl IoDriver {
                                     stream_state.pending_write = Some(pw);
                                 }
                                 Err(_) => {
-                                    pw.task.settle(Ok(Value::Int(-1)));
+                                    deferred.push((pw.task, Ok(Value::Int(-1))));
                                 }
                             }
                         }
@@ -244,23 +296,50 @@ impl IoDriver {
                             let mut buf = vec![0u8; pr.len];
                             match stream_state.stream.read(&mut buf) {
                                 Ok(0) => {
-                                    pr.task.settle(Ok(Value::Null));
+                                    deferred.push((pr.task, Ok(Value::Null)));
                                 }
                                 Ok(n) => {
                                     buf.truncate(n);
                                     let vm_buf = varn_types::VmBuffer::from_bytes(&buf);
-                                    pr.task.settle(Ok(Value::Buffer(vm_buf)));
+                                    deferred.push((pr.task, Ok(Value::Buffer(vm_buf))));
                                 }
                                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                     stream_state.pending_read = Some(pr);
                                 }
                                 Err(_) => {
-                                    pr.task.settle(Ok(Value::Null));
+                                    deferred.push((pr.task, Ok(Value::Null)));
                                 }
                             }
                         }
                     }
                 }
+                if let Some(udp_state) = reg.udps.get_mut(&id) {
+                    if event.is_readable() {
+                        while let Some(pr) = udp_state.pending_recvs.pop_front() {
+                            let mut buf = vec![0u8; pr.max_len.max(64)];
+                            match udp_state.socket.recv_from(&mut buf) {
+                                Ok((n, src)) => {
+                                    buf.truncate(n);
+                                    deferred.push((pr.task, Ok(udp_packet_value(&buf, src))));
+                                }
+                                Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                                    udp_state.pending_recvs.push_front(pr);
+                                    break;
+                                }
+                                Err(_) => {
+                                    deferred.push((pr.task, Ok(Value::Null)));
+                                }
+                            }
+                        }
+                    }
+                }
+                drop(reg);
+                for (task, res) in deferred {
+                    task.settle(res);
+                }
+            }
+            for task in varn_runtime::timer::take_due() {
+                task.resolve(varn_types::Value::Null);
             }
         }
     }
@@ -482,7 +561,7 @@ impl IoDriver {
                 task.settle(Ok(Value::Int(-1)));
             }
             if let Some(pr) = stream_state.pending_read.take() {
-                pr.task.settle(Ok(Value::Str(std::sync::Arc::from(""))));
+                pr.task.settle(Ok(Value::Null));
             }
             if let Some(pw) = stream_state.pending_write.take() {
                 pw.task.settle(Ok(Value::Int(-1)));
@@ -505,6 +584,88 @@ impl IoDriver {
             let _ = self
                 .cmd_tx
                 .send(DriverCommand::DeregisterListener(listener_state.listener));
+            let _ = self.waker.wake();
+        }
+    }
+
+    pub fn udp_bind(&self, host: &str, port: i64) -> std::io::Result<i64> {
+        let addr: SocketAddr = format!("{host}:{port}")
+            .parse()
+            .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
+        let socket = MioUdpSocket::bind(addr)?;
+        let id = next_socket_id();
+        {
+            let mut reg = self.registry.lock().unwrap();
+            reg.udps.insert(
+                id,
+                UdpState {
+                    socket,
+                    pending_recvs: std::collections::VecDeque::new(),
+                },
+            );
+        }
+        let _ = self.cmd_tx.send(DriverCommand::RegisterUdp(id));
+        let _ = self.waker.wake();
+        Ok(id)
+    }
+
+    pub fn udp_send_to(
+        &self,
+        id: i64,
+        bytes: &[u8],
+        host: &str,
+        port: i64,
+    ) -> std::io::Result<usize> {
+        let addr: SocketAddr = format!("{host}:{port}")
+            .parse()
+            .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
+        let reg = self.registry.lock().unwrap();
+        let ustate = reg.udps.get(&id).ok_or_else(|| {
+            std::io::Error::new(ErrorKind::NotFound, format!("invalid UDP socket id {id}"))
+        })?;
+        ustate.socket.send_to(bytes, addr)
+    }
+
+    pub fn udp_recv(&self, id: i64, max_len: usize) -> AsyncTask {
+        let mut reg = self.registry.lock().unwrap();
+        let ustate = match reg.udps.get_mut(&id) {
+            Some(u) => u,
+            None => {
+                let task = AsyncTask::pending();
+                task.reject_msg(format!("invalid UDP socket id {id}"));
+                return task;
+            }
+        };
+        let mut buf = vec![0u8; max_len.max(64)];
+        match ustate.socket.recv_from(&mut buf) {
+            Ok((n, src)) => {
+                buf.truncate(n);
+                AsyncTask::resolved(udp_packet_value(&buf, src))
+            }
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                let task = AsyncTask::pending();
+                ustate.pending_recvs.push_back(PendingUdpRecv {
+                    max_len,
+                    task: task.clone(),
+                });
+                drop(reg);
+                let _ = self.waker.wake();
+                task
+            }
+            Err(_) => AsyncTask::resolved(Value::Null),
+        }
+    }
+
+    pub fn udp_close(&self, id: i64) {
+        let mut reg = self.registry.lock().unwrap();
+        if let Some(ustate) = reg.udps.remove(&id) {
+            for pr in ustate.pending_recvs {
+                pr.task.settle(Ok(Value::Null));
+            }
+            drop(reg);
+            let _ = self
+                .cmd_tx
+                .send(DriverCommand::DeregisterUdp(ustate.socket));
             let _ = self.waker.wake();
         }
     }

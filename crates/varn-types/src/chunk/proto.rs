@@ -45,6 +45,12 @@ pub const STATE_YIELDED: u32 = 1;
 pub const FIRST_RESUME: u32 = 2;
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct SuspendLive {
+    pub resume_ip: u32,
+    pub regs: Vec<u16>,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ExceptionRange {
     pub try_start_ip: u32,
     pub try_end_ip: u32,
@@ -221,6 +227,10 @@ pub struct FunctionProto {
 
     #[serde(skip)]
     #[serde(default)]
+    pub frame_layout: std::cell::OnceCell<Rc<crate::register_meta::FrameLayout>>,
+
+    #[serde(skip)]
+    #[serde(default)]
     pub static_closure_val: std::cell::Cell<u64>,
 
     /// Frame entries seen so far, counted only while this proto is still
@@ -297,6 +307,12 @@ pub struct FunctionProto {
     /// (the JIT then lowers it from bytecode).
     #[serde(default)]
     pub ssa: crate::ssa::PortableSsa,
+
+    /// Live physical registers at each suspension resume point, sorted by
+    /// `resume_ip`. Only what the continuation can still read; the scheduler
+    /// and GC root a parked frame through this instead of the whole frame.
+    #[serde(default)]
+    pub suspend_live: Vec<SuspendLive>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
@@ -461,6 +477,13 @@ impl FunctionProto {
             }
         }
         Some(plan)
+    }
+
+    pub fn frame_layout(&self) -> Rc<crate::register_meta::FrameLayout> {
+        Rc::clone(
+            self.frame_layout
+                .get_or_init(|| Rc::new(crate::register_meta::FrameLayout::for_proto(self))),
+        )
     }
 
     pub fn ensure_ic(&self) {

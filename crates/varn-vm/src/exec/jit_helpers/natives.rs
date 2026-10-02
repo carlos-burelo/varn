@@ -51,4 +51,3 @@ unsafe fn resolve_native(
         ),
     }
 }
-

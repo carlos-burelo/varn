@@ -10,6 +10,7 @@ mod object;
 mod sendable;
 mod shape;
 mod task;
+mod task_args;
 mod traits;
 use crate::generator::GeneratorObj;
 pub use crate::native::NativeFn;
@@ -34,14 +35,17 @@ pub use shape::{root_shape, Shape, SHAPE_ID_OFF};
 use std::rc::Rc;
 use std::sync::Arc;
 pub use task::{reject_task, reject_value_task, resolve_task, Poll, TaskState};
+pub use task_args::TaskArgs;
 pub use varn_core::{RuntimeKind, VmValuePayload};
 
 pub type RuntimeArray = Vec<Value>;
 
 #[derive(Debug, Clone)]
 pub struct LazyTask {
-    pub closure: Rc<crate::value::closure::Closure>,
-    pub args: Vec<Value>,
+    pub proto: Rc<crate::chunk::FunctionProto>,
+    pub upvalues: Vec<crate::value::closure::Upvalue>,
+    pub module_base: u32,
+    pub args: TaskArgs,
     pub current_class: Option<Rc<crate::value::class::ClassObj>>,
 }
 

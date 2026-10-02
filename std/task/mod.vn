@@ -18,6 +18,7 @@ export {
     parallel,
     spawn,
     sleep,
+    cancel,
     Task,
     delay,
     setTimeout,

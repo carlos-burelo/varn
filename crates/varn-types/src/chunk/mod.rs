@@ -15,7 +15,9 @@ pub use inline_cache::{
 pub use lines::{LineEntry, LineMapping};
 pub use literal::Literal;
 pub use pool::PoolEntry;
-pub use proto::{ExceptionRange, FunctionProto, FIRST_RESUME, STATE_DONE, STATE_YIELDED};
+pub use proto::{
+    ExceptionRange, FunctionProto, SuspendLive, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
+};
 
 use literal::rc_str_serde;
 use std::sync::Arc;

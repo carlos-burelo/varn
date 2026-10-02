@@ -69,11 +69,11 @@ impl ExecCtx {
                 let gidx = closure.module_base as usize + code[*ip] as usize;
                 *ip += 1;
                 debug_assert!(
-                    gidx < self.globals.values.len(),
+                    gidx < self.globals_ref().values.len(),
                     "LoadGlobalIdx out of bounds: {gidx} >= {}",
-                    self.globals.values.len()
+                    self.globals_ref().values.len()
                 );
-                let nv = self.globals.values[gidx];
+                let nv = self.globals_ref().values[gidx];
                 self.stack.unbox_into_reg(base, first_reg, nv)?;
                 self.record_hotspot_global(gidx);
             }
@@ -81,11 +81,11 @@ impl ExecCtx {
                 let gidx = code[*ip] as usize;
                 *ip += 1;
                 debug_assert!(
-                    gidx < self.globals.values.len(),
+                    gidx < self.globals_ref().values.len(),
                     "LoadNativeGlobalIdx out of bounds: {gidx} >= {}",
-                    self.globals.values.len()
+                    self.globals_ref().values.len()
                 );
-                let nv = self.globals.values[gidx];
+                let nv = self.globals_ref().values[gidx];
                 self.stack.unbox_into_reg(base, first_reg, nv)?;
                 self.record_hotspot_global(gidx);
             }
@@ -94,12 +94,12 @@ impl ExecCtx {
                 let gidx = closure.module_base as usize + code[*ip + 1] as usize;
                 *ip += 2;
                 debug_assert!(
-                    gidx < self.globals.values.len(),
+                    gidx < self.globals_ref().values.len(),
                     "StoreGlobalIdx out of bounds: {gidx} >= {}",
-                    self.globals.values.len()
+                    self.globals_ref().values.len()
                 );
                 let val = self.stack.box_reg(base, src);
-                self.globals.set_by_index_unchecked(gidx, val);
+                self.globals_mut().set_by_index_unchecked(gidx, val);
             }
             OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::DefineGlobal => {
                 self.frames[frame_idx].ip = *ip;

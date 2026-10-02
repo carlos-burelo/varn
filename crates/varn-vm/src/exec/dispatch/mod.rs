@@ -193,7 +193,7 @@ impl ExecCtx {
                         let gidx = closure.module_base as usize + code[ip] as usize;
                         ip += 1;
 
-                        let nv = (*ctx).globals.get_by_index_unchecked(gidx);
+                        let nv = (*ctx).globals_ref().get_by_index_unchecked(gidx);
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, nv));
                         (*ctx).record_hotspot_global(gidx);
                     }
@@ -201,7 +201,7 @@ impl ExecCtx {
                         let gidx = code[ip] as usize;
                         ip += 1;
 
-                        let nv = (*ctx).globals.get_by_index_unchecked(gidx);
+                        let nv = (*ctx).globals_ref().get_by_index_unchecked(gidx);
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, nv));
                         (*ctx).record_hotspot_global(gidx);
                     }
@@ -229,7 +229,7 @@ impl ExecCtx {
                         let gidx = closure.module_base as usize + code[ip + 1] as usize;
                         ip += 2;
                         let val = reg_box!(src);
-                        (*ctx).globals.set_by_index_unchecked(gidx, val);
+                        (*ctx).globals_mut().set_by_index_unchecked(gidx, val);
                     }
                     OpCode::LoadInt => {
                         let val = code[ip] as i16;
@@ -646,7 +646,7 @@ impl ExecCtx {
             let module_exports = self.module_exports.remove(&returning_frame_idx);
             let cached = module_exports.unwrap_or(final_val);
             let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
-            self.modules.insert(module_id, cached);
+            unsafe { &mut *self.modules.get() }.insert(module_id, cached);
         }
 
         if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {

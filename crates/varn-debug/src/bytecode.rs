@@ -105,6 +105,8 @@ fn print_proto(
     let indent = "  ".repeat(depth);
     let state_size_flag =
         (proto.state_size != 0).then(|| format!("state_size={}", proto.state_size));
+    let suspend_flag = (!proto.suspend_live.is_empty())
+        .then(|| format!("suspend_live={}", proto.suspend_live.len()));
     let proto_flags: Vec<&str> = [
         proto.is_async.then_some("async"),
         proto.is_generator.then_some("gen"),
@@ -114,6 +116,7 @@ fn print_proto(
     .into_iter()
     .flatten()
     .chain(state_size_flag.as_deref())
+    .chain(suspend_flag.as_deref())
     .collect();
     let flags_str = if proto_flags.is_empty() {
         String::new()

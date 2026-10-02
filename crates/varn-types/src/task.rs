@@ -1,6 +1,4 @@
 use crate::value::Value;
-use std::cell::RefCell;
-
 #[derive(Debug, Clone)]
 pub enum TaskState {
     Pending,
@@ -10,17 +8,39 @@ pub enum TaskState {
 
 type SettleCallback = Box<dyn FnOnce(Result<Value, Value>) + 'static>;
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use crate::wake::WakeToken;
+use std::sync::atomic::{fence, AtomicU32, Ordering};
 use std::sync::Mutex;
 
-struct Inner {
-    state: Mutex<TaskState>,
-    on_settle: Mutex<Vec<SettleCallback>>,
-    ref_count: AtomicU32,
+enum Waiter {
+    Wake(WakeToken),
+    Call(SettleCallback),
 }
 
-thread_local! {
-    static TASK_POOL: RefCell<Vec<*mut Inner>> = const { RefCell::new(Vec::new()) };
+struct Slot {
+    state: TaskState,
+    first: Option<Waiter>,
+    more: Vec<Waiter>,
+}
+
+impl Slot {
+    fn push(&mut self, waiter: Waiter) {
+        if self.first.is_none() {
+            self.first = Some(waiter);
+            return;
+        }
+        self.more.reserve_exact(1);
+        self.more.push(waiter);
+    }
+
+    fn take_waiters(&mut self) -> (Option<Waiter>, Vec<Waiter>) {
+        (self.first.take(), std::mem::take(&mut self.more))
+    }
+}
+
+struct Inner {
+    slot: Mutex<Slot>,
+    ref_count: AtomicU32,
 }
 
 pub struct AsyncTask(*mut Inner);
@@ -31,7 +51,7 @@ unsafe impl Sync for AsyncTask {}
 impl Clone for AsyncTask {
     fn clone(&self) -> Self {
         unsafe {
-            (*self.0).ref_count.fetch_add(1, Ordering::SeqCst);
+            (*self.0).ref_count.fetch_add(1, Ordering::Relaxed);
         }
         AsyncTask(self.0)
     }
@@ -40,30 +60,18 @@ impl Clone for AsyncTask {
 impl Drop for AsyncTask {
     fn drop(&mut self) {
         unsafe {
-            let old_ref = (*self.0).ref_count.fetch_sub(1, Ordering::SeqCst);
-            if old_ref == 1 {
-                let inner = self.0;
-
-                *(*inner).state.lock().unwrap() = TaskState::Pending;
-                (*inner).on_settle.lock().unwrap().clear();
-
-                TASK_POOL.with(|pool| {
-                    let mut p = pool.borrow_mut();
-                    if p.len() < 1024 {
-                        p.push(inner);
-                    } else {
-                        drop(Box::from_raw(inner));
-                    }
-                });
+            if (*self.0).ref_count.fetch_sub(1, Ordering::Release) == 1 {
+                fence(Ordering::Acquire);
+                drop(Box::from_raw(self.0));
             }
         }
     }
 }
 
 impl AsyncTask {
-    /// Stable identity of this task while any clone is alive (the pooled
-    /// `Inner` pointer). Only meaningful as a map key alongside an owning
-    /// clone — the pool reuses the allocation once every clone drops.
+    /// Stable identity of this task while any clone is alive (the `Inner`
+    /// pointer). Only meaningful as a map key alongside an owning clone: the
+    /// allocation is reused once every clone drops.
     #[inline(always)]
     pub fn identity(&self) -> usize {
         self.0 as usize
@@ -95,23 +103,20 @@ impl std::fmt::Debug for AsyncTask {
 
 impl AsyncTask {
     fn alloc(state: TaskState) -> Self {
-        let ptr = TASK_POOL.with(|pool| {
-            let mut p = pool.borrow_mut();
-            if let Some(ptr) = p.pop() {
-                unsafe {
-                    *(*ptr).state.lock().unwrap() = state;
-                    (*ptr).ref_count.store(1, Ordering::SeqCst);
-                    ptr
-                }
-            } else {
-                Box::into_raw(Box::new(Inner {
-                    state: Mutex::new(state),
-                    on_settle: Mutex::new(Vec::new()),
-                    ref_count: AtomicU32::new(1),
-                }))
-            }
+        let inner = Box::new(Inner {
+            slot: Mutex::new(Slot {
+                state,
+                first: None,
+                more: Vec::new(),
+            }),
+            ref_count: AtomicU32::new(1),
         });
-        AsyncTask(ptr)
+        AsyncTask(Box::into_raw(inner))
+    }
+
+    #[inline(always)]
+    fn slot(&self) -> std::sync::MutexGuard<'_, Slot> {
+        unsafe { (*self.0).slot.lock().unwrap() }
     }
 
     pub fn pending() -> Self {
@@ -131,25 +136,33 @@ impl AsyncTask {
         Self::rejected(Value::Str(std::sync::Arc::from(s.as_str())))
     }
 
+    #[inline]
+    pub fn is_pending(&self) -> bool {
+        matches!(self.slot().state, TaskState::Pending)
+    }
+
     pub fn peek_state(&self) -> TaskState {
-        unsafe { (*self.0).state.lock().unwrap().clone() }
+        self.slot().state.clone()
     }
 
     pub fn settle(&self, result: Result<Value, Value>) {
-        let callbacks = unsafe {
-            let inner = &*self.0;
-            let mut state_guard = inner.state.lock().unwrap();
-            if !matches!(*state_guard, TaskState::Pending) {
+        let waiters = {
+            let mut slot = self.slot();
+            if !matches!(slot.state, TaskState::Pending) {
                 return;
             }
-            match &result {
-                Ok(v) => *state_guard = TaskState::Resolved(v.clone()),
-                Err(v) => *state_guard = TaskState::Rejected(v.clone()),
-            }
-            std::mem::take(&mut *inner.on_settle.lock().unwrap())
+            slot.state = match &result {
+                Ok(v) => TaskState::Resolved(v.clone()),
+                Err(v) => TaskState::Rejected(v.clone()),
+            };
+            slot.take_waiters()
         };
-        for cb in callbacks {
-            cb(result.clone());
+        let (first, more) = waiters;
+        for waiter in first.into_iter().chain(more) {
+            match waiter {
+                Waiter::Wake(token) => token.fire(),
+                Waiter::Call(cb) => cb(result.clone()),
+            }
         }
     }
 
@@ -169,16 +182,26 @@ impl AsyncTask {
         self.reject(Value::Str(std::sync::Arc::from(s.as_str())));
     }
 
+    pub fn wake_on_settle(&self, token: WakeToken) {
+        {
+            let mut slot = self.slot();
+            if matches!(slot.state, TaskState::Pending) {
+                slot.push(Waiter::Wake(token));
+                return;
+            }
+        }
+        token.fire();
+    }
+
     pub fn on_settle<F>(&self, cb: F)
     where
         F: FnOnce(Result<Value, Value>) + 'static,
     {
-        let already = unsafe {
-            let inner = &*self.0;
-            let state_guard = inner.state.lock().unwrap();
-            match &*state_guard {
+        let already = {
+            let mut slot = self.slot();
+            match &slot.state {
                 TaskState::Pending => {
-                    inner.on_settle.lock().unwrap().push(Box::new(cb));
+                    slot.push(Waiter::Call(Box::new(cb)));
                     return;
                 }
                 TaskState::Resolved(v) => Ok(v.clone()),
@@ -191,6 +214,19 @@ impl AsyncTask {
     #[inline]
     pub fn cancel(&self) {
         self.reject_msg("Task cancelled");
+    }
+}
+
+static YIELD_TOKEN: std::sync::OnceLock<AsyncTask> = std::sync::OnceLock::new();
+
+impl AsyncTask {
+    pub fn yield_token() -> Self {
+        YIELD_TOKEN.get_or_init(AsyncTask::pending).clone()
+    }
+
+    pub fn is_yield_token(&self) -> bool {
+        let token = YIELD_TOKEN.get_or_init(AsyncTask::pending);
+        self.identity() == token.identity()
     }
 }
 

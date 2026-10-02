@@ -47,8 +47,7 @@ pub fn debug_summary(proto: &FunctionProto) {
         .subtitle(proto.name.as_deref().unwrap_or("<module>"))
         .color(|c| c.bold())
         .print();
-    let mut stats =
-        terminal::Table::new(["métrica", "valor"]).align([Align::Left, Align::Right]);
+    let mut stats = terminal::Table::new(["métrica", "valor"]).align([Align::Left, Align::Right]);
     stats.row(["funciones".to_string(), fns.len().to_string()]);
     stats.row(["bytecode (words)".to_string(), total_words.to_string()]);
     stats.row(["constantes".to_string(), total_consts.to_string()]);
@@ -61,13 +60,20 @@ pub fn debug_summary(proto: &FunctionProto) {
 
     fns.sort_by_key(|b| std::cmp::Reverse(b.words));
     terminal::tagged("top", format!("{TOP_N} por tamaño"));
-    let mut top =
-        terminal::Table::new(["función", "words", "gate"]).align([Align::Left, Align::Right, Align::Left]);
+    let mut top = terminal::Table::new(["función", "words", "gate"]).align([
+        Align::Left,
+        Align::Right,
+        Align::Left,
+    ]);
     for f in fns.iter().take(TOP_N) {
         top.row([
             truncate(&f.name, 32).to_string(),
             format!("{} words", f.words),
-            if f.gated { "excede el gate".to_string() } else { String::new() },
+            if f.gated {
+                "excede el gate".to_string()
+            } else {
+                String::new()
+            },
         ]);
     }
     top.print();

@@ -1,7 +1,10 @@
 //! Global reads and writes for the SSA lowering.
 //!
-//! Globals live in `ExecCtx.globals` (a `GlobalStore`); its `values` Vec data
-//! pointer sits at `globals_offset`. A module global's slot is RELATIVE to
+//! Globals live in the store shared across task forks (`ExecCtx.globals`, an
+//! Rc to a `GlobalStore`); its `values` Vec data pointer is chased per
+//! access: Rc field at `globals_offset`, then the buffer word at
+//! `globals_store_offset` (Rc control prefix + `values` field + Vec word).
+//! A module global's slot is RELATIVE to
 //! the running closure's module region (`closure.module_base`, at
 //! `closure_module_base_offset`); a native (prelude) global's index is
 //! absolute. Both offsets come from the one probed `JitHelpers` table, so
@@ -34,11 +37,17 @@ fn slot_addr(
         .as_ref()
         .ok_or("from_ssa: global access in a frame-less body")?;
     let helpers = ctx.helpers;
-    let gbase = b.ins().load(
+    let rcbox = b.ins().load(
         types::I64,
         MemFlags::trusted(),
         frame.exec_ctx,
         helpers.globals_offset as i32,
+    );
+    let gbase = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        rcbox,
+        helpers.globals_store_offset as i32,
     );
     let idx = b.ins().iconst(types::I64, i64::from(slot));
     let eff = match region {

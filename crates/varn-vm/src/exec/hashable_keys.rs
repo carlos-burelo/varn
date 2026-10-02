@@ -31,8 +31,7 @@ impl ExecCtx {
             return Err(RuntimeError::new("hash() must return int"));
         }
         let bucket_key = (class_id, hash.as_int());
-        let candidates = self
-            .hashable_keys
+        let candidates = unsafe { &*self.hashable_keys.get() }
             .get(&bucket_key)
             .cloned()
             .unwrap_or_default();
@@ -45,7 +44,10 @@ impl ExecCtx {
                 return Ok(rep);
             }
         }
-        self.hashable_keys.entry(bucket_key).or_default().push(key);
+        unsafe { &mut *self.hashable_keys.get() }
+            .entry(bucket_key)
+            .or_default()
+            .push(key);
         Ok(key)
     }
 

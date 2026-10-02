@@ -203,10 +203,9 @@ pub(crate) fn prepare_call(
                 }
                 if nc.proto.is_async {
                     let args_start = staging.len().saturating_sub(arg_count);
-                    let args: Vec<Value> = staging
-                        .drain(args_start..)
-                        .map(|nv| heap.extract(nv))
-                        .collect();
+                    let args = varn_types::value::TaskArgs::collect(
+                        staging.drain(args_start..).map(|nv| heap.extract(nv)),
+                    );
                     let upvalues: Vec<varn_types::Upvalue> = nc
                         .upvalues
                         .iter()
@@ -223,16 +222,10 @@ pub(crate) fn prepare_call(
                             }
                         })
                         .collect();
-                    let consts: Vec<varn_types::Value> =
-                        nc.constants.iter().map(|&c| heap.extract(c)).collect();
-                    let closure = varn_types::Closure::with_module_base(
-                        nc.proto.clone(),
-                        upvalues,
-                        consts,
-                        nc.module_base,
-                    );
                     let task = Value::Task(std::rc::Rc::new(LazyTask {
-                        closure: std::rc::Rc::new(closure),
+                        proto: nc.proto.clone(),
+                        upvalues,
+                        module_base: nc.module_base,
                         args,
                         current_class: None,
                     }));
@@ -305,10 +298,9 @@ pub(crate) fn prepare_call(
                         }
                         if nc.proto.is_async {
                             let args_start = staging.len().saturating_sub(full_arg_count);
-                            let args: Vec<Value> = staging
-                                .drain(args_start..)
-                                .map(|nv| heap.extract(nv))
-                                .collect();
+                            let args = varn_types::value::TaskArgs::collect(
+                                staging.drain(args_start..).map(|nv| heap.extract(nv)),
+                            );
                             let upvalues: Vec<varn_types::Upvalue> = nc
                                 .upvalues
                                 .iter()
@@ -325,16 +317,10 @@ pub(crate) fn prepare_call(
                                     }
                                 })
                                 .collect();
-                            let consts: Vec<varn_types::Value> =
-                                nc.constants.iter().map(|&c| heap.extract(c)).collect();
-                            let closure = varn_types::Closure::with_module_base(
-                                nc.proto.clone(),
-                                upvalues,
-                                consts,
-                                nc.module_base,
-                            );
                             let task = Value::Task(std::rc::Rc::new(LazyTask {
-                                closure: std::rc::Rc::new(closure),
+                                proto: nc.proto.clone(),
+                                upvalues,
+                                module_base: nc.module_base,
                                 args,
                                 current_class: owner_class,
                             }));

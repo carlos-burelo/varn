@@ -43,7 +43,7 @@ pub fn execute_with_caps(
     ]));
     let settings = varn_vm::ExecSettings::from_env(_debug.trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
-    machine.ctx.capabilities = capabilities;
+    machine.ctx.capabilities = Rc::new(capabilities);
     varn_vm::prefill_native_modules(&mut machine);
 
     if _debug.trace {
@@ -58,13 +58,13 @@ pub fn execute_with_caps(
                 format_args!("running builtin {name}"),
             );
         }
-        let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
+        let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new()));
         machine
             .run(closure)
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
 
-    let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
+    let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new()));
 
     let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
     let mut export_map = FxHashMap::default();
@@ -77,7 +77,7 @@ pub fn execute_with_caps(
     );
     module_obj.export_map = export_map;
     let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
-    machine.ctx.modules.insert(main_module_id, module_val);
+    unsafe { &mut *machine.ctx.modules.get() }.insert(main_module_id, module_val);
     machine.ctx.module_exports.insert(0, module_val);
 
     if _debug.trace {
@@ -93,7 +93,7 @@ pub fn execute_with_caps(
                 Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
                     let res_val = match value {
                         varn_types::Value::Task(lazy) => {
-                            let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                            let handle = machine.ctx.run_lazy_task_sync(lazy);
                             match handle.peek_state() {
                                 varn_types::task::TaskState::Resolved(v) => Ok(v),
                                 varn_types::task::TaskState::Rejected(e) => Err(e),
@@ -103,7 +103,14 @@ pub fn execute_with_caps(
                         varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                             varn_types::task::TaskState::Resolved(v) => Ok(v),
                             varn_types::task::TaskState::Rejected(e) => Err(e),
-                            _ => varn_vm::exec::ExecCtx::wait_task_handle_value(handle.clone()),
+                            _ => {
+                                machine.ctx.pump_until(&handle);
+                                match handle.peek_state() {
+                                    varn_types::task::TaskState::Resolved(v) => Ok(v),
+                                    varn_types::task::TaskState::Rejected(e) => Err(e),
+                                    _ => Ok(varn_types::Value::Null),
+                                }
+                            }
                         },
                         other => Ok(other),
                     };

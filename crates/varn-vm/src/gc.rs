@@ -256,21 +256,16 @@ impl TricolorMarker {
                 }
                 HeapObj::Task(task) => {
                     let task = task.clone();
-                    for v in &task.args {
+                    for v in task.args.as_slice() {
                         if let Some(ci) = heap.value_heap_idx(v) {
                             self.mark_gray(ci);
                         }
                     }
-                    for uv in &task.closure.upvalues {
+                    for uv in &task.upvalues {
                         if let Ok(inner) = uv.inner.try_borrow() {
                             if let Some(ci) = heap.value_heap_idx(&inner.value) {
                                 self.mark_gray(ci);
                             }
-                        }
-                    }
-                    for v in &task.closure.resolved_constants {
-                        if let Some(ci) = heap.value_heap_idx(v) {
-                            self.mark_gray(ci);
                         }
                     }
                 }

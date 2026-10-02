@@ -182,8 +182,35 @@ Word 1 (Payload, 64-bit): [64-bit Native Value / Direct Pointer / SSO bytes (<= 
 
 ## 7. Concurrencia: `await` e Isolates
 
-- **`await`**: lo implementa la VM, no `varn-runtime`. `ExecCtx::wait_task_handle` registra un callback con `AsyncTask::on_settle` y espera el resultado por un canal `std::sync::mpsc` — espera bloqueante, cooperativa dentro del hilo, sin event loop.
-- **Timers**: `suspend_timer` duerme el hilo (`thread::sleep`) salvo que exista un contexto Tokio con `LocalSet`, caso que hoy no se da en ninguna ruta del CLI.
+- **`await`**: lo implementa la VM, no `varn-runtime`. Sobre un `TaskHandle`
+  pendiente, el scheduler cooperativo congela la tarea (`Frozen`: frames con
+  sus slots vivos, handlers y upvalues abiertos) y drivea la cola FIFO hasta
+  que el handle resuelve. Las tareas aparcadas viven en un slab con
+  generación; el handle las despierta con un `WakeToken` (`varn-types::wake`)
+  que apunta a su celda, sin mapas de espera ni cierres. El orden de despertar
+  es el de registro (FIFO) y determinista.
+  Un `ExecCtx` solo existe mientras la tarea corre: sale de un pool por cola
+  y se recicla al aparcar o terminar.
+  Sin event loop central: cada `pump_until` es el loop.
+- **Timers + I/O, un solo hilo**: `varn-io-driver` (mio + wheel). La cola de
+  timers vive en `varn-runtime::timer` sin hilo propio; el driver la liquida
+  con timeout `min(50ms, próxima deadline)`. `sleep(0)` resuelve sin
+  encolar. Un thread-por-sleep y un hilo-por-`recv` quedaron eliminados.
+- **Tablas compartidas**: globals, módulos, recursos, pools de constantes,
+  closures estáticos, metadata y hashable-keys son una sola tabla por
+  proceso (`Rc<UnsafeCell>`, mismo contrato single-thread que el heap), igual
+  que el `Linker`; los contextos de tarea solo poseen estado de ejecución
+  (stack, frames, handlers, staging). El GC menor reúne las compartidas una
+  vez y `major_roots` no las duplica; el alcance del GC (contexto en
+  ejecución + contextos que bombean + `Frozen` de toda cola) vive en
+  `exec/scheduler/pumps.rs`.
+  `parallel` rechaza con el valor tipado original, no con su `String`.
+- **Retención live-only**: cada proto publica `suspend_live` (live sets +
+  handlers + reg 0); al aparcar se podan Dyn/Ref muertos del frame
+  superior y los frames pasan a `Frozen`, reconstruidos idénticos al
+  reanudar (`exec/scheduler/suspend.rs`). Una tarea que no puede congelarse
+  se rechaza con un error interno explícito; no existe camino de retención
+  completa.
 - **Isolates**: hilos independientes con su propia VM y heap. La comunicación es paso de mensajes serializados (`SendValue` / `SendEnvelope`) por los canales tipados de `varn-runtime::channel`.
 
 Detalle y estado en [RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md).

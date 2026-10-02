@@ -331,19 +331,17 @@ impl NativeCtx for ExecCtx {
     }
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
-        let output = varn_types::AsyncTask::pending();
-        let out_clone = output.clone();
-        std::thread::spawn(move || {
-            if ms > 0 {
-                std::thread::sleep(std::time::Duration::from_millis(ms));
-            }
-            out_clone.resolve(varn_types::Value::Null);
-        });
-        self.heap.intern(varn_types::Value::TaskHandle(output))
+        varn_builtins::modules::net::driver::driver();
+        let task = varn_runtime::timer::sleep_task(ms);
+        self.heap.intern(varn_types::Value::TaskHandle(task))
     }
 
+    /// `&mut` out of the shared table under the same single-threaded
+    /// contract as the heap: tasks on this thread take turns, never
+    /// overlapping, so no aliasing `&mut` exists at once.
+    #[allow(clippy::mut_from_ref)]
     fn resources(&mut self) -> &mut ResourceStore {
-        &mut self.resources
+        unsafe { &mut *self.resources.get() }
     }
 
     fn extract(&self, v: VmValue) -> varn_types::Value {
@@ -465,7 +463,7 @@ impl NativeCtx for ExecCtx {
 
     fn define_metadata(&mut self, target: VmValue, key: &str, value: VmValue) {
         let target_k = self.target_meta_key(target);
-        self.metadata
+        unsafe { &mut *self.metadata.get() }
             .entry(target_k)
             .or_default()
             .insert(key.to_string(), value);
@@ -473,7 +471,7 @@ impl NativeCtx for ExecCtx {
 
     fn get_metadata(&self, target: VmValue, key: &str) -> Option<VmValue> {
         let target_k = self.target_meta_key(target);
-        self.metadata
+        unsafe { &*self.metadata.get() }
             .get(&target_k)
             .and_then(|m| m.get(key))
             .copied()
@@ -481,7 +479,7 @@ impl NativeCtx for ExecCtx {
 
     fn has_metadata(&self, target: VmValue, key: &str) -> bool {
         let target_k = self.target_meta_key(target);
-        self.metadata
+        unsafe { &*self.metadata.get() }
             .get(&target_k)
             .map(|m| m.contains_key(key))
             .unwrap_or(false)

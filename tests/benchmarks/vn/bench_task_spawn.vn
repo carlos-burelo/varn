@@ -1,0 +1,26 @@
+import { parallel, sleep, Task } from "std:task";
+import { now } from "std:time";
+
+async function nap(ms: int): Task<void> {
+    await sleep(ms);
+}
+
+async function trivial(n: int): Task<int> {
+    return n + 1;
+}
+
+let t0 = now();
+await parallel([nap(100), nap(100), nap(100), nap(100), nap(100), nap(100), nap(100), nap(100)]);
+print("overlap8x100=" + (now() - t0).toString());
+
+let batch: Array<Task<int>> = [];
+for (let i = 0; i < 500; i = i + 1) {
+    batch.push(trivial(i));
+}
+t0 = now();
+let res = await parallel(batch);
+let sum = 0;
+for (let i = 0; i < res.length; i = i + 1) {
+    sum = sum + res[i];
+}
+print("spawn500=" + (now() - t0).toString() + " sum=" + sum.toString());

@@ -312,7 +312,7 @@ pub(crate) extern "C" fn jit_load_global_by_name(
             .unwrap_or(VmValue::null());
         let name = ctx_ref.heap.str_val(name_nv).unwrap_or_default();
         ctx_ref.jit_native_result = ctx_ref
-            .globals
+            .globals_ref()
             .get_by_name(&name)
             .unwrap_or(VmValue::null());
     }
@@ -338,8 +338,8 @@ pub(crate) extern "C" fn jit_store_global_by_name(
             .copied()
             .unwrap_or(VmValue::null());
         let name = ctx_ref.heap.str_val(name_nv).unwrap_or_default();
-        if !ctx_ref.globals.set_by_name(&name, val) {
-            ctx_ref.globals.define(&name, val);
+        if !ctx_ref.globals_mut().set_by_name(&name, val) {
+            ctx_ref.globals_mut().define(&name, val);
         }
     }
 }

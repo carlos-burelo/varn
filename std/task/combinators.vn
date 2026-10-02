@@ -1,4 +1,4 @@
-import { spawn$, sleep$, parallel$, channel$, Channel } from "runtime:task";
+import { spawn$, sleep$, parallel$, cancelTask$, yieldTask$, channel$, Channel } from "runtime:task";
 
 export type TaskSettledResult<T> = {
     status: str,
@@ -18,23 +18,33 @@ export function sleep(ms: int): TaskHandle<void> {
     return sleep$(ms);
 }
 
+export function cancel<T>(handle: TaskHandle<T>): void {
+    cancelTask$(handle);
+}
+
 async function wrapSettledOne<T>(task: Task<T>): Task<TaskSettledResult<T>> {
     try {
         let val = await task;
         return { status: "fulfilled", value: val };
     } catch (err) {
-        return { status: "rejected", reason: "" + err };
+        return { status: "rejected", reason: err.message ?? ("" + err) };
     }
 }
 
-async function raceOne<T>(task: Task<T>, ch: Channel<T>): Task<void> {
+async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<TaskSettledResult<T>>): Task<void> {
     try {
-        let res = await task;
-        await ch.tx.send(res);
-    } catch {}
+        let res = await handle;
+        await ch.tx.send({ status: "fulfilled", value: res });
+    } catch (err) {
+        await ch.tx.send({ status: "rejected", reason: err.message ?? ("" + err) });
+    }
 }
 
 export namespace Task {
+    export async function yield(): Task<void> {
+        await yieldTask$();
+    }
+
     export async function all<T>(tasks: Array<Task<T>>): Task<Array<T>> {
         return await parallel$(tasks);
     }
@@ -51,11 +61,22 @@ export namespace Task {
         if (tasks.length === 0) {
             throw new Error("Task.race requires at least one task");
         }
-        let ch = channel$<T>(tasks.length);
+        let ch = channel$<TaskSettledResult<T>>(tasks.length);
+        let handles: Array<TaskHandle<T>> = [];
         for (let i = 0; i < tasks.length; i = i + 1) {
-            spawn(raceOne(tasks[i], ch));
+            handles.push(spawn(tasks[i]));
         }
-        return await ch.rx.receive();
+        for (let i = 0; i < handles.length; i = i + 1) {
+            spawn(raceOneHandle(handles[i], ch));
+        }
+        let first = await ch.rx.receive();
+        for (let i = 0; i < handles.length; i = i + 1) {
+            cancel(handles[i]);
+        }
+        if (first.status === "rejected") {
+            throw new Error(first.reason ?? "Task.race rejected");
+        }
+        return first.value as T;
     }
 }
 
@@ -73,6 +94,6 @@ export function setTimeout(callback: () => void, ms: int): TaskHandle<void> {
 
 export function clearTimeout(handle: TaskHandle<void>): void {
     if (handle !== null) {
-        handle.cancel();
+        cancel(handle);
     }
 }

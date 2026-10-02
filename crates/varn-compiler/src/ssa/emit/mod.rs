@@ -182,6 +182,12 @@ pub fn emit_function_meta(
         Err(why) => varn_types::ssa::PortableSsa::Unavailable(Arc::from(why)),
     };
 
+    let suspend_live = if f.is_async || f.is_generator {
+        suspend_live_table(&ssa, &reg, &inst_next)
+    } else {
+        Vec::new()
+    };
+
     Ok(FunctionProto {
         name: Some(Arc::from(f.name.as_ref())),
         arity: 1 + nparams,
@@ -214,6 +220,7 @@ pub fn emit_function_meta(
             (0..ic.count()).map(|_| PolyICSlot::new()).collect(),
         )),
         feedback: Rc::new(RefCell::new(FeedbackVector::new(ic.count() as usize))),
+        frame_layout: Default::default(),
         static_closure_val: Cell::new(0),
         jit_entry_count: Cell::new(0),
         backedge_count: Cell::new(0),
@@ -224,7 +231,25 @@ pub fn emit_function_meta(
         jit_osr_failed: Cell::new(false),
         trivial_init_memo: RefCell::new(None),
         ssa: ssa_proto,
+        suspend_live,
     })
+}
+
+/// Live physical registers at every suspension resume point, sorted by
+/// resume ip. Same `live_after` sets the state machine pass uses, mapped
+/// through the emitted register assignment, plus every `Try` handler's
+/// `live_in` (see `suspend::suspend_live_regs`); the VM roots a parked frame
+/// through this instead of the whole frame. A point is omitted if any live
+/// value lacks a register: absence means full roots, never fewer roots.
+fn suspend_live_table(
+    ssa: &SsaFunc,
+    reg: &[u8],
+    inst_next: &[Vec<usize>],
+) -> Vec<varn_types::chunk::SuspendLive> {
+    super::suspend::suspend_live_regs(ssa, reg, inst_next)
+        .into_iter()
+        .map(|(resume_ip, regs)| varn_types::chunk::SuspendLive { resume_ip, regs })
+        .collect()
 }
 
 /// Loop-aware emission order: reverse postorder from the entry, visiting

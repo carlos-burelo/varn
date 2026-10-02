@@ -188,7 +188,7 @@ pub(super) unsafe fn run_compiled_frame(
         let module_exports = (*ctx).module_exports.remove(&returning_frame_idx);
         let cached = module_exports.unwrap_or(final_val);
         let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
-        (*ctx).modules.insert(module_id, cached);
+        unsafe { &mut *(*ctx).modules.get() }.insert(module_id, cached);
     }
 
     if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {

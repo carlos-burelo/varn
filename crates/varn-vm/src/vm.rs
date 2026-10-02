@@ -45,7 +45,7 @@ impl Vm {
         let mut ctx = ExecCtx::new(globals, settings);
         ctx.heap = heap.deep_clone();
         ctx.precompiled = precompiled;
-        ctx.modules = modules;
+        ctx.modules = std::rc::Rc::new(std::cell::UnsafeCell::new(modules));
         Self { ctx }
     }
 
@@ -78,7 +78,10 @@ impl Vm {
             );
             // The entry proto's module owns the first global region after the
             // native/prelude layout.
-            nan_closure.module_base = self.ctx.globals.reserve_region(closure.proto.global_count);
+            nan_closure.module_base = self
+                .ctx
+                .globals_mut()
+                .reserve_region(closure.proto.global_count);
             self.ctx.push_frame(Rc::new(nan_closure))?;
         }
 
@@ -88,7 +91,7 @@ impl Vm {
     pub fn snapshot(&self) -> (GlobalStore, Heap, rustc_hash::FxHashMap<ModuleId, VmValue>) {
         let native_modules = self
             .ctx
-            .modules
+            .modules_ref()
             .iter()
             .filter(|(id, _)| {
                 matches!(
@@ -99,7 +102,7 @@ impl Vm {
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         (
-            self.ctx.globals.clone(),
+            self.ctx.globals_ref().clone(),
             self.ctx.heap.clone(),
             native_modules,
         )
@@ -149,6 +152,7 @@ impl Vm {
     pub fn take_profile(&mut self) -> Option<VmProfile> {
         self.ctx.profile_counters.take().map(|arc| {
             let profile = VmProfile::from_counters(&arc);
+            let tasks = crate::profile::TASK_STATS.snapshot();
             VmProfile {
                 heap_allocs: self.ctx.heap.alloc_count,
                 gc_collections: self.ctx.heap.gc_collections,
@@ -158,6 +162,12 @@ impl Vm {
                 nursery_allocs: self.ctx.heap.nursery.alloc_count,
                 minor_gc_count: self.ctx.heap.nursery.minor_gc_count,
                 minor_gc_promoted: self.ctx.heap.nursery.minor_gc_promoted,
+                task_parks: tasks.parks,
+                task_released: tasks.released,
+                task_prune_hit: tasks.prune_hit,
+                task_prune_miss: tasks.prune_miss,
+                task_yields: tasks.yields,
+                timer_purged: varn_runtime::timer::purged(),
                 ..profile
             }
         })
@@ -169,13 +179,13 @@ impl Vm {
         self.ctx.stack.collect_roots(dyn_len, ref_len, &mut roots);
         roots.extend(
             self.ctx
-                .globals
+                .globals_ref()
                 .values
                 .iter()
                 .filter(|v| v.is_heap())
                 .map(|v| v.as_heap_idx()),
         );
-        for v in self.ctx.modules.values() {
+        for v in unsafe { &*self.ctx.modules.get() }.values() {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }
@@ -214,7 +224,7 @@ pub fn prefill_native_modules(vm: &mut Vm) {
         }
 
         let resolved = varn_core::ModuleId::from_canonical_str(&raw_id);
-        if vm.ctx.modules.contains_key(&resolved) {
+        if unsafe { &*vm.ctx.modules.get() }.contains_key(&resolved) {
             continue;
         }
 
@@ -226,7 +236,7 @@ pub fn prefill_native_modules(vm: &mut Vm) {
 
         if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap) {
             if let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv) {
-                vm.ctx.modules.insert(resolved, converted);
+                unsafe { &mut *vm.ctx.modules.get() }.insert(resolved, converted);
             }
         }
     }
@@ -250,13 +260,13 @@ fn freeze_pure_modules(vm: &mut Vm) {
         scratch.ctx.loader = Some(loader.clone());
     }
 
-    for (id, &val) in &vm.ctx.modules {
+    for (id, &val) in unsafe { &*vm.ctx.modules.get() }.iter() {
         if matches!(id, varn_core::ModuleId::Runtime(_)) {
             if let Some(frozen_arc) =
                 crate::exec::ctx_modules::freeze_module(val, id.clone(), &vm.ctx.heap)
             {
                 let fv = scratch.ctx.heap.alloc_frozen_module(frozen_arc);
-                scratch.ctx.modules.insert(id.clone(), fv);
+                unsafe { &mut *scratch.ctx.modules.get() }.insert(id.clone(), fv);
                 scratch.ctx.linker.set_done(id.clone(), fv);
             }
         }
@@ -269,7 +279,7 @@ fn freeze_pure_modules(vm: &mut Vm) {
             continue;
         }
 
-        if vm.ctx.modules.contains_key(&resolved) {
+        if unsafe { &*vm.ctx.modules.get() }.contains_key(&resolved) {
             continue;
         }
 
@@ -288,7 +298,7 @@ fn freeze_pure_modules(vm: &mut Vm) {
         };
 
         let frozen_val = vm.ctx.heap.alloc_frozen_module(frozen);
-        vm.ctx.modules.insert(resolved.clone(), frozen_val);
+        unsafe { &mut *vm.ctx.modules.get() }.insert(resolved.clone(), frozen_val);
         vm.ctx.linker.set_done(resolved, frozen_val);
     }
 }

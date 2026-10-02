@@ -81,11 +81,7 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
     } else {
         ""
     };
-    terminal::log(format!(
-        "  {}{}",
-        chalk(&insp.name).bold(),
-        chalk(fa).dim()
-    ));
+    terminal::log(format!("  {}{}", chalk(&insp.name).bold(), chalk(fa).dim()));
 
     if flags.clif_check {
         match &insp.route {
@@ -103,7 +99,10 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
 
     if flags.clif_kinds {
         if let Some(k) = &insp.kinds {
-            terminal::log(format!("    {}", chalk(format!("kinds ({} regs):", k.nregs)).dim()));
+            terminal::log(format!(
+                "    {}",
+                chalk(format!("kinds ({} regs):", k.nregs)).dim()
+            ));
             let mut table = terminal::Table::new(["block", "kinds"]);
             for (start, ks) in &k.blocks {
                 table.row([format!("block@{start}"), ks.join(", ")]);

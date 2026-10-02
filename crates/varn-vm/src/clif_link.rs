@@ -215,7 +215,10 @@ impl ClifLinker for CtxLinker {
         // Safety: the pointer is valid for the lifetime of the CtxGuard that
         // set it; clif compilation runs synchronously inside that run.
         let ctx = unsafe { &*self.ctx };
-        let gv = *ctx.globals.values.get(self.module_base + global_idx)?;
+        let gv = *ctx
+            .globals_ref()
+            .values
+            .get(self.module_base + global_idx)?;
         if !gv.is_heap() {
             return None;
         }
@@ -248,7 +251,10 @@ impl ClifLinker for CtxLinker {
             return None;
         }
         let ctx = unsafe { &*self.ctx };
-        let gv = *ctx.globals.values.get(self.module_base + global_idx)?;
+        let gv = *ctx
+            .globals_ref()
+            .values
+            .get(self.module_base + global_idx)?;
         if !gv.is_heap() {
             return None;
         }

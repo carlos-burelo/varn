@@ -98,7 +98,13 @@ pub fn build_rename(
             continue;
         }
         let temp_state = crate::pipeline::run_pipeline(source, file_uri.clone());
-        collect_rename_edits_in_document(&temp_state, &target, target_name, &new_name, &mut changes);
+        collect_rename_edits_in_document(
+            &temp_state,
+            &target,
+            target_name,
+            &new_name,
+            &mut changes,
+        );
     }
 
     if changes.is_empty() {

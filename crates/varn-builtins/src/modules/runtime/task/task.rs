@@ -4,7 +4,7 @@ use varn_types::{NativeCtx, Value, VmValue};
 struct ParallelState {
     remaining: usize,
     results: Vec<Value>,
-    error: Option<String>,
+    error: Option<Value>,
 }
 
 fn settle_parallel_one(
@@ -21,14 +21,14 @@ fn settle_parallel_one(
         Ok(v) => st.results[idx] = v,
         Err(e) => {
             if st.error.is_none() {
-                st.error = Some(format!("{e}"));
+                st.error = Some(e);
             }
         }
     }
     st.remaining -= 1;
     if st.remaining == 0 {
-        if let Some(msg) = st.error.take() {
-            output.reject_msg(msg);
+        if let Some(err) = st.error.take() {
+            output.reject(err);
         } else {
             let arr = varn_types::value::ArrayRef::new(std::mem::take(&mut st.results));
             output.resolve(Value::Array(arr));
@@ -97,8 +97,24 @@ varn_contract! {
             Ok(ctx.intern(Value::TaskHandle(output)))
         }
 
-        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, String> {
-            let (resolved_path, export_name) = ctx
+        fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), String> {
+            match ctx.extract(handle_nv) {
+                Value::TaskHandle(handle) => {
+                    if !handle.is_yield_token() {
+                        handle.cancel();
+                        varn_runtime::timer::note_cancel();
+                    }
+                    Ok(())
+                }
+                _ => Err("cancel: expected a task handle".to_string()),
+            }
+        }
+
+        fn yieldTask(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {
+            Ok(ctx.intern(Value::TaskHandle(varn_types::AsyncTask::yield_token())))
+        }
+
+        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, String> {            let (resolved_path, export_name) = ctx
                 .get_function_location(func)
                 .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
 

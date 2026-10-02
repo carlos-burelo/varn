@@ -56,7 +56,10 @@ const h1 = spawn(asyncAdd(1, 2))
 assert("spawn handle await", await h1 === 3)
 ```
 
-`spawn` devuelve un handle que puede ser `await`-ed para obtener el resultado.
+`spawn` encola la tarea en el scheduler cooperativo y devuelve un handle
+que puede ser `await`-ed para obtener el resultado. A diferencia del modelo
+anterior (ejecución síncrona hasta completar), `spawn` retorna de inmediato:
+las tareas avanzan cuando el `await` que las espera bumpea la cola.
 
 ---
 
@@ -76,13 +79,54 @@ assert("parallel[2]",   all[2] === 16)
 ```
 
 Ejecuta todas las tareas en paralelo y devuelve los resultados en el mismo orden.
+Las tareas con esperas (timers, I/O, canales) se solapan de verdad:
+`parallel` de dos `sleep(500)` tarda ~500 ms, no ~1000 ms (medido: 501 ms).
+El primer rechazo gana con su valor tipado (`instanceof Error` se preserva).
+
+### Cancelación (`cancel`)
+
+```varn
+import { sleep, cancel } from "std:task"
+
+const h = sleep(60000)
+cancel(h)
+try {
+    await h
+} catch (e) {
+    // el handle fue cancelado
+}
+```
+
+`cancel(handle)` rechaza el handle pendiente; el scheduler descarta el trabajo
+huérfano (tareas parqueadas o en cola cuyo output ya resolvió no se drivean).
+Cancelar un handle ya resuelto es no-op. `clearTimeout(h)` es `cancel(h).
+
+### `Task.race` — gana el primero en resolver
+
+```varn
+import { Task } from "std:task"
+
+const winner = await Task.race([slowTask(), fastTask()])
+```
+
+Gana el primer *settlement* (fulfill o reject): si el más rápido rechaza, `race`
+rechaza. Los perdedores se cancelan. Con cero tareas lanza `Error`.
+
+### Cesión cooperativa (`Task.yield`)
+
+```varn
+await Task.yield()
+```
+
+Cede un turno del scheduler (los listos avanzan primero). Sin preempción:
+un bucle CPU sin `yield`/`await` no cede nunca; para CPU real usar Isolates.
 
 ---
 
 ## 4. `TaskGroup` — Grupos de tareas
 
 ```varn
-using group = TaskGroup<int>()
+using group = new TaskGroup<int>()
 const g1 = group.spawn(asyncAdd(7, 8))
 const g2 = group.spawn(asyncAdd(9, 10))
 const joined = await group.join()
@@ -93,10 +137,17 @@ assert("group handle 1",    await g1 === 15)
 // tests/21-async.vn:57
 ```
 
+`join(timeoutMs?)` acepta un timeout en milisegundos: si expira, rechaza con
+`Error("TaskGroup.join timed out")` y cancela el join en vuelo.
+
 ### Cancelación del grupo
 
+`cancel()` marca el grupo y cancela los joins en vuelo (sus tareas parqueadas
+se descartan en vez de seguir consumiendo drive). Los hijos ya completados no
+se ven afectados; `join()` posterior lanza `Error("TaskGroup is cancelled")`.
+
 ```varn
-using cancelGroup = TaskGroup<int>()
+using cancelGroup = new TaskGroup<int>()
 const c1 = cancelGroup.spawn(asyncAdd(10, 20))
 cancelGroup.cancel()
 try {
@@ -110,7 +161,7 @@ try {
 ### Disposición asíncrona (`disposeAsync`)
 
 ```varn
-using disposeGroup = TaskGroup<int>()
+using disposeGroup = new TaskGroup<int>()
 const d1 = disposeGroup.spawn(asyncAdd(30, 40))
 await disposeGroup.disposeAsync()
 try {

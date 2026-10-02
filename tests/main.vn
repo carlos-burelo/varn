@@ -139,6 +139,7 @@ import "./151-jit-osr.vn"
 import "./152-jit-optional-chains.vn"
 import { summary } from "std:test";
 import "./153-local-types.vn"
+import "./154-task-gc-roots.vn"
 
 summary()
 

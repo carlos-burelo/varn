@@ -90,14 +90,30 @@ Declarar una función `async` transforma automáticamente su tipo de retorno en 
 ### `TaskGroup` y Concurrencia Estructurada (`using`)
 `TaskGroup` implementa el protocolo de concurrencia estructurada:
 - Toda tarea lanzada con `group.spawn(...)` queda acotada al ciclo de vida del grupo.
-- **Cancelación Automática**: Si una tarea falla, el grupo propaga inmediatamente la cancelación (`isCancelled = true`) a todas sus tareas hermanas.
+- **Cancelación**: `cancel()` marca el grupo y cancela los joins en vuelo; las
+  tareas parqueadas cuyo output ya resolvió se descartan sin drivear. Las
+  hijas ya en ejecución terminan (su resultado se descarta), no se preemptan.
+- **Timeouts**: `join(ms)` rechaza con `Error("TaskGroup.join timed out")` si expira.
 - **Gestión Determinista de Ámbito (`using`)**: Al salir del bloque `using`, el compilador garantiza que se invoca `group.dispose()`, cancelando cualquier tarea huérfana.
+
+### Cesión cooperativa (`Task.yield`)
+El scheduler es cooperativo sin preempción: una tarea CPU-bound no cede
+sola. `await Task.yield()` aparca la tarea al final de la cola lista y
+sigue con las demás (intercalado determinista `a1,b1,a2,b2,a3` medido).
+Para paralelismo real de CPU, usar Isolates.
+
+### Garantías de orden (qué es determinista y qué no)
+- Determinista: cola lista FIFO, timers por `(deadline, seq)`, canales
+  `VecDeque` FIFO, wake O(1) por handle.
+- No determinista: carreras timer-vs-I/O (wall-clock entre hilos) y
+  consolidación de `parallel` con rechazos simultáneos (gana el primero
+  que liquida).
 
 ```typescript
 import { sleep, TaskGroup } from "std:task"
 
 async function procesarParalelo(): Task<int> {
-    using group = TaskGroup<int>();
+    using group = new TaskGroup<int>();
     
     group.spawn(async () => {
         await sleep(50);
@@ -137,21 +153,64 @@ La comunicación inter-Isolate se realiza mediante paso de mensajes tipados a tr
 
 | Característica | Node.js (V8 + libuv) | Bun (JSC + Zig) | **Varn (Register VM + Rust/ASM)** |
 | :--- | :--- | :--- | :--- |
-| **Huella de memoria por tarea / promesa** | ~2.5 KB – 4.0 KB por `Promise` + Closure | ~1.0 KB – 1.5 KB | **~128 B – 256 B por `Task`** *(4x a 16x menor)* |
-| **Modelo de Concurrencia** | Single-thread (Event Loop) | Single-thread (Event Loop nativo en Zig) | **Híbrido: Corrutinas SSA + Isolates Multihilo Reales** |
+| **Huella de memoria por tarea / promesa** | ~2.5 KB – 4.0 KB por `Promise` + Closure *(reportado)* | ~1.0 KB – 1.5 KB *(reportado)* | **~1 KB por `Task` aparcada *(medido 100k–1M en esta máquina)*** |
+| **Modelo de Concurrencia** | Single-thread (Event Loop) | Single-thread (Event Loop nativo en Zig) | **Híbrido: Corrutinas cooperativas + Isolates Multihilo Reales** |
 | **Aprovechamiento de Núcleos CPU** | Requiere `cluster` (procesos separados) | Requiere `worker_threads` | **Nativo: `spawnIsolate` en hilos del SO con canales tipados** |
 | **Contención de Garbage Collector (GC)** | Pausas globales de GC aumentan con el heap | GC optimizado en JSC | **GC por Isolate**: el GC de un hilo no congela a los demás |
-| **Límite Práctico Concurrente (1 hilo)** | ~10,000 – 25,000 reqs simultáneas | ~50,000 – 100,000 reqs simultáneas | **~16,000 – 50,000 reqs simultáneas** |
-| **Límite Teórico Total (Multihilo / 12 Cores)** | Limitado por memoria de procesos | Limitado por procesos | **> 150,000 – 300,000 reqs simultáneas** |
+| **Medido aquí (100k sleeps 12s)** | 12.04s · 118MB pico | 12.08s · 196MB pico | **12.10s · 137MB pico; spawn 19ms** (Go: 12.28s · 854MB) |
+| **Medido aquí (1M sleeps 8s)** | 8.32s · 538MB pico | 8.40s · 769MB pico | **9.10s · 1.0GB pico; spawn 251ms** (Go: 11.69s · 8.5GB) |
 
 ### 7.2 Huella de Memoria por Tarea
 
-En V8/Node.js, cada closure de callback o promesa crea un contexto en el heap con scopes léxicos, mapas de depuración y promesas encadenadas. En Varn:
-- Cada tarea asíncrona `Task<T>` se compila como un objeto `ObjData` plano de tamaño fijo (`state_size`), requiriendo únicamente los slots estrictamente vivos determinados por el análisis de liveness.
-- Esto permite alojar **hasta un millón de tareas asíncronas en vuelo en ~250 MB de memoria RAM**.
+Medido en esta máquina (32 GB RAM, Windows x86-64, build release; pico =
+`PeakWorkingSet64` del proceso, mismo método para los cuatro runtimes).
+Una tarea aparcada retiene solo su estado congelado (`Frozen`: frames con
+los slots vivos por `suspend_live`, handlers y upvalues abiertos); no retiene
+un `ExecCtx`. Los contextos de ejecución salen de un pool acotado por cola y
+se reciclan al aparcar o terminar, de modo que hay uno por tarea *en
+ejecución* y no uno por tarea viva.
+
+| Escala | Original | Tarea congelada | Núcleo rediseñado (ADR-0019 rev. 2) |
+| :--- | :--- | :--- | :--- |
+| 100k × sleep 12s | ~12.5s · 540MB | 12.18s · 184MB | 12.10s · 137MB |
+| 1M × sleep 8s | 21.3s · 5.0GB | 10.04s · 1.5GB | 9.10s · 1.0GB |
+| 1M × `await Task.yield()` (ciclo ceder+reanudar) | — | 3.1s | 1.5s |
+
+Origen de la mejora, medido con dhat (100k tareas, pico global): 471MB →
+274MB al compartir `Linker` y capacidades entre forks, crear la `TaskQueue` de
+forma perezosa, cachear el `FrameLayout` en el proto (no por `FrameStore`) y
+tomar las constantes del pool compartido `proto_constants` en vez de
+re-internarlas por tarea; 274MB → 162MB al dejar de retener el `ExecCtx`.
+Rediseño del núcleo (segunda ronda), medido con el perfil del ciclo
+congelar/reanudar (1M tareas, ms acumulados: `wake_settled` 514, `watch+park`
+308, montaje 279, `freeze` 203): el coste era maquinaria, no el modelo.
+- `AsyncTask`: un solo `Mutex`, sin pool global con mutex, lectura de estado sin
+  clonar (`is_pending`) y observadores tipados. Un observador de despertar es
+  un `WakeToken` (cola + token, sin `Box` ni cierre); el primero vive inline.
+- La cola de tareas: las aparcadas viven en un slab indexado por token con
+  generación; no hay `HashMap` de aparcadas ni de esperas, y el despertar es
+  un índice directo. El orden entre tareas que esperan un mismo handle pasa de
+  LIFO a FIFO (el orden de registro). Las tareas abandonadas (output ya
+  liquidado) se purgan de forma amortizada al duplicarse el slab.
+- Creación: `LazyTask` ya no envuelve un `Closure` portable ni copia el pool de
+  constantes; guarda `proto`, upvalues y argumentos inline. Una función async
+  sin upvalues reutiliza su closure estático al montarse.
+- `Frozen` en una sola asignación para el caso de un frame y con solo los slots
+  vivos (`suspend_live` ∪ slots con upvalues abiertos), no el frame completo.
+- Timers: el driver solo se despierta (llamada de sistema) cuando el timer
+  nuevo pasa a ser el más cercano, no en cada `sleep`.
+
+Piso restante por tarea (~0.9 KB): tres objetos de heap por tarea (la tarea
+perezosa y los dos handles) con su entrada en el índice de identidad, dos
+`AsyncTask` (~120 B) y el `Frozen` (~180 B); más ~25 MB fijos de nursery.
+
+Node y Bun siguen por delante a 1M (538MB / 769MB; 0.3s de sobrecarga frente
+a ~1.1s de Varn). Lo que queda es el modelo de objetos de heap: cada valor
+visible para la VM paga un slot más una entrada de hash de identidad, y una
+tarea crea tres.
 
 ### 7.3 Escalado y Límites Empíricos
 
-1. **Escalado Lineal Multinúcleo**: En máquinas multinúcleo (p. ej. Intel Core i7 con 10 núcleos físicos / 12 hilos lógicos), la concurrencia distribuida en Isolates escala de forma estrictamente lineal, superando a servidores monohilo que saturan un único core.
-2. **Capacidad de Nursery**: En un único Isolate, la recolección de memoria joven evacúa ráfagas de hasta 16,384 alocaciones simultáneas (`NURSERY_CAPACITY`).
-3. **Evolución del I/O Host**: Para superar a Bun en sockets TCP crudos en Windows/Linux, el backend de red de Varn está diseñado para evolucionar hacia un bucle reactivo basado en `mio` (IOCP / epoll).
+1. **Multinúcleo por Isolates**: cada Isolate corre en su propio hilo con heap y GC dedicados; la comunicación es por canales tipados. Sin medición de escalado lineal publicada: pendiente.
+2. **Capacidad de Nursery**: `NURSERY_CAPACITY = 65 536` objetos jóvenes con umbral de colección en `3/4` (49 152). Un GC lo dispara el contexto que esté ejecutando (el root o una tarea), y reúne raíces del contexto que lo dispara, de todo contexto que esté bombeando la cola (`pump_until`) y del estado congelado de toda tarea lista o aparcada. `tests/154-task-gc-roots.vn` fija ese contrato.
+3. **Evolución del I/O Host**: el backend de red de Varn corre en un bucle reactivo basado en `mio` (IOCP / epoll) fusionado con la wheel de timers: un solo hilo `varn-io-driver` liquida timers vencidos y eventos TCP/UDP. UDP también va por el driver con fast-path no bloqueante (sin hilo por `recv`). El wake del scheduler es O(1) por handle vía mapa `waiters`, no escaneo lineal. Medido en esta máquina: solape `8×sleep(100)` Varn 111ms / Go 100 / Node 103 / Bun 122; `parallel` 500 tareas Varn 5ms / Go 0 / Node 0 / Bun 8; 100k tareas dormidas Varn 12.10s y 137MB pico frente a Go 12.28s y 854MB (~8.4KB/tarea); a 1M, Varn 9.10s y 1.0GB frente a Go 11.69s y 8.5GB.

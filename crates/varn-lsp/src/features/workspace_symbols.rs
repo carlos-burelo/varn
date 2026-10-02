@@ -13,7 +13,9 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
             continue;
         }
         for entry in entries {
-            let Ok(url) = Url::parse(&entry.uri) else { continue };
+            let Ok(url) = Url::parse(&entry.uri) else {
+                continue;
+            };
             let pos = Position {
                 line: entry.line,
                 character: entry.col,

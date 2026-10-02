@@ -1,12 +1,7 @@
-use std::rc::Rc;
-
-use crate::frame::CallFrame;
-
-use crate::closure::{VmClosure, VmUpvalue};
+use crate::closure::VmClosure;
 use crate::value::VmValue;
 
 use super::ctx::ExecCtx;
-use super::VmSuspend;
 
 /// What happened to a rejection delivered into a suspended frame.
 pub(crate) enum Rejection {
@@ -30,7 +25,7 @@ impl ExecCtx {
     ) -> Result<varn_types::Value, varn_types::Value> {
         match value {
             varn_types::Value::Task(lazy) => {
-                let handle = self.run_lazy_task_sync(lazy.as_ref());
+                let handle = self.run_lazy_task_sync(lazy);
                 match handle.peek_state() {
                     varn_types::task::TaskState::Resolved(v) => Ok(v),
                     varn_types::task::TaskState::Rejected(v) => Err(v),
@@ -40,7 +35,17 @@ impl ExecCtx {
             varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                 varn_types::task::TaskState::Resolved(v) => Ok(v),
                 varn_types::task::TaskState::Rejected(v) => Err(v),
-                varn_types::task::TaskState::Pending => Self::wait_task_handle_value(handle),
+                varn_types::task::TaskState::Pending => {
+                    if handle.is_yield_token() {
+                        return Ok(varn_types::Value::Null);
+                    }
+                    self.pump_until(&handle);
+                    match handle.peek_state() {
+                        varn_types::task::TaskState::Resolved(v) => Ok(v),
+                        varn_types::task::TaskState::Rejected(v) => Err(v),
+                        varn_types::task::TaskState::Pending => Ok(varn_types::Value::Null),
+                    }
+                }
             },
             // `await` on anything else is the identity — that is what makes
             // awaiting a plain value, or a `next()` that already settled, a
@@ -86,34 +91,6 @@ impl ExecCtx {
         }
     }
 
-    pub fn wait_task_handle(task: varn_types::AsyncTask) -> Result<varn_types::Value, String> {
-        Self::wait_task_handle_value(task).map_err(|v| format!("{v}"))
-    }
-
-    /// Like [`Self::wait_task_handle`] but preserves the rejection `Value`
-    /// instead of stringifying it — required so typed payloads (e.g.
-    /// `HostError`) survive to the await-resume hook (`host_values`).
-    pub fn wait_task_handle_value(
-        task: varn_types::AsyncTask,
-    ) -> Result<varn_types::Value, varn_types::Value> {
-        match task.peek_state() {
-            varn_types::task::TaskState::Resolved(v) => return Ok(v),
-            varn_types::task::TaskState::Rejected(v) => return Err(v),
-            varn_types::task::TaskState::Pending => {}
-        }
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        task.on_settle(move |result| {
-            let _ = tx.send(result);
-        });
-
-        match rx.recv() {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(v)) => Err(v),
-            Err(_) => Err(varn_types::Value::Str(std::sync::Arc::from("task dropped"))),
-        }
-    }
-
     pub(crate) fn trace_event(
         &self,
         label: &str,
@@ -145,87 +122,14 @@ impl ExecCtx {
 
     pub fn run_lazy_task_sync(
         &mut self,
-        task: &varn_types::value::LazyTask,
+        task: std::rc::Rc<varn_types::value::LazyTask>,
     ) -> varn_types::AsyncTask {
-        let mut fork = self.fork_for_task();
-        let constants: Vec<VmValue> = task
-            .closure
-            .resolved_constants
-            .iter()
-            .map(|v| fork.heap.intern(v.clone()))
-            .collect();
-        let upvalues = task
-            .closure
-            .upvalues
-            .iter()
-            .map(|uv| {
-                let val = uv.inner.borrow_mut().value.clone();
-                VmUpvalue::closed(fork.heap.intern(val))
-            })
-            .collect();
-        let proto = Rc::clone(&task.closure.proto);
-        let mut vm_closure =
-            VmClosure::with_upvalues(proto, upvalues, Rc::new(constants), fork.settings);
-        // The spawned function keeps its home module's global region. A task
-        // fork shares the parent store, so the base is still valid.
-        vm_closure.module_base = task.closure.module_base;
-        let closure = Rc::new(vm_closure);
-        let stack_values: Vec<VmValue> = task
-            .args
-            .iter()
-            .cloned()
-            .map(|value| fork.heap.intern(value))
-            .collect();
-        let alloc = fork.stack.push_frame(&task.closure.proto);
-        let nregs = task.closure.proto.register_count as usize;
-        fork.stack.adopt_values(alloc, 0, &stack_values, nregs);
-        let mut frame = CallFrame::new_owned(closure, alloc);
-        frame.current_class = task.current_class.clone();
-        fork.frames.push(frame);
-
         let output = varn_types::AsyncTask::pending();
-        loop {
-            match fork.run() {
-                Ok(result) => match fork.vm_suspend.take() {
-                    Some(VmSuspend::Await { value, dest_reg }) => {
-                        match fork.settle_awaited(value) {
-                            Ok(resolved) => fork.resume_with_awaited(dest_reg, resolved),
-                            Err(thrown) => match fork.reject_awaited(thrown) {
-                                Rejection::Caught => {}
-                                Rejection::Unhandled(thrown) => {
-                                    output.reject(thrown);
-                                    break;
-                                }
-                            },
-                        }
-                    }
-                    None => {
-                        output.resolve(fork.heap.extract(result));
-                        break;
-                    }
-                    Some(_) => {
-                        output.resolve(fork.heap.extract(result));
-                        break;
-                    }
-                },
-                Err(err) => {
-                    let mut msg = err.message;
-                    for frame in &err.frames {
-                        msg.push_str(&format!(
-                            "\n  at {} ({}:{})",
-                            frame.fn_name, frame.file, frame.line
-                        ));
-                    }
-                    output.reject_msg(msg);
-                    break;
-                }
-            }
-        }
-
-        self.heap = fork.heap;
-        self.globals = fork.globals;
-        self.modules = fork.modules;
-
+        self.queue().push_ready(super::scheduler::ReadyTask {
+            start: super::scheduler::Start::Fresh(task),
+            output: output.clone(),
+        });
+        self.pump_until(&output);
         output
     }
 }

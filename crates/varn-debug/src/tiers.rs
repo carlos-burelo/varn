@@ -151,8 +151,12 @@ pub fn debug_tiers(
         ))
         .color(|c| c.bold())
         .print();
-    let mut table = terminal::Table::new(["función", "words", "tier", "razón"])
-        .align([Align::Left, Align::Right, Align::Left, Align::Left]);
+    let mut table = terminal::Table::new(["función", "words", "tier", "razón"]).align([
+        Align::Left,
+        Align::Right,
+        Align::Left,
+        Align::Left,
+    ]);
     for r in &rows {
         let mut detail = r.reason().to_string();
         if r.frame_aware {
@@ -206,8 +210,11 @@ pub fn debug_bails(
             continue;
         }
         terminal::tagged(kind, format!("{} bloqueada(s)", group.len()));
-        let mut table = terminal::Table::new(["función", "words", "razón"])
-            .align([Align::Left, Align::Right, Align::Left]);
+        let mut table = terminal::Table::new(["función", "words", "razón"]).align([
+            Align::Left,
+            Align::Right,
+            Align::Left,
+        ]);
         for r in group {
             table.row([
                 truncate(&r.name, 32).to_string(),
