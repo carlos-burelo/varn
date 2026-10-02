@@ -38,12 +38,19 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
         return false;
     }
 
-    // `global M::C` defs, so a call's callee can be resolved to a class.
-    let mut globals: FxHashMap<u32, &str> = FxHashMap::default();
+    // Class global loads, by name or by numbered slot, so a call's callee can
+    // be resolved to a class.
+    let mut globals: FxHashMap<u32, &Vec<SlotInit>> = FxHashMap::default();
     for block in &func.blocks {
         for inst in &block.insts {
-            if let (Some(d), InstKind::LoadGlobal(name)) = (inst.dest, &inst.kind) {
-                globals.insert(d.0, name);
+            let Some(dest) = inst.dest else { continue };
+            let found = match &inst.kind {
+                InstKind::LoadGlobal(name) => summaries.by_name(name),
+                InstKind::LoadGlobalIdx(slot) => summaries.by_slot(*slot),
+                _ => None,
+            };
+            if let Some(slots) = found {
+                globals.insert(dest.0, slots);
             }
         }
     }
@@ -64,7 +71,7 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
                 }
                 _ => continue,
             };
-            let Some(slots) = globals.get(&callee.0).and_then(|n| summaries.get(*n)) else {
+            let Some(&slots) = globals.get(&callee.0) else {
                 continue;
             };
             // The summary indexes PARAMETERS; a call passing fewer arguments

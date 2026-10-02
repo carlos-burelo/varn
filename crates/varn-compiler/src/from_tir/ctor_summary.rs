@@ -30,8 +30,28 @@ pub enum SlotInit {
     Null,
 }
 
-/// Qualified or bare class global -> per-slot initializer, in declared field order.
-pub type CtorSummaries = FxHashMap<Arc<str>, Vec<SlotInit>>;
+/// Per-class field initializers, in declared field order, reachable by the two
+/// ways SSA names a class global: by name (`LoadGlobal`) and by the module's
+/// numbered global slot (`LoadGlobalIdx`).
+#[derive(Default)]
+pub struct CtorSummaries {
+    by_name: FxHashMap<Arc<str>, Vec<SlotInit>>,
+    by_slot: FxHashMap<u32, Vec<SlotInit>>,
+}
+
+impl CtorSummaries {
+    pub fn is_empty(&self) -> bool {
+        self.by_name.is_empty() && self.by_slot.is_empty()
+    }
+
+    pub fn by_name(&self, name: &str) -> Option<&Vec<SlotInit>> {
+        self.by_name.get(name)
+    }
+
+    pub fn by_slot(&self, slot: u32) -> Option<&Vec<SlotInit>> {
+        self.by_slot.get(&slot)
+    }
+}
 
 thread_local! {
     static CURRENT: RefCell<Rc<CtorSummaries>> = RefCell::new(Rc::new(CtorSummaries::default()));
@@ -231,8 +251,11 @@ pub fn collect(tir: &TirModule) -> CtorSummaries {
                 tir.source_file.replace('\\', "/"),
                 ci.name
             ));
-            out.insert(qualified, slots.clone());
-            out.insert(ci.name.clone(), slots);
+            if let Some(slot) = tir.global_names.iter().position(|n| *n == ci.name) {
+                out.by_slot.insert(slot as u32, slots.clone());
+            }
+            out.by_name.insert(qualified, slots.clone());
+            out.by_name.insert(ci.name.clone(), slots);
         }
     }
     out
