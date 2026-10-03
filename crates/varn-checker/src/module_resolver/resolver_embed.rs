@@ -32,8 +32,12 @@ impl DiskResolver {
             return ExportMap::default();
         };
         let source = source.text;
-        let Some((program, ast_arena, _lex_errs, interner)) =
-            self.parse_and_cache(&source, abs_path)
+        let Some(super::resolver_parse::ParsedModule {
+            program,
+            arena: ast_arena,
+            interner,
+            ..
+        }) = self.parse_and_cache(&source, abs_path)
         else {
             return ExportMap::default();
         };
@@ -71,8 +75,12 @@ impl DiskResolver {
             return Arc::new(cached.exports);
         }
 
-        let Some((program, ast_arena, _lex_errs, interner)) =
-            self.parse_and_cache(source, virtual_id)
+        let Some(super::resolver_parse::ParsedModule {
+            program,
+            arena: ast_arena,
+            interner,
+            ..
+        }) = self.parse_and_cache(source, virtual_id)
         else {
             visiting.pop();
             return Arc::new(ExportMap::default());
@@ -116,7 +124,12 @@ impl DiskResolver {
             );
             return Some(bind_rc);
         }
-        let (program, ast_arena, lex_errs, interner) = self.parse_and_cache(source, virtual_id)?;
+        let super::resolver_parse::ParsedModule {
+            program,
+            arena: ast_arena,
+            lex_errs,
+            interner,
+        } = self.parse_and_cache(source, virtual_id)?;
         Some(self.bind_and_cache(&program, ast_arena.as_ref(), interner, lex_errs, virtual_id))
     }
 }

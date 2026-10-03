@@ -46,7 +46,12 @@ impl ImportResolver for DiskResolver {
             return Some(bind_rc);
         }
 
-        let (program, ast_arena, lex_errs, interner) = self.parse_and_cache(source, &canonical)?;
+        let super::resolver_parse::ParsedModule {
+            program,
+            arena: ast_arena,
+            lex_errs,
+            interner,
+        } = self.parse_and_cache(source, &canonical)?;
         let bind =
             self.bind_and_cache(&program, ast_arena.as_ref(), interner, lex_errs, &canonical);
 

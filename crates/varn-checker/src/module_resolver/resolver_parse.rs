@@ -4,17 +4,15 @@ use crate::binder::BindResult;
 use std::path::Path;
 use std::sync::Arc;
 
+pub(super) struct ParsedModule {
+    pub(super) program: Arc<varn_core::ast::Program>,
+    pub(super) arena: Arc<varn_core::ast::AstArena>,
+    pub(super) lex_errs: Vec<varn_core::Diagnostic>,
+    pub(super) interner: varn_core::AtomInterner,
+}
+
 impl DiskResolver {
-    pub(super) fn parse_and_cache(
-        &self,
-        source: &str,
-        key: &str,
-    ) -> Option<(
-        Arc<varn_core::ast::Program>,
-        Arc<varn_core::ast::AstArena>,
-        Vec<varn_core::Diagnostic>,
-        varn_core::AtomInterner,
-    )> {
+    pub(super) fn parse_and_cache(&self, source: &str, key: &str) -> Option<ParsedModule> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
         let (program, interner, arena) =
             varn_parser::parse(tokens, lexeme_buf, key, varn_core::AtomInterner::new()).ok()?;
@@ -22,7 +20,12 @@ impl DiskResolver {
         let arena = Arc::new(arena);
         self.store_program(key.to_owned(), Arc::clone(&program));
         self.store_arena(key.to_owned(), Arc::clone(&arena));
-        Some((program, arena, lex_errs, interner))
+        Some(ParsedModule {
+            program,
+            arena,
+            lex_errs,
+            interner,
+        })
     }
 
     /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
