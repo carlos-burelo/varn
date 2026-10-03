@@ -58,17 +58,8 @@ pub struct Binder<'r> {
     pub(crate) type_members: TypeMembers,
     pub(crate) class_parents: FxHashMap<Arc<str>, Arc<str>>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
-    /// The real per-parse `AtomInterner`, threaded in from `Binder::bind`'s
-    /// caller (see the doc comment on `BindResult::interner`).
     pub(crate) interner: varn_core::AtomInterner,
-    pub(crate) live_names_seen: usize,
-    /// The shared, per-compilation `CheckerTyId` table — same lifecycle as
-    /// `interner` above: snapshotted from `ImportResolver::ty_table_snapshot`
-    /// when this `Binder` is constructed, grown while binding, published
-    /// back via `ImportResolver::set_ty_table` by whoever drives binding
-    /// (mirrors `DiskResolver::bind_and_cache`'s `set_interner` call), and
-    /// carried out to `BindResult::ty_table` so later checking/emit stages
-    /// read the same ids this bind minted.
+    pub(crate) deps: Vec<Arc<str>>,
     pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
     pub(crate) source_file: Arc<str>,
     pub(crate) sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,

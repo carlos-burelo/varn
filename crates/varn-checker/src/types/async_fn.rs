@@ -13,7 +13,6 @@
 //! consumer downstream just reads the type.
 
 use super::{CheckerTyTable, Type};
-use crate::module_resolver::ImportResolver;
 use varn_core::{AtomInterner, TypeKind};
 
 /// The return type an `async` function's *type* carries, given the return type
@@ -36,18 +35,12 @@ pub fn async_fn_return(
     is_async: bool,
     table: &mut CheckerTyTable,
     interner: &AtomInterner,
-    resolver: Option<&dyn ImportResolver>,
 ) -> Type {
     if !is_async || ret.is_dynamic() || is_awaitable(&ret, table, interner) {
         return ret;
     }
-    match resolver {
-        Some(r) => {
-            let atom = r.intern(varn_core::BuiltinType::Task.name());
-            Type::generic_atom(atom, vec![ret], None, table)
-        }
-        None => ret,
-    }
+    let atom = table.intern_name(varn_core::BuiltinType::Task.name());
+    Type::generic_atom(atom, vec![ret], None, table)
 }
 
 /// The type a generator function's *value* has, given the type its `yield`s
@@ -55,24 +48,14 @@ pub fn async_fn_return(
 /// `Generator<T>`, since the driver settles the body's awaits inside `next()`,
 /// but a distinct name so `for await` and the `await` inside the body are
 /// meaningful in the type system.
-pub fn generator_of(
-    yielded: Type,
-    is_async: bool,
-    table: &mut CheckerTyTable,
-    resolver: Option<&dyn ImportResolver>,
-) -> Type {
+pub fn generator_of(yielded: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
     let name = if is_async {
         "AsyncGenerator"
     } else {
         varn_core::BuiltinType::Generator.name()
     };
-    match resolver {
-        Some(r) => {
-            let atom = r.intern(name);
-            Type::generic_atom(atom, vec![yielded], None, table)
-        }
-        None => Type::Dynamic,
-    }
+    let atom = table.intern_name(name);
+    Type::generic_atom(atom, vec![yielded], None, table)
 }
 
 /// Whether `await` on this type has something to unwrap. `Task` is what async

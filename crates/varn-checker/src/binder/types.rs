@@ -76,6 +76,7 @@ pub struct BindResult {
     pub interner: varn_core::AtomInterner,
     #[serde(skip, default)]
     pub ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
+    pub deps: Vec<Arc<str>>,
     pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub type_members: TypeMembers,
     pub class_parents: FxHashMap<Arc<str>, Arc<str>>,

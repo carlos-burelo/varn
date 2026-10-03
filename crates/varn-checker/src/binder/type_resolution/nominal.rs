@@ -44,7 +44,9 @@ pub(super) fn resolve_generic_type(
         }
     }
 
-    let resolver = ctx.and_then(|c| c.resolver());
+    let source_origin = ctx
+        .and_then(|c| c.source_file())
+        .map(|s| table.intern_name(s));
     let origin = ctx
         .and_then(|c| c.resolve_symbol(&name_str))
         .and_then(|t| match table.get(t.0) {
@@ -52,10 +54,7 @@ pub(super) fn resolve_generic_type(
             _ => None,
         })
         .or_else(|| ctx.and_then(|c| c.symbol_origin(&name_str)))
-        .or_else(|| {
-            ctx.and_then(|c| c.source_file())
-                .and_then(|s| resolver.map(|r| r.intern(s)))
-        });
+        .or(source_origin);
     Type::generic_atom(name, resolved_args, origin, table)
 }
 

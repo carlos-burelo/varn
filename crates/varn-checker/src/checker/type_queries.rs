@@ -115,7 +115,7 @@ impl<'r> Checker<'r> {
         if let Some(s) = bind.interner.try_resolve(atom) {
             return Arc::from(s);
         }
-        if let Some(s) = self.resolver.interner_snapshot().try_resolve(atom) {
+        if let Some(s) = self.ty_table.name(atom) {
             return Arc::from(s);
         }
         Arc::from(format!("<stale:{atom:?}>"))
@@ -129,8 +129,9 @@ impl<'r> Checker<'r> {
             self.ty_table.get(ty.0),
             varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
         ) {
-            let origin = self.resolver.intern(bind.source_file.as_ref());
-            return ty.with_origin(origin, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+            let table = std::sync::Arc::make_mut(&mut self.ty_table);
+            let origin = table.intern_name(bind.source_file.as_ref());
+            return ty.with_origin(origin, table);
         }
         ty
     }

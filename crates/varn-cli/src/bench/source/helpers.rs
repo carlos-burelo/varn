@@ -126,9 +126,5 @@ pub(super) fn parse_shared(
     ),
     varn_core::DiagnosticBag,
 > {
-    varn_pipeline::in_shared_atoms(|interner| {
-        varn_parser::parse_with_profile(tokens, lexeme_buf, path, interner)
-            .map(|(program, profile, interner, arena)| ((program, profile, arena), interner))
-    })
-    .map(|((program, profile, arena), interner)| (program, profile, interner, arena))
+    varn_parser::parse_with_profile(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
 }

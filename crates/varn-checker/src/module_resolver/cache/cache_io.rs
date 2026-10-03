@@ -1,8 +1,9 @@
-use super::super::{ExportMap, ImportResolver};
+use super::super::ExportMap;
 use super::cache_types::PortableModule;
 use crate::binder::BindResult;
 use crate::types::CheckerTyTable;
 use std::path::PathBuf;
+use std::sync::Arc;
 use varn_core::AtomInterner;
 
 pub(crate) struct CachedModule {
@@ -13,26 +14,19 @@ pub(crate) struct CachedModule {
 pub fn serialize_module_interface(
     exports: &ExportMap,
     bind: &BindResult,
-    interner: &AtomInterner,
-    resolver: Option<&dyn ImportResolver>,
 ) -> Result<Vec<u8>, String> {
     let mut names = bind.interner.clone();
-    names.absorb(interner);
-    let mut table = (*bind.ty_table).clone();
-    if let Some(resolver) = resolver {
-        table.absorb(&resolver.ty_table_snapshot());
-    }
+    names.absorb(exports.table.names());
+    let mut table = (*exports.table).clone();
+    table.absorb(&bind.ty_table);
     let cached = PortableModule::from_live(exports, bind, &names, &table);
     postcard::to_allocvec(&cached).map_err(|e| e.to_string())
 }
 
-pub fn deserialize_module_interface(
-    bytes: &[u8],
-    interner: &mut AtomInterner,
-    table: std::sync::Arc<CheckerTyTable>,
-) -> Result<(ExportMap, BindResult), String> {
+pub fn deserialize_module_interface(bytes: &[u8]) -> Result<(ExportMap, BindResult), String> {
     let cached: PortableModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
-    let (mut exports, bind) = cached.into_live(interner, table);
+    let (mut exports, bind) =
+        cached.into_live(&mut AtomInterner::new(), Arc::new(CheckerTyTable::new()));
     super::super::exports::assign_slots(&mut exports);
     Ok((exports, bind))
 }
@@ -75,22 +69,45 @@ pub(crate) fn try_load_cache(
         &id,
         fingerprint,
     )?;
-    let table = resolver.ty_table_snapshot();
-    let mut interner = resolver.interner_snapshot();
-    let result = deserialize_module_interface(&payload, &mut interner, table);
-    resolver.set_interner(&interner);
-    match result {
-        Ok((exports, bind)) => {
+    match deserialize_module_interface(&payload) {
+        Ok((mut exports, mut bind)) => {
             let expected = varn_modules::canonical_or_original(std::path::Path::new(virtual_id));
             let got = bind.source_file.to_string();
             if got != virtual_id && got != expected {
                 return None;
             }
-            resolver.set_ty_table(bind.ty_table.clone());
+            adopt_dependencies(resolver, virtual_id, &mut bind);
+            exports.table = bind.ty_table.clone();
             Some(CachedModule { exports, bind })
         }
         Err(_) => None,
     }
+}
+
+fn adopt_dependencies(
+    resolver: &super::super::resolver_disk::DiskResolver,
+    virtual_id: &str,
+    bind: &mut BindResult,
+) {
+    use super::super::ImportResolver;
+    if !resolver.begin_cache_load(virtual_id) {
+        return;
+    }
+    for dep in bind.deps.clone() {
+        if resolver.is_binding(&dep) {
+            continue;
+        }
+        let dep_bind = if super::super::paths::is_known_module(&dep) {
+            resolver.stdlib_bind(&dep)
+        } else {
+            resolver.module_bind(&dep)
+        };
+        if let Some(dep_bind) = dep_bind {
+            bind.interner.absorb(dep_bind.ty_table.names());
+            Arc::make_mut(&mut bind.ty_table).absorb(&dep_bind.ty_table);
+        }
+    }
+    resolver.end_cache_load(virtual_id);
 }
 
 pub(crate) fn save_to_cache(
@@ -106,13 +123,7 @@ pub(crate) fn save_to_cache(
     }
     let id = cache_module_id(virtual_id);
     let fingerprint = cache_fingerprint(source, carrier);
-    let interner = resolver.interner_snapshot();
-    if let Ok(payload) = serialize_module_interface(
-        exports,
-        bind,
-        &interner,
-        Some(resolver as &dyn ImportResolver),
-    ) {
+    if let Ok(payload) = serialize_module_interface(exports, bind) {
         varn_modules::artifact::write_module_artifact(
             &get_cache_dir(resolver),
             varn_modules::artifact::ArtifactKind::CheckerInterface,

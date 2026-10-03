@@ -7,46 +7,12 @@ use std::sync::Arc;
 use varn_core::ModuleId;
 
 impl ImportResolver for DiskResolver {
-    fn interner_snapshot(&self) -> varn_core::AtomInterner {
-        self.interner.lock().clone()
-    }
-
-    fn ty_table_snapshot(&self) -> std::sync::Arc<crate::types::CheckerTyTable> {
-        self.ty_table.lock().clone()
-    }
-
-    fn set_ty_table(&self, table: std::sync::Arc<crate::types::CheckerTyTable>) {
-        // Merge, never replace: `table` is one module's locally-grown view,
-        // which can disagree with the live table past their common prefix.
-        // `absorb` keeps live's own indices stable and only learns shapes it
-        // is missing.
-        let mut live = self.ty_table.lock();
-        std::sync::Arc::make_mut(&mut live).absorb(&table);
-    }
-
-    fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId {
-        let mut live = self.ty_table.lock();
-        std::sync::Arc::make_mut(&mut live).intern(kind)
-    }
-
-    fn interner_len(&self) -> usize {
-        self.interner.lock().len()
-    }
-
-    fn ty_table_len(&self) -> usize {
-        self.ty_table.lock().len()
-    }
-
     fn evict_heavy(&self) -> (usize, usize, usize) {
         self.graph.lock().evict_heavy()
     }
 
     fn graph_stats(&self) -> (usize, usize, usize, usize) {
         self.graph.lock().heavy_stats()
-    }
-
-    fn intern(&self, s: &str) -> varn_core::Atom {
-        self.interner.lock().intern(s)
     }
 
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
@@ -80,14 +46,9 @@ impl ImportResolver for DiskResolver {
             return Some(bind_rc);
         }
 
-        let (program, ast_arena, lex_errs) = self.parse_and_cache(source, &canonical)?;
-        let bind = self.bind_and_cache(
-            &program,
-            ast_arena.as_ref(),
-            self.interner_snapshot(),
-            lex_errs,
-            &canonical,
-        );
+        let (program, ast_arena, lex_errs, interner) = self.parse_and_cache(source, &canonical)?;
+        let bind =
+            self.bind_and_cache(&program, ast_arena.as_ref(), interner, lex_errs, &canonical);
 
         let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
         let exports = self.collect(
@@ -189,7 +150,7 @@ impl ImportResolver for DiskResolver {
         self.graph.lock().record_dep(importer, imported);
     }
 
-    fn core_exports(&self) -> Arc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>> {
+    fn core_exports(&self) -> Arc<crate::core::loader::CoreExports> {
         if let Some(hit) = self.core_exports.lock().as_ref() {
             return Arc::clone(hit);
         }

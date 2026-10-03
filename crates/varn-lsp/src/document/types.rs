@@ -64,13 +64,10 @@ impl SemanticDB {
 
     /// The type named `name`, interned into this document's table.
     pub fn named_type(&self, name: &str) -> Type {
-        crate::workspace::resolver::with_resolver(|r| {
-            Type::named(
-                name.to_owned(),
-                r,
-                std::sync::Arc::make_mut(&mut self.types.borrow_mut()),
-            )
-        })
+        Type::named(
+            name.to_owned(),
+            std::sync::Arc::make_mut(&mut self.types.borrow_mut()),
+        )
     }
 
     /// The type of a primitive.

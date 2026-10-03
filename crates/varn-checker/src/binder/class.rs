@@ -18,7 +18,6 @@ impl<'r> super::Binder<'r> {
         let cls_type = Type::named_with_origin(
             name.clone(),
             Some(Arc::from(self.source_file.as_ref())),
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym = Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type);
@@ -64,15 +63,7 @@ impl<'r> super::Binder<'r> {
                 _ => None,
             }
         });
-        // The super-class type may carry an origin minted in the live table
-        // after this binder's snapshot was taken.
-        self.resync_interner();
-        let extends = extends.map(|(n, o)| {
-            (
-                Arc::<str>::from(self.interner.resolve(n)),
-                o.map(|o| Arc::<str>::from(self.interner.resolve(o))),
-            )
-        });
+        let extends = extends.map(|(n, o)| (self.name_text(n), o.map(|o| self.name_text(o))));
 
         let mut final_members = members.clone();
         if let Some((parent_name, parent_origin)) = extends {

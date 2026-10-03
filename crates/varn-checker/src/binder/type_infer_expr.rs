@@ -152,12 +152,7 @@ pub fn infer_expr_type(
             ..
         } => {
             let ret = if *is_generator {
-                crate::types::generator_of(
-                    Type::Dynamic,
-                    false,
-                    table,
-                    ctx.and_then(|c| c.resolver()),
-                )
+                crate::types::generator_of(Type::Dynamic, false, table)
             } else {
                 Type::Dynamic
             };
@@ -182,10 +177,7 @@ pub fn infer_expr_type(
         ExprKind::Object { properties } => infer_object(properties, arena, ctx, table),
         ExprKind::Range { start, .. } => {
             let bound = infer_expr_type(*start, arena, ctx, table);
-            match ctx.and_then(|c| c.resolver()) {
-                Some(resolver) => Type::range_over(&bound, resolver, table),
-                None => Type::builtin(varn_core::BuiltinType::Range, table),
-            }
+            Type::range_over(&bound, table)
         }
         ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
         _ => Type::Dynamic,

@@ -1,7 +1,7 @@
 use crate::binder::BindResult;
 use crate::module_resolver::ImportResolver;
 use crate::symbol::Symbol;
-use crate::types::{ClassMemberInfo, Type};
+use crate::types::{CheckerTyTable, ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_modules::spec::CORE_PREFIX;
@@ -16,6 +16,13 @@ pub struct CoreMembers {
     pub flattened_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
     pub class_parents: FxHashMap<Arc<str>, Arc<str>>,
     pub class_type_params: FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    pub table: Arc<CheckerTyTable>,
+}
+
+#[derive(Default)]
+pub struct CoreExports {
+    pub symbols: FxHashMap<Arc<str>, Symbol>,
+    pub table: Arc<CheckerTyTable>,
 }
 
 pub fn is_core_file(filename: &str) -> bool {
@@ -28,35 +35,42 @@ pub fn is_core_file(filename: &str) -> bool {
 pub(crate) fn module_globals(
     filename: &str,
     resolver: &dyn ImportResolver,
-) -> Option<Arc<FxHashMap<Arc<str>, Symbol>>> {
+) -> Option<Arc<CoreExports>> {
     (!is_core_file(filename)).then(|| resolver.core_exports())
 }
 
 pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) {
-    bind.core = Some(resolver.core_members());
+    let core = resolver.core_members();
+    bind.interner.absorb(core.table.names());
+    Arc::make_mut(&mut bind.ty_table).absorb(&core.table);
+    bind.core = Some(core);
 }
 
 /// Build the prelude's global symbols from `resolver`'s stdlib.
 ///
 /// Memoized by the resolver, not here: the result is a function of which
 /// stdlib is active, so it must not outlive a change of stdlib.
-pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> FxHashMap<Arc<str>, Symbol> {
-    let mut globals = FxHashMap::default();
+pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> CoreExports {
+    let mut core = CoreExports::default();
     for spec in varn_modules::core_module_ids() {
-        let origin = resolver.intern(spec);
-        for (k, v) in resolver.stdlib_exports(spec).as_ref() {
+        let exports = resolver.stdlib_exports(spec);
+        let table = Arc::make_mut(&mut core.table);
+        table.absorb(&exports.table);
+        let origin = table.intern_name(spec);
+        for (k, v) in exports.iter() {
             let mut symbol = v.clone();
             symbol.origin_module = symbol.origin_module.or(Some(origin));
-            globals.insert(Arc::from(k.as_str()), symbol);
+            core.symbols.insert(Arc::from(k.as_str()), symbol);
         }
     }
-    globals
+    core
 }
 
 pub(crate) fn build_core_members(resolver: &dyn ImportResolver) -> CoreMembers {
     let mut members = CoreMembers::default();
     for spec in varn_modules::core_module_ids() {
         if let Some(rb) = resolver.stdlib_bind(spec) {
+            Arc::make_mut(&mut members.table).absorb(&rb.ty_table);
             let scope = rb.scopes.get(rb.global_scope);
             for (name, &sid) in &scope.bindings {
                 let sym = rb.arena.get(sid);

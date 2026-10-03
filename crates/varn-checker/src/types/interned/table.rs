@@ -36,6 +36,7 @@ pub struct CheckerTyTable {
     pub(super) delta_lists: FxHashMap<TyListId, Vec<CheckerTyId>>,
     pub(super) delta_functions: FxHashMap<FunctionTypeId, FunctionType>,
     pub(super) delta_object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
+    pub(super) names: varn_core::AtomInterner,
 }
 
 impl Default for CheckerTyTable {
@@ -86,6 +87,7 @@ impl CheckerTyTable {
             delta_lists: FxHashMap::default(),
             delta_functions: FxHashMap::default(),
             delta_object_members: FxHashMap::default(),
+            names: super::names::builtin_names(),
         }
     }
 
@@ -126,8 +128,6 @@ impl CheckerTyTable {
         }
     }
 
-    /// Number of distinct interned shapes. Used as a cheap "did the live table
-    /// grow past this snapshot" heuristic by `Binder::sync_ty_table`.
     pub fn len(&self) -> usize {
         self.base.entries.len() + self.delta_entries.len()
     }

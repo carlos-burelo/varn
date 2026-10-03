@@ -9,12 +9,7 @@ pub(super) fn resolve_atom_name(
     if let Some(s) = interner.try_resolve(atom) {
         return Arc::from(s);
     }
-    ctx.and_then(|c| c.resolver())
-        .and_then(|r| {
-            r.interner_snapshot()
-                .try_resolve(atom)
-                .map(|s| s.to_owned())
-        })
+    ctx.and_then(|c| c.atom_text(atom))
         .map(Arc::from)
         .unwrap_or_default()
 }

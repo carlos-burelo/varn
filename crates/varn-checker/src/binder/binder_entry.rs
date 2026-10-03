@@ -13,7 +13,14 @@ impl<'r> Binder<'r> {
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
     ) -> super::BindResult {
-        Self::bind_with_globals_iter(program, ast_arena, interner, resolver, FxHashMap::default())
+        Self::bind_with_globals_iter(
+            program,
+            ast_arena,
+            interner,
+            resolver,
+            None,
+            FxHashMap::default(),
+        )
     }
 
     pub fn bind_with_global_refs(
@@ -21,14 +28,16 @@ impl<'r> Binder<'r> {
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
-        globals: &FxHashMap<Arc<str>, Symbol>,
+        globals: &crate::core::loader::CoreExports,
     ) -> super::BindResult {
         Self::bind_with_globals_iter(
             program,
             ast_arena,
             interner,
             resolver,
+            Some(&globals.table),
             globals
+                .symbols
                 .iter()
                 .map(|(name, sym)| (name.clone(), sym.clone())),
         )
@@ -39,6 +48,7 @@ impl<'r> Binder<'r> {
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
+        globals_table: Option<&crate::types::CheckerTyTable>,
         globals: I,
     ) -> super::BindResult
     where
@@ -55,8 +65,8 @@ impl<'r> Binder<'r> {
             class_parents: FxHashMap::default(),
             diagnostics: varn_core::DiagnosticBag::new(),
             interner,
-            live_names_seen: 0,
-            ty_table: resolver.ty_table_snapshot(),
+            deps: Vec::new(),
+            ty_table: Arc::new(crate::types::CheckerTyTable::new()),
             source_file: Arc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
             sum_variant_parent: FxHashMap::default(),
@@ -71,6 +81,11 @@ impl<'r> Binder<'r> {
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
         b.current = global;
+        let source_file = b.source_file.clone();
+        b.intern_local(&source_file);
+        if let Some(table) = globals_table {
+            b.adopt(table);
+        }
 
         for (name, sym) in globals {
             let name_atom = b.interner.intern(name.as_ref());
@@ -80,6 +95,7 @@ impl<'r> Binder<'r> {
 
         b.bind_stmts(&program.body);
         b.finalize_array_watch(global);
+        Arc::make_mut(&mut b.ty_table).absorb_names(&b.interner);
 
         super::BindResult {
             arena: b.arena,
@@ -87,6 +103,7 @@ impl<'r> Binder<'r> {
             global_scope: global,
             diagnostics: b.diagnostics,
             interner: b.interner,
+            deps: b.deps,
             ty_table: b.ty_table,
             class_methods: b.class_methods,
             type_members: b.type_members,

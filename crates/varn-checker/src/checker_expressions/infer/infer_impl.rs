@@ -39,7 +39,6 @@ impl<'r> Checker<'r> {
                     }
                     _ => Type::named(
                         cn.to_string(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     ),
                 })
@@ -52,7 +51,6 @@ impl<'r> Checker<'r> {
                 .map(|parent| {
                     Type::named(
                         parent.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
                 })
@@ -228,11 +226,7 @@ impl<'r> Checker<'r> {
             ExprKind::NullLiteral => Type::Null,
             ExprKind::Range { start, .. } => {
                 let bound = self.infer_type(*start, bind);
-                Type::range_over(
-                    &bound,
-                    self.resolver,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                )
+                Type::range_over(&bound, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
             ExprKind::Match { cases, .. } => self.infer_match(cases, arena, bind),
             ExprKind::Pipeline { left, right } => {

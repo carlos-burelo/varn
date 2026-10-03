@@ -36,13 +36,11 @@ impl<'r> Checker<'r> {
                 return Type::generic(
                     class_name_str,
                     resolved,
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
             }
             return Type::named(
                 class_name_str,
-                self.resolver,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             );
         }
@@ -199,7 +197,6 @@ impl<'r> Checker<'r> {
             is_async,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             &bind.interner,
-            Some(self.resolver),
         );
         Type::fn_(
             FunctionType {

@@ -12,7 +12,6 @@ impl<'r> super::super::Binder<'r> {
         let namespace_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym =
@@ -52,7 +51,6 @@ impl<'r> super::super::Binder<'r> {
                         f.modifiers.is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         &self.interner,
-                        Some(self.resolver),
                     );
                     let params_list = f
                         .params
@@ -142,7 +140,6 @@ impl<'r> super::super::Binder<'r> {
                     let class_ty = Type::named_with_origin(
                         name.clone(),
                         Some(Arc::from(self.source_file.as_ref())),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -212,7 +209,6 @@ impl<'r> super::super::Binder<'r> {
                     let n_id_rc: Arc<str> = Arc::from(self.interner.resolve(n.id));
                     let ns_ty = Type::named(
                         n_id_rc.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -242,7 +238,6 @@ impl<'r> super::super::Binder<'r> {
                     let alias_ty = Type::named_with_origin(
                         t_id_rc.clone(),
                         Some(Arc::from(self.source_file.as_ref())),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -277,7 +272,6 @@ impl<'r> super::super::Binder<'r> {
                     let symbol_id = scope.resolve(e.id, &self.scopes);
                     let enum_ty = Type::named(
                         e_id_rc.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -312,7 +306,6 @@ impl<'r> super::super::Binder<'r> {
                     let s_id_rc: Arc<str> = Arc::from(self.interner.resolve(s.id));
                     let struct_ty = Type::named(
                         s_id_rc.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -347,7 +340,6 @@ impl<'r> super::super::Binder<'r> {
                     let symbol_id = scope.resolve(i.id, &self.scopes);
                     let iface_ty = Type::named(
                         i_id_rc.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -389,7 +381,6 @@ impl<'r> super::super::Binder<'r> {
         let struct_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut sym =
@@ -442,7 +433,6 @@ impl<'r> super::super::Binder<'r> {
             ty: Type::named_with_origin(
                 id_rc.clone(),
                 Some(Arc::from(self.source_file.as_ref())),
-                self.resolver,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
             members,

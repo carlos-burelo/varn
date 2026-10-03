@@ -123,7 +123,6 @@ impl<'r> super::super::Binder<'r> {
                                             Some(Type::named_with_origin(
                                                 key_str.clone(),
                                                 Some(Arc::from(origin_path)),
-                                                self.resolver,
                                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                             ))
                                         } else {
@@ -172,7 +171,6 @@ impl<'r> super::super::Binder<'r> {
         let alias_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         let mut pe_sym =
@@ -212,7 +210,6 @@ impl<'r> super::super::Binder<'r> {
                 let variant_ty = Type::named_with_origin(
                     id_rc.clone(),
                     Some(Arc::from(self.source_file.as_ref())),
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let sym = Symbol::new(SymbolKind::Const, v.name, v.range.start.line)
@@ -231,7 +228,6 @@ impl<'r> super::super::Binder<'r> {
                 let ret_ty = Type::named_with_origin(
                     id_rc.clone(),
                     Some(Arc::from(self.source_file.as_ref())),
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let fn_ty = Type::fn_(

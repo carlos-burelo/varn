@@ -1,5 +1,4 @@
 use super::*;
-use crate::module_resolver::ImportResolver;
 use std::sync::Arc;
 
 #[allow(non_upper_case_globals)]
@@ -66,22 +65,13 @@ impl Type {
 
     /// `Range<T>` over the domain of a range bound: `char` bounds make a
     /// `Range<char>`, every other bound a `Range<int>`.
-    pub fn range_over(
-        bound: &Type,
-        resolver: &dyn ImportResolver,
-        table: &mut CheckerTyTable,
-    ) -> Self {
+    pub fn range_over(bound: &Type, table: &mut CheckerTyTable) -> Self {
         let elem = if bound.apparent(table) == Type::Char {
             Type::Char
         } else {
             Type::Int
         };
-        Type::generic(
-            varn_core::BuiltinType::Range.name(),
-            vec![elem],
-            resolver,
-            table,
-        )
+        Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], table)
     }
 
     /// `Range` or `Range<T>`.
@@ -124,12 +114,8 @@ impl Type {
         Type(table.intern(TypeKind::Fn(fid)), false)
     }
 
-    pub fn named(
-        name: impl Into<Arc<str>>,
-        resolver: &dyn ImportResolver,
-        table: &mut CheckerTyTable,
-    ) -> Self {
-        let atom = resolver.intern(&name.into());
+    pub fn named(name: impl Into<Arc<str>>, table: &mut CheckerTyTable) -> Self {
+        let atom = table.intern_name(&name.into());
         Type(table.intern(TypeKind::Named(atom, None)), false)
     }
 
@@ -145,29 +131,19 @@ impl Type {
         Type(table.intern(TypeKind::Named(name, origin)), false)
     }
 
-    /// String-name convenience over [`Self::named_with_origin_atom`]: mints
-    /// both `Atom`s via `resolver.intern` — the shared, per-compilation
-    /// interner every other `Named`/`Generic` name comes from — rather than
-    /// asking every call site to intern for itself.
     pub fn named_with_origin(
         name: impl Into<Arc<str>>,
         origin: Option<Arc<str>>,
-        resolver: &dyn ImportResolver,
         table: &mut CheckerTyTable,
     ) -> Self {
-        let name_atom = resolver.intern(&name.into());
-        let origin_atom = origin.map(|o| resolver.intern(&o));
+        let name_atom = table.intern_name(&name.into());
+        let origin_atom = origin.map(|o| table.intern_name(&o));
         Type::named_with_origin_atom(name_atom, origin_atom, table)
     }
 
     /// String-name convenience over [`Self::generic_atom`], no origin.
-    pub fn generic(
-        name: impl Into<Arc<str>>,
-        args: Vec<Type>,
-        resolver: &dyn ImportResolver,
-        table: &mut CheckerTyTable,
-    ) -> Self {
-        let atom = resolver.intern(&name.into());
+    pub fn generic(name: impl Into<Arc<str>>, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
+        let atom = table.intern_name(&name.into());
         Type::generic_atom(atom, args, None, table)
     }
 
@@ -176,11 +152,10 @@ impl Type {
         name: impl Into<Arc<str>>,
         args: Vec<Type>,
         origin: Option<Arc<str>>,
-        resolver: &dyn ImportResolver,
         table: &mut CheckerTyTable,
     ) -> Self {
-        let atom = resolver.intern(&name.into());
-        let origin_atom = origin.map(|o| resolver.intern(&o));
+        let atom = table.intern_name(&name.into());
+        let origin_atom = origin.map(|o| table.intern_name(&o));
         Type::generic_atom(atom, args, origin_atom, table)
     }
 

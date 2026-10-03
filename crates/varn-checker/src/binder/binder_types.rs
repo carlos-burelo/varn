@@ -7,7 +7,6 @@ use varn_core::ast::TypeNode;
 impl<'r> Binder<'r> {
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
         self.reject_forbidden_type_forms(node);
-        self.sync_ty_table();
         let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
         let result = resolve_type_node(node, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
@@ -46,18 +45,10 @@ impl<'r> Binder<'r> {
     }
 
     pub(crate) fn infer_expr_type_self(&mut self, expr: varn_core::ast::ExprId) -> Type {
-        self.sync_ty_table();
         let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
         let arena = self.ast_arena;
         let result = infer_expr_type(expr, arena, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
         result
-    }
-
-    fn sync_ty_table(&mut self) {
-        let live = self.resolver.ty_table_snapshot();
-        if live.len() > self.ty_table.len() {
-            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&live);
-        }
     }
 }

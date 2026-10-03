@@ -101,7 +101,6 @@ pub fn enrich_call_returns(
                         *is_async,
                         &mut table,
                         &bind.interner,
-                        Some(resolver),
                     );
                     bind.ty_table = std::sync::Arc::new(table);
                     if let Some(old_ty) = bind.arena.get(*sym_id).ty {
@@ -154,7 +153,6 @@ pub fn enrich_call_returns(
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
                         &bind.interner,
-                        Some(resolver),
                     );
                     if let Some(old) = bind
                         .class_methods

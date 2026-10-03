@@ -69,7 +69,7 @@ pub(crate) fn generic_mapping(
     }
     class_type_params(resolver, name, origin, bind)
         .into_iter()
-        .map(|p| resolver.intern(&p))
+        .map(|p| varn_core::Atom::of(&p))
         .zip(args.iter().cloned())
         .collect()
 }

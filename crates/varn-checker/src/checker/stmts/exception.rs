@@ -24,7 +24,6 @@ impl<'r> Checker<'r> {
                         } else {
                             Type::named(
                                 "Error",
-                                checker.resolver,
                                 &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                             )
                         };

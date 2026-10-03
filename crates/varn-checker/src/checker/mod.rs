@@ -92,10 +92,6 @@ pub struct Checker<'r> {
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
     pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, crate::semantic_info::MatchGap>,
-    /// Seeded from `bind.ty_table` and grown as checking synthesizes types
-    /// beyond what binding produced (unions from narrowing, instantiated
-    /// generics, etc). Same snapshot/publish discipline as `AtomInterner`:
-    /// see `ImportResolver::ty_table_snapshot`/`set_ty_table`.
     pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
 }
 
@@ -141,7 +137,7 @@ impl<'r> Checker<'r> {
     fn check_internal(
         program: &Program,
         ast_arena: &'r AstArena,
-        mut interner: varn_core::AtomInterner,
+        interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
         warn_implicit_dynamic: bool,
@@ -151,28 +147,6 @@ impl<'r> Checker<'r> {
         let started = Instant::now();
         let globals_ref = crate::core::loader::module_globals(&program.filename, resolver);
         profile.load_globals = started.elapsed();
-
-        // `core_exports()` may have just bound the core stdlib modules for the
-        // first time, minting `Atom`s into the resolver's shared table that
-        // `interner` (captured by the caller before this call) never saw. Its
-        // `Symbol`s carry those new `Atom`s, so binding against the stale
-        // `interner` leaves them unresolvable. This compilation's whole
-        // parse/publish discipline (`interner_snapshot`/`set_interner`)
-        // already guarantees `interner`'s own entries are a prefix of the
-        // resolver's current table, so replacing it here is lossless — every
-        // downstream user of `bind.interner`, this file's own atoms included,
-        // still resolves correctly.
-        //
-        // Unconditional, not just `if globals_ref.is_some()`: a core/stdlib
-        // module (`is_builtin`, `globals_ref: None`) skips `core_exports()`
-        // but can still be checked *after* a sibling core module earlier in
-        // the same `compile_stdlib_bundle` loop already grew and published
-        // the live table (e.g. a `Generic<T>`-typed symbol whose class-name
-        // `Atom` that sibling minted) — this caller's own `interner`, taken
-        // before that publish, is exactly as stale either way. Always
-        // starting from the live snapshot is never wrong (same prefix
-        // guarantee) and is the only branch that actually covers this case.
-        interner.absorb(&resolver.interner_snapshot());
 
         let started = Instant::now();
         let mut bind = match globals_ref {
@@ -187,35 +161,12 @@ impl<'r> Checker<'r> {
         crate::core::merge_core_members(&mut bind, resolver);
         profile.merge_core_members = started.elapsed();
 
-        // `Binder::bind` (and the nested binds it resolves) mints `Atom`s and
-        // `CheckerTyId`s after `bind` took its snapshot, so both can be behind
-        // the live tables by now. `enrich_call_returns` resolves names and
-        // reads types off `bind`, so refresh BOTH here — otherwise
-        // `infer_call_type` resolves an atom past the end of `bind.interner`
-        // (observed as `index out of bounds: the len is 335 but the index is
-        // 335` when checking a core module on the runtime path).
-        bind.interner.absorb(&resolver.interner_snapshot());
-        let live_ty_table = resolver.ty_table_snapshot();
-        if live_ty_table.len() > bind.ty_table.len() {
-            std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
-        }
-
         let started = Instant::now();
         enrich_call_returns(&mut bind, ast_arena, resolver);
         profile.enrich_call_returns = started.elapsed();
 
         let source_file: std::sync::Arc<str> = std::sync::Arc::from(bind.source_file.as_ref());
 
-        // `enrich_call_returns` may itself have triggered nested binds
-        // (`resolver` calls), so re-adopt live one more time before the
-        // checker starts: `absorb` keeps this bind's own id meanings and only
-        // learns shapes it lacks (see the pre-enrich block above), and the
-        // interner refresh is lossless for the same reason.
-        let live_ty_table = resolver.ty_table_snapshot();
-        if live_ty_table.len() > bind.ty_table.len() {
-            std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
-        }
-        bind.interner.absorb(&resolver.interner_snapshot());
         let started = Instant::now();
         let mut checker = Checker::new(
             resolver,
@@ -243,22 +194,8 @@ impl<'r> Checker<'r> {
             checker.project_expr_types(&bind);
         }
 
-        // Publish types synthesized during checking (narrowed unions,
-        // instantiated generics, ...) the same way binding publishes its own
-        // growth: `bind.ty_table` carries it onward to emit, and
-        // `resolver.set_ty_table` makes it visible to modules that import
-        // this one afterward. Same snapshot/publish discipline as
-        // `AtomInterner`/`set_interner`.
         bind.ty_table = checker.ty_table.clone();
-        resolver.set_ty_table(checker.ty_table.clone());
-
-        // Checking also resolves imports on demand (`module_bind`/
-        // `stdlib_bind` inside member lookups, alias expansion, ...), and each
-        // of those binds mints atoms into the live table. Emit runs against
-        // `bind`, so refresh the atom snapshot once more: emitting a type whose
-        // name atom was minted after the last resync would otherwise index out
-        // of bounds in `AtomInterner::resolve`.
-        bind.interner.absorb(&resolver.interner_snapshot());
+        bind.interner.absorb(checker.ty_table.names());
 
         checker.desugar.foreign_enums = checker
             .collect_foreign_enums(&bind, checker.expr_table.values().map(|entry| &entry.ty));

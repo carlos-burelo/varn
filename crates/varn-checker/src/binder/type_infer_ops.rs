@@ -116,10 +116,9 @@ pub(crate) fn infer_new(
             .and_then(|c| c.interner())
             .map(|i| i.resolve(*name).to_owned())
             .unwrap_or_default();
-        let resolver = ctx.and_then(|c| c.resolver());
         let origin = ctx
             .and_then(|c| c.source_file())
-            .and_then(|s| resolver.map(|r| r.intern(s)));
+            .map(|s| table.intern_name(s));
         if type_args.is_empty() {
             if name_str == varn_core::BuiltinType::Map.name() {
                 return Type::generic_atom(

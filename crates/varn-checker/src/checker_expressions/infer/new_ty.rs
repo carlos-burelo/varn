@@ -29,7 +29,6 @@ impl<'r> Checker<'r> {
                         name_str,
                         args,
                         origin_str,
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
                 } else if name_str == varn_core::BuiltinType::Map.name() {
@@ -37,14 +36,12 @@ impl<'r> Checker<'r> {
                         name_str,
                         vec![Type::Dynamic, Type::Dynamic],
                         origin_str,
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
                 } else {
                     Type::named_with_origin(
                         name_str,
                         origin_str,
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
                 }
@@ -58,7 +55,6 @@ impl<'r> Checker<'r> {
                     name_str,
                     args,
                     origin_str,
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 )
             }
@@ -75,22 +71,16 @@ impl<'r> Checker<'r> {
                         Type::generic(
                             name_str,
                             args,
-                            self.resolver,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
                     } else if name_str == varn_core::BuiltinType::Map.name() {
                         Type::generic(
                             name_str,
                             vec![Type::Dynamic, Type::Dynamic],
-                            self.resolver,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
                     } else {
-                        Type::named(
-                            name_str,
-                            self.resolver,
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        )
+                        Type::named(name_str, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
                 } else {
                     Type::Dynamic

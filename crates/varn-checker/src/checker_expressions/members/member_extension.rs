@@ -4,14 +4,13 @@ use crate::binder::BindResult;
 use crate::types::{CheckerTyTable, Type};
 
 pub(super) fn collect_extension_members(
-    resolver: &dyn crate::module_resolver::ImportResolver,
     results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
     seen: &mut rustc_hash::FxHashSet<Arc<str>>,
     ty: &Type,
     bind: &BindResult,
     table: &mut CheckerTyTable,
 ) {
-    let Some(type_name) = extension_key(resolver, ty, table, bind) else {
+    let Some(type_name) = extension_key(ty, table, bind) else {
         return;
     };
     let scope = bind.scopes.get(bind.global_scope);
@@ -114,16 +113,11 @@ pub(super) fn collect_extension_members(
     }
 }
 
-fn extension_key(
-    resolver: &dyn crate::module_resolver::ImportResolver,
-    ty: &Type,
-    table: &CheckerTyTable,
-    bind: &BindResult,
-) -> Option<Arc<str>> {
+fn extension_key(ty: &Type, table: &CheckerTyTable, bind: &BindResult) -> Option<Arc<str>> {
     match table.get(ty.0) {
-        varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => Some(
-            Arc::from(super::member_atom::resolve_atom_text(resolver, bind, n)),
-        ),
+        varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => {
+            Some(Arc::from(super::member_atom::resolve_atom_text(bind, n)))
+        }
         k @ (varn_core::TypeKind::Primitive(_)
         | varn_core::TypeKind::Builtin(_)
         | varn_core::TypeKind::Literal(_)) => k.lang_name().map(Arc::from),

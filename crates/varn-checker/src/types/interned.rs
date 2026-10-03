@@ -32,6 +32,7 @@ mod hash;
 mod ids;
 mod interning;
 mod merge;
+mod names;
 mod resolution;
 mod slice;
 mod table;

@@ -88,16 +88,10 @@ pub trait TypeContext {
         None
     }
 
-    /// Text of `atom`. This context's interner is a snapshot whose contents
-    /// are a prefix of the resolver's live table, so an atom minted after the
-    /// snapshot (an `origin` interned mid-resolution) is found in the live one.
     fn atom_text(&self, atom: varn_core::Atom) -> Option<String> {
-        if let Some(s) = self.interner().and_then(|i| i.try_resolve(atom)) {
-            return Some(s.to_owned());
-        }
-        self.resolver()?
-            .interner_snapshot()
-            .try_resolve(atom)
+        self.interner()
+            .and_then(|i| i.try_resolve(atom))
+            .or_else(|| self.ty_table().and_then(|t| t.name(atom)))
             .map(str::to_owned)
     }
 }

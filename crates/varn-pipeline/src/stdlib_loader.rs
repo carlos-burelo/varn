@@ -330,16 +330,8 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
                 return Err(format!("cannot bind {}: {}", m.id, err_msg));
             }
         };
-        let shared_interner = crate::resolver::with_resolver(|r| r.interner_snapshot());
-        let interface = crate::resolver::with_resolver(|r| {
-            varn_checker::module_resolver::serialize_module_interface(
-                &exports,
-                &bind,
-                &shared_interner,
-                Some(r),
-            )
-        })
-        .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
+        let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
+            .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
         let proto = match compile_source_checked(&source, &m.id) {
             Ok(p) => p,

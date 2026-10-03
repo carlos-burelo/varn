@@ -75,7 +75,6 @@ impl<'r> super::super::Binder<'r> {
                         method.modifiers.is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         &self.interner,
-                        Some(self.resolver),
                     );
                     let fn_type = Type::fn_(
                         crate::types::FunctionType {

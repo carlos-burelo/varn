@@ -12,10 +12,10 @@ pub(super) fn resolve_literal_type(
     let l = match lit {
         varn_core::TypeLiteral::Str(a) => {
             let text = resolve_atom_name(a, ctx, interner);
-            let atom = ctx
-                .and_then(|c| c.resolver())
-                .map_or(a, |r| r.intern(&text));
-            varn_core::TypeLiteral::Str(atom)
+            if !text.is_empty() {
+                table.intern_name(&text);
+            }
+            varn_core::TypeLiteral::Str(a)
         }
         other => other,
     };

@@ -48,6 +48,15 @@ impl<'r> super::Binder<'r> {
         } else {
             None
         };
+        for exports in relative_exports.iter().chain(stdlib_exports.iter()) {
+            self.adopt(&exports.table);
+        }
+        if let Some(dep) = resolved_target
+            .clone()
+            .or_else(|| is_stdlib.then(|| source_str.clone()))
+        {
+            self.deps.push(Arc::from(dep));
+        }
 
         if is_relative || is_package {
             if resolved_target.is_none() {
@@ -111,7 +120,6 @@ impl<'r> super::Binder<'r> {
                     s.ty = Some(crate::types::Type::named_with_origin(
                         Arc::from("*"),
                         module_path.clone(),
-                        self.resolver,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     ));
                     s.origin_module = module_path_atom;
@@ -119,9 +127,6 @@ impl<'r> super::Binder<'r> {
                 } else {
                     match exports.get(&imported) {
                         Some(resolved) => {
-                            self.resync_interner();
-                            let live_table = self.resolver.ty_table_snapshot();
-                            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&live_table);
                             let mut s = resolved.clone();
                             s.full_range = resolved.full_range;
                             s.name = local;
@@ -139,10 +144,8 @@ impl<'r> super::Binder<'r> {
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
                             {
-                                let origin_rc: Arc<str> = Arc::from(self.interner.resolve(*origin));
-                                let origin_atom = self.resolver.intern(&origin_rc);
                                 *ty = ty.with_origin(
-                                    origin_atom,
+                                    *origin,
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 );
                             }
@@ -209,12 +212,32 @@ impl<'r> super::Binder<'r> {
             },
             // `export { a, b }` names locals without producing identifier
             // expressions the binder would otherwise visit.
-            ExportDecl::Named { specifiers, .. } => {
+            ExportDecl::Named {
+                specifiers, source, ..
+            } => {
                 for s in specifiers {
                     self.escape_array_candidate(s.local);
                 }
+                if let Some(source) = source {
+                    self.record_reexport_dep(*source);
+                }
             }
-            ExportDecl::All { .. } => {}
+            ExportDecl::All { source, .. } => self.record_reexport_dep(*source),
+        }
+    }
+
+    fn record_reexport_dep(&mut self, source: varn_core::Atom) {
+        let spec = self.interner.resolve(source).to_string();
+        let dep = if module_resolver::is_known_module(&spec) {
+            Some(spec)
+        } else {
+            let base = std::path::Path::new(self.source_file.as_ref())
+                .parent()
+                .unwrap_or(std::path::Path::new("."));
+            self.resolver.resolve_specifier(base, &spec)
+        };
+        if let Some(dep) = dep {
+            self.deps.push(Arc::from(dep));
         }
     }
 }

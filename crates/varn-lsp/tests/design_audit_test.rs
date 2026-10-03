@@ -173,32 +173,6 @@ fn h5_sources_survive_close_and_remove() {
     );
 }
 
-/// H6 — el interner global solo crece.
-///
-/// `set_interner` es append-only; nada lo encoge al borrar archivos. Cada
-/// archivo indexado deja átomos para siempre en la sesión.
-#[test]
-fn h6_interner_grows_monotonically() {
-    let before = varn_lsp::workspace::resolver::with_resolver(|r| r.interner_len());
-    run_pipeline(
-        "function audit_unique_alpha_xyz(): int { return 1; }".to_string(),
-        "file:///test/h6a.vn".to_string(),
-    );
-    let mid = varn_lsp::workspace::resolver::with_resolver(|r| r.interner_len());
-    run_pipeline(
-        "function audit_unique_beta_xyz(): int { return 2; }".to_string(),
-        "file:///test/h6b.vn".to_string(),
-    );
-    let after = varn_lsp::workspace::resolver::with_resolver(|r| r.interner_len());
-    eprintln!("interner: {before} -> {mid} -> {after}");
-
-    assert!(
-        mid > before,
-        "identificadores nuevos deben crecer el interner"
-    );
-    assert!(after > mid, "el interner nunca se encoge entre archivos");
-}
-
 /// H10 — `evict_heavy` suelta artefactos, conserva exports y re-deriva.
 ///
 /// El grafo memoiza binds+programs+arenas de cada dependencia (el grueso de

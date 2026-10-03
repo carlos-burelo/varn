@@ -7,12 +7,10 @@ pub(super) fn ctx_interner<'a>(bind: Option<&'a BindView>) -> Option<&'a varn_co
 
 pub(super) fn resolve_atom(bind: Option<&BindView>, atom: varn_core::Atom) -> Option<String> {
     let b = bind?;
-    if let Some(s) = b.bind.interner.try_resolve(atom) {
-        return Some(s.to_string());
-    }
-    b.resolver
-        .interner_snapshot()
+    b.bind
+        .interner
         .try_resolve(atom)
+        .or_else(|| b.bind.ty_table.name(atom))
         .map(|s| s.to_string())
 }
 

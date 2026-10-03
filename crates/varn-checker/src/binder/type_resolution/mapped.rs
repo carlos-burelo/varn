@@ -83,10 +83,7 @@ pub(super) fn resolve_mapped(
     let members: Vec<ObjectTypeMember> = keys
         .into_iter()
         .map(|key| {
-            let key_atom = ctx
-                .and_then(|c| c.resolver())
-                .map(|r| r.intern(&key))
-                .unwrap_or_default();
+            let key_atom = table.intern_name(&key);
             let key_value = Type::named_atom(key_atom, table);
             let mapped_ctx = MappedContext {
                 inner: ctx,

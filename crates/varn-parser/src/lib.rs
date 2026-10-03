@@ -17,12 +17,6 @@ use varn_core::{
     Token,
 };
 
-/// `interner` is owned by the caller and comes back enlarged in the returned
-/// tuple: pass `varn_core::AtomInterner::new()` for a self-contained parse, or
-/// a clone of a compilation-wide table (see `DiskResolver::interner_snapshot`)
-/// when this file's `Atom`s must compare equal to another module's already
-/// parsed in the same compilation.
-///
 /// `AstArena` is never shared across files — unlike `interner`, it is always
 /// created fresh inside `Parser::new` and simply handed back here once this
 /// parse is done owning it.

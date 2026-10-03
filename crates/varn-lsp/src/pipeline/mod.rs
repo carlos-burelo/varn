@@ -70,13 +70,12 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         })
         .collect();
 
-    // Parse into the resolver's shared atom table and publish it back, as the
-    // compile pipeline does: this document's atoms and every imported
-    // module's must be one space.
-    let interner = crate::workspace::resolver::with_resolver(|r| r.interner_snapshot());
-    let (program, parse_errs, ast_arena, interner) =
-        varn_parser::parse_partial(raw_tokens, lexeme_buf, &path, interner);
-    crate::workspace::resolver::with_resolver(|r| r.set_interner(&interner));
+    let (program, parse_errs, ast_arena, interner) = varn_parser::parse_partial(
+        raw_tokens,
+        lexeme_buf,
+        &path,
+        varn_core::AtomInterner::new(),
+    );
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,

@@ -139,16 +139,14 @@ pub fn get_members_of_type(
             );
         }
         TypeKind::Array(inner) => {
-            let atom = resolver.intern(varn_core::BuiltinType::Array.name());
+            let atom = table.intern_name(varn_core::BuiltinType::Array.name());
             let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
             return get_members_of_type(resolver, &array_ty, bind, table);
         }
         TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
-            let cn: Arc<str> = Arc::from(super::member_atom::resolve_atom_text(
-                resolver, bind, cn_atom,
-            ));
-            let origin: Option<Arc<str>> = origin_atom
-                .map(|o| Arc::from(super::member_atom::resolve_atom_text(resolver, bind, o)));
+            let cn: Arc<str> = Arc::from(super::member_atom::resolve_atom_text(bind, cn_atom));
+            let origin: Option<Arc<str>> =
+                origin_atom.map(|o| Arc::from(super::member_atom::resolve_atom_text(bind, o)));
             let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
                 let args: Vec<Type> = table
                     .get_list(args_list)
@@ -228,11 +226,7 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let str_ty = Type::named(
-                varn_core::RuntimeKind::Str.name().to_owned(),
-                resolver,
-                table,
-            );
+            let str_ty = Type::named(varn_core::RuntimeKind::Str.name().to_owned(), table);
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
         TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
@@ -246,28 +240,17 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let bytes_ty = Type::named(
-                varn_core::RuntimeKind::Bytes.name().to_owned(),
-                resolver,
-                table,
-            );
+            let bytes_ty = Type::named(varn_core::RuntimeKind::Bytes.name().to_owned(), table);
             return get_members_of_type(resolver, &bytes_ty, bind, table);
         }
         kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
             let name = kind.lang_name().unwrap_or_default();
-            let named_ty = Type::named(name.to_owned(), resolver, table);
+            let named_ty = Type::named(name.to_owned(), table);
             return get_members_of_type(resolver, &named_ty, bind, table);
         }
         _ => {}
     }
 
-    super::member_extension::collect_extension_members(
-        resolver,
-        &mut results,
-        &mut seen,
-        ty,
-        bind,
-        table,
-    );
+    super::member_extension::collect_extension_members(&mut results, &mut seen, ty, bind, table);
     results
 }

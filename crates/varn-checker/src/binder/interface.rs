@@ -18,7 +18,6 @@ impl<'r> super::Binder<'r> {
         sym.ty = Some(Type::named_with_origin(
             id_rc.clone(),
             origin_rc,
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         ));
         sym.col = i.range.start.column;
@@ -116,7 +115,6 @@ impl<'r> super::Binder<'r> {
                     *is_async,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     &self.interner,
-                    Some(self.resolver),
                 );
                 let params_list = params
                     .iter()

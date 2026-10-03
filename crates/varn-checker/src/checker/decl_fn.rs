@@ -73,7 +73,6 @@ impl<'r> Checker<'r> {
                                 inferred_yield,
                                 f.modifiers.is_async,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                Some(self.resolver),
                             );
                             let mut ft = self.ty_table.get_function(fid).clone();
                             ft.return_type = new_ret.0;

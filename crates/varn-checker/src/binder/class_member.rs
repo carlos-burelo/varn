@@ -194,7 +194,6 @@ impl<'r> Binder<'r> {
                     modifiers.is_async,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     &self.interner,
-                    Some(self.resolver),
                 );
 
                 let ps: Vec<FunctionParam> = params

@@ -120,9 +120,8 @@ impl<'r> Checker<'r> {
                             bind.interner
                                 .try_resolve(a)
                                 .map(str::to_string)
-                                .unwrap_or_else(|| {
-                                    self.resolver.interner_snapshot().resolve(a).to_string()
-                                })
+                                .or_else(|| self.ty_table.name(a).map(str::to_string))
+                                .unwrap_or_default()
                         };
                         let name = resolve_atom(name_atom);
                         let origin: Option<String> = origin_atom.map(resolve_atom);

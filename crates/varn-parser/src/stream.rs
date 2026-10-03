@@ -33,12 +33,6 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
-    /// `interner` is owned by the caller: a fresh `AtomInterner::new()` for a
-    /// self-contained parse (benchmarks, macros, isolated tests), or a clone
-    /// of a compilation-wide table when this parse's `Atom`s must compare
-    /// equal to another module's (see `varn_core::AtomInterner` and
-    /// `DiskResolver::interner_snapshot`). Either way `TokenStream` never
-    /// mints its own — doing that per file is exactly the bug this replaced.
     pub fn new(
         tokens: Vec<Token>,
         lexeme_buf: Arc<[u8]>,

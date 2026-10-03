@@ -83,6 +83,7 @@ impl CheckerTyTable {
                 self.delta_object_members.insert(*k, v.clone());
             }
         }
+        self.names.absorb(&other.names);
         self.maybe_freeze();
     }
 }

@@ -50,8 +50,6 @@ pub fn execute_command(
 /// tool: the OS's own number for this process, plus the internal counts a
 /// spike in that number would be explained by.
 fn memory_stats(workspace: &Workspace) -> serde_json::Value {
-    let (interner_len, ty_table_len) =
-        crate::workspace::resolver::with_resolver(|r| (r.interner_len(), r.ty_table_len()));
     let (graph_binds, graph_programs, graph_arenas, graph_exports) =
         crate::workspace::resolver::with_resolver(|r| r.graph_stats());
 
@@ -109,8 +107,6 @@ fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     serde_json::json!({
         "residentKb": crate::backend::mem::resident_kb(),
         "openDocuments": workspace.file_count(),
-        "internedAtoms": interner_len,
-        "internedTypes": ty_table_len,
         "graphBinds": graph_binds,
         "graphPrograms": graph_programs,
         "graphArenas": graph_arenas,

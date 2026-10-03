@@ -136,13 +136,9 @@ impl<'r> Checker<'r> {
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
-        let atom = self.resolver.intern(varn_core::BuiltinType::Array.name());
-        let array_ty = Type::generic_atom(
-            atom,
-            vec![Type(inner, false)],
-            None,
-            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-        );
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        let atom = table.intern_name(varn_core::BuiltinType::Array.name());
+        let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
         self.find_member_info_uncached(&array_ty, key, bind)
     }
 
@@ -183,8 +179,9 @@ impl<'r> Checker<'r> {
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
-        let atom = self.resolver.intern(varn_core::BuiltinType::Range.name());
-        let range_ty = Type::named_atom(atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        let atom = table.intern_name(varn_core::BuiltinType::Range.name());
+        let range_ty = Type::named_atom(atom, table);
         self.find_member_info_uncached(&range_ty, key, bind)
     }
 }

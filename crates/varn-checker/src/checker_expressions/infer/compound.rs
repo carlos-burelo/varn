@@ -133,7 +133,6 @@ impl<'r> Checker<'r> {
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         &bind.interner,
-                        Some(self.resolver),
                     );
                     members.push(ObjectTypeMember::Method {
                         name,
@@ -192,7 +191,6 @@ impl<'r> Checker<'r> {
                 declared.unwrap_or(Type::Dynamic),
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                Some(self.resolver),
             )
         } else {
             crate::types::async_fn_return(
@@ -200,7 +198,6 @@ impl<'r> Checker<'r> {
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 &bind.interner,
-                Some(self.resolver),
             )
         };
         let params = self.signature_params(params, bind);

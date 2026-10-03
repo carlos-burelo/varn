@@ -46,7 +46,7 @@ pub(crate) fn reintern_member_type(
         table.get(ty.0),
         varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
     ) {
-        let origin = resolver.intern(b.source_file.as_ref());
+        let origin = table.intern_name(b.source_file.as_ref());
         return ty.with_origin(origin, table);
     }
     ty

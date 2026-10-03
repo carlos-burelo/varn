@@ -149,7 +149,6 @@ impl<'r> super::super::Binder<'r> {
                 declared_ret.unwrap_or(Type::Dynamic),
                 f.modifiers.is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                Some(self.resolver),
             )
         } else {
             crate::types::async_fn_return(
@@ -157,7 +156,6 @@ impl<'r> super::super::Binder<'r> {
                 f.modifiers.is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 &self.interner,
-                Some(self.resolver),
             )
         };
         let fn_type = Type::fn_(
@@ -269,7 +267,6 @@ impl<'r> super::super::Binder<'r> {
         let mut sym = Symbol::new(SymbolKind::Enum, e.id, line).with_type(Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),
-            self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         ));
         sym.doc = e.doc.as_ref().map(|s| self.intern_local(s.as_str()));
@@ -311,7 +308,6 @@ impl<'r> super::super::Binder<'r> {
                 let variant_ty = Type::named_with_origin(
                     id_rc.clone(),
                     Some(Arc::from(self.source_file.as_ref())),
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
@@ -330,7 +326,6 @@ impl<'r> super::super::Binder<'r> {
                 let ret_ty = Type::named_with_origin(
                     id_rc.clone(),
                     Some(Arc::from(self.source_file.as_ref())),
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let fn_ty = Type::fn_(
@@ -360,7 +355,6 @@ impl<'r> super::super::Binder<'r> {
                 ty: Type::named_with_origin(
                     id_rc.clone(),
                     Some(Arc::from(self.source_file.as_ref())),
-                    self.resolver,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),
                 members: Vec::new(),
@@ -490,7 +484,6 @@ impl<'r> super::super::Binder<'r> {
             ty: Type::named_with_origin(
                 id_rc.clone(),
                 Some(Arc::from(self.source_file.as_ref())),
-                self.resolver,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
             members: members.clone(),

@@ -421,7 +421,7 @@ pub(crate) fn map_generics_cached(
     // against `TypeKind::Named`'s own `Atom` slot, not a source-text name.
     let atom_mapping: FxHashMap<varn_core::Atom, Type> = mapping
         .iter()
-        .map(|(k, v)| (checker.resolver.intern(k), *v))
+        .map(|(k, v)| (varn_core::Atom::of(k), *v))
         .collect();
 
     if let TypeKind::Named(n, _) = checker.ty_table.get(base.0) {

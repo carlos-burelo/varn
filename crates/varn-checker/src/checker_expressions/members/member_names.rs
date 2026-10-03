@@ -20,7 +20,7 @@ impl<'r> Checker<'r> {
                 })
                 .collect(),
             TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => {
-                let cn_str = super::member_atom::resolve_atom_text(self.resolver, bind, cn);
+                let cn_str = super::member_atom::resolve_atom_text(bind, cn);
                 bind.get_class_entry(&cn_str)
                     .map(|entry| entry.members.iter().map(|m| m.name.clone()).collect())
                     .unwrap_or_default()

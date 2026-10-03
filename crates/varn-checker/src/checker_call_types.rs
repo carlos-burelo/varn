@@ -24,15 +24,9 @@ pub(crate) fn infer_call_type(
         ExprKind::FloatLiteral { .. } => Some(Type::Float),
         ExprKind::StrLiteral { .. } => Some(Type::Str),
         ExprKind::BoolLiteral { .. } => Some(Type::Bool),
-        ExprKind::This => current_class.and_then(|n| {
-            let resolver = ctx.and_then(|c| c.resolver())?;
+        ExprKind::This => current_class.map(|n| {
             let origin = ctx.and_then(|c| c.source_file());
-            Some(Type::named_with_origin(
-                Arc::from(n),
-                origin.map(Arc::from),
-                resolver,
-                table,
-            ))
+            Type::named_with_origin(Arc::from(n), origin.map(Arc::from), table)
         }),
         ExprKind::Identifier { name } => sym_map.get(interner.resolve(*name)).cloned(),
 
@@ -151,12 +145,10 @@ pub(crate) fn infer_call_type(
                 if let Some(ty) = fn_map.get(callee_name_str) {
                     if let Some(tps) = fn_type_params.get(callee_name_str) {
                         let mut mapping: FxHashMap<varn_core::Atom, Type> = FxHashMap::default();
-                        if let Some(resolver) = ctx.and_then(|c| c.resolver()) {
-                            for (i, tp) in tps.iter().enumerate() {
-                                if let Some(node) = type_args.get(i) {
-                                    let resolved = resolve_type_node(node, ctx, table);
-                                    mapping.insert(resolver.intern(tp), resolved);
-                                }
+                        for (i, tp) in tps.iter().enumerate() {
+                            if let Some(node) = type_args.get(i) {
+                                let resolved = resolve_type_node(node, ctx, table);
+                                mapping.insert(varn_core::Atom::of(tp), resolved);
                             }
                         }
                         return Some(ty.map_generics(&mapping, table));
@@ -187,24 +179,22 @@ pub(crate) fn infer_call_type(
             callee, type_args, ..
         } => {
             if let ExprKind::Identifier { name } = &ast_arena.expr(*callee).kind {
-                let resolver = ctx.and_then(|c| c.resolver())?;
                 let name_str = interner.resolve(*name);
                 if !type_args.is_empty() {
                     let mut args = Vec::new();
                     for node in type_args {
                         args.push(resolve_type_node(node, ctx, table));
                     }
-                    return Some(Type::generic(Arc::from(name_str), args, resolver, table));
+                    return Some(Type::generic(Arc::from(name_str), args, table));
                 }
                 if name_str == varn_core::BuiltinType::Map.name() {
                     return Some(Type::generic(
                         Arc::from(name_str),
                         vec![Type::Dynamic, Type::Dynamic],
-                        resolver,
                         table,
                     ));
                 }
-                return Some(Type::named(Arc::from(name_str), resolver, table));
+                return Some(Type::named(Arc::from(name_str), table));
             }
             None
         }

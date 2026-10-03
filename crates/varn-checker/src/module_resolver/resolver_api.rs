@@ -3,7 +3,6 @@ use crate::module_resolver::cache::ExportMap;
 use std::path::Path;
 use std::sync::Arc;
 
-pub(super) type CoreExportsMap = rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>;
 pub trait ImportResolver {
     /// Bind a workspace module identified by canonical absolute path.
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
@@ -28,67 +27,7 @@ pub trait ImportResolver {
     /// The prelude's global symbols (`core:*`), as this resolver's stdlib
     /// defines them. Part of the trait because which prelude is in force is a
     /// property of which stdlib you resolve against.
-    fn core_exports(&self) -> Arc<rustc_hash::FxHashMap<Arc<str>, crate::symbol::Symbol>>;
-
-    /// A clone of this resolver's single, whole-compilation `Atom` table.
-    ///
-    /// `core_exports`'s `Symbol`s carry `Atom`s minted while binding the core
-    /// stdlib modules against this same table — a caller that binds a program
-    /// against a `Checker::check`-supplied `AtomInterner` captured *before*
-    /// `core_exports()` ran must re-fetch this snapshot afterward, or those
-    /// `Symbol`s' `Atom`s (now real, published indices) resolve out of bounds
-    /// against the caller's now-stale, smaller table.
-    fn interner_snapshot(&self) -> varn_core::AtomInterner;
-
-    /// A clone of this resolver's single, whole-compilation `CheckerTyId`
-    /// table, mirroring [`Self::interner_snapshot`] for exactly the same
-    /// reason: a module imports types from another module, so their
-    /// `CheckerTyId`s must be comparable — which only holds if every
-    /// `Binder` grows the SAME numbering from a prefix-compatible snapshot
-    /// of it, never a table of its own.
-    fn ty_table_snapshot(&self) -> std::sync::Arc<crate::types::CheckerTyTable>;
-
-    /// Publish `table`'s shapes into the compilation's live `CheckerTyId`
-    /// table. Merging, not replacing: `table` is one module's locally-grown
-    /// view, which can disagree with the live table past their common prefix
-    /// (nested binds grow live behind any single module's back), and a
-    /// wholesale swap would repoint every id the live table already handed
-    /// out. `CheckerTyTable::absorb` keeps live's own indices stable and only
-    /// learns shapes it is missing.
-    fn set_ty_table(&self, table: std::sync::Arc<crate::types::CheckerTyTable>);
-
-    /// Intern `kind` into the live `CheckerTyId` table itself, publishing
-    /// immediately, and return the id it now has *there*.
-    ///
-    /// For a caller that must put a type on an exported symbol (`export * as
-    /// ns`, a synthesized member) without growing any module's bind table —
-    /// the id crosses module boundaries through the `ExportMap`, so it has to
-    /// be valid in the table importers decode against, which is the live one.
-    fn intern_ty(&self, kind: crate::types::InternedTypeKind) -> crate::types::CheckerTyId;
-
-    /// Intern `s` into this resolver's shared `Atom` table, publishing the
-    /// result immediately (unlike `interner_snapshot`, which only reads).
-    ///
-    /// Exists for callers that hold no mutable interner of their own but must
-    /// mint an `Atom` for text that is not part of any module's own source —
-    /// an absolute file path or `std:`-style specifier used as an export's
-    /// `origin_module`. Interning here (the live, shared table) rather than
-    /// into a throwaway copy is what makes the returned `Atom` resolve
-    /// correctly through every later `interner_snapshot()`.
-    fn intern(&self, s: &str) -> varn_core::Atom;
-
-    /// Length of this resolver's live `Atom` table, without cloning it (unlike
-    /// [`Self::interner_snapshot`]). Lets a caller cheaply check "has the live
-    /// table grown past what I have locally" before paying for a snapshot —
-    /// see `Binder::intern_local`'s doc for why that check has to happen
-    /// before every locally-minted `Atom`, not just at construction.
-    fn interner_len(&self) -> usize;
-
-    /// Number of shapes interned in this resolver's live `CheckerTyId` table,
-    /// without cloning it (unlike [`Self::ty_table_snapshot`]) — memory
-    /// introspection reads this on every open document; cloning the table to
-    /// answer "how big is it" would be the exact bug it is trying to surface.
-    fn ty_table_len(&self) -> usize;
+    fn core_exports(&self) -> Arc<crate::core::loader::CoreExports>;
 
     /// Evict heavy memoized artifacts (`binds`, parsed `programs`, AST
     /// `arenas`) while keeping `exports`, specifier paths and dependency
