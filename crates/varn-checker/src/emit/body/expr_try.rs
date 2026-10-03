@@ -21,99 +21,17 @@ impl<'a> FnEmitter<'a> {
         let span = hoisted.span;
 
         if let (Some(sum), BackendTy::Enum(eid)) = (sum, hoisted.ty.non_nullable(self.tt)) {
-            if let Some(info) = self.m.enums.get(eid.0 as usize) {
+            let (fail, pass) = match sum {
+                varn_core::CoreSum::Result => ("Err", "Ok"),
+                varn_core::CoreSum::Option => ("None", "Some"),
+            };
+            let tags = self.m.enums.get(eid.0 as usize).and_then(|info| {
                 let variant = |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
-                let is_err_res = variant("Err").filter(|_| sum == varn_core::CoreSum::Result);
-                let is_ok_res = variant("Ok").filter(|_| sum == varn_core::CoreSum::Result);
-                if let (Some(err_var), Some(ok_var)) = (is_err_res, is_ok_res) {
-                    let disc = TirExpr {
-                        kind: TirExprKind::Discriminant {
-                            value: Box::new(hoisted.clone()),
-                        },
-                        ty: BackendTy::Int,
-                        res: Resolution::None,
-                        span,
-                    };
-                    let cond = TirExpr {
-                        kind: TirExprKind::Binary {
-                            op: TirBinOp::Eq,
-                            lhs: Box::new(disc),
-                            rhs: Box::new(TirExpr {
-                                kind: TirExprKind::IntLit(err_var.tag as i64),
-                                ty: BackendTy::Int,
-                                res: Resolution::None,
-                                span,
-                            }),
-                        },
-                        ty: BackendTy::Bool,
-                        res: Resolution::None,
-                        span,
-                    };
-                    self.pending.push(TirStmt::If {
-                        cond,
-                        then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
-                        else_body: vec![],
-                    });
-                    return TirExpr {
-                        kind: TirExprKind::VariantPayload {
-                            value: Box::new(hoisted),
-                            tag: ok_var.tag,
-                            field: 0,
-                        },
-                        ty,
-                        res: Resolution::EnumVariant {
-                            enum_id: eid,
-                            tag: ok_var.tag,
-                        },
-                        span,
-                    };
-                }
-
-                let is_none_opt = variant("None").filter(|_| sum == varn_core::CoreSum::Option);
-                let is_some_opt = variant("Some").filter(|_| sum == varn_core::CoreSum::Option);
-                if let (Some(none_var), Some(some_var)) = (is_none_opt, is_some_opt) {
-                    let disc = TirExpr {
-                        kind: TirExprKind::Discriminant {
-                            value: Box::new(hoisted.clone()),
-                        },
-                        ty: BackendTy::Int,
-                        res: Resolution::None,
-                        span,
-                    };
-                    let cond = TirExpr {
-                        kind: TirExprKind::Binary {
-                            op: TirBinOp::Eq,
-                            lhs: Box::new(disc),
-                            rhs: Box::new(TirExpr {
-                                kind: TirExprKind::IntLit(none_var.tag as i64),
-                                ty: BackendTy::Int,
-                                res: Resolution::None,
-                                span,
-                            }),
-                        },
-                        ty: BackendTy::Bool,
-                        res: Resolution::None,
-                        span,
-                    };
-                    self.pending.push(TirStmt::If {
-                        cond,
-                        then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
-                        else_body: vec![],
-                    });
-                    return TirExpr {
-                        kind: TirExprKind::VariantPayload {
-                            value: Box::new(hoisted),
-                            tag: some_var.tag,
-                            field: 0,
-                        },
-                        ty,
-                        res: Resolution::EnumVariant {
-                            enum_id: eid,
-                            tag: some_var.tag,
-                        },
-                        span,
-                    };
-                }
+                let (fail, pass) = (variant(fail)?, variant(pass)?);
+                Some((fail.tag, pass.tag, pass.payload.first().copied()?))
+            });
+            if let Some((fail_tag, pass_tag, payload_ty)) = tags {
+                return self.unwrap_or_propagate(hoisted, eid, fail_tag, pass_tag, payload_ty, ty);
             }
         }
 
@@ -151,5 +69,59 @@ impl<'a> FnEmitter<'a> {
         }
 
         hoisted
+    }
+
+    fn unwrap_or_propagate(
+        &mut self,
+        hoisted: TirExpr,
+        eid: varn_tir::EnumId,
+        fail_tag: u16,
+        pass_tag: u16,
+        payload_ty: BackendTy,
+        ty: BackendTy,
+    ) -> TirExpr {
+        let span = hoisted.span;
+        let disc = TirExpr {
+            kind: TirExprKind::Discriminant {
+                value: Box::new(hoisted.clone()),
+            },
+            ty: BackendTy::Int,
+            res: Resolution::None,
+            span,
+        };
+        let cond = TirExpr {
+            kind: TirExprKind::Binary {
+                op: TirBinOp::Eq,
+                lhs: Box::new(disc),
+                rhs: Box::new(TirExpr {
+                    kind: TirExprKind::IntLit(fail_tag as i64),
+                    ty: BackendTy::Int,
+                    res: Resolution::None,
+                    span,
+                }),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        };
+        self.pending.push(TirStmt::If {
+            cond,
+            then_body: vec![TirStmt::Return(Some(hoisted.clone()))],
+            else_body: vec![],
+        });
+        let payload = TirExpr {
+            kind: TirExprKind::VariantPayload {
+                value: Box::new(hoisted),
+                tag: pass_tag,
+                field: 0,
+            },
+            ty: payload_ty,
+            res: Resolution::EnumVariant {
+                enum_id: eid,
+                tag: pass_tag,
+            },
+            span,
+        };
+        self.cast_to(payload, ty)
     }
 }
