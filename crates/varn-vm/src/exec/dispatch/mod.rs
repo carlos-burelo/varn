@@ -493,7 +493,7 @@ impl ExecCtx {
                         let fut = reg_box!(src);
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Await {
-                            value: (*ctx).heap.extract(fut),
+                            value: fut,
                             dest_reg: first_reg as u16,
                         });
                         return Ok(VmValue::null());

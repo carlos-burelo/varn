@@ -4,7 +4,7 @@
 //! order can shuffle elements but never crash the sort.
 
 use std::cmp::Ordering;
-use varn_types::{NativeCtx, NativeError, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 /// `a` against `b` with no comparator: numbers numerically, text and chars by
 /// code point, booleans `false < true`, a `Comparable` by `a.compare(b)`.
@@ -13,18 +13,7 @@ pub(super) fn natural_cmp(
     a: VmValue,
     b: VmValue,
 ) -> Result<Ordering, NativeError> {
-    let order = match (ctx.extract(a), ctx.extract(b)) {
-        (Value::Int(x), Value::Int(y)) => Some(x.cmp(&y)),
-        (Value::Float(x), Value::Float(y)) => Some(x.total_cmp(&y)),
-        (Value::Int(x), Value::Float(y)) => Some((x as f64).total_cmp(&y)),
-        (Value::Float(x), Value::Int(y)) => Some(x.total_cmp(&(y as f64))),
-        (Value::Str(x), Value::Str(y)) => Some(x.cmp(&y)),
-        (Value::Char(x), Value::Char(y)) => Some(x.cmp(&y)),
-        (Value::Bool(x), Value::Bool(y)) => Some(x.cmp(&y)),
-        (Value::BigInt(x), Value::BigInt(y)) => Some(x.cmp(&y)),
-        (Value::Decimal(x), Value::Decimal(y)) => Some(x.cmp(&y)),
-        _ => None,
-    };
+    let order = natural_scalar_cmp(ctx, a, b);
     if let Some(order) = order {
         return Ok(order);
     }
@@ -84,4 +73,35 @@ pub(super) fn merge_sort(
         width *= 2;
     }
     Ok(())
+}
+
+fn natural_scalar_cmp(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> Option<Ordering> {
+    if ctx.is_int(a) && ctx.is_int(b) {
+        return Some(ctx.as_int(a).cmp(&ctx.as_int(b)));
+    }
+    if a.is_f64() && b.is_f64() {
+        return Some(a.as_f64().total_cmp(&b.as_f64()));
+    }
+    if ctx.is_int(a) && b.is_f64() {
+        return Some((ctx.as_int(a) as f64).total_cmp(&b.as_f64()));
+    }
+    if a.is_f64() && ctx.is_int(b) {
+        return Some(a.as_f64().total_cmp(&(ctx.as_int(b) as f64)));
+    }
+    if ctx.is_string(a) && ctx.is_string(b) {
+        return Some(ctx.str_repr_borrowed(a).cmp(&ctx.str_repr_borrowed(b)));
+    }
+    if a.is_bool() && b.is_bool() {
+        return Some(a.as_bool().cmp(&b.as_bool()));
+    }
+    if let (Some(x), Some(y)) = (ctx.as_char(a), ctx.as_char(b)) {
+        return Some(x.cmp(&y));
+    }
+    if let (Some(x), Some(y)) = (ctx.as_bigint(a), ctx.as_bigint(b)) {
+        return Some(x.cmp(&y));
+    }
+    if let (Some(x), Some(y)) = (ctx.as_decimal(a), ctx.as_decimal(b)) {
+        return Some(x.cmp(&y));
+    }
+    None
 }

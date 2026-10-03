@@ -1,7 +1,7 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use varn_types::{Value, VmArray};
+use varn_types::VmArray;
 
 impl ExecCtx {
     pub(crate) fn exec_call_reg(
@@ -53,7 +53,7 @@ impl ExecCtx {
             }
 
             if let Some(bm) = bound_method {
-                let receiver = self.heap.intern(bm.receiver.clone());
+                let receiver = bm.receiver;
                 match &bm.target {
                     varn_types::value::BoundMethodTarget::Native { func, name, .. } => {
                         let f = *func;
@@ -75,11 +75,8 @@ impl ExecCtx {
                         closure: method_closure,
                         owner_class,
                     } => {
-                        if let Some(nc_w) = method_closure
-                            .as_any()
-                            .downcast_ref::<crate::closure::VmClosurePayload>()
-                        {
-                            let nc = &nc_w.0;
+                        if let Some(nc) = self.heap.closure_of(*method_closure).cloned() {
+                            let nc = &nc;
                             let arity = nc.proto.arity;
                             if !nc.proto.is_generator
                                 && !nc.proto.is_async
@@ -386,25 +383,10 @@ impl ExecCtx {
         frame_idx: usize,
     ) -> VmResult<bool> {
         let mut expanded = Vec::new();
-        for i in 0..arg_count {
-            let nv = self.stack.box_reg(base, arg_start + i);
-            match self.heap.extract(nv) {
-                Value::Spread(inner) => match *inner {
-                    Value::Array(arr) => {
-                        for v in arr.borrow().iter().cloned() {
-                            expanded.push(self.heap.intern(v));
-                        }
-                    }
-                    other => expanded.push(self.heap.intern(other)),
-                },
-                Value::Array(arr) => {
-                    for v in arr.borrow().iter().cloned() {
-                        expanded.push(self.heap.intern(v));
-                    }
-                }
-                other => expanded.push(self.heap.intern(other)),
-            }
-        }
+        let window: Vec<VmValue> = (0..arg_count)
+            .map(|i| self.stack.box_reg(base, arg_start + i))
+            .collect();
+        crate::exec::calls::expand_spread_args(&self.heap, window, &mut expanded);
         let flat_count = expanded.len();
         self.stage.clear();
         self.stage.push(callee);

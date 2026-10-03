@@ -29,6 +29,7 @@ pub(crate) mod nursery;
 pub(crate) mod profile;
 pub(crate) mod settings;
 pub(crate) mod strbuf;
+pub(crate) mod task;
 pub(crate) mod value;
 pub(crate) mod vm;
 

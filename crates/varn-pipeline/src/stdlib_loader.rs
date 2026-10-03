@@ -110,10 +110,6 @@ impl ModuleLoader for FileLoader {
         store_proto(&key, fingerprint, &proto);
         Ok(Some(proto))
     }
-
-    fn native(&self, _id: &ModuleId) -> Option<varn_types::Value> {
-        None
-    }
 }
 
 pub struct StdlibLoader;
@@ -130,10 +126,6 @@ impl ModuleLoader for StdlibLoader {
                     "StdlibLoader cannot resolve non-stdlib specifier: {specifier}"
                 ))),
             })
-    }
-
-    fn native(&self, _id: &ModuleId) -> Option<varn_types::Value> {
-        None
     }
 
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {

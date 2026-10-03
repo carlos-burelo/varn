@@ -10,10 +10,8 @@ use crate::frame_store::{FrameStore, SlotAddr};
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_core::VmValuePayload;
 use varn_types::chunk::PolyICSlot;
 use varn_types::FunctionProto;
-pub use varn_types::VmValueRef;
 
 #[derive(Debug, Clone)]
 pub struct VmUpvalue {
@@ -151,27 +149,5 @@ impl VmClosure {
     #[inline(always)]
     pub(crate) fn ic_cache_len(&self) -> usize {
         self.ic_cache.borrow().len()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VmClosurePayload(pub Rc<VmClosure>);
-
-impl VmValuePayload for VmClosurePayload {
-    fn clone_payload(&self) -> Box<dyn VmValuePayload> {
-        Box::new(self.clone())
-    }
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
-impl VmClosurePayload {
-    #[inline(always)]
-    pub fn downcast_from(payload: &dyn VmValuePayload) -> Option<&Rc<VmClosure>> {
-        payload
-            .as_any()
-            .downcast_ref::<VmClosurePayload>()
-            .map(|w| &w.0)
     }
 }

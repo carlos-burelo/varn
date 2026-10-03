@@ -6,10 +6,7 @@ use crate::value::VmValue;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_types::{
-    value::{ArrayRef, MapRef, ObjRef, RuntimeSymbol, SetRef},
-    ClassObj, RuntimeString,
-};
+use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 
 #[derive(Clone)]
 pub struct HeapInner {
@@ -38,12 +35,8 @@ pub struct HeapInner {
     pub(super) objects: Vec<Option<HeapObj>>,
     pub(super) string_interner: FxHashMap<RuntimeString, u32>,
     pub(super) symbol_interner: FxHashMap<RuntimeSymbol, u32>,
-    pub(super) array_interner: FxHashMap<ArrayRef, u32>,
-    pub(super) object_interner: FxHashMap<ObjRef, u32>,
-    pub(super) young_interned: Vec<(ObjRef, u32)>,
-    pub(super) map_interner: FxHashMap<MapRef, u32>,
-    pub(super) empty_map: Option<MapRef>,
-    pub(super) set_interner: FxHashMap<SetRef, u32>,
+    pub(crate) young_cells: Vec<Rc<crate::task::TaskCell>>,
+    pub(crate) young_lazies: Vec<Rc<crate::task::LazyTask>>,
     pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, u32>,
     pub(super) decimal_interner: FxHashMap<bigdecimal::BigDecimal, u32>,
     pub(super) char_interner: FxHashMap<char, u32>,
@@ -70,12 +63,8 @@ impl HeapInner {
             intrinsic_classes: FxHashMap::default(),
             string_interner: FxHashMap::default(),
             symbol_interner: FxHashMap::default(),
-            array_interner: FxHashMap::default(),
-            object_interner: FxHashMap::default(),
-            young_interned: Vec::new(),
-            map_interner: FxHashMap::default(),
-            empty_map: None,
-            set_interner: FxHashMap::default(),
+            young_cells: Vec::new(),
+            young_lazies: Vec::new(),
             bigint_interner: FxHashMap::default(),
             decimal_interner: FxHashMap::default(),
             char_interner: FxHashMap::default(),

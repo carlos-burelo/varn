@@ -1,14 +1,11 @@
 use num_traits::ToPrimitive;
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, NativeError, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct BigInt;
 
 fn get_bigint(ctx: &dyn NativeCtx, this: VmValue) -> Option<num_bigint::BigInt> {
-    match ctx.extract(this) {
-        Value::BigInt(n) => Some(*n),
-        _ => None,
-    }
+    ctx.as_bigint(this)
 }
 
 varn_contract! {

@@ -272,12 +272,26 @@ impl Nursery {
             }
         }
 
+        self.phase = "tareas con valores jóvenes";
+        for cell in std::mem::take(&mut old_gen.young_cells) {
+            cell.trace_cells(&mut |c| {
+                let mut v = c.get();
+                self.update_value(&mut v, old_gen, &mut worklist);
+                c.set(v);
+            });
+        }
+        for lazy in std::mem::take(&mut old_gen.young_lazies) {
+            lazy.trace_cells(&mut |c| {
+                let mut v = c.get();
+                self.update_value(&mut v, old_gen, &mut worklist);
+                c.set(v);
+            });
+        }
+
         self.phase = "worklist (hijos de lo ya promovido)";
         while let Some(raw) = worklist.pop() {
             self.scan_and_fix_old_obj(raw, old_gen, &mut worklist, &mut fixups);
         }
-
-        old_gen.update_interners_after_minor_gc(&self.forwarding);
 
         self.objects.clear();
         self.forwarding.clear();
@@ -404,8 +418,9 @@ impl Nursery {
             Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => Container::Array(a.clone()),
             Some(HeapObj::Instance(inst)) => Container::Instance(inst.clone()),
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => Container::Object(o.clone()),
+            Some(HeapObj::Class(cls)) => Container::Class(cls.clone()),
             Some(obj) => {
-                Self::scan_children(obj, old_gen, fixups);
+                Self::scan_children(obj, fixups);
                 Container::None
             }
             None => Container::None,
@@ -479,21 +494,16 @@ impl Nursery {
                 }
                 return;
             }
+            Container::Class(cls) => {
+                cls.for_each_value_mut(&mut |v| self.update_value(v, old_gen, worklist));
+                return;
+            }
             Container::None => {}
         }
 
         for (slot, nursery_idx) in fixups.drain(..) {
             let packed = self.evacuate(nursery_idx, old_gen, worklist);
             let new_val = VmValue::from_heap_idx(packed);
-            let extracted_val = if matches!(slot, ChildSlot::BoundMethodReceiver)
-                || matches!(slot, ChildSlot::ClassVtableItem(_))
-                || matches!(slot, ChildSlot::ClassStatic(_))
-                || matches!(slot, ChildSlot::EnumVariantPayload)
-            {
-                Some(old_gen.extract(new_val))
-            } else {
-                None
-            };
             let Some(obj) = old_gen.get_raw_mut(raw_old) else {
                 continue;
             };
@@ -509,13 +519,13 @@ impl Nursery {
                     *v = new_val;
                 }
                 (ChildSlot::BoundMethodReceiver, HeapObj::BoundMethod(bm)) => {
-                    bm.receiver = extracted_val.unwrap();
+                    bm.receiver = new_val;
                 }
-                (ChildSlot::ClassVtableItem(i), HeapObj::Class(cls)) => {
-                    cls.vtable.borrow_mut()[i] = extracted_val.unwrap();
-                }
-                (ChildSlot::ClassStatic(k), HeapObj::Class(cls)) => {
-                    cls.statics.borrow_mut().insert(k, extracted_val.unwrap());
+                (ChildSlot::BoundMethodClosure, HeapObj::BoundMethod(bm)) => {
+                    if let varn_types::value::BoundMethodTarget::Vm { closure, .. } = &mut bm.target
+                    {
+                        *closure = new_val;
+                    }
                 }
                 (ChildSlot::ModuleExport(i), HeapObj::Module(m)) => {
                     if let Some(s) = Rc::make_mut(m).exports.get_mut(i) {
@@ -523,7 +533,7 @@ impl Nursery {
                     }
                 }
                 (ChildSlot::EnumVariantPayload, HeapObj::EnumVariant(ev)) => {
-                    ev.payload = extracted_val.unwrap();
+                    ev.payload = new_val;
                 }
                 _ => {}
             }
@@ -599,15 +609,18 @@ impl Nursery {
                 found
             }
             HeapObj::Spread(v) => nursery_val(v),
-            // An enum variant's payload and a map/set's entries are Rust-side
-            // `Value`s; deciding cheaply would mean duplicating their traversal.
-            // They are rare enough that always enrolling is the honest choice.
-            HeapObj::EnumVariant(_) | HeapObj::Map(_) | HeapObj::Set(_) => true,
+            HeapObj::BoundMethod(bm) => {
+                nursery_val(&bm.receiver)
+                    || matches!(&bm.target,
+                        varn_types::value::BoundMethodTarget::Vm { closure, .. } if nursery_val(closure))
+            }
+            HeapObj::EnumVariant(ev) => nursery_val(&ev.payload),
+            HeapObj::Class(_) | HeapObj::Map(_) | HeapObj::Set(_) => true,
             _ => false,
         }
     }
 
-    fn scan_children(obj: &HeapObj, old_gen: &HeapInner, fixups: &mut Vec<(ChildSlot, u32)>) {
+    fn scan_children(obj: &HeapObj, fixups: &mut Vec<(ChildSlot, u32)>) {
         match obj {
             HeapObj::VmClosure(clos) => {
                 for (i, uv) in clos.upvalues.iter().enumerate() {
@@ -624,25 +637,12 @@ impl Nursery {
                 }
             }
             HeapObj::BoundMethod(bm) => {
-                if let Some(idx) = old_gen.value_heap_idx(&bm.receiver) {
-                    if is_nursery_idx(idx) {
-                        fixups.push((ChildSlot::BoundMethodReceiver, idx));
-                    }
+                if bm.receiver.is_heap() && is_nursery_idx(bm.receiver.as_heap_idx()) {
+                    fixups.push((ChildSlot::BoundMethodReceiver, bm.receiver.as_heap_idx()));
                 }
-            }
-            HeapObj::Class(cls) => {
-                for (i, v) in cls.vtable.borrow().iter().enumerate() {
-                    if let Some(idx) = old_gen.value_heap_idx(v) {
-                        if is_nursery_idx(idx) {
-                            fixups.push((ChildSlot::ClassVtableItem(i), idx));
-                        }
-                    }
-                }
-                for (k, v) in cls.statics.borrow().iter() {
-                    if let Some(idx) = old_gen.value_heap_idx(v) {
-                        if is_nursery_idx(idx) {
-                            fixups.push((ChildSlot::ClassStatic(k.clone()), idx));
-                        }
+                if let varn_types::value::BoundMethodTarget::Vm { closure, .. } = &bm.target {
+                    if closure.is_heap() && is_nursery_idx(closure.as_heap_idx()) {
+                        fixups.push((ChildSlot::BoundMethodClosure, closure.as_heap_idx()));
                     }
                 }
             }
@@ -654,10 +654,8 @@ impl Nursery {
                 }
             }
             HeapObj::EnumVariant(ev) => {
-                if let Some(idx) = old_gen.value_heap_idx(&ev.payload) {
-                    if is_nursery_idx(idx) {
-                        fixups.push((ChildSlot::EnumVariantPayload, idx));
-                    }
+                if ev.payload.is_heap() && is_nursery_idx(ev.payload.as_heap_idx()) {
+                    fixups.push((ChildSlot::EnumVariantPayload, ev.payload.as_heap_idx()));
                 }
             }
             _ => {}
@@ -676,6 +674,7 @@ enum Container {
     Array(varn_types::VmArray),
     Object(varn_types::value::ObjRef),
     Instance(varn_types::value::InstanceRef),
+    Class(std::rc::Rc<varn_types::ClassObj>),
     None,
 }
 
@@ -684,8 +683,7 @@ enum ChildSlot {
     Upvalue(usize),
     Spread,
     BoundMethodReceiver,
-    ClassVtableItem(usize),
-    ClassStatic(std::sync::Arc<str>),
+    BoundMethodClosure,
     ModuleExport(usize),
     EnumVariantPayload,
 }

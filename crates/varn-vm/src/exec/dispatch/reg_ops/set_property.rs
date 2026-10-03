@@ -39,7 +39,7 @@ impl ExecCtx {
             );
         if obj_is_heap_object && cs_idx < cache_len && !is_megamorphic {
             let mut found_slot: Option<(usize, u8)> = None;
-            let mut found_setter: Option<varn_types::Value> = None;
+            let mut found_setter: Option<VmValue> = None;
             let mut hit_found = false;
 
             {
@@ -93,7 +93,7 @@ impl ExecCtx {
                             {
                                 let vtable = unsafe { &*cls.setter_vtable.as_ptr() };
                                 if slot < vtable.len() {
-                                    found_setter = Some(vtable[slot].clone());
+                                    found_setter = Some(vtable[slot]);
                                     hit_found = true;
                                     break 'entries;
                                 }
@@ -131,8 +131,7 @@ impl ExecCtx {
                 }
             } else if let Some(setter_val) = found_setter {
                 self.record_ic_hit_setprop();
-                let setter_nv = self.heap.intern(setter_val);
-                self.call_setter_sync(setter_nv, obj, val, base)?;
+                self.call_setter_sync(setter_val, obj, val, base)?;
                 return Ok(false);
             }
         }
@@ -153,8 +152,7 @@ impl ExecCtx {
                     }
                 }
             }
-            let setter_nv = self.heap.intern(setter_val);
-            self.call_setter_sync(setter_nv, obj, val, base)?;
+            self.call_setter_sync(setter_val, obj, val, base)?;
             return Ok(false);
         }
 
@@ -251,22 +249,25 @@ impl ExecCtx {
         value: VmValue,
         _base: usize,
     ) -> VmResult<()> {
-        let setter_val = self.heap.extract(setter_nv);
-        match setter_val {
-            varn_types::Value::NativeFn(boxed) => {
-                let f = boxed.0;
-                let args = [receiver, value];
-                f(self as &mut dyn varn_types::NativeCtx, &args)
-                    .map_err(crate::error::RuntimeError::from)?;
-            }
-            varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {
-                let setter_nv2 = self.heap.intern(setter_val);
+        if let Some((f, _)) = self.heap.native_of(setter_nv) {
+            let args = [receiver, value];
+            f(self as &mut dyn varn_types::NativeCtx, &args)
+                .map_err(crate::error::RuntimeError::from)?;
+            return Ok(());
+        }
+        let callable = setter_nv.is_heap()
+            && matches!(
+                self.heap.get(setter_nv.as_heap_idx()),
+                Some(crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::BoundMethod(_))
+            );
+        if callable {
+            {
                 self.stage.clear();
-                self.stage.push(setter_nv2);
+                self.stage.push(setter_nv);
                 self.stage.push(receiver);
                 self.stage.push(value);
                 let prepared = self
-                    .prepare_call(setter_nv2, 2)
+                    .prepare_call(setter_nv, 2)
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 if let crate::exec::calls::PreparedCall::Frame(mut frame) = prepared {
                     if self.frames.len() >= 10000 {
@@ -281,7 +282,6 @@ impl ExecCtx {
                         .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 }
             }
-            _ => {}
         }
         Ok(())
     }
@@ -294,41 +294,44 @@ impl ExecCtx {
         base: usize,
         _frame_idx: usize,
     ) -> VmResult<bool> {
-        let getter_val = self.heap.extract(getter_nv);
-        let result_opt: Option<varn_types::Value> = match getter_val {
-            varn_types::Value::NativeFn(boxed) => {
-                let f = boxed.0;
-                let args = [receiver];
-                let nv = f(self as &mut dyn varn_types::NativeCtx, &args)
-                    .map_err(crate::error::RuntimeError::from)?;
-                Some(self.heap.extract(nv))
-            }
-            varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {
-                let getter_nv2 = self.heap.intern(getter_val);
-                self.stage.clear();
-                self.stage.push(getter_nv2);
-                self.stage.push(receiver);
-                let prepared = self
-                    .prepare_call(getter_nv2, 1)
-                    .map_err(|e| crate::error::RuntimeError::new(e.message))?;
-                match prepared {
-                    crate::exec::calls::PreparedCall::Frame(mut frame) => {
-                        if self.frames.len() >= 10000 {
-                            return Err(crate::error::RuntimeError::new(
-                                "stack overflow: call depth exceeded 10000",
-                            ));
+        let callable = getter_nv.is_heap()
+            && matches!(
+                self.heap.get(getter_nv.as_heap_idx()),
+                Some(crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::BoundMethod(_))
+            );
+        let result_opt: Option<VmValue> = if let Some((f, _)) = self.heap.native_of(getter_nv) {
+            let args = [receiver];
+            let nv = f(self as &mut dyn varn_types::NativeCtx, &args)
+                .map_err(crate::error::RuntimeError::from)?;
+            Some(nv)
+        } else {
+            if callable {
+                {
+                    self.stage.clear();
+                    self.stage.push(getter_nv);
+                    self.stage.push(receiver);
+                    let prepared = self
+                        .prepare_call(getter_nv, 1)
+                        .map_err(|e| crate::error::RuntimeError::new(e.message))?;
+                    match prepared {
+                        crate::exec::calls::PreparedCall::Frame(mut frame) => {
+                            if self.frames.len() >= 10000 {
+                                return Err(crate::error::RuntimeError::new(
+                                    "stack overflow: call depth exceeded 10000",
+                                ));
+                            }
+                            frame.return_reg = dest as u16;
+                            self.frames.push(frame);
+                            return Ok(true);
                         }
-                        frame.return_reg = dest as u16;
-                        self.frames.push(frame);
-                        return Ok(true);
+                        _ => None,
                     }
-                    _ => None,
                 }
+            } else {
+                None
             }
-            _ => None,
         };
-        if let Some(result) = result_opt {
-            let result_nv = self.heap.intern(result);
+        if let Some(result_nv) = result_opt {
             self.stack.unbox_into_reg(base, dest, result_nv)?;
         }
         Ok(false)

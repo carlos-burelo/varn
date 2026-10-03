@@ -3,14 +3,13 @@ use crate::closure::VmClosure;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::VmValuePayload;
 use varn_types::{
     generator::GeneratorObj,
     value::{
         BoundMethod, EnumVariantData, FrozenModuleObj, InstanceRef, MapRef, ModuleObj, ObjRef,
         RangeData, RuntimeSymbol, SetRef,
     },
-    AsyncTask, ClassObj, LazyTask, NativeFn, VmArray,
+    ClassObj, NativeFn, VmArray,
 };
 
 // `repr(u8)` pins the discriminant to the first byte with a defined layout
@@ -35,8 +34,8 @@ pub enum HeapObj {
     BoundMethod(Box<BoundMethod>),
     Map(MapRef),
     Set(SetRef),
-    Task(Rc<LazyTask>),
-    TaskHandle(AsyncTask),
+    Task(Rc<crate::task::LazyTask>),
+    TaskHandle(Rc<crate::task::TaskCell>),
     Range(RangeData),
     Symbol(RuntimeSymbol),
     EnumVariant(Box<EnumVariantData>),
@@ -45,7 +44,6 @@ pub enum HeapObj {
     Char(char),
     Generator(GeneratorObj),
     Spread(VmValue),
-    VmValue(Box<dyn VmValuePayload>),
 }
 
 impl HeapObj {
@@ -81,7 +79,6 @@ impl HeapObj {
             HeapObj::Generator(_) => RuntimeKind::Generator,
             HeapObj::Spread(_) => RuntimeKind::Array,
             HeapObj::Buffer(_) => RuntimeKind::Bytes,
-            HeapObj::VmValue(_) => RuntimeKind::Opaque,
         }
     }
 }

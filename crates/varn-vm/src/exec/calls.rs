@@ -1,4 +1,4 @@
-use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
+use crate::closure::{VmClosure, VmUpvalue};
 use crate::error::{RuntimeError, VmResult};
 use crate::frame::CallFrame;
 use crate::frame_store::FrameStore;
@@ -7,8 +7,7 @@ use crate::value::VmValue;
 
 use std::rc::Rc;
 use varn_types::value::BoundMethodTarget;
-use varn_types::value::LazyTask;
-use varn_types::{FunctionProto, Literal, PoolEntry, Value, VmArray};
+use varn_types::{FunctionProto, Literal, PoolEntry, VmArray};
 
 pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue> {
     proto
@@ -23,10 +22,10 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
                     Literal::Int(n) => VmValue::from_int(*n),
                     Literal::Float(f) => VmValue::from_f64(*f),
                     Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
-                    Literal::BigInt(n) => heap.intern(Value::BigInt(Box::new(n.clone()))),
-                    Literal::Decimal(d) => heap.intern(Value::Decimal(Box::new(d.clone()))),
-                    Literal::Symbol(s) => heap.intern(Value::Symbol(s.clone())),
-                    Literal::Char(c) => heap.intern(Value::Char(*c)),
+                    Literal::BigInt(n) => heap.alloc_bigint(n.clone()),
+                    Literal::Decimal(d) => heap.alloc_decimal(d.clone()),
+                    Literal::Symbol(s) => heap.alloc_symbol(s.clone()),
+                    Literal::Char(c) => heap.alloc_char(*c),
                 },
                 PoolEntry::Function(_) => VmValue::null(),
                 PoolEntry::Shape(_) => VmValue::null(),
@@ -203,34 +202,17 @@ pub(crate) fn prepare_call(
                 }
                 if nc.proto.is_async {
                     let args_start = staging.len().saturating_sub(arg_count);
-                    let args = varn_types::value::TaskArgs::collect(
-                        staging.drain(args_start..).map(|nv| heap.extract(nv)),
-                    );
-                    let upvalues: Vec<varn_types::Upvalue> = nc
-                        .upvalues
-                        .iter()
-                        .map(|uv| {
-                            let nv = uv.read(store);
-                            let val = heap.extract(nv);
-                            varn_types::Upvalue {
-                                inner: std::rc::Rc::new(std::cell::RefCell::new(
-                                    varn_types::UpvalueInner {
-                                        value: val,
-                                        location: None,
-                                    },
-                                )),
-                            }
-                        })
-                        .collect();
-                    let task = Value::Task(std::rc::Rc::new(LazyTask {
-                        proto: nc.proto.clone(),
+                    let upvalues: Vec<VmValue> =
+                        nc.upvalues.iter().map(|uv| uv.read(store)).collect();
+                    let task = crate::task::new_lazy(
+                        heap,
+                        nc.proto.clone(),
                         upvalues,
-                        module_base: nc.module_base,
-                        args,
-                        current_class: None,
-                    }));
-
-                    return Ok(PreparedCall::PushValue(heap.intern(task)));
+                        nc.module_base,
+                        staging.drain(args_start..),
+                        None,
+                    );
+                    return Ok(PreparedCall::PushValue(task));
                 }
                 let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
                 let _ = arg_count;
@@ -244,7 +226,7 @@ pub(crate) fn prepare_call(
                 let bm = bm.clone();
                 match bm.target {
                     BoundMethodTarget::Native { func, .. } => {
-                        let recv_nv = heap.intern(bm.receiver);
+                        let recv_nv = bm.receiver;
                         let mut final_count = arg_count;
                         // El placeholder de callee es el PRIMER valor de la
                         // ventana (los últimos `arg_count` de staging), no
@@ -263,11 +245,9 @@ pub(crate) fn prepare_call(
                         closure,
                         owner_class,
                     } => {
-                        let recv_nv = heap.intern(bm.receiver);
-                        let nc = if let Some(wrapper) =
-                            closure.as_any().downcast_ref::<VmClosurePayload>()
-                        {
-                            wrapper.0.clone()
+                        let recv_nv = bm.receiver;
+                        let nc = if let Some(rc) = heap.closure_of(closure) {
+                            rc.clone()
                         } else {
                             return Err(RuntimeError::new(
                                 "BoundMethod(Vm): invalid closure payload",
@@ -298,34 +278,17 @@ pub(crate) fn prepare_call(
                         }
                         if nc.proto.is_async {
                             let args_start = staging.len().saturating_sub(full_arg_count);
-                            let args = varn_types::value::TaskArgs::collect(
-                                staging.drain(args_start..).map(|nv| heap.extract(nv)),
-                            );
-                            let upvalues: Vec<varn_types::Upvalue> = nc
-                                .upvalues
-                                .iter()
-                                .map(|uv| {
-                                    let nv = uv.read(store);
-                                    let val = heap.extract(nv);
-                                    varn_types::Upvalue {
-                                        inner: std::rc::Rc::new(std::cell::RefCell::new(
-                                            varn_types::UpvalueInner {
-                                                value: val,
-                                                location: None,
-                                            },
-                                        )),
-                                    }
-                                })
-                                .collect();
-                            let task = Value::Task(std::rc::Rc::new(LazyTask {
-                                proto: nc.proto.clone(),
+                            let upvalues: Vec<VmValue> =
+                                nc.upvalues.iter().map(|uv| uv.read(store)).collect();
+                            let task = crate::task::new_lazy(
+                                heap,
+                                nc.proto.clone(),
                                 upvalues,
-                                module_base: nc.module_base,
-                                args,
-                                current_class: owner_class,
-                            }));
-
-                            return Ok(PreparedCall::PushValue(heap.intern(task)));
+                                nc.module_base,
+                                staging.drain(args_start..),
+                                owner_class,
+                            );
+                            return Ok(PreparedCall::PushValue(task));
                         }
                         if !nc.proto.is_generator && !nc.proto.is_async {
                             bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
@@ -356,29 +319,17 @@ pub(crate) fn prepare_call(
                         let start = staging.len().saturating_sub(full_arg_count);
                         staging[start] = instance_nv;
                     }
-                    match ctor {
-                        Value::VmValue(payload) => {
-                            if let Some(wrapper) =
-                                payload.as_any().downcast_ref::<VmClosurePayload>()
-                            {
-                                let nc = wrapper.0.clone();
-                                bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
-                                let window: Vec<VmValue> =
-                                    stage_window(staging, full_arg_count).to_vec();
-                                let _ = full_arg_count;
-                                let mut frame = materialize_frame(store, &nc, &window)?;
-                                frame.current_class = Some(cls.clone());
-                                return Ok(PreparedCall::Constructor(frame, instance_nv));
-                            }
-                        }
-                        Value::NativeFn(b) => {
-                            let (f, _) = *b;
-
-                            let take = staging.len().saturating_sub(full_arg_count);
-                            let vm_args: Vec<VmValue> = staging.drain(take..).collect();
-                            return Ok(PreparedCall::NativeConstructor(f, vm_args, instance_nv));
-                        }
-                        _ => {}
+                    if let Some(nc) = heap.closure_of(ctor).cloned() {
+                        bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
+                        let window: Vec<VmValue> = stage_window(staging, full_arg_count).to_vec();
+                        let mut frame = materialize_frame(store, &nc, &window)?;
+                        frame.current_class = Some(cls.clone());
+                        return Ok(PreparedCall::Constructor(frame, instance_nv));
+                    }
+                    if let Some((f, _)) = heap.native_of(ctor) {
+                        let take = staging.len().saturating_sub(full_arg_count);
+                        let vm_args: Vec<VmValue> = staging.drain(take..).collect();
+                        return Ok(PreparedCall::NativeConstructor(f, vm_args, instance_nv));
                     }
                 }
                 staging.clear();
@@ -397,20 +348,19 @@ pub(crate) fn prepare_call(
                 }
 
                 let payload = if !data.fields.is_empty() {
-                    Value::Object(varn_types::value::ObjRef::from_pairs(
+                    let obj = varn_types::value::ObjRef::from_pairs(
                         data.fields.iter().enumerate().map(|(idx, field_name)| {
                             let nv = args.get(idx).copied().unwrap_or(VmValue::null());
                             (field_name.clone(), nv)
                         }),
-                    ))
+                    );
+                    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(obj)))
                 } else if args.len() == 1 {
-                    heap.extract(args[0])
+                    args[0]
                 } else if args.len() > 1 {
-                    Value::Array(varn_types::value::ArrayRef::new(
-                        args.iter().map(|&nv| heap.extract(nv)).collect(),
-                    ))
+                    heap.alloc_array_vm(args)
                 } else {
-                    Value::Null
+                    VmValue::null()
                 };
 
                 let mut new_data = *data;
@@ -424,11 +374,7 @@ pub(crate) fn prepare_call(
     }
 
     let callee_repr = heap.str_repr(callee_nv);
-    let extracted = heap.extract(callee_nv);
-    let type_name = match extracted {
-        Value::Class(ref c) => c.name.as_str(),
-        ref other => other.type_name(),
-    };
+    let type_name = crate::exec::props::meta::type_name(callee_nv, heap);
     if callee_nv.is_null() {
         Err(RuntimeError::new(
             "Cannot invoke function because the value is null. Check if the function or host entry exists and is exported.",
@@ -508,4 +454,23 @@ pub enum PreparedCall {
         args: Vec<VmValue>,
         current_class: Option<Rc<varn_types::ClassObj>>,
     },
+}
+
+pub(crate) fn expand_spread_args(
+    heap: &Heap,
+    args: impl IntoIterator<Item = VmValue>,
+    out: &mut Vec<VmValue>,
+) {
+    for nv in args {
+        let inner = match heap.get_heap_idx(nv).and_then(|i| heap.get(i)) {
+            Some(HeapObj::Spread(inner)) => *inner,
+            _ => nv,
+        };
+        match heap.get_heap_idx(inner).and_then(|i| heap.get(i)) {
+            Some(HeapObj::Array(arr) | HeapObj::Tuple(arr)) => {
+                out.extend((0..arr.len()).filter_map(|i| arr.get_vm(i)));
+            }
+            _ => out.push(inner),
+        }
+    }
 }

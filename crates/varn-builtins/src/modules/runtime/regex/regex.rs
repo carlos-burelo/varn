@@ -1,6 +1,6 @@
 use parking_lot::RwLock;
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::{NativeCtx, VmValue};
 
 static REGEX_POOL: RwLock<Vec<regex::Regex>> = RwLock::new(Vec::new());
 
@@ -53,7 +53,7 @@ varn_contract! {
                 let m = caps.get(0).unwrap();
                 let obj = ctx.alloc_object();
 
-                let match_str = ctx.intern(Value::Str(m.as_str().into()));
+                let match_str = ctx.alloc_str(m.as_str());
                 ctx.set_field(obj, "match", match_str);
 
                 let index_val = VmValue::from_int(m.start() as i64);
@@ -64,7 +64,7 @@ varn_contract! {
                     .skip(1)
                     .map(|g| {
                         if let Some(grp) = g {
-                            ctx.intern(Value::Str(grp.as_str().into()))
+                            ctx.alloc_str(grp.as_str())
                         } else {
                             VmValue::null()
                         }
@@ -88,7 +88,7 @@ varn_contract! {
                 let m = caps.get(0).unwrap();
                 let obj = ctx.alloc_object();
 
-                let match_str = ctx.intern(Value::Str(m.as_str().into()));
+                let match_str = ctx.alloc_str(m.as_str());
                 ctx.set_field(obj, "match", match_str);
 
                 let index_val = VmValue::from_int(m.start() as i64);
@@ -99,7 +99,7 @@ varn_contract! {
                     .skip(1)
                     .map(|g| {
                         if let Some(grp) = g {
-                            ctx.intern(Value::Str(grp.as_str().into()))
+                            ctx.alloc_str(grp.as_str())
                         } else {
                             VmValue::null()
                         }
@@ -124,7 +124,7 @@ varn_contract! {
             let re = get_regex(handle)?;
             let parts: Vec<VmValue> = re
                 .split(text)
-                .map(|p| ctx.intern(Value::Str(p.into())))
+                .map(|p| ctx.alloc_str(p))
                 .collect();
             Ok(ctx.alloc_array(parts))
         }

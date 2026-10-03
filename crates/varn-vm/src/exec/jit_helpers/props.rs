@@ -248,15 +248,12 @@ pub(crate) extern "C" fn jit_get_symbol(
         let frame_idx = ctx_ref.frames.len() - 1;
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let sym_nv = closure_ref.constants[sym_idx];
-        let sym_val = ctx_ref.heap.extract(sym_nv);
-        match sym_val {
-            varn_types::Value::Symbol(s) => {
-                match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
-                    Ok(v) => ctx_ref.jit_native_result = v,
-                    Err(e) => jit_propagate_error(ctx_ref, e),
-                }
-            }
-            _ => panic!("GetSymbol: non-symbol constant"),
+        let Some(s) = ctx_ref.heap.symbol_of(sym_nv) else {
+            panic!("GetSymbol: non-symbol constant");
+        };
+        match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }

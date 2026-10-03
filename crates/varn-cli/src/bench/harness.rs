@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 use rustc_hash::FxHashMap;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
-use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
 
@@ -29,7 +28,7 @@ pub struct VmFactory {
 }
 
 impl VmFactory {
-    /// A fresh VM with the entry module registered, ready to run [`Self::closure`].
+    /// A fresh VM with the entry module registered, ready to run [`Self::entry_proto`].
     pub fn build(&self) -> Vm {
         let mut machine = Vm::from_snapshot(
             self.globals.clone(),
@@ -54,77 +53,39 @@ impl VmFactory {
         machine
     }
 
-    pub fn closure(&self) -> Rc<Closure> {
-        Rc::new(Closure::new(self.proto.clone(), Vec::new()))
+    pub fn entry_proto(&self) -> Rc<FunctionProto> {
+        self.proto.clone()
     }
 
     /// Build, run to completion, and hand the machine back for inspection.
     pub fn run_once(&self) -> Result<Vm, String> {
         let mut machine = self.build();
-        run_vm_to_completion(&mut machine, self.closure())?;
+        run_vm_to_completion(&mut machine, self.entry_proto())?;
         Ok(machine)
     }
 }
 
-pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<(), String> {
+pub fn run_vm_to_completion(machine: &mut Vm, entry: Rc<FunctionProto>) -> Result<(), String> {
     loop {
-        let res = machine.run(closure.clone());
+        let res = machine.run(entry.clone());
         match res {
             Ok(_) => match machine.ctx.vm_suspend.take() {
                 None => break,
                 Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
-                    let res_val = match value {
-                        varn_types::Value::Task(lazy) => {
-                            let handle = machine.ctx.run_lazy_task_sync(lazy);
-                            match handle.peek_state() {
-                                varn_types::TaskState::Resolved(v) => Ok(v),
-                                varn_types::TaskState::Rejected(e) => Err(e),
-                                _ => Ok(varn_types::Value::Null),
-                            }
-                        }
-                        varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
-                            varn_types::TaskState::Resolved(v) => Ok(v),
-                            varn_types::TaskState::Rejected(e) => Err(e),
-                            _ => {
-                                machine.ctx.pump_until(&handle);
-                                match handle.peek_state() {
-                                    varn_types::TaskState::Resolved(v) => Ok(v),
-                                    varn_types::TaskState::Rejected(e) => Err(e),
-                                    _ => Ok(varn_types::Value::Null),
-                                }
-                            }
-                        },
-                        other => Ok(other),
-                    };
-
-                    match res_val {
+                    match machine.ctx.settle_awaited(value) {
                         Ok(resolved) => {
-                            let resolved = varn_vm::exec::host_values::open_resolved(
-                                &mut machine.ctx,
-                                resolved,
-                            );
-                            let resolved_nv = machine.ctx.heap.intern(resolved);
-
                             if let Some(frame) = machine.ctx.frames.last() {
-                                // Fase A (frame por clases): el registro vive en
-                                // el almacén por clases y se escribe por su ruta
-                                // tipada; `Await` reescribe un registro DYN del
-                                // llamante (el resultado de la tarea), no un
-                                // escalar del frame.
                                 let base = frame.base;
                                 let _ = machine.ctx.stack.unbox_into_reg(
                                     base,
                                     dest_reg as usize,
-                                    resolved_nv,
+                                    resolved,
                                 );
                             }
                         }
                         Err(thrown) => {
-                            let thrown =
-                                varn_vm::exec::host_values::open_rejected(&mut machine.ctx, thrown);
-                            let thrown_nv = machine.ctx.heap.intern(thrown.clone());
                             let err = varn_vm::exec::exceptions::build_thrown_error(
-                                thrown_nv,
+                                thrown,
                                 &machine.ctx.heap,
                                 &machine.ctx.frames,
                             );

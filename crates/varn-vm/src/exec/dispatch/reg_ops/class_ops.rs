@@ -4,7 +4,6 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::sync::Arc;
 use varn_core::OpCode;
-use varn_types::Value;
 
 /// See [`ExecCtx::enum_variant_template`].
 pub(crate) struct EnumVariantTemplate {
@@ -172,30 +171,24 @@ impl ExecCtx {
                     .ok_or_else(|| RuntimeError::new("BindMethod: non-string const"))?;
                 let method = crate::exec::props::get_property(obj_nv, &key, &mut self.heap)?;
 
-                let receiver = self.heap.extract(obj_nv);
-                let method_val = self.heap.extract(method);
-                let bound =
-                    varn_types::Value::BoundMethod(Box::new(varn_types::value::BoundMethod {
-                        receiver,
-                        target: match method_val {
-                            varn_types::Value::NativeFn(b) => {
-                                varn_types::value::BoundMethodTarget::Native {
-                                    func: b.0,
-                                    name: b.1,
-                                }
-                            }
-                            varn_types::Value::VmValue(payload) => {
-                                varn_types::value::BoundMethodTarget::Vm {
-                                    closure: payload,
-                                    owner_class: None,
-                                }
-                            }
-                            _ => {
-                                return Err(RuntimeError::new("BindMethod: method is not callable"))
-                            }
-                        },
-                    }));
-                let bound_nv = self.heap.intern(bound);
+                let target = if let Some((func, name)) = self.heap.native_of(method) {
+                    varn_types::value::BoundMethodTarget::Native { func, name }
+                } else if self.heap.closure_of(method).is_some() {
+                    varn_types::value::BoundMethodTarget::Vm {
+                        closure: method,
+                        owner_class: None,
+                    }
+                } else {
+                    return Err(RuntimeError::new("BindMethod: method is not callable"));
+                };
+                let bound = varn_types::value::BoundMethod {
+                    receiver: obj_nv,
+                    target,
+                };
+                let bound_nv = VmValue::from_heap_idx(
+                    self.heap
+                        .alloc(crate::heap::HeapObj::BoundMethod(Box::new(bound))),
+                );
                 self.stack.unbox_into_reg(base, dest, bound_nv)?;
             }
             _ => {}
@@ -267,8 +260,12 @@ impl ExecCtx {
         let crate::heap::HeapObj::Class(cls) = self.heap.get(receiver.as_heap_idx())? else {
             return None;
         };
-        let statics = cls.statics.borrow();
-        let Some(Value::EnumVariant(t)) = statics.get(name) else {
+        let template = cls.statics.borrow().get(name).copied()?;
+        if !template.is_heap() {
+            return None;
+        }
+        let Some(crate::heap::HeapObj::EnumVariant(t)) = self.heap.get(template.as_heap_idx())
+        else {
             return None;
         };
         Some(EnumVariantTemplate {
@@ -291,7 +288,7 @@ impl ExecCtx {
         }
 
         let payload = if !template.fields.is_empty() {
-            Value::Object(varn_types::value::ObjRef::from_pairs(
+            let obj = varn_types::value::ObjRef::from_pairs(
                 template.fields.iter().enumerate().map(|(idx, field_name)| {
                     let nv = if idx < arg_count {
                         args.get(&self.stack, idx)
@@ -300,21 +297,15 @@ impl ExecCtx {
                     };
                     (field_name.clone(), nv)
                 }),
-            ))
+            );
+            VmValue::from_heap_idx(self.heap.alloc(crate::heap::HeapObj::Object(obj)))
         } else if arg_count == 1 {
-            let arg = args.get(&self.stack, 0);
-            self.heap.extract(arg)
+            args.get(&self.stack, 0)
         } else if arg_count > 1 {
-            Value::Array(varn_types::value::ArrayRef::new(
-                (0..arg_count)
-                    .map(|i| {
-                        let arg = args.get(&self.stack, i);
-                        self.heap.extract(arg)
-                    })
-                    .collect(),
-            ))
+            let items: Vec<VmValue> = (0..arg_count).map(|i| args.get(&self.stack, i)).collect();
+            self.heap.alloc_array_vm(items)
         } else {
-            Value::Null
+            VmValue::null()
         };
 
         let data = varn_types::value::EnumVariantData {
@@ -332,16 +323,20 @@ impl ExecCtx {
     }
 
     pub(in crate::exec::dispatch) fn exec_get_enum_tag(&mut self, v: VmValue) -> VmResult<VmValue> {
-        let val = self.heap.extract(v);
-        match val {
-            Value::EnumVariant(ev) => Ok(VmValue::from_i32(ev.variant_tag as i32)),
+        match v
+            .is_heap()
+            .then(|| self.heap.get(v.as_heap_idx()))
+            .flatten()
+        {
+            Some(crate::heap::HeapObj::EnumVariant(ev)) => {
+                Ok(VmValue::from_i32(ev.variant_tag as i32))
+            }
             _ => Ok(VmValue::from_i32(0)),
         }
     }
 
     pub(crate) fn exec_spawn(&mut self, task_val: VmValue) -> VmResult<VmValue> {
-        let task = self.heap.extract(task_val);
-        Ok(self.heap.intern(task))
+        Ok(task_val)
     }
 
     pub(in crate::exec::dispatch) fn exec_module_op_reg(

@@ -15,21 +15,18 @@ pub trait NativeCtx {
         VmValue::from_bool(b)
     }
     fn int_val(&mut self, n: i64) -> VmValue {
-        self.intern(crate::Value::Int(n))
+        VmValue::from_int(n)
     }
 
     fn is_int(&self, v: VmValue) -> bool {
-        v.is_int() || (v.is_heap() && matches!(self.extract(v), crate::Value::Int(_)))
+        v.is_int()
     }
 
     fn as_int(&self, v: VmValue) -> i64 {
         if v.is_int() {
             v.as_int()
         } else {
-            match self.extract(v) {
-                crate::Value::Int(n) => n,
-                _ => 0,
-            }
+            0
         }
     }
 
@@ -39,11 +36,7 @@ pub trait NativeCtx {
         } else if v.is_int() {
             v.as_int() as f64
         } else {
-            match self.extract(v) {
-                crate::Value::Int(n) => n as f64,
-                crate::Value::Float(f) => f,
-                _ => 0.0,
-            }
+            0.0
         }
     }
 
@@ -51,6 +44,32 @@ pub trait NativeCtx {
     fn alloc_str_owned(&mut self, s: String) -> VmValue;
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue;
     fn alloc_object(&mut self) -> VmValue;
+    fn alloc_bigint(&mut self, _value: num_bigint::BigInt) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_decimal(&mut self, _value: bigdecimal::BigDecimal) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_char(&mut self, _value: char) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_map(&mut self, _entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_set(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_enum_variant(&mut self, _data: crate::value::EnumVariantData) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_bound_native(
+        &mut self,
+        _receiver: VmValue,
+        _func: NativeFn,
+        _name: &'static str,
+    ) -> VmValue {
+        VmValue::null()
+    }
     fn alloc_object_with_shape(
         &mut self,
         _shape: &Rc<crate::value::Shape>,
@@ -129,6 +148,7 @@ pub trait NativeCtx {
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue>;
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue);
     fn object_for_each(&self, _obj: VmValue, _f: &mut dyn FnMut(&str, VmValue)) {}
+    fn map_for_each(&self, _map: VmValue, _f: &mut dyn FnMut(VmValue, VmValue)) {}
     fn get_object_shape(&self, _obj: VmValue) -> Option<Rc<crate::value::Shape>> {
         None
     }
@@ -150,6 +170,28 @@ pub trait NativeCtx {
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String>;
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue;
+
+    fn task_new(&mut self) -> VmValue {
+        VmValue::null()
+    }
+    fn task_resolved(&mut self, _value: VmValue) -> VmValue {
+        VmValue::null()
+    }
+    fn task_rejected(&mut self, _value: VmValue) -> VmValue {
+        VmValue::null()
+    }
+    fn task_from_host(&mut self, _promise: crate::HostPromise, _open: crate::HostOpen) -> VmValue {
+        VmValue::null()
+    }
+    fn task_gather(&mut self, _tasks: VmValue) -> Result<VmValue, String> {
+        Err("task_gather: unsupported in this context".into())
+    }
+    fn task_yield(&mut self) -> VmValue {
+        VmValue::null()
+    }
+    fn task_cancel(&mut self, _task: VmValue) -> Result<(), String> {
+        Err("task_cancel: unsupported in this context".into())
+    }
 
     fn capabilities(&self) -> &crate::capabilities::CapabilitySet {
         static DEFAULT_CAPS: crate::capabilities::CapabilitySet =
@@ -193,11 +235,47 @@ pub trait NativeCtx {
 
     fn resources(&mut self) -> &mut ResourceStore;
 
-    fn extract(&self, v: VmValue) -> crate::Value;
-    fn intern(&mut self, v: crate::Value) -> VmValue;
+    fn is_static_receiver(&self, v: VmValue) -> bool {
+        v.is_null()
+    }
 
-    fn intern_value(&mut self, v: crate::Value) -> VmValue {
-        self.intern(v)
+    fn as_generator(&self, _v: VmValue) -> Option<crate::GeneratorObj> {
+        None
+    }
+
+    fn as_char(&self, _v: VmValue) -> Option<char> {
+        None
+    }
+
+    fn as_bigint(&self, _v: VmValue) -> Option<num_bigint::BigInt> {
+        None
+    }
+
+    fn as_decimal(&self, _v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        None
+    }
+
+    fn as_range(&self, _v: VmValue) -> Option<crate::value::RangeData> {
+        None
+    }
+
+    fn as_map(&self, _v: VmValue) -> Option<crate::value::MapRef> {
+        None
+    }
+
+    fn as_set(&self, _v: VmValue) -> Option<crate::value::SetRef> {
+        None
+    }
+
+    fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
+        VmValue::null()
+    }
+
+    fn range_element(&mut self, range: &crate::value::RangeData, raw: i64) -> VmValue {
+        match range.elem {
+            crate::value::RangeElem::Int => self.int_val(raw),
+            crate::value::RangeElem::Char => self.alloc_char(crate::value::RangeData::char_of(raw)),
+        }
     }
 
     /// Canonicalize a value for use as a `Map`/`Set` key (see
@@ -214,7 +292,7 @@ pub trait NativeCtx {
     fn str_map_key(&mut self, s: &str) -> crate::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => crate::value::MapKey(v),
-            None => crate::value::MapKey(self.intern(crate::Value::Str(std::sync::Arc::from(s)))),
+            None => crate::value::MapKey(self.alloc_str(s)),
         }
     }
 
@@ -248,7 +326,7 @@ pub trait NativeCtx {
         _module_path: &str,
         _export_name: &str,
         _args: Vec<crate::value::SendValue>,
-    ) -> Result<crate::AsyncTask, String> {
+    ) -> Result<crate::HostPromise, String> {
         Err("spawn_isolate: unsupported in this context".into())
     }
 

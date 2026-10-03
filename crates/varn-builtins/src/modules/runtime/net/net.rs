@@ -4,7 +4,7 @@ pub mod http_parser;
 use driver::driver;
 use urlencoding::{decode, encode};
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::{HostOpen, NativeCtx, VmValue};
 
 pub struct NetRuntime;
 
@@ -42,7 +42,7 @@ varn_contract! {
 
         fn tcpAccept(ctx: &mut dyn NativeCtx, listener_id: i64) -> Result<VmValue, String> {
             let task = driver().accept(listener_id);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn tcpConnect(ctx: &mut dyn NativeCtx, host: &str, port: i64) -> Result<VmValue, String> {
@@ -50,12 +50,12 @@ varn_contract! {
                 return Err(format!("SecurityError: Permission denied (net.client) to host '{host}'"));
             }
             let task = driver().connect(host, port);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn tcpRead(ctx: &mut dyn NativeCtx, conn_id: i64, len: i64) -> Result<VmValue, String> {
             let task = driver().read(conn_id, len.max(0) as usize);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn tcpWrite(ctx: &mut dyn NativeCtx, conn_id: i64, data: VmValue) -> Result<VmValue, String> {
@@ -67,7 +67,7 @@ varn_contract! {
                 ctx.str_repr(data).into_bytes()
             };
             let task = driver().write(conn_id, bytes);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn tcpClose(_ctx: &mut dyn NativeCtx, conn_id: i64) -> Result<(), String> {
@@ -135,7 +135,7 @@ varn_contract! {
             out.extend_from_slice(body.as_bytes());
 
             let task = driver().write(conn_id, out);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn udpBind(ctx: &mut dyn NativeCtx, host: &str, port: i64) -> Result<i64, String> {
@@ -175,7 +175,7 @@ varn_contract! {
 
         fn udpRecvFrom(ctx: &mut dyn NativeCtx, socket_id: i64, max_len: i64) -> Result<VmValue, String> {
             let task = driver().udp_recv(socket_id, max_len.max(0) as usize);
-            Ok(ctx.intern(Value::TaskHandle(task)))
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
         fn udpClose(_ctx: &mut dyn NativeCtx, socket_id: i64) -> Result<(), String> {

@@ -1,0 +1,80 @@
+import { describe, it, expect } from "std:test";
+import { parallel, sleep, spawn, Task } from "std:task";
+
+class TvBox {
+    v: int
+    constructor(v: int) {
+        this.v = v
+    }
+}
+
+let tvSink: TvBox = new TvBox(0)
+
+function tvChurn(n: int): int {
+    for (let i = 0; i < n; i = i + 1) {
+        tvSink = new TvBox(i)
+    }
+    return tvSink.v
+}
+
+async function tvUseArg(b: TvBox): Task<int> {
+    await sleep(5)
+    return b.v
+}
+
+async function tvMake(i: int): Task<TvBox> {
+    return new TvBox(i * 3)
+}
+
+async function tvChurnTask(): Task<TvBox> {
+    for (let i = 0; i < 400000; i = i + 1) {
+        tvSink = new TvBox(i)
+    }
+    return new TvBox(-1)
+}
+
+await describe("157 task value handles", async () => {
+    await it("1. an instance passed to a lazy task survives a collection before it starts", async () => {
+        const batch: Array<Task<int>> = []
+        for (let i = 0; i < 2000; i = i + 1) {
+            batch.push(tvUseArg(new TvBox(i)))
+        }
+        tvChurn(400000)
+        const res = await parallel(batch)
+        let sum = 0
+        for (let i = 0; i < res.length; i = i + 1) {
+            sum = sum + res[i]
+        }
+        expect(sum).toBe(1999000)
+    })
+
+    await it("2. a task result settled before a collection is intact when consumed after", async () => {
+        const handles = []
+        for (let i = 0; i < 2000; i = i + 1) {
+            handles.push(spawn(tvMake(i)))
+        }
+        await sleep(20)
+        tvChurn(400000)
+        let sum = 0
+        for (let i = 0; i < handles.length; i = i + 1) {
+            const r = await handles[i]
+            sum = sum + r.v
+        }
+        expect(sum).toBe(5997000)
+    })
+
+    await it("3. parallel keeps instance results across a collection run by a sibling", async () => {
+        const batch: Array<Task<TvBox>> = []
+        for (let i = 0; i < 2000; i = i + 1) {
+            batch.push(tvMake(i))
+        }
+        batch.push(tvChurnTask())
+        const all = await parallel(batch)
+        let sum = 0
+        for (let i = 0; i < 2000; i = i + 1) {
+            sum = sum + all[i].v
+        }
+        expect(sum).toBe(5997000)
+        expect(all[2000].v).toBe(-1)
+    })
+})

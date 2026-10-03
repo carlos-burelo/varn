@@ -319,16 +319,6 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
         FrozenExport::Str(s) => heap.alloc_str(s),
         FrozenExport::NativeFn(f, name) => heap.alloc_native_fn(*f, name),
         FrozenExport::Class(cls) => VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls.clone()))),
-        FrozenExport::VmClosure(payload) => {
-            if let Some(wrapper) = payload
-                .as_any()
-                .downcast_ref::<crate::closure::VmClosurePayload>()
-            {
-                VmValue::from_heap_idx(heap.alloc(HeapObj::VmClosure(wrapper.0.clone())))
-            } else {
-                VmValue::null()
-            }
-        }
         FrozenExport::Nested(nested) => {
             let obj_val = heap.alloc_object();
             let raw_idx = obj_val.as_heap_idx();

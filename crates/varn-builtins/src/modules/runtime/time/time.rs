@@ -1,5 +1,5 @@
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::{NativeCtx, VmValue};
 
 pub struct TimeRuntime;
 
@@ -45,7 +45,7 @@ fn parse_iso_duration(s: &str) -> i64 {
 }
 
 fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {
-    let nv = ctx.intern(Value::Int(val));
+    let nv = VmValue::from_int(val);
     ctx.set_field(obj, key, nv);
 }
 
@@ -82,7 +82,8 @@ varn_contract! {
         fn partsToMs(ctx: &mut dyn NativeCtx, parts: VmValue) -> Result<i64, String> {
             let get_int = |ctx: &mut dyn NativeCtx, key: &str| -> i64 {
                 ctx.get_field(parts, key)
-                    .and_then(|v| if let Value::Int(n) = ctx.extract(v) { Some(n) } else { None })
+                    .filter(|v| ctx.is_int(*v))
+                    .map(|v| ctx.as_int(v))
                     .unwrap_or(0)
             };
             let year = get_int(ctx, "year") as i32;

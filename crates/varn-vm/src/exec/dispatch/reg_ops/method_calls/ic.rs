@@ -1,12 +1,12 @@
 //! A method call site's inline cache: the probe that answers a call from it
 //! and the one place that records a resolution into it.
 
-use crate::closure::{VmClosure, VmClosurePayload};
+use crate::closure::VmClosure;
+use crate::heap::Heap;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use varn_types::chunk::{CacheEntry, ICKind};
 use varn_types::value::ClassObj;
-use varn_types::Value;
 
 /// Cache slot `cs` of the calling closure, usable when the closure has that
 /// slot and the site has not gone megamorphic. `usize::MAX` names no slot.
@@ -46,6 +46,7 @@ pub(super) enum IcHit {
 /// vtable version, if any. A VM method is only answered from the cache when
 /// it takes a plain frame (not a generator, not async) and `arg_count` fits.
 pub(super) fn probe(
+    heap: &Heap,
     closure: &VmClosure,
     site: IcSite,
     cls: &Rc<ClassObj>,
@@ -63,15 +64,13 @@ pub(super) fn probe(
         let vtable = unsafe { &*cls.vtable.as_ptr() };
         let method = vtable.get(entry.slot as usize);
         if entry.is_class == ICKind::NATIVE_VTABLE_METHOD {
-            if let Some(Value::NativeFn(b)) = method {
-                return Some(IcHit::Native(b.0));
+            if let Some((f, _)) = method.and_then(|m| heap.native_of(*m)) {
+                return Some(IcHit::Native(f));
             }
         } else if entry.is_class == ICKind::VM_VTABLE_METHOD {
-            if let Some(Value::VmValue(payload)) = method {
-                if let Some(nc) = VmClosurePayload::downcast_from(&**payload) {
-                    if !nc.proto.is_generator && !nc.proto.is_async && arg_count <= nc.proto.arity {
-                        return Some(IcHit::Vm(nc.clone(), cls.clone()));
-                    }
+            if let Some(nc) = method.and_then(|m| heap.closure_of(*m)) {
+                if !nc.proto.is_generator && !nc.proto.is_async && arg_count <= nc.proto.arity {
+                    return Some(IcHit::Vm(nc.clone(), cls.clone()));
                 }
             }
         }

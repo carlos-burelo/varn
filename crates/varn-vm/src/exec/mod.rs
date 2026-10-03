@@ -20,7 +20,7 @@ pub mod exceptions;
 pub mod frame_ctrl;
 pub(crate) mod hashable_keys;
 pub(crate) mod host;
-pub mod host_values;
+pub(crate) mod host_tasks;
 pub(crate) mod intrinsics;
 pub(crate) mod jit_helpers;
 pub(crate) mod method_args;
@@ -32,14 +32,8 @@ use crate::value::VmValue;
 pub use ctx::ExecCtx;
 
 pub enum VmSuspend {
-    Yield {
-        value: VmValue,
-        dest_reg: u8,
-    },
-    Await {
-        value: varn_types::Value,
-        dest_reg: u16,
-    },
+    Yield { value: VmValue, dest_reg: u8 },
+    Await { value: VmValue, dest_reg: u16 },
 }
 
 #[derive(Debug, Clone)]

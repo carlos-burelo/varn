@@ -128,7 +128,7 @@ varn_contract! {
                             8 => { let f: extern "C" fn(usize, usize, usize, usize, usize, usize, usize, usize) -> f64 = std::mem::transmute(ptr_val); f(raw_args[0], raw_args[1], raw_args[2], raw_args[3], raw_args[4], raw_args[5], raw_args[6], raw_args[7]) }
                             _ => unreachable!(),
                         };
-                        Ok(ctx.intern(varn_types::Value::Float(res)))
+                        Ok(VmValue::from_f64(res))
                     }
                     _ => {
                         let res: i64 = match argc {

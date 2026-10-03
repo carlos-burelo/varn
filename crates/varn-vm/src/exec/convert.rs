@@ -8,7 +8,6 @@ use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use varn_core::NumConv;
-use varn_types::Value;
 
 #[cold]
 #[inline(never)]
@@ -87,7 +86,7 @@ fn to_bigint(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
                 .0
         }
     };
-    Ok(heap.intern(Value::BigInt(Box::new(b))))
+    Ok(heap.alloc_bigint(b))
 }
 
 fn to_decimal(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {

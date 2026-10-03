@@ -6,7 +6,6 @@
 
 use super::obj::HeapObj;
 use super::structs::HeapInner;
-use crate::closure::{VmClosurePayload, VmValueRef};
 use crate::nursery::{is_nursery_idx, old_idx_raw};
 use crate::value::VmValue;
 use std::rc::Rc;
@@ -50,47 +49,95 @@ impl HeapInner {
         self.objects.get_mut(raw_old_idx as usize)?.as_mut()
     }
 
+    pub(crate) fn class_idx(&self, class: &Rc<varn_types::ClassObj>) -> Option<u32> {
+        self.identity_index
+            .get(&(Rc::as_ptr(class) as usize))
+            .copied()
+    }
+
+    pub(crate) fn closure_of(&self, v: VmValue) -> Option<&Rc<crate::closure::VmClosure>> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::VmClosure(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn native_of(&self, v: VmValue) -> Option<(varn_types::NativeFn, &'static str)> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::NativeFn(f, name) => Some((*f, *name)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn symbol_of(&self, v: VmValue) -> Option<varn_types::value::RuntimeSymbol> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Symbol(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn generator_of(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Generator(g) => Some(g.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn char_of(&self, v: VmValue) -> Option<char> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Char(c) => Some(*c),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn bigint_of(&self, v: VmValue) -> Option<num_bigint::BigInt> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::BigInt(b) => Some((**b).clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn decimal_of(&self, v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Decimal(d) => Some((**d).clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn range_of(&self, v: VmValue) -> Option<varn_types::value::RangeData> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Range(r) => Some(r.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn map_of(&self, v: VmValue) -> Option<varn_types::value::MapRef> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Map(m) => Some(m.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn set_of(&self, v: VmValue) -> Option<varn_types::value::SetRef> {
+        match self.get(self.get_heap_idx(v)?)? {
+            HeapObj::Set(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn is_static_receiver(&self, v: VmValue) -> bool {
+        v.is_null()
+            || self
+                .get_heap_idx(v)
+                .and_then(|idx| self.get(idx))
+                .is_some_and(|o| matches!(o, HeapObj::Class(_) | HeapObj::Module(_)))
+    }
+
     pub(crate) fn get_heap_idx(&self, val: VmValue) -> Option<u32> {
         if val.is_heap() {
             Some(val.as_heap_idx())
         } else {
             None
-        }
-    }
-
-    pub(crate) fn value_heap_idx(&self, val: &varn_types::Value) -> Option<u32> {
-        match val {
-            varn_types::Value::Str(s) => self.string_interner.get(s).copied(),
-            varn_types::Value::Array(a) => self.array_interner.get(a).copied(),
-            varn_types::Value::Object(o) => self.object_interner.get(o).copied(),
-            varn_types::Value::Map(m) => self.map_interner.get(m).copied(),
-            varn_types::Value::Set(s) => self.set_interner.get(s).copied(),
-            varn_types::Value::BigInt(b) => self.bigint_interner.get(b.as_ref()).copied(),
-            varn_types::Value::Decimal(d) => self.decimal_interner.get(d.as_ref()).copied(),
-            varn_types::Value::Char(c) => self.char_interner.get(c).copied(),
-            varn_types::Value::Class(c) => {
-                self.identity_index.get(&(Rc::as_ptr(c) as usize)).copied()
-            }
-            varn_types::Value::Task(_) | varn_types::Value::TaskHandle(_) => None,
-            varn_types::Value::Generator(g) => self
-                .identity_index
-                .get(&(Rc::as_ptr(&g.0) as *const () as usize))
-                .copied(),
-            varn_types::Value::VmValue(payload) => {
-                if let Some(wrapper) = payload.as_any().downcast_ref::<VmClosurePayload>() {
-                    let closure_ptr = std::rc::Rc::as_ptr(&wrapper.0) as *const () as usize;
-                    self.identity_index.get(&closure_ptr).copied()
-                } else if let Some(vr) = payload.as_any().downcast_ref::<VmValueRef>() {
-                    if vr.0.is_heap() {
-                        Some(vr.0.as_heap_idx())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            _ => None,
         }
     }
 }

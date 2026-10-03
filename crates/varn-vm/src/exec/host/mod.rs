@@ -143,6 +143,16 @@ impl NativeCtx for ExecCtx {
         }
     }
 
+    fn map_for_each(&self, map: VmValue, f: &mut dyn FnMut(VmValue, VmValue)) {
+        if map.is_heap() {
+            if let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap_idx()) {
+                for (k, v) in m.0.borrow().iter() {
+                    f(k.0, *v);
+                }
+            }
+        }
+    }
+
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
@@ -221,7 +231,7 @@ impl NativeCtx for ExecCtx {
     }
 
     fn alloc_class(&mut self, class: std::rc::Rc<ClassObj>) -> VmValue {
-        self.heap.intern(varn_types::Value::Class(class))
+        self.heap.alloc_class_vm(class)
     }
 
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
@@ -324,16 +334,109 @@ impl NativeCtx for ExecCtx {
     }
 
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
-        let value = self.heap.extract(callee);
-        let val_args: Vec<varn_types::Value> = args.iter().map(|&a| self.heap.extract(a)).collect();
-        let task = self.spawn_internal(value, &val_args)?;
-        Ok(self.heap.intern(task))
+        self.spawn_internal(callee, args)
     }
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
         varn_builtins::modules::net::driver::driver();
-        let task = varn_runtime::timer::sleep_task(ms);
-        self.heap.intern(varn_types::Value::TaskHandle(task))
+        let promise = varn_runtime::timer::sleep_task(ms);
+        self.task_from_host(promise, varn_types::HostOpen::Plain)
+    }
+
+    fn task_new(&mut self) -> VmValue {
+        crate::task::alloc_handle(&mut self.heap, crate::task::TaskCell::pending())
+    }
+
+    fn task_resolved(&mut self, value: VmValue) -> VmValue {
+        let cell = crate::task::TaskCell::pending();
+        crate::task::settle(&mut self.heap, &cell, Ok(value));
+        crate::task::alloc_handle(&mut self.heap, cell)
+    }
+
+    fn task_rejected(&mut self, value: VmValue) -> VmValue {
+        let cell = crate::task::TaskCell::pending();
+        crate::task::settle(&mut self.heap, &cell, Err(value));
+        crate::task::alloc_handle(&mut self.heap, cell)
+    }
+
+    fn task_from_host(
+        &mut self,
+        promise: varn_types::HostPromise,
+        open: varn_types::HostOpen,
+    ) -> VmValue {
+        let cell = crate::task::TaskCell::host(promise.clone(), open);
+        let handle = crate::task::alloc_handle(&mut self.heap, std::rc::Rc::clone(&cell));
+        crate::exec::scheduler::adopt_host(cell, &promise);
+        handle
+    }
+
+    fn alloc_bigint(&mut self, value: num_bigint::BigInt) -> VmValue {
+        self.heap.alloc_bigint(value)
+    }
+
+    fn alloc_decimal(&mut self, value: bigdecimal::BigDecimal) -> VmValue {
+        self.heap.alloc_decimal(value)
+    }
+
+    fn alloc_char(&mut self, value: char) -> VmValue {
+        self.heap.alloc_char(value)
+    }
+
+    fn alloc_map(&mut self, entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        let mut map = varn_types::value::ValueMap::default();
+        for (key, value) in entries {
+            let key = self.map_key(key).unwrap_or(varn_types::value::MapKey(key));
+            map.insert(key, value);
+        }
+        self.heap.alloc_map_vm(map)
+    }
+
+    fn alloc_set(&mut self, items: Vec<VmValue>) -> VmValue {
+        let mut set = varn_types::value::ValueSet::default();
+        for item in items {
+            let key = self
+                .map_key(item)
+                .unwrap_or(varn_types::value::MapKey(item));
+            set.insert(key);
+        }
+        self.heap.alloc_set_vm(set)
+    }
+
+    fn alloc_enum_variant(&mut self, data: varn_types::value::EnumVariantData) -> VmValue {
+        self.heap.alloc_enum_variant_vm(data)
+    }
+
+    fn alloc_bound_native(
+        &mut self,
+        receiver: VmValue,
+        func: NativeFn,
+        name: &'static str,
+    ) -> VmValue {
+        self.heap.alloc_bound_native(receiver, func, name)
+    }
+
+    fn task_gather(&mut self, tasks: VmValue) -> Result<VmValue, String> {
+        isolates::gather_tasks(self, tasks)
+    }
+
+    fn task_yield(&mut self) -> VmValue {
+        crate::task::alloc_handle(&mut self.heap, crate::task::TaskCell::yielded())
+    }
+
+    fn task_cancel(&mut self, task: VmValue) -> Result<(), String> {
+        let cell = match self.task_cell(task) {
+            Some(cell) => cell,
+            None => return Err("cancel: expected a task handle".to_string()),
+        };
+        if cell.is_yield() {
+            return Ok(());
+        }
+        if let Some(promise) = cell.host_promise() {
+            promise.reject_msg("Task cancelled");
+        }
+        let reason = self.heap.alloc_str("Task cancelled");
+        crate::task::settle(&mut self.heap, &cell, Err(reason));
+        Ok(())
     }
 
     /// `&mut` out of the shared table under the same single-threaded
@@ -344,16 +447,44 @@ impl NativeCtx for ExecCtx {
         unsafe { &mut *self.resources.get() }
     }
 
-    fn extract(&self, v: VmValue) -> varn_types::Value {
-        self.heap.extract(v)
+    fn as_generator(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
+        self.heap.generator_of(v)
     }
 
-    fn intern(&mut self, v: varn_types::Value) -> VmValue {
-        self.heap.intern(v)
+    fn as_char(&self, v: VmValue) -> Option<char> {
+        self.heap.char_of(v)
+    }
+
+    fn as_bigint(&self, v: VmValue) -> Option<num_bigint::BigInt> {
+        self.heap.bigint_of(v)
+    }
+
+    fn as_decimal(&self, v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        self.heap.decimal_of(v)
+    }
+
+    fn as_range(&self, v: VmValue) -> Option<varn_types::value::RangeData> {
+        self.heap.range_of(v)
+    }
+
+    fn as_map(&self, v: VmValue) -> Option<varn_types::value::MapRef> {
+        self.heap.map_of(v)
+    }
+
+    fn as_set(&self, v: VmValue) -> Option<varn_types::value::SetRef> {
+        self.heap.set_of(v)
+    }
+
+    fn is_static_receiver(&self, v: VmValue) -> bool {
+        self.heap.is_static_receiver(v)
+    }
+
+    fn alloc_range_data(&mut self, range: varn_types::value::RangeData) -> VmValue {
+        self.heap.alloc_range_data(range)
     }
 
     fn call_static(&mut self, f: NativeFn) -> VmValue {
-        varn_types::call_static_with(self, f)
+        varn_types::call_static_with(f)
     }
 
     fn get_class(&self, name: &str) -> Option<std::rc::Rc<ClassObj>> {
@@ -382,7 +513,7 @@ impl NativeCtx for ExecCtx {
         module_path: &str,
         export_name: &str,
         args: Vec<varn_types::value::SendValue>,
-    ) -> Result<varn_types::AsyncTask, String> {
+    ) -> Result<varn_types::HostPromise, String> {
         isolates::spawn_isolate(self, module_path, export_name, args)
     }
 
@@ -406,17 +537,10 @@ impl NativeCtx for ExecCtx {
                 }
                 Some(HeapObj::BoundMethod(bm)) => match &bm.target {
                     varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
-                        if let Some(wrapper) = closure
-                            .as_any()
-                            .downcast_ref::<crate::closure::VmClosurePayload>()
-                        {
-                            let c = &wrapper.0;
-                            let source_file = c.proto.chunk.source_file.to_string();
-                            let name = c.proto.name.as_ref()?.to_string();
-                            Some((source_file, name))
-                        } else {
-                            None
-                        }
+                        let c = self.heap.closure_of(*closure)?;
+                        let source_file = c.proto.chunk.source_file.to_string();
+                        let name = c.proto.name.as_ref()?.to_string();
+                        Some((source_file, name))
                     }
                     _ => None,
                 },

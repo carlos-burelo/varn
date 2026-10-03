@@ -366,9 +366,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             decode.push(quote! {
                 let arg_base = if args.len() > #expected_len {
                     if let Some(&first) = args.first() {
-                        match ctx.extract(first) {
-                            ::varn_types::Value::Null | ::varn_types::Value::Class(_) | ::varn_types::Value::Module(_) => 1usize,
-                            _ => 0usize,
+                        if ctx.is_static_receiver(first) {
+                            1usize
+                        } else {
+                            0usize
                         }
                     } else {
                         0usize
@@ -557,14 +558,14 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 };
             });
         } else {
-            let native = quote!(::varn_types::Value::native(#wrap_ident::<#self_ty>, #sym));
+            let native = quote!(ctx.alloc_fn(#wrap_ident::<#self_ty>, #sym));
             let setup = match m.kind {
                 Kind::Method => quote!(cls.add_method(#sym, #native);),
                 Kind::Getter => quote!(cls.add_getter(#sym, #native);),
                 Kind::StaticMethod => quote!(cls.add_static(#sym, #native);),
                 Kind::StaticGetter => quote!(cls.add_static_getter(#sym, #native);),
                 Kind::Constructor => {
-                    quote!(cls.add_method("constructor", ::varn_types::Value::native(#wrap_ident::<#self_ty>, "constructor"));)
+                    quote!(cls.add_method("constructor", ctx.alloc_fn(#wrap_ident::<#self_ty>, "constructor"));)
                 }
                 Kind::Function | Kind::Property => unreachable!(),
             };

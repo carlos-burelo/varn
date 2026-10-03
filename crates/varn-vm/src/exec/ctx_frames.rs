@@ -26,12 +26,12 @@ impl ExecCtx {
                 let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
                     self.heap.get(callee_nv.as_heap_idx())
                 {
-                    Some(bm.receiver.clone())
+                    Some(bm.receiver)
                 } else {
                     None
                 };
                 if let Some(receiver) = receiver_clone {
-                    let recv_nv = self.heap.intern(receiver);
+                    let recv_nv = receiver;
                     match prepared {
                         PreparedCall::Frame(ref frame) => {
                             // El frame ya se materializó (r0 es DYN por

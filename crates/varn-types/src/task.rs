@@ -1,40 +1,32 @@
-use crate::value::Value;
-#[derive(Debug, Clone)]
-pub enum TaskState {
-    Pending,
-    Resolved(Value),
-    Rejected(Value),
-}
-
-type SettleCallback = Box<dyn FnOnce(Result<Value, Value>) + 'static>;
-
+use crate::value::SendValue;
 use crate::wake::WakeToken;
 use std::sync::atomic::{fence, AtomicU32, Ordering};
 use std::sync::Mutex;
 
-enum Waiter {
-    Wake(WakeToken),
-    Call(SettleCallback),
+pub type Completion = Result<SendValue, SendValue>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostOpen {
+    Plain,
+    ReceiveNext,
+    Receive,
+    SendAck,
 }
 
 struct Slot {
-    state: TaskState,
-    first: Option<Waiter>,
-    more: Vec<Waiter>,
+    done: Option<Completion>,
+    first: Option<WakeToken>,
+    more: Vec<WakeToken>,
 }
 
 impl Slot {
-    fn push(&mut self, waiter: Waiter) {
+    fn push(&mut self, token: WakeToken) {
         if self.first.is_none() {
-            self.first = Some(waiter);
+            self.first = Some(token);
             return;
         }
         self.more.reserve_exact(1);
-        self.more.push(waiter);
-    }
-
-    fn take_waiters(&mut self) -> (Option<Waiter>, Vec<Waiter>) {
-        (self.first.take(), std::mem::take(&mut self.more))
+        self.more.push(token);
     }
 }
 
@@ -43,21 +35,21 @@ struct Inner {
     ref_count: AtomicU32,
 }
 
-pub struct AsyncTask(*mut Inner);
+pub struct HostPromise(*mut Inner);
 
-unsafe impl Send for AsyncTask {}
-unsafe impl Sync for AsyncTask {}
+unsafe impl Send for HostPromise {}
+unsafe impl Sync for HostPromise {}
 
-impl Clone for AsyncTask {
+impl Clone for HostPromise {
     fn clone(&self) -> Self {
         unsafe {
             (*self.0).ref_count.fetch_add(1, Ordering::Relaxed);
         }
-        AsyncTask(self.0)
+        HostPromise(self.0)
     }
 }
 
-impl Drop for AsyncTask {
+impl Drop for HostPromise {
     fn drop(&mut self) {
         unsafe {
             if (*self.0).ref_count.fetch_sub(1, Ordering::Release) == 1 {
@@ -68,50 +60,34 @@ impl Drop for AsyncTask {
     }
 }
 
-impl AsyncTask {
-    /// Stable identity of this task while any clone is alive (the `Inner`
-    /// pointer). Only meaningful as a map key alongside an owning clone: the
-    /// allocation is reused once every clone drops.
-    #[inline(always)]
-    pub fn identity(&self) -> usize {
-        self.0 as usize
-    }
-}
-
-impl PartialEq for AsyncTask {
+impl PartialEq for HostPromise {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl Eq for AsyncTask {}
+impl Eq for HostPromise {}
 
-impl std::hash::Hash for AsyncTask {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl std::fmt::Debug for AsyncTask {
+impl std::fmt::Debug for HostPromise {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.peek_state() {
-            TaskState::Pending => write!(f, "Task(<pending>)"),
-            TaskState::Resolved(v) => write!(f, "Task({v})"),
-            TaskState::Rejected(v) => write!(f, "Task(<rejected:{v}>)"),
+        match self.peek() {
+            None => write!(f, "HostPromise(<pending>)"),
+            Some(Ok(v)) => write!(f, "HostPromise({v:?})"),
+            Some(Err(v)) => write!(f, "HostPromise(<rejected:{v:?}>)"),
         }
     }
 }
 
-impl AsyncTask {
-    fn alloc(state: TaskState) -> Self {
+impl HostPromise {
+    fn alloc(done: Option<Completion>) -> Self {
         let inner = Box::new(Inner {
             slot: Mutex::new(Slot {
-                state,
+                done,
                 first: None,
                 more: Vec::new(),
             }),
             ref_count: AtomicU32::new(1),
         });
-        AsyncTask(Box::into_raw(inner))
+        HostPromise(Box::into_raw(inner))
     }
 
     #[inline(always)]
@@ -119,130 +95,73 @@ impl AsyncTask {
         unsafe { (*self.0).slot.lock().unwrap() }
     }
 
+    #[inline(always)]
+    pub fn identity(&self) -> usize {
+        self.0 as usize
+    }
+
     pub fn pending() -> Self {
-        Self::alloc(TaskState::Pending)
+        Self::alloc(None)
     }
 
-    pub fn resolved(v: Value) -> Self {
-        Self::alloc(TaskState::Resolved(v))
+    pub fn resolved(v: SendValue) -> Self {
+        Self::alloc(Some(Ok(v)))
     }
 
-    pub fn rejected(v: Value) -> Self {
-        Self::alloc(TaskState::Rejected(v))
+    pub fn rejected(v: SendValue) -> Self {
+        Self::alloc(Some(Err(v)))
     }
 
     pub fn rejected_msg(msg: impl Into<String>) -> Self {
-        let s: String = msg.into();
-        Self::rejected(Value::Str(std::sync::Arc::from(s.as_str())))
+        Self::rejected(SendValue::Str(msg.into()))
     }
 
     #[inline]
     pub fn is_pending(&self) -> bool {
-        matches!(self.slot().state, TaskState::Pending)
+        self.slot().done.is_none()
     }
 
-    pub fn peek_state(&self) -> TaskState {
-        self.slot().state.clone()
+    pub fn peek(&self) -> Option<Completion> {
+        self.slot().done.clone()
     }
 
-    pub fn settle(&self, result: Result<Value, Value>) {
-        let waiters = {
+    pub fn complete(&self, result: Completion) {
+        let (first, more) = {
             let mut slot = self.slot();
-            if !matches!(slot.state, TaskState::Pending) {
+            if slot.done.is_some() {
                 return;
             }
-            slot.state = match &result {
-                Ok(v) => TaskState::Resolved(v.clone()),
-                Err(v) => TaskState::Rejected(v.clone()),
-            };
-            slot.take_waiters()
+            slot.done = Some(result);
+            (slot.first.take(), std::mem::take(&mut slot.more))
         };
-        let (first, more) = waiters;
-        for waiter in first.into_iter().chain(more) {
-            match waiter {
-                Waiter::Wake(token) => token.fire(),
-                Waiter::Call(cb) => cb(result.clone()),
-            }
+        for token in first.into_iter().chain(more) {
+            token.fire();
         }
     }
 
     #[inline]
-    pub fn resolve(&self, v: Value) {
-        self.settle(Ok(v));
+    pub fn resolve(&self, v: SendValue) {
+        self.complete(Ok(v));
     }
 
     #[inline]
-    pub fn reject(&self, v: Value) {
-        self.settle(Err(v));
+    pub fn reject(&self, v: SendValue) {
+        self.complete(Err(v));
     }
 
     #[inline]
     pub fn reject_msg(&self, msg: impl Into<String>) {
-        let s: String = msg.into();
-        self.reject(Value::Str(std::sync::Arc::from(s.as_str())));
+        self.reject(SendValue::Str(msg.into()));
     }
 
-    pub fn wake_on_settle(&self, token: WakeToken) {
+    pub fn watch(&self, token: WakeToken) {
         {
             let mut slot = self.slot();
-            if matches!(slot.state, TaskState::Pending) {
-                slot.push(Waiter::Wake(token));
+            if slot.done.is_none() {
+                slot.push(token);
                 return;
             }
         }
         token.fire();
     }
-
-    pub fn on_settle<F>(&self, cb: F)
-    where
-        F: FnOnce(Result<Value, Value>) + 'static,
-    {
-        let already = {
-            let mut slot = self.slot();
-            match &slot.state {
-                TaskState::Pending => {
-                    slot.push(Waiter::Call(Box::new(cb)));
-                    return;
-                }
-                TaskState::Resolved(v) => Ok(v.clone()),
-                TaskState::Rejected(v) => Err(v.clone()),
-            }
-        };
-        cb(already);
-    }
-
-    #[inline]
-    pub fn cancel(&self) {
-        self.reject_msg("Task cancelled");
-    }
-}
-
-static YIELD_TOKEN: std::sync::OnceLock<AsyncTask> = std::sync::OnceLock::new();
-
-impl AsyncTask {
-    pub fn yield_token() -> Self {
-        YIELD_TOKEN.get_or_init(AsyncTask::pending).clone()
-    }
-
-    pub fn is_yield_token(&self) -> bool {
-        let token = YIELD_TOKEN.get_or_init(AsyncTask::pending);
-        self.identity() == token.identity()
-    }
-}
-
-pub enum Poll {
-    Ready(Result<Value, String>),
-    Pending,
-}
-
-pub fn resolve_task(v: Value) -> Value {
-    Value::TaskHandle(AsyncTask::resolved(v))
-}
-
-pub fn reject_task(msg: String) -> Value {
-    Value::TaskHandle(AsyncTask::rejected_msg(msg))
-}
-
-pub fn reject_value_task(v: Value) -> Value {
-    Value::TaskHandle(AsyncTask::rejected(v))
 }

@@ -76,17 +76,12 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
                 return None;
             }
             let vtable = &*cls.vtable.as_ptr();
-            let method = vtable.get(slot as usize)?.clone();
+            let method = *vtable.get(slot as usize)?;
             if kind == ICKind::NATIVE_VTABLE_METHOD {
-                let varn_types::Value::NativeFn(b) = method else {
-                    return None;
-                };
-                Some(FastMethod::Native(b.0))
+                let (f, _) = ctx_ref.heap.native_of(method)?;
+                Some(FastMethod::Native(f))
             } else {
-                let varn_types::Value::VmValue(payload) = method else {
-                    return None;
-                };
-                let nc = crate::closure::VmClosurePayload::downcast_from(&*payload)?;
+                let nc = ctx_ref.heap.closure_of(method)?;
                 if nc.proto.is_generator || nc.proto.is_async || args.len() > nc.proto.arity {
                     return None;
                 }
@@ -330,30 +325,23 @@ fn try_trivial_construct(
     cls: &std::rc::Rc<varn_types::value::ClassObj>,
     argc: usize,
 ) -> Result<Option<VmValue>, crate::error::RuntimeError> {
-    let resolved = cls.with_constructor(|ctor| match ctor {
+    let ctor = cls.constructor();
+    let resolved = match ctor {
         None => Some((None, None)),
-        Some(varn_types::Value::VmValue(payload)) => {
-            let wrapper = payload
-                .as_any()
-                .downcast_ref::<crate::closure::VmClosurePayload>()?;
-            let proto = &wrapper.0.proto;
-            let plan = proto.trivial_field_init_plan()?;
-            Some((Some(plan), Some(proto.arity.saturating_sub(1))))
-        }
-        Some(_) => None,
-    });
+        Some(ctor) => ctx.heap.closure_of(ctor).and_then(|c| {
+            let plan = c.proto.trivial_field_init_plan()?;
+            Some((Some(plan), Some(c.proto.arity.saturating_sub(1))))
+        }),
+    };
     let Some((plan, arity)) = resolved else {
         return Ok(None);
     };
     let Some(plan) = plan else {
         // No constructor: the interpreter ignores the arguments.
-        if cls.with_constructor(|ctor| ctor.is_none()) {
-            let inst = varn_types::value::InstanceRef::alloc(cls.clone());
-            return Ok(Some(VmValue::from_heap_idx(
-                ctx.heap.alloc(crate::heap::HeapObj::Instance(inst)),
-            )));
-        }
-        return Ok(None);
+        let inst = varn_types::value::InstanceRef::alloc(cls.clone());
+        return Ok(Some(VmValue::from_heap_idx(
+            ctx.heap.alloc(crate::heap::HeapObj::Instance(inst)),
+        )));
     };
     let arity = arity.unwrap_or(0);
     if argc != arity {
@@ -393,24 +381,7 @@ pub(crate) extern "C" fn jit_call_spread_window(
         let args = std::slice::from_raw_parts(window, argc);
         let mut expanded = Vec::with_capacity(argc + 1);
         expanded.push(callee);
-        for &nv in args {
-            match ctx_ref.heap.extract(nv) {
-                varn_types::Value::Spread(inner) => match *inner {
-                    varn_types::Value::Array(arr) => {
-                        for v in arr.borrow().iter().cloned() {
-                            expanded.push(ctx_ref.heap.intern(v));
-                        }
-                    }
-                    other => expanded.push(ctx_ref.heap.intern(other)),
-                },
-                varn_types::Value::Array(arr) => {
-                    for v in arr.borrow().iter().cloned() {
-                        expanded.push(ctx_ref.heap.intern(v));
-                    }
-                }
-                other => expanded.push(ctx_ref.heap.intern(other)),
-            }
-        }
+        crate::exec::calls::expand_spread_args(&ctx_ref.heap, args.iter().copied(), &mut expanded);
         match ctx_ref.invoke(callee, &expanded) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),

@@ -7,7 +7,7 @@
 use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
-use varn_types::{value::MapKey, Value};
+use varn_types::value::MapKey;
 
 impl HeapInner {
     pub(crate) fn lookup_str_map_key(&self, s: &str) -> Option<MapKey> {
@@ -72,15 +72,15 @@ impl HeapInner {
         match self.get_by_idx(v.as_heap_idx()) {
             Some(HeapObj::Char(c)) => {
                 let c = *c;
-                MapKey(self.intern(Value::Char(c)))
+                MapKey(self.alloc_char(c))
             }
             Some(HeapObj::BigInt(b)) => {
                 let b = b.clone();
-                MapKey(self.intern(Value::BigInt(b)))
+                MapKey(self.alloc_bigint(*b))
             }
             Some(HeapObj::Decimal(d)) => {
                 let d = d.clone();
-                MapKey(self.intern(Value::Decimal(d)))
+                MapKey(self.intern_decimal(*d))
             }
             _ => MapKey(v),
         }

@@ -5,7 +5,7 @@ use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, Value, VmArray};
+use varn_types::{value::ObjRef, VmArray};
 
 impl HeapInner {
     pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -16,11 +16,6 @@ impl HeapInner {
     pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
-    }
-
-    pub(crate) fn alloc_array(&mut self, items: Vec<Value>) -> VmValue {
-        let vm_items: Vec<VmValue> = items.into_iter().map(|v| self.intern(v)).collect();
-        self.alloc_array_vm(vm_items)
     }
 
     pub(crate) fn alloc_object(&mut self) -> VmValue {
@@ -57,15 +52,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_empty_map_vm(&mut self) -> VmValue {
-        let mref = match &self.empty_map {
-            Some(m) => m.clone(),
-            None => {
-                let m = varn_types::value::MapRef::new(varn_types::value::ValueMap::default());
-                self.empty_map = Some(m.clone());
-                m
-            }
-        };
-        VmValue::from_heap_idx(self.alloc(HeapObj::Map(mref)))
+        self.alloc_map_vm(varn_types::value::ValueMap::default())
     }
 
     pub(crate) fn alloc_map_vm(&mut self, map: varn_types::value::ValueMap) -> VmValue {

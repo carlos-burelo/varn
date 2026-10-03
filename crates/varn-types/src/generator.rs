@@ -1,8 +1,8 @@
-use crate::value::Value;
+use crate::vm_value::VmValue;
 use std::rc::Rc;
 
 pub trait GeneratorDriver: std::fmt::Debug {
-    fn next(&self, input: Value) -> Result<Value, String>;
+    fn next(&self, input: VmValue) -> Result<VmValue, String>;
     fn is_done(&self) -> bool;
     fn is_async(&self) -> bool;
     fn trace_vm_values(&self, _callback: &mut dyn FnMut(crate::VmValue)) {}

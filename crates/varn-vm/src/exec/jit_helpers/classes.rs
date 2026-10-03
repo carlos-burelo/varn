@@ -31,8 +31,7 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
             .clone()
             .or_else(|| crate::exec::props::get_class(this_val, &ctx_ref.heap))
             .expect("GetSuper: 'this' has no class");
-        let class_nv = ctx_ref.heap.intern(varn_types::Value::Class(cls));
-        match crate::exec::class::op_get_super(class_nv, &name, this_val, &mut ctx_ref.heap) {
+        match crate::exec::class::op_get_super(cls, &name, this_val, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }

@@ -1,12 +1,12 @@
 use std::collections::BinaryHeap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use varn_types::{AsyncTask, Value};
+use varn_types::{value::SendValue, HostPromise};
 
 struct TimerEntry {
     deadline: Instant,
     seq: u64,
-    task: AsyncTask,
+    task: HostPromise,
 }
 
 impl PartialEq for TimerEntry {
@@ -58,11 +58,11 @@ fn poke() {
     }
 }
 
-pub fn sleep_task(ms: u64) -> AsyncTask {
+pub fn sleep_task(ms: u64) -> HostPromise {
     if ms == 0 {
-        return AsyncTask::resolved(Value::Null);
+        return HostPromise::resolved(SendValue::Null);
     }
-    let task = AsyncTask::pending();
+    let task = HostPromise::pending();
     let deadline = Instant::now() + Duration::from_millis(ms);
     let becomes_earliest = {
         let mut guard = wheel().lock().unwrap();
@@ -94,7 +94,7 @@ pub fn next_deadline() -> Option<Instant> {
         .map(|entry| entry.0.deadline)
 }
 
-pub fn take_due() -> Vec<AsyncTask> {
+pub fn take_due() -> Vec<HostPromise> {
     let mut due = Vec::new();
     let mut guard = wheel().lock().unwrap();
     let now = Instant::now();

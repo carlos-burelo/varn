@@ -85,17 +85,6 @@ impl RuntimeKind {
     }
 }
 
-pub trait VmValuePayload: std::fmt::Debug + std::any::Any {
-    fn clone_payload(&self) -> Box<dyn VmValuePayload>;
-    fn as_any(&self) -> &dyn std::any::Any;
-}
-
-impl Clone for Box<dyn VmValuePayload> {
-    fn clone(&self) -> Self {
-        self.clone_payload()
-    }
-}
-
 impl RuntimeKind {
     /// The kind whose discriminant is `raw`, or `None` (a boxed `VmValue`)
     /// when `raw` names none — the conservative reading, and the one a

@@ -3,7 +3,7 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_types::{value::ObjRef, Value};
+use varn_types::value::ObjRef;
 
 /// `may_hold_closure` lo decide el sitio de llamada cuando puede: si el backend
 /// sabe que todos los campos son valores desboxados, ninguno es una closure y el
@@ -297,7 +297,12 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
         Some(HeapObj::Range(r)) => {
             let r = r.clone();
             match r.nth(heap.as_int(key)) {
-                Some(raw) => Ok(heap.intern(r.element(raw))),
+                Some(raw) => Ok(match r.elem {
+                    varn_types::value::RangeElem::Int => VmValue::from_int(raw),
+                    varn_types::value::RangeElem::Char => {
+                        heap.alloc_char(varn_types::value::RangeData::char_of(raw))
+                    }
+                }),
                 None => Ok(VmValue::null()),
             }
         }
@@ -327,11 +332,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             match super::props::get_property(obj, &key_str, heap) {
                 Ok(v) if !v.is_null() => Ok(v),
                 _ => match super::props::find_getter(obj, &key_str, heap) {
-                    Some(g) => {
-                        let receiver = heap.extract(obj);
-                        let bound = super::props::bind_method_to_receiver(receiver, g, None);
-                        Ok(heap.intern(bound))
-                    }
+                    Some(g) => Ok(super::props::bind_method_to_receiver(heap, obj, g, None)),
                     None => Ok(VmValue::null()),
                 },
             }
@@ -486,8 +487,12 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
             _ => None,
         };
         if let Some(o) = maybe_obj {
-            let keys: Vec<Value> = o.borrow().keys().map(|k| Value::Str(k.clone())).collect();
-            return Ok(heap.alloc_array(keys));
+            let keys: Vec<VmValue> = o
+                .borrow()
+                .keys()
+                .map(|k| heap.alloc_str_interned(&k))
+                .collect();
+            return Ok(heap.alloc_array_vm(keys));
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
@@ -580,10 +585,12 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
             return Ok(target);
         }
     }
-    if let Value::Object(src) = heap.extract(spread) {
-        let pairs: Vec<(Arc<str>, VmValue)> = src.borrow().iter().collect();
-        for (k, nv) in pairs {
-            target_obj.insert(k, nv);
+    if spread.is_heap() {
+        if let Some(HeapObj::Object(src) | HeapObj::Record(src)) = heap.get(spread.as_heap_idx()) {
+            let pairs: Vec<(Arc<str>, VmValue)> = src.borrow().iter().collect();
+            for (k, nv) in pairs {
+                target_obj.insert(k, nv);
+            }
         }
     }
     Ok(target)

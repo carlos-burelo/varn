@@ -264,24 +264,19 @@ impl ClifLinker for CtxLinker {
         };
         let layout = cls.get_or_compute_layout();
         let trivial_plan = if let Some(ctor_val) = cls.constructor() {
-            match ctor_val {
-                varn_types::Value::VmValue(payload) => {
-                    let wrapper = payload
-                        .as_any()
-                        .downcast_ref::<crate::closure::VmClosurePayload>()?;
-                    wrapper.0.proto.trivial_field_init_plan().map(|p| {
-                        p.iter()
-                            .map(
-                                |&(param_idx, offset, tag)| varn_jit::clif::lower::ClifFieldInit {
-                                    param_idx,
-                                    offset,
-                                    repr: varn_types::layout::TypeLayout::of_field(tag).repr,
-                                },
-                            )
-                            .collect()
-                    })
-                }
-                _ => None,
+            match ctx.heap.closure_of(ctor_val) {
+                Some(closure) => closure.proto.trivial_field_init_plan().map(|p| {
+                    p.iter()
+                        .map(
+                            |&(param_idx, offset, tag)| varn_jit::clif::lower::ClifFieldInit {
+                                param_idx,
+                                offset,
+                                repr: varn_types::layout::TypeLayout::of_field(tag).repr,
+                            },
+                        )
+                        .collect()
+                }),
+                None => None,
             }
         } else {
             Some(Vec::new())

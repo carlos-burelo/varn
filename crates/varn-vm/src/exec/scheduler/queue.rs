@@ -1,22 +1,17 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::Arc;
-
-use varn_types::value::LazyTask;
-use varn_types::{AsyncTask, TaskState, Value, WakeQueue, WakeToken};
 
 use super::suspend::Frozen;
 use crate::exec::ctx::ExecCtx;
+use crate::task::{Inbox, LazyTask, TaskCell};
 
 const SPARE_CTX_LIMIT: usize = 8;
-const KICK: u64 = u64::MAX;
 const SWEEP_FLOOR: usize = 1024;
 
 pub(crate) enum Delivery {
     Nothing,
-    Resolved(Value),
-    Rejected(Value),
+    Settled(Rc<TaskCell>),
 }
 
 pub(crate) enum Start {
@@ -26,12 +21,12 @@ pub(crate) enum Start {
 
 pub(crate) struct ReadyTask {
     pub(crate) start: Start,
-    pub(crate) output: AsyncTask,
+    pub(crate) output: Rc<TaskCell>,
 }
 
 struct ParkedTask {
-    output: AsyncTask,
-    waiting_on: AsyncTask,
+    output: Rc<TaskCell>,
+    waiting_on: Rc<TaskCell>,
     frozen: Box<Frozen>,
 }
 
@@ -113,25 +108,30 @@ impl Parked {
 struct Local {
     ready: VecDeque<ReadyTask>,
     parked: Parked,
-    incoming: VecDeque<u64>,
     #[allow(clippy::vec_box)]
     spare: Vec<Box<ExecCtx>>,
 }
 
 pub(crate) struct TaskQueue {
     local: RefCell<Local>,
-    wakes: Arc<WakeQueue>,
+    inbox: Inbox,
 }
 
 fn token(index: u32, generation: u32) -> u64 {
     (u64::from(generation) << 32) | u64::from(index)
 }
 
+pub(crate) struct QueueRoots {
+    pub(crate) frozen: Vec<*mut Frozen>,
+    pub(crate) cells: Vec<Rc<TaskCell>>,
+    pub(crate) lazies: Vec<Rc<LazyTask>>,
+}
+
 impl TaskQueue {
     pub(crate) fn new() -> Self {
         Self {
             local: RefCell::new(Local::default()),
-            wakes: WakeQueue::new(),
+            inbox: Inbox::default(),
         }
     }
 
@@ -154,34 +154,24 @@ impl TaskQueue {
         }
     }
 
-    pub(crate) fn wake_generation(&self) -> u64 {
-        self.wakes.generation()
+    pub(crate) fn has_inbox(&self) -> bool {
+        !self.inbox.borrow().is_empty()
     }
 
-    pub(crate) fn wait_for_change(&self, entered: u64, done: impl Fn() -> bool) {
-        self.wakes.wait_past(entered, done);
-    }
-
-    pub(crate) fn kick_on_settle(&self, handle: &AsyncTask) {
-        handle.wake_on_settle(WakeToken::new(&self.wakes, KICK));
-    }
-
-    pub(crate) fn park(&self, output: AsyncTask, waiting_on: AsyncTask, frozen: Box<Frozen>) {
+    pub(crate) fn park(&self, output: Rc<TaskCell>, waiting_on: Rc<TaskCell>, frozen: Box<Frozen>) {
         let (index, generation) = self.local.borrow_mut().parked.insert(ParkedTask {
             output,
-            waiting_on: waiting_on.clone(),
+            waiting_on: Rc::clone(&waiting_on),
             frozen,
         });
-        waiting_on.wake_on_settle(WakeToken::new(&self.wakes, token(index, generation)));
+        waiting_on.watch(&self.inbox, token(index, generation));
     }
 
-    pub(crate) fn wake_settled(&self) {
-        let mut incoming = std::mem::take(&mut self.local.borrow_mut().incoming);
-        self.wakes.drain_into(&mut incoming);
-        while let Some(raw) = incoming.pop_front() {
-            if raw == KICK {
-                continue;
-            }
+    pub(crate) fn collect_resumes(&self) {
+        loop {
+            let Some(raw) = self.inbox.borrow_mut().pop_front() else {
+                return;
+            };
             let index = (raw & 0xFFFF_FFFF) as u32;
             let generation = (raw >> 32) as u32;
             let Some(parked) = self.local.borrow_mut().parked.remove(index, generation) else {
@@ -190,38 +180,44 @@ impl TaskQueue {
             if !parked.output.is_pending() {
                 continue;
             }
-            let delivery = match parked.waiting_on.peek_state() {
-                TaskState::Pending => {
-                    self.repark(parked);
-                    continue;
-                }
-                TaskState::Resolved(v) => Delivery::Resolved(v),
-                TaskState::Rejected(e) => Delivery::Rejected(e),
-            };
+            if parked.waiting_on.is_pending() {
+                self.park(parked.output, parked.waiting_on, parked.frozen);
+                continue;
+            }
             self.push_ready(ReadyTask {
-                start: Start::Resume(parked.frozen, delivery),
+                start: Start::Resume(parked.frozen, Delivery::Settled(parked.waiting_on)),
                 output: parked.output,
             });
         }
-        self.local.borrow_mut().incoming = incoming;
     }
 
-    fn repark(&self, parked: ParkedTask) {
-        self.park(parked.output, parked.waiting_on, parked.frozen);
-    }
-
-    pub(crate) fn for_each_frozen(&self, mut f: impl FnMut(*mut Frozen)) {
+    pub(crate) fn collect_roots(&self) -> QueueRoots {
         let mut guard = self.local.borrow_mut();
         let local = &mut *guard;
+        let mut roots = QueueRoots {
+            frozen: Vec::new(),
+            cells: Vec::new(),
+            lazies: Vec::new(),
+        };
         for ready in local.ready.iter_mut() {
-            if let Start::Resume(frozen, _) = &mut ready.start {
-                f(&mut **frozen as *mut Frozen);
+            roots.cells.push(Rc::clone(&ready.output));
+            match &mut ready.start {
+                Start::Fresh(lazy) => roots.lazies.push(Rc::clone(lazy)),
+                Start::Resume(frozen, delivery) => {
+                    roots.frozen.push(&mut **frozen as *mut Frozen);
+                    if let Delivery::Settled(cell) = delivery {
+                        roots.cells.push(Rc::clone(cell));
+                    }
+                }
             }
         }
         for cell in local.parked.cells.iter_mut() {
             if let Some(parked) = cell.task.as_mut() {
-                f(&mut *parked.frozen as *mut Frozen);
+                roots.frozen.push(&mut *parked.frozen as *mut Frozen);
+                roots.cells.push(Rc::clone(&parked.output));
+                roots.cells.push(Rc::clone(&parked.waiting_on));
             }
         }
+        roots
     }
 }

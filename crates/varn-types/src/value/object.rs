@@ -1,6 +1,6 @@
 use super::shape::{root_shape, Shape};
-use super::{ClassObj, RuntimeString, Value};
-use crate::vm_value::{VmValue, VmValueRef};
+use super::{ClassObj, RuntimeString};
+use crate::vm_value::VmValue;
 use std::cell::{Cell, UnsafeCell};
 use std::mem::MaybeUninit;
 use std::ptr;
@@ -416,14 +416,6 @@ impl ObjData<[Cell<VmValue>]> {
         self.set_shape(shape);
     }
 
-    pub fn get_field(&self, key: &str) -> Option<Value> {
-        self.get(key).map(nv_to_value)
-    }
-
-    pub fn set_field(&self, key: RuntimeString, value: Value) {
-        self.insert(key, value_to_nv(&value));
-    }
-
     #[inline]
     pub fn get_field_nv(&self, key: &str) -> Option<VmValue> {
         self.get(key)
@@ -495,62 +487,3 @@ impl PartialEq for ObjData {
     }
 }
 impl Eq for ObjData {}
-
-#[inline]
-pub fn nv_to_value(nv: VmValue) -> Value {
-    if nv.is_null() {
-        return Value::Null;
-    }
-    if nv.is_bool() {
-        return Value::Bool(nv.as_bool());
-    }
-    if nv.is_int() {
-        return Value::Int(nv.as_int());
-    }
-    if nv.is_f64() {
-        return Value::Float(nv.as_f64());
-    }
-    if nv.is_sso() {
-        let mut buf = [0u8; 5];
-        return Value::Str(Arc::from(nv.sso_as_str(&mut buf)));
-    }
-
-    Value::VmValue(Box::new(VmValueRef(nv)))
-}
-
-#[inline]
-pub fn value_to_nv(v: &Value) -> VmValue {
-    match v {
-        Value::Null => VmValue::null(),
-        Value::Bool(b) => VmValue::from_bool(*b),
-        Value::Int(i) => VmValue::from_int(*i),
-        Value::Float(f) => VmValue::from_f64(*f),
-        Value::Str(s) => {
-            if let Some(nv) = VmValue::try_from_sso(s) {
-                nv
-            } else {
-                debug_assert!(false, "set_field: long string '{}' must be pre-interned; use set_field_nv after heap.intern_str()", s);
-                VmValue::null()
-            }
-        }
-        Value::VmValue(payload) => {
-            if let Some(vr) = payload.as_any().downcast_ref::<VmValueRef>() {
-                vr.0
-            } else {
-                debug_assert!(
-                    false,
-                    "set_field: Value::VmValue with non-VmValueRef payload; use set_field_nv"
-                );
-                VmValue::null()
-            }
-        }
-        other => {
-            debug_assert!(
-                false,
-                "set_field: {:?} must be pre-interned; use set_field_nv after heap.intern()",
-                other
-            );
-            VmValue::null()
-        }
-    }
-}

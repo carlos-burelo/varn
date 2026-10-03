@@ -2,27 +2,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::generator::GeneratorDriver;
-use varn_types::value::Value;
 
 use crate::exec::{ExecCtx, VmSuspend};
 use crate::value::VmValue;
 
-/// `{ value, done }`, built straight from the yielded slot.
-///
-/// The yielded value stays a `VmValue` all the way through on purpose. This
-/// used to `heap.extract` it into a `Value` and then push it back through
-/// `value_to_nv`, which cannot represent anything heap-allocated without a
-/// heap to intern into — it has a `debug_assert!(false, "must be pre-interned")`
-/// for exactly that and returns null in release. So `yield [1, 2]` and
-/// `yield { a: 1 }` came out as `null`, while `yield 7` and short strings
-/// survived because they fit inline. The generator shares its caller's heap
-/// (`Heap` is an `Rc<UnsafeCell<…>>` handle), so the index is valid on both
-/// sides and the round trip bought nothing.
-fn make_iter_result(value: VmValue, done: bool) -> Value {
-    varn_types::value::new_object(varn_types::value::ObjRef::from_pairs([
+fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
+    let obj = varn_types::value::ObjRef::from_pairs([
         (Arc::from("value"), value),
-        (Arc::from("done"), varn_types::VmValue::from_bool(done)),
-    ]))
+        (Arc::from("done"), VmValue::from_bool(done)),
+    ]);
+    VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Object(obj)))
 }
 
 struct NanGenInner {
@@ -70,16 +59,16 @@ impl NanGenDriver {
 }
 
 impl GeneratorDriver for NanGenDriver {
-    fn next(&self, input: Value) -> Result<Value, String> {
+    fn next(&self, input: VmValue) -> Result<VmValue, String> {
         let mut inner = self.inner.borrow_mut();
 
         if inner.done {
-            return Ok(make_iter_result(VmValue::null(), true));
+            return Ok(make_iter_result(&mut inner.ctx.heap, VmValue::null(), true));
         }
 
         if inner.started {
             if let Some(dest_reg) = inner.resume_dest.take() {
-                let input_nv = inner.ctx.heap.intern(input);
+                let input_nv = input;
                 if let Some(frame) = inner.ctx.frames.last() {
                     let base = frame.base;
                     let nregs = frame.closure().proto.register_count as usize;
@@ -108,7 +97,7 @@ impl GeneratorDriver for NanGenDriver {
                     dest_reg,
                 }) => {
                     inner.resume_dest = Some(dest_reg);
-                    return Ok(make_iter_result(nv, false));
+                    return Ok(make_iter_result(&mut inner.ctx.heap, nv, false));
                 }
                 Some(VmSuspend::Await { value, dest_reg }) if self.is_async => {
                     match inner.ctx.settle_awaited(value) {
@@ -132,7 +121,7 @@ impl GeneratorDriver for NanGenDriver {
                 None => {
                     inner.done = true;
                     let ret = result.map_err(|e| e.message)?;
-                    return Ok(make_iter_result(ret, true));
+                    return Ok(make_iter_result(&mut inner.ctx.heap, ret, true));
                 }
             }
         }

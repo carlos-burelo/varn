@@ -7,7 +7,6 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
-use varn_types::Value;
 
 #[derive(Clone, Copy)]
 pub(crate) enum BigOp {
@@ -37,7 +36,7 @@ fn is_bigint(v: VmValue, heap: &Heap) -> bool {
 }
 
 fn alloc(heap: &mut Heap, v: BigInt) -> VmValue {
-    heap.intern(Value::BigInt(Box::new(v)))
+    heap.alloc_bigint(v)
 }
 
 fn fault(f: varn_core::IntDivFault, op: &str) -> RuntimeError {

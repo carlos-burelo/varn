@@ -1,5 +1,4 @@
 use std::fmt;
-use varn_core::VmValuePayload;
 
 /// A VM value: an explicit tag word plus a full 64-bit payload.
 ///
@@ -25,18 +24,6 @@ use varn_core::VmValuePayload;
 pub struct VmValue {
     tag: u64,
     payload: u64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct VmValueRef(pub VmValue);
-
-impl VmValuePayload for VmValueRef {
-    fn clone_payload(&self) -> Box<dyn VmValuePayload> {
-        Box::new(*self)
-    }
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 // ── Tag word ────────────────────────────────────────────────────────────

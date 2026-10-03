@@ -4,7 +4,7 @@ use crate::value::VmValue;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_types::{value::MapKey, ClassObj, NativeCtx, NativeFn, ResourceStore, Value};
+use varn_types::{value::MapKey, ClassObj, NativeCtx, NativeFn, ResourceStore};
 
 impl NativeCtx for Heap {
     fn int_val(&mut self, n: i64) -> VmValue {
@@ -29,6 +29,15 @@ impl NativeCtx for Heap {
 
     fn alloc_str_owned(&mut self, s: String) -> VmValue {
         self.deref_mut().alloc_str_dynamic(&s)
+    }
+
+    fn alloc_bound_native(
+        &mut self,
+        receiver: VmValue,
+        func: NativeFn,
+        name: &'static str,
+    ) -> VmValue {
+        self.deref_mut().alloc_bound_native(receiver, func, name)
     }
 
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -56,7 +65,7 @@ impl NativeCtx for Heap {
     }
 
     fn alloc_class(&mut self, class: Rc<ClassObj>) -> VmValue {
-        self.intern(Value::Class(class))
+        self.deref_mut().alloc_class_vm(class)
     }
 
     fn is_string(&self, v: VmValue) -> bool {
@@ -216,12 +225,52 @@ impl NativeCtx for Heap {
         panic!("resources() unavailable on bare Heap")
     }
 
-    fn extract(&self, v: VmValue) -> Value {
-        self.deref().extract(v)
+    fn as_generator(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
+        self.deref().generator_of(v)
     }
 
-    fn intern(&mut self, v: Value) -> VmValue {
-        self.deref_mut().intern(v)
+    fn as_char(&self, v: VmValue) -> Option<char> {
+        self.deref().char_of(v)
+    }
+
+    fn as_bigint(&self, v: VmValue) -> Option<num_bigint::BigInt> {
+        self.deref().bigint_of(v)
+    }
+
+    fn as_decimal(&self, v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        self.deref().decimal_of(v)
+    }
+
+    fn as_range(&self, v: VmValue) -> Option<varn_types::value::RangeData> {
+        self.deref().range_of(v)
+    }
+
+    fn as_map(&self, v: VmValue) -> Option<varn_types::value::MapRef> {
+        self.deref().map_of(v)
+    }
+
+    fn as_set(&self, v: VmValue) -> Option<varn_types::value::SetRef> {
+        self.deref().set_of(v)
+    }
+
+    fn is_static_receiver(&self, v: VmValue) -> bool {
+        self.deref().is_static_receiver(v)
+    }
+
+    fn alloc_range_data(&mut self, range: varn_types::value::RangeData) -> VmValue {
+        self.deref_mut().alloc_range_data(range)
+    }
+
+    fn alloc_char(&mut self, value: char) -> VmValue {
+        self.deref_mut().alloc_char(value)
+    }
+
+    fn alloc_bigint(&mut self, value: num_bigint::BigInt) -> VmValue {
+        self.deref_mut().alloc_bigint(value)
+    }
+
+    fn alloc_decimal(&mut self, value: bigdecimal::BigDecimal) -> VmValue {
+        self.deref_mut().alloc_decimal(value)
     }
 
     fn map_key(&mut self, v: VmValue) -> Result<MapKey, varn_types::NativeError> {
@@ -242,7 +291,7 @@ impl NativeCtx for Heap {
     }
 
     fn call_static(&mut self, f: NativeFn) -> VmValue {
-        varn_types::call_static_with(self, f)
+        varn_types::call_static_with(f)
     }
 
     fn get_class(&self, name: &str) -> Option<std::rc::Rc<ClassObj>> {

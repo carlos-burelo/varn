@@ -7,7 +7,6 @@ use std::time::Duration;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::ModuleId;
-use varn_types::value::Closure;
 use varn_vm::Vm;
 
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
@@ -48,7 +47,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let settings = varn_vm::ExecSettings::from_env(false);
     let mut init_vm = Vm::new(precompiled_base.clone(), settings).with_loader(loader.clone());
     for bp in &builtin_protos {
-        let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new()));
+        let closure = Rc::new(bp.clone());
         init_vm
             .run(closure)
             .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;
@@ -81,7 +80,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
             varn_builtins::reset_testing_counters();
             factory.build()
         },
-        |machine| run_vm_to_completion(machine, factory.closure()),
+        |machine| run_vm_to_completion(machine, factory.entry_proto()),
     )?;
 
     let phases = vec![
@@ -149,7 +148,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         profile_vm.enable_hotspot_profiling();
-        run_vm_to_completion(&mut profile_vm, factory.closure())
+        run_vm_to_completion(&mut profile_vm, factory.entry_proto())
             .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
         profile_vm.collect_gc();
         let opcode_counts = profile_vm.take_opcode_counts();

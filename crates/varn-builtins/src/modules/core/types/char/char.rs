@@ -1,5 +1,5 @@
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_types::{NativeCtx, VmValue};
 
 pub struct Char;
 
@@ -34,11 +34,11 @@ varn_contract! {
 
         fn toUppercase(ctx: &mut dyn NativeCtx, this: char) -> VmValue {
             let u = this.to_uppercase().next().unwrap_or(this);
-            ctx.intern(Value::Char(u))
+            ctx.alloc_char(u)
         }
         fn toLowercase(ctx: &mut dyn NativeCtx, this: char) -> VmValue {
             let l = this.to_lowercase().next().unwrap_or(this);
-            ctx.intern(Value::Char(l))
+            ctx.alloc_char(l)
         }
     }
 }

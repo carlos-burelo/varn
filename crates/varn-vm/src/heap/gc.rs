@@ -81,42 +81,9 @@ impl HeapInner {
             self.decimal_interner
                 .retain(|_, &mut packed| check(packed, &self.objects));
         }
-        if !self.array_interner.is_empty() {
-            self.array_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.object_interner.is_empty() {
-            self.object_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.map_interner.is_empty() {
-            self.map_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.set_interner.is_empty() {
-            self.set_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
         if !self.identity_index.is_empty() {
             self.identity_index
                 .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-    }
-
-    pub(crate) fn update_interners_after_minor_gc(&mut self, fwd: &[Option<u32>]) {
-        for (key, idx) in std::mem::take(&mut self.young_interned) {
-            let still_points_here = self.object_interner.get(&key) == Some(&idx);
-            if !still_points_here {
-                continue;
-            }
-            match fwd.get(idx as usize) {
-                Some(Some(promoted)) => {
-                    self.object_interner.insert(key, *promoted);
-                }
-                _ => {
-                    self.object_interner.remove(&key);
-                }
-            }
         }
     }
 

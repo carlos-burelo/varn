@@ -1,20 +1,19 @@
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_traits::{One, Signed, ToPrimitive, Zero};
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, NativeError, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Dec;
 
 fn get_decimal(ctx: &dyn NativeCtx, this: VmValue) -> Option<BigDecimal> {
-    match ctx.extract(this) {
-        Value::Decimal(d) => Some(*d),
-        Value::Int(n) => Some(BigDecimal::from(n)),
-        _ => None,
+    if ctx.is_int(this) {
+        return Some(BigDecimal::from(ctx.as_int(this)));
     }
+    ctx.as_decimal(this)
 }
 
 fn alloc_decimal(ctx: &mut dyn NativeCtx, d: BigDecimal) -> VmValue {
-    ctx.intern(Value::Decimal(Box::new(d)))
+    ctx.alloc_decimal(d)
 }
 
 fn rounded(ctx: &mut dyn NativeCtx, this: VmValue, mode: RoundingMode) -> VmValue {

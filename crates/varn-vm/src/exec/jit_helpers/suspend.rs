@@ -51,7 +51,7 @@ pub(crate) extern "C" fn jit_await(
         let frame_idx = caller_depth - 1;
         ctx_ref.frames[frame_idx].ip = resume_ip;
         ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Await {
-            value: ctx_ref.heap.extract(fut),
+            value: fut,
             dest_reg: dest_reg as u16,
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);

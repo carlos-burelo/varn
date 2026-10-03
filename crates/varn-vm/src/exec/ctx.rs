@@ -109,7 +109,6 @@ pub struct ExecCtx {
 
 impl ExecCtx {
     pub(crate) fn new(mut globals: GlobalStore, settings: crate::settings::ExecSettings) -> Self {
-        varn_runtime::init_heap();
         let mut heap = Heap::new();
 
         let fresh = globals.values.is_empty();
@@ -451,7 +450,9 @@ fn gather_minor_roots(
         }
     });
     seg!(9, 0, {
-        if let Some(VmSuspend::Yield { value, .. }) = &ctx.vm_suspend {
+        if let Some(VmSuspend::Yield { value, .. } | VmSuspend::Await { value, .. }) =
+            &ctx.vm_suspend
+        {
             vals.push(*value);
         }
     });
@@ -527,7 +528,9 @@ fn write_minor_seg(ctx: &mut ExecCtx, seg: &MinorSeg, vals: &[VmValue]) {
         }
         9 => {
             if seg.len == 1 {
-                if let Some(VmSuspend::Yield { value, .. }) = &mut ctx.vm_suspend {
+                if let Some(VmSuspend::Yield { value, .. } | VmSuspend::Await { value, .. }) =
+                    &mut ctx.vm_suspend
+                {
                     *value = slice[0];
                 }
             }
@@ -695,6 +698,22 @@ impl ExecCtx {
         let scope = super::scheduler::gc_scope(self);
         for &owner in &scope.owners[1..] {
             roots.extend(unsafe { &*owner }.major_roots_local());
+        }
+        for cell in &scope.cells {
+            cell.trace_cells(&mut |c| {
+                let v = c.get();
+                if v.is_heap() {
+                    roots.push(v.as_heap_idx());
+                }
+            });
+        }
+        for lazy in &scope.lazies {
+            lazy.trace_cells(&mut |c| {
+                let v = c.get();
+                if v.is_heap() {
+                    roots.push(v.as_heap_idx());
+                }
+            });
         }
         for &frozen in &scope.frozen {
             let st: &super::scheduler::Frozen = unsafe { &*frozen };

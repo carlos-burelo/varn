@@ -1,7 +1,7 @@
 use parking_lot::RwLock;
 use std::process::{Child, Command};
 use varn_op_macros::varn_contract;
-use varn_types::{NativeCtx, Value, VmValue, VnArray};
+use varn_types::{NativeCtx, VmValue, VnArray};
 
 static PROCESS_POOL: RwLock<Vec<Option<Child>>> = RwLock::new(Vec::new());
 
@@ -33,10 +33,10 @@ varn_contract! {
             ctx.set_field(obj, "exitCode", VmValue::from_int(exit_code));
             ctx.set_field(obj, "success", VmValue::from_bool(success));
 
-            let out_nv = ctx.intern(Value::Str(stdout_str.into()));
+            let out_nv = ctx.alloc_str_owned(stdout_str);
             ctx.set_field(obj, "stdout", out_nv);
 
-            let err_nv = ctx.intern(Value::Str(stderr_str.into()));
+            let err_nv = ctx.alloc_str_owned(stderr_str);
             ctx.set_field(obj, "stderr", err_nv);
 
             Ok(obj)

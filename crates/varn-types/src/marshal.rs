@@ -1,6 +1,5 @@
 use crate::native_ctx::NativeCtx;
 use crate::vm_value::VmValue;
-use crate::Value;
 
 pub trait FromVm: Sized {
     fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String>;
@@ -149,10 +148,8 @@ impl FromVm for VnStr {
 impl FromVm for char {
     #[inline]
     fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
-        match ctx.extract(v) {
-            Value::Char(c) => Ok(c),
-            other => Err(format!("expected char, got {other:?}")),
-        }
+        ctx.as_char(v)
+            .ok_or_else(|| format!("expected char, got {v:?}"))
     }
 }
 
@@ -226,7 +223,7 @@ impl IntoVm for &str {
 impl IntoVm for char {
     #[inline]
     fn into_vm(self, ctx: &mut dyn NativeCtx) -> VmValue {
-        ctx.intern(Value::Char(self))
+        ctx.alloc_char(self)
     }
 }
 

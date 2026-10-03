@@ -30,7 +30,6 @@ impl Display for ModuleError {
 pub trait ModuleLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError>;
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError>;
-    fn native(&self, id: &ModuleId) -> Option<varn_types::Value>;
 }
 
 pub struct CompositeLoader {
@@ -64,14 +63,5 @@ impl ModuleLoader for CompositeLoader {
             }
         }
         Ok(None)
-    }
-
-    fn native(&self, id: &ModuleId) -> Option<varn_types::Value> {
-        for loader in &self.loaders {
-            if let Some(v) = loader.native(id) {
-                return Some(v);
-            }
-        }
-        None
     }
 }

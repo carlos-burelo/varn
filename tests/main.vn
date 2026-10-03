@@ -142,6 +142,7 @@ import "./153-local-types.vn"
 import "./154-task-gc-roots.vn"
 import "./155-array-remembered-prefix.vn"
 import "./156-array-literal-forwarding.vn"
+import "./157-task-value-handles.vn"
 
 summary()
 

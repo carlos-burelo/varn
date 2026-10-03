@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{native_ctx::NativeCtx, vm_value::VmValue, Value};
+use crate::{native_ctx::NativeCtx, vm_value::VmValue};
 
 pub type NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> crate::NativeFnResult;
 
@@ -150,12 +150,6 @@ use crate::resource::ResourceStore;
 pub struct DummyCtx;
 
 impl NativeCtx for DummyCtx {
-    fn intern(&mut self, _v: Value) -> VmValue {
-        VmValue::null()
-    }
-    fn intern_value(&mut self, _v: Value) -> VmValue {
-        VmValue::null()
-    }
     fn alloc_str(&mut self, _s: &str) -> VmValue {
         VmValue::null()
     }
@@ -221,23 +215,14 @@ impl NativeCtx for DummyCtx {
     fn resources(&mut self) -> &mut ResourceStore {
         panic!("DummyCtx")
     }
-    fn extract(&self, _v: VmValue) -> Value {
-        Value::Null
-    }
     fn call_static(&mut self, _f: NativeFn) -> VmValue {
         VmValue::null()
     }
 }
 
-struct StaticInitCtx<'a>(&'a mut dyn NativeCtx);
+struct StaticInitCtx;
 
-impl<'a> NativeCtx for StaticInitCtx<'a> {
-    fn intern(&mut self, v: Value) -> VmValue {
-        self.0.intern(v)
-    }
-    fn intern_value(&mut self, v: Value) -> VmValue {
-        self.0.intern(v)
-    }
+impl NativeCtx for StaticInitCtx {
     fn alloc_str(&mut self, _s: &str) -> VmValue {
         VmValue::null()
     }
@@ -303,15 +288,11 @@ impl<'a> NativeCtx for StaticInitCtx<'a> {
     fn resources(&mut self) -> &mut ResourceStore {
         panic!("resources() unavailable in static init context")
     }
-    fn extract(&self, _v: VmValue) -> Value {
-        Value::Null
-    }
     fn call_static(&mut self, f: NativeFn) -> VmValue {
         (f)(self as &mut dyn NativeCtx, &[]).unwrap_or(VmValue::null())
     }
 }
 
-pub fn call_static_with(ctx: &mut dyn NativeCtx, f: NativeFn) -> VmValue {
-    let mut shim = StaticInitCtx(ctx);
-    (f)(&mut shim, &[]).unwrap_or(VmValue::null())
+pub fn call_static_with(f: NativeFn) -> VmValue {
+    (f)(&mut StaticInitCtx, &[]).unwrap_or(VmValue::null())
 }

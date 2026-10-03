@@ -1,53 +1,24 @@
 mod alloc;
 mod buffer;
 mod class;
-mod closure;
-mod constructors;
 mod instance;
 mod map;
 mod module;
 mod object;
 mod sendable;
 mod shape;
-mod task;
-mod task_args;
-mod traits;
-use crate::generator::GeneratorObj;
 pub use crate::native::NativeFn;
-use crate::task::AsyncTask;
-pub use alloc::{
-    alloc_array, alloc_map, alloc_object, alloc_set, get_global_vtable, init_thread_heap,
-    install_allocator, register_global_vtable, AllocVtable, ArrayRef, MapKey, MapRef, ObjRef,
-    RuntimeString, SetRef, ValueMap, ValueSet,
-};
-use bigdecimal::BigDecimal as Decimal;
+pub use alloc::{MapKey, MapRef, ObjRef, RuntimeString, SetRef, ValueMap, ValueSet};
 pub use buffer::VmBuffer;
 pub use class::{find_method_with_owner, ClassObj};
-pub use closure::{Closure, Upvalue, UpvalueInner};
-pub use constructors::{new_array, new_object};
 pub use instance::{InstanceData, InstanceRef, INST_CLASS_ID_OFF, INST_PAYLOAD_OFF};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
-pub use object::{
-    nv_to_value, value_to_nv, ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF,
-};
-pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
+pub use object::{ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF};
+pub use sendable::{SendEnumVariant, SendValue};
 pub use shape::{root_shape, Shape, SHAPE_ID_OFF};
 use std::rc::Rc;
 use std::sync::Arc;
-pub use task::{reject_task, reject_value_task, resolve_task, Poll, TaskState};
-pub use task_args::TaskArgs;
-pub use varn_core::{RuntimeKind, VmValuePayload};
-
-pub type RuntimeArray = Vec<Value>;
-
-#[derive(Debug, Clone)]
-pub struct LazyTask {
-    pub proto: Rc<crate::chunk::FunctionProto>,
-    pub upvalues: Vec<crate::value::closure::Upvalue>,
-    pub module_base: u32,
-    pub args: TaskArgs,
-    pub current_class: Option<Rc<crate::value::class::ClassObj>>,
-}
+pub use varn_core::RuntimeKind;
 
 /// The element domain of a `Range<T>`: bounds are stored as `i64` either
 /// way (a `char` as its code point).
@@ -110,17 +81,12 @@ impl RangeData {
         raw >= self.start && raw < self.end_exclusive() && (raw - self.start) % self.step == 0
     }
 
-    /// The element `raw` stands for.
-    pub fn element(&self, raw: i64) -> crate::Value {
-        match self.elem {
-            RangeElem::Int => crate::Value::Int(raw),
-            RangeElem::Char => crate::Value::Char(
-                u32::try_from(raw)
-                    .ok()
-                    .and_then(char::from_u32)
-                    .unwrap_or('\0'),
-            ),
-        }
+    /// The character a raw bound of a `char` range stands for.
+    pub fn char_of(raw: i64) -> char {
+        u32::try_from(raw)
+            .ok()
+            .and_then(char::from_u32)
+            .unwrap_or('\0')
     }
 
     pub fn with_step(&self, step: i64) -> Self {
@@ -139,8 +105,8 @@ impl std::fmt::Display for RangeData {
             RangeElem::Char => write!(
                 f,
                 "{}{dots}{}",
-                self.element(self.start),
-                self.element(self.end)
+                Self::char_of(self.start),
+                Self::char_of(self.end)
             )?,
         }
         if self.step != 1 {
@@ -181,7 +147,7 @@ pub struct EnumVariantData {
     pub variant_name: Arc<str>,
     pub variant_tag: i64,
     pub fields: Vec<Arc<str>>,
-    pub payload: Value,
+    pub payload: crate::vm_value::VmValue,
 }
 
 #[derive(Clone, Debug)]
@@ -191,44 +157,13 @@ pub enum BoundMethodTarget {
         name: &'static str,
     },
     Vm {
-        closure: Box<dyn VmValuePayload>,
+        closure: crate::vm_value::VmValue,
         owner_class: Option<Rc<ClassObj>>,
     },
 }
 
 #[derive(Clone, Debug)]
 pub struct BoundMethod {
-    pub receiver: Value,
+    pub receiver: crate::vm_value::VmValue,
     pub target: BoundMethodTarget,
 }
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    Str(RuntimeString),
-    BigInt(Box<num_bigint::BigInt>),
-    Decimal(Box<Decimal>),
-    Array(ArrayRef),
-    Object(ObjRef),
-    Class(Rc<ClassObj>),
-    NativeFn(Box<(NativeFn, &'static str)>),
-    BoundMethod(Box<BoundMethod>),
-    Spread(Box<Value>),
-    Task(Rc<LazyTask>),
-    TaskHandle(AsyncTask),
-    Range(Box<RangeData>),
-    Map(MapRef),
-    Set(SetRef),
-    Symbol(RuntimeSymbol),
-    Generator(GeneratorObj),
-    Char(char),
-    EnumVariant(Box<EnumVariantData>),
-    VmValue(Box<dyn VmValuePayload>),
-    Module(Rc<ModuleObj>),
-    Buffer(VmBuffer),
-}
-
-pub type ResultType = Result<Value, String>;

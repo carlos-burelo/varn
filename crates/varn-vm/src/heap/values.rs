@@ -39,12 +39,65 @@ impl HeapInner {
         VmValue::from_int(n)
     }
 
+    pub(crate) fn alloc_spread(&mut self, inner: VmValue) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::Spread(inner)))
+    }
+
+    pub(crate) fn alloc_range_data(&mut self, r: varn_types::value::RangeData) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::Range(r)))
+    }
+
     pub(crate) fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::Range(RangeData::int(start, end, inclusive))))
     }
 
     pub(crate) fn alloc_decimal(&mut self, d: bigdecimal::BigDecimal) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::Decimal(Box::new(d))))
+    }
+
+    pub(crate) fn alloc_bound_native(
+        &mut self,
+        receiver: VmValue,
+        func: varn_types::NativeFn,
+        name: &'static str,
+    ) -> VmValue {
+        let bound = varn_types::value::BoundMethod {
+            receiver,
+            target: varn_types::value::BoundMethodTarget::Native { func, name },
+        };
+        VmValue::from_heap_idx(self.alloc(HeapObj::BoundMethod(Box::new(bound))))
+    }
+
+    pub(crate) fn alloc_bound_vm(
+        &mut self,
+        receiver: VmValue,
+        closure: VmValue,
+        owner_class: Option<Rc<varn_types::ClassObj>>,
+    ) -> VmValue {
+        let bound = varn_types::value::BoundMethod {
+            receiver,
+            target: varn_types::value::BoundMethodTarget::Vm {
+                closure,
+                owner_class,
+            },
+        };
+        VmValue::from_heap_idx(self.alloc(HeapObj::BoundMethod(Box::new(bound))))
+    }
+
+    pub(crate) fn alloc_enum_variant_vm(
+        &mut self,
+        data: varn_types::value::EnumVariantData,
+    ) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::EnumVariant(Box::new(data))))
+    }
+
+    pub(crate) fn alloc_set_vm(&mut self, set: varn_types::value::ValueSet) -> VmValue {
+        let sref = varn_types::value::SetRef::new(set);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Set(sref)))
+    }
+
+    pub(crate) fn alloc_class_vm(&mut self, class: Rc<varn_types::ClassObj>) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::Class(class)))
     }
 
     pub(crate) fn alloc_vm_closure(&mut self, c: Rc<VmClosure>) -> VmValue {

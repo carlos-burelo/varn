@@ -158,28 +158,23 @@ fn variant_eq(
         // A value that crossed an isolate channel carries only the name.
         _ => a.enum_name == b.enum_name,
     };
-    same_enum && a.variant_tag == b.variant_tag && payload_eq(&a.payload, &b.payload, heap)
+    same_enum && a.variant_tag == b.variant_tag && payload_eq(a.payload, b.payload, heap)
 }
 
-fn payload_eq(a: &varn_types::Value, b: &varn_types::Value, heap: &Heap) -> bool {
-    use varn_types::Value;
-    match (a, b) {
-        (Value::Array(x), Value::Array(y)) => {
-            let (x, y) = (x.read(), y.read());
-            x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| payload_eq(p, q, heap))
-        }
-        (Value::Object(x), Value::Object(y)) => {
-            let (x, y) = (x.borrow(), y.borrow());
+fn payload_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+    if a.is_heap() && b.is_heap() {
+        if let (Some(HeapObj::Object(x)), Some(HeapObj::Object(y))) =
+            (heap.get(a.as_heap_idx()), heap.get(b.as_heap_idx()))
+        {
             let keys: Vec<_> = x.keys().collect();
-            keys.len() == y.keys().count()
+            return keys.len() == y.keys().count()
                 && keys.iter().all(|k| match (x.get(k), y.get(k)) {
                     (Some(p), Some(q)) => member_eq(p, q, heap),
                     _ => false,
-                })
+                });
         }
-        (Value::EnumVariant(x), Value::EnumVariant(y)) => variant_eq(x, y, heap),
-        _ => a == b,
     }
+    member_eq(a, b, heap)
 }
 
 #[inline(always)]

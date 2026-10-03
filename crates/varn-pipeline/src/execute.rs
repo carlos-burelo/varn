@@ -6,7 +6,6 @@ use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
 use varn_types::capabilities::CapabilitySet;
-use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
 
@@ -58,91 +57,51 @@ pub fn execute_with_caps(
                 format_args!("running builtin {name}"),
             );
         }
-        let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new()));
+        let closure = Rc::new(builtin_proto);
         machine
             .run(closure)
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
 
-    let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new()));
+    let main_proto = Rc::new(proto);
 
-    let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
+    let main_module_id = ModuleId::local_str(&main_proto.chunk.source_file);
     let mut export_map = FxHashMap::default();
-    for (idx, name) in main_closure.proto.export_names.iter().enumerate() {
+    for (idx, name) in main_proto.export_names.iter().enumerate() {
         export_map.insert(name.clone(), idx);
     }
-    let mut module_obj = varn_types::ModuleObj::new(
-        main_module_id.clone(),
-        main_closure.proto.export_names.len(),
-    );
+    let mut module_obj =
+        varn_types::ModuleObj::new(main_module_id.clone(), main_proto.export_names.len());
     module_obj.export_map = export_map;
     let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
     unsafe { &mut *machine.ctx.modules.get() }.insert(main_module_id, module_val);
     machine.ctx.module_exports.insert(0, module_val);
 
     if _debug.trace {
-        let name = main_closure.proto.name.as_deref().unwrap_or("<main>");
+        let name = main_proto.name.as_deref().unwrap_or("<main>");
         varn_core::term::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
     }
 
     loop {
-        let res = machine.run(main_closure.clone());
+        let res = machine.run(main_proto.clone());
         match res {
             Ok(_) => match machine.ctx.vm_suspend.take() {
                 None => break,
                 Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
-                    let res_val = match value {
-                        varn_types::Value::Task(lazy) => {
-                            let handle = machine.ctx.run_lazy_task_sync(lazy);
-                            match handle.peek_state() {
-                                varn_types::task::TaskState::Resolved(v) => Ok(v),
-                                varn_types::task::TaskState::Rejected(e) => Err(e),
-                                _ => Ok(varn_types::Value::Null),
-                            }
-                        }
-                        varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
-                            varn_types::task::TaskState::Resolved(v) => Ok(v),
-                            varn_types::task::TaskState::Rejected(e) => Err(e),
-                            _ => {
-                                machine.ctx.pump_until(&handle);
-                                match handle.peek_state() {
-                                    varn_types::task::TaskState::Resolved(v) => Ok(v),
-                                    varn_types::task::TaskState::Rejected(e) => Err(e),
-                                    _ => Ok(varn_types::Value::Null),
-                                }
-                            }
-                        },
-                        other => Ok(other),
-                    };
-
-                    match res_val {
+                    match machine.ctx.settle_awaited(value) {
                         Ok(resolved) => {
-                            let resolved = varn_vm::exec::host_values::open_resolved(
-                                &mut machine.ctx,
-                                resolved,
-                            );
-                            let resolved_nv = machine.ctx.heap.intern(resolved);
-
                             if let Some(frame) = machine.ctx.frames.last() {
-                                // Fase A (frame por clases): el registro vive en
-                                // el almacén por clases y se escribe por su ruta
-                                // tipada; `Await` reescribe un registro DYN del
-                                // llamante (el resultado de la tarea), no un
-                                // escalar del frame.
                                 let base = frame.base;
                                 let _ = machine.ctx.stack.unbox_into_reg(
                                     base,
                                     dest_reg as usize,
-                                    resolved_nv,
+                                    resolved,
                                 );
                             }
                         }
                         Err(thrown) => {
-                            let thrown =
-                                varn_vm::exec::host_values::open_rejected(&mut machine.ctx, thrown);
-                            let thrown_nv = machine.ctx.heap.intern(thrown.clone());
                             let err = varn_vm::exec::exceptions::build_thrown_error(
-                                thrown_nv,
+                                thrown,
                                 &machine.ctx.heap,
                                 &machine.ctx.frames,
                             );

@@ -62,8 +62,7 @@ impl ExecCtx {
             .clone()
             .or_else(|| crate::exec::props::get_class(this_val, &self.heap))
             .ok_or_else(|| RuntimeError::new("GetSuper: 'this' has no class"))?;
-        let class_nv = self.heap.intern(varn_types::Value::Class(cls));
-        crate::exec::class::op_get_super(class_nv, &name, this_val, &mut self.heap)
+        crate::exec::class::op_get_super(cls, &name, this_val, &mut self.heap)
     }
 
     pub(in crate::exec::dispatch) fn exec_get_symbol(
@@ -73,12 +72,9 @@ impl ExecCtx {
         closure: &VmClosure,
     ) -> VmResult<VmValue> {
         let sym_nv = closure.constants[sym_idx];
-        let sym_val = self.heap.extract(sym_nv);
-        match sym_val {
-            varn_types::Value::Symbol(s) => {
-                crate::exec::advanced::get_symbol_property(obj, s, &mut self.heap)
-            }
-            _ => Err(crate::error::RuntimeError::new(
+        match self.heap.symbol_of(sym_nv) {
+            Some(s) => crate::exec::advanced::get_symbol_property(obj, s, &mut self.heap),
+            None => Err(crate::error::RuntimeError::new(
                 "GetSymbol: non-symbol constant",
             )),
         }

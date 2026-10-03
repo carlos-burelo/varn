@@ -1,15 +1,11 @@
 use varn_op_macros::varn_contract;
 use varn_types::value::MapRef;
-use varn_types::{NativeCtx, NativeError, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Map;
 
 fn get_map(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
-    if let Value::Map(m) = ctx.extract(this) {
-        Some(m)
-    } else {
-        None
-    }
+    ctx.as_map(this)
 }
 
 varn_contract! {
@@ -18,7 +14,7 @@ varn_contract! {
     contract: "src/modules/core/types/map/map.vn",
     impl Map {
         fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
-            ctx.intern(Value::Map(MapRef::new(varn_types::value::ValueMap::default())))
+            ctx.alloc_map(Vec::new())
         }
 
         fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Result<Option<VmValue>, NativeError> {

@@ -368,12 +368,9 @@ impl ExecCtx {
             OpCode::WrapSpread => {
                 let src = hi(code[*ip]);
                 *ip += 1;
-                let v = self.heap.extract(self.stack.box_reg(base, src));
-                self.stack.unbox_into_reg(
-                    base,
-                    first_reg,
-                    self.heap.intern(varn_types::Value::Spread(Box::new(v))),
-                )?;
+                let v = self.stack.box_reg(base, src);
+                let spread = self.heap.alloc_spread(v);
+                self.stack.unbox_into_reg(base, first_reg, spread)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayLength => {

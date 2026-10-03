@@ -25,7 +25,6 @@ pub enum FrozenExport {
     Str(Arc<str>),
     NativeFn(NativeFn, &'static str),
     Class(Rc<crate::value::class::ClassObj>),
-    VmClosure(Box<dyn crate::value::VmValuePayload>),
     Nested(Arc<FrozenModuleObj>),
 }
 

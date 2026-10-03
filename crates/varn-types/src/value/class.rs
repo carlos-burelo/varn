@@ -1,4 +1,5 @@
-use super::{RuntimeString, Value};
+use super::RuntimeString;
+use crate::vm_value::VmValue;
 use rustc_hash::FxHashMap as HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,27 +19,27 @@ pub struct ClassObj {
     pub name: String,
     pub is_native: bool,
     pub superclass: RefCell<Option<Rc<ClassObj>>>,
-    pub vtable: RefCell<Vec<Value>>,
+    pub vtable: RefCell<Vec<VmValue>>,
     pub vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub method_map: RefCell<HashMap<RuntimeString, usize>>,
-    pub statics: RefCell<HashMap<RuntimeString, Value>>,
+    pub statics: RefCell<HashMap<RuntimeString, VmValue>>,
     pub static_fields: RefCell<Vec<RuntimeString>>,
     pub vtable_version: AtomicU32,
     pub root_shape: RefCell<Rc<super::shape::Shape>>,
     pub getter_map: RefCell<HashMap<RuntimeString, usize>>,
-    pub getter_vtable: RefCell<Vec<Value>>,
+    pub getter_vtable: RefCell<Vec<VmValue>>,
     pub getter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub setter_map: RefCell<HashMap<RuntimeString, usize>>,
-    pub setter_vtable: RefCell<Vec<Value>>,
+    pub setter_vtable: RefCell<Vec<VmValue>>,
     pub setter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
-    pub static_getter_map: RefCell<HashMap<RuntimeString, Value>>,
-    pub static_setter_map: RefCell<HashMap<RuntimeString, Value>>,
+    pub static_getter_map: RefCell<HashMap<RuntimeString, VmValue>>,
+    pub static_setter_map: RefCell<HashMap<RuntimeString, VmValue>>,
     /// Cached `constructor` lookup keyed by vtable_version, so hot `new`
     /// paths skip the method_map hash lookup on every instantiation.
-    pub ctor_cache: RefCell<Option<(u32, Option<Value>)>>,
+    pub ctor_cache: RefCell<Option<(u32, Option<VmValue>)>>,
     /// VM-owned constructor cache keyed by vtable_version: the VM stores its
     /// resolved closure here (`Rc<VmClosure>` as `Rc<dyn Any>`) so hot `new`
-    /// paths skip the `Value` box clone + downcast. `Some((v, None))` means
+    /// paths skip the `VmValue` box clone + downcast. `Some((v, None))` means
     /// "class has no constructor". varn-types only provides the slot.
     pub ctor_rt_cache: RefCell<Option<CtorRtCacheEntry>>,
     /// Cached instance shape and inline field count. In Varn, classes have
@@ -176,14 +177,36 @@ impl ClassObj {
         layout
     }
 
-    pub fn add_method(&self, name: impl Into<Arc<str>>, value: Value) {
+    pub fn for_each_value_mut(&self, f: &mut dyn FnMut(&mut VmValue)) {
+        for v in self.vtable.borrow_mut().iter_mut() {
+            f(v);
+        }
+        for v in self.getter_vtable.borrow_mut().iter_mut() {
+            f(v);
+        }
+        for v in self.setter_vtable.borrow_mut().iter_mut() {
+            f(v);
+        }
+        for v in self.statics.borrow_mut().values_mut() {
+            f(v);
+        }
+        for v in self.static_getter_map.borrow_mut().values_mut() {
+            f(v);
+        }
+        for v in self.static_setter_map.borrow_mut().values_mut() {
+            f(v);
+        }
+        *self.ctor_cache.borrow_mut() = None;
+    }
+
+    pub fn add_method(&self, name: impl Into<Arc<str>>, value: VmValue) {
         self.add_method_with_owner(name, value, None);
     }
 
     pub fn add_method_with_owner(
         &self,
         name: impl Into<Arc<str>>,
-        value: Value,
+        value: VmValue,
         owner: Option<Rc<ClassObj>>,
     ) {
         let name: Arc<str> = name.into();
@@ -203,14 +226,14 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_getter(&self, name: impl Into<Arc<str>>, value: Value) {
+    pub fn add_getter(&self, name: impl Into<Arc<str>>, value: VmValue) {
         self.add_getter_with_owner(name, value, None);
     }
 
     pub fn add_getter_with_owner(
         &self,
         name: impl Into<Arc<str>>,
-        value: Value,
+        value: VmValue,
         owner: Option<Rc<ClassObj>>,
     ) {
         let name: Arc<str> = name.into();
@@ -233,7 +256,7 @@ impl ClassObj {
     pub fn add_setter_with_owner(
         &self,
         name: impl Into<Arc<str>>,
-        value: Value,
+        value: VmValue,
         owner: Option<Rc<ClassObj>>,
     ) {
         let name: Arc<str> = name.into();
@@ -253,7 +276,7 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_static_getter(&self, name: impl Into<Arc<str>>, value: Value) {
+    pub fn add_static_getter(&self, name: impl Into<Arc<str>>, value: VmValue) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {
@@ -262,7 +285,7 @@ impl ClassObj {
         self.static_getter_map.borrow_mut().insert(name_rc, value);
     }
 
-    pub fn add_static_setter(&self, name: impl Into<Arc<str>>, value: Value) {
+    pub fn add_static_setter(&self, name: impl Into<Arc<str>>, value: VmValue) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {
@@ -271,7 +294,7 @@ impl ClassObj {
         self.static_setter_map.borrow_mut().insert(name_rc, value);
     }
 
-    pub fn add_static(&self, name: impl Into<Arc<str>>, value: Value) {
+    pub fn add_static(&self, name: impl Into<Arc<str>>, value: VmValue) {
         let name_rc = name.into();
         let mut fields = self.static_fields.borrow_mut();
         if !fields.contains(&name_rc) {
@@ -280,41 +303,41 @@ impl ClassObj {
         self.statics.borrow_mut().insert(name_rc, value);
     }
 
-    pub fn get_static(&self, name: &str) -> Option<Value> {
-        self.statics.borrow().get(name).cloned()
+    pub fn get_static(&self, name: &str) -> Option<VmValue> {
+        self.statics.borrow().get(name).copied()
     }
 
-    pub fn find_getter(&self, name: &str) -> Option<Value> {
+    pub fn find_getter(&self, name: &str) -> Option<VmValue> {
         if let Some(&idx) = self.getter_map.borrow().get(name) {
-            return Some(self.getter_vtable.borrow()[idx].clone());
+            return Some(self.getter_vtable.borrow()[idx]);
         }
         self.superclass.borrow().as_ref()?.find_getter(name)
     }
 
-    pub fn find_setter(&self, name: &str) -> Option<Value> {
+    pub fn find_setter(&self, name: &str) -> Option<VmValue> {
         if let Some(&idx) = self.setter_map.borrow().get(name) {
-            return Some(self.setter_vtable.borrow()[idx].clone());
+            return Some(self.setter_vtable.borrow()[idx]);
         }
         self.superclass.borrow().as_ref()?.find_setter(name)
     }
 
-    pub fn find_static_getter(&self, name: &str) -> Option<Value> {
+    pub fn find_static_getter(&self, name: &str) -> Option<VmValue> {
         if let Some(v) = self.static_getter_map.borrow().get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
         self.superclass.borrow().as_ref()?.find_static_getter(name)
     }
 
-    pub fn find_static_setter(&self, name: &str) -> Option<Value> {
+    pub fn find_static_setter(&self, name: &str) -> Option<VmValue> {
         if let Some(v) = self.static_setter_map.borrow().get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
         self.superclass.borrow().as_ref()?.find_static_setter(name)
     }
 
-    pub fn find_method(&self, name: &str) -> Option<Value> {
+    pub fn find_method(&self, name: &str) -> Option<VmValue> {
         if let Some(&idx) = self.method_map.borrow().get(name) {
-            return Some(self.vtable.borrow()[idx].clone());
+            return Some(self.vtable.borrow()[idx]);
         }
         if let Some(super_cls) = &*self.superclass.borrow() {
             return super_cls.find_method(name);
@@ -322,35 +345,23 @@ impl ClassObj {
         None
     }
 
-    /// Runs `f` on the cached constructor without cloning it out of the cache.
-    pub fn with_constructor<R>(&self, f: impl FnOnce(Option<&Value>) -> R) -> R {
-        let ver = self.vtable_version.load(Ordering::Relaxed);
-        if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {
-            if *cached_ver == ver {
-                return f(ctor.as_ref());
-            }
-        }
-        let ctor = self.constructor();
-        f(ctor.as_ref())
-    }
-
     /// Cached `find_method("constructor")`, invalidated by vtable_version.
-    pub fn constructor(&self) -> Option<Value> {
+    pub fn constructor(&self) -> Option<VmValue> {
         let ver = self.vtable_version.load(Ordering::Relaxed);
         if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {
             if *cached_ver == ver {
-                return ctor.clone();
+                return *ctor;
             }
         }
         let ctor = self.find_method("constructor");
-        *self.ctor_cache.borrow_mut() = Some((ver, ctor.clone()));
+        *self.ctor_cache.borrow_mut() = Some((ver, ctor));
         ctor
     }
 }
 
-pub fn find_method_with_owner(class: &Rc<ClassObj>, name: &str) -> Option<(Value, Rc<ClassObj>)> {
+pub fn find_method_with_owner(class: &Rc<ClassObj>, name: &str) -> Option<(VmValue, Rc<ClassObj>)> {
     if let Some(&idx) = class.method_map.borrow().get(name) {
-        return Some((class.vtable.borrow()[idx].clone(), class.clone()));
+        return Some((class.vtable.borrow()[idx], class.clone()));
     }
     if let Some(super_cls) = &*class.superclass.borrow() {
         return find_method_with_owner(super_cls, name);

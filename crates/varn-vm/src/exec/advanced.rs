@@ -3,7 +3,7 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use varn_core::RuntimeKind;
 use varn_types::value::RuntimeSymbol;
-use varn_types::{ClassObj, NativeCtx, Value};
+use varn_types::{ClassObj, NativeCtx};
 
 pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     if val.is_null() {
@@ -87,7 +87,7 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
     }
     let key_s = heap.str_repr(key);
     match heap.get(obj.as_heap_idx()) {
-        Some(HeapObj::Object(o)) => o.borrow().get_field(&key_s).is_some(),
+        Some(HeapObj::Object(o)) => o.borrow().contains_key(&key_s),
         Some(HeapObj::Array(a)) => {
             if let Ok(idx) = key_s.parse::<usize>() {
                 return idx < a.len();
@@ -124,14 +124,25 @@ pub(crate) fn get_symbol_property(
     symbol: RuntimeSymbol,
     heap: &mut Heap,
 ) -> VmResult<VmValue> {
-    let val = heap.extract(obj);
     let sym_str = symbol.to_string();
-    let result = match (&val, symbol) {
-        (Value::Array(_), RuntimeSymbol::Iterator) => {
-            Value::native_bound(val.clone(), array_symbol_iterator, "[Symbol.iterator]")
+    let kind = obj
+        .is_heap()
+        .then(|| heap.get(obj.as_heap_idx()))
+        .flatten()
+        .map(|o| match o {
+            HeapObj::Array(_) => 1,
+            HeapObj::Range(_) => 2,
+            HeapObj::Generator(_) => 3,
+            HeapObj::Object(_) => 4,
+            _ => 0,
+        })
+        .unwrap_or(0);
+    let result = match (kind, symbol) {
+        (1, RuntimeSymbol::Iterator) => {
+            heap.alloc_bound_native(obj, array_symbol_iterator, "[Symbol.iterator]")
         }
-        (Value::Range(_), RuntimeSymbol::Iterator) => {
-            Value::native_bound(val.clone(), range_symbol_iterator, "[Symbol.iterator]")
+        (2, RuntimeSymbol::Iterator) => {
+            heap.alloc_bound_native(obj, range_symbol_iterator, "[Symbol.iterator]")
         }
         // A generator is its own iterator under both protocols. `for await`
         // asks for `Symbol.asyncIterator`, and an `async function*` has to
@@ -139,16 +150,16 @@ pub(crate) fn get_symbol_property(
         // answers `Symbol.iterator`: `next()` settles its awaits before
         // returning, so the two protocols are the same object here and
         // `for await` over a sync generator is simply a no-op await per step.
-        (Value::Generator(_), RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
-            Value::native_bound(val.clone(), generator_symbol_iterator, "[Symbol.iterator]")
+        (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
+            heap.alloc_bound_native(obj, generator_symbol_iterator, "[Symbol.iterator]")
         }
-        (Value::Object(o), _) => {
-            let guard = o.borrow();
-            guard.get_field(sym_str.as_str()).unwrap_or(Value::Null)
-        }
-        _ => Value::Null,
+        (4, _) => match heap.get(obj.as_heap_idx()) {
+            Some(HeapObj::Object(o)) => o.get(sym_str.as_str()).unwrap_or(VmValue::null()),
+            _ => VmValue::null(),
+        },
+        _ => VmValue::null(),
     };
-    Ok(heap.intern(result))
+    Ok(result)
 }
 
 fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
@@ -158,8 +169,7 @@ fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_type
     ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
     let res_nv = ctx.alloc_object();
     ctx.set_field(iter_nv, "__res", res_nv);
-    let extracted = ctx.extract(iter_nv);
-    let next_nv = ctx.intern(Value::native_bound(extracted, array_iter_next, "next"));
+    let next_nv = ctx.alloc_bound_native(iter_nv, array_iter_next, "next");
     ctx.set_field(iter_nv, "next", next_nv);
     Ok(iter_nv)
 }
@@ -195,7 +205,7 @@ fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_type
         .first()
         .copied()
         .ok_or("range_symbol_iterator: missing receiver")?;
-    if !matches!(ctx.extract(range_nv), Value::Range(_)) {
+    if ctx.as_range(range_nv).is_none() {
         return Err("range_symbol_iterator: invalid receiver".into());
     }
     let iter_nv = ctx.alloc_object();
@@ -203,11 +213,7 @@ fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_type
     ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
     let res_nv = ctx.alloc_object();
     ctx.set_field(iter_nv, "__res", res_nv);
-    let next_nv = ctx.intern(Value::native_bound(
-        ctx.extract(iter_nv),
-        range_iter_next,
-        "next",
-    ));
+    let next_nv = ctx.alloc_bound_native(iter_nv, range_iter_next, "next");
     ctx.set_field(iter_nv, "next", next_nv);
     Ok(iter_nv)
 }
@@ -218,7 +224,7 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nat
         .copied()
         .ok_or("range_iter_next: missing receiver")?;
     let range_nv = ctx.get_field(obj_nv, "__range").unwrap_or(VmValue::null());
-    let Value::Range(range) = ctx.extract(range_nv) else {
+    let Some(range) = ctx.as_range(range_nv) else {
         return Err("range_iter_next: invalid range".into());
     };
     let idx = ctx.as_int(ctx.get_field(obj_nv, "__idx").unwrap_or(VmValue::null()));
@@ -232,7 +238,7 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nat
     };
     let next_idx = ctx.int_val(idx + 1);
     ctx.set_field(obj_nv, "__idx", next_idx);
-    let item = ctx.intern(range.element(raw));
+    let item = ctx.range_element(&range, raw);
     ctx.set_field(result_nv, "value", item);
     ctx.set_field(result_nv, "done", VmValue::from_bool(false));
     Ok(result_nv)
@@ -250,15 +256,13 @@ pub(crate) fn bind_method(
     method: VmValue,
     heap: &mut Heap,
 ) -> VmResult<VmValue> {
-    let recv_val = heap.extract(receiver);
-    let method_val = heap.extract(method);
-    match method_val {
-        Value::NativeFn(b) => Ok(heap.intern(Value::native_bound(recv_val, b.0, b.1))),
-        Value::VmValue(payload) if !recv_val.is_null() => {
-            Ok(heap.intern(Value::vm_bound(recv_val, payload, None)))
-        }
-        other => Ok(heap.intern(other)),
+    if let Some((f, name)) = heap.native_of(method) {
+        return Ok(heap.alloc_bound_native(receiver, f, name));
     }
+    if heap.closure_of(method).is_some() && !receiver.is_null() {
+        return Ok(heap.alloc_bound_vm(receiver, method, None));
+    }
+    Ok(method)
 }
 
 pub(crate) fn invoke_runtime_static(
@@ -275,8 +279,8 @@ pub(crate) fn invoke_runtime_static(
             let start = stack
                 .pop()
                 .ok_or_else(|| RuntimeError::new("range: stack empty"))?;
-            let r = match (heap.extract(start), heap.extract(end)) {
-                (Value::Char(a), Value::Char(b)) => varn_types::value::RangeData {
+            let r = match (heap.char_of(start), heap.char_of(end)) {
+                (Some(a), Some(b)) => varn_types::value::RangeData {
                     elem: varn_types::value::RangeElem::Char,
                     ..varn_types::value::RangeData::int(a as i64, b as i64, flag != 0)
                 },
@@ -286,7 +290,7 @@ pub(crate) fn invoke_runtime_static(
                     flag != 0,
                 ),
             };
-            Ok(heap.intern(Value::Range(Box::new(r))))
+            Ok(heap.alloc_range_data(r))
         }
         _ => Err(RuntimeError::new(format!(
             "OpInvokeRuntimeStatic: method '{}' not supported",

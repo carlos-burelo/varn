@@ -6,18 +6,16 @@ mod ic;
 mod intrinsic;
 mod invoke;
 
-use crate::closure::{VmClosure, VmClosurePayload};
+use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::exec::method_args::{MethodArgs, MethodOutcome};
-use crate::exec::props::ResolvedProperty;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 use ic::{IcHit, IcSite};
 use std::rc::Rc;
 use varn_types::chunk::ICKind;
 use varn_types::value::{BoundMethodTarget, ClassObj};
-use varn_types::Value;
 
 impl ExecCtx {
     /// The interpreter's `CallMethod` / `InvokeVirtual`: the arguments are
@@ -94,7 +92,7 @@ impl ExecCtx {
         let receiver_class = crate::exec::props::get_class(this_val, &self.heap);
         if let Some(cls) = &receiver_class {
             if site.usable() {
-                match ic::probe(closure, site, cls, args.len()) {
+                match ic::probe(&self.heap, closure, site, cls, args.len()) {
                     Some(IcHit::Native(f)) => {
                         self.record_ic_hit_callmethod();
                         return self.call_native_method(f, this_val, args, name.as_ref());
@@ -120,25 +118,7 @@ impl ExecCtx {
         }
 
         let receiver_class = receiver_class.as_ref();
-        let method_nv = match crate::exec::props::resolve_property(this_val, &name, &mut self.heap)?
-        {
-            ResolvedProperty::Built(Value::BoundMethod(bm)) => match &bm.target {
-                BoundMethodTarget::Native { func, .. } => {
-                    let f = *func;
-                    ic::record(
-                        closure,
-                        site,
-                        receiver_class,
-                        name.as_ref(),
-                        ICKind::NATIVE_VTABLE_METHOD,
-                    );
-                    return self.call_native_method(f, this_val, args, name.as_ref());
-                }
-                BoundMethodTarget::Vm { .. } => self.heap.intern(Value::BoundMethod(bm)),
-            },
-            ResolvedProperty::Built(v) => self.heap.intern(v),
-            ResolvedProperty::Nv(v) => v,
-        };
+        let method_nv = crate::exec::props::get_property(this_val, &name, &mut self.heap)?;
 
         if method_nv.is_heap() {
             if let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap_idx()) {
@@ -158,7 +138,7 @@ impl ExecCtx {
                         closure: method_closure,
                         ..
                     } => {
-                        if let Some(nc) = VmClosurePayload::downcast_from(&**method_closure) {
+                        if let Some(nc) = self.heap.closure_of(*method_closure) {
                             if !nc.proto.is_generator && !nc.proto.is_async {
                                 ic::record(
                                     closure,
@@ -192,24 +172,20 @@ impl ExecCtx {
         let Some((method_val, owner_cls)) = varn_types::find_method_with_owner(cls, name) else {
             return Ok(None);
         };
-        match method_val {
-            Value::VmValue(payload) => {
-                let Some(nc) = VmClosurePayload::downcast_from(&*payload) else {
-                    return Ok(None);
-                };
-                if nc.proto.is_generator || nc.proto.is_async || args.len() > nc.proto.arity {
-                    return Ok(None);
-                }
-                ic::record(closure, site, Some(cls), name, ICKind::VM_VTABLE_METHOD);
-                self.invoke_vm_method_fast(nc.clone(), Some(owner_cls), this_val, args, name)
-                    .map(Some)
+        if let Some(nc) = self.heap.closure_of(method_val).cloned() {
+            if nc.proto.is_generator || nc.proto.is_async || args.len() > nc.proto.arity {
+                return Ok(None);
             }
-            Value::NativeFn(b) => {
-                ic::record(closure, site, Some(cls), name, ICKind::NATIVE_VTABLE_METHOD);
-                self.call_native_method(b.0, this_val, args, name).map(Some)
-            }
-            _ => Ok(None),
+            ic::record(closure, site, Some(cls), name, ICKind::VM_VTABLE_METHOD);
+            return self
+                .invoke_vm_method_fast(nc, Some(owner_cls), this_val, args, name)
+                .map(Some);
         }
+        if let Some((f, _)) = self.heap.native_of(method_val) {
+            ic::record(closure, site, Some(cls), name, ICKind::NATIVE_VTABLE_METHOD);
+            return self.call_native_method(f, this_val, args, name).map(Some);
+        }
+        Ok(None)
     }
 
     /// Native method `f` called on `this_val`, counted for the profile.

@@ -181,9 +181,6 @@ pub(crate) extern "C" fn jit_wrap_spread(ctx: *mut ExecCtx, val_tag: u64, val_pa
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
-        let extracted = ctx_ref.heap.extract(val);
-        ctx_ref.jit_native_result = ctx_ref
-            .heap
-            .intern(varn_types::Value::Spread(Box::new(extracted)));
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_spread(val);
     }
 }

@@ -17,9 +17,8 @@ pub(crate) fn op_method(
     method_nv: VmValue,
     heap: &mut Heap,
 ) -> VmResult<()> {
-    let method_val = heap.extract(method_nv);
     let cls = get_class_arc(class_nv, heap)?;
-    cls.add_method_with_owner(name, method_val, Some(cls.clone()));
+    cls.add_method_with_owner(name, method_nv, Some(cls.clone()));
     Ok(())
 }
 
@@ -29,14 +28,15 @@ pub(crate) fn op_define_static(
     val_nv: VmValue,
     heap: &mut Heap,
 ) -> VmResult<()> {
-    let mut val = heap.extract(val_nv);
     let cls = get_class_arc(class_nv, heap)?;
     // A variant template joins its enum here: every value built from it
     // finds its methods through this id, not through its name.
-    if let varn_types::Value::EnumVariant(ev) = &mut val {
-        ev.enum_class_id = Some(cls.id);
+    if val_nv.is_heap() {
+        if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap_idx()) {
+            ev.enum_class_id = Some(cls.id);
+        }
     }
-    cls.add_static(name, val);
+    cls.add_static(name, val_nv);
     Ok(())
 }
 
@@ -98,10 +98,9 @@ pub(crate) fn op_declare_field(
             return Ok(());
         }
     }
-    let got = heap.extract(class_nv);
     Err(RuntimeError::new(format!(
         "OpDeclareField: expected class, got {}",
-        got.type_name()
+        crate::exec::props::meta::type_name(class_nv, heap)
     )))
 }
 
@@ -112,8 +111,7 @@ pub(crate) fn op_define_getter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    let val = heap.extract(closure_nv);
-    cls.add_getter_with_owner(name, val, Some(cls.clone()));
+    cls.add_getter_with_owner(name, closure_nv, Some(cls.clone()));
     Ok(())
 }
 
@@ -124,8 +122,7 @@ pub(crate) fn op_define_setter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    let val = heap.extract(closure_nv);
-    cls.add_setter_with_owner(name, val, Some(cls.clone()));
+    cls.add_setter_with_owner(name, closure_nv, Some(cls.clone()));
     Ok(())
 }
 
@@ -136,8 +133,7 @@ pub(crate) fn op_define_static_getter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    let val = heap.extract(closure_nv);
-    cls.add_static_getter(name, val);
+    cls.add_static_getter(name, closure_nv);
     Ok(())
 }
 
@@ -148,18 +144,16 @@ pub(crate) fn op_define_static_setter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    let val = heap.extract(closure_nv);
-    cls.add_static_setter(name, val);
+    cls.add_static_setter(name, closure_nv);
     Ok(())
 }
 
 pub(crate) fn op_get_super(
-    class_nv: VmValue,
+    cls: Rc<ClassObj>,
     name: &str,
     receiver_nv: VmValue,
     heap: &mut Heap,
 ) -> VmResult<VmValue> {
-    let cls = get_class_arc(class_nv, heap)?;
     let super_cls = cls
         .superclass
         .borrow()
@@ -169,9 +163,12 @@ pub(crate) fn op_get_super(
     let method = super_cls
         .find_method(name)
         .ok_or_else(|| RuntimeError::new(format!("super: method '{}' not found", name)))?;
-    let receiver = heap.extract(receiver_nv);
-    let bound = bind_method_to_receiver(receiver, method, Some(super_cls.clone()));
-    Ok(heap.intern(bound))
+    Ok(bind_method_to_receiver(
+        heap,
+        receiver_nv,
+        method,
+        Some(super_cls.clone()),
+    ))
 }
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {

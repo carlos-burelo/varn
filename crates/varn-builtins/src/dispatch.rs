@@ -478,12 +478,6 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
     fn resources(&mut self) -> &mut varn_types::ResourceStore {
         panic!("DevNullModuleCtx::resources")
     }
-    fn extract(&self, _v: VmValue) -> varn_types::Value {
-        varn_types::Value::Null
-    }
-    fn intern(&mut self, _v: varn_types::Value) -> VmValue {
-        VmValue::null()
-    }
     fn call_static(&mut self, _f: varn_types::NativeFn) -> VmValue {
         VmValue::null()
     }

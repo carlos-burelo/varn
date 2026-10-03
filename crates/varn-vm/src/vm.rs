@@ -1,4 +1,4 @@
-use crate::closure::{VmClosure, VmUpvalue, VmUpvalueInner};
+use crate::closure::VmClosure;
 use crate::exec;
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
@@ -8,13 +8,11 @@ use crate::value::VmValue;
 use exec::calls;
 use exec::ExecCtx;
 
-use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use varn_core::{ModuleId, OpCode};
-use varn_types::Closure;
 
 pub struct Vm {
     pub ctx: ExecCtx,
@@ -49,40 +47,20 @@ impl Vm {
         Self { ctx }
     }
 
-    pub fn run(&mut self, closure: Rc<Closure>) -> Result<VmValue, crate::error::RuntimeError> {
-        let constants = calls::resolve_constants(&closure.proto, &mut self.ctx.heap);
-        let upvalues = closure
-            .upvalues
-            .iter()
-            .map(|uv| {
-                let inner = uv.inner.borrow();
-                // `location` nunca es `Some` en el workspace (campo a futuro
-                // del tipo transfronterizo): el upvalue entra cerrado. Con el
-                // frame por clases no hay índice lineal que heredar de todos
-                // modos (`SlotAddr` pertenece a un almacén concreto).
-                VmUpvalue {
-                    inner: Rc::new(RefCell::new(VmUpvalueInner {
-                        value: self.ctx.heap.intern(inner.value.clone()),
-                        stack_slot: None,
-                    })),
-                }
-            })
-            .collect();
-
+    pub fn run(
+        &mut self,
+        proto: Rc<varn_types::FunctionProto>,
+    ) -> Result<VmValue, crate::error::RuntimeError> {
+        let constants = calls::resolve_constants(&proto, &mut self.ctx.heap);
         if self.ctx.frames.is_empty() {
-            let mut nan_closure = VmClosure::with_upvalues(
-                closure.proto.clone(),
-                upvalues,
+            let mut entry = VmClosure::with_upvalues(
+                proto.clone(),
+                Vec::new(),
                 Rc::new(constants),
                 self.ctx.settings,
             );
-            // The entry proto's module owns the first global region after the
-            // native/prelude layout.
-            nan_closure.module_base = self
-                .ctx
-                .globals_mut()
-                .reserve_region(closure.proto.global_count);
-            self.ctx.push_frame(Rc::new(nan_closure))?;
+            entry.module_base = self.ctx.globals_mut().reserve_region(proto.global_count);
+            self.ctx.push_frame(Rc::new(entry))?;
         }
 
         self.ctx.run()

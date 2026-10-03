@@ -135,8 +135,7 @@ impl TricolorMarker {
                 | HeapObj::Range(_)
                 | HeapObj::NativeFn(_, _)
                 | HeapObj::FrozenModule(_)
-                | HeapObj::Buffer(_)
-                | HeapObj::VmValue(_) => {}
+                | HeapObj::Buffer(_) => {}
                 HeapObj::Module(m) => {
                     let exports = m.exports.clone();
                     for val in exports {
@@ -166,7 +165,7 @@ impl TricolorMarker {
                         self.mark_gray(child_idx);
                     }
                     if let Some(cls) = guard.class() {
-                        if let Some(ci) = heap.value_heap_idx(&varn_types::Value::Class(cls)) {
+                        if let Some(ci) = heap.class_idx(&cls) {
                             self.mark_gray(ci);
                         }
                     }
@@ -178,7 +177,7 @@ impl TricolorMarker {
                         }
                     });
                     if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
-                        if let Some(ci) = heap.value_heap_idx(&varn_types::Value::Class(cls)) {
+                        if let Some(ci) = heap.class_idx(&cls) {
                             self.mark_gray(ci);
                         }
                     }
@@ -198,26 +197,15 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Class(cls) => {
-                    let mark_value =
-                        |marker: &mut TricolorMarker, heap: &HeapInner, v: &varn_types::Value| {
-                            if let Some(ci) = heap.value_heap_idx(v) {
-                                marker.mark_gray(ci);
-                            }
-                        };
-                    for v in cls
-                        .vtable
-                        .borrow()
-                        .iter()
-                        .chain(cls.getter_vtable.borrow().iter())
-                        .chain(cls.setter_vtable.borrow().iter())
-                    {
-                        mark_value(self, heap, v);
-                    }
+                    cls.for_each_value_mut(&mut |v| {
+                        if let Some(ci) = heap.get_heap_idx(*v) {
+                            self.mark_gray(ci);
+                        }
+                    });
                     if let Some(super_cls) = cls.superclass.borrow().as_ref() {
-                        mark_value(self, heap, &varn_types::Value::Class(super_cls.clone()));
-                    }
-                    for v in cls.statics.borrow().values() {
-                        mark_value(self, heap, v);
+                        if let Some(ci) = heap.class_idx(super_cls) {
+                            self.mark_gray(ci);
+                        }
                     }
                 }
                 HeapObj::Map(map_ref) => {
@@ -240,8 +228,13 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::BoundMethod(bm) => {
-                    if let Some(ci) = heap.value_heap_idx(&bm.receiver) {
+                    if let Some(ci) = heap.get_heap_idx(bm.receiver) {
                         self.mark_gray(ci);
+                    }
+                    if let varn_types::value::BoundMethodTarget::Vm { closure, .. } = &bm.target {
+                        if let Some(ci) = heap.get_heap_idx(*closure) {
+                            self.mark_gray(ci);
+                        }
                     }
                 }
                 HeapObj::Spread(spread_val) => {
@@ -250,33 +243,24 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::EnumVariant(ev) => {
-                    if let Some(ci) = heap.value_heap_idx(&ev.payload) {
+                    if let Some(ci) = heap.get_heap_idx(ev.payload) {
                         self.mark_gray(ci);
                     }
                 }
                 HeapObj::Task(task) => {
-                    let task = task.clone();
-                    for v in task.args.as_slice() {
-                        if let Some(ci) = heap.value_heap_idx(v) {
+                    task.trace_cells(&mut |cell| {
+                        if let Some(ci) = heap.get_heap_idx(cell.get()) {
                             self.mark_gray(ci);
                         }
-                    }
-                    for uv in &task.upvalues {
-                        if let Ok(inner) = uv.inner.try_borrow() {
-                            if let Some(ci) = heap.value_heap_idx(&inner.value) {
-                                self.mark_gray(ci);
-                            }
-                        }
-                    }
+                    });
                 }
-                HeapObj::TaskHandle(task) => match task.peek_state() {
-                    varn_types::TaskState::Resolved(v) | varn_types::TaskState::Rejected(v) => {
-                        if let Some(ci) = heap.value_heap_idx(&v) {
+                HeapObj::TaskHandle(cell) => {
+                    cell.trace_cells(&mut |c| {
+                        if let Some(ci) = heap.get_heap_idx(c.get()) {
                             self.mark_gray(ci);
                         }
-                    }
-                    varn_types::TaskState::Pending => {}
-                },
+                    });
+                }
                 HeapObj::Generator(gen) => {
                     let mut visit = |nv: varn_types::VmValue| {
                         if let Some(child_idx) = heap.get_heap_idx(nv) {

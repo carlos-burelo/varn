@@ -43,9 +43,8 @@ impl ExecCtx {
             );
         if obj_is_heap_object && cs_idx < cache_len && !is_megamorphic {
             let mut found_slot_val: Option<VmValue> = None;
-            let mut found_method: Option<(varn_types::Value, Option<Rc<varn_types::ClassObj>>)> =
-                None;
-            let mut found_getter: Option<varn_types::Value> = None;
+            let mut found_method: Option<(VmValue, Option<Rc<varn_types::ClassObj>>)> = None;
+            let mut found_getter: Option<VmValue> = None;
             let mut hit_found = false;
 
             {
@@ -97,8 +96,7 @@ impl ExecCtx {
                             let vtable = unsafe { &*cls.vtable.as_ptr() };
                             let vtable_owners = unsafe { &*cls.vtable_owners.as_ptr() };
                             if slot < vtable.len() {
-                                found_method =
-                                    Some((vtable[slot].clone(), vtable_owners[slot].clone()));
+                                found_method = Some((vtable[slot], vtable_owners[slot].clone()));
                                 hit_found = true;
                                 break 'entries;
                             }
@@ -109,7 +107,7 @@ impl ExecCtx {
                         {
                             let vtable = unsafe { &*cls.getter_vtable.as_ptr() };
                             if slot < vtable.len() {
-                                found_getter = Some(vtable[slot].clone());
+                                found_getter = Some(vtable[slot]);
                                 hit_found = true;
                                 break 'entries;
                             }
@@ -128,15 +126,13 @@ impl ExecCtx {
                 return Ok(false);
             } else if let Some((method, owner)) = found_method {
                 self.record_ic_hit_getprop();
-                let receiver = self.heap.extract(obj);
-                let bound = crate::exec::props::bind_method_to_receiver(receiver, method, owner);
-                let bound_nv = self.heap.intern(bound);
+                let bound_nv =
+                    crate::exec::props::bind_method_to_receiver(&mut self.heap, obj, method, owner);
                 self.stack.unbox_into_reg(base, dest, bound_nv)?;
                 return Ok(false);
             } else if let Some(getter_val) = found_getter {
                 self.record_ic_hit_getprop();
-                let getter_nv = self.heap.intern(getter_val);
-                return self.call_getter_sync(getter_nv, obj, dest, base, frame_idx);
+                return self.call_getter_sync(getter_val, obj, dest, base, frame_idx);
             }
         }
 
@@ -185,8 +181,7 @@ impl ExecCtx {
                     }
                 }
             }
-            let getter_nv = self.heap.intern(getter_val);
-            return self.call_getter_sync(getter_nv, obj, dest, base, frame_idx);
+            return self.call_getter_sync(getter_val, obj, dest, base, frame_idx);
         }
 
         let val_res = crate::exec::props::get_property(obj, &name, &mut self.heap);

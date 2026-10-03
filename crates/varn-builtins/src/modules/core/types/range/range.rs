@@ -1,31 +1,26 @@
 use varn_op_macros::varn_contract;
 use varn_types::value::{RangeData, RangeElem};
-use varn_types::{NativeCtx, NativeError, Value, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Range;
 
 fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
-    if let Value::Range(r) = ctx.extract(this) {
-        Some(*r)
-    } else {
-        None
-    }
+    ctx.as_range(this)
 }
 
 /// Every element of `r`, in order.
 fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
     (0..r.len())
         .filter_map(|i| r.nth(i))
-        .map(|raw| ctx.intern(r.element(raw)))
+        .map(|raw| ctx.range_element(r, raw))
         .collect()
 }
 
 /// The raw bound `val` stands for in `r`'s domain, if it belongs to it.
 fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
-    match (r.elem, ctx.extract(val)) {
-        (RangeElem::Int, Value::Int(n)) => Some(n),
-        (RangeElem::Char, Value::Char(c)) => Some(c as i64),
-        _ => None,
+    match r.elem {
+        RangeElem::Int => ctx.is_int(val).then(|| ctx.as_int(val)),
+        RangeElem::Char => ctx.as_char(val).map(|c| c as i64),
     }
 }
 
@@ -37,13 +32,13 @@ varn_contract! {
 
         fn start(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             match get_range(ctx, this) {
-                Some(r) => ctx.intern(r.element(r.start)),
+                Some(r) => ctx.range_element(&r, r.start),
                 None => VmValue::null(),
             }
         }
         fn end(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             match get_range(ctx, this) {
-                Some(r) => ctx.intern(r.element(r.end)),
+                Some(r) => ctx.range_element(&r, r.end),
                 None => VmValue::null(),
             }
         }
@@ -73,7 +68,7 @@ varn_contract! {
                 return Err(NativeError::from(format!("range step must be positive, got {n}")));
             }
             let r = get_range(ctx, this).ok_or_else(|| NativeError::from("range.step: not a range"))?;
-            Ok(ctx.intern(Value::Range(Box::new(r.with_step(r.step * n)))))
+            Ok(ctx.alloc_range_data(r.with_step(r.step * n)))
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(r) = get_range(ctx, this) {

@@ -4,7 +4,7 @@ use crate::value::VmValue;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
 use std::borrow::Cow;
-use varn_types::{NativeCtx, Value};
+use varn_types::NativeCtx;
 
 thread_local! {
     static JSON_SHAPE_CACHE: ShapeCache = const { std::cell::RefCell::new(None) };
@@ -174,68 +174,7 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
             _ => {}
         }
     }
-    let extracted = ctx.extract(val);
-    write_value_json(&extracted, ctx, out);
-}
-
-fn write_value_json(val: &Value, ctx: &ExecCtx, out: &mut String) {
-    match val {
-        Value::Null => out.push_str("null"),
-        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        Value::Int(i) => {
-            write_int(*i, out);
-        }
-        Value::Float(f) => {
-            if f.is_finite() {
-                out.push_str(ryu::Buffer::new().format(*f));
-            } else {
-                out.push_str("null");
-            }
-        }
-        Value::Str(s) => write_json_str(s, out),
-        Value::Array(a) => {
-            out.push('[');
-            let mut first = true;
-            for item in a.borrow().iter() {
-                if !first {
-                    out.push(',');
-                }
-                first = false;
-                write_value_json(item, ctx, out);
-            }
-            out.push(']');
-        }
-        Value::Object(o) => {
-            out.push('{');
-            let mut first = true;
-            for (k, nv) in o.borrow().iter() {
-                if !first {
-                    out.push(',');
-                }
-                first = false;
-                write_json_str(k.as_ref(), out);
-                out.push(':');
-                write_json_vm(ctx, nv, out);
-            }
-            out.push('}');
-        }
-        Value::Map(m) => {
-            out.push('{');
-            let mut first = true;
-            for (k, &nv) in m.borrow().iter() {
-                if !first {
-                    out.push(',');
-                }
-                first = false;
-                let key_s = ctx.heap.str_repr(k.0);
-                write_json_str(&key_s, out);
-                out.push(':');
-                write_json_vm(ctx, nv, out);
-            }
-            out.push('}');
-        }
-        _ => out.push_str("null"),
-    }
+    out.push_str("null");
 }
 
 fn write_json_str(s: &str, out: &mut String) {

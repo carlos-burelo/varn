@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::OnceLock;
 
 pub type RuntimeString = Arc<str>;
 
@@ -83,75 +82,6 @@ impl std::fmt::Debug for ObjRef {
     }
 }
 
-use std::cell::UnsafeCell;
-
-#[derive(Clone)]
-pub struct ArrayRef(pub Rc<UnsafeCell<Vec<super::Value>>>);
-
-impl ArrayRef {
-    pub fn new(data: Vec<super::Value>) -> Self {
-        Self(Rc::new(UnsafeCell::new(data)))
-    }
-
-    pub fn read(&self) -> &Vec<super::Value> {
-        unsafe { &*self.0.get() }
-    }
-
-    /// # Why `mut_from_ref` is allowed here
-    ///
-    /// Handing out `&mut` from `&self` is exactly what `UnsafeCell` is for, and
-    /// it is the representation this VM is built on: object identity is the
-    /// address of the `Rc` (see `ObjRef`), so a value can never be reallocated
-    /// to be mutated. The safety argument is the VM's single-threaded
-    /// execution, not the borrow checker.
-    ///
-    /// Allowed at the site rather than for the workspace, so a NEW
-    /// `&mut`-from-`&self` somewhere that has not made this argument still
-    /// fails the build.
-    #[allow(clippy::mut_from_ref)]
-    pub fn write(&self) -> &mut Vec<super::Value> {
-        unsafe { &mut *self.0.get() }
-    }
-
-    pub fn borrow(&self) -> &Vec<super::Value> {
-        unsafe { &*self.0.get() }
-    }
-
-    /// Same interior-mutability contract as [`Self::write`].
-    #[allow(clippy::mut_from_ref)]
-    pub fn borrow_mut(&self) -> &mut Vec<super::Value> {
-        unsafe { &mut *self.0.get() }
-    }
-
-    pub fn len(&self) -> usize {
-        self.borrow().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.borrow().is_empty()
-    }
-}
-
-impl PartialEq for ArrayRef {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for ArrayRef {}
-
-impl std::hash::Hash for ArrayRef {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
-    }
-}
-
-impl std::fmt::Debug for ArrayRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ArrayRef({:p})", self.0)
-    }
-}
-
 #[derive(Clone)]
 pub struct SetRef(pub Rc<RefCell<ValueSet>>);
 
@@ -195,89 +125,4 @@ impl std::fmt::Debug for SetRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SetRef({:p})", self.0)
     }
-}
-
-pub struct AllocVtable {
-    pub alloc_object: fn() -> ObjRef,
-    pub alloc_array: fn() -> ArrayRef,
-    pub alloc_map: fn() -> MapRef,
-    pub alloc_set: fn() -> SetRef,
-}
-
-static GLOBAL_VTABLE: OnceLock<&'static AllocVtable> = OnceLock::new();
-
-pub fn register_global_vtable(v: &'static AllocVtable) {
-    let _ = GLOBAL_VTABLE.set(v);
-}
-
-pub fn init_thread_heap() {
-    if let Some(v) = GLOBAL_VTABLE.get() {
-        install_allocator(v);
-    }
-}
-
-pub fn get_global_vtable() -> Option<&'static AllocVtable> {
-    GLOBAL_VTABLE.get().copied()
-}
-
-fn uninitialized_panic(what: &str) -> ! {
-    panic!(
-        "Varn heap not initialized — heap::init_heap() must be called before allocating a {what}"
-    )
-}
-fn uninitialized_obj() -> ObjRef {
-    uninitialized_panic(varn_core::RuntimeKind::Object.name())
-}
-fn uninitialized_arr() -> ArrayRef {
-    uninitialized_panic(varn_core::RuntimeKind::Array.name())
-}
-fn uninitialized_map() -> MapRef {
-    uninitialized_panic(varn_core::RuntimeKind::Map.name())
-}
-fn uninitialized_set() -> SetRef {
-    uninitialized_panic(varn_core::RuntimeKind::Set.name())
-}
-
-use std::cell::Cell;
-thread_local! {
-    static TL_VTABLE: Cell<*const AllocVtable> = const { Cell::new(std::ptr::null()) };
-}
-
-pub fn install_allocator(v: &'static AllocVtable) {
-    TL_VTABLE.with(|c| c.set(v as *const AllocVtable));
-}
-
-#[inline(always)]
-fn get_vtable() -> &'static AllocVtable {
-    let ptr = TL_VTABLE.with(|c| c.get());
-    if ptr.is_null() {
-        static UNINITIALIZED_VTABLE: AllocVtable = AllocVtable {
-            alloc_object: uninitialized_obj,
-            alloc_array: uninitialized_arr,
-            alloc_map: uninitialized_map,
-            alloc_set: uninitialized_set,
-        };
-        return &UNINITIALIZED_VTABLE;
-    }
-    unsafe { &*ptr }
-}
-
-#[inline(always)]
-pub fn alloc_object() -> ObjRef {
-    (get_vtable().alloc_object)()
-}
-
-#[inline(always)]
-pub fn alloc_array() -> ArrayRef {
-    (get_vtable().alloc_array)()
-}
-
-#[inline(always)]
-pub fn alloc_map() -> MapRef {
-    (get_vtable().alloc_map)()
-}
-
-#[inline(always)]
-pub fn alloc_set() -> SetRef {
-    (get_vtable().alloc_set)()
 }
