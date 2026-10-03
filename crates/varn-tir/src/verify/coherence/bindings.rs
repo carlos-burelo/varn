@@ -1,9 +1,15 @@
 use super::assign::assignable;
-use crate::node::{Span, TirExpr, TirFunction, TirModule};
+use crate::node::{Span, TirExpr};
 use crate::ty::BackendTy;
 use crate::verify::VerifyError;
+use crate::{TirFunction, TirModule};
 
-pub(super) fn check_condition(_m: &TirModule, context: &str, cond: &TirExpr, errors: &mut Vec<VerifyError>) {
+pub(super) fn check_condition(
+    _m: &TirModule,
+    context: &str,
+    cond: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
     // Skip if condition is Dynamic
     if matches!(cond.ty, BackendTy::Dynamic(_)) {
         return;
@@ -17,7 +23,12 @@ pub(super) fn check_condition(_m: &TirModule, context: &str, cond: &TirExpr, err
     }
 }
 
-pub(super) fn check_let(m: &TirModule, declared_ty: BackendTy, init: &TirExpr, errors: &mut Vec<VerifyError>) {
+pub(super) fn check_let(
+    m: &TirModule,
+    declared_ty: BackendTy,
+    init: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
     // The initializer must be assignable TO the declared type
     if !assignable(m, init.ty, declared_ty) {
         errors.push(VerifyError::new(
@@ -30,7 +41,12 @@ pub(super) fn check_let(m: &TirModule, declared_ty: BackendTy, init: &TirExpr, e
     }
 }
 
-pub(super) fn check_return(m: &TirModule, f: &TirFunction, returned: &TirExpr, errors: &mut Vec<VerifyError>) {
+pub(super) fn check_return(
+    m: &TirModule,
+    f: &TirFunction,
+    returned: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
     // The returned value must be assignable TO the function's return_ty
     if !assignable(m, returned.ty, f.return_ty) {
         errors.push(VerifyError::new(

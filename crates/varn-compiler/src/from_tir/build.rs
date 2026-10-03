@@ -84,6 +84,7 @@ impl<'m> Builder<'m> {
                 let c = self.lower_expr(cond)?;
                 self.lower_select(c, then_val, else_val, ty)
             }
+            TirExprKind::Seq { stmts, value } => self.lower_seq(stmts, value),
 
             TirExprKind::Field { object, name } => self.lower_field(object, name, &e.res, ty),
             TirExprKind::Index { object, index } => self.lower_index(object, index, ty),

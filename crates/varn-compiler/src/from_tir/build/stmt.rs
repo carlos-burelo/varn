@@ -15,6 +15,20 @@ impl<'m> Builder<'m> {
         Ok(())
     }
 
+    pub(super) fn lower_seq(
+        &mut self,
+        stmts: &[TirStmt],
+        value: &varn_tir::TirExpr,
+    ) -> Result<crate::ssa::ir::Value> {
+        self.lower_block(stmts)?;
+        if !self.is_open() {
+            let dead = self.new_block();
+            self.seal_block(dead);
+            self.current = dead;
+        }
+        self.lower_expr(value)
+    }
+
     pub(super) fn lower_stmt(&mut self, s: &TirStmt) -> Result<()> {
         match s {
             TirStmt::Expr(e) => {

@@ -183,10 +183,8 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             LogicalOp::Nullish => {
-                let mut l = self.lower_expr(left);
-                if !Self::is_pure(self.ast_arena, left) {
-                    l = self.hoist(l);
-                }
+                let l = self.lower_expr(left);
+                let l = self.pin(l);
                 let r = self.lower_expr(right);
                 let is_null = TirExpr {
                     kind: TirExprKind::Unary {

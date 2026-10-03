@@ -73,6 +73,9 @@ impl<'m> Builder<'m> {
     pub(super) fn loop_body_pinned(&self, body: &[TirStmt]) -> Vec<VarId> {
         fn walk(stmts: &[TirStmt], pinned: &FxHashSet<VarId>, out: &mut Vec<VarId>) {
             for s in stmts {
+                for nested in crate::from_tir::tir_children::seq_bodies(s) {
+                    walk(nested, pinned, out);
+                }
                 match s {
                     TirStmt::Let { local, .. } => {
                         let v = VarId::Local(LocalId(local.0));

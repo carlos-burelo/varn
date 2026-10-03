@@ -21,16 +21,8 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Map(_, val) => self.tt.get(val),
             _ => ty,
         };
-        let obj_h = if Self::is_pure(self.ast_arena, object) {
-            obj
-        } else {
-            self.hoist(obj)
-        };
-        let index_h = if Self::is_pure(self.ast_arena, property) {
-            index
-        } else {
-            self.hoist(index)
-        };
+        let obj_h = self.pin(obj);
+        let index_h = self.pin(index);
         let read = TirExpr {
             kind: TirExprKind::Index {
                 object: Box::new(obj_h.clone()),
@@ -97,6 +89,7 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let t = self.lower_expr(operand);
+        let t = self.pin_place(t);
         let bop = match op {
             UpdateOp::Increment => TirBinOp::Add,
             UpdateOp::Decrement => TirBinOp::Sub,

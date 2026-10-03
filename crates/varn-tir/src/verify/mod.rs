@@ -9,7 +9,8 @@
 mod coherence;
 mod wellformed;
 
-use crate::node::{Span, TirModule};
+use crate::node::Span;
+use crate::TirModule;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifyError {

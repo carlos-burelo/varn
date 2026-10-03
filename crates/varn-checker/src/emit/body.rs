@@ -36,7 +36,7 @@ pub(super) use context::{FnEmitter, ModuleCtx};
 use small_utils::{assign_bin_op, span_of};
 
 impl<'a> FnEmitter<'a> {
-    fn lower_expr(&mut self, e: ExprId) -> TirExpr {
+    fn lower_expr_node(&mut self, e: ExprId) -> TirExpr {
         let ty = self.expr_ty(e);
         let span = span_of(self.ast_arena, e);
 
@@ -245,7 +245,7 @@ impl<'a> FnEmitter<'a> {
                 if matches!(
                     self.ast_arena.expr(*target).kind,
                     ExprKind::Identifier { .. } | ExprKind::Member { .. }
-                ) && Self::is_pure(self.ast_arena, *target) =>
+                ) =>
             {
                 let (op, target, value) = (*op, *target, *value);
                 return self.lower_plain_assign(op, target, value, ty, span);
@@ -281,7 +281,7 @@ impl<'a> FnEmitter<'a> {
             } if matches!(
                 self.ast_arena.expr(*operand).kind,
                 ExprKind::Identifier { .. } | ExprKind::Member { .. }
-            ) && Self::is_pure(self.ast_arena, *operand) =>
+            ) =>
             {
                 let (op, operand, prefix) = (*op, *operand, *prefix);
                 return self.lower_plain_update(op, operand, prefix, span);

@@ -48,6 +48,57 @@ impl<'a> FnEmitter<'a> {
         id
     }
 
+    pub(super) fn lower_expr(&mut self, e: ExprId) -> TirExpr {
+        let outer = std::mem::take(&mut self.pending);
+        let value = self.lower_expr_node(e);
+        let stmts = std::mem::replace(&mut self.pending, outer);
+        if stmts.is_empty() {
+            return value;
+        }
+        TirExpr {
+            ty: value.ty,
+            span: value.span,
+            res: Resolution::None,
+            kind: TirExprKind::Seq {
+                stmts,
+                value: Box::new(value),
+            },
+        }
+    }
+
+    pub(super) fn pin(&mut self, e: TirExpr) -> TirExpr {
+        match e.kind {
+            TirExprKind::Var => e,
+            _ => self.hoist(e),
+        }
+    }
+
+    pub(super) fn pin_place(&mut self, place: TirExpr) -> TirExpr {
+        let TirExpr {
+            kind,
+            ty,
+            res,
+            span,
+        } = place;
+        let kind = match kind {
+            TirExprKind::Field { object, name } => TirExprKind::Field {
+                object: Box::new(self.pin(*object)),
+                name,
+            },
+            TirExprKind::Index { object, index } => TirExprKind::Index {
+                object: Box::new(self.pin(*object)),
+                index: Box::new(self.pin(*index)),
+            },
+            other => other,
+        };
+        TirExpr {
+            kind,
+            ty,
+            res,
+            span,
+        }
+    }
+
     pub fn hoist(&mut self, e: TirExpr) -> TirExpr {
         let ty = e.ty;
         let span = e.span;

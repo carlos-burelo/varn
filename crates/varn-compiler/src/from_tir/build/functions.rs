@@ -50,8 +50,8 @@ fn build_inner(
     export_slots: &[Arc<str>],
     self_fn: Option<varn_tir::FnId>,
 ) -> Result<SsaFunc> {
-    let mut pinned = super::super::ctor_summary::captured_vars(func);
-    pinned.extend(super::super::ctor_summary::try_pinned_vars(func));
+    let mut pinned = super::super::pinning::captured_vars(func);
+    pinned.extend(super::super::pinning::try_pinned_vars(func));
     let mut b = Builder::with_pinned(tir, pinned.clone());
     b.self_fn = self_fn;
     b.locals_bt = func.locals.clone();

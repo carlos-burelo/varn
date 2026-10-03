@@ -4,11 +4,10 @@
 //! is advancing — and with the corpus red, those are two different questions
 //! that need two different instruments.
 
-use crate::node::{
-    TirArrayEl, TirExpr, TirExprKind, TirFunction, TirModule, TirObjectEntry, TirStmt,
-};
+use crate::node::{TirArrayEl, TirExpr, TirExprKind, TirObjectEntry, TirStmt};
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, DynReason};
+use crate::{TirFunction, TirModule};
 
 #[derive(Debug, Default, Clone)]
 pub struct Coverage {
@@ -228,6 +227,12 @@ impl Coverage {
                 self.walk_expr(cond);
                 self.walk_expr(then_val);
                 self.walk_expr(else_val);
+            }
+            TirExprKind::Seq { stmts, value } => {
+                for s in stmts {
+                    self.walk_stmt(s);
+                }
+                self.walk_expr(value);
             }
             TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
             TirExprKind::IterInit { source, .. } => self.walk_expr(source),

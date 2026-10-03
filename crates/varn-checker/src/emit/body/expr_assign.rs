@@ -59,15 +59,10 @@ impl<'a> FnEmitter<'a> {
             span,
         };
         let plain = matches!(assign_bin_op(op), Ok(None));
-        let obj_w = if plain || Self::is_pure(self.ast_arena, object) {
-            obj
+        let (obj_w, index_w) = if plain {
+            (obj, index)
         } else {
-            self.hoist(obj)
-        };
-        let index_w = if plain || Self::is_pure(self.ast_arena, property) {
-            index
-        } else {
-            self.hoist(index)
+            (self.pin(obj), self.pin(index))
         };
         let rhs = match assign_bin_op(op) {
             Ok(None) => v,
@@ -136,6 +131,10 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let t = self.lower_expr(target);
+        let t = match assign_bin_op(op) {
+            Ok(None) => t,
+            _ => self.pin_place(t),
+        };
         let v = self.lower_expr(value);
         let rhs = match assign_bin_op(op) {
             Ok(None) => v,

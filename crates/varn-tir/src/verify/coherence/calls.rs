@@ -1,8 +1,9 @@
 use super::assign::assignable;
-use crate::node::{TirArg, TirExpr, TirModule};
+use crate::node::{TirArg, TirExpr};
 use crate::resolution::Resolution;
 use crate::ty::BackendTy;
 use crate::verify::VerifyError;
+use crate::TirModule;
 
 /// Arity and per-argument types can only be checked against a positional list
 /// with no spread. A spread contributes an unknown count; a named argument is
@@ -11,7 +12,12 @@ fn is_positional(args: &[TirArg]) -> bool {
     args.iter().all(|a| matches!(a, TirArg::Expr(_)))
 }
 
-pub(super) fn check_direct_call(m: &TirModule, e: &TirExpr, args: &[TirArg], errors: &mut Vec<VerifyError>) {
+pub(super) fn check_direct_call(
+    m: &TirModule,
+    e: &TirExpr,
+    args: &[TirArg],
+    errors: &mut Vec<VerifyError>,
+) {
     let Resolution::DirectFn(f) = &e.res else {
         return;
     };

@@ -1,7 +1,8 @@
-use crate::node::{TirBinOp, TirExpr, TirModule};
+use crate::node::{TirBinOp, TirExpr};
 use crate::resolution::Resolution;
 use crate::ty::BackendTy;
 use crate::verify::VerifyError;
+use crate::TirModule;
 
 fn is_comparison(op: TirBinOp) -> bool {
     matches!(
@@ -61,7 +62,12 @@ pub(super) fn check_binary(
     }
 }
 
-pub(super) fn check_field(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: &mut Vec<VerifyError>) {
+pub(super) fn check_field(
+    m: &TirModule,
+    e: &TirExpr,
+    object: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
     let Resolution::FieldSlot(slot) = &e.res else {
         return;
     };
@@ -85,7 +91,12 @@ pub(super) fn check_field(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: 
     }
 }
 
-pub(super) fn check_index(m: &TirModule, e: &TirExpr, object: &TirExpr, errors: &mut Vec<VerifyError>) {
+pub(super) fn check_index(
+    m: &TirModule,
+    e: &TirExpr,
+    object: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) {
     if let BackendTy::Array(el) = object.ty.non_nullable(&m.types) {
         let elem = m.types.get(el);
         if e.ty != elem {

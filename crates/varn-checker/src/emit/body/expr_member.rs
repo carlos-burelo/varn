@@ -18,34 +18,6 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn is_pure(ast_arena: &AstArena, e: ExprId) -> bool {
-        match &ast_arena.expr(e).kind {
-            ExprKind::Identifier { .. }
-            | ExprKind::This
-            | ExprKind::IntLiteral { .. }
-            | ExprKind::FloatLiteral { .. }
-            | ExprKind::BoolLiteral { .. }
-            | ExprKind::StrLiteral { .. }
-            | ExprKind::CharLiteral { .. }
-            | ExprKind::NullLiteral => true,
-            ExprKind::Paren { expression } => Self::is_pure(ast_arena, *expression),
-            ExprKind::Member {
-                object,
-                property,
-                computed,
-                ..
-            } => {
-                Self::is_pure(ast_arena, *object)
-                    && (!computed || Self::is_pure(ast_arena, *property))
-            }
-            ExprKind::Binary { left, right, .. } => {
-                Self::is_pure(ast_arena, *left) && Self::is_pure(ast_arena, *right)
-            }
-            ExprKind::Unary { operand, .. } => Self::is_pure(ast_arena, *operand),
-            _ => false,
-        }
-    }
-
     pub(super) fn lower_member(
         &mut self,
         object: ExprId,
@@ -58,10 +30,8 @@ impl<'a> FnEmitter<'a> {
         if optional && !computed {
             let name = Self::member_name(self.ast_arena, property, self.m.interner)
                 .unwrap_or_else(|| Arc::from("<member>"));
-            let mut recv = self.lower_expr(object);
-            if !Self::is_pure(self.ast_arena, object) {
-                recv = self.hoist(recv);
-            }
+            let recv = self.lower_expr(object);
+            let recv = self.pin(recv);
             let is_null = TirExpr {
                 kind: TirExprKind::Unary {
                     op: varn_tir::TirUnOp::IsNull,

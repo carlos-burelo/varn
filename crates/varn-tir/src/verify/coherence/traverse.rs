@@ -1,12 +1,10 @@
 use super::bindings::{check_condition, check_let, check_return, check_return_none};
 use super::calls::{check_direct_call, check_method_call};
 use super::ops::{check_binary, check_field, check_index, check_variant_payload};
-use crate::node::{
-    TirArg, TirArrayEl, TirExpr, TirExprKind, TirFunction, TirModule, TirObjectEntry, TirStmt,
-    TirUnOp,
-};
+use crate::node::{TirArg, TirArrayEl, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp};
 use crate::ty::BackendTy;
 use crate::verify::VerifyError;
+use crate::{TirFunction, TirModule};
 
 pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
     check_function(m, &m.top_level, errors);
@@ -230,6 +228,18 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
             {
                 errors.push(VerifyError::new(
                     "Select arms have different types and the result is not a union",
+                    e.span,
+                ));
+            }
+        }
+        TirExprKind::Seq { stmts, value } => {
+            for s in stmts {
+                walk_stmt(m, f, s, errors);
+            }
+            walk_expr(m, f, value, errors);
+            if value.ty != e.ty {
+                errors.push(VerifyError::new(
+                    "Seq type differs from the type of its value",
                     e.span,
                 ));
             }

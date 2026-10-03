@@ -14,9 +14,14 @@ pub use resolution::Resolution;
 
 mod node;
 pub use node::{
-    Span, TirArg, TirArrayEl, TirBinOp, TirClassAccessor, TirClassDef, TirClassMember, TirExport,
-    TirExpr, TirExprKind, TirFunction, TirImport, TirImportKind, TirImportSpec, TirModule,
-    TirObjectEntry, TirStmt, TirUnOp, TirUpvalue, TirVariantDef,
+    Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp,
+    TirUpvalue,
+};
+
+mod module;
+pub use module::{
+    TirClassAccessor, TirClassDef, TirClassMember, TirExport, TirFunction, TirImport,
+    TirImportKind, TirImportSpec, TirModule, TirVariantDef,
 };
 
 mod tables;

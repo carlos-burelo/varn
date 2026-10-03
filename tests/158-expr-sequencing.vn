@@ -1,0 +1,137 @@
+import { describe, it, expect } from "std:test";
+
+let calls = 0
+
+class Lazy { get v(): int? { calls = calls + 1; return 7 } }
+
+class Cell { v: int = 1 }
+class Holder { _c: Cell = new Cell(); get c(): Cell { calls = calls + 1; return this._c } }
+
+function side(): int? { calls = calls + 1; return 5 }
+
+function nullishGetter(): int {
+    calls = 0
+    let l = new Lazy()
+    let r = l.v ?? 0
+    return calls * 100 + r
+}
+
+function compoundGetter(): int {
+    calls = 0
+    let h = new Holder()
+    h.c.v += 5
+    let afterAssign = calls
+    h.c.v++
+    return afterAssign * 1000 + calls * 100 + h._c.v
+}
+
+function shortCircuitAnd(): int {
+    calls = 0
+    let ok = false
+    let r = ok && ((side() ?? 0) > 1)
+    return calls
+}
+
+function shortCircuitTernary(): int {
+    calls = 0
+    let ok = false
+    let t = ok ? (side() ?? 0) : 9
+    return calls * 100 + t
+}
+
+function mapNullish(): int {
+    let m = new Map<str, int?>()
+    m.set("a", 3)
+    let n = new Map<str, int>()
+    n.set("c", 5)
+    return (m["a"] ?? 0) * 1000 + (m["b"] ?? 4) * 100 + (n.get("c") ?? 0) * 10 + (n.get("d") ?? 6)
+}
+
+class Inner { b: int? = null }
+function optionalChainNullish(o: Inner?): int {
+    return o?.b ?? 11
+}
+
+function counted(): int { calls = calls + 1; return 20 }
+
+function orAssign(): int {
+    calls = 0
+    let x = 1
+    x ||= counted()
+    let y = 0
+    y ||= counted()
+    return calls * 1000 + x * 100 + y
+}
+
+function nullishAssign(): int {
+    calls = 0
+    let x: int? = 3
+    x ??= counted()
+    let y: int? = null
+    y ??= counted()
+    return calls * 1000 + (x ?? 0) * 100 + (y ?? 0)
+}
+
+function tryInBranch(flag: bool, v: int?): int? {
+    return flag ? 0 : (try v) + 1
+}
+
+function bump(): int { calls = calls + 10; return 1 }
+function evalOrder(): int {
+    calls = 0
+    let l = new Lazy()
+    let r = bump() + (l.v ?? 0)
+    return calls * 100 + r
+}
+
+class Box { x: int = 0 }
+let shared = new Box()
+function boxed(): Box { calls = calls + 1; return shared }
+
+function receiverOnce(): int {
+    calls = 0
+    shared.x = 0
+    boxed().x = 4
+    boxed().x += 2
+    boxed().x++
+    return calls * 100 + shared.x
+}
+
+await describe("158 expr sequencing", async () => {
+    await it("1. nullish over a getter calls it once", async () => {
+        expect(nullishGetter()).toBe(107)
+    })
+    await it("2. compound assignment and update evaluate the receiver once", async () => {
+        expect(compoundGetter()).toBe(1207)
+    })
+    await it("3. && does not evaluate a hoisted rhs", async () => {
+        expect(shortCircuitAnd()).toBe(0)
+    })
+    await it("4. ?: does not evaluate the untaken branch", async () => {
+        expect(shortCircuitTernary()).toBe(9)
+    })
+    await it("5. map index with nullish default", async () => {
+        expect(mapNullish()).toBe(3456)
+    })
+    await it("6. optional chain with nullish default", async () => {
+        expect(optionalChainNullish(null)).toBe(11)
+        expect(optionalChainNullish(new Inner())).toBe(11)
+    })
+    await it("7. ||= evaluates its rhs only when needed", async () => {
+        expect(orAssign()).toBe(1120)
+    })
+    await it("8. ??= evaluates its rhs only when needed", async () => {
+        expect(nullishAssign()).toBe(1320)
+    })
+    await it("9. try operator inside an untaken branch does not return", async () => {
+        expect(tryInBranch(true, null)).toBe(0)
+        expect(tryInBranch(false, null)).toBe(null)
+        expect(tryInBranch(false, 4)).toBe(5)
+    })
+    await it("10. hoisting keeps left-to-right evaluation order", async () => {
+        expect(evalOrder()).toBe(1108)
+    })
+    await it("11. member assignment through a call evaluates the call once per statement", async () => {
+        expect(receiverOnce()).toBe(307)
+    })
+})

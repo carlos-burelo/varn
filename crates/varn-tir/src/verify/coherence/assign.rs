@@ -1,5 +1,5 @@
-use crate::node::TirModule;
 use crate::ty::BackendTy;
+use crate::TirModule;
 
 /// Whether a value of type `from` may be used where `to` is expected.
 ///
