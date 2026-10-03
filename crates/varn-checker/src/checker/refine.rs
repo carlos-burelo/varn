@@ -86,7 +86,7 @@ impl<'r> Checker<'r> {
                 };
                 if computed {
                     // `x[i]` on a proved `Array<T>` is a `T`.
-                    Some(Type(elem, false))
+                    Some(Type::resolved(elem))
                 } else if matches!(
                     &arena.expr(property).kind,
                     ExprKind::Identifier { name }
@@ -159,16 +159,10 @@ impl<'r> Checker<'r> {
 /// Result type of an arithmetic operator over two operand types, following the
 /// language's numeric rules (every operator keeps its operands' domain). Anything not both-numeric yields no refinement.
 fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> Option<Type> {
+    use crate::binder::type_inference::numeric_operand;
     use varn_core::{binary_operand_kind, NumericOperand};
 
-    let operand = |t: &Type| match table.get(t.0) {
-        TypeKind::Primitive(varn_core::LangPrimitive::Int)
-        | TypeKind::Literal(varn_core::TypeLiteral::Int(_)) => Some(NumericOperand::Int),
-        TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
-        TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
-        _ => None,
-    };
-    let combined = binary_operand_kind(operand(l), operand(r))?;
+    let combined = binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;
     match combined {
         NumericOperand::Int => Some(Type::Int),
         NumericOperand::Float => Some(Type::Float),
@@ -176,6 +170,6 @@ fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> O
         // kind for it either, so claiming one here would be the refinement
         // lane telling codegen something the rest of the pipeline does not
         // model.
-        NumericOperand::Decimal => None,
+        NumericOperand::Decimal | NumericOperand::BigInt => None,
     }
 }

@@ -6,20 +6,30 @@ use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{AstArena, ExprId, ObjectProp, PropKey};
 use varn_core::TypeKind;
 
-pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
-    use varn_core::{binary_operand_kind, NumericOperand};
-    let operand = |t: &Type| match table.get(t.0) {
+pub(crate) fn numeric_operand(
+    t: &Type,
+    table: &CheckerTyTable,
+) -> Option<varn_core::NumericOperand> {
+    use varn_core::NumericOperand;
+    match table.get(t.0) {
         TypeKind::Primitive(varn_core::LangPrimitive::Int)
         | TypeKind::Literal(varn_core::TypeLiteral::Int(_)) => Some(NumericOperand::Int),
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
+        TypeKind::Primitive(varn_core::LangPrimitive::BigInt) => Some(NumericOperand::BigInt),
         _ => None,
-    };
-    let kind = binary_operand_kind(operand(l), operand(r))?;
+    }
+}
+
+pub(crate) fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
+    use varn_core::NumericOperand;
+    let kind =
+        varn_core::binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;
     Some(match kind {
         NumericOperand::Int => Type::Int,
         NumericOperand::Float => Type::Float,
         NumericOperand::Decimal => Type::Decimal,
+        NumericOperand::BigInt => Type::BigInt,
     })
 }
 
@@ -38,15 +48,7 @@ pub(crate) fn adopt_literal_operands(
 }
 
 pub(crate) fn numeric_operands_compatible(l: &Type, r: &Type, table: &CheckerTyTable) -> bool {
-    let is_big = |t: &Type| {
-        matches!(
-            table.get(t.0),
-            TypeKind::Primitive(varn_core::LangPrimitive::BigInt)
-        )
-    };
-    let big_or_int = |t: &Type| is_big(t) || t.is_int();
     numeric_binary_type(l, r, table).is_some()
-        || ((is_big(l) || is_big(r)) && big_or_int(l) && big_or_int(r))
 }
 
 pub(crate) fn infer_binary(
@@ -144,7 +146,7 @@ pub(crate) fn infer_new(
             }
             TypeKind::Generic(name, args, origin) => {
                 let arg_ids = table.get_list(args).to_vec();
-                let arg_tys: Vec<Type> = arg_ids.into_iter().map(|id| Type(id, false)).collect();
+                let arg_tys: Vec<Type> = arg_ids.into_iter().map(|id| Type::resolved(id)).collect();
                 return Type::generic_atom(name, arg_tys, origin, table);
             }
             _ => {}

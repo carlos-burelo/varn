@@ -126,6 +126,7 @@ pub enum NumericOperand {
     Int,
     Float,
     Decimal,
+    BigInt,
 }
 
 /// The common operand class of a numeric binary operation, or `None` when
@@ -141,7 +142,15 @@ pub fn binary_operand_kind(
         (Int, Int) => Some(Int),
         (Float, Float) => Some(Float),
         (Decimal, Decimal) | (Decimal, Int) | (Int, Decimal) => Some(Decimal),
-        (Int, Float) | (Float, Int) | (Decimal, Float) | (Float, Decimal) => None,
+        (BigInt, BigInt) | (BigInt, Int) | (Int, BigInt) => Some(BigInt),
+        (Int, Float)
+        | (Float, Int)
+        | (Decimal, Float)
+        | (Float, Decimal)
+        | (BigInt, Float)
+        | (Float, BigInt)
+        | (BigInt, Decimal)
+        | (Decimal, BigInt) => None,
     }
 }
 

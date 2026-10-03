@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+let big = 10n ** 3n
+let s: str = big
