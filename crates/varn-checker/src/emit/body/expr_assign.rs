@@ -81,34 +81,8 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Err(()) => {
-                use varn_core::ast::operators::AssignOp as A;
                 let read = index_target(obj_w.clone(), index_w.clone());
-                let cond = match op {
-                    A::NullishAssign => TirExpr {
-                        kind: TirExprKind::Unary {
-                            op: TirUnOp::IsNull,
-                            operand: Box::new(read.clone()),
-                        },
-                        ty: BackendTy::Bool,
-                        res: Resolution::None,
-                        span,
-                    },
-                    _ => self.cast_to(read.clone(), BackendTy::Bool),
-                };
-                let (then_val, else_val) = match op {
-                    A::OrAssign => (read.clone(), v),
-                    _ => (v, read.clone()),
-                };
-                TirExpr {
-                    kind: TirExprKind::Select {
-                        cond: Box::new(cond),
-                        then_val: Box::new(then_val),
-                        else_val: Box::new(else_val),
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                }
+                self.lower_logical_assign(op, read, v, span)
             }
         };
         TirExpr {
@@ -152,35 +126,7 @@ impl<'a> FnEmitter<'a> {
                 }
             }
 
-            Err(()) => {
-                use varn_core::ast::operators::AssignOp as A;
-                let cond = match op {
-                    A::NullishAssign => TirExpr {
-                        kind: TirExprKind::Unary {
-                            op: TirUnOp::IsNull,
-                            operand: Box::new(t.clone()),
-                        },
-                        ty: BackendTy::Bool,
-                        res: Resolution::None,
-                        span,
-                    },
-                    _ => self.cast_to(t.clone(), BackendTy::Bool),
-                };
-                let (then_val, else_val) = match op {
-                    A::OrAssign => (t.clone(), v),
-                    _ => (v, t.clone()),
-                };
-                TirExpr {
-                    kind: TirExprKind::Select {
-                        cond: Box::new(cond),
-                        then_val: Box::new(then_val),
-                        else_val: Box::new(else_val),
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                }
-            }
+            Err(()) => self.lower_logical_assign(op, t.clone(), v, span),
         };
         TirExpr {
             kind: TirExprKind::Assign {
@@ -188,6 +134,43 @@ impl<'a> FnEmitter<'a> {
                 value: Box::new(rhs),
             },
             ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
+    fn lower_logical_assign(
+        &mut self,
+        op: AssignOp,
+        read: TirExpr,
+        v: TirExpr,
+        span: Span,
+    ) -> TirExpr {
+        let place_ty = read.ty;
+        let cond = match op {
+            AssignOp::NullishAssign => TirExpr {
+                kind: TirExprKind::Unary {
+                    op: TirUnOp::IsNull,
+                    operand: Box::new(read.clone()),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span,
+            },
+            _ => self.cast_to(read.clone(), BackendTy::Bool),
+        };
+        let v = self.cast_to(v, place_ty);
+        let (then_val, else_val) = match op {
+            AssignOp::OrAssign => (read, v),
+            _ => (v, read),
+        };
+        TirExpr {
+            kind: TirExprKind::Select {
+                cond: Box::new(cond),
+                then_val: Box::new(then_val),
+                else_val: Box::new(else_val),
+            },
+            ty: place_ty,
             res: Resolution::None,
             span,
         }
