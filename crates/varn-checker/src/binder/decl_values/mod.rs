@@ -3,6 +3,8 @@ mod extensions;
 mod namespace_struct;
 mod object_members;
 mod patterns_sum;
+mod structs;
+mod type_decls;
 
 use varn_core::ast::TypeNode;
 

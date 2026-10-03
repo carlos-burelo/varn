@@ -1,6 +1,7 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::{build_call_mapping, map_generics_cached};
+use crate::checker_generics::build_call_mapping;
+use crate::generic_substitution::map_generics_cached;
 use crate::types::{FunctionParam, FunctionType, Type};
 use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind, Param};

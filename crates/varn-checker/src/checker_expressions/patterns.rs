@@ -100,7 +100,9 @@ impl<'r> Checker<'r> {
                         let resolved = if mapping.is_empty() {
                             *field_ty
                         } else {
-                            crate::checker_generics::map_generics_cached(self, field_ty, &mapping)
+                            crate::generic_substitution::map_generics_cached(
+                                self, field_ty, &mapping,
+                            )
                         };
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(binding.name, &bind.scopes) {

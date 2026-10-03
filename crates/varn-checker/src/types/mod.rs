@@ -6,6 +6,7 @@ mod display;
 pub mod interned;
 pub(crate) mod numeric_literal;
 mod object_member_impl;
+mod type_algebra;
 mod type_impl;
 
 pub use async_fn::{async_fn_return, awaited, generator_of, is_awaitable};

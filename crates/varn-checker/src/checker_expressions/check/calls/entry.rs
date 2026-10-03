@@ -1,6 +1,7 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::{build_call_mapping, map_generics_cached};
+use crate::checker_generics::build_call_mapping;
+use crate::generic_substitution::map_generics_cached;
 use crate::types::{FunctionParam, Type};
 use varn_core::ast::{Arg, ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
