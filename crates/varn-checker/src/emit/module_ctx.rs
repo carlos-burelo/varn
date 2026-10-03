@@ -19,6 +19,7 @@ pub(super) struct MCtx<'a> {
     pub(super) math_intrinsics: &'a FxHashMap<Atom, u8>,
     pub(super) interner: &'a AtomInterner,
     pub(super) checker_table: &'a crate::types::CheckerTyTable,
+    pub(super) annotation_types: &'a FxHashMap<AstId, crate::types::Type>,
     pub(super) nested_types: &'a NestedTypes,
 }
 
@@ -37,6 +38,7 @@ impl<'a> MCtx<'a> {
             math_intrinsics: self.math_intrinsics,
             interner: self.interner,
             checker_table: self.checker_table,
+            annotation_types: self.annotation_types,
             nested_types: self.nested_types,
         }
     }

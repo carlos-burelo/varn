@@ -10,6 +10,7 @@ impl<'r> Binder<'r> {
         let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
         let result = resolve_type_node(node, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
+        self.annotation_types.insert(node.id, result);
         result
     }
 

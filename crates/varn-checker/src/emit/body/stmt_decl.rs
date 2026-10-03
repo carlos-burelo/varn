@@ -132,10 +132,15 @@ impl<'a> FnEmitter<'a> {
                     let ty = d
                         .type_ann
                         .as_ref()
-                        .map(|t| {
-                            let mut scratch = crate::types::CheckerTyTable::new();
-                            let resolved = crate::binder::resolve_type_node(t, None, &mut scratch);
-                            lower_type(&resolved, &scratch, self.m.interner, self.tt, self.m.names)
+                        .and_then(|t| self.m.annotation_types.get(&t.id))
+                        .map(|resolved| {
+                            lower_type(
+                                resolved,
+                                self.m.checker_table,
+                                self.m.interner,
+                                self.tt,
+                                self.m.names,
+                            )
                         })
                         .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
                         .or_else(|| init.as_ref().map(|e| e.ty))

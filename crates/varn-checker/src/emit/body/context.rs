@@ -34,6 +34,8 @@ pub(crate) struct ModuleCtx<'a> {
 
     pub checker_table: &'a crate::types::CheckerTyTable,
 
+    pub annotation_types: &'a FxHashMap<AstId, crate::types::Type>,
+
     pub nested_types: &'a NestedTypes,
 }
 

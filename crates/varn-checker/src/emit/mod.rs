@@ -102,6 +102,7 @@ pub fn emit_module(
         math_intrinsics: &math_intrinsics,
         interner,
         checker_table: &bind.ty_table,
+        annotation_types: &bind.annotation_types,
         nested_types: &nested,
     };
 

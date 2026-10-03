@@ -60,6 +60,7 @@ pub struct Binder<'r> {
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) interner: varn_core::AtomInterner,
     pub(crate) deps: Vec<Arc<str>>,
+    pub(crate) annotation_types: FxHashMap<varn_core::ast::AstId, crate::types::Type>,
     pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
     pub(crate) source_file: Arc<str>,
     pub(crate) sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,

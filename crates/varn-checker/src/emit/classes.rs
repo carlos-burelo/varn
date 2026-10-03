@@ -262,11 +262,15 @@ pub(super) fn emit_class(
                         .map(|p| {
                             p.type_ann
                                 .as_ref()
-                                .map(|t| {
-                                    let mut scratch = crate::types::CheckerTyTable::new();
-                                    let resolved =
-                                        crate::binder::resolve_type_node(t, None, &mut scratch);
-                                    lower_type(&resolved, &scratch, ctx.interner, types, ctx.names)
+                                .and_then(|t| ctx.annotation_types.get(&t.id))
+                                .map(|resolved| {
+                                    lower_type(
+                                        resolved,
+                                        ctx.checker_table,
+                                        ctx.interner,
+                                        types,
+                                        ctx.names,
+                                    )
                                 })
                                 .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
                         })
