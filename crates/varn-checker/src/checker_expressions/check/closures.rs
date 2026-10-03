@@ -58,46 +58,7 @@ impl<'r> Checker<'r> {
             self.apply_contextual_arrow_params(&params, &expected_fn, bind);
         }
 
-        let saved_in_function = self.in_function;
-        let saved_loop_depth = self.loop_depth;
-        let saved_switch_depth = self.switch_depth;
-        self.in_function = true;
-        self.loop_depth = 0;
-        self.switch_depth = 0;
-
-        match body {
-            ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
-            ArrowBody::Expr(e) => {
-                let expected_ret = self.expected_return_type;
-                self.with_expected(expected_ret, |c| c.check_expr(e, bind));
-                let actual = self.infer_type(e, bind);
-                if let Some(expected) = self.expected_return_type {
-                    let expected_kind = self.ty_table.get(expected.0);
-                    let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
-                    let is_void = matches!(
-                        expected_kind,
-                        varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
-                    );
-                    if !is_tp
-                        && !is_void
-                        && !self.types_compatible_cached(&expected, &actual, Some(bind))
-                    {
-                        let expected_s = expected.display(&self.ty_table, &bind.interner);
-                        let actual_s = actual.display(&self.ty_table, &bind.interner);
-                        self.emit(
-                            Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                "type mismatch: arrow function is declared to return '{expected_s}', but returns '{actual_s}'"
-                            ))
-                            .with_range(range),
-                        );
-                    }
-                }
-            }
-        }
-
-        self.in_function = saved_in_function;
-        self.loop_depth = saved_loop_depth;
-        self.switch_depth = saved_switch_depth;
+        self.in_function_body(is_async, |c| c.check_arrow_body(body, range, bind));
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
@@ -131,7 +92,7 @@ impl<'r> Checker<'r> {
             self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
         }
 
-        self.in_function_body(|c| c.check_stmt(body, bind));
+        self.in_function_body(is_async, |c| c.check_stmt(body, bind));
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
@@ -166,6 +127,15 @@ impl<'r> Checker<'r> {
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
+        if !self.in_async {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::AwaitOutsideAsync,
+                    "'await' is only valid inside an async function or at the top level",
+                )
+                .with_range(range),
+            );
+        }
         self.check_expr(argument, bind);
         let arg_ty = self.infer_type(argument, bind);
         if !arg_ty.is_dynamic()
@@ -191,6 +161,43 @@ impl<'r> Checker<'r> {
         };
         if let Some(yields) = &mut self.yielded_types {
             yields.push(ty);
+        }
+    }
+
+    fn check_arrow_body(
+        &mut self,
+        body: ArrowBody,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        match body {
+            ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
+            ArrowBody::Expr(e) => {
+                let expected_ret = self.expected_return_type;
+                self.with_expected(expected_ret, |c| c.check_expr(e, bind));
+                let actual = self.infer_type(e, bind);
+                if let Some(expected) = self.expected_return_type {
+                    let expected_kind = self.ty_table.get(expected.0);
+                    let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
+                    let is_void = matches!(
+                        expected_kind,
+                        varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
+                    );
+                    if !is_tp
+                        && !is_void
+                        && !self.types_compatible_cached(&expected, &actual, Some(bind))
+                    {
+                        let expected_s = expected.display(&self.ty_table, &bind.interner);
+                        let actual_s = actual.display(&self.ty_table, &bind.interner);
+                        self.emit(
+                            Diagnostic::error(ErrorCode::TypeMismatch, format!(
+                                "type mismatch: arrow function is declared to return '{expected_s}', but returns '{actual_s}'"
+                            ))
+                            .with_range(range),
+                        );
+                    }
+                }
+            }
         }
     }
 }

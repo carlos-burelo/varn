@@ -4,7 +4,7 @@ import { Cli } from "std:cli";
 import { Uuid } from "std:crypto";
 import { describe, it, expect } from "std:test";
 
-await describe("Consolidated StdLib Enrichments", () => {
+await describe("Consolidated StdLib Enrichments", async () => {
     await it("std:time DateTime and formatDurationMs", () => {
         const dt = DateTime.now();
         expect(dt.toMs > 0).toBeTruthy();

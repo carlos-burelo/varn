@@ -74,8 +74,14 @@ impl<'r> Checker<'r> {
         result
     }
 
-    pub(crate) fn in_function_body<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+    pub(crate) fn in_function_body<R>(
+        &mut self,
+        is_async: bool,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
         let saved_in_function = self.in_function;
+        let saved_in_async = self.in_async;
+        self.in_async = is_async;
         let saved_loop_depth = self.loop_depth;
         let saved_switch_depth = self.switch_depth;
         self.in_function = true;
@@ -85,6 +91,7 @@ impl<'r> Checker<'r> {
         let result = f(self);
 
         self.in_function = saved_in_function;
+        self.in_async = saved_in_async;
         self.loop_depth = saved_loop_depth;
         self.switch_depth = saved_switch_depth;
         result

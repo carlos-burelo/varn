@@ -37,16 +37,15 @@ impl<'r> Checker<'r> {
                             ty
                         }
                     });
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
                         self.record_scope(self.ast_arena.stmt(method.body).range.start.offset);
                     }
-                    self.check_stmt(method.body, bind);
+                    self.in_function_body(method.modifiers.is_async, |c| {
+                        c.check_stmt(method.body, bind)
+                    });
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
                 varn_core::ast::ExtensionMember::Getter {
                     return_type, body, ..
@@ -55,30 +54,24 @@ impl<'r> Checker<'r> {
                     self.expected_return_type = return_type
                         .as_ref()
                         .map(|rt| self.resolve_type_node_cached(rt, bind));
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
                         self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                     }
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
                 varn_core::ast::ExtensionMember::Setter { body, .. } => {
                     let body = *body;
                     self.expected_return_type = Some(Type::Void);
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
                         self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                     }
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
             }
             self.expected_return_type = saved_expected;

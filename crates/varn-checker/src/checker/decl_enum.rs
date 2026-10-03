@@ -51,6 +51,7 @@ impl<'r> Checker<'r> {
                     return_type,
                     body,
                     range,
+                    modifiers,
                     ..
                 } => {
                     if let Some(body_stmt) = *body {
@@ -70,12 +71,9 @@ impl<'r> Checker<'r> {
                                 .insert(Arc::from(bind.interner.resolve(tp.name)));
                         }
 
-                        let saved_in_function = self.in_function;
-                        self.in_function = true;
-
-                        self.check_stmt(body_stmt, bind);
-
-                        self.in_function = saved_in_function;
+                        self.in_function_body(modifiers.is_async, |c| {
+                            c.check_stmt(body_stmt, bind)
+                        });
 
                         for tp in type_params {
                             self.active_type_params
@@ -104,12 +102,7 @@ impl<'r> Checker<'r> {
                             .as_ref()
                             .map(|rt| self.resolve_type_node_cached(rt, bind));
 
-                        let saved_in_function = self.in_function;
-                        self.in_function = true;
-
-                        self.check_stmt(body_stmt, bind);
-
-                        self.in_function = saved_in_function;
+                        self.in_function_body(false, |c| c.check_stmt(body_stmt, bind));
 
                         self.expected_return_type = saved_expected;
                         self.current_scope = saved_getter_scope;
@@ -152,28 +145,20 @@ impl<'r> Checker<'r> {
 
                         self.check_pattern(&param.pattern, &param_ty, bind);
 
-                        let saved_in_function = self.in_function;
-                        self.in_function = true;
-
-                        self.check_stmt(body_stmt, bind);
-
-                        self.in_function = saved_in_function;
+                        self.in_function_body(false, |c| c.check_stmt(body_stmt, bind));
 
                         self.current_scope = saved_setter_scope;
                     }
                 }
                 ClassMember::Constructor { body, .. } => {
                     let body = *body;
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     if let Some(ctor_scope) = self.next_child_scope(bind) {
                         self.current_scope = ctor_scope;
                         self.record_scope(self.ast_arena.stmt(body).range.start.offset);
                     }
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
                 ClassMember::StaticBlock { body, range } => {
                     let body = *body;

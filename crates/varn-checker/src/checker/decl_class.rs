@@ -200,8 +200,6 @@ impl<'r> Checker<'r> {
                 }
                 ClassMember::Constructor { body, .. } => {
                     let body = *body;
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     let body_range = self.ast_arena.stmt(body).range;
                     if let Some(ctor_scope) = self.next_child_scope(bind) {
@@ -212,9 +210,8 @@ impl<'r> Checker<'r> {
                             ctor_scope,
                         );
                     }
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
                 ClassMember::Method {
                     return_type,
@@ -233,8 +230,6 @@ impl<'r> Checker<'r> {
                         }
                     });
 
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     let body_range = self.ast_arena.stmt(body).range;
                     if let Some(m_scope) = self.next_child_scope(bind) {
@@ -246,10 +241,9 @@ impl<'r> Checker<'r> {
                         );
                     }
 
-                    self.check_stmt(body, bind);
+                    self.in_function_body(modifiers.is_async, |c| c.check_stmt(body, bind));
 
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                     self.expected_return_type = saved_expected;
                 }
                 ClassMember::Getter {
@@ -263,8 +257,6 @@ impl<'r> Checker<'r> {
                         .as_ref()
                         .map(|rt| self.resolve_type_node_cached(rt, bind));
 
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     let body_range = self.ast_arena.stmt(body).range;
                     if let Some(g_scope) = self.next_child_scope(bind) {
@@ -276,18 +268,15 @@ impl<'r> Checker<'r> {
                         );
                     }
 
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
 
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                     self.expected_return_type = saved_expected;
                 }
                 ClassMember::Setter {
                     body: Some(body), ..
                 } => {
                     let body = *body;
-                    let saved_in_function = self.in_function;
-                    self.in_function = true;
                     let saved_scope = self.current_scope;
                     let body_range = self.ast_arena.stmt(body).range;
                     if let Some(s_scope) = self.next_child_scope(bind) {
@@ -299,10 +288,9 @@ impl<'r> Checker<'r> {
                         );
                     }
 
-                    self.check_stmt(body, bind);
+                    self.in_function_body(false, |c| c.check_stmt(body, bind));
 
                     self.current_scope = saved_scope;
-                    self.in_function = saved_in_function;
                 }
                 _ => {}
             }

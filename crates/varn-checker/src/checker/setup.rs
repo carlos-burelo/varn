@@ -53,6 +53,7 @@ impl<'r> Checker<'r> {
             loop_depth: 0,
             switch_depth: 0,
             in_function: false,
+            in_async: true,
             expected_object_members_cache: FxHashMap::default(),
             member_resolutions: FxHashMap::default(),
             call_resolutions: FxHashMap::default(),

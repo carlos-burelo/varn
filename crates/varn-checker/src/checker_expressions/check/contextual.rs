@@ -223,7 +223,7 @@ impl<'r> Checker<'r> {
                     if let Some(fn_scope) = self.next_child_scope(bind) {
                         self.current_scope = fn_scope;
                     }
-                    self.in_function_body(|c| c.check_stmt(*body, bind));
+                    self.in_function_body(*is_async, |c| c.check_stmt(*body, bind));
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
@@ -242,7 +242,7 @@ impl<'r> Checker<'r> {
                         .with_range(*range),
                     );
                     let saved_expected = self.expected_return_type.take();
-                    self.in_function_body(|c| c.check_stmt(*body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(*body, bind));
                     self.expected_return_type = saved_expected;
                 }
                 ObjectProp::Spread { argument, .. } => self.check_expr(*argument, bind),

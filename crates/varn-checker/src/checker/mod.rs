@@ -87,6 +87,7 @@ pub struct Checker<'r> {
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
     pub(crate) in_function: bool,
+    pub(crate) in_async: bool,
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
