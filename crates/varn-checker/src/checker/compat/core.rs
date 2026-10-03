@@ -84,6 +84,8 @@ pub(super) fn types_compatible_impl(
         (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _)
         | (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => true,
 
+        (_, TypeKind::Primitive(varn_core::LangPrimitive::Never)) => true,
+
         (a, b) if a == b => true,
 
         (
