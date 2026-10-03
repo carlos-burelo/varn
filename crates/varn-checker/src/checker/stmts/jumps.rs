@@ -31,8 +31,7 @@ impl<'r> Checker<'r> {
 
         if let Some(expected) = self.expected_return_type {
             let expected_kind = self.ty_table.get(expected.0);
-            let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. })
-            {
+            let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. }) {
                 Type::Bool
             } else {
                 expected
