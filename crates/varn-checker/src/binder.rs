@@ -61,6 +61,7 @@ pub struct Binder<'r> {
     /// The real per-parse `AtomInterner`, threaded in from `Binder::bind`'s
     /// caller (see the doc comment on `BindResult::interner`).
     pub(crate) interner: varn_core::AtomInterner,
+    pub(crate) live_names_seen: usize,
     /// The shared, per-compilation `CheckerTyId` table — same lifecycle as
     /// `interner` above: snapshotted from `ImportResolver::ty_table_snapshot`
     /// when this `Binder` is constructed, grown while binding, published

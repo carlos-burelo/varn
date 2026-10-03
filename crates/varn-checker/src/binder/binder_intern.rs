@@ -9,20 +9,19 @@ impl<'r> Binder<'r> {
     }
 
     pub(crate) fn resync_interner(&mut self) {
-        if self.resolver.interner_len() > self.interner.len() {
-            self.interner = self.resolver.interner_snapshot();
+        let live_len = self.resolver.interner_len();
+        if live_len != self.live_names_seen {
+            self.interner.absorb(&self.resolver.interner_snapshot());
+            self.live_names_seen = live_len;
         }
     }
 
     pub(crate) fn publish_interner_tail(&mut self) {
-        let live_len = self.resolver.interner_len();
-        if self.interner.len() <= live_len {
-            return;
-        }
+        let live = self.resolver.interner_snapshot();
         let texts: Vec<String> = self
             .interner
-            .iter_strings()
-            .skip(live_len)
+            .texts()
+            .filter(|t| live.get(t).is_none())
             .map(|s| s.to_owned())
             .collect();
         for text in texts {

@@ -2141,6 +2141,7 @@ dependencies = [
  "varn-modules",
  "varn-parser",
  "varn-tir",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -2192,6 +2193,7 @@ dependencies = [
  "num-traits",
  "rustc-hash 1.1.0",
  "serde",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -2853,6 +2855,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "yoke"

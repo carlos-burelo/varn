@@ -141,7 +141,7 @@ impl<'r> Checker<'r> {
     fn check_internal(
         program: &Program,
         ast_arena: &'r AstArena,
-        _interner: varn_core::AtomInterner,
+        mut interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
         warn_implicit_dynamic: bool,
@@ -172,7 +172,7 @@ impl<'r> Checker<'r> {
         // before that publish, is exactly as stale either way. Always
         // starting from the live snapshot is never wrong (same prefix
         // guarantee) and is the only branch that actually covers this case.
-        let interner = resolver.interner_snapshot();
+        interner.absorb(&resolver.interner_snapshot());
 
         let started = Instant::now();
         let mut bind = match globals_ref {
@@ -194,7 +194,7 @@ impl<'r> Checker<'r> {
         // `infer_call_type` resolves an atom past the end of `bind.interner`
         // (observed as `index out of bounds: the len is 335 but the index is
         // 335` when checking a core module on the runtime path).
-        bind.interner = resolver.interner_snapshot();
+        bind.interner.absorb(&resolver.interner_snapshot());
         let live_ty_table = resolver.ty_table_snapshot();
         if live_ty_table.len() > bind.ty_table.len() {
             std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
@@ -215,7 +215,7 @@ impl<'r> Checker<'r> {
         if live_ty_table.len() > bind.ty_table.len() {
             std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&live_ty_table);
         }
-        bind.interner = resolver.interner_snapshot();
+        bind.interner.absorb(&resolver.interner_snapshot());
         let started = Instant::now();
         let mut checker = Checker::new(
             resolver,
@@ -258,13 +258,19 @@ impl<'r> Checker<'r> {
         // `bind`, so refresh the atom snapshot once more: emitting a type whose
         // name atom was minted after the last resync would otherwise index out
         // of bounds in `AtomInterner::resolve`.
-        bind.interner = resolver.interner_snapshot();
+        bind.interner.absorb(&resolver.interner_snapshot());
 
         checker.desugar.foreign_enums = checker
             .collect_foreign_enums(&bind, checker.expr_table.values().map(|entry| &entry.ty));
 
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);
+        for (kept, rejected) in bind.interner.collisions() {
+            final_diagnostics.emit(varn_core::Diagnostic::error(
+                varn_core::ErrorCode::CompilationInternalError,
+                format!("name hash collision: '{kept}' and '{rejected}' share an Atom"),
+            ));
+        }
 
         let expr_table = std::mem::take(&mut checker.expr_table);
         profile.collect_annotations = Duration::ZERO;

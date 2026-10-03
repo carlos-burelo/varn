@@ -107,18 +107,7 @@ impl DiskResolver {
     /// still resolve through that binder's own interner for cross-module
     /// reads (the `cache::encode_symbol`/`decode_symbol` text round-trip).
     pub fn set_interner(&self, interner: &varn_core::AtomInterner) {
-        let mut live = self.interner.lock();
-        if interner.len() <= live.len() {
-            return;
-        }
-        let new_texts: Vec<String> = interner
-            .iter_strings()
-            .skip(live.len())
-            .map(|s| s.to_owned())
-            .collect();
-        for text in new_texts {
-            live.intern(&text);
-        }
+        self.interner.lock().absorb(interner);
     }
 
     /// Evict `id` and everything that transitively imports it.

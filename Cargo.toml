@@ -30,6 +30,7 @@ edition = "2021"
 
 [workspace.dependencies]
 rustc-hash   = "1.1.0"
+xxhash-rust  = { version = "0.8.19", features = ["xxh3"] }
 console      = "0.16"
 bigdecimal   = { version = "0.4", features = ["serde"] }
 num-bigint   = { version = "0.4", features = ["serde"] }

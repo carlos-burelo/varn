@@ -22,10 +22,8 @@
 //! id range (`0..=THIS`) because `Type::Int`/`Type::Str`/... are `const`.
 //! Non-intrinsic ids set the top bit, so they can never collide with that range.
 //!
-//! The hash is computed with `rustc_hash::FxHasher` (fixed seed, no
-//! `RandomState`), hashed twice with different salts into 128 bits. 128 bits is
-//! the engineering standard for collision resistance (rustc uses the same width
-//! for its stable hashes): the birthday bound for 2^32 shapes is ~2^-64.
+//! The hash is XXH3-128 over the shape's `Hash` stream; names inside a shape
+//! are content-addressed `Atom`s, so the id never depends on interning order.
 //!
 //! `FunctionTypeId`/`ObjectMembersId` are content hashes of the function shape
 //! and the member vector, so a shape's id is a Merkle hash over its children.

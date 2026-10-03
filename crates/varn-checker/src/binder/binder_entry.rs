@@ -55,6 +55,7 @@ impl<'r> Binder<'r> {
             class_parents: FxHashMap::default(),
             diagnostics: varn_core::DiagnosticBag::new(),
             interner,
+            live_names_seen: 0,
             ty_table: resolver.ty_table_snapshot(),
             source_file: Arc::from(program.filename.as_ref()),
             sum_type_variants: FxHashMap::default(),
