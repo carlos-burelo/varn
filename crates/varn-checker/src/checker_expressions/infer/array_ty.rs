@@ -101,15 +101,22 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_match(
         &mut self,
+        subject: varn_core::ast::ExprId,
         cases: &[varn_core::ast::MatchCase],
         arena: &varn_core::ast::AstArena,
         bind: &BindResult,
     ) -> Type {
+        let arm_scopes = bind.match_arm_scopes.get(&subject.index());
         let mut tys = Vec::new();
-        for case in cases {
+        for (i, case) in cases.iter().enumerate() {
             match &case.body {
                 varn_core::ast::MatchBody::Expr(e) => {
+                    let saved_scope = self.current_scope;
+                    if let Some(&scope) = arm_scopes.and_then(|s| s.get(i)) {
+                        self.current_scope = scope;
+                    }
                     let ty = self.infer_type(*e, bind);
+                    self.current_scope = saved_scope;
                     tys.push(ty);
                 }
                 varn_core::ast::MatchBody::Block(stmt) => {

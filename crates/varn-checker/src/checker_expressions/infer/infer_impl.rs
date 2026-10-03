@@ -228,7 +228,7 @@ impl<'r> Checker<'r> {
                 let bound = self.infer_type(*start, bind);
                 Type::range_over(&bound, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
-            ExprKind::Match { cases, .. } => self.infer_match(cases, arena, bind),
+            ExprKind::Match { subject, cases } => self.infer_match(*subject, cases, arena, bind),
             ExprKind::Pipeline { left, right } => {
                 let (left, right) = (*left, *right);
                 let lhs_ty = self.infer_type(left, bind);

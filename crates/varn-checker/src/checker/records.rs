@@ -38,6 +38,7 @@ pub struct Desugarings {
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
+    pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<crate::types::Type>>,
 }
 
 pub struct CheckResult {

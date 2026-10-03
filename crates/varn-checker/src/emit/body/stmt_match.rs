@@ -1,5 +1,6 @@
 use super::context::FnEmitter;
 use super::match_pattern::MatchDest;
+use crate::emit::ty::lower_type;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{ExprId, MatchBody, MatchCase};
@@ -16,7 +17,7 @@ impl<'a> FnEmitter<'a> {
         let mut out = std::mem::take(&mut self.pending);
         let s = self.hoist(subj);
         out.extend(std::mem::take(&mut self.pending));
-        let chain = self.match_cases(&s, cases, 0, dest);
+        let chain = self.match_cases(&s, subject, cases, 0, dest);
         out.extend(chain);
         out
     }
@@ -55,6 +56,7 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn match_cases(
         &mut self,
         s: &TirExpr,
+        subject: ExprId,
         cases: &[MatchCase],
         i: usize,
         dest: MatchDest,
@@ -67,7 +69,8 @@ impl<'a> FnEmitter<'a> {
         };
 
         self.scopes.push(FxHashMap::default());
-        let (cond, bindings) = self.match_pattern(s, &case.pattern);
+        let arm_subject = self.arm_subject(s, subject, i);
+        let (cond, bindings) = self.match_pattern(&arm_subject, &case.pattern);
 
         let guard = case.guard.map(|g| {
             let gexpr = self.lower_expr(g);
@@ -109,7 +112,7 @@ impl<'a> FnEmitter<'a> {
         }
         self.scopes.pop();
 
-        let else_body = self.match_cases(s, cases, i + 1, dest);
+        let else_body = self.match_cases(s, subject, cases, i + 1, dest);
         match guard {
             None => {
                 let mut m = bindings;
@@ -157,11 +160,28 @@ impl<'a> FnEmitter<'a> {
                 args: vec![TirArg::Expr(message)],
             },
             ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-            res: Resolution::ByName {
-                name: Arc::from("<new>"),
-                why: DynReason::NotYetSupported,
-            },
+            res: Resolution::None,
             span,
         })
+    }
+
+    fn arm_subject(&mut self, s: &TirExpr, subject: ExprId, arm: usize) -> TirExpr {
+        let Some(checked) = self
+            .m
+            .desugar
+            .match_arm_subjects
+            .get(&subject.index())
+            .and_then(|arms| arms.get(arm))
+        else {
+            return s.clone();
+        };
+        let ty = lower_type(
+            checked,
+            self.m.checker_table,
+            self.m.interner,
+            self.tt,
+            self.m.names,
+        );
+        self.cast_to(s.clone(), ty)
     }
 }

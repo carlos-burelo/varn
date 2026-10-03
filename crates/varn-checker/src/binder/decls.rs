@@ -273,10 +273,12 @@ impl<'r> super::Binder<'r> {
             ExprKind::Match { subject, cases } => {
                 let subject = *subject;
                 self.bind_expr(subject);
+                let mut arm_scopes = Vec::with_capacity(cases.len());
                 for case in cases {
                     use crate::scope::ScopeKind;
 
                     let child = self.scopes.child(ScopeKind::Block, self.current);
+                    arm_scopes.push(child);
                     let saved = self.current;
                     self.current = child;
 
@@ -292,6 +294,7 @@ impl<'r> super::Binder<'r> {
                     self.finalize_array_watch(child);
                     self.current = saved;
                 }
+                self.match_arm_scopes.insert(subject.index(), arm_scopes);
             }
             ExprKind::Update { operand, .. } => self.bind_expr(*operand),
             ExprKind::Spread { argument } => self.bind_expr(*argument),
