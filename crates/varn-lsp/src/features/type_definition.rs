@@ -100,7 +100,9 @@ fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Op
         TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
             Some(state.name(name).to_owned())
         }
-        TypeKind::Array(elem) => extract_type_identifier(state, &varn_checker::Type(elem, false)),
+        TypeKind::Array(elem) => {
+            extract_type_identifier(state, &varn_checker::Type::resolved(elem))
+        }
         TypeKind::Union(list) => {
             let named: Vec<String> = state
                 .db

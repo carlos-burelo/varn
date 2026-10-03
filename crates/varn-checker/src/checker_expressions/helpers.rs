@@ -130,7 +130,7 @@ impl<'r> Checker<'r> {
                 .ty_table
                 .get_list(list)
                 .iter()
-                .all(|id| self.is_throwable(&Type(*id, false), bind)),
+                .all(|id| self.is_throwable(&Type::resolved(*id), bind)),
             varn_core::TypeKind::This => self
                 .current_class
                 .as_deref()

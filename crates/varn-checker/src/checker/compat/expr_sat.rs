@@ -74,7 +74,7 @@ pub(crate) fn expr_satisfies_target_type(
             };
             let matched = members.iter().any(|m| match m {
                 ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {
-                    let ty = Type(*ty, false);
+                    let ty = Type::resolved(*ty);
                     expr_satisfies_target_type(&ty, &ty, arena, Some(*value), table, interner)
                         || plain_literal_matches(&ty, arena, *value, table)
                 }

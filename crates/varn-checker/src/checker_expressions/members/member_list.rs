@@ -75,7 +75,7 @@ pub fn get_members_of_type(
                             &mut results,
                             &mut seen,
                             name.clone(),
-                            Type(ty, false),
+                            Type::resolved(ty),
                             crate::semantic_info::ResolvedMemberKind::Property,
                             false,
                             optional,
@@ -120,7 +120,7 @@ pub fn get_members_of_type(
                     &mut results,
                     &mut seen,
                     Arc::from(idx.to_string()),
-                    Type(*elem, false),
+                    Type::resolved(*elem),
                     crate::semantic_info::ResolvedMemberKind::Property,
                     false,
                     false,
@@ -140,7 +140,7 @@ pub fn get_members_of_type(
         }
         TypeKind::Array(inner) => {
             let atom = table.intern_name(varn_core::BuiltinType::Array.name());
-            let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
+            let array_ty = Type::generic_atom(atom, vec![Type::resolved(inner)], None, table);
             return get_members_of_type(resolver, &array_ty, bind, table);
         }
         TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
@@ -151,7 +151,7 @@ pub fn get_members_of_type(
                 let args: Vec<Type> = table
                     .get_list(args_list)
                     .iter()
-                    .map(|id| Type(*id, false))
+                    .map(|id| Type::resolved(*id))
                     .collect();
                 super::member_util::generic_mapping(
                     resolver,

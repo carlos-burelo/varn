@@ -36,7 +36,7 @@ pub fn infer_expr_type(
                         i.get(varn_core::BuiltinType::Task.name()) == Some(name)
                     }) && table.get_list(args).len() == 1 =>
                 {
-                    Type(table.get_list(args)[0], false)
+                    Type::resolved(table.get_list(args)[0])
                 }
                 _ => inner,
             }
@@ -102,7 +102,7 @@ pub fn infer_expr_type(
                 .map(|e| infer_expr_type(*e, arena, ctx, table).0)
                 .collect();
             let list = table.intern_list(&ids);
-            Type(table.intern(TypeKind::Tuple(list)), false)
+            Type::resolved(table.intern(TypeKind::Tuple(list)))
         }
         ExprKind::Array { elements } => {
             for el in elements {
@@ -119,7 +119,7 @@ pub fn infer_expr_type(
         ExprKind::Call { callee, .. } => {
             let callee_ty = infer_expr_type(*callee, arena, ctx, table);
             if let TypeKind::Fn(fid) = table.get(callee_ty.0) {
-                return Type(table.get_function(fid).return_type, false);
+                return Type::resolved(table.get_function(fid).return_type);
             }
             Type::Dynamic
         }

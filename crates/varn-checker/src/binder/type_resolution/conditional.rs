@@ -27,7 +27,7 @@ pub(super) fn resolve_conditional(
                 let results: Vec<Type> = members
                     .into_iter()
                     .map(|m_id| {
-                        let m = Type(m_id, false);
+                        let m = Type::resolved(m_id);
                         let dist_ctx = AliasSubstitutionContext {
                             inner: ctx,
                             params: vec![var_name_str.clone()],
@@ -129,7 +129,7 @@ fn resolve_extends_with_infer(
                                 arg_node,
                                 ctx,
                                 bindings,
-                                &Type(*check_arg, false),
+                                &Type::resolved(*check_arg),
                                 table,
                             );
                         }
@@ -140,7 +140,7 @@ fn resolve_extends_with_infer(
         }
         TypeKind::Array(inner) => {
             if let TypeKind::Array(check_inner) = table.get(check.0) {
-                let check_inner = Type(check_inner, false);
+                let check_inner = Type::resolved(check_inner);
                 resolve_extends_with_infer(inner, ctx, bindings, &check_inner, table);
             }
             resolve_type_node(node, ctx, table)
@@ -148,12 +148,12 @@ fn resolve_extends_with_infer(
         TypeKind::Fn((params, ret)) => {
             if let TypeKind::Fn(fid) = table.get(check.0) {
                 let ft = table.get_function(fid).clone();
-                let ret_ty = Type(ft.return_type, false);
+                let ret_ty = Type::resolved(ft.return_type);
                 resolve_extends_with_infer(ret, ctx, bindings, &ret_ty, table);
 
                 for (param_node, check_param) in params.iter().zip(ft.params.iter()) {
                     if let Some(constraint) = &param_node.constraint {
-                        let param_ty = Type(check_param.ty, false);
+                        let param_ty = Type::resolved(check_param.ty);
                         resolve_extends_with_infer(constraint, ctx, bindings, &param_ty, table);
                     }
                 }
@@ -183,28 +183,27 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         (_, TypeKind::Union(list)) => table
             .get_list(list)
             .iter()
-            .any(|m| type_satisfies_extends(check, &Type(*m, false), table)),
+            .any(|m| type_satisfies_extends(check, &Type::resolved(*m), table)),
 
         (TypeKind::Generic(cn, ca, _), TypeKind::Generic(en, ea, _)) => {
             let ca_ids = table.get_list(ca).to_vec();
             let ea_ids = table.get_list(ea).to_vec();
             cn == en
                 && ca_ids.len() == ea_ids.len()
-                && ca_ids
-                    .iter()
-                    .zip(ea_ids.iter())
-                    .all(|(c, e)| type_satisfies_extends(&Type(*c, false), &Type(*e, false), table))
+                && ca_ids.iter().zip(ea_ids.iter()).all(|(c, e)| {
+                    type_satisfies_extends(&Type::resolved(*c), &Type::resolved(*e), table)
+                })
         }
 
         (TypeKind::Named(cn, _), TypeKind::Named(en, _)) => cn == en,
 
         (TypeKind::Array(c), TypeKind::Array(e)) => {
-            type_satisfies_extends(&Type(c, false), &Type(e, false), table)
+            type_satisfies_extends(&Type::resolved(c), &Type::resolved(e), table)
         }
 
         (TypeKind::Fn(f_check), TypeKind::Fn(f_extends)) => {
-            let check_ret = Type(table.get_function(f_check).return_type, false);
-            let extends_ret = Type(table.get_function(f_extends).return_type, false);
+            let check_ret = Type::resolved(table.get_function(f_check).return_type);
+            let extends_ret = Type::resolved(table.get_function(f_extends).return_type);
             type_satisfies_extends(&check_ret, &extends_ret, table)
         }
 

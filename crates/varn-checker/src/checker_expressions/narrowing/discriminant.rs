@@ -54,7 +54,7 @@ impl<'r> Checker<'r> {
                                     .ty_table
                                     .get_list(list)
                                     .iter()
-                                    .map(|id| Type(*id, false))
+                                    .map(|id| Type::resolved(*id))
                                     .collect();
                                 let mut matched: Vec<Type> = Vec::new();
                                 let mut unmatched: Vec<Type> = Vec::new();
@@ -157,7 +157,7 @@ impl<'r> Checker<'r> {
                                 .ty_table
                                 .get_list(list)
                                 .iter()
-                                .map(|id| Type(*id, false))
+                                .map(|id| Type::resolved(*id))
                                 .collect();
                             return Some((id, members));
                         }

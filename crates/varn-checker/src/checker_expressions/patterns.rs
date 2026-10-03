@@ -167,7 +167,7 @@ impl<'r> Checker<'r> {
                 self.ty_table
                     .get_list(a)
                     .iter()
-                    .map(|id| Type(*id, false))
+                    .map(|id| Type::resolved(*id))
                     .collect(),
                 o.map(|o| std::sync::Arc::from(bind.interner.resolve(o))),
             ),

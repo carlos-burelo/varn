@@ -63,7 +63,7 @@ pub(crate) fn infer_member(
     let obj_ty = infer_expr_type(object, arena, ctx, table);
     if computed {
         return match table.get(obj_ty.0) {
-            TypeKind::Array(inner) => Type(inner, false),
+            TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
             TypeKind::Named(name, _)
                 if ctx
@@ -79,7 +79,7 @@ pub(crate) fn infer_member(
             {
                 let arg_ids = table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
-                    Type(arg_ids[1], false)
+                    Type::resolved(arg_ids[1])
                 } else {
                     Type::Dynamic
                 }
@@ -91,7 +91,7 @@ pub(crate) fn infer_member(
                     crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
                     _ => None,
                 })
-                .map(|id| Type(id, false))
+                .map(|id| Type::resolved(id))
                 .unwrap_or(Type::Dynamic),
             _ => Type::Dynamic,
         };
@@ -131,7 +131,7 @@ pub(crate) fn infer_member(
                             if let Some(p) = table.get_function(fid).params.iter().find(|p| {
                                 p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name)
                             }) {
-                                found_tys.push(Type(p.ty, false));
+                                found_tys.push(Type::resolved(p.ty));
                             }
                         }
                     }

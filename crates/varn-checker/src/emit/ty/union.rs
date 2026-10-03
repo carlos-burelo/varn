@@ -30,7 +30,7 @@ pub(super) fn lower_union(
     ) -> Option<BackendTy> {
         let mut iter = non_null
             .iter()
-            .map(|id| lower_type(&Type(**id, false), table, interner, tt, names));
+            .map(|id| lower_type(&Type::resolved(**id), table, interner, tt, names));
         let first = iter.next()?;
         if matches!(first, BackendTy::Dynamic(_)) {
             return None;
@@ -47,7 +47,7 @@ pub(super) fn lower_union(
     match non_null.as_slice() {
         [] => BackendTy::Nullable(NEVER_TY),
         [only] => {
-            let inner = lower_type(&Type(**only, false), table, interner, tt, names);
+            let inner = lower_type(&Type::resolved(**only), table, interner, tt, names);
             BackendTy::Nullable(tt.intern(inner))
         }
         _ => match common_base(&non_null, table, interner, tt, names) {

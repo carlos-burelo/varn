@@ -53,10 +53,9 @@ impl<'r> Checker<'r> {
             Some(varn_core::MemberKey::Entries) => {
                 let ids: Vec<crate::types::CheckerTyId> = vec![Type::Str.0, Type::Dynamic.0];
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
-                let entry = Type(
+                let entry = Type::resolved(
                     std::sync::Arc::make_mut(&mut self.ty_table)
                         .intern(varn_core::TypeKind::Tuple(list)),
-                    false,
                 );
                 let ret = Type::array(entry, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 Type::fn_(

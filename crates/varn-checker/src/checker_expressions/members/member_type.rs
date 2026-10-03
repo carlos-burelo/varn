@@ -115,7 +115,7 @@ impl<'r> Checker<'r> {
                         readonly: true,
                     });
                 }
-                if let Some(res) = self.find_member(&Type(payload_ty, false), key, bind) {
+                if let Some(res) = self.find_member(&Type::resolved(payload_ty), key, bind) {
                     return Some(res);
                 }
                 let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
@@ -193,7 +193,7 @@ impl<'r> Checker<'r> {
                             .ty_table
                             .get_list(args_list)
                             .iter()
-                            .map(|id| Type(*id, false))
+                            .map(|id| Type::resolved(*id))
                             .collect();
                         let mapping = super::member_util::generic_mapping(
                             self.resolver,

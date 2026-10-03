@@ -257,7 +257,7 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
     match table.get(subject.0) {
         TypeKind::Union(list) => {
             for id in table.get_list(list).to_vec() {
-                split_bool(Type(id, false), &mut out, table);
+                split_bool(Type::resolved(id), &mut out, table);
             }
         }
         TypeKind::Primitive(varn_core::LangPrimitive::Bool) => {

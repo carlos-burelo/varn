@@ -83,7 +83,7 @@ impl<'r> Checker<'r> {
         let right_ty = self.infer_type(right, bind);
         let right_kind = self.ty_table.get(right_ty.0);
         let elem_ty = match right_kind {
-            TypeKind::Array(inner) => Type(inner, false),
+            TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => {
                 Type::Char
             }
@@ -98,13 +98,12 @@ impl<'r> Checker<'r> {
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
-                Type(
+                Type::resolved(
                     std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)),
-                    false,
                 )
             }
             TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
-                Type(self.ty_table.get_list(args)[0], false)
+                Type::resolved(self.ty_table.get_list(args)[0])
             }
             TypeKind::Builtin(varn_core::BuiltinType::Range) => Type::Int,
             _ => Type::Dynamic,

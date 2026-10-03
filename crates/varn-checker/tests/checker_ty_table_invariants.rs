@@ -122,7 +122,7 @@ fn absorb_is_a_union_that_preserves_ids() {
 fn tainted_flag_is_not_part_of_type_identity() {
     let mut t = CheckerTyTable::new();
     let id = t.intern(TypeKind::Array(CheckerTyId::INT));
-    let plain = Type(id, false);
+    let plain = Type::resolved(id);
     let tainted = Type(id, true);
     assert_eq!(plain.id(), tainted.id());
     assert_eq!(plain.kind(&t), tainted.kind(&t));

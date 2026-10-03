@@ -58,7 +58,7 @@ impl<'r> Checker<'r> {
         let tag_ty = tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if let varn_core::TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
             let ret = self.ty_table.get_function(fid).return_type;
-            self.record_type(range.start.offset, Type(ret, false));
+            self.record_type(range.start.offset, Type::resolved(ret));
         }
     }
 

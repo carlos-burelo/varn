@@ -112,7 +112,7 @@ impl<'r> Checker<'r> {
                     .enumerate()
                     .find(|(_, p)| p.name.as_deref() == Some(lbl))
                 {
-                    (Some(Type(p.ty, false)), Some(i))
+                    (Some(Type::resolved(p.ty)), Some(i))
                 } else {
                     (None, None)
                 }
@@ -125,7 +125,9 @@ impl<'r> Checker<'r> {
                 {
                     positional_param_idx += 1;
                 }
-                let ty = params.get(positional_param_idx).map(|p| Type(p.ty, false));
+                let ty = params
+                    .get(positional_param_idx)
+                    .map(|p| Type::resolved(p.ty));
                 let idx = if ty.is_some() {
                     Some(positional_param_idx)
                 } else {
@@ -265,7 +267,7 @@ impl<'r> Checker<'r> {
             Arg::Spread(expr) => {
                 let arg_ty = self.infer_type(*expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
-                    TypeKind::Array(inner) => Some(Type(inner, false)),
+                    TypeKind::Array(inner) => Some(Type::resolved(inner)),
                     _ => None,
                 };
                 match spread_inner {
@@ -329,20 +331,20 @@ fn compatible_param_type(
     if let Some(inner) = spread_inner {
         if param.is_rest {
             if let TypeKind::Array(expected_inner) = table.get(param.ty) {
-                Type(expected_inner, false)
+                Type::resolved(expected_inner)
             } else {
-                Type(param.ty, false)
+                Type::resolved(param.ty)
             }
         } else {
             inner
         }
     } else if param.is_rest {
         if let TypeKind::Array(inner) = table.get(param.ty) {
-            Type(inner, false)
+            Type::resolved(inner)
         } else {
-            Type(param.ty, false)
+            Type::resolved(param.ty)
         }
     } else {
-        Type(param.ty, false)
+        Type::resolved(param.ty)
     }
 }

@@ -3,7 +3,7 @@ use varn_core::TypeKind;
 
 #[inline]
 pub(super) fn t(id: CheckerTyId) -> Type {
-    Type(id, false)
+    Type::resolved(id)
 }
 
 pub(super) fn is_simple_type(ty: &Type, table: &CheckerTyTable) -> bool {
@@ -85,13 +85,13 @@ pub(super) fn array_element_type(
     interner: Option<&varn_core::AtomInterner>,
 ) -> Option<Type> {
     match table.get(ty.0) {
-        TypeKind::Array(inner) => Some(Type(inner, false)),
+        TypeKind::Array(inner) => Some(Type::resolved(inner)),
         TypeKind::Generic(name, args, _)
             if table.get_list(args).len() == 1
                 && interner
                     .is_some_and(|it| it.resolve(name) == varn_core::BuiltinType::Array.name()) =>
         {
-            Some(Type(table.get_list(args)[0], false))
+            Some(Type::resolved(table.get_list(args)[0]))
         }
         _ => None,
     }

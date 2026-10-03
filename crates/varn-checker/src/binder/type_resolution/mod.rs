@@ -42,9 +42,7 @@ pub fn resolve_type_node(
         TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Null,
         TypeKind::Primitive(varn_core::LangPrimitive::Never) => Type::Never,
         TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
-        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
-            Type::builtin(varn_core::BuiltinType::Bytes, table)
-        }
+        TypeKind::Builtin(b) => Type::builtin(*b, table),
         TypeKind::This => Type::This,
         TypeKind::Literal(l) => scalar::resolve_literal_type(*l, ctx, interner, table),
         TypeKind::Array(inner) => compound::resolve_array_type(inner, ctx, table),
@@ -92,7 +90,34 @@ pub fn resolve_type_node(
             let check_ty = resolve_type_node(check, ctx, table);
             resolve_conditional(check, &check_ty, extends, true_type, false_type, ctx, table)
         }
-        TypeKind::Infer(_) => Type::Dynamic.tainted(),
+        TypeKind::Infer(_) => Type::Error,
+        TypeKind::Tuple(elements) => {
+            let ids: Vec<_> = elements
+                .iter()
+                .map(|e| resolve_type_node(e, ctx, table).0)
+                .collect();
+            let list = table.intern_list(&ids);
+            Type::resolved(table.intern(TypeKind::Tuple(list)))
+        }
+        TypeKind::EnumVariant {
+            enum_name,
+            variant_name,
+            type_args,
+            payload_ty,
+        } => {
+            let args: Vec<_> = type_args
+                .iter()
+                .map(|a| resolve_type_node(a, ctx, table).0)
+                .collect();
+            let type_args = table.intern_list(&args);
+            let payload_ty = resolve_type_node(payload_ty, ctx, table).0;
+            Type::resolved(table.intern(TypeKind::EnumVariant {
+                enum_name: *enum_name,
+                variant_name: *variant_name,
+                type_args,
+                payload_ty,
+            }))
+        }
         TypeKind::TypePredicate {
             parameter_name,
             target_type,
@@ -102,8 +127,7 @@ pub fn resolve_type_node(
                 parameter_name: *parameter_name,
                 target_type: target.0,
             });
-            Type(interned, false)
+            Type::resolved(interned)
         }
-        _ => Type::Dynamic.tainted(),
     }
 }

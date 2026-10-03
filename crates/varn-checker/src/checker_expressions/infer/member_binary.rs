@@ -112,9 +112,21 @@ pub(super) fn infer_binary_type(
             let r_raw = base_type(&checker.infer_type(right, bind));
             let l = normalize_for_binary(&l_raw, &checker.ty_table, &bind.interner);
             let r = normalize_for_binary(&r_raw, &checker.ty_table, &bind.interner);
-            if l.is_dynamic() || r.is_dynamic() {
-                return Type::Dynamic.tainted();
+            if l_raw.is_error() || r_raw.is_error() {
+                return Type::Error;
             }
+            if l.is_dynamic() || r.is_dynamic() {
+                return Type::Dynamic;
+            }
+            let is_type_param = |t: &Type| {
+                matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _)
+                    if checker.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()))
+            };
+            let unresolved = if is_type_param(&l) || is_type_param(&r) {
+                Type::Dynamic
+            } else {
+                Type::Error
+            };
             let (l, r) = crate::binder::type_inference::adopt_literal_operands(
                 checker.ast_arena,
                 left,
@@ -135,11 +147,11 @@ pub(super) fn infer_binary_type(
                         return Type::Str;
                     }
                     crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
-                        .unwrap_or_else(|| Type::Dynamic.tainted())
+                        .unwrap_or(unresolved)
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
                     crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
-                        .unwrap_or_else(|| Type::Dynamic.tainted())
+                        .unwrap_or(unresolved)
                 }
                 BinaryOp::BitAnd
                 | BinaryOp::BitOr
@@ -153,9 +165,9 @@ pub(super) fn infer_binary_type(
                             &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                         );
                     }
-                    Type::Dynamic.tainted()
+                    unresolved
                 }
-                _ => Type::Dynamic.tainted(),
+                _ => unresolved,
             }
         }
     }

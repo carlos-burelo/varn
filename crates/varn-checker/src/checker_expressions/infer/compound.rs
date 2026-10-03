@@ -24,7 +24,7 @@ impl<'r> Checker<'r> {
         let prop_ty = self.infer_type(property, bind);
         let obj_kind = self.ty_table.get(obj_ty.0);
         match obj_kind {
-            TypeKind::Array(inner) if prop_ty.is_int() => Type(inner, false),
+            TypeKind::Array(inner) if prop_ty.is_int() => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) if prop_ty.is_int() => Type::Str,
             TypeKind::Builtin(varn_core::BuiltinType::Bytes) if prop_ty.is_int() => Type::Int,
             TypeKind::Named(name, _)
@@ -44,7 +44,7 @@ impl<'r> Checker<'r> {
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
-                    Type(arg_ids[1], false)
+                    Type::resolved(arg_ids[1])
                 } else {
                     Type::Dynamic
                 }
@@ -55,7 +55,7 @@ impl<'r> Checker<'r> {
                 .get_object_members(mid)
                 .iter()
                 .find_map(|m| match m {
-                    ObjectTypeMember::Index { value_ty, .. } => Some(Type(*value_ty, false)),
+                    ObjectTypeMember::Index { value_ty, .. } => Some(Type::resolved(*value_ty)),
                     _ => None,
                 })
                 .unwrap_or(Type::Dynamic),

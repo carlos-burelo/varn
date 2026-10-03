@@ -19,5 +19,5 @@ pub(super) fn resolve_literal_type(
         }
         other => other,
     };
-    Type(table.intern(TypeKind::Literal(l)), false)
+    Type::resolved(table.intern(TypeKind::Literal(l)))
 }

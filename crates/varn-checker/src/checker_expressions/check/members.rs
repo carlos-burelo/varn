@@ -96,7 +96,7 @@ impl<'r> Checker<'r> {
                 {
                     let arg_ids = self.ty_table.get_list(args).to_vec();
                     if arg_ids.len() == 2 {
-                        Some(Type(arg_ids[0], false))
+                        Some(Type::resolved(arg_ids[0]))
                     } else {
                         None
                     }
@@ -106,7 +106,7 @@ impl<'r> Checker<'r> {
                         .get_object_members(mid)
                         .iter()
                         .find_map(|m| match m {
-                            ObjectTypeMember::Index { key_ty, .. } => Some(Type(*key_ty, false)),
+                            ObjectTypeMember::Index { key_ty, .. } => Some(Type::resolved(*key_ty)),
                             _ => None,
                         })
                 }

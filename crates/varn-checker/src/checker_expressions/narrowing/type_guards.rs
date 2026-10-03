@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
                 target_type,
             } = self.ty_table.get(ft.return_type)
             {
-                let target_type = Type(target_type, false);
+                let target_type = Type::resolved(target_type);
                 let parameter_name_str = bind.interner.resolve(parameter_name);
                 let arg_expr = if let Some(pos) = ft
                     .params
@@ -65,7 +65,7 @@ impl<'r> Checker<'r> {
                                         .get_list(list)
                                         .to_vec()
                                         .into_iter()
-                                        .map(|id| Type(id, false))
+                                        .map(|id| Type::resolved(id))
                                         .filter(|m| {
                                             let m_kind = self.ty_table.get(m.0);
                                             match (m_kind, target_kind) {

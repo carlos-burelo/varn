@@ -54,7 +54,7 @@ fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHin
         return None;
     }
 
-    let ret_ty = varn_checker::Type(state.db.fn_shape(sym.ty())?.return_type, false);
+    let ret_ty = varn_checker::Type::resolved(state.db.fn_shape(sym.ty())?.return_type);
     if !worth_hinting(state, &ret_ty) {
         return None;
     }

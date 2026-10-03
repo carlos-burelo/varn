@@ -14,7 +14,7 @@ impl ObjectTypeMember {
                 readonly,
             } => ObjectTypeMember::Property {
                 name: name.clone(),
-                ty: Type(*ty, false).map_generics(mapping, table).0,
+                ty: Type::resolved(*ty).map_generics(mapping, table).0,
                 optional: *optional,
                 readonly: *readonly,
             },
@@ -30,12 +30,12 @@ impl ObjectTypeMember {
                     .iter()
                     .map(|p| FunctionParam {
                         name: p.name.clone(),
-                        ty: Type(p.ty, false).map_generics(mapping, table).0,
+                        ty: Type::resolved(p.ty).map_generics(mapping, table).0,
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
                     .collect(),
-                return_type: Type(*return_type, false).map_generics(mapping, table).0,
+                return_type: Type::resolved(*return_type).map_generics(mapping, table).0,
                 optional: *optional,
                 is_arrow: *is_arrow,
             },
@@ -45,8 +45,8 @@ impl ObjectTypeMember {
                 value_ty,
             } => ObjectTypeMember::Index {
                 param_name: param_name.clone(),
-                key_ty: Type(*key_ty, false).map_generics(mapping, table).0,
-                value_ty: Type(*value_ty, false).map_generics(mapping, table).0,
+                key_ty: Type::resolved(*key_ty).map_generics(mapping, table).0,
+                value_ty: Type::resolved(*value_ty).map_generics(mapping, table).0,
             },
             ObjectTypeMember::Callable {
                 params,
@@ -57,12 +57,12 @@ impl ObjectTypeMember {
                     .iter()
                     .map(|p| FunctionParam {
                         name: p.name.clone(),
-                        ty: Type(p.ty, false).map_generics(mapping, table).0,
+                        ty: Type::resolved(p.ty).map_generics(mapping, table).0,
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
                     .collect(),
-                return_type: Type(*return_type, false).map_generics(mapping, table).0,
+                return_type: Type::resolved(*return_type).map_generics(mapping, table).0,
                 is_arrow: *is_arrow,
             },
         }

@@ -117,7 +117,7 @@ pub(super) fn extension_getter_type(
 ) -> Option<Type> {
     let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
     match table.get(sym_ty.0) {
-        TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
+        TypeKind::Fn(fid) => Some(Type::resolved(table.get_function(fid).return_type)),
         _ => Some(sym_ty),
     }
 }

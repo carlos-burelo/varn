@@ -31,7 +31,7 @@ pub fn resolve_primitive(
     table: &mut CheckerTyTable,
 ) -> Type {
     if let Some(kind) = TypeKind::of_lang_name(name) {
-        return Type(table.intern(kind), false);
+        return Type::resolved(table.intern(kind));
     }
     let name_atom = table.intern_name(name);
     let origin = ctx

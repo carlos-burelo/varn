@@ -76,7 +76,7 @@ pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) 
 pub fn awaited(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> Type {
     match table.get(ty.0) {
         TypeKind::Generic(_, args, _) if is_awaitable(ty, table, interner) => {
-            Type(table.get_list(args)[0], false)
+            Type::resolved(table.get_list(args)[0])
         }
         _ => *ty,
     }

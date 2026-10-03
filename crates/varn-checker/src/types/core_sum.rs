@@ -20,7 +20,7 @@ impl Type {
         let args = table
             .get_list(args)
             .iter()
-            .map(|&id| Type(id, false))
+            .map(|&id| Type::resolved(id))
             .collect();
         Some((sum, args))
     }

@@ -88,7 +88,7 @@ pub fn infer_object_member_type(
 ) -> Option<Type> {
     match m {
         ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == prop_name => {
-            Some(Type(*ty, false))
+            Some(Type::resolved(*ty))
         }
         ObjectTypeMember::Method {
             name,

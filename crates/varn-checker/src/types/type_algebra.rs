@@ -19,7 +19,7 @@ impl Type {
             TypeKind::Union(list) => table
                 .get_list(list)
                 .iter()
-                .any(|m| Type(*m, false).is_nullable(table)),
+                .any(|m| Type::resolved(*m).is_nullable(table)),
             _ => false,
         }
     }
@@ -39,7 +39,7 @@ impl Type {
                 let members: Vec<Type> = table
                     .get_list(list)
                     .iter()
-                    .map(|id| Type(*id, false))
+                    .map(|id| Type::resolved(*id))
                     .collect();
                 let new_members: Vec<Type> = members
                     .into_iter()
@@ -53,7 +53,7 @@ impl Type {
                 } else {
                     let ids: Vec<CheckerTyId> = new_members.iter().map(|m| m.0).collect();
                     let new_list = table.intern_list(&ids);
-                    Type(table.intern(TypeKind::Union(new_list)), false)
+                    Type::resolved(table.intern(TypeKind::Union(new_list)))
                 }
             }
             _ => *self,
@@ -76,10 +76,10 @@ impl Type {
                 if kept.is_empty() {
                     Type::Never
                 } else if kept.len() == 1 {
-                    Type(kept[0], false)
+                    Type::resolved(kept[0])
                 } else {
                     let new_list = table.intern_list(&kept);
-                    Type(table.intern(TypeKind::Union(new_list)), false)
+                    Type::resolved(table.intern(TypeKind::Union(new_list)))
                 }
             }
             _ => *self,
@@ -114,10 +114,10 @@ impl Type {
                 if kept.is_empty() {
                     Type::Never
                 } else if kept.len() == 1 {
-                    Type(kept[0], false)
+                    Type::resolved(kept[0])
                 } else {
                     let new_list = table.intern_list(&kept);
-                    Type(table.intern(TypeKind::Union(new_list)), false)
+                    Type::resolved(table.intern(TypeKind::Union(new_list)))
                 }
             }
             _ => *self,
@@ -140,20 +140,20 @@ impl Type {
                 let arg_ids = table.get_list(args).to_vec();
                 let new_args: Vec<CheckerTyId> = arg_ids
                     .into_iter()
-                    .map(|a| Type(a, false).map_generics(mapping, table).0)
+                    .map(|a| Type::resolved(a).map_generics(mapping, table).0)
                     .collect();
                 let new_list = table.intern_list(&new_args);
                 Type(table.intern(TypeKind::Generic(n, new_list, origin)), self.1)
             }
             TypeKind::Array(inner) => {
-                let mapped = Type(inner, false).map_generics(mapping, table);
+                let mapped = Type::resolved(inner).map_generics(mapping, table);
                 Type::array(mapped, table)
             }
             TypeKind::Union(list) => {
                 let ids = table.get_list(list).to_vec();
                 let new_members: Vec<Type> = ids
                     .into_iter()
-                    .map(|id| Type(id, false).map_generics(mapping, table))
+                    .map(|id| Type::resolved(id).map_generics(mapping, table))
                     .collect();
                 Type::union(new_members, table)
             }
@@ -164,12 +164,14 @@ impl Type {
                     .iter()
                     .map(|p| FunctionParam {
                         name: p.name.clone(),
-                        ty: Type(p.ty, false).map_generics(mapping, table).0,
+                        ty: Type::resolved(p.ty).map_generics(mapping, table).0,
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
                     .collect();
-                let new_ret = Type(ft.return_type, false).map_generics(mapping, table).0;
+                let new_ret = Type::resolved(ft.return_type)
+                    .map_generics(mapping, table)
+                    .0;
                 Type::fn_(
                     FunctionType {
                         params: new_params,

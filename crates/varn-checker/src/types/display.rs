@@ -30,7 +30,7 @@ impl Type {
 impl<'t> TypeDisplay<'t> {
     fn child(&self, id: CheckerTyId) -> TypeDisplay<'t> {
         TypeDisplay {
-            ty: Type(id, false),
+            ty: Type::resolved(id),
             table: self.table,
             interner: self.interner,
         }
@@ -73,7 +73,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let non_null: Vec<CheckerTyId> = members
                     .iter()
-                    .filter(|m| !Type(**m, false).is_nullable(table))
+                    .filter(|m| !Type::resolved(**m).is_nullable(table))
                     .copied()
                     .collect();
                 if non_null.len() == 1 && non_null.len() < members.len() {

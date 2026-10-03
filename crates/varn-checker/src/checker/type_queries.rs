@@ -71,7 +71,7 @@ impl<'r> Checker<'r> {
             .ty_table
             .get_list(args_list)
             .iter()
-            .map(|id| Type(*id, false))
+            .map(|id| Type::resolved(*id))
             .collect();
         let mapping = crate::checker_expressions::members::member_util::generic_mapping(
             self.resolver,

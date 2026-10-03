@@ -52,7 +52,7 @@ pub(super) fn resolve_intersection_type(
     }
     let ids: Vec<crate::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
     let list = table.intern_list(&ids);
-    Type(table.intern(TypeKind::Intersection(list)), false)
+    Type::resolved(table.intern(TypeKind::Intersection(list)))
 }
 
 fn is_scalar(ty: &Type, table: &CheckerTyTable) -> bool {
@@ -81,7 +81,7 @@ fn intersect_two(a: Type, b: Type, table: &mut CheckerTyTable) -> Type {
         ) => Type::Never,
         _ => {
             let list = table.intern_list(&[a.0, b.0]);
-            Type(table.intern(TypeKind::Intersection(list)), false)
+            Type::resolved(table.intern(TypeKind::Intersection(list)))
         }
     }
 }
@@ -112,7 +112,7 @@ fn merge_members(
                 readonly: prev_ro,
                 ..
             }) => {
-                *prev_ty = intersect_two(Type(*prev_ty, false), Type(*ty, false), table).0;
+                *prev_ty = intersect_two(Type::resolved(*prev_ty), Type::resolved(*ty), table).0;
                 *prev_opt = *prev_opt && *optional;
                 *prev_ro = *prev_ro || *readonly;
             }

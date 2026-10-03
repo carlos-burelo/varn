@@ -26,7 +26,7 @@ pub(crate) fn intern_signature(
                 .params
                 .iter()
                 .map(|p| {
-                    let inner = lower_type(&Type(p.ty, false), table, interner, tt, names);
+                    let inner = lower_type(&Type::resolved(p.ty), table, interner, tt, names);
                     match inner {
                         BackendTy::Dynamic(_) | BackendTy::Nullable(_) => inner,
                         _ if p.optional => BackendTy::Nullable(tt.intern(inner)),
@@ -34,7 +34,7 @@ pub(crate) fn intern_signature(
                     }
                 })
                 .collect();
-            let return_ty = lower_type(&Type(ft.return_type, false), table, interner, tt, names);
+            let return_ty = lower_type(&Type::resolved(ft.return_type), table, interner, tt, names);
             (p_tys, return_ty)
         }
         _ => (vec![], BackendTy::Dynamic(varn_tir::DynReason::Unannotated)),

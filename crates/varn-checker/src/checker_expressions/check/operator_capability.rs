@@ -40,15 +40,15 @@ impl Checker<'_> {
                 return_type,
                 ..
             } => (
-                params.first().map(|p| Type(p.ty, false)),
-                Type(return_type, false),
+                params.first().map(|p| Type::resolved(p.ty)),
+                Type::resolved(return_type),
             ),
             ObjectTypeMember::Property { ty, .. } => match self.ty_table.get(ty) {
                 TypeKind::Fn(fid) => {
                     let ft = self.ty_table.get_function(fid);
                     (
-                        ft.params.first().map(|p| Type(p.ty, false)),
-                        Type(ft.return_type, false),
+                        ft.params.first().map(|p| Type::resolved(p.ty)),
+                        Type::resolved(ft.return_type),
                     )
                 }
                 _ => return None,

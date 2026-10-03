@@ -23,11 +23,11 @@ impl<'r> Checker<'r> {
             let expected = param.map(|p| {
                 if p.is_rest {
                     match self.ty_table.get(p.ty) {
-                        TypeKind::Array(inner) => Type(inner, false),
-                        _ => Type(p.ty, false),
+                        TypeKind::Array(inner) => Type::resolved(inner),
+                        _ => Type::resolved(p.ty),
                     }
                 } else {
-                    Type(p.ty, false)
+                    Type::resolved(p.ty)
                 }
             });
             match arg {

@@ -29,7 +29,7 @@ pub(super) fn build_enrich_context(
                     let FunctionType { return_type, .. } = bind.ty_table.get_function(fid);
                     // Already `Task<R>` for async functions — the binder wrapped
                     // it when it built the type.
-                    let raw = Type(*return_type, false);
+                    let raw = Type::resolved(*return_type);
                     if !raw.is_dynamic() {
                         fn_map.insert(name_rc.clone(), raw);
                     }

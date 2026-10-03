@@ -21,7 +21,7 @@ pub struct SymbolView<'a> {
 }
 
 /// `dynamic`, for symbols the checker left untyped.
-pub(super) static DYNAMIC_TY: Type = Type(varn_checker::types::CheckerTyId::DYNAMIC, false);
+pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_checker::types::CheckerTyId::DYNAMIC);
 
 impl std::fmt::Debug for SymbolView<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -113,7 +113,7 @@ impl<'a> SymbolView<'a> {
     pub fn type_str(&self) -> String {
         match (self.fn_shape(), self.kind()) {
             (Some(ft), SymbolKind::Function | SymbolKind::Method) => {
-                self.db.ty_text(&Type(ft.return_type, false))
+                self.db.ty_text(&Type::resolved(ft.return_type))
             }
             _ => self.db.ty_text(self.ty),
         }
@@ -127,7 +127,7 @@ impl<'a> SymbolView<'a> {
                     format!(
                         "{}: {}{}",
                         p.name.as_deref().unwrap_or("_"),
-                        self.db.ty_text(&Type(p.ty, false)),
+                        self.db.ty_text(&Type::resolved(p.ty)),
                         if p.optional { "?" } else { "" }
                     )
                 })

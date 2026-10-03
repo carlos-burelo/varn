@@ -20,7 +20,7 @@ impl<'r> Checker<'r> {
                         ..
                     }
                 );
-            let ep_ty = Type(ep.ty, false);
+            let ep_ty = Type::resolved(ep.ty);
             if has_ann || ep_ty.is_dynamic() {
                 continue;
             }
@@ -42,12 +42,12 @@ impl<'r> Checker<'r> {
         let elem_expected = self
             .expected_type
             .and_then(|t| match self.ty_table.get(t.0) {
-                TypeKind::Array(inner) => Some(Type(inner, false)),
+                TypeKind::Array(inner) => Some(Type::resolved(inner)),
                 TypeKind::Generic(name, args, _)
                     if bind.interner.get(varn_core::BuiltinType::Array.name()) == Some(name)
                         && self.ty_table.get_list(args).len() == 1 =>
                 {
-                    Some(Type(self.ty_table.get_list(args)[0], false))
+                    Some(Type::resolved(self.ty_table.get_list(args)[0]))
                 }
                 _ => None,
             });
@@ -174,10 +174,10 @@ impl<'r> Checker<'r> {
                     let prop_expected = key_str.and_then(|k| {
                         expected_members.iter().find_map(|m| match m {
                             ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == k => {
-                                Some(Type(*ty, false))
+                                Some(Type::resolved(*ty))
                             }
                             ObjectTypeMember::Index { value_ty, .. } => {
-                                Some(Type(*value_ty, false))
+                                Some(Type::resolved(*value_ty))
                             }
                             _ => None,
                         })
@@ -269,7 +269,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn expected_return_from_fn_type(&self) -> Option<Type> {
         self.expected_fn_type()
-            .map(|ft| Type(ft.return_type, false))
+            .map(|ft| Type::resolved(ft.return_type))
             .filter(|t| !t.is_dynamic())
     }
 }

@@ -60,8 +60,8 @@ fn lower_kind(
                 && table.get_list(args).len() == 2 =>
         {
             let arg_ids = table.get_list(args).to_vec();
-            let k = lower_type(&Type(arg_ids[0], false), table, interner, tt, names);
-            let v = lower_type(&Type(arg_ids[1], false), table, interner, tt, names);
+            let k = lower_type(&Type::resolved(arg_ids[0]), table, interner, tt, names);
+            let v = lower_type(&Type::resolved(arg_ids[1]), table, interner, tt, names);
             BackendTy::Map(tt.intern(k), tt.intern(v))
         }
         TypeKind::Generic(name, args, _)
@@ -69,7 +69,7 @@ fn lower_kind(
                 && table.get_list(args).len() == 1 =>
         {
             let el = lower_type(
-                &Type(table.get_list(args)[0], false),
+                &Type::resolved(table.get_list(args)[0]),
                 table,
                 interner,
                 tt,
@@ -91,7 +91,7 @@ fn lower_kind(
         TypeKind::Builtin(b) => lower_builtin(b),
 
         TypeKind::Array(el) => {
-            let inner = lower_type(&Type(el, false), table, interner, tt, names);
+            let inner = lower_type(&Type::resolved(el), table, interner, tt, names);
             BackendTy::Array(tt.intern(inner))
         }
 
@@ -99,7 +99,7 @@ fn lower_kind(
             let lowered: Vec<BackendTy> = table
                 .get_list(els)
                 .iter()
-                .map(|e| lower_type(&Type(*e, false), table, interner, tt, names))
+                .map(|e| lower_type(&Type::resolved(*e), table, interner, tt, names))
                 .collect();
             BackendTy::Tuple(tt.intern_list(&lowered))
         }
@@ -122,8 +122,8 @@ fn lower_kind(
                     key_ty, value_ty, ..
                 } = &members[0]
                 {
-                    let k = lower_type(&Type(*key_ty, false), table, interner, tt, names);
-                    let v = lower_type(&Type(*value_ty, false), table, interner, tt, names);
+                    let k = lower_type(&Type::resolved(*key_ty), table, interner, tt, names);
+                    let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
                     return BackendTy::Map(tt.intern(k), tt.intern(v));
                 }
             }

@@ -21,7 +21,7 @@ impl<'r> Checker<'r> {
         {
             return Some((Type::Int, None));
         }
-        if let Some(res) = self.find_member_info_uncached(&Type(payload_ty, false), key, bind) {
+        if let Some(res) = self.find_member_info_uncached(&Type::resolved(payload_ty), key, bind) {
             return Some(res);
         }
         let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();

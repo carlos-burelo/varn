@@ -50,7 +50,7 @@ impl<'r> Checker<'r> {
                 let name_str = bind.interner.resolve(name).to_string();
                 let origin_str = origin.map(|o| std::sync::Arc::from(bind.interner.resolve(o)));
                 let arg_ids = self.ty_table.get_list(args).to_vec();
-                let args: Vec<Type> = arg_ids.into_iter().map(|id| Type(id, false)).collect();
+                let args: Vec<Type> = arg_ids.into_iter().map(|id| Type::resolved(id)).collect();
                 Type::generic_with_origin(
                     name_str,
                     args,

@@ -199,7 +199,7 @@ pub(super) fn collect_exports(
                 let name_atom = table.intern_name("*");
                 let origin_atom = table.intern_name(src_abs.as_str());
                 let ns_ty = table.intern(varn_core::TypeKind::Named(name_atom, Some(origin_atom)));
-                ns_sym.ty = Some(Type(ns_ty, false));
+                ns_sym.ty = Some(Type::resolved(ns_ty));
                 ns_sym.origin_module = Some(intern_origin(out, &src_abs));
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = rehome_to_declaring_module(resolver, bind, visiting, sub_sym, out)

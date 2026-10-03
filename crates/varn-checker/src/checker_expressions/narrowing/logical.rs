@@ -73,7 +73,7 @@ impl<'r> Checker<'r> {
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
                 let interned = std::sync::Arc::make_mut(&mut self.ty_table)
                     .intern(TypeKind::Intersection(list));
-                merged.push((id, Type(interned, false)));
+                merged.push((id, Type::resolved(interned)));
             }
         }
         merged

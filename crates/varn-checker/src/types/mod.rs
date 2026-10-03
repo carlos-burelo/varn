@@ -21,21 +21,20 @@ use std::sync::Arc;
 use varn_core::ast::operators::Visibility;
 use varn_core::TypeKind;
 
-/// The checker's public type handle. Used to be a recursive, heap-allocated
-/// `Type(SemanticTypeKind, bool)` — every distinct shape (`Array<int>` at ten
-/// call sites, say) was its own boxed tree, cloned on every pass. Fase 1
-/// Componente 3 replaces the payload with a hash-consed `CheckerTyId`: the
-/// SAME shape always gets the SAME id (see `CheckerTyTable::intern`), so
-/// comparing two types is an integer compare and cloning a `Type` is a
-/// `Copy`. The `bool` survives unchanged — it is NOT part of a type's
-/// hash-consed identity (two occurrences of the same shape can be tainted
-/// independently, e.g. one narrowed-from-dynamic call result and one
-/// statically-known local of the same type), so it stays outside `CheckerTyId`
-/// and rides along on this wrapper instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Type(pub CheckerTyId, pub bool);
+pub enum Origin {
+    Resolved,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Type(pub CheckerTyId, pub Origin);
 
 impl Type {
+    pub const fn resolved(id: CheckerTyId) -> Self {
+        Type(id, Origin::Resolved)
+    }
+
     pub fn id(&self) -> CheckerTyId {
         self.0
     }
@@ -44,15 +43,14 @@ impl Type {
         table.get(self.0)
     }
 
-    pub fn tainted(mut self) -> Self {
-        self.1 = true;
-        self
+    pub fn is_error(&self) -> bool {
+        self.1 == Origin::Error
     }
 }
 
 impl Default for Type {
     fn default() -> Self {
-        Type(CheckerTyId::DYNAMIC, false)
+        Type::resolved(CheckerTyId::DYNAMIC)
     }
 }
 

@@ -41,7 +41,7 @@ pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTab
         TypeKind::Union(list) => table
             .get_list(list)
             .iter()
-            .any(|m| int_literal_adopts(&Type(*m, false), value, table)),
+            .any(|m| int_literal_adopts(&Type::resolved(*m), value, table)),
         _ => false,
     }
 }

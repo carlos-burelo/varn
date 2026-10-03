@@ -65,7 +65,7 @@ impl<'r> Checker<'r> {
                     tag_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
                     let ret = self.ty_table.get_function(fid).return_type;
-                    Type(ret, false)
+                    Type::resolved(ret)
                 } else {
                     Type::Dynamic
                 }
@@ -239,7 +239,9 @@ impl<'r> Checker<'r> {
                 self.in_pipeline_rhs = saved_pipeline;
                 self.pipeline_value_type = saved_pipe_ty;
                 match self.ty_table.get(res.0) {
-                    TypeKind::Fn(fid) => Type(self.ty_table.get_function(fid).return_type, false),
+                    TypeKind::Fn(fid) => {
+                        Type::resolved(self.ty_table.get_function(fid).return_type)
+                    }
                     _ => res,
                 }
             }

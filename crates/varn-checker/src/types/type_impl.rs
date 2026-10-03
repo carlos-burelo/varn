@@ -9,23 +9,24 @@ impl Type {
     // `CheckerTyId` (see `interned.rs`), so these stay `const` even though
     // `Type` now wraps a hash-consed id instead of an owned tree: no table
     // access is needed to produce them, only to look one up later.
-    pub const Int: Type = Type(CheckerTyId::INT, false);
-    pub const Float: Type = Type(CheckerTyId::FLOAT, false);
-    pub const Decimal: Type = Type(CheckerTyId::DECIMAL, false);
-    pub const BigInt: Type = Type(CheckerTyId::BIGINT, false);
-    pub const Str: Type = Type(CheckerTyId::STR, false);
-    pub const Char: Type = Type(CheckerTyId::CHAR, false);
-    pub const Bool: Type = Type(CheckerTyId::BOOL, false);
-    pub const Void: Type = Type(CheckerTyId::VOID, false);
-    pub const Null: Type = Type(CheckerTyId::NULL, false);
-    pub const Never: Type = Type(CheckerTyId::NEVER, false);
-    pub const Dynamic: Type = Type(CheckerTyId::DYNAMIC, false);
-    pub const This: Type = Type(CheckerTyId::THIS, false);
+    pub const Int: Type = Type::resolved(CheckerTyId::INT);
+    pub const Float: Type = Type::resolved(CheckerTyId::FLOAT);
+    pub const Decimal: Type = Type::resolved(CheckerTyId::DECIMAL);
+    pub const BigInt: Type = Type::resolved(CheckerTyId::BIGINT);
+    pub const Str: Type = Type::resolved(CheckerTyId::STR);
+    pub const Char: Type = Type::resolved(CheckerTyId::CHAR);
+    pub const Bool: Type = Type::resolved(CheckerTyId::BOOL);
+    pub const Void: Type = Type::resolved(CheckerTyId::VOID);
+    pub const Null: Type = Type::resolved(CheckerTyId::NULL);
+    pub const Never: Type = Type::resolved(CheckerTyId::NEVER);
+    pub const Dynamic: Type = Type::resolved(CheckerTyId::DYNAMIC);
+    pub const Error: Type = Type(CheckerTyId::DYNAMIC, Origin::Error);
+    pub const This: Type = Type::resolved(CheckerTyId::THIS);
 
     /// Primitives have fixed ids (the constants above); interning goes through
     /// the table so every spelling of one lands on the same id.
     pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Primitive(p)), false)
+        Type::resolved(table.intern(TypeKind::Primitive(p)))
     }
 
     /// The type operators and member lookup see: a literal type (or a union
@@ -86,11 +87,11 @@ impl Type {
     }
 
     pub fn literal(l: varn_core::TypeLiteral<varn_core::Atom>, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Literal(l)), false)
+        Type::resolved(table.intern(TypeKind::Literal(l)))
     }
 
     pub fn builtin(b: varn_core::BuiltinType, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Builtin(b)), false)
+        Type::resolved(table.intern(TypeKind::Builtin(b)))
     }
 
     /// Content-addressed ids are portable, so there is nothing to sanitize:
@@ -104,23 +105,23 @@ impl Type {
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
         match table.get(self.0) {
-            TypeKind::Array(inner) => Type(inner, false),
+            TypeKind::Array(inner) => Type::resolved(inner),
             _ => Type::Dynamic,
         }
     }
 
     pub fn fn_(f: FunctionType, table: &mut CheckerTyTable) -> Self {
         let fid = table.intern_function(f);
-        Type(table.intern(TypeKind::Fn(fid)), false)
+        Type::resolved(table.intern(TypeKind::Fn(fid)))
     }
 
     pub fn named(name: impl Into<Arc<str>>, table: &mut CheckerTyTable) -> Self {
         let atom = table.intern_name(&name.into());
-        Type(table.intern(TypeKind::Named(atom, None)), false)
+        Type::resolved(table.intern(TypeKind::Named(atom, None)))
     }
 
     pub fn named_atom(name: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Named(name, None)), false)
+        Type::resolved(table.intern(TypeKind::Named(name, None)))
     }
 
     pub fn named_with_origin_atom(
@@ -128,7 +129,7 @@ impl Type {
         origin: Option<varn_core::Atom>,
         table: &mut CheckerTyTable,
     ) -> Self {
-        Type(table.intern(TypeKind::Named(name, origin)), false)
+        Type::resolved(table.intern(TypeKind::Named(name, origin)))
     }
 
     pub fn named_with_origin(
@@ -160,7 +161,7 @@ impl Type {
     }
 
     pub fn array(inner: Type, table: &mut CheckerTyTable) -> Self {
-        Type(table.intern(TypeKind::Array(inner.0)), false)
+        Type::resolved(table.intern(TypeKind::Array(inner.0)))
     }
 
     pub fn generic_atom(
@@ -171,12 +172,12 @@ impl Type {
     ) -> Self {
         let ids: Vec<CheckerTyId> = args.iter().map(|a| a.0).collect();
         let list = table.intern_list(&ids);
-        Type(table.intern(TypeKind::Generic(name, list, origin)), false)
+        Type::resolved(table.intern(TypeKind::Generic(name, list, origin)))
     }
 
     pub fn object(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
         let mid = table.intern_object_members(members);
-        Type(table.intern(TypeKind::Object(mid)), false)
+        Type::resolved(table.intern(TypeKind::Object(mid)))
     }
 
     pub fn union(members: Vec<Type>, table: &mut CheckerTyTable) -> Self {
@@ -193,12 +194,12 @@ impl Type {
                 } else {
                     let ids: Vec<CheckerTyId> = members.iter().map(|m| m.0).collect();
                     let list = table.intern_list(&ids);
-                    return Type(table.intern(TypeKind::Union(list)), false);
+                    return Type::resolved(table.intern(TypeKind::Union(list)));
                 }
             }
         } else if members.is_empty() {
             let list = table.intern_list(&[]);
-            return Type(table.intern(TypeKind::Union(list)), false);
+            return Type::resolved(table.intern(TypeKind::Union(list)));
         }
 
         let mut seen = rustc_hash::FxHashSet::default();
@@ -207,7 +208,7 @@ impl Type {
             match table.get(m.0) {
                 TypeKind::Union(inner_list) => {
                     for id in table.get_list(inner_list).to_vec() {
-                        let t = Type(id, false);
+                        let t = Type::resolved(id);
                         if seen.insert(t) {
                             flat.push(t);
                         }
@@ -225,7 +226,7 @@ impl Type {
         } else {
             let ids: Vec<CheckerTyId> = flat.iter().map(|m| m.0).collect();
             let list = table.intern_list(&ids);
-            Type(table.intern(TypeKind::Union(list)), false)
+            Type::resolved(table.intern(TypeKind::Union(list)))
         }
     }
 

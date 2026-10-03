@@ -136,7 +136,7 @@ impl<'r> Checker<'r> {
                 {
                     return true;
                 }
-                if self.member_exists(&Type(payload_ty, false), key, bind) {
+                if self.member_exists(&Type::resolved(payload_ty), key, bind) {
                     return true;
                 }
                 let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
@@ -306,12 +306,12 @@ impl<'r> Checker<'r> {
             TypeKind::Union(list) => {
                 let ids = self.ty_table.get_list(list).to_vec();
                 ids.iter()
-                    .all(|id| self.member_exists(&Type(*id, false), key, bind))
+                    .all(|id| self.member_exists(&Type::resolved(*id), key, bind))
             }
             TypeKind::Intersection(list) => {
                 let ids = self.ty_table.get_list(list).to_vec();
                 ids.iter()
-                    .any(|id| self.member_exists(&Type(*id, false), key, bind))
+                    .any(|id| self.member_exists(&Type::resolved(*id), key, bind))
             }
             _ => false,
         };

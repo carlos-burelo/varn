@@ -28,7 +28,7 @@ impl<'r> Checker<'r> {
             TypeKind::Union(list) => {
                 let mut names: Vec<Arc<str>> = Vec::new();
                 for id in self.ty_table.get_list(list).to_vec() {
-                    let m = Type(id, false);
+                    let m = Type::resolved(id);
                     if !m.is_nullable(&self.ty_table) {
                         names.extend(self.collect_member_names(&m, bind));
                     }

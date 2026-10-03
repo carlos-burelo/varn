@@ -28,8 +28,8 @@ pub(crate) fn collect_type_inferences(
                 let a_ids = table.get_list(a_args).to_vec();
                 for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
                     collect_type_inferences(
-                        &Type(*ea, false),
-                        &Type(*aa, false),
+                        &Type::resolved(*ea),
+                        &Type::resolved(*aa),
                         params,
                         out,
                         table,
@@ -41,8 +41,8 @@ pub(crate) fn collect_type_inferences(
         TypeKind::Array(e_inner) => {
             if let TypeKind::Array(a_inner) = table.get(actual.0) {
                 collect_type_inferences(
-                    &Type(e_inner, false),
-                    &Type(a_inner, false),
+                    &Type::resolved(e_inner),
+                    &Type::resolved(a_inner),
                     params,
                     out,
                     table,
@@ -56,8 +56,8 @@ pub(crate) fn collect_type_inferences(
                 let a_ft = table.get_function(a_fid).clone();
                 for (ep, ap) in e_ft.params.iter().zip(a_ft.params.iter()) {
                     collect_type_inferences(
-                        &Type(ep.ty, false),
-                        &Type(ap.ty, false),
+                        &Type::resolved(ep.ty),
+                        &Type::resolved(ap.ty),
                         params,
                         out,
                         table,
@@ -65,8 +65,8 @@ pub(crate) fn collect_type_inferences(
                     );
                 }
                 collect_type_inferences(
-                    &Type(e_ft.return_type, false),
-                    &Type(a_ft.return_type, false),
+                    &Type::resolved(e_ft.return_type),
+                    &Type::resolved(a_ft.return_type),
                     params,
                     out,
                     table,
@@ -80,8 +80,8 @@ pub(crate) fn collect_type_inferences(
                 let a_ids = table.get_list(a_members).to_vec();
                 for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
                     collect_type_inferences(
-                        &Type(*ea, false),
-                        &Type(*aa, false),
+                        &Type::resolved(*ea),
+                        &Type::resolved(*aa),
                         params,
                         out,
                         table,

@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
             .ty_table
             .get_list(args_list)
             .iter()
-            .map(|id| Type(*id, false))
+            .map(|id| Type::resolved(*id))
             .collect();
         self.find_member_info_uncached(&base, key, bind)
             .map(|(member_ty, sym)| {
@@ -61,10 +61,10 @@ impl<'r> Checker<'r> {
                 ObjectTypeMember::Property {
                     ty, optional: true, ..
                 } => Type::make_nullable(
-                    Type(*ty, false),
+                    Type::resolved(*ty),
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),
-                ObjectTypeMember::Property { ty, .. } => Type(*ty, false),
+                ObjectTypeMember::Property { ty, .. } => Type::resolved(*ty),
                 ObjectTypeMember::Method {
                     params,
                     return_type,
@@ -112,7 +112,7 @@ impl<'r> Checker<'r> {
         let ids = self.ty_table.get_list(list).to_vec();
         let infos: Vec<(Type, Option<usize>)> = ids
             .iter()
-            .filter_map(|id| self.find_member_info_uncached(&Type(*id, false), key, bind))
+            .filter_map(|id| self.find_member_info_uncached(&Type::resolved(*id), key, bind))
             .collect();
         if infos.len() == ids.len() {
             let first_sid = infos[0].1;
@@ -138,7 +138,7 @@ impl<'r> Checker<'r> {
     ) -> Option<(Type, Option<usize>)> {
         let table = std::sync::Arc::make_mut(&mut self.ty_table);
         let atom = table.intern_name(varn_core::BuiltinType::Array.name());
-        let array_ty = Type::generic_atom(atom, vec![Type(inner, false)], None, table);
+        let array_ty = Type::generic_atom(atom, vec![Type::resolved(inner)], None, table);
         self.find_member_info_uncached(&array_ty, key, bind)
     }
 

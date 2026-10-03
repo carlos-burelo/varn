@@ -170,7 +170,7 @@ pub(crate) fn infer_call_type(
                 table,
             )?;
             match table.get(callee_ty.0) {
-                TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
+                TypeKind::Fn(fid) => Some(Type::resolved(table.get_function(fid).return_type)),
                 _ => None,
             }
         }
@@ -234,7 +234,7 @@ pub(crate) fn infer_call_type(
                             == Some(name))
                         && table.get_list(args).len() == 1 =>
                 {
-                    Some(Type(table.get_list(args)[0], false))
+                    Some(Type::resolved(table.get_list(args)[0]))
                 }
                 _ => Some(ty),
             }

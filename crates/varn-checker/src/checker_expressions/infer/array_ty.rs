@@ -22,7 +22,7 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ArrayEl::Spread(e) => {
                     let ty = self.infer_type(*e, bind);
                     if let varn_core::TypeKind::Array(inner) = self.ty_table.get(ty.0) {
-                        elem_tys.push(Type(inner, false));
+                        elem_tys.push(Type::resolved(inner));
                     }
                 }
                 _ => {}
@@ -34,7 +34,7 @@ impl<'r> Checker<'r> {
                     expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let varn_core::TypeKind::Array(inner) = self.ty_table.get(non_null.0) {
                     Type::array(
-                        Type(inner, false),
+                        Type::resolved(inner),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
                 } else {
@@ -67,9 +67,8 @@ impl<'r> Checker<'r> {
         let elem_tys: Vec<Type> = elements.iter().map(|e| self.infer_type(*e, bind)).collect();
         let ids: Vec<crate::types::CheckerTyId> = elem_tys.iter().map(|t| t.0).collect();
         let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
-        Type(
+        Type::resolved(
             std::sync::Arc::make_mut(&mut self.ty_table).intern(varn_core::TypeKind::Tuple(list)),
-            false,
         )
     }
 

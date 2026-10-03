@@ -51,7 +51,7 @@ impl<'r> Checker<'r> {
         let ft = self.ty_table.get_function(fid).clone();
 
         let mapping = build_call_mapping(callee, &type_args, &args, &ft, self, bind);
-        let ret = map_generics_cached(self, &Type(ft.return_type, false), &mapping);
+        let ret = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);
 
         let ret_kind = self.ty_table.get(ret.0);
         let ret = if matches!(ret_kind, TypeKind::This) {
@@ -110,7 +110,7 @@ impl<'r> Checker<'r> {
                     .or_else(|| {
                         expected_params
                             .get(i)
-                            .map(|ep| Type(ep.ty, false))
+                            .map(|ep| Type::resolved(ep.ty))
                             .filter(|t| !t.is_dynamic())
                     })
                     .unwrap_or_else(|| {
@@ -158,7 +158,7 @@ impl<'r> Checker<'r> {
                     .get(name)
                     .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
                 {
-                    self.symbol_types.insert(sym_id, Type(fp.ty, false));
+                    self.symbol_types.insert(sym_id, Type::resolved(fp.ty));
                 }
             }
         }

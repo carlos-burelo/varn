@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+let t: [int, str] = #[1, "a"]
+let b: bool = t

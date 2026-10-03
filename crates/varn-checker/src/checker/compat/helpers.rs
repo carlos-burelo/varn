@@ -9,7 +9,7 @@ use varn_core::TypeKind;
 
 #[inline]
 fn t(id: CheckerTyId) -> Type {
-    Type(id, false)
+    Type::resolved(id)
 }
 
 pub(super) fn is_known_named(bind: &BindView, name: &str) -> bool {

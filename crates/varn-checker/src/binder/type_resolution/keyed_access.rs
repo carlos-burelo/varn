@@ -20,9 +20,9 @@ pub(super) fn resolve_keyof(
         }
         if !key_types.is_empty() {
             return if key_types.len() == 1 {
-                Type(key_types[0], false)
+                Type::resolved(key_types[0])
             } else {
-                let types: Vec<Type> = key_types.into_iter().map(|id| Type(id, false)).collect();
+                let types: Vec<Type> = key_types.into_iter().map(|id| Type::resolved(id)).collect();
                 Type::union(types, table)
             };
         }
@@ -67,7 +67,7 @@ pub(super) fn collect_type_keys(
         TypeKind::Intersection(list) => {
             let mut all_keys: Vec<Arc<str>> = vec![];
             for part in table.get_list(list).to_vec() {
-                for key in collect_type_keys(&Type(part, false), ctx, table) {
+                for key in collect_type_keys(&Type::resolved(part), ctx, table) {
                     if !all_keys.contains(&key) {
                         all_keys.push(key);
                     }
@@ -80,13 +80,13 @@ pub(super) fn collect_type_keys(
             if parts.is_empty() {
                 return vec![];
             }
-            let first = collect_type_keys(&Type(parts[0], false), ctx, table);
+            let first = collect_type_keys(&Type::resolved(parts[0]), ctx, table);
             first
                 .into_iter()
                 .filter(|k| {
                     parts[1..]
                         .iter()
-                        .all(|p| collect_type_keys(&Type(*p, false), ctx, table).contains(k))
+                        .all(|p| collect_type_keys(&Type::resolved(*p), ctx, table).contains(k))
                 })
                 .collect()
         }
@@ -112,7 +112,7 @@ pub(super) fn resolve_indexed_access(
             for m in &members {
                 match m {
                     ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_name => {
-                        return Type(*ty, false);
+                        return Type::resolved(*ty);
                     }
                     ObjectTypeMember::Method {
                         name,
@@ -141,7 +141,7 @@ pub(super) fn resolve_indexed_access(
                 let ids = table.get_list(list).to_vec();
                 let resolved: Vec<Type> = ids
                     .into_iter()
-                    .map(|m| resolve_indexed_access(obj, Type(m, false), ctx, table))
+                    .map(|m| resolve_indexed_access(obj, Type::resolved(m), ctx, table))
                     .filter(|m| !m.is_dynamic())
                     .collect();
                 return match resolved.len() {
@@ -155,7 +155,7 @@ pub(super) fn resolve_indexed_access(
                     ObjectTypeMember::Index {
                         key_ty, value_ty, ..
                     } if crate::checker::compat::types_compatible(
-                        &Type(*key_ty, false),
+                        &Type::resolved(*key_ty),
                         &index,
                         None,
                         table,
@@ -166,7 +166,7 @@ pub(super) fn resolve_indexed_access(
                     _ => None,
                 });
                 if let Some(v) = value_from_index {
-                    return Type(v, false);
+                    return Type::resolved(v);
                 }
             }
         }
@@ -196,7 +196,7 @@ pub(super) fn resolve_indexed_access(
             let ids = table.get_list(list).to_vec();
             let types: Vec<Type> = ids
                 .into_iter()
-                .map(|m| resolve_indexed_access(obj, Type(m, false), ctx, table))
+                .map(|m| resolve_indexed_access(obj, Type::resolved(m), ctx, table))
                 .collect();
             match types.len() {
                 0 => Type::Dynamic,

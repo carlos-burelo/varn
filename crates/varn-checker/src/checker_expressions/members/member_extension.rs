@@ -51,7 +51,7 @@ pub(super) fn collect_extension_members(
         };
         let ft = table.get_function(fid).clone();
         let member_ty = if as_return {
-            Type(ft.return_type, false)
+            Type::resolved(ft.return_type)
         } else {
             Type::fn_(strip_this(&ft), table)
         };

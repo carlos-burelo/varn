@@ -19,7 +19,7 @@ impl SemanticDB {
 
     /// A signature's type (a parameter's, a return type) as source text.
     pub fn id_text(&self, id: CheckerTyId) -> String {
-        self.ty_text(&Type(id, false))
+        self.ty_text(&Type::resolved(id))
     }
 
     /// The kind of `ty`.
@@ -29,7 +29,7 @@ impl SemanticDB {
 
     /// The kind of a signature's type.
     pub fn id_kind(&self, id: CheckerTyId) -> InternedTypeKind {
-        self.ty_kind(&Type(id, false))
+        self.ty_kind(&Type::resolved(id))
     }
 
     /// The members of a union, intersection or tuple.
@@ -38,7 +38,7 @@ impl SemanticDB {
         types
             .get_list(list)
             .iter()
-            .map(|&id| Type(id, false))
+            .map(|&id| Type::resolved(id))
             .collect()
     }
 

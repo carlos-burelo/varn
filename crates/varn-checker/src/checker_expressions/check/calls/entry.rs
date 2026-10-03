@@ -94,7 +94,7 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|p| crate::semantic_info::CallParamInfo {
                         name: p.name.clone(),
-                        ty: Type(p.ty, false),
+                        ty: Type::resolved(p.ty),
                         optional: p.optional,
                         is_rest: p.is_rest,
                     })
@@ -123,7 +123,7 @@ impl<'r> Checker<'r> {
                 let call_res = crate::semantic_info::CallResolution {
                     callee_name,
                     params,
-                    return_ty: Type(ft.return_type, false),
+                    return_ty: Type::resolved(ft.return_type),
                     arg_to_param_map,
                 };
                 self.call_resolutions

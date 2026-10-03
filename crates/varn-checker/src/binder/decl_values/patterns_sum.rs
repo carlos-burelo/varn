@@ -34,12 +34,12 @@ impl<'r> super::super::Binder<'r> {
             }
             Pattern::Array { elements, rest, .. } => {
                 let elem_ty = ty.as_ref().and_then(|t| match self.ty_table.get(t.0) {
-                    varn_core::TypeKind::Array(inner) => Some(Type(inner, false)),
+                    varn_core::TypeKind::Array(inner) => Some(Type::resolved(inner)),
                     varn_core::TypeKind::Generic(name, args, _)
                         if self.interner.resolve(name) == varn_core::BuiltinType::Array.name()
                             && self.ty_table.get_list(args).len() == 1 =>
                     {
-                        Some(Type(self.ty_table.get_list(args)[0], false))
+                        Some(Type::resolved(self.ty_table.get_list(args)[0]))
                     }
                     _ => None,
                 });
@@ -66,7 +66,7 @@ impl<'r> super::super::Binder<'r> {
                                 .find_map(|m| match m {
                                     crate::types::ObjectTypeMember::Property {
                                         name, ty, ..
-                                    } if name.as_ref() == key_str => Some(Type(*ty, false)),
+                                    } if name.as_ref() == key_str => Some(Type::resolved(*ty)),
                                     crate::types::ObjectTypeMember::Method {
                                         name,
                                         params,

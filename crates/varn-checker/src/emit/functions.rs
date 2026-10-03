@@ -268,7 +268,7 @@ pub(super) fn emit_function(
         let ft = ctx.checker_table.get_function(fn_id);
         for (i, p) in ft.params.iter().take(arity).enumerate() {
             let inner = lower_type(
-                &crate::types::Type(p.ty, false),
+                &crate::types::Type::resolved(p.ty),
                 ctx.checker_table,
                 ctx.interner,
                 types,
@@ -284,7 +284,7 @@ pub(super) fn emit_function(
             BackendTy::Dynamic(DynReason::Unannotated)
         } else {
             lower_type(
-                &crate::types::Type(ft.return_type, false),
+                &crate::types::Type::resolved(ft.return_type),
                 ctx.checker_table,
                 ctx.interner,
                 types,

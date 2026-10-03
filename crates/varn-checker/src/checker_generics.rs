@@ -76,7 +76,7 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(
-            &Type(param.ty, false),
+            &Type::resolved(param.ty),
             &arg_ty,
             type_params,
             &mut mapping,
@@ -97,7 +97,7 @@ pub(crate) fn infer_mapping_from_args(
             continue;
         }
 
-        let mapped_param_ty = map_generics_cached(checker, &Type(param.ty, false), &mapping);
+        let mapped_param_ty = map_generics_cached(checker, &Type::resolved(param.ty), &mapping);
         let arg_ty = match arg {
             Arg::Positional(e) => {
                 let mapped_kind = checker.ty_table.get(mapped_param_ty.0);
@@ -107,7 +107,7 @@ pub(crate) fn infer_mapping_from_args(
                         infer_arrow_with_context(*e, &expected_fn, checker, bind)
                     {
                         collect_type_inferences(
-                            &Type(param.ty, false),
+                            &Type::resolved(param.ty),
                             &concrete,
                             type_params,
                             &mut mapping,
@@ -123,7 +123,7 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(
-            &Type(param.ty, false),
+            &Type::resolved(param.ty),
             &arg_ty,
             type_params,
             &mut mapping,
@@ -191,7 +191,7 @@ fn infer_arrow_with_context(
                         })
                         .map(|m| checker.resolve_type_node_cached(m, bind));
 
-                    let ty = explicit_ty.unwrap_or(Type(ep.ty, false));
+                    let ty = explicit_ty.unwrap_or(Type::resolved(ep.ty));
                     checker.symbol_types.insert(sym_id, ty);
                 }
             }
