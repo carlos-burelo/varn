@@ -42,15 +42,16 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
             let access = self.field_access(recv, name, ty, span);
-            let null_arm = TirExpr {
-                kind: TirExprKind::NullLit,
-                ty: BackendTy::Nullable(self.tt.intern(BackendTy::Never)),
-                res: Resolution::None,
-                span,
-            };
             let result_ty = match access.ty {
                 BackendTy::Nullable(_) | BackendTy::Dynamic(_) => access.ty,
                 member => BackendTy::Nullable(self.tt.intern(member)),
+            };
+            let access = self.cast_to(access, result_ty);
+            let null_arm = TirExpr {
+                kind: TirExprKind::NullLit,
+                ty: result_ty,
+                res: Resolution::None,
+                span,
             };
             return TirExpr {
                 kind: TirExprKind::Select {
