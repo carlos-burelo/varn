@@ -2336,6 +2336,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "varn-shadow"
+version = "0.1.0"
+
+[[package]]
 name = "varn-tir"
 version = "0.1.0"
 dependencies = [

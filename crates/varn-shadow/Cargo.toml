@@ -1,0 +1,13 @@
+[package]
+name = "varn-shadow"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "vn-shadow"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true

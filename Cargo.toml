@@ -20,6 +20,7 @@ members = [
     "crates/varn-pipeline",
     "crates/varn-compiler",
     "crates/varn-rt",
+    "crates/varn-shadow",
     "crates/xtask",
 ]
 resolver = "2"
