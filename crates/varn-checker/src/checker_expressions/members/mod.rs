@@ -10,6 +10,6 @@ mod member_names;
 pub(crate) mod member_type;
 pub(crate) mod member_util;
 mod owner;
+pub(super) use crate::checker::Checker;
 pub(crate) use member_enum::is_enum_type;
 pub use member_list::get_members_of_type;
-pub(super) use crate::checker::Checker;

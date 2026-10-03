@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use super::super::Chunk;
 use super::super::inline_cache::{FeedbackVector, PolyICSlot};
 use super::super::literal::opt_rc_str_serde;
+use super::super::Chunk;
 
 pub type TrivialInitPlan = Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>;
 

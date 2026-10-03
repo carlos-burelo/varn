@@ -50,10 +50,7 @@ impl CheckerTyTable {
         // Seed the reserved intrinsic ids. `intern` maps these shapes back to
         // the same ids, so the seed is only so `get` is total over them.
         for (id, kind) in [
-            (
-                CheckerTyId::INT,
-                TypeKind::Primitive(LangPrimitive::Int),
-            ),
+            (CheckerTyId::INT, TypeKind::Primitive(LangPrimitive::Int)),
             (
                 CheckerTyId::FLOAT,
                 TypeKind::Primitive(LangPrimitive::Float),
@@ -66,26 +63,11 @@ impl CheckerTyTable {
                 CheckerTyId::BIGINT,
                 TypeKind::Primitive(LangPrimitive::BigInt),
             ),
-            (
-                CheckerTyId::STR,
-                TypeKind::Primitive(LangPrimitive::Str),
-            ),
-            (
-                CheckerTyId::CHAR,
-                TypeKind::Primitive(LangPrimitive::Char),
-            ),
-            (
-                CheckerTyId::BOOL,
-                TypeKind::Primitive(LangPrimitive::Bool),
-            ),
-            (
-                CheckerTyId::VOID,
-                TypeKind::Primitive(LangPrimitive::Void),
-            ),
-            (
-                CheckerTyId::NULL,
-                TypeKind::Primitive(LangPrimitive::Null),
-            ),
+            (CheckerTyId::STR, TypeKind::Primitive(LangPrimitive::Str)),
+            (CheckerTyId::CHAR, TypeKind::Primitive(LangPrimitive::Char)),
+            (CheckerTyId::BOOL, TypeKind::Primitive(LangPrimitive::Bool)),
+            (CheckerTyId::VOID, TypeKind::Primitive(LangPrimitive::Void)),
+            (CheckerTyId::NULL, TypeKind::Primitive(LangPrimitive::Null)),
             (
                 CheckerTyId::NEVER,
                 TypeKind::Primitive(LangPrimitive::Never),
@@ -179,10 +161,7 @@ mod tests {
     fn get_roundtrips_the_interned_value() {
         let mut t = CheckerTyTable::default();
         let a = t.intern(TypeKind::Primitive(LangPrimitive::Bool));
-        assert_eq!(
-            t.get(a),
-            TypeKind::Primitive(LangPrimitive::Bool)
-        );
+        assert_eq!(t.get(a), TypeKind::Primitive(LangPrimitive::Bool));
     }
 
     #[test]

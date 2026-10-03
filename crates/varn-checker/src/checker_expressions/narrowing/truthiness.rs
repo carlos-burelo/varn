@@ -21,8 +21,8 @@ impl<'r> Checker<'r> {
                 .or_else(|| bind.arena.get(id).ty);
             if let Some(ty) = original_ty {
                 if is_true_branch {
-                    let narrowed = ty
-                        .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    let narrowed =
+                        ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     if !narrowed.is_dynamic() && narrowed != ty {
                         out.push((id, narrowed));
                     }

@@ -17,10 +17,8 @@ impl<'r> Checker<'r> {
     ) {
         let arena = self.ast_arena;
         if op == BinaryOp::Instanceof {
-            if let (
-                ExprKind::Identifier { name },
-                ExprKind::Identifier { name: class_name },
-            ) = (&arena.expr(left).kind, &arena.expr(right).kind)
+            if let (ExprKind::Identifier { name }, ExprKind::Identifier { name: class_name }) =
+                (&arena.expr(left).kind, &arena.expr(right).kind)
             {
                 let (name, class_name) = (*name, *class_name);
                 let scope = bind.scopes.get(self.current_scope);

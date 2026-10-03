@@ -1,4 +1,6 @@
-use super::cache_types::{PortableClassMemberInfo, PortableModule, PortableSymbol, PortableTypeMembers};
+use super::cache_types::{
+    PortableClassMemberInfo, PortableModule, PortableSymbol, PortableTypeMembers,
+};
 use crate::binder::{BindResult, TypeMembers};
 use crate::scope::ScopeArena;
 use crate::symbol::{Symbol, SymbolArena};
@@ -150,7 +152,12 @@ impl PortableModule {
         Self {
             exports: exports
                 .iter()
-                .map(|(k, v)| (k.clone(), super::cache_encode::encode_symbol(v, table, interner, resolver)))
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        super::cache_encode::encode_symbol(v, table, interner, resolver),
+                    )
+                })
                 .collect(),
             arena: bind
                 .arena
@@ -173,7 +180,11 @@ impl PortableModule {
                     )
                 })
                 .collect(),
-            type_members: super::cache_encode::encode_type_members(&bind.type_members, table, interner),
+            type_members: super::cache_encode::encode_type_members(
+                &bind.type_members,
+                table,
+                interner,
+            ),
             class_parents: bind.class_parents.clone(),
             source_file: bind.source_file.clone(),
             sum_type_variants: bind.sum_type_variants.clone(),
@@ -271,6 +282,3 @@ pub(super) fn rebuild_scope_bindings(scopes: &mut ScopeArena, arena: &SymbolAren
         }
     }
 }
-
-
-

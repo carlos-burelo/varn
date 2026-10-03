@@ -18,16 +18,11 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let is_eq = op == BinaryOp::Eq;
         let is_neq = op == BinaryOp::NotEq;
-        let (ident_name, is_null_check) =
-            match (&arena.expr(left).kind, &arena.expr(right).kind) {
-                (ExprKind::Identifier { name }, ExprKind::NullLiteral) => {
-                    (Some(*name), true)
-                }
-                (ExprKind::NullLiteral, ExprKind::Identifier { name }) => {
-                    (Some(*name), true)
-                }
-                _ => (None, false),
-            };
+        let (ident_name, is_null_check) = match (&arena.expr(left).kind, &arena.expr(right).kind) {
+            (ExprKind::Identifier { name }, ExprKind::NullLiteral) => (Some(*name), true),
+            (ExprKind::NullLiteral, ExprKind::Identifier { name }) => (Some(*name), true),
+            _ => (None, false),
+        };
 
         if is_null_check {
             if let Some(name) = ident_name {
@@ -40,9 +35,8 @@ impl<'r> Checker<'r> {
                             .cloned()
                             .or_else(|| bind.arena.get(id).ty);
                         if let Some(ty) = original_ty {
-                            let narrowed = ty.non_nullified(
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            );
+                            let narrowed = ty
+                                .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                             if !narrowed.is_dynamic() {
                                 out.push((id, narrowed));
                             }

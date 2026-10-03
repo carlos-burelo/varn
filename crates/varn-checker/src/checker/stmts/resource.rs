@@ -37,9 +37,7 @@ impl<'r> Checker<'r> {
             self.with_expected(ann_ty_opt, |c| c.check_expr(init, bind));
             let init_ty = self.infer_type(init, bind);
 
-            if !init_ty.is_dynamic()
-                && !self.member_exists_cached(&init_ty, dispose_method, bind)
-            {
+            if !init_ty.is_dynamic() && !self.member_exists_cached(&init_ty, dispose_method, bind) {
                 let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                 self.emit(
                     Diagnostic::error(ErrorCode::InvalidUsingTarget, format!(

@@ -36,14 +36,7 @@ impl<'r> Checker<'r> {
             ExprKind::Binary { left, right, op } => {
                 let (left, right, op) = (*left, *right, *op);
                 self.narrow_typeof(left, right, op, bind, is_true_branch, &mut narrowings);
-                self.narrow_null_comparison(
-                    left,
-                    right,
-                    op,
-                    bind,
-                    is_true_branch,
-                    &mut narrowings,
-                );
+                self.narrow_null_comparison(left, right, op, bind, is_true_branch, &mut narrowings);
                 self.narrow_discriminant(left, right, op, bind, is_true_branch, &mut narrowings);
                 self.narrow_instanceof(left, right, op, bind, is_true_branch, &mut narrowings);
             }

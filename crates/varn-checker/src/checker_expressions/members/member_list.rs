@@ -147,15 +147,21 @@ pub fn get_members_of_type(
             let cn: Arc<str> = Arc::from(super::member_atom::resolve_atom_text(
                 resolver, bind, cn_atom,
             ));
-            let origin: Option<Arc<str>> =
-                origin_atom.map(|o| Arc::from(super::member_atom::resolve_atom_text(resolver, bind, o)));
+            let origin: Option<Arc<str>> = origin_atom
+                .map(|o| Arc::from(super::member_atom::resolve_atom_text(resolver, bind, o)));
             let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
                 let args: Vec<Type> = table
                     .get_list(args_list)
                     .iter()
                     .map(|id| Type(*id, false))
                     .collect();
-                super::member_util::generic_mapping(resolver, cn.as_ref(), &args, origin.as_ref(), bind)
+                super::member_util::generic_mapping(
+                    resolver,
+                    cn.as_ref(),
+                    &args,
+                    origin.as_ref(),
+                    bind,
+                )
             } else {
                 rustc_hash::FxHashMap::default()
             };
@@ -255,6 +261,13 @@ pub fn get_members_of_type(
         _ => {}
     }
 
-    super::member_extension::collect_extension_members(resolver, &mut results, &mut seen, ty, bind, table);
+    super::member_extension::collect_extension_members(
+        resolver,
+        &mut results,
+        &mut seen,
+        ty,
+        bind,
+        table,
+    );
     results
 }

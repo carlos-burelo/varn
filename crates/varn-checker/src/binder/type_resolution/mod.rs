@@ -42,35 +42,56 @@ pub fn resolve_type_node(
         TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Null,
         TypeKind::Primitive(varn_core::LangPrimitive::Never) => Type::Never,
         TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
-        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => Type::builtin(varn_core::BuiltinType::Bytes, table),
+        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
+            Type::builtin(varn_core::BuiltinType::Bytes, table)
+        }
         TypeKind::This => Type::This,
         TypeKind::Literal(l) => scalar::resolve_literal_type(*l, ctx, interner, table),
         TypeKind::Array(inner) => compound::resolve_array_type(inner, ctx, table),
         TypeKind::Union(members) => compound::resolve_union_type(members, ctx, table),
-        TypeKind::Generic(name, args, _) => nominal::resolve_generic_type(*name, args, ctx, interner, table),
+        TypeKind::Generic(name, args, _) => {
+            nominal::resolve_generic_type(*name, args, ctx, interner, table)
+        }
         TypeKind::Named(name, _) => nominal::resolve_named_type(*name, ctx, interner, table),
-        TypeKind::Fn((params, ret)) => functions::resolve_fn_type(params, ret, ctx, interner, table),
+        TypeKind::Fn((params, ret)) => {
+            functions::resolve_fn_type(params, ret, ctx, interner, table)
+        }
         TypeKind::Object(members) => objects::resolve_object_type(members, ctx, interner, table),
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx, table),
         TypeKind::Typeof(expr) => match ctx.and_then(|c| c.ast_arena()) {
             Some(arena) => crate::binder::infer_expr_type(*expr, arena, ctx, table),
             None => Type::Dynamic,
         },
-        TypeKind::Intersection(members) => intersections::resolve_intersection_type(members, ctx, table),
+        TypeKind::Intersection(members) => {
+            intersections::resolve_intersection_type(members, ctx, table)
+        }
         TypeKind::KeyOf(inner) => {
             let resolved = resolve_type_node(inner, ctx, table);
             resolve_keyof(resolved, ctx, table)
-        },
+        }
         TypeKind::IndexedAccess { object, index } => {
             let obj = resolve_type_node(object, ctx, table);
             let idx = resolve_type_node(index, ctx, table);
             resolve_indexed_access(obj, idx, ctx, table)
-        },
-        TypeKind::Mapped { key_var, source, value, optional, readonly } => resolve_mapped_type(*key_var, source, value, *optional, *readonly, ctx, interner, table),
-        TypeKind::Conditional { check, extends, true_type, false_type } => {
+        }
+        TypeKind::Mapped {
+            key_var,
+            source,
+            value,
+            optional,
+            readonly,
+        } => resolve_mapped_type(
+            *key_var, source, value, *optional, *readonly, ctx, interner, table,
+        ),
+        TypeKind::Conditional {
+            check,
+            extends,
+            true_type,
+            false_type,
+        } => {
             let check_ty = resolve_type_node(check, ctx, table);
             resolve_conditional(check, &check_ty, extends, true_type, false_type, ctx, table)
-        },
+        }
         TypeKind::Infer(_) => Type::Dynamic.tainted(),
         TypeKind::TypePredicate {
             parameter_name,

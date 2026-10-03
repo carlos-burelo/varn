@@ -3,9 +3,9 @@ use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::AtomInterner;
 
-use super::print_expr;
 use super::super::decl::print_decl;
 use super::super::print_stmt;
+use super::print_expr;
 
 pub(super) fn try_print(
     expr_id: ExprId,

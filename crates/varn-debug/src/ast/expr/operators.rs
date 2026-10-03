@@ -168,13 +168,7 @@ pub(super) fn try_print(
         ExprKind::Sequence { expressions } => {
             terminal::log(format!("{indent}{marker}{}", chalk("Sequence").bold()));
             for (i, &e) in expressions.iter().enumerate() {
-                print_expr(
-                    e,
-                    arena,
-                    child_indent,
-                    i == expressions.len() - 1,
-                    interner,
-                );
+                print_expr(e, arena, child_indent, i == expressions.len() - 1, interner);
             }
             true
         }

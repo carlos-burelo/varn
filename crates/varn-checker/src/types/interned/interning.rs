@@ -1,5 +1,7 @@
 use super::hash::{content_function_id, content_id, content_list_id, content_object_id};
-use super::ids::{seeded_id, CheckerTyId, FunctionTypeId, InternedTypeKind, ObjectMembersId, TyListId};
+use super::ids::{
+    seeded_id, CheckerTyId, FunctionTypeId, InternedTypeKind, ObjectMembersId, TyListId,
+};
 use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
 

@@ -66,19 +66,14 @@ impl<'r> Checker<'r> {
                                             .get_object_members(mid)
                                             .iter()
                                             .any(|f| match f {
-                                                ObjectTypeMember::Property {
-                                                    name,
-                                                    ty,
-                                                    ..
-                                                } => {
+                                                ObjectTypeMember::Property { name, ty, .. } => {
                                                     name.as_ref() == prop_name_str
                                                         && *ty == disc_ty.0
                                                 }
                                                 _ => false,
                                             }),
                                         TypeKind::Named(cn, _) => {
-                                            let cn_str =
-                                                bind.interner.resolve(cn).to_string();
+                                            let cn_str = bind.interner.resolve(cn).to_string();
                                             bind.get_interface_members_local(&cn_str)
                                                 .or_else(|| {
                                                     bind.get_class_entry(&cn_str)
@@ -99,25 +94,24 @@ impl<'r> Checker<'r> {
                                         unmatched.push(*m);
                                     }
                                 }
-                                let make_ty = |v: Vec<Type>, table: &mut crate::types::CheckerTyTable| match v.len() {
-                                    0 => None,
-                                    1 => Some(v.into_iter().next().unwrap()),
-                                    _ => Some(Type::union(v, table)),
-                                };
-                                if (is_eq && is_true_branch) || (is_neq && !is_true_branch)
-                                {
+                                let make_ty =
+                                    |v: Vec<Type>, table: &mut crate::types::CheckerTyTable| match v
+                                        .len()
+                                    {
+                                        0 => None,
+                                        1 => Some(v.into_iter().next().unwrap()),
+                                        _ => Some(Type::union(v, table)),
+                                    };
+                                if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
                                     if !matched.is_empty() {
                                         if let Some(t) = make_ty(
                                             matched,
-                                            &mut *std::sync::Arc::make_mut(
-                                                &mut self.ty_table,
-                                            ),
+                                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                         ) {
                                             out.push((id, t));
                                         }
                                     }
-                                } else if ((is_neq && is_true_branch)
-                                    || (is_eq && !is_true_branch))
+                                } else if ((is_neq && is_true_branch) || (is_eq && !is_true_branch))
                                     && !matched.is_empty()
                                 {
                                     if let Some(t) = make_ty(

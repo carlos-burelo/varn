@@ -15,15 +15,11 @@ impl<'r> Checker<'r> {
         self.check_expr(test, bind);
         if self.can_extract_narrowings(test) {
             let narrow_true = self.extract_narrowings(test, bind, true);
-            self.with_narrowings(&narrow_true, |checker| {
-                checker.check_stmt(consequent, bind)
-            });
+            self.with_narrowings(&narrow_true, |checker| checker.check_stmt(consequent, bind));
 
             if let Some(alt) = alternate {
                 let narrow_false = self.extract_narrowings(test, bind, false);
-                self.with_narrowings(&narrow_false, |checker| {
-                    checker.check_stmt(alt, bind)
-                });
+                self.with_narrowings(&narrow_false, |checker| checker.check_stmt(alt, bind));
             }
         } else {
             self.check_stmt(consequent, bind);
@@ -55,28 +51,23 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.loop_depth += 1;
-        self.with_next_child_scope_span(
-            bind,
-            range.start.offset,
-            range.end.offset,
-            |checker| {
-                if let Some(i) = &init {
-                    match i.as_ref() {
-                        ForInit::Var { declarators, .. } => {
-                            checker.check_for_var_init(declarators, bind)
-                        }
-                        ForInit::Expr(e) => checker.check_expr(*e, bind),
+        self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+            if let Some(i) = &init {
+                match i.as_ref() {
+                    ForInit::Var { declarators, .. } => {
+                        checker.check_for_var_init(declarators, bind)
                     }
+                    ForInit::Expr(e) => checker.check_expr(*e, bind),
                 }
-                if let Some(t) = test {
-                    checker.check_expr(t, bind);
-                }
-                if let Some(u) = update {
-                    checker.check_expr(u, bind);
-                }
-                checker.check_stmt(body, bind);
-            },
-        );
+            }
+            if let Some(t) = test {
+                checker.check_expr(t, bind);
+            }
+            if let Some(u) = update {
+                checker.check_expr(u, bind);
+            }
+            checker.check_stmt(body, bind);
+        });
         self.loop_depth -= 1;
     }
 
@@ -93,11 +84,11 @@ impl<'r> Checker<'r> {
         let right_kind = self.ty_table.get(right_ty.0);
         let elem_ty = match right_kind {
             TypeKind::Array(inner) => Type(inner, false),
-            TypeKind::Primitive(varn_core::LangPrimitive::Str)
-            | TypeKind::TemplateLiteral(_) => Type::Char,
+            TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => {
+                Type::Char
+            }
             TypeKind::Named(name, _)
-                if bind.interner.get(varn_core::LangPrimitive::Str.name())
-                    == Some(name) =>
+                if bind.interner.get(varn_core::LangPrimitive::Str.name()) == Some(name) =>
             {
                 Type::Char
             }
@@ -106,32 +97,23 @@ impl<'r> Checker<'r> {
                     && self.ty_table.get_list(args).len() == 2 =>
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
-                let list =
-                    std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
+                let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
                 Type(
-                    std::sync::Arc::make_mut(&mut self.ty_table)
-                        .intern(TypeKind::Tuple(list)),
+                    std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)),
                     false,
                 )
             }
-            TypeKind::Generic(_name, args, _)
-                if self.ty_table.get_list(args).len() == 1 =>
-            {
+            TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
                 Type(self.ty_table.get_list(args)[0], false)
             }
             TypeKind::Builtin(varn_core::BuiltinType::Range) => Type::Int,
             _ => Type::Dynamic,
         };
         self.loop_depth += 1;
-        self.with_next_child_scope_span(
-            bind,
-            range.start.offset,
-            range.end.offset,
-            |checker| {
-                checker.check_pattern(&left, &elem_ty, bind);
-                checker.check_stmt(body, bind);
-            },
-        );
+        self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+            checker.check_pattern(&left, &elem_ty, bind);
+            checker.check_stmt(body, bind);
+        });
         self.loop_depth -= 1;
     }
 
@@ -145,23 +127,14 @@ impl<'r> Checker<'r> {
     ) {
         self.check_expr(right, bind);
         self.loop_depth += 1;
-        self.with_next_child_scope_span(
-            bind,
-            range.start.offset,
-            range.end.offset,
-            |checker| {
-                checker.check_pattern(&left, &Type::Str, bind);
-                checker.check_stmt(body, bind);
-            },
-        );
+        self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {
+            checker.check_pattern(&left, &Type::Str, bind);
+            checker.check_stmt(body, bind);
+        });
         self.loop_depth -= 1;
     }
 
-    pub(super) fn check_for_var_init(
-        &mut self,
-        declarators: &[VarDeclarator],
-        bind: &BindResult,
-    ) {
+    pub(super) fn check_for_var_init(&mut self, declarators: &[VarDeclarator], bind: &BindResult) {
         for declarator in declarators {
             let ann = declarator.type_ann.as_ref().or(match &declarator.id {
                 varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),

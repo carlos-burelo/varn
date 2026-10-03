@@ -15,9 +15,7 @@ pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {
     Ok(args)
 }
 
-pub fn parse_type_params(
-    s: &mut TokenStream,
-) -> Result<Vec<varn_core::ast::TypeParam>, String> {
+pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<varn_core::ast::TypeParam>, String> {
     s.expect(TokenKind::LAngle)?;
     let mut params = vec![];
     while !s.check(TokenKind::RAngle) && !s.is_eof() {

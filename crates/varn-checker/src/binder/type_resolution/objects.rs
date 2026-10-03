@@ -44,9 +44,9 @@ pub(super) fn resolve_object_type(
                             .type_ann
                             .as_ref()
                             .or(match &p.pattern {
-                                varn_core::ast::Pattern::Identifier {
-                                    type_ann, ..
-                                } => type_ann.as_ref(),
+                                varn_core::ast::Pattern::Identifier { type_ann, .. } => {
+                                    type_ann.as_ref()
+                                }
                                 _ => None,
                             })
                             .map(|ann| resolve_type_node(ann, ctx, table))
@@ -91,9 +91,7 @@ pub(super) fn resolve_object_type(
                     .type_ann
                     .as_ref()
                     .or(match &param.pattern {
-                        varn_core::ast::Pattern::Identifier { type_ann, .. } => {
-                            type_ann.as_ref()
-                        }
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                         _ => None,
                     })
                     .map(|ann| resolve_type_node(ann, ctx, table))
@@ -120,9 +118,9 @@ pub(super) fn resolve_object_type(
                             .type_ann
                             .as_ref()
                             .or(match &p.pattern {
-                                varn_core::ast::Pattern::Identifier {
-                                    type_ann, ..
-                                } => type_ann.as_ref(),
+                                varn_core::ast::Pattern::Identifier { type_ann, .. } => {
+                                    type_ann.as_ref()
+                                }
                                 _ => None,
                             })
                             .map(|ann| resolve_type_node(ann, ctx, table))

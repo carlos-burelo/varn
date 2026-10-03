@@ -2,9 +2,7 @@ use super::cache_types::{PortableClassMemberInfo, PortableSymbol, PortableTypeMe
 use crate::binder::TypeMembers;
 use crate::module_resolver::ImportResolver;
 use crate::symbol::Symbol;
-use crate::types::{
-    encode_portable_type, CheckerTyTable, ClassMemberInfo, Type,
-};
+use crate::types::{encode_portable_type, CheckerTyTable, ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::{Atom, AtomInterner};

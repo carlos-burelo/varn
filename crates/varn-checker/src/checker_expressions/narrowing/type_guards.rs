@@ -69,10 +69,7 @@ impl<'r> Checker<'r> {
                                         .filter(|m| {
                                             let m_kind = self.ty_table.get(m.0);
                                             match (m_kind, target_kind) {
-                                                (
-                                                    TypeKind::Array(_),
-                                                    TypeKind::Array(_),
-                                                ) => true,
+                                                (TypeKind::Array(_), TypeKind::Array(_)) => true,
                                                 _ => *m == target_type,
                                             }
                                         })
@@ -85,9 +82,7 @@ impl<'r> Checker<'r> {
                                     } else {
                                         Type::union(
                                             matched,
-                                            &mut *std::sync::Arc::make_mut(
-                                                &mut self.ty_table,
-                                            ),
+                                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                         )
                                     };
                                     out.push((id, narrowed));

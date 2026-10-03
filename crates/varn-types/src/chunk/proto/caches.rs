@@ -1,9 +1,9 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use super::definition::FunctionProto;
 use super::super::inline_cache::{FeedbackVector, PolyICSlot};
 use super::super::pool::PoolEntry;
+use super::definition::FunctionProto;
 
 impl FunctionProto {
     pub fn frame_layout(&self) -> Rc<crate::register_meta::FrameLayout> {

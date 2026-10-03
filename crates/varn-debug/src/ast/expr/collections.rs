@@ -120,11 +120,7 @@ fn is_simple_array_el(el: &ArrayEl, arena: &AstArena) -> bool {
     }
 }
 
-fn format_array_el_short(
-    el: &ArrayEl,
-    arena: &AstArena,
-    interner: &AtomInterner,
-) -> String {
+fn format_array_el_short(el: &ArrayEl, arena: &AstArena, interner: &AtomInterner) -> String {
     match el {
         ArrayEl::Hole => "_".to_owned(),
         ArrayEl::Expr(e) => format_expr_short(*e, arena, interner),

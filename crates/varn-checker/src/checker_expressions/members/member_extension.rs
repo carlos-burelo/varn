@@ -121,14 +121,12 @@ fn extension_key(
     bind: &BindResult,
 ) -> Option<Arc<str>> {
     match table.get(ty.0) {
-        varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => {
-            Some(Arc::from(super::member_atom::resolve_atom_text(
-                resolver, bind, n,
-            )))
-        }
-        k @ (varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_) | varn_core::TypeKind::Literal(_)) => {
-            k.lang_name().map(Arc::from)
-        }
+        varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => Some(
+            Arc::from(super::member_atom::resolve_atom_text(resolver, bind, n)),
+        ),
+        k @ (varn_core::TypeKind::Primitive(_)
+        | varn_core::TypeKind::Builtin(_)
+        | varn_core::TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
         varn_core::TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         _ => None,
     }

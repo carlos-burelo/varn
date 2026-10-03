@@ -2,9 +2,7 @@ use super::Binder;
 use crate::scope::ScopeKind;
 use crate::symbol::SymbolKind;
 use std::sync::Arc;
-use varn_core::ast::{
-    ExprKind, ForInit, Pattern, StmtId, StmtKind, VarDeclarator, VarKind,
-};
+use varn_core::ast::{ExprKind, ForInit, Pattern, StmtId, StmtKind, VarDeclarator, VarKind};
 
 impl<'r> Binder<'r> {
     pub(crate) fn bind_stmts(&mut self, stmts: &[StmtId]) {

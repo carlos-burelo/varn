@@ -1,5 +1,5 @@
-use super::cache_types::PortableModule;
 use super::super::{ExportMap, ImportResolver};
+use super::cache_types::PortableModule;
 use crate::binder::BindResult;
 use crate::types::CheckerTyTable;
 use std::path::PathBuf;
@@ -116,5 +116,3 @@ pub(crate) fn save_to_cache(
         );
     }
 }
-
-
