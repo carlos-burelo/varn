@@ -16,7 +16,13 @@ pub fn serialize_module_interface(
     interner: &AtomInterner,
     resolver: Option<&dyn ImportResolver>,
 ) -> Result<Vec<u8>, String> {
-    let cached = PortableModule::from_live(exports, bind, interner, resolver);
+    let mut names = bind.interner.clone();
+    names.absorb(interner);
+    let mut table = (*bind.ty_table).clone();
+    if let Some(resolver) = resolver {
+        table.absorb(&resolver.ty_table_snapshot());
+    }
+    let cached = PortableModule::from_live(exports, bind, &names, &table);
     postcard::to_allocvec(&cached).map_err(|e| e.to_string())
 }
 

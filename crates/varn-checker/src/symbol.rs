@@ -50,13 +50,6 @@ impl SymbolKind {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     pub kind: SymbolKind,
-    // `Atom` is a per-parse interned index and does not (and should not)
-    // derive `serde::{Serialize, Deserialize}` — see
-    // `binder::types::TypeMembers::objects` for the established rationale.
-    // Every `Atom`-typed field below is skipped for the same reason; a
-    // reloaded (cached) `Symbol` needs its names re-resolved against a live
-    // interner by its caller, same as `BindResult::interner`.
-    #[serde(skip)]
     pub name: Atom,
     pub ty: Option<Type>,
     pub line: u32,
@@ -64,19 +57,14 @@ pub struct Symbol {
     pub has_explicit_type: bool,
     pub is_async: bool,
     pub is_generator: bool,
-    #[serde(skip)]
     pub doc: Option<Atom>,
-    #[serde(skip)]
     pub type_params: Vec<Atom>,
     pub type_param_constraints: Vec<Option<Type>>,
     pub offset: u32,
     #[serde(skip)]
     pub full_range: varn_core::SourceRange,
-    #[serde(skip)]
     pub origin_module: Option<Atom>,
-    #[serde(skip)]
     pub re_export_path: Vec<Atom>,
-    #[serde(skip)]
     pub original_name: Option<Atom>,
     #[serde(skip)]
     pub alias_node: Option<Box<TypeNode>>,

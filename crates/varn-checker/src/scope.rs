@@ -18,10 +18,6 @@ pub enum ScopeKind {
 pub struct CheckerScope {
     pub kind: ScopeKind,
     pub parent: Option<ScopeId>,
-    // `Atom` is a per-parse interned index and does not (and should not)
-    // derive `serde::{Serialize, Deserialize}` — see
-    // `binder::types::TypeMembers::objects` for the established rationale.
-    #[serde(skip)]
     pub bindings: FxHashMap<Atom, SymbolId>,
     pub children: Vec<ScopeId>,
     pub ordered: Vec<SymbolId>,
@@ -45,16 +41,6 @@ impl CheckerScope {
 
     pub fn lookup(&self, name: Atom) -> Option<SymbolId> {
         self.bindings.get(&name).copied()
-    }
-
-    /// Insert into `bindings` without touching `ordered`.
-    ///
-    /// Used only to rebuild a deserialized scope's lookup table from its
-    /// already-correct `ordered` list (see
-    /// `module_resolver::cache::rebuild_scope_bindings`) — `define` would
-    /// duplicate the id `ordered` already has.
-    pub(crate) fn insert_binding_only(&mut self, name: Atom, id: SymbolId) {
-        self.bindings.insert(name, id);
     }
 
     pub fn resolve<'s>(&'s self, name: Atom, arena: &'s ScopeArena) -> Option<SymbolId> {

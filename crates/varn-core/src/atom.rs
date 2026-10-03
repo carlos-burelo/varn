@@ -114,13 +114,6 @@ impl AtomInterner {
         self.collisions.extend(other.collisions.iter().cloned());
     }
 
-    pub fn texts(&self) -> impl Iterator<Item = &str> {
-        self.base
-            .values()
-            .chain(self.delta.values())
-            .map(|s| s.as_ref())
-    }
-
     pub fn collisions(&self) -> &[(Box<str>, Box<str>)] {
         &self.collisions
     }

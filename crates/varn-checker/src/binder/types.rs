@@ -50,15 +50,6 @@ pub enum PendingEnrich {
 pub struct TypeMembers {
     pub classes: FxHashMap<Arc<str>, ClassMemberInfo>,
     pub interfaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
-    // Object-literal declarator names are looked up by `Atom` at every call
-    // site that still compiles (`Decl::Struct.id`, `Pattern::Identifier.name`),
-    // unlike the other maps here which are queried by `&str` through
-    // `TypeContext`/`BindResult` accessors — so this one forwards the AST's
-    // `Atom` directly instead of re-wrapping into `Arc<str>`. `Atom` does not
-    // (and should not) derive `serde::{Serialize, Deserialize}` — a bare
-    // interned index is meaningless without the matching `AtomInterner`, so
-    // this field, like the binder's other in-process-only data, is skipped.
-    #[serde(skip)]
     pub objects: FxHashMap<Atom, Vec<ClassMemberInfo>>,
     pub enums: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
     pub namespaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
@@ -81,26 +72,8 @@ pub struct BindResult {
     pub global_scope: ScopeId,
     #[serde(skip)]
     pub diagnostics: varn_core::DiagnosticBag,
-    /// Resolves the `Atom`s carried by this bind result (`PendingEnrich`,
-    /// `type_members.objects`, ...) back to text — diagnostics and any
-    /// comparison against externally-supplied text need it.
-    ///
-    /// NOT YET WIRED to the real per-parse interner `varn_parser::parse`
-    /// returns: threading it here would require changing the signature of
-    /// `Binder::bind`/`bind_with_global_refs`, whose callers
-    /// (`crate::checker::mod`, `crate::module_resolver::resolver`,
-    /// `varn-cli/src/debug_binder.rs`) are outside this task's 3-file scope
-    /// and are already broken pending their own migration tasks. Until a
-    /// later task threads the real interner through, this is a placeholder
-    /// `AtomInterner::new()` built in `Binder::bind_with_globals_iter` —
-    /// resolving an `Atom` interned by the *real* parser interner against
-    /// this placeholder will panic (empty table). See task-4-report.md.
     #[serde(skip)]
     pub interner: varn_core::AtomInterner,
-    /// Same caveat as `interner` above, same reason: a `CheckerTyId` is
-    /// meaningless without the table that minted it, so this is skipped on
-    /// (de)serialize too. See `ImportResolver::ty_table_snapshot`/
-    /// `set_ty_table` for how it stays comparable across modules.
     #[serde(skip, default)]
     pub ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
     pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,

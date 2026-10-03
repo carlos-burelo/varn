@@ -119,35 +119,10 @@ impl<'r> super::Binder<'r> {
                 } else {
                     match exports.get(&imported) {
                         Some(resolved) => {
-                            // Cross the module boundary ONCE, through the same
-                            // portable codec the on-disk interface uses
-                            // (`types/portable.rs`): every `Atom` resolves to
-                            // text and every `CheckerTyId` to the shape in its
-                            // OWNER's table, then both re-intern into this
-                            // binder's interner/table. A raw clone would carry
-                            // the text and the id straight through, pointing at
-                            // whatever sits at the same index here.
-                            //
-                            // `resync_interner` before the batch and
-                            // `publish_interner_tail` after: `decode_symbol`
-                            // mints several atoms in a row with no resolver
-                            // call in between, and the live table must not
-                            // diverge from this one (see `resync_interner`).
                             self.resync_interner();
-                            let foreign = self.resolver.interner_snapshot();
-                            let fallback_table = self.resolver.ty_table_snapshot();
-                            let portable = crate::module_resolver::cache::encode_symbol(
-                                resolved,
-                                &fallback_table,
-                                &foreign,
-                                Some(self.resolver),
-                            );
-                            let mut s = crate::module_resolver::cache::decode_symbol(
-                                portable,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                &mut self.interner,
-                            );
-                            self.publish_interner_tail();
+                            let live_table = self.resolver.ty_table_snapshot();
+                            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&live_table);
+                            let mut s = resolved.clone();
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;

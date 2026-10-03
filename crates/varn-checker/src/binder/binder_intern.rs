@@ -15,17 +15,4 @@ impl<'r> Binder<'r> {
             self.live_names_seen = live_len;
         }
     }
-
-    pub(crate) fn publish_interner_tail(&mut self) {
-        let live = self.resolver.interner_snapshot();
-        let texts: Vec<String> = self
-            .interner
-            .texts()
-            .filter(|t| live.get(t).is_none())
-            .map(|s| s.to_owned())
-            .collect();
-        for text in texts {
-            self.resolver.intern(&text);
-        }
-    }
 }
