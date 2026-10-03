@@ -23,7 +23,7 @@ impl<'a> FnEmitter<'a> {
                         let ty = iexpr
                             .as_ref()
                             .map(|e| e.ty)
-                            .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                         let local = self.bind_local(Arc::from(self.m.interner.resolve(*name)), ty);
                         out.extend(std::mem::take(&mut self.pending));
                         out.push(TirStmt::Let {

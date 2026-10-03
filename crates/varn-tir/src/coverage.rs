@@ -24,7 +24,7 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::HostBoundary => 0,
         DynReason::Union => 1,
         DynReason::IndexSignature => 2,
-        DynReason::Unannotated => 3,
+        DynReason::Declared => 3,
         DynReason::NotYetSupported => 4,
     }
 }
@@ -33,7 +33,7 @@ const REASONS: [(DynReason, &str); 5] = [
     (DynReason::HostBoundary, "host boundary"),
     (DynReason::Union, "union"),
     (DynReason::IndexSignature, "index signature"),
-    (DynReason::Unannotated, "unannotated"),
+    (DynReason::Declared, "declared"),
     (DynReason::NotYetSupported, "not yet supported"),
 ];
 

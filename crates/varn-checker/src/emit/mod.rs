@@ -11,7 +11,7 @@
 //! `async` / generators, all loop forms, `switch`, `try`, destructuring,
 //! templates. A construct with no precise TIR shape (a host intrinsic, a
 //! spread the arity rule can't see, an iterator-protocol `for…of`) still emits
-//! real nodes typed `Dynamic(Unannotated)` — never a bare hole.
+//! real nodes typed `Dynamic(NotYetSupported)` — never a bare hole.
 
 mod body;
 mod class_members;

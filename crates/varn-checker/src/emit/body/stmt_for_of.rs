@@ -237,10 +237,10 @@ impl<'a> FnEmitter<'a> {
         body: StmtId,
         is_await: bool,
     ) -> Vec<TirStmt> {
-        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
         let by_name = |n: &str| Resolution::ByName {
             name: Arc::from(n),
-            why: DynReason::Unannotated,
+            why: DynReason::NotYetSupported,
         };
 
         out.extend(std::mem::take(&mut self.pending));
@@ -279,10 +279,10 @@ impl<'a> FnEmitter<'a> {
                 object: Box::new(recv),
                 name: Arc::from(n),
             },
-            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             res: Resolution::ByName {
                 name: Arc::from(n),
-                why: DynReason::Unannotated,
+                why: DynReason::NotYetSupported,
             },
             span: Span::EMPTY,
         };

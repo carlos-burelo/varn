@@ -37,7 +37,10 @@ pub(crate) fn intern_signature(
             let return_ty = lower_type(&Type::resolved(ft.return_type), table, interner, tt, names);
             (p_tys, return_ty)
         }
-        _ => (vec![], BackendTy::Dynamic(varn_tir::DynReason::Unannotated)),
+        _ => (
+            vec![],
+            BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
+        ),
     };
     let id = signatures.len() as u32;
     signatures.push(Signature { params, return_ty });

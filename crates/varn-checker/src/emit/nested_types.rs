@@ -99,7 +99,7 @@ impl NestedTypes {
         };
         let global = TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             res: Resolution::GlobalSlot(slot),
             span: Span::EMPTY,
         };

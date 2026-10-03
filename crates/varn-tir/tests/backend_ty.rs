@@ -65,7 +65,7 @@ fn nullable_keeps_its_payload() {
 #[test]
 fn dynamic_carries_its_reason() {
     let d = BackendTy::Dynamic(DynReason::HostBoundary);
-    assert_ne!(d, BackendTy::Dynamic(DynReason::Unannotated));
+    assert_ne!(d, BackendTy::Dynamic(DynReason::Declared));
 }
 
 /// `BackendTy` is Copy, so it can be a field of every node without cloning.

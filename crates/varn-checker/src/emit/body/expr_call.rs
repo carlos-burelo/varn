@@ -29,7 +29,7 @@ impl<'a> FnEmitter<'a> {
                     },
                     None => TirArg::Expr(TirExpr {
                         kind: TirExprKind::NullLit,
-                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                         res: Resolution::None,
                         span: Span::EMPTY,
                     }),
@@ -197,7 +197,7 @@ impl<'a> FnEmitter<'a> {
             })
             .unwrap_or(Resolution::ByName {
                 name: name.clone(),
-                why: DynReason::Unannotated,
+                why: DynReason::NotYetSupported,
             });
 
         TirExpr {

@@ -20,7 +20,7 @@ pub(super) fn param_field_assign(field: Arc<str>, param: u32) -> TirStmt {
         field,
         TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             res: Resolution::Param(param),
             span: Span::EMPTY,
         },
@@ -30,7 +30,7 @@ pub(super) fn param_field_assign(field: Arc<str>, param: u32) -> TirStmt {
 pub(super) fn this_field_assign(field: Arc<str>, value: TirExpr) -> TirStmt {
     let this = TirExpr {
         kind: TirExprKind::Var,
-        ty: BackendTy::Dynamic(DynReason::Unannotated),
+        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
         res: Resolution::None,
         span: Span::EMPTY,
     };
@@ -41,7 +41,7 @@ pub(super) fn this_field_assign(field: Arc<str>, value: TirExpr) -> TirStmt {
                     object: Box::new(this),
                     name: field,
                 },
-                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                 res: Resolution::None,
                 span: Span::EMPTY,
             }),
@@ -272,7 +272,7 @@ pub(super) fn emit_class(
                                         ctx.names,
                                     )
                                 })
-                                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
+                                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported))
                         })
                         .collect();
                     signatures[sig.0 as usize].params = tys;

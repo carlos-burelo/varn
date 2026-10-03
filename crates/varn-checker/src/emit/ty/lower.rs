@@ -17,7 +17,7 @@ pub fn lower_type(
 }
 
 fn opaque() -> BackendTy {
-    BackendTy::Dynamic(DynReason::Unannotated)
+    BackendTy::Dynamic(DynReason::NotYetSupported)
 }
 
 fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
@@ -25,7 +25,7 @@ fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
         .class_id(name)
         .map(BackendTy::Class)
         .or_else(|| names.enum_id(name).map(BackendTy::Enum))
-        .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated))
+        .unwrap_or_else(opaque)
 }
 
 fn resolve_type_ref(
@@ -78,11 +78,11 @@ fn lower_kind(
             BackendTy::Set(tt.intern(el))
         }
         TypeKind::Builtin(varn_core::BuiltinType::Map) => {
-            let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
+            let d = tt.intern(opaque());
             BackendTy::Map(d, d)
         }
         TypeKind::Builtin(varn_core::BuiltinType::Set) => {
-            let d = tt.intern(BackendTy::Dynamic(DynReason::Unannotated));
+            let d = tt.intern(opaque());
             BackendTy::Set(d)
         }
 
@@ -156,7 +156,7 @@ fn lower_primitive(p: LangPrimitive) -> BackendTy {
         LangPrimitive::Void => BackendTy::Void,
         LangPrimitive::Never => BackendTy::Never,
         LangPrimitive::Null => BackendTy::Nullable(NEVER_TY),
-        LangPrimitive::Dynamic => BackendTy::Dynamic(DynReason::Unannotated),
+        LangPrimitive::Dynamic => BackendTy::Dynamic(DynReason::Declared),
     }
 }
 
@@ -169,7 +169,7 @@ fn lower_builtin(b: BuiltinType) -> BackendTy {
         | BuiltinType::Range
         | BuiltinType::Task
         | BuiltinType::TaskHandle
-        | BuiltinType::Generator => BackendTy::Dynamic(DynReason::Unannotated),
+        | BuiltinType::Generator => opaque(),
     }
 }
 

@@ -126,7 +126,7 @@ mod tests {
         let m = empty_module();
         let mut out = SsaTyTable::default();
         assert_eq!(
-            lower(B::Dynamic(DynReason::Unannotated), &m, &mut out),
+            lower(B::Dynamic(DynReason::NotYetSupported), &m, &mut out),
             HirType::Dynamic
         );
         assert_eq!(lower(B::Decimal, &m, &mut out), HirType::Dynamic);

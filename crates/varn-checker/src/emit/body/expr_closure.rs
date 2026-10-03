@@ -27,7 +27,7 @@ impl<'a> FnEmitter<'a> {
             name: Arc::from("<closure>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -42,7 +42,7 @@ impl<'a> FnEmitter<'a> {
             .iter()
             .map(|p| pattern_lead(&p.pattern, self.m.interner))
             .collect();
-        let param_tys = vec![BackendTy::Dynamic(DynReason::Unannotated); params.len()];
+        let param_tys = vec![BackendTy::Dynamic(DynReason::NotYetSupported); params.len()];
 
         let mut outer_names = self.outer_names.clone();
         for scope in &self.scopes {
@@ -78,7 +78,7 @@ impl<'a> FnEmitter<'a> {
             name: Arc::from("<closure>"),
             sig: SigId(0),
             params: param_tys,
-            return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             locals,
             body: stmts,
             has_this: false,

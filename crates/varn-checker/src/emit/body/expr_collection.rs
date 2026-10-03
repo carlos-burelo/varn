@@ -101,7 +101,7 @@ impl<'a> FnEmitter<'a> {
                             super::expr_closure::ClosureBody::Stmt(*body),
                             *is_async,
                             *is_generator,
-                            BackendTy::Dynamic(DynReason::Unannotated),
+                            BackendTy::Dynamic(DynReason::NotYetSupported),
                             span,
                         );
                         entries.push(TirObjectEntry::Field {

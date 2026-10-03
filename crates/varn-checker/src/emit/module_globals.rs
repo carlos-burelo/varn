@@ -86,7 +86,7 @@ pub(super) fn assign_global_slots(
             sym.ty
                 .as_ref()
                 .map(|t| lower_type(t, &bind.ty_table, interner, types, names))
-                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
+                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported)),
         );
         global_slots.insert(sym_name, slot);
     }
@@ -99,7 +99,7 @@ pub(super) fn assign_global_slots(
         extra.sort();
         for name in extra {
             let slot = globals.len() as u32;
-            globals.push(BackendTy::Dynamic(DynReason::Unannotated));
+            globals.push(BackendTy::Dynamic(DynReason::NotYetSupported));
             global_slots.insert(name, slot);
         }
     }
@@ -114,7 +114,7 @@ pub(super) fn assign_global_slots(
     );
     for (name, slot) in nested.new_globals(&global_slots) {
         debug_assert_eq!(slot as usize, globals.len());
-        globals.push(BackendTy::Dynamic(DynReason::Unannotated));
+        globals.push(BackendTy::Dynamic(DynReason::NotYetSupported));
         global_slots.insert(name, slot);
     }
     let mut global_names: Vec<Arc<str>> = vec![Arc::from(""); globals.len()];

@@ -8,7 +8,7 @@ use varn_tir::{
 };
 
 pub(super) fn apply_one_decorator(top: &mut FnEmitter, prev: TirExpr, deco: TirExpr) -> TirExpr {
-    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let dyno = || BackendTy::Dynamic(DynReason::NotYetSupported);
     let applied = TirExpr {
         kind: TirExprKind::Call {
             callee: Box::new(deco),
@@ -53,7 +53,7 @@ pub(super) fn emit_fn_decorator_app(
     let Some(&slot) = global_slots.get(name) else {
         return;
     };
-    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let dyno = || BackendTy::Dynamic(DynReason::NotYetSupported);
     let global_ref = || TirExpr {
         kind: TirExprKind::Var,
         ty: dyno(),

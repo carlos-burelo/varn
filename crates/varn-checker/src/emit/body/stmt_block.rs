@@ -25,7 +25,7 @@ impl<'a> FnEmitter<'a> {
                 ty: BackendTy::Void,
                 res: Resolution::ByName {
                     name: Arc::from("dispose"),
-                    why: DynReason::Unannotated,
+                    why: DynReason::NotYetSupported,
                 },
                 span: Span::EMPTY,
             }));
@@ -188,7 +188,7 @@ impl<'a> FnEmitter<'a> {
             } => self.lower_switch(*discriminant, cases),
 
             StmtKind::Using { declarations, .. } => {
-                let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+                let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
                 let mut out = Vec::new();
                 for d in declarations {
                     let init = d.init.map(|e| self.lower_expr(e));
@@ -210,7 +210,8 @@ impl<'a> FnEmitter<'a> {
                         }
 
                         pat => {
-                            let src = init.unwrap_or_else(|| placeholder(DynReason::Unannotated));
+                            let src =
+                                init.unwrap_or_else(|| placeholder(DynReason::NotYetSupported));
                             out.extend(std::mem::take(&mut self.pending));
                             let src = self.hoist(src);
                             out.extend(std::mem::take(&mut self.pending));

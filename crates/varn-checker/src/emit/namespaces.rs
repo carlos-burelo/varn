@@ -39,7 +39,7 @@ pub(super) fn emit_namespace_object(
     top: &mut FnEmitter,
     top_body: &mut Vec<TirStmt>,
 ) {
-    let dyno = || BackendTy::Dynamic(DynReason::Unannotated);
+    let dyno = || BackendTy::Dynamic(DynReason::NotYetSupported);
     let global_ref = |slot: u32| TirExpr {
         kind: TirExprKind::Var,
         ty: dyno(),
@@ -295,7 +295,7 @@ pub(super) fn emit_extensions(
                 .names
                 .class_id(other)
                 .map(BackendTy::Class)
-                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated)),
+                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported)),
         };
         let this_cid = match recv_ty {
             BackendTy::Class(cid) => Some(cid),
@@ -351,8 +351,8 @@ pub(super) fn emit_extensions(
             out.push(TirFunction {
                 name: mangled,
                 sig,
-                params: vec![BackendTy::Dynamic(DynReason::Unannotated); arity],
-                return_ty: BackendTy::Dynamic(DynReason::Unannotated),
+                params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); arity],
+                return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                 locals,
                 body: body_stmts,
                 has_this: true,

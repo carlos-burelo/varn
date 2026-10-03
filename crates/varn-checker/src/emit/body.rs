@@ -86,7 +86,7 @@ impl<'a> FnEmitter<'a> {
                     .this_enum
                     .map(BackendTy::Enum)
                     .or_else(|| self.this_class.map(BackendTy::Class))
-                    .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                 return TirExpr {
                     kind: TirExprKind::Var,
                     ty: this_ty,
@@ -329,7 +329,7 @@ impl<'a> FnEmitter<'a> {
                     ty,
                     res: Resolution::ByName {
                         name: key,
-                        why: DynReason::Unannotated,
+                        why: DynReason::NotYetSupported,
                     },
                     span,
                 };
@@ -339,7 +339,7 @@ impl<'a> FnEmitter<'a> {
                 let sty = self
                     .this_class
                     .map(BackendTy::Class)
-                    .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                 return TirExpr {
                     kind: TirExprKind::Var,
                     ty: sty,
@@ -385,7 +385,7 @@ impl<'a> FnEmitter<'a> {
             },
             None => TirExpr {
                 kind: TirExprKind::NullLit,
-                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                 res: Resolution::None,
                 span,
             },

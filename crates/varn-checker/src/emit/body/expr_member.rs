@@ -97,7 +97,7 @@ impl<'a> FnEmitter<'a> {
                     ty,
                     res: Resolution::ByName {
                         name: Arc::from("slice"),
-                        why: DynReason::Unannotated,
+                        why: DynReason::NotYetSupported,
                     },
                     span,
                 };
@@ -182,7 +182,7 @@ impl<'a> FnEmitter<'a> {
                 ty,
                 res: Resolution::ByName {
                     name,
-                    why: DynReason::Unannotated,
+                    why: DynReason::NotYetSupported,
                 },
                 span,
             },

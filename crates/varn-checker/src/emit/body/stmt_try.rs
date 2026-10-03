@@ -35,7 +35,7 @@ impl<'a> FnEmitter<'a> {
         }
         let rhs = TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::Unannotated),
+            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             res: self.resolve_name(name),
             span,
         };
@@ -58,7 +58,7 @@ impl<'a> FnEmitter<'a> {
         finally: Option<StmtId>,
     ) -> Vec<TirStmt> {
         let body = self.lower_stmt_as_block(block);
-        let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+        let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
 
         self.scopes.push(FxHashMap::default());
         let catch_local = self.bind_local(Arc::from("<catch>"), dyn_ty);

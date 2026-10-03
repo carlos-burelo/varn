@@ -53,8 +53,8 @@ pub enum DynReason {
     Union,
     /// Read off an index signature — `{ [key: str]: T }` has no named members.
     IndexSignature,
-    /// The author wrote no annotation and inference reached no answer.
-    Unannotated,
+    /// The author wrote `dynamic`.
+    Declared,
     /// The TIR cannot express this type yet. This is the redesign's backlog.
     NotYetSupported,
 }

@@ -64,13 +64,13 @@ fn dynamics_are_counted_by_reason() {
     )));
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Var,
-        BackendTy::Dynamic(DynReason::Unannotated),
+        BackendTy::Dynamic(DynReason::Declared),
         Resolution::Local(LocalId(0)),
     )));
 
     let c = Coverage::of(&m);
     assert_eq!(c.dynamic_by_reason(DynReason::HostBoundary), 1);
-    assert_eq!(c.dynamic_by_reason(DynReason::Unannotated), 1);
+    assert_eq!(c.dynamic_by_reason(DynReason::Declared), 1);
     assert_eq!(c.dynamic_by_reason(DynReason::Union), 0);
 }
 
@@ -92,7 +92,7 @@ fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
         BackendTy::Int,
         Resolution::ByName {
             name: "x".into(),
-            why: DynReason::Unannotated,
+            why: DynReason::Declared,
         },
     )));
 

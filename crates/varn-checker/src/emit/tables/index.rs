@@ -105,7 +105,10 @@ pub fn build(
                 .map(|(tag, (name, fields))| VariantInfo {
                     name: name.clone(),
                     tag: tag as u16,
-                    payload: vec![BackendTy::Dynamic(varn_tir::DynReason::Unannotated); *fields],
+                    payload: vec![
+                        BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported);
+                        *fields
+                    ],
                 })
                 .collect(),
         }

@@ -173,7 +173,7 @@ impl<'a> FnEmitter<'a> {
         let interner = self.m.interner;
         match self.expr_table.get(&e.index()) {
             Some(entry) => lower_type(&entry.ty, table, interner, self.tt, names),
-            None => BackendTy::Dynamic(DynReason::Unannotated),
+            None => BackendTy::Dynamic(DynReason::NotYetSupported),
         }
     }
 
@@ -204,7 +204,7 @@ impl<'a> FnEmitter<'a> {
         }
         Resolution::ByName {
             name: Arc::from(name),
-            why: DynReason::Unannotated,
+            why: DynReason::NotYetSupported,
         }
     }
 

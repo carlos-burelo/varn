@@ -18,7 +18,7 @@ impl<'a> FnEmitter<'a> {
         };
 
         if let Decl::Function(f) = unwrapped {
-            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
             let local = self.bind_local(Arc::from(self.m.interner.resolve(f.id)), dyn_ty);
             let closure = self.lower_closure(
                 &f.params,
@@ -36,7 +36,7 @@ impl<'a> FnEmitter<'a> {
         }
 
         if let Decl::Namespace(ns) = unwrapped {
-            let dyn_ty = BackendTy::Dynamic(DynReason::Unannotated);
+            let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
             let local = self.bind_local(Arc::from(self.m.interner.resolve(ns.id)), dyn_ty);
             let mut entries: Vec<varn_tir::TirObjectEntry> = Vec::new();
             for m in &ns.body {
@@ -96,7 +96,7 @@ impl<'a> FnEmitter<'a> {
                                     let interner = self.m.interner;
                                     lower_type(&e.ty, table, interner, self.tt, names)
                                 })
-                                .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                             let local = self.bind_local(Arc::from(name_str), ty);
                             out.push(TirStmt::Let {
                                 local,
@@ -120,7 +120,7 @@ impl<'a> FnEmitter<'a> {
                         if is_closure && !is_global {
                             Some(self.bind_local(
                                 Arc::from(name_str),
-                                BackendTy::Dynamic(DynReason::Unannotated),
+                                BackendTy::Dynamic(DynReason::NotYetSupported),
                             ))
                         } else {
                             None
@@ -144,7 +144,7 @@ impl<'a> FnEmitter<'a> {
                         })
                         .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
                         .or_else(|| init.as_ref().map(|e| e.ty))
-                        .unwrap_or(BackendTy::Dynamic(DynReason::Unannotated));
+                        .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                     out.extend(std::mem::take(&mut self.pending));
 
                     if self.top_level && prebound.is_none() {
@@ -182,7 +182,7 @@ impl<'a> FnEmitter<'a> {
                 pat => {
                     let src = match d.init {
                         Some(init) => self.lower_expr(init),
-                        None => placeholder(DynReason::Unannotated),
+                        None => placeholder(DynReason::NotYetSupported),
                     };
                     out.extend(std::mem::take(&mut self.pending));
                     let src = self.hoist(src);
@@ -200,7 +200,7 @@ impl<'a> FnEmitter<'a> {
             if let Some(def) = p.default {
                 let pvar = || TirExpr {
                     kind: TirExprKind::Var,
-                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                     res: Resolution::Param(i as u32),
                     span: Span::EMPTY,
                 };
@@ -219,7 +219,7 @@ impl<'a> FnEmitter<'a> {
                         target: Box::new(pvar()),
                         value: Box::new(value),
                     },
-                    ty: BackendTy::Dynamic(DynReason::Unannotated),
+                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                     res: Resolution::None,
                     span: Span::EMPTY,
                 };
@@ -236,7 +236,7 @@ impl<'a> FnEmitter<'a> {
             }
             let src = TirExpr {
                 kind: TirExprKind::Var,
-                ty: BackendTy::Dynamic(DynReason::Unannotated),
+                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                 res: Resolution::Param(i as u32),
                 span: Span::EMPTY,
             };
@@ -262,7 +262,7 @@ impl<'a> FnEmitter<'a> {
                     let field = self.field_access(
                         src.clone(),
                         Arc::from(self.m.interner.resolve(prop.key)),
-                        BackendTy::Dynamic(DynReason::Unannotated),
+                        BackendTy::Dynamic(DynReason::NotYetSupported),
                         src.span,
                     );
                     self.bind_pattern(&prop.value, field, out);
@@ -277,7 +277,7 @@ impl<'a> FnEmitter<'a> {
                             object: Box::new(src.clone()),
                             skip_keys: skip,
                         },
-                        ty: BackendTy::Dynamic(DynReason::Unannotated),
+                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
                         res: Resolution::None,
                         span: src.span,
                     };
@@ -287,13 +287,13 @@ impl<'a> FnEmitter<'a> {
             Pattern::Array { elements, rest, .. } => {
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
-                    _ => BackendTy::Dynamic(DynReason::Unannotated),
+                    _ => BackendTy::Dynamic(DynReason::NotYetSupported),
                 };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue };
 
                     let read_ty = if matches!(el.pattern, Pattern::Assignment { .. }) {
-                        BackendTy::Dynamic(DynReason::Unannotated)
+                        BackendTy::Dynamic(DynReason::NotYetSupported)
                     } else {
                         elem_ty
                     };
@@ -319,7 +319,7 @@ impl<'a> FnEmitter<'a> {
                         ty: src.ty,
                         res: Resolution::ByName {
                             name: Arc::from("slice"),
-                            why: DynReason::Unannotated,
+                            why: DynReason::NotYetSupported,
                         },
                         span: src.span,
                     };
