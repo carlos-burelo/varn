@@ -140,6 +140,19 @@ pub(crate) fn compile_closure(
 /// Compile a whole module: the top-level proto, with every free function and
 /// method stored as a global by name (the HIR path's convention).
 pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<FunctionProto> {
+    varn_tir::verify_module(tir).map_err(|errors| {
+        crate::OptError::InvalidTir(
+            errors
+                .iter()
+                .map(|e| {
+                    format!(
+                        "{}:{}..{}: {}",
+                        tir.source_file, e.span.start, e.span.end, e.message
+                    )
+                })
+                .collect(),
+        )
+    })?;
     let _scope = enter_module(tir);
     let summaries = super::ctor_summary::collect(tir);
     let _ctor_scope = super::ctor_summary::Scope::enter(summaries);
