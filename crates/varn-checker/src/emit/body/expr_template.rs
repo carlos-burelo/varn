@@ -1,9 +1,7 @@
 use super::context::FnEmitter;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
-use varn_tir::{
-    BackendTy, DynReason, Resolution, Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind,
-};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn lower_tagged_template(
@@ -72,13 +70,7 @@ impl<'a> FnEmitter<'a> {
             }
         }
         let callee = self.lower_expr(tag);
-        let res = match &self.ast_arena.expr(tag).kind {
-            ExprKind::Identifier { name } => Resolution::ByName {
-                name: Arc::from(self.m.interner.resolve(*name)),
-                why: DynReason::Unannotated,
-            },
-            _ => Resolution::None,
-        };
+        let res = Resolution::None;
         TirExpr {
             kind: TirExprKind::Call {
                 callee: Box::new(callee),

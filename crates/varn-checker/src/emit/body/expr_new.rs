@@ -1,8 +1,7 @@
 use super::context::FnEmitter;
 use crate::emit::ty::NameResolver;
-use std::sync::Arc;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirExpr, TirExprKind};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn lower_new(
@@ -41,10 +40,7 @@ impl<'a> FnEmitter<'a> {
                         args: targs,
                     },
                     ty,
-                    res: Resolution::ByName {
-                        name: Arc::from("<new>"),
-                        why: DynReason::Unannotated,
-                    },
+                    res: Resolution::None,
                     span,
                 }
             }

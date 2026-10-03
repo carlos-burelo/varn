@@ -176,16 +176,23 @@ pub(super) fn check_res(
                 ));
             }
         }
-        // StaticField, ModuleSlot, Intrinsic, NativeOp, NativeGlobal, Upvalue,
-        // ByName, and None have no backing tables in this crate and cannot be
-        // validated here
+        Resolution::ByName { name, .. } => {
+            if !matches!(
+                e.kind,
+                TirExprKind::Field { .. } | TirExprKind::MethodCall { .. }
+            ) {
+                errors.push(VerifyError::new(
+                    format!("by-name resolution of `{name}` outside a dynamic member access"),
+                    e.span,
+                ));
+            }
+        }
         Resolution::StaticField(_)
         | Resolution::ModuleSlot { .. }
         | Resolution::Intrinsic(_)
         | Resolution::NativeOp(_)
         | Resolution::NativeGlobal(_)
         | Resolution::Upvalue(_)
-        | Resolution::ByName { .. }
         | Resolution::None => {}
     }
 }

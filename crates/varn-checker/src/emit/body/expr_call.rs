@@ -95,10 +95,7 @@ impl<'a> FnEmitter<'a> {
                 }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
-                    _ => Resolution::ByName {
-                        name: Arc::from(self.m.interner.resolve(*name)),
-                        why: DynReason::Unannotated,
-                    },
+                    _ => Resolution::None,
                 },
             };
             return TirExpr {
@@ -299,10 +296,7 @@ impl<'a> FnEmitter<'a> {
                         args: targs,
                     },
                     ty,
-                    res: Resolution::ByName {
-                        name: Arc::from("<pipeline>"),
-                        why: DynReason::Unannotated,
-                    },
+                    res: Resolution::None,
                     span,
                 };
             }
@@ -315,10 +309,7 @@ impl<'a> FnEmitter<'a> {
                 args: vec![TirArg::Expr(arg)],
             },
             ty,
-            res: Resolution::ByName {
-                name: Arc::from("<pipeline>"),
-                why: DynReason::Unannotated,
-            },
+            res: Resolution::None,
             span,
         }
     }
@@ -339,10 +330,7 @@ impl<'a> FnEmitter<'a> {
                 args: targs,
             },
             ty,
-            res: Resolution::ByName {
-                name: Arc::from("<call>"),
-                why: DynReason::Unannotated,
-            },
+            res: Resolution::None,
             span,
         }
     }

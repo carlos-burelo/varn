@@ -20,7 +20,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn instance_of_name(&self, value: TirExpr, name: &str) -> TirExpr {
+    pub(super) fn instance_of_name(&mut self, value: TirExpr, name: &str) -> TirExpr {
         let span = value.span;
         if let Some(class) = self.m.names.class_id(name) {
             return TirExpr {
@@ -36,10 +36,7 @@ impl<'a> FnEmitter<'a> {
         let rhs = TirExpr {
             kind: TirExprKind::Var,
             ty: BackendTy::Dynamic(DynReason::Unannotated),
-            res: Resolution::ByName {
-                name: Arc::from(name),
-                why: DynReason::Unannotated,
-            },
+            res: self.resolve_name(name),
             span,
         };
         TirExpr {
