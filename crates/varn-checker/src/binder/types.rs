@@ -375,7 +375,7 @@ impl TypeContext for BindView<'_> {
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);
-        if sym.kind == crate::binder::SymbolKind::TypeAlias {
+        if sym.kind == crate::symbol::SymbolKind::TypeAlias {
             return sym.ty;
         }
         None

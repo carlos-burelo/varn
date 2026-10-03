@@ -1,7 +1,12 @@
+mod array_ty;
 mod collectors;
+mod compound;
 mod infer_call;
 mod infer_impl;
+mod logical;
 pub(crate) mod member_binary;
+mod meta;
+mod new_ty;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;

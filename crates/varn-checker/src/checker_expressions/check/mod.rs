@@ -1,41 +1,22 @@
+mod assign;
 mod binary_ops;
 mod calls;
+mod closures;
+mod const_int;
 mod contextual;
+mod control;
 mod exhaustiveness;
+mod match_arm;
 pub(crate) mod members;
+mod misc;
 mod operator_capability;
+mod ops;
 
-use super::helpers::closest_in_list;
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{Type, TypeContext};
-use std::sync::Arc;
-use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::{ArrowBody, ExprId, ExprKind, MatchBody, MatchPattern, TemplatePart};
-use varn_core::{Diagnostic, ErrorCode, Suggestion, TypeKind};
+use varn_core::ast::{ExprId, ExprKind, TemplatePart};
 
 impl<'r> Checker<'r> {
-    /// Emit the literal-overflow diagnostic for `expr`.
-    ///
-    /// Callers gate on the operands NOT overflowing themselves, so a nested
-    /// overflow is named once at its innermost expression instead of again at
-    /// every enclosing one.
-    fn report_int_overflow(&mut self, expr: ExprId) {
-        let range = self.ast_arena.expr(expr).range;
-        self.diagnostics.push(
-            Diagnostic::error(
-                ErrorCode::IntegerOverflow,
-                format!(
-                    "this expression overflows int ({}..={})",
-                    varn_core::INT_MIN,
-                    varn_core::INT_MAX
-                ),
-            )
-            .with_file(self.source_file.clone())
-            .with_range(range),
-        );
-    }
-
     pub(crate) fn check_expr(&mut self, expr: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
         self.check_expr_no_record(expr, bind);
@@ -110,390 +91,35 @@ impl<'r> Checker<'r> {
                 body,
                 is_async,
                 ..
-            } => {
-                let (params, return_type, body, is_async) = (
-                    params.clone(),
-                    return_type.clone(),
-                    (**body).clone(),
-                    *is_async,
-                );
-                let saved_expected = self.expected_return_type.take();
-
-                let resolved_ret = return_type
-                    .as_ref()
-                    .map(|rt| self.resolve_type_node_cached(rt, bind))
-                    .or_else(|| self.expected_return_from_fn_type());
-                self.expected_return_type = if is_async {
-                    resolved_ret.map(|t| crate::types::awaited(&t, &self.ty_table, &bind.interner))
-                } else {
-                    resolved_ret
-                };
-
-                let saved_scope = self.current_scope;
-                if let Some(fn_scope) = self.next_child_scope(bind) {
-                    self.current_scope = fn_scope;
-                    self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
-                }
-
-                let mut injected_type_params: Vec<Arc<str>> = vec![];
-                if let Some(expected_fn) = self.expected_fn_type() {
-                    for ep in &expected_fn.params {
-                        if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
-                            let n_str = bind.interner.try_resolve(n).unwrap_or_default();
-                            if !varn_core::is_lang_type_name(n_str) {
-                                injected_type_params.push(Arc::from(n_str));
-                            }
-                        }
-                    }
-                    if let varn_core::TypeKind::Named(n, _) =
-                        self.ty_table.get(expected_fn.return_type)
-                    {
-                        let n_str = bind.interner.try_resolve(n).unwrap_or_default();
-                        if !varn_core::is_lang_type_name(n_str) {
-                            injected_type_params.push(Arc::from(n_str));
-                        }
-                    }
-                    for tp in &injected_type_params {
-                        self.active_type_params.insert(tp.clone());
-                    }
-                    self.apply_contextual_arrow_params(&params, &expected_fn, bind);
-                }
-
-                let saved_in_function = self.in_function;
-                let saved_loop_depth = self.loop_depth;
-                let saved_switch_depth = self.switch_depth;
-                self.in_function = true;
-                self.loop_depth = 0;
-                self.switch_depth = 0;
-
-                match body {
-                    ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
-                    ArrowBody::Expr(e) => {
-                        let expected_ret = self.expected_return_type;
-                        self.with_expected(expected_ret, |c| c.check_expr(e, bind));
-                        let actual = self.infer_type(e, bind);
-                        if let Some(expected) = self.expected_return_type {
-                            let expected_kind = self.ty_table.get(expected.0);
-                            let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
-                            let is_void = matches!(
-                                expected_kind,
-                                varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
-                            );
-                            if !is_tp
-                                && !is_void
-                                && !self.types_compatible_cached(&expected, &actual, Some(bind))
-                            {
-                                let expected_s = expected.display(&self.ty_table, &bind.interner);
-                                let actual_s = actual.display(&self.ty_table, &bind.interner);
-                                self.emit(
-                                    Diagnostic::error(ErrorCode::TypeMismatch, format!(
-                                        "type mismatch: arrow function is declared to return '{expected_s}', but returns '{actual_s}'"
-                                    ))
-                                    .with_range(range),
-                                );
-                            }
-                        }
-                    }
-                }
-
-                self.in_function = saved_in_function;
-                self.loop_depth = saved_loop_depth;
-                self.switch_depth = saved_switch_depth;
-
-                self.current_scope = saved_scope;
-                self.expected_return_type = saved_expected;
-                for tp in &injected_type_params {
-                    self.active_type_params.remove(tp.as_ref());
-                }
-            }
+            } => self.check_arrow(params, return_type, body, *is_async, range, bind),
             ExprKind::Function {
                 return_type,
                 body,
                 is_async,
                 ..
-            } => {
-                let (return_type, body, is_async) = (return_type.clone(), *body, *is_async);
-                let saved_expected = self.expected_return_type.take();
-                self.expected_return_type = return_type.as_ref().map(|rt| {
-                    let ty = self.resolve_type_node_cached(rt, bind);
-                    if is_async {
-                        crate::types::awaited(&ty, &self.ty_table, &bind.interner)
-                    } else {
-                        ty
-                    }
-                });
-
-                let saved_scope = self.current_scope;
-                if let Some(fn_scope) = self.next_child_scope(bind) {
-                    self.current_scope = fn_scope;
-                    self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
-                }
-
-                self.in_function_body(|c| c.check_stmt(body, bind));
-
-                self.current_scope = saved_scope;
-                self.expected_return_type = saved_expected;
-            }
+            } => self.check_function_expr(return_type, *body, *is_async, range, bind),
             ExprKind::As { expression, .. } => self.check_expr(*expression, bind),
             ExprKind::Is { expression, .. } => self.check_expr(*expression, bind),
             ExprKind::Satisfies {
                 expression,
                 type_ann,
-            } => {
-                let (expression, type_ann) = (*expression, type_ann.clone());
-                self.check_expr(expression, bind);
-                let declared_ty = self.resolve_type_node_cached(&type_ann, bind);
-                let inferred_ty = self.infer_type(expression, bind);
-                if !self.types_compatible_cached(&declared_ty, &inferred_ty, Some(bind)) {
-                    let declared_s = declared_ty.display(&self.ty_table, &bind.interner);
-                    let inferred_s = inferred_ty.display(&self.ty_table, &bind.interner);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::InvalidSatisfies,
-                            format!(
-                                "expression does not satisfy '{declared_s}': got '{inferred_s}'"
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
-            }
-            ExprKind::Await { argument } => {
-                let argument = *argument;
-                self.check_expr(argument, bind);
-                let arg_ty = self.infer_type(argument, bind);
-                if !arg_ty.is_dynamic()
-                    && !crate::types::is_awaitable(&arg_ty, &self.ty_table, &bind.interner)
-                {
-                    let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
-                    self.emit(
-                        Diagnostic::warning(
-                            ErrorCode::TypeMismatch,
-                            format!(
-                                "'await' applied to non-Future type '{arg_ty_s}' has no effect"
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
-            }
+            } => self.check_satisfies(*expression, type_ann, range, bind),
+            ExprKind::Await { argument } => self.check_await(*argument, range, bind),
             ExprKind::Spawn { argument } => self.check_expr(*argument, bind),
-            ExprKind::Try { expression } => {
-                let expression = *expression;
-                self.check_expr(expression, bind);
-                let expr_ty = self.infer_type(expression, bind);
-
-                let resolve = |a| bind.interner.try_resolve(a);
-                let operand = expr_ty.core_sum(&self.ty_table, resolve);
-                let is_nullable = expr_ty.is_nullable(&self.ty_table);
-
-                if !expr_ty.is_dynamic() && operand.is_none() && !is_nullable {
-                    let expr_ty_s = expr_ty.display(&self.ty_table, &bind.interner);
-                    let shadowed = matches!(
-                        self.ty_table.get(expr_ty.0),
-                        TypeKind::Generic(name, _, _) if matches!(resolve(name), Some("Result" | "Option"))
-                    );
-                    let note = if shadowed {
-                        " (a user declaration shadows the core type here)"
-                    } else {
-                        ""
-                    };
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::TypeMismatch,
-                            format!("operator 'try' can only be applied to 'Result', 'Option', or nullable types, found '{expr_ty_s}'{note}"),
-                        )
-                        .with_range(range),
-                    );
-                    return;
-                }
-
-                let Some(expected_ret) = self.expected_return_type else {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::TypeMismatch,
-                            "operator 'try' cannot be used outside of a function".to_string(),
-                        )
-                        .with_range(range),
-                    );
-                    return;
-                };
-
-                if expected_ret.is_dynamic() {
-                    return;
-                }
-
-                let enclosing = expected_ret.core_sum(&self.ty_table, resolve);
-                match (operand, enclosing) {
-                    (Some((sum, args)), Some((ret_sum, ret_args))) if sum == ret_sum => {
-                        if sum == varn_core::CoreSum::Result {
-                            if let (Some(err_e), Some(err_r)) = (args.get(1), ret_args.get(1)) {
-                                if !self.types_compatible_cached(err_r, err_e, Some(bind)) {
-                                    let err_e_s = err_e.display(&self.ty_table, &bind.interner);
-                                    let err_r_s = err_r.display(&self.ty_table, &bind.interner);
-                                    self.emit(
-                                        Diagnostic::error(
-                                            ErrorCode::TypeMismatch,
-                                            format!("cannot propagate error type '{err_e_s}' into return type '{err_r_s}'"),
-                                        )
-                                        .with_range(range),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    (Some((sum, _)), _) => {
-                        let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
-                        let name = sum.name();
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::TypeMismatch,
-                                format!("operator 'try' on '{name}' requires enclosing function to return '{name}', found '{expected_s}'"),
-                            )
-                            .with_range(range),
-                        );
-                    }
-                    (None, _) if !expected_ret.is_nullable(&self.ty_table) => {
-                        let expected_s = expected_ret.display(&self.ty_table, &bind.interner);
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::TypeMismatch,
-                                format!("operator 'try' on nullable type requires enclosing function to return a nullable type, found '{expected_s}'"),
-                            )
-                            .with_range(range),
-                        );
-                    }
-                    (None, _) => {}
-                }
-            }
-            ExprKind::Yield { argument, .. } => {
-                let argument = *argument;
-                let ty = if let Some(arg) = argument {
-                    self.check_expr(arg, bind);
-                    self.infer_type(arg, bind)
-                } else {
-                    Type::Void
-                };
-                if let Some(yields) = &mut self.yielded_types {
-                    yields.push(ty);
-                }
-            }
+            ExprKind::Try { expression } => self.check_try(*expression, range, bind),
+            ExprKind::Yield { argument, .. } => self.check_yield(*argument, bind),
             ExprKind::Unary { op, operand, .. } => {
-                let (op, operand) = (*op, *operand);
-                self.check_expr(operand, bind);
-                self.check_unary_capability(expr, op, operand, bind);
-                if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
-                    self.report_int_overflow(expr);
-                }
+                self.check_unary(expr, *op, *operand, arena, bind)
             }
             ExprKind::Binary { left, right, op } => {
-                let (left, right, op) = (*left, *right, *op);
-                self.check_expr(left, bind);
-                self.check_expr(right, bind);
-
-                // An all-literal arithmetic expression whose value leaves the
-                // `int` range is reported HERE, where the span is, rather than
-                // waiting for the run-time raise. Reported only when neither
-                // operand already overflows on its own, so a nested overflow
-                // names its innermost expression once.
-                if overflows_int_literal(expr, arena)
-                    && !overflows_int_literal(left, arena)
-                    && !overflows_int_literal(right, arena)
-                {
-                    self.report_int_overflow(expr);
-                }
-
-                if !self.check_binary_capability(expr, op, left, right, bind) {
-                    self.check_binary_operands(op, left, right, range, bind);
-                }
+                self.check_binary(expr, *left, *right, *op, range, arena, bind)
             }
             ExprKind::Logical { left, right, .. } => {
                 self.check_expr(*left, bind);
                 self.check_expr(*right, bind);
             }
             ExprKind::Assign { target, value, .. } => {
-                let (target, value) = (*target, *value);
-                let prev = self.is_assignment_target;
-                self.is_assignment_target = true;
-                self.check_expr(target, bind);
-                self.is_assignment_target = prev;
-
-                let target_ty = if let ExprKind::Identifier { name } = &arena.expr(target).kind {
-                    let name = *name;
-                    let scope = bind.scopes.get(self.current_scope);
-                    scope
-                        .resolve(name, &bind.scopes)
-                        .and_then(|id| {
-                            self.symbol_types
-                                .get(&id)
-                                .cloned()
-                                .or_else(|| bind.arena.get(id).ty)
-                        })
-                        .unwrap_or_else(|| self.infer_type(target, bind))
-                } else {
-                    self.infer_type(target, bind)
-                };
-
-                let target_expected = if target_ty.is_dynamic() {
-                    None
-                } else {
-                    Some(target_ty)
-                };
-                self.with_expected(target_expected, |c| c.check_expr(value, bind));
-
-                self.check_extension_assignment(target, bind);
-
-                if !matches!(
-                    &arena.expr(target).kind,
-                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
-                ) {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::NotAssignable,
-                            "invalid left-hand side in assignment",
-                        )
-                        .with_range(arena.expr(target).range),
-                    );
-                }
-
-                if let ExprKind::Identifier { name } = &arena.expr(target).kind {
-                    let name = *name;
-                    let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(name, &bind.scopes) {
-                        let sym = bind.arena.get(id);
-                        if sym.kind == crate::symbol::SymbolKind::Const {
-                            self.emit(
-                                Diagnostic::error(
-                                    ErrorCode::NotAssignable,
-                                    format!(
-                                        "cannot reassign to constant '{}'",
-                                        bind.interner.resolve(name)
-                                    ),
-                                )
-                                .with_range(range),
-                            );
-                        }
-                    }
-                }
-
-                let value_ty = self.infer_type(value, bind);
-                let is_empty_array_val = value_ty.is_dynamic()
-                    && matches!(&arena.expr(value).kind, ExprKind::Array { elements } if elements.is_empty());
-                if !is_empty_array_val
-                    && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind))
-                {
-                    let value_ty_s = value_ty.display(&self.ty_table, &bind.interner);
-                    let target_ty_s = target_ty.display(&self.ty_table, &bind.interner);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::TypeMismatch,
-                            format!(
-                                "type mismatch: cannot assign '{value_ty_s}' to '{target_ty_s}'"
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
+                self.check_assign(*target, *value, range, bind)
             }
             ExprKind::Call {
                 callee,
@@ -504,51 +130,7 @@ impl<'r> Checker<'r> {
                 let (callee, args, type_args) = (*callee, args.clone(), type_args.clone());
                 self.check_call_expr(callee, &args, &type_args, &range, expr.index(), bind)
             }
-            ExprKind::New { callee, args, .. } => {
-                let (callee, args) = (*callee, args.clone());
-                let cls_name = match &arena.expr(callee).kind {
-                    ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
-                    ExprKind::Member {
-                        property,
-                        computed: false,
-                        ..
-                    } => match &arena.expr(*property).kind {
-                        ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                if let Some(name) = cls_name {
-                    if self.abstract_classes.contains(name) {
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::AbstractMethodNotImplemented,
-                                format!("cannot instantiate abstract class '{name}'"),
-                            )
-                            .with_range(range),
-                        );
-                    }
-                }
-                self.check_expr(callee, bind);
-                let view = crate::binder::BindView::new(bind, self.resolver);
-                let ctor_params = cls_name
-                    .and_then(|cn| {
-                        view.get_class_members(cn, None).and_then(|members| {
-                            members.iter().find_map(|m| {
-                                if m.kind == crate::types::ClassMemberKind::Constructor {
-                                    if let TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
-                                        return Some(
-                                            self.ty_table.get_function(fid).params.clone(),
-                                        );
-                                    }
-                                }
-                                None
-                            })
-                        })
-                    })
-                    .unwrap_or_default();
-                self.check_call_args_with_context(&args, &ctor_params, bind);
-            }
+            ExprKind::New { callee, args, .. } => self.check_new(*callee, args, range, arena, bind),
 
             ExprKind::Conditional {
                 test,
@@ -614,210 +196,29 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Match { subject, cases } => {
-                let (subject, cases) = (*subject, cases.clone());
-                self.check_expr(subject, bind);
-                let disc_narrowings = self.collect_match_disc_narrowings(subject, bind);
-                for case in &cases {
-                    let saved_scope = self.current_scope;
-                    if let Some(arm_scope) = self.next_child_scope(bind) {
-                        self.current_scope = arm_scope;
-                    }
-
-                    if let Some(g) = &case.guard {
-                        self.check_expr(*g, bind);
-                    }
-
-                    let arm_disc_ty = match &case.pattern {
-                        MatchPattern::Literal(e) => match &arena.expr(*e).kind {
-                            ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
-                            ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
-                            _ => None,
-                        },
-                        _ => None,
-                    };
-
-                    let narrowings = arm_disc_ty.and_then(|disc_ty| {
-                        disc_narrowings.as_ref().map(|(id, members)| {
-                            let matched: Vec<crate::types::Type> = members
-                                .iter()
-                                .filter(|m| {
-                                    self.union_member_matches_disc(
-                                        m,
-                                        disc_narrowings.as_ref().map(|(_, _)| &disc_ty),
-                                        disc_narrowings.as_ref().map(|(_, _)| subject),
-                                        bind,
-                                    )
-                                })
-                                .cloned()
-                                .collect();
-                            (*id, matched)
-                        })
-                    });
-
-                    let narrowing_vec: Vec<(crate::symbol::SymbolId, crate::types::Type)> =
-                        if let Some((id, matched)) = narrowings {
-                            match matched.len() {
-                                0 => vec![],
-                                1 => vec![(id, matched.into_iter().next().unwrap())],
-                                _ => vec![(
-                                    id,
-                                    crate::types::Type::union(
-                                        matched,
-                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                    ),
-                                )],
-                            }
-                        } else {
-                            vec![]
-                        };
-
-                    self.with_narrowings(&narrowing_vec, |checker| {
-                        if let Some(g) = &case.guard {
-                            checker.check_expr(*g, bind);
-                        }
-
-                        let subject_ty = checker.infer_type(subject, bind);
-                        checker.check_pattern_match(&case.pattern, &subject_ty, bind);
-
-                        match &case.body {
-                            MatchBody::Expr(e) => checker.check_expr(*e, bind),
-                            MatchBody::Block(stmt) => checker.check_stmt(*stmt, bind),
-                        }
-                    });
-                    self.current_scope = saved_scope;
-                }
-                let subject_ty = self.infer_type(subject, bind);
-                self.check_match_exhaustiveness(expr, &subject_ty, &cases, &range, bind);
+                self.check_match(*subject, cases, expr, range, bind)
             }
 
-            ExprKind::Update { operand, .. } => {
-                let operand = *operand;
-                self.check_expr(operand, bind);
-                if !matches!(
-                    &arena.expr(operand).kind,
-                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
-                ) {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::NotAssignable,
-                            "invalid left-hand side in update expression",
-                        )
-                        .with_range(arena.expr(operand).range),
-                    );
-                }
-            }
+            ExprKind::Update { operand, .. } => self.check_update(*operand, bind),
             ExprKind::Spread { argument } => self.check_expr(*argument, bind),
 
-            ExprKind::Pipeline { left, right } => {
-                let (left, right) = (*left, *right);
-                self.check_expr(left, bind);
-                let lhs_ty = self.infer_type(left, bind);
-                let saved_pipeline = self.in_pipeline_rhs;
-                let saved_pipe_ty = self.pipeline_value_type.replace(lhs_ty);
-                self.in_pipeline_rhs = true;
-                self.check_expr(right, bind);
-                self.in_pipeline_rhs = saved_pipeline;
-                self.pipeline_value_type = saved_pipe_ty;
-            }
+            ExprKind::Pipeline { left, right } => self.check_pipeline(*left, *right, bind),
 
-            ExprKind::Range { start, end, .. } => {
-                let (start, end) = (*start, *end);
-                self.check_expr(start, bind);
-                self.check_expr(end, bind);
-                let lo = self.infer_type(start, bind).apparent(&self.ty_table);
-                let hi = self.infer_type(end, bind).apparent(&self.ty_table);
-                let domain_ok = |t: &Type| t.is_dynamic() || *t == Type::Int || *t == Type::Char;
-                let same = lo.is_dynamic() || hi.is_dynamic() || lo == hi;
-                if !(domain_ok(&lo) && domain_ok(&hi) && same) {
-                    let lo_s = lo.display(&self.ty_table, &bind.interner);
-                    let hi_s = hi.display(&self.ty_table, &bind.interner);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::TypeMismatch,
-                            format!(
-                                "range bounds must be both `int` or both `char`, found '{lo_s}' and '{hi_s}'"
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
-            }
+            ExprKind::Range { start, end, .. } => self.check_range(*start, *end, range, bind),
 
             ExprKind::TaggedTemplate { tag, template, .. } => {
-                let (tag, template) = (*tag, *template);
-                self.check_expr(tag, bind);
-                self.check_expr(template, bind);
-                let tag_ty_raw = self.infer_type(tag, bind);
-                let tag_ty =
-                    tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
-                    let ret = self.ty_table.get_function(fid).return_type;
-                    self.record_type(range.start.offset, Type(ret, false));
-                }
+                self.check_tagged_template(*tag, *template, range, bind)
             }
 
             ExprKind::With { object, properties } => {
-                let (object, properties) = (*object, properties.clone());
-                self.check_expr(object, bind);
-                for prop in &properties {
-                    match prop {
-                        varn_core::ast::ObjectProp::Property { value, .. } => {
-                            self.check_expr(*value, bind);
-                        }
-                        varn_core::ast::ObjectProp::Spread { argument, .. } => {
-                            self.check_expr(*argument, bind);
-                        }
-                        _ => {}
-                    }
-                }
-                let obj_ty = self.infer_type(object, bind);
-                self.record_type(range.start.offset, obj_ty);
+                self.check_with_object(*object, properties, range, bind)
             }
 
             ExprKind::MetaAccess { target, .. } => {
-                let target = *target;
-                self.check_expr(target, bind);
-                let ty = self.infer_type(expr, bind);
-                self.record_type(range.start.offset, ty);
+                self.check_meta_access(*target, expr, range, bind)
             }
 
-            ExprKind::Identifier { name } => {
-                let name = *name;
-                let name_str = bind.interner.resolve(name);
-                if name_str == "_" {
-                    if !self.is_assignment_target && !self.in_pipeline_rhs {
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::UnknownSymbol,
-                                "cannot use '_' as a value; '_' is the discard placeholder",
-                            )
-                            .with_range(range),
-                        );
-                    } else if self.in_pipeline_rhs {
-                        // `_` stands for the piped value; record its concrete type so
-                        // downstream consumers (compiler, LSP) don't see `dynamic`.
-                        if let Some(ty) = self.pipeline_value_type {
-                            self.record_type(range.start.offset, ty);
-                        }
-                    }
-                    return;
-                }
-
-                let scope = bind.scopes.get(self.current_scope);
-                if scope.resolve(name, &bind.scopes).is_none() && !self.is_assignment_target {
-                    let mut diag = Diagnostic::error(
-                        ErrorCode::UnknownSymbol,
-                        format!("undefined variable: {name_str}"),
-                    )
-                    .with_range(range);
-                    if let Some(candidate) =
-                        closest_name(name_str, scope, &bind.scopes, &bind.interner)
-                    {
-                        diag = diag.with_suggestion(Suggestion::did_you_mean(&candidate, range));
-                    }
-                    self.emit(diag);
-                }
-            }
+            ExprKind::Identifier { name } => self.check_identifier(*name, range, bind),
 
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
@@ -832,112 +233,4 @@ impl<'r> Checker<'r> {
             | ExprKind::This => {}
         }
     }
-}
-
-fn closest_name(
-    name: &str,
-    scope: &crate::scope::CheckerScope,
-    arena: &crate::scope::ScopeArena,
-    interner: &varn_core::AtomInterner,
-) -> Option<String> {
-    let mut all: Vec<String> = Vec::new();
-    let mut current = scope;
-    loop {
-        all.extend(
-            current
-                .bindings
-                .keys()
-                .map(|k| interner.resolve(*k).to_string()),
-        );
-        match current.parent {
-            Some(parent_id) => current = arena.get(parent_id),
-            None => break,
-        }
-    }
-    let all_rc: Vec<Arc<str>> = all.into_iter().map(Arc::from).collect();
-    closest_in_list(name, &all_rc).map(|s| s.to_owned())
-}
-
-/// What an expression is, for the literal-overflow diagnostic.
-///
-/// Three states, not two: an expression this cannot evaluate and one whose
-/// value does not fit are DIFFERENT answers, and collapsing them into `None`
-/// is how `2 ** 46` — which fits comfortably — got reported as overflow.
-#[derive(PartialEq)]
-enum ConstInt {
-    /// An integer-literal expression with this value.
-    Value(i64),
-    /// An integer-literal expression whose value leaves the `int` range.
-    Overflow,
-    /// Not an integer-literal expression at all (an identifier, a call, a
-    /// float, an operator this does not evaluate).
-    NotConst,
-}
-
-/// Evaluate an integer-literal expression.
-///
-/// Deliberately narrow: literals, unary `+`/`-`, and the arithmetic operators,
-/// all evaluated with the same `varn_core` checks the interpreter uses. It does
-/// NOT follow `const` bindings or fold across statements — that is constant
-/// propagation, which the SSA pipeline already owns. The point is to catch the
-/// expression a person can read and see is out of range, where they wrote it.
-fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> ConstInt {
-    use ConstInt::*;
-    let lift = |o: Option<i64>| o.map_or(Overflow, Value);
-    match &arena.expr(e).kind {
-        // Every `i64` is a valid `int`, so a literal the parser produced is
-        // always in range; a number too large to be an `i64` never reaches
-        // here as an `IntLiteral`.
-        ExprKind::IntLiteral { value, .. } => Value(*value),
-        ExprKind::Unary { op, operand, .. } => {
-            use varn_core::ast::operators::UnaryOp;
-            let v = match const_int_expr(*operand, arena) {
-                Value(v) => v,
-                other => return other,
-            };
-            match op {
-                UnaryOp::Minus => lift(varn_core::neg_int(v)),
-                UnaryOp::Plus => Value(v),
-                _ => NotConst,
-            }
-        }
-        // Parentheses are a node, not just syntax; without this `(1 << 47)`
-        // and `-(-x)` read as NotConst.
-        ExprKind::Paren { expression } => const_int_expr(*expression, arena),
-        ExprKind::Binary { left, right, op } => {
-            let a = match const_int_expr(*left, arena) {
-                Value(v) => v,
-                other => return other,
-            };
-            let b = match const_int_expr(*right, arena) {
-                Value(v) => v,
-                other => return other,
-            };
-            match op {
-                BinaryOp::Add => lift(varn_core::add_int(a, b)),
-                BinaryOp::Sub => lift(varn_core::sub_int(a, b)),
-                BinaryOp::Mul => lift(varn_core::mul_int(a, b)),
-                // A negative exponent raises at run time rather than
-                // overflowing, and one past u32 cannot be a literal `int`
-                // anyway; neither is this diagnostic's business.
-                BinaryOp::Pow => match u32::try_from(b) {
-                    Ok(e) => lift(varn_core::pow_int(a, e)),
-                    Err(_) => NotConst,
-                },
-                _ => NotConst,
-            }
-        }
-        _ => NotConst,
-    }
-}
-
-/// Whether `e` is an integer-literal expression that does not fit `int`.
-///
-/// KNOWN GAP: a literal `-(-2^47)` is not reported here even though it does
-/// overflow — the shape the parser produces for a doubly-negated literal does
-/// not reach this evaluator. It is caught at run time instead (see
-/// `tests/errors/int-overflow-negate.vn`), which is the arm that matters for
-/// safety; this diagnostic is an earlier warning, not the guarantee.
-fn overflows_int_literal(e: ExprId, arena: &varn_core::ast::AstArena) -> bool {
-    const_int_expr(e, arena) == ConstInt::Overflow
 }

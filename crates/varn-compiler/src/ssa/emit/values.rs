@@ -1,18 +1,18 @@
-//! Instructions that define a value: constants, arithmetic, calls, property
-//! and index reads, allocation, closures.
-
-use super::super::ir::{BlockId, Inst, InstKind, VarId};
-use super::regs::var_reg;
-use super::terminator::emit_call_args;
-use crate::hir::{HirUnOp, HirUpvalueSrc};
-use crate::lower::binary_opcode;
+//! Value-defining instruction emission.
+#[path = "values/access.rs"]
+mod access;
+#[path = "values/build.rs"]
+mod build;
+#[path = "values/calls.rs"]
+mod calls;
+#[path = "values/closure.rs"]
+mod closure;
+#[path = "values/scalars.rs"]
+mod scalars;
+use super::super::ir::{BlockId, Inst, InstKind};
 use crate::OptError;
-use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::OpCode;
-use varn_types::chunk::{Chunk, Literal, PoolEntry};
-use varn_types::value::RuntimeSymbol;
-
+use varn_types::chunk::Chunk;
 type Result<T> = std::result::Result<T, OptError>;
 
 #[allow(clippy::too_many_arguments)]
@@ -32,106 +32,36 @@ pub(super) fn emit_value(
 ) -> Result<()> {
     let line = inst.line;
     match &inst.kind {
-        InstKind::ConstInt(n) => chunk.emit_load_int(d, *n, line),
-        InstKind::ConstFloat(f) => {
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Float(*f)));
-            chunk.emit_rc(OpCode::LoadConst, d, idx, line);
-        }
-        InstKind::ConstBool(b) => {
-            let op = if *b {
-                OpCode::LoadTrue
-            } else {
-                OpCode::LoadFalse
-            };
-            chunk.emit_rr(op, d, 0, line);
-        }
-        InstKind::ConstStr(s) => {
-            let idx = chunk.add_str(s);
-            chunk.emit_rc(OpCode::LoadConst, d, idx, line);
-        }
-        InstKind::ConstChar(c) => {
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Char(*c)));
-            chunk.emit_rc(OpCode::LoadConst, d, idx, line);
-        }
-        InstKind::ConstDecimal(dec) => {
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Decimal(dec.clone())));
-            chunk.emit_rc(OpCode::LoadConst, d, idx, line);
-        }
-        InstKind::ConstBigInt(n) => {
-            let value: num_bigint::BigInt = n
-                .parse()
-                .map_err(|_| OptError::Unsupported("malformed bigint literal"))?;
-            let idx = chunk.add_constant(PoolEntry::Literal(Literal::BigInt(value)));
-            chunk.emit_rc(OpCode::LoadConst, d, idx, line);
-        }
-        InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, line),
+        InstKind::ConstInt(n) => scalars::emit_const_int(chunk, d, *n, line),
+        InstKind::ConstFloat(f) => scalars::emit_const_float(chunk, d, *f, line),
+        InstKind::ConstBool(b) => scalars::emit_const_bool(chunk, d, *b, line),
+        InstKind::ConstStr(s) => scalars::emit_const_str(chunk, d, s, line),
+        InstKind::ConstChar(c) => scalars::emit_const_char(chunk, d, *c, line),
+        InstKind::ConstDecimal(dec) => scalars::emit_const_decimal(chunk, d, dec, line),
+        InstKind::ConstBigInt(n) => scalars::emit_const_bigint(chunk, d, n, line)?,
+        InstKind::ConstNull => scalars::emit_const_null(chunk, d, line),
         InstKind::Binary { op, lhs, rhs, ty } => {
-            let opcode = binary_opcode(
-                *op,
-                *ty,
-                value_tys.get(lhs.0 as usize).copied(),
-                value_tys.get(rhs.0 as usize).copied(),
-            );
-            chunk.emit_rrr(opcode, d, reg[lhs.0 as usize], reg[rhs.0 as usize], line);
+            scalars::emit_binary(chunk, d, *op, *lhs, *rhs, *ty, value_tys, reg, line);
         }
         InstKind::Unary { op, operand, .. } => {
-            let s = reg[operand.0 as usize];
-            match op {
-                HirUnOp::Neg => chunk.emit_rr(OpCode::Negate, d, s, line),
-                HirUnOp::Not => chunk.emit_rr(OpCode::Not, d, s, line),
-                HirUnOp::Typeof => chunk.emit_rr(OpCode::Typeof, d, s, line),
-                HirUnOp::BitNot => {
-                    let idx = chunk.add_constant(PoolEntry::Literal(Literal::Int(-1)));
-                    chunk.emit_rc(OpCode::LoadConst, scratch, idx, line);
-                    chunk.emit_rrr(OpCode::BitXor, d, s, scratch, line);
-                }
-            }
+            scalars::emit_unary(chunk, d, *op, *operand, reg, scratch, line);
         }
-        InstKind::LoadGlobal(name) => {
-            let idx = chunk.add_str(name);
-            chunk.emit_rc(OpCode::LoadGlobal, d, idx, line);
-        }
-        InstKind::LoadGlobalIdx(slot) => {
-            let slot = u16::try_from(*slot)
-                .map_err(|_| OptError::Unsupported("ssa-emit: global slot exceeds u16"))?;
-            chunk.emit_rc(OpCode::LoadGlobalIdx, d, slot, line);
-        }
+        InstKind::LoadGlobal(name) => access::emit_load_global(chunk, d, name, line),
+        InstKind::LoadGlobalIdx(slot) => access::emit_load_global_idx(chunk, d, *slot, line)?,
         InstKind::LoadNativeGlobalIdx(slot) => {
-            let slot = u16::try_from(*slot)
-                .map_err(|_| OptError::Unsupported("ssa-emit: native global slot exceeds u16"))?;
-            chunk.emit_rc(OpCode::LoadNativeGlobalIdx, d, slot, line);
+            access::emit_load_native_global_idx(chunk, d, *slot, line)?;
         }
-        InstKind::LoadUpvalue(uv) => {
-            chunk.emit(OpCode::LoadUpvalue, line);
-            chunk.write(Chunk::pack(d, *uv as u8), line);
-        }
+        InstKind::LoadUpvalue(uv) => access::emit_load_upvalue(chunk, d, *uv, line),
 
         InstKind::Call { callee, args } | InstKind::NewInstance { callee, args } => {
-            emit_call_args(chunk, reg, call_base, args, line);
-            let total = (args.len() + 1) as u8;
-            chunk.emit(OpCode::Call, line);
-            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), line);
-            chunk.write(Chunk::pack(total, call_base), line);
+            calls::emit_call(chunk, d, *callee, args, reg, call_base, line);
         }
 
         InstKind::SelfCall { args } => {
-            emit_call_args(chunk, reg, call_base, args, line);
-            let total = (args.len() + 1) as u8;
-            chunk.emit(OpCode::CallSelf, line);
-            chunk.write(Chunk::pack(d, 0), line);
-            chunk.write(Chunk::pack(total, call_base), line);
+            calls::emit_self_call(chunk, d, args, reg, call_base, line);
         }
         InstKind::GetProperty { object, name } => {
-            let idx = chunk.add_str(name);
-            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-            chunk.emit_rrc_ic(
-                OpCode::GetProperty,
-                d,
-                reg[object.0 as usize],
-                idx,
-                cs,
-                line,
-            );
+            access::emit_get_property(chunk, d, *object, name, reg, ic_slot, line)?;
         }
         InstKind::GetFixedField {
             object,
@@ -139,203 +69,66 @@ pub(super) fn emit_value(
             offset,
             tag,
         } => {
-            // `w1` low = the encoded `FieldAccess` (`Compact` = a class
-            // field); `w2` = the dynamic `slot` (for the Object/Record
-            // fallback); `w3` = the compact byte offset. A class has NO shape,
-            // so the offset is baked; a dynamic object ignores it and uses the
-            // slot.
-            let tag_byte = tag.encode();
-            chunk.write(Chunk::pack_op(OpCode::GetFixedField, d), line);
-            chunk.write(Chunk::pack(reg[object.0 as usize], tag_byte), line);
-            chunk.write(*slot, line);
-            chunk.write(*offset as u16, line);
+            access::emit_get_fixed_field(chunk, d, *object, reg, *slot, *offset, *tag, line);
         }
         InstKind::GetIndex { object, index } => {
-            chunk.emit_rrr(
-                OpCode::GetIndex,
-                d,
-                reg[object.0 as usize],
-                reg[index.0 as usize],
-                line,
-            );
+            access::emit_get_index(chunk, d, *object, *index, reg, line);
         }
         InstKind::ArrayGetIndex { object, index } => {
-            chunk.emit_rrr(
-                OpCode::ArrayGetIndex,
-                d,
-                reg[object.0 as usize],
-                reg[index.0 as usize],
-                line,
-            );
+            access::emit_array_get_index(chunk, d, *object, *index, reg, line);
         }
         InstKind::MapGetIndex { object, index } => {
-            chunk.emit_rrr(
-                OpCode::MapGetIndex,
-                d,
-                reg[object.0 as usize],
-                reg[index.0 as usize],
-                line,
-            );
+            access::emit_map_get_index(chunk, d, *object, *index, reg, line);
         }
 
         InstKind::MethodCall { recv, name, args } => {
-            let name_idx = chunk.add_str(name);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], line);
-            }
-            let argc = args.len() as u8;
-            let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-            // `InvokeVirtual` when the checker knew the receiver's class — the
-            // call site is then guaranteed monomorphic on the vtable. It shares
-            // `CallMethod`'s call-site cache slot (packed into the opcode word)
-            // so the inline cache resolves it to a vtable index after the first
-            // hit instead of a name lookup every call.
-            let op = if matches!(
-                value_tys.get(recv.0 as usize),
-                Some(crate::hir::HirType::Class(_))
-            ) {
-                OpCode::InvokeVirtual
-            } else {
-                OpCode::CallMethod
-            };
-            chunk.write(Chunk::pack_op(op, cs), line);
-            chunk.write(Chunk::pack(d, reg[recv.0 as usize]), line);
-            chunk.write(name_idx, line);
-            chunk.write(Chunk::pack(argc, call_base), line);
+            calls::emit_method_call(
+                chunk, d, *recv, name, args, value_tys, reg, call_base, ic_slot, line,
+            )?;
         }
         InstKind::IsNull { operand } => {
-            chunk.emit_rr(OpCode::IsNull, d, reg[operand.0 as usize], line);
+            scalars::emit_is_null(chunk, d, *operand, reg, line);
         }
         InstKind::Cast { operand, .. } => {
-            let src = reg[operand.0 as usize];
-            if d != src {
-                chunk.emit_rr(OpCode::Move, d, src, line);
-            }
+            scalars::emit_cast(chunk, d, *operand, reg, line);
         }
         InstKind::Convert { operand, conv } => {
-            chunk.write(Chunk::pack_op(OpCode::Convert, d), line);
-            chunk.write(Chunk::pack(reg[operand.0 as usize], *conv as u8), line);
+            scalars::emit_convert(chunk, d, *operand, reg, *conv, line);
         }
 
         InstKind::BuildArray { elements } => {
-            for (i, e) in elements.iter().enumerate() {
-                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], line);
-            }
-            chunk.emit(OpCode::BuildArray, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(elements.len() as u8, 0), line);
+            build::emit_build_array(chunk, d, elements, reg, call_base, line);
         }
 
         InstKind::BuildTuple { elements } => {
-            for (i, e) in elements.iter().enumerate() {
-                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], line);
-            }
-            chunk.emit(OpCode::BuildTuple, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(elements.len() as u8, 0), line);
+            build::emit_build_tuple(chunk, d, elements, reg, call_base, line);
         }
 
         InstKind::BuildObject { pairs } => {
-            let count = pairs.len();
-            let mut is_contiguous = count > 0;
-            let mut start_reg = call_base;
-            if count > 0 {
-                let first = reg[pairs[0].1 .0 as usize];
-                for (i, (_, v)) in pairs.iter().enumerate() {
-                    if reg[v.0 as usize] != first + i as u8 {
-                        is_contiguous = false;
-                        break;
-                    }
-                }
-                if is_contiguous {
-                    start_reg = first;
-                } else {
-                    for (i, (_, v)) in pairs.iter().enumerate() {
-                        chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[v.0 as usize], line);
-                    }
-                }
-            }
-            let keys = pairs.iter().map(|(k, _)| Arc::from(k.as_ref())).collect();
-            let shape_idx = chunk.add_shape(keys);
-            chunk.emit(OpCode::BuildObjectWithShape, line);
-            chunk.write(Chunk::pack(d, start_reg), line);
-            chunk.write(shape_idx, line);
+            build::emit_build_object(chunk, d, pairs, reg, call_base, line);
         }
 
         InstKind::BuildRecord { pairs } => {
-            let count = pairs.len();
-            let mut is_contiguous = count > 0;
-            let mut start_reg = call_base;
-            if count > 0 {
-                let first = reg[pairs[0].1 .0 as usize];
-                for (i, (_, v)) in pairs.iter().enumerate() {
-                    if reg[v.0 as usize] != first + i as u8 {
-                        is_contiguous = false;
-                        break;
-                    }
-                }
-                if is_contiguous {
-                    start_reg = first;
-                } else {
-                    for (i, (_, v)) in pairs.iter().enumerate() {
-                        chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[v.0 as usize], line);
-                    }
-                }
-            }
-            let keys = pairs.iter().map(|(k, _)| Arc::from(k.as_ref())).collect();
-            let shape_idx = chunk.add_shape(keys);
-            chunk.emit(OpCode::BuildRecord, line);
-            chunk.write(Chunk::pack(d, start_reg), line);
-            chunk.write(shape_idx, line);
+            build::emit_build_record(chunk, d, pairs, reg, call_base, line);
         }
         InstKind::BuildMap { pairs } => {
-            for (i, (k, v)) in pairs.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + (i * 2) as u8,
-                    reg[k.0 as usize],
-                    line,
-                );
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + (i * 2 + 1) as u8,
-                    reg[v.0 as usize],
-                    line,
-                );
-            }
-            chunk.emit(OpCode::BuildMap, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(pairs.len() as u8, 0), line);
+            build::emit_build_map(chunk, d, pairs, reg, call_base, line);
         }
         InstKind::ToString { operand } => {
-            chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], line);
+            scalars::emit_to_string(chunk, d, *operand, reg, line);
         }
 
         InstKind::MakeClosure { func, upvalues_src } => {
-            let proto = crate::from_tir::compile::emit_tir_closure(*func, source_file.clone())?;
-            let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
-            *closure_const = Some(idx);
-            if upvalues_src.is_empty() {
-                chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), line);
-                chunk.write(idx, line);
-            } else {
-                let uv_count = upvalues_src.len() as u8;
-                chunk.emit(OpCode::MakeClosure, line);
-                chunk.write(Chunk::pack(d, uv_count), line);
-                chunk.write(idx, line);
-                for uv_src in upvalues_src {
-                    let is_local = match uv_src {
-                        HirUpvalueSrc::ParentLocal(_) | HirUpvalueSrc::ParentParam(_) => 1u8,
-                        HirUpvalueSrc::ParentUpvalue(_) => 0u8,
-                    };
-                    let index = match uv_src {
-                        HirUpvalueSrc::ParentLocal(id) => var_reg(VarId::Local(*id), nparams),
-                        HirUpvalueSrc::ParentParam(i) => var_reg(VarId::Param(*i), nparams),
-                        HirUpvalueSrc::ParentUpvalue(idx) => *idx as u8,
-                    };
-                    chunk.write(Chunk::pack(is_local, index), line);
-                }
-            }
+            closure::emit_make_closure(
+                chunk,
+                d,
+                *func,
+                upvalues_src,
+                source_file,
+                nparams,
+                closure_const,
+                line,
+            )?;
         }
 
         InstKind::IntrinsicCall {
@@ -349,22 +142,7 @@ pub(super) fn emit_value(
                 Some(crate::hir::HirType::Float)
             ) =>
         {
-            // Direct form: no receiver staged, no window, no result Move.
-            // `object` was already lowered (its side effects, if any, ran);
-            // a unary math dispatch never reads it, so it simply stays in
-            // its own register instead of being copied into a call slot.
-            //
-            // The float-argument requirement is semantic, not an
-            // optimization: `intrinsics::math::dispatch` re-boxes an integral
-            // result back to `int` when the argument was int-tagged, and the
-            // direct form has no window for that path to round-trip through.
-            // An int argument keeps the windowed encoding.
-            let _ = object;
-            chunk.write(Chunk::pack_op(OpCode::IntrinsicDirect, d), line);
-            chunk.write(
-                ((reg[args[0].0 as usize] as u16) << 8) | *wire_byte as u16,
-                line,
-            );
+            calls::emit_intrinsic_direct(chunk, d, args, *wire_byte, reg, line);
         }
 
         InstKind::IntrinsicCall {
@@ -372,19 +150,7 @@ pub(super) fn emit_value(
             args,
             wire_byte,
         } => {
-            chunk.emit_rr(OpCode::Move, call_base, reg[object.0 as usize], line);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + 1 + i as u8,
-                    reg[a.0 as usize],
-                    line,
-                );
-            }
-            let arg_count = (args.len() + 1) as u16;
-            chunk.write(Chunk::pack_op(OpCode::Intrinsic, call_base), line);
-            chunk.write(((*wire_byte as u16) << 8) | arg_count, line);
-            chunk.emit_rr(OpCode::Move, d, call_base, line);
+            calls::emit_intrinsic(chunk, d, *object, args, *wire_byte, reg, call_base, line);
         }
 
         InstKind::CallNativeOp {
@@ -392,144 +158,64 @@ pub(super) fn emit_value(
             args,
             op_id,
         } => {
-            chunk.emit_rr(OpCode::Move, call_base, reg[object.0 as usize], line);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + 1 + i as u8,
-                    reg[a.0 as usize],
-                    line,
-                );
-            }
-            // arg_count includes the receiver; op-id stored as a constant
-            // (full i64) so it survives `.vnc` serialization.
-            let arg_count = (args.len() + 1) as u16;
-            let cidx = chunk.add_int(*op_id as i64);
-            chunk.write(Chunk::pack_op(OpCode::CallNativeOp, call_base), line);
-            chunk.write(cidx, line);
-            chunk.write(arg_count, line);
-            chunk.emit_rr(OpCode::Move, d, call_base, line);
+            calls::emit_call_native_op(chunk, d, *object, args, *op_id, reg, call_base, line);
         }
 
         InstKind::BuildStr { parts } => {
-            chunk.write(Chunk::pack_op(OpCode::BuildStr, d), line);
-            chunk.write(Chunk::pack(parts.len() as u8, 0), line);
-            for p in parts {
-                chunk.write(Chunk::pack(reg[p.0 as usize], 0), line);
-            }
+            build::emit_build_str(chunk, d, parts, reg, line);
         }
         InstKind::GetPropertyMaybe { object, name } => {
-            let idx = chunk.add_str(name);
-            chunk.emit_rrc(
-                OpCode::GetPropertyMaybe,
-                d,
-                reg[object.0 as usize],
-                idx,
-                line,
-            );
+            access::emit_get_property_maybe(chunk, d, *object, name, reg, line);
         }
         InstKind::ModuleSlot { object, slot } => {
-            chunk.emit_rrc(
-                OpCode::LoadModuleSlot,
-                d,
-                reg[object.0 as usize],
-                *slot,
-                line,
-            );
+            access::emit_module_slot(chunk, d, *object, reg, *slot, line);
         }
         InstKind::GetEnumTag { operand } => {
-            chunk.emit_rr(OpCode::GetEnumTag, d, reg[operand.0 as usize], line);
+            scalars::emit_get_enum_tag(chunk, d, *operand, reg, line);
         }
         InstKind::IsArray { operand } => {
-            chunk.emit_rr(OpCode::IsArray, d, reg[operand.0 as usize], line);
+            scalars::emit_is_array(chunk, d, *operand, reg, line);
         }
         InstKind::StrLength { operand } => {
-            chunk.emit_rr(OpCode::StrLength, d, reg[operand.0 as usize], line);
+            scalars::emit_str_length(chunk, d, *operand, reg, line);
         }
         InstKind::ArrayLength { operand } => {
-            chunk.emit_rr(OpCode::ArrayLength, d, reg[operand.0 as usize], line);
+            scalars::emit_array_length(chunk, d, *operand, reg, line);
         }
         InstKind::BytesLength { operand } => {
-            chunk.emit_rr(OpCode::BytesLength, d, reg[operand.0 as usize], line);
+            scalars::emit_bytes_length(chunk, d, *operand, reg, line);
         }
 
-        InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, line),
+        InstKind::This => scalars::emit_this(chunk, d, line),
 
         InstKind::Range {
             start,
             end,
             inclusive,
         } => {
-            let method = chunk.add_str(varn_core::well_known::RUNTIME_RANGE);
-            let flag = if *inclusive { 1u8 } else { 0u8 };
-            chunk.emit(OpCode::InvokeRuntimeStatic, line);
-            chunk.write(Chunk::pack(d, 0), line);
-            chunk.write(method, line);
-            chunk.write(Chunk::pack(2, reg[start.0 as usize]), line);
-            chunk.write(Chunk::pack(reg[end.0 as usize], flag), line);
+            access::emit_range(chunk, d, *start, *end, *inclusive, reg, line);
         }
         InstKind::ObjectKeys { operand } => {
-            chunk.emit_rr(OpCode::ObjectKeys, d, reg[operand.0 as usize], line);
+            scalars::emit_object_keys(chunk, d, *operand, reg, line);
         }
         InstKind::GetSymbol { object, is_async } => {
-            let sym = if *is_async {
-                RuntimeSymbol::AsyncIterator
-            } else {
-                RuntimeSymbol::Iterator
-            };
-            let idx = chunk.add_symbol(sym);
-            chunk.emit_rrc(OpCode::GetSymbol, d, reg[object.0 as usize], idx, line);
+            scalars::emit_get_symbol(chunk, d, *object, reg, *is_async, line);
         }
 
         InstKind::IterCall { callee, recv } => {
-            chunk.emit_rr(OpCode::Move, call_base, reg[recv.0 as usize], line);
-            chunk.emit(OpCode::Call, line);
-            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), line);
-            chunk.write(Chunk::pack(1, call_base), line);
+            calls::emit_iter_call(chunk, d, *callee, *recv, reg, call_base, line);
         }
 
         InstKind::GetSuper { name } => {
-            let idx = chunk.add_str(name);
-            chunk.emit_rc(OpCode::GetSuper, d, idx, line);
+            access::emit_get_super(chunk, d, name, line);
         }
 
         InstKind::SuperCall { args } => {
-            let ctor_idx = chunk.add_str("constructor");
-            chunk.emit_rc(OpCode::GetSuper, call_base, ctor_idx, line);
-            chunk.emit_rr(OpCode::Move, call_base + 1, 0, line);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + 2 + i as u8,
-                    reg[a.0 as usize],
-                    line,
-                );
-            }
-            let total = (args.len() + 1) as u8;
-            chunk.emit(OpCode::Call, line);
-            chunk.write(Chunk::pack(call_base, call_base), line);
-            chunk.write(Chunk::pack(total, call_base + 1), line);
-            chunk.emit_rr(OpCode::Move, d, call_base + 1, line);
+            calls::emit_super_call(chunk, d, args, reg, call_base, line);
         }
 
         InstKind::SuperMethodCall { name, args } => {
-            let name_idx = chunk.add_str(name);
-            chunk.emit_rc(OpCode::GetSuper, call_base, name_idx, line);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + 1 + i as u8,
-                    reg[a.0 as usize],
-                    line,
-                );
-            }
-            let count = args.len() as u8;
-            chunk.emit(OpCode::Call, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(
-                Chunk::pack(count, if count > 0 { call_base + 1 } else { 0 }),
-                line,
-            );
+            calls::emit_super_method_call(chunk, d, name, args, reg, call_base, line);
         }
 
         InstKind::ExtensionCall {
@@ -538,130 +224,49 @@ pub(super) fn emit_value(
             recv,
             args,
         } => {
-            match slot {
-                Some(s) => {
-                    let s = u16::try_from(*s).map_err(|_| {
-                        OptError::Unsupported("ssa-emit: extension global slot exceeds u16")
-                    })?;
-                    chunk.emit_rc(OpCode::LoadGlobalIdx, call_base, s, line);
-                }
-                None => {
-                    let idx = chunk.add_str(func);
-                    chunk.emit_rc(OpCode::LoadGlobal, call_base, idx, line);
-                }
-            }
-            chunk.emit_rr(OpCode::Move, call_base + 1, reg[recv.0 as usize], line);
-            for (i, a) in args.iter().enumerate() {
-                chunk.emit_rr(
-                    OpCode::Move,
-                    call_base + 2 + i as u8,
-                    reg[a.0 as usize],
-                    line,
-                );
-            }
-            let total = (args.len() + 1) as u8;
-            chunk.emit(OpCode::Call, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(total, call_base + 1), line);
+            calls::emit_extension_call(chunk, d, func, *slot, *recv, args, reg, call_base, line)?;
         }
 
         InstKind::CallSpread { callee, args } => {
-            chunk.emit_rr(OpCode::LoadNull, call_base, 0, line);
-            for (i, (a, spread)) in args.iter().enumerate() {
-                let op = if *spread {
-                    OpCode::WrapSpread
-                } else {
-                    OpCode::Move
-                };
-                chunk.emit_rr(op, call_base + 1 + i as u8, reg[a.0 as usize], line);
-            }
-            let total = (args.len() + 1) as u8;
-            chunk.emit(OpCode::CallSpread, line);
-            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), line);
-            chunk.write(Chunk::pack(total, call_base), line);
+            calls::emit_call_spread(chunk, d, *callee, args, reg, call_base, line);
         }
 
         InstKind::BuildArraySpread { elements } => {
-            chunk.emit(OpCode::BuildArray, line);
-            chunk.write(Chunk::pack(d, call_base), line);
-            chunk.write(Chunk::pack(0, 0), line);
-            for (v, spread) in elements {
-                let op = if *spread {
-                    OpCode::ArrayExtend
-                } else {
-                    OpCode::ArrayPush
-                };
-                chunk.emit_rr(op, d, reg[v.0 as usize], line);
-            }
+            build::emit_build_array_spread(chunk, d, elements, reg, call_base, line);
         }
 
         InstKind::BuildObjectSpread { parts } => {
-            chunk.emit(OpCode::BuildObject, line);
-            chunk.write(Chunk::pack(d, 0), line);
-            let mut next_slot = ic_slot;
-            for (key, v) in parts {
-                match key {
-                    Some(k) => {
-                        let idx = chunk.add_str(k);
-                        let cs = next_slot
-                            .ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-                        next_slot = cs.checked_add(1);
-                        chunk.emit_rrc_ic(OpCode::SetProperty, d, reg[v.0 as usize], idx, cs, line);
-                    }
-                    None => chunk.emit_rr(OpCode::ObjectMerge, d, reg[v.0 as usize], line),
-                }
-            }
+            build::emit_build_object_spread(chunk, d, parts, reg, ic_slot, line)?;
         }
         InstKind::ObjectRest { object, skip_keys } => {
-            chunk.emit(OpCode::ObjectRest, line);
-            chunk.write(Chunk::pack(d, reg[object.0 as usize]), line);
-            chunk.write(Chunk::pack(skip_keys.len() as u8, 0), line);
-            for k in skip_keys {
-                let idx = chunk.add_str(k);
-                chunk.write(idx, line);
-            }
+            build::emit_object_rest(chunk, d, *object, skip_keys, reg, line);
         }
         InstKind::LoadCaptured { var } => {
-            let src = var_reg(*var, nparams);
-            chunk.emit_rr(OpCode::Move, d, src, line);
+            access::emit_load_captured(chunk, d, *var, nparams, line);
         }
         InstKind::MakeClass { name, super_class } => {
-            let name_idx = chunk.add_str(name);
-            let super_reg = super_class.map(|sc| reg[sc.0 as usize]).unwrap_or(0);
-            chunk.emit_rrc(OpCode::MakeClass, d, super_reg, name_idx, line);
+            closure::emit_make_class(chunk, d, name, *super_class, reg, line);
         }
         InstKind::MakeEnumVariant { tag, meta } => {
-            let meta_idx = chunk.add_str(meta);
-            chunk.emit_load_int(scratch, *tag, line);
-            chunk.emit(OpCode::MakeEnumVariant, line);
-            chunk.write(Chunk::pack(d, scratch), line);
-            chunk.write(meta_idx, line);
+            closure::emit_make_enum_variant(chunk, d, *tag, meta, scratch, line);
         }
         InstKind::Try { handler } => {
-            chunk.emit(OpCode::Try, line);
-            chunk.write(Chunk::pack(d, 0), line);
-            let pos = chunk.code.len();
-            chunk.write(0xFFFF, line);
-            chunk.write(0xFFFF, line);
-            fixups.push((pos, *handler));
+            closure::emit_try(chunk, d, *handler, fixups, line);
         }
         InstKind::CatchParam { try_val } => {
-            chunk.emit_rr(OpCode::Move, d, reg[try_val.0 as usize], line);
+            closure::emit_catch_param(chunk, d, *try_val, reg, line);
         }
         InstKind::LoadModule { source } => {
-            let src_idx = chunk.add_str(source);
-            chunk.emit_rc(OpCode::LoadModule, d, src_idx, line);
+            access::emit_load_module(chunk, d, source, line);
         }
         InstKind::Await { operand } => {
-            chunk.emit_rr(OpCode::Await, d, reg[operand.0 as usize], line);
+            closure::emit_await(chunk, d, *operand, reg, line);
         }
         InstKind::Spawn { operand } => {
-            // Same 2-word shape as Await: dest in the opcode word, task
-            // register in the operand word (varn_types::bytecode).
-            chunk.emit_rr(OpCode::Spawn, d, reg[operand.0 as usize], line);
+            closure::emit_spawn(chunk, d, *operand, reg, line);
         }
         InstKind::Yield { operand } => {
-            chunk.emit1(OpCode::Yield, Chunk::pack(d, reg[operand.0 as usize]), line);
+            closure::emit_yield(chunk, d, *operand, reg, line);
         }
 
         InstKind::SetProperty { .. }

@@ -3,6 +3,12 @@ pub mod exports;
 pub mod graph;
 pub mod paths;
 pub mod resolver;
+mod resolver_access;
+mod resolver_api;
+mod resolver_disk;
+mod resolver_embed;
+mod resolver_parse;
+mod resolver_trait;
 
 pub use cache::{deserialize_module_interface, serialize_module_interface, ExportMap};
 pub use graph::ModuleGraph;

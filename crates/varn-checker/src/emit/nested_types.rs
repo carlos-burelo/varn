@@ -141,10 +141,10 @@ pub(super) fn top_level_types(
     interner: &varn_core::AtomInterner,
 ) -> FxHashSet<Arc<str>> {
     let type_name = |d: &Decl| {
-        super::class_decl(d)
+        super::decl_classify::class_decl(d)
             .and_then(|c| c.id)
-            .or_else(|| super::enum_decl(d).map(|e| e.id))
-            .or_else(|| super::anon_class_of(d, arena).and_then(|c| c.id))
+            .or_else(|| super::decl_classify::enum_decl(d).map(|e| e.id))
+            .or_else(|| super::decl_classify::anon_class_of(d, arena).and_then(|c| c.id))
     };
     let mut out = FxHashSet::default();
     for &stmt in &program.body {
@@ -152,8 +152,8 @@ pub(super) fn top_level_types(
             continue;
         };
         let mut decls = vec![d.as_ref()];
-        if let Some(ns) = super::namespace_decl(d) {
-            decls.extend(super::ns_nested_types(ns));
+        if let Some(ns) = super::decl_classify::namespace_decl(d) {
+            decls.extend(super::namespaces::ns_nested_types(ns));
         }
         for id in decls.into_iter().filter_map(type_name) {
             out.insert(Arc::from(interner.resolve(id)));

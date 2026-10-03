@@ -1,0 +1,42 @@
+use crate::binder::BindResult;
+use crate::checker::Checker;
+use crate::types::{FunctionParam, Type};
+use varn_core::ast::Arg;
+use varn_core::TypeKind;
+
+impl<'r> Checker<'r> {
+    pub(in super::super) fn check_call_args_with_context(
+        &mut self,
+        args: &[Arg],
+        params: &[FunctionParam],
+        bind: &BindResult,
+    ) {
+        for (i, arg) in args.iter().enumerate() {
+            let param = if i < params.len() {
+                Some(&params[i])
+            } else if params.last().is_some_and(|p| p.is_rest) {
+                params.last()
+            } else {
+                None
+            };
+
+            let expected = param.map(|p| {
+                if p.is_rest {
+                    match self.ty_table.get(p.ty) {
+                        TypeKind::Array(inner) => Type(inner, false),
+                        _ => Type(p.ty, false),
+                    }
+                } else {
+                    Type(p.ty, false)
+                }
+            });
+            match arg {
+                Arg::Positional(e) | Arg::Spread(e) => {
+                    let e = *e;
+                    self.with_expected(expected, |c| c.check_expr(e, bind));
+                }
+                Arg::Named { value, .. } => self.check_expr(*value, bind),
+            }
+        }
+    }
+}

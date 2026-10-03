@@ -8,6 +8,34 @@ use super::keyed_access::collect_type_keys;
 use super::resolve_type_node;
 use super::template::collect_string_literals;
 
+pub(super) fn resolve_mapped_type(
+    key_var: varn_core::Atom,
+    source: &TypeNode,
+    value: &TypeNode,
+    optional: bool,
+    readonly: bool,
+    ctx: Option<&dyn TypeContext>,
+    interner: &varn_core::AtomInterner,
+    table: &mut CheckerTyTable,
+) -> Type {
+    let resolved_source = resolve_type_node(source, ctx, table);
+    let source_obj = if let TypeKind::KeyOf(inner) = &source.kind {
+        Some(resolve_type_node(inner, ctx, table))
+    } else {
+        None
+    };
+    resolve_mapped(
+        interner.try_resolve(key_var).unwrap_or(""),
+        resolved_source,
+        value,
+        optional,
+        readonly,
+        source_obj,
+        ctx,
+        table,
+    )
+}
+
 pub(super) fn resolve_mapped(
     key_var: &str,
     source: Type,

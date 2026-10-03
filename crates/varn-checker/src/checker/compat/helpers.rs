@@ -1,4 +1,4 @@
-use super::types_compatible_impl;
+use super::core::types_compatible_impl;
 use crate::binder::BindView;
 use crate::types::{
     CheckerTyId, CheckerTyTable, ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type,

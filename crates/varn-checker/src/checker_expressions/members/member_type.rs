@@ -1,151 +1,8 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{CheckerTyTable, ObjectTypeMember, Type};
-use rustc_hash::FxHashMap;
+use crate::types::{ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::TypeKind;
-
-/// Declared type-parameter names of a class/interface, by name. Mirrors
-/// `Checker::symbol_type_params_any` without its cache, which needs `&mut`,
-/// and additionally follows `origin` into the declaring module: a generic type
-/// can flow in as a call's return type (`channel<int>()` -> `Channel<int>`)
-/// without `Channel` itself ever being imported here.
-fn class_type_params(
-    resolver: &dyn crate::module_resolver::ImportResolver,
-    name: &str,
-    origin: Option<&Arc<str>>,
-    bind: &BindResult,
-) -> Vec<Arc<str>> {
-    let local = params_in(name, bind);
-    if !local.is_empty() {
-        return local;
-    }
-    if let Some(params) = bind
-        .core
-        .as_ref()
-        .and_then(|b| b.class_type_params.get(name))
-    {
-        return params.clone();
-    }
-    let origins: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(b) = resolver.find_bind_for_type(name, &origins) {
-        return params_in(name, &b);
-    }
-    if origin.is_none() {
-        for spec in varn_modules::std_module_ids() {
-            if let Some(b) = resolver.stdlib_bind(spec) {
-                let params = params_in(name, &b);
-                if !params.is_empty() {
-                    return params;
-                }
-            }
-        }
-    }
-    Vec::new()
-}
-
-fn params_in(name: &str, bind: &BindResult) -> Vec<Arc<str>> {
-    bind.interner
-        .get(name)
-        .and_then(|atom| {
-            bind.scopes
-                .get(bind.global_scope)
-                .resolve(atom, &bind.scopes)
-        })
-        .map(|sid| {
-            bind.arena
-                .get(sid)
-                .type_params
-                .iter()
-                .map(|a| Arc::from(bind.interner.resolve(*a)))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// `{ T -> int }` for a `Generic("Channel", [int])` receiver. Empty when the
-/// class declares no parameters or the receiver carries no arguments.
-pub(crate) fn generic_mapping(
-    resolver: &dyn crate::module_resolver::ImportResolver,
-    name: &str,
-    args: &[Type],
-    origin: Option<&Arc<str>>,
-    bind: &BindResult,
-) -> FxHashMap<varn_core::Atom, Type> {
-    if args.is_empty() {
-        return FxHashMap::default();
-    }
-    class_type_params(resolver, name, origin, bind)
-        .into_iter()
-        .map(|p| resolver.intern(&p))
-        .zip(args.iter().cloned())
-        .collect()
-}
-
-fn resolve_extension_symbol_type(bind: &BindResult, mangled: &Arc<str>) -> Option<Type> {
-    let scope = bind.scopes.get(bind.global_scope);
-    let atom = bind.interner.get(mangled.as_ref())?;
-    let sid = scope.resolve(atom, &bind.scopes)?;
-    bind.arena.get(sid).ty
-}
-
-fn extension_method_type(
-    bind: &BindResult,
-    mangled: &Arc<str>,
-    table: &mut CheckerTyTable,
-) -> Option<Type> {
-    let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
-    let TypeKind::Fn(fid) = table.get(sym_ty.0) else {
-        return Some(sym_ty);
-    };
-    let ft = table.get_function(fid).clone();
-
-    let params: Vec<crate::types::FunctionParam> = ft
-        .params
-        .iter()
-        .skip_while(|p| p.name.as_deref() == Some("this"))
-        .cloned()
-        .collect();
-
-    Some(Type::fn_(
-        crate::types::FunctionType {
-            params,
-            return_type: ft.return_type,
-            is_arrow: ft.is_arrow,
-            type_params: ft.type_params.clone(),
-        },
-        table,
-    ))
-}
-
-fn extension_getter_type(
-    bind: &BindResult,
-    mangled: &Arc<str>,
-    table: &CheckerTyTable,
-) -> Option<Type> {
-    let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
-    match table.get(sym_ty.0) {
-        TypeKind::Fn(fid) => Some(Type(table.get_function(fid).return_type, false)),
-        _ => Some(sym_ty),
-    }
-}
-
-fn intrinsic_member_info(
-    bind: &BindResult,
-    type_name: &str,
-    key: &str,
-) -> Option<(Type, Option<usize>)> {
-    bind.core
-        .as_ref()
-        .and_then(|b| b.class_members.get(type_name))
-        .and_then(|members| {
-            members
-                .members
-                .iter()
-                .find(|m| m.name.as_ref() == key)
-                .map(|m| (m.ty, m.symbol_id))
-        })
-}
 
 impl<'r> Checker<'r> {
     pub(crate) fn find_member_info(
@@ -164,7 +21,7 @@ impl<'r> Checker<'r> {
         res
     }
 
-    fn find_member_info_uncached(
+    pub(super) fn find_member_info_uncached(
         &mut self,
         ty: &Type,
         key: &str,
@@ -174,415 +31,29 @@ impl<'r> Checker<'r> {
         let res = match ty_kind {
             TypeKind::EnumVariant {
                 enum_name,
-                variant_name: _,
-                type_args: _,
                 payload_ty,
-            } => {
-                if key == varn_core::MemberKey::Name.as_str()
-                    || key == varn_core::MemberKey::VariantName.as_str()
-                {
-                    return Some((Type::Str, None));
-                }
-                if key == varn_core::MemberKey::Tag.as_str()
-                    || key == varn_core::MemberKey::RawValue.as_str()
-                {
-                    return Some((Type::Int, None));
-                }
-                if let Some(res) =
-                    self.find_member_info_uncached(&Type(payload_ty, false), key, bind)
-                {
-                    return Some(res);
-                }
-                let enum_name_str = self.resolve_bind_atom(bind, enum_name).to_string();
-                let named = Type::named(
-                    enum_name_str,
-                    self.resolver,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
-                return self.find_member_info_uncached(&named, key, bind);
-            }
+                ..
+            } => self.member_enum_variant(enum_name, payload_ty, key, bind),
             TypeKind::Named(name_atom, origin_atom) => {
-                let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
-                let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                if name.as_ref() == "*" {
-                    if let Some(origin_path) = &origin {
-                        let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(self.resolver.stdlib_exports(origin_path))
-                        } else {
-                            let mut visiting = Vec::new();
-                            Some(self.resolver.module_exports(origin_path, &mut visiting))
-                        };
-                        if let Some(exports) = exports {
-                            if let Some(sym) = exports.get(key) {
-                                let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
-                                if let Some(origin) = &sym.origin_module {
-                                    let origin_str =
-                                        self.resolve_bind_atom(bind, *origin).to_string();
-                                    sym_ty = sym_ty.with_origin(
-                                        self.resolver.intern(&origin_str),
-                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                    );
-                                }
-                                return Some((sym_ty, None));
-                            }
-                        }
-                    }
-                    return None;
-                }
-
-                if name.as_ref() == varn_core::LangPrimitive::Str.name()
-                    && key == varn_core::MemberKey::Length.as_str()
-                {
-                    return Some((Type::Int, None));
-                }
-
-                // A type declared in another module has its members there,
-                // never in a same-named local declaration.
-                if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
-                    return self
-                        .find_member_info_uncached(ty, key, &owner)
-                        .map(|(t, sym)| (self.reintern_foreign_ty(&owner, t), sym));
-                }
-
-                let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-                let is_enum = super::is_enum_type(self.resolver, bind, &name, &origin_modules);
-
-                if is_enum {
-                    if key == varn_core::MemberKey::RawValue.as_str()
-                        || key == varn_core::MemberKey::Tag.as_str()
-                    {
-                        return Some((Type::Int, None));
-                    }
-                    if key == varn_core::MemberKey::Name.as_str()
-                        || key == varn_core::MemberKey::VariantName.as_str()
-                    {
-                        return Some((Type::Str, None));
-                    }
-
-                    let mut variants = Vec::new();
-                    if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
-                        variants.extend(members.iter().map(|m| m.name.clone()));
-                    }
-                    if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules)
-                    {
-                        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-                            variants.extend(members.iter().map(|m| m.name.clone()));
-                        }
-                    }
-                    let mut found_tys = Vec::new();
-                    for v in &variants {
-                        if let Some(fields) = bind.sum_variant_fields.get(v) {
-                            if let Some((_, ty)) =
-                                fields.iter().find(|(fname, _)| fname.as_ref() == key)
-                            {
-                                found_tys.push(*ty);
-                            }
-                        }
-                        if let Some(ext_bind) =
-                            self.resolver.find_bind_for_type(&name, &origin_modules)
-                        {
-                            if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
-                                if let Some((_, ty)) =
-                                    fields.iter().find(|(fname, _)| fname.as_ref() == key)
-                                {
-                                    let ty = *ty;
-                                    found_tys.push(self.reintern_foreign_ty(&ext_bind, ty));
-                                }
-                            }
-                        }
-                    }
-                    if !found_tys.is_empty() {
-                        return Some((
-                            Type::union(
-                                found_tys,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            ),
-                            None,
-                        ));
-                    }
-                }
-                if let Some(members) = bind.type_members.classes.get(&name) {
-                    if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                        // `is_optional` aquí también marca un campo que
-                        // ningún constructor garantiza asignar en todos sus
-                        // caminos (`binder::class::bind_class`) — se lee
-                        // `null` en runtime igual que un miembro de interfaz
-                        // ausente, así que se expone igual: `T | null`.
-                        let ty = if m.is_optional {
-                            Type::make_nullable(
-                                m.ty,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            )
-                        } else {
-                            m.ty
-                        };
-                        return Some((ty, m.symbol_id));
-                    }
-                }
-                if let Some(members) = bind.type_members.interfaces.get(&name) {
-                    if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                        // Miembro opcional de interface: puede ausentar en
-                        // runtime (objeto construido sin el campo) y la lectura
-                        // devuelve null. Exponerlo con el tipo plano minte —
-                        // misma razón que los miembros opcionales de Object.
-                        let ty = if m.is_optional {
-                            Type::make_nullable(
-                                m.ty,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            )
-                        } else {
-                            m.ty
-                        };
-                        return Some((ty, m.symbol_id));
-                    }
-                }
-                if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
-                    if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                        return Some((m.ty, m.symbol_id));
-                    }
-                }
-
-                if let Some(ty) = bind
-                    .get_class_methods_for(name.as_ref())
-                    .and_then(|m| m.get(key))
-                {
-                    return Some((*ty, None));
-                }
-                if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(name.as_ref()) {
-                        if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                            return Some((m.ty, m.symbol_id));
-                        }
-                    }
-                    if let Some(members) = b.flattened_members.get(name.as_ref()) {
-                        if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                            return Some((m.ty, m.symbol_id));
-                        }
-                    }
-                    if let Some(methods) = b.class_methods.get(name.as_ref()) {
-                        if let Some(ty) = methods.get(key) {
-                            return Some((*ty, None));
-                        }
-                    }
-                }
-                if let Some(parent) = bind.class_parents.get(&name) {
-                    let parent = parent.clone();
-                    let named = Type::named(
-                        parent,
-                        self.resolver,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    );
-                    return self.find_member_info_uncached(&named, key, bind);
-                }
-
-                let ext_bind_opt = self.resolver.find_bind_for_type(&name, &origin_modules);
-                let candidates: Box<dyn Iterator<Item = Arc<crate::binder::BindResult>>> =
-                    if let Some(b) = ext_bind_opt {
-                        Box::new(std::iter::once(b))
-                    } else if origin.is_none() {
-                        Box::new(
-                            varn_modules::std_module_ids()
-                                .into_iter()
-                                .filter_map(|spec| self.resolver.stdlib_bind(spec)),
-                        )
-                    } else {
-                        Box::new(std::iter::empty())
-                    };
-                for ext_bind in candidates {
-                    if let Some(members) = ext_bind.type_members.classes.get(&name) {
-                        if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                            let ty = m.ty;
-                            return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                        }
-                    }
-                    if let Some(entry) = ext_bind.get_class_entry(&name) {
-                        if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                            let ty = m.ty;
-                            return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                        }
-                    }
-                    if let Some(members) = ext_bind.type_members.interfaces.get(&name) {
-                        if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                            let ty = m.ty;
-                            return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                        }
-                    }
-                    if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-                        if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                            let ty = m.ty;
-                            return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                        }
-                    }
-                    if let Some(ty) = ext_bind
-                        .get_class_methods_for(name.as_ref())
-                        .and_then(|m| m.get(key))
-                    {
-                        let ty = *ty;
-                        return Some((self.reintern_foreign_ty(&ext_bind, ty), None));
-                    }
-                }
-                None
+                self.member_named(ty, name_atom, origin_atom, key, bind)
             }
             TypeKind::Generic(name_atom, args_list, origin_atom) => {
-                let base = Type::named_with_origin_atom(
-                    name_atom,
-                    origin_atom,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
-                // The member is declared against the class's type PARAMETERS
-                // (`Channel<T>.rx: Receiver<T>`); the receiver carries the
-                // ARGUMENTS. Without this substitution `channel<int>(…).rx`
-                // reads as `Receiver<T>` and every use of the element type sees
-                // an unbound `T`.
-                let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
-                let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                let args: Vec<Type> = self
-                    .ty_table
-                    .get_list(args_list)
-                    .iter()
-                    .map(|id| Type(*id, false))
-                    .collect();
-                self.find_member_info_uncached(&base, key, bind)
-                    .map(|(member_ty, sym)| {
-                        let mapping = generic_mapping(
-                            self.resolver,
-                            name.as_ref(),
-                            &args,
-                            origin.as_ref(),
-                            bind,
-                        );
-                        if mapping.is_empty() {
-                            (member_ty, sym)
-                        } else {
-                            (
-                                member_ty.map_generics(
-                                    &mapping,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                ),
-                                sym,
-                            )
-                        }
-                    })
+                self.member_generic(name_atom, args_list, origin_atom, key, bind)
             }
-            TypeKind::Object(mid) => {
-                let members = self.ty_table.get_object_members(mid).to_vec();
-                members.iter().find(|m| m.name() == key).map(|m| {
-                    let ty = match m {
-                        // Optional member may be absent at runtime; reading it
-                        // yields `null`, so expose `T | null` (same rule as
-                        // main's old-API arm, ported to table ids).
-                        ObjectTypeMember::Property {
-                            ty, optional: true, ..
-                        } => Type::make_nullable(
-                            Type(*ty, false),
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        ),
-                        ObjectTypeMember::Property { ty, .. } => Type(*ty, false),
-                        ObjectTypeMember::Method {
-                            params,
-                            return_type,
-                            is_arrow,
-                            optional: true,
-                            ..
-                        } => Type::make_nullable(
-                            Type::fn_(
-                                crate::types::FunctionType {
-                                    params: params.clone(),
-                                    return_type: *return_type,
-                                    is_arrow: *is_arrow,
-                                    type_params: vec![],
-                                },
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            ),
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        ),
-                        ObjectTypeMember::Method {
-                            params,
-                            return_type,
-                            is_arrow,
-                            ..
-                        } => Type::fn_(
-                            crate::types::FunctionType {
-                                params: params.clone(),
-                                return_type: *return_type,
-                                is_arrow: *is_arrow,
-                                type_params: vec![],
-                            },
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        ),
-                        _ => Type::Dynamic,
-                    };
-                    (ty, None)
-                })
-            }
-            TypeKind::Union(list) => {
-                let ids = self.ty_table.get_list(list).to_vec();
-                let infos: Vec<(Type, Option<usize>)> = ids
-                    .iter()
-                    .filter_map(|id| self.find_member_info_uncached(&Type(*id, false), key, bind))
-                    .collect();
-                if infos.len() == ids.len() {
-                    let first_sid = infos[0].1;
-                    let all_same_sid = infos.iter().all(|i| i.1 == first_sid);
-                    let types: Vec<Type> = infos.into_iter().map(|i| i.0).collect();
-
-                    let collapsed = if types.windows(2).all(|w| w[0] == w[1]) {
-                        types[0]
-                    } else {
-                        Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
-                    };
-                    Some((collapsed, if all_same_sid { first_sid } else { None }))
-                } else {
-                    None
+            TypeKind::Object(mid) => self.member_object(mid, key),
+            TypeKind::Union(list) => self.member_union(list, key, bind),
+            TypeKind::Array(inner) => self.member_array(inner, key, bind),
+            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+                match self.member_scalar(&kind, key, bind) {
+                    Some(r) => Some(r),
+                    None if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) => {
+                        self.member_range_fallback(key, bind)
+                    }
+                    None => None,
                 }
             }
-            TypeKind::Array(inner) => {
-                let atom = self.resolver.intern(varn_core::BuiltinType::Array.name());
-                let array_ty = Type::generic_atom(
-                    atom,
-                    vec![Type(inner, false)],
-                    None,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
-                self.find_member_info_uncached(&array_ty, key, bind)
-            }
-            TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
-                if key == varn_core::MemberKey::Length.as_str() {
-                    Some((Type::Int, None))
-                } else {
-                    intrinsic_member_info(bind, varn_core::LangPrimitive::Str.name(), key)
-                }
-            }
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
-                if key == varn_core::MemberKey::Length.as_str() {
-                    Some((Type::Int, None))
-                } else {
-                    intrinsic_member_info(bind, varn_core::BuiltinType::Bytes.name(), key)
-                }
-            }
-            // A tuple's length is known at check time — it is the arity of the
-            // type itself. The runtime has always answered `.length` on a
-            // tuple (the heap stores it as an array; `is_array` accepts
-            // `Tuple`), but the checker had no member table for tuples at all,
-            // so `#[1, "a", true].length` was rejected in any file the checker
-            // actually looked at. It went unnoticed because imported modules
-            // had their diagnostics discarded, and `tests/69-tuples-records.vn`
-            // is only ever reached through an import.
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
-            }
-            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
-                let name = kind.lang_name().unwrap_or_default();
-                if let Some(info) = intrinsic_member_info(bind, name, key) {
-                    Some(info)
-                } else if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) {
-                    let atom = self.resolver.intern(varn_core::BuiltinType::Range.name());
-                    let range_ty =
-                        Type::named_atom(atom, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                    self.find_member_info_uncached(&range_ty, key, bind)
-                } else {
-                    None
-                }
             }
             _ => None,
         };
@@ -595,7 +66,7 @@ impl<'r> Checker<'r> {
             ) {
                 if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
                     let mangled = mangled.clone();
-                    if let Some(sym_ty) = extension_method_type(
+                    if let Some(sym_ty) = super::member_util::extension_method_type(
                         bind,
                         &mangled,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -604,7 +75,9 @@ impl<'r> Checker<'r> {
                     }
                 }
                 if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym_ty) = extension_getter_type(bind, mangled, &self.ty_table) {
+                    if let Some(sym_ty) =
+                        super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
+                    {
                         return Some((sym_ty, None));
                     }
                 }
@@ -612,7 +85,6 @@ impl<'r> Checker<'r> {
         }
         res
     }
-
     pub(crate) fn find_member(
         &mut self,
         ty: &Type,
@@ -728,7 +200,7 @@ impl<'r> Checker<'r> {
                             .iter()
                             .map(|id| Type(*id, false))
                             .collect();
-                        let mapping = generic_mapping(
+                        let mapping = super::member_util::generic_mapping(
                             self.resolver,
                             name.as_ref(),
                             &args,
@@ -773,7 +245,7 @@ impl<'r> Checker<'r> {
             ) {
                 if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
                     let mangled = mangled.clone();
-                    if let Some(sym) = extension_method_type(
+                    if let Some(sym) = super::member_util::extension_method_type(
                         bind,
                         &mangled,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -796,7 +268,9 @@ impl<'r> Checker<'r> {
                     }
                 }
                 if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) = extension_getter_type(bind, mangled, &self.ty_table) {
+                    if let Some(sym) =
+                        super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
+                    {
                         let has_setter = bind
                             .extensions
                             .setters
