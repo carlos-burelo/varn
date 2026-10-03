@@ -172,13 +172,7 @@ impl<'r> Checker<'r> {
             }
             kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
                 let name = kind.lang_name().unwrap_or_default();
-                if let Some(info) = intrinsic_member_info(bind, name, key) {
-                    Some(info)
-                } else if *kind == TypeKind::Builtin(varn_core::BuiltinType::Range) {
-                    None
-                } else {
-                    None
-                }
+                intrinsic_member_info(bind, name, key)
             }
             _ => None,
         }

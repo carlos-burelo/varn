@@ -92,11 +92,7 @@ impl<'r> Binder<'r> {
         }
     }
 
-    pub(super) fn mark_optional_fields(
-        &mut self,
-        c: &ClassDecl,
-        members: &mut Vec<ClassMemberInfo>,
-    ) {
+    pub(super) fn mark_optional_fields(&mut self, c: &ClassDecl, members: &mut [ClassMemberInfo]) {
         let declared_ctor = c.body.iter().find_map(|m| match m {
             ClassMember::Constructor { body, .. } => Some(body),
             _ => None,
