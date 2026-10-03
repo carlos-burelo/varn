@@ -107,7 +107,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             interner.clone(),
             &source,
             &debug_flags,
-            false,
         )
         .map(|_| ())
         .map_err(|e| format!("{e}"))

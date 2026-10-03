@@ -63,7 +63,6 @@ fn run_snippet(source: &str) {
         no_run: false,
         debug: DebugFlags::default(),
         trace: false,
-        strict: false,
         capabilities: Default::default(),
     };
     if let Err(e) = crate::pipeline::run(&opts) {

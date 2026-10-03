@@ -75,6 +75,7 @@ impl<'r> Binder<'r> {
             extensions: Extensions::default(),
             pending_enrich: Vec::new(),
             reported_type_forms: Default::default(),
+            reported_params: Default::default(),
             array_watch: Vec::new(),
             evolved_array_types: FxHashMap::default(),
             type_decls: FxHashMap::default(),

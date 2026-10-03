@@ -33,21 +33,7 @@ impl<'r> super::super::Binder<'r> {
                             is_rest: false,
                         }];
                     for p in &method.params {
-                        let mut ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann))
-                            .unwrap_or(Type::Dynamic);
-                        if p.is_rest {
-                            let is_array =
-                                matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
-                            if !is_array {
-                                ty = Type::array(
-                                    ty,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                );
-                            }
-                        }
+                        let ty = self.param_type(p, crate::binder::ParamSite::Declared);
                         param_types.push(crate::types::FunctionParam {
                             name: Some(Arc::from(
                                 super::super::type_inference::pattern_to_string(
@@ -160,11 +146,7 @@ impl<'r> super::super::Binder<'r> {
                 } => {
                     let key_str = self.interner.resolve(*key).to_string();
                     let mangled = format!("__extset_{type_name}_{}", key_str);
-                    let param_ty = param
-                        .type_ann
-                        .as_ref()
-                        .map(|ann| self.resolve_type(ann))
-                        .unwrap_or(Type::Dynamic);
+                    let param_ty = self.param_type(param, crate::binder::ParamSite::Declared);
                     let fn_type = Type::fn_(
                         crate::types::FunctionType {
                             params: vec![
@@ -232,17 +214,7 @@ impl<'r> super::super::Binder<'r> {
         self.define(this_atom, this_sym);
 
         for p in params {
-            let mut ty = p
-                .type_ann
-                .as_ref()
-                .map(|ann| self.resolve_type(ann))
-                .unwrap_or(Type::Dynamic);
-            if p.is_rest {
-                let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
-                if !is_array {
-                    ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                }
-            }
+            let ty = self.param_type(p, crate::binder::ParamSite::Declared);
             self.bind_pattern(
                 &p.pattern,
                 SymbolKind::Parameter,

@@ -64,9 +64,6 @@ pub struct RunArgs {
     #[arg(long)]
     pub trace: bool,
 
-    #[arg(long)]
-    pub strict: bool,
-
     /// Grant all permissions (bypasses security sandbox)
     #[arg(short = 'A', long = "allow-all")]
     pub allow_all: bool,
@@ -126,9 +123,6 @@ pub struct CheckArgs {
 
     #[arg(short, long)]
     pub verbose: bool,
-
-    #[arg(long)]
-    pub strict: bool,
 }
 
 #[derive(Args)]

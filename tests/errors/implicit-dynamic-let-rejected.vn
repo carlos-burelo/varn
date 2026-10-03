@@ -1,0 +1,3 @@
+// expect: error[VN3011]
+let x
+x = 1

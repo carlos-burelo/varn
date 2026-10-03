@@ -13,7 +13,6 @@ impl<'r> Checker<'r> {
         source_file: Arc<str>,
         global_scope: crate::scope::ScopeId,
         record_expr_types: bool,
-        warn_implicit_dynamic: bool,
         ty_table: Arc<crate::types::CheckerTyTable>,
     ) -> Self {
         Checker {
@@ -44,7 +43,6 @@ impl<'r> Checker<'r> {
             desugar: super::records::Desugarings::default(),
             member_exists_cache: FxHashMap::default(),
             member_type_cache: FxHashMap::default(),
-            warn_implicit_dynamic,
             expected_type: None,
             call_mappings: FxHashMap::default(),
             record_expr_types,

@@ -10,6 +10,7 @@ mod binder_entry;
 mod binder_intern;
 mod binder_stmts;
 mod binder_types;
+mod binding_types;
 mod class;
 mod class_body;
 mod class_ctor;
@@ -35,6 +36,7 @@ mod types;
 
 use crate::module_resolver::ImportResolver;
 pub use crate::types::{ClassMemberInfo, ClassMemberKind, TypeContext};
+pub(crate) use binding_types::ParamSite;
 pub use inference_utils::build_fn_type;
 pub use type_inference::{infer_expr_type, pattern_lead_name, widen_literal};
 pub use type_resolution::{resolve_primitive, resolve_type_node};
@@ -69,6 +71,7 @@ pub struct Binder<'r> {
     pub(crate) extensions: Extensions,
     pub(crate) pending_enrich: Vec<PendingEnrich>,
     reported_type_forms: rustc_hash::FxHashSet<u32>,
+    reported_params: rustc_hash::FxHashSet<u32>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
     /// Optimization-only element types proved for evolving empty-array
     /// locals (Task A0.3'); moved into `BindResult::evolved_array_types`.

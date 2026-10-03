@@ -16,7 +16,6 @@ pub struct RunOpts {
     pub no_run: bool,
     pub debug: DebugFlags,
     pub trace: bool,
-    pub strict: bool,
     pub capabilities: CapabilitySet,
 }
 
@@ -29,7 +28,6 @@ impl Default for RunOpts {
             no_run: false,
             debug: DebugFlags::default(),
             trace: false,
-            strict: false,
             capabilities: CapabilitySet::allow_all(),
         }
     }

@@ -9,7 +9,6 @@ pub fn execute(args: CheckArgs) -> Result<(), CliError> {
         no_run: true,
         debug: Default::default(),
         trace: false,
-        strict: args.strict,
         capabilities: Default::default(),
     })
 }

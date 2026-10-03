@@ -54,7 +54,7 @@ function annotatedUnchanged(): int {
     return a[0] + a[1]
 }
 
-function sumOf(arr): int {
+function sumOf(arr: dynamic): int {
     let total = 0
     for (let i = 0; i < arr.length; i = i + 1) {
         total = total + arr[i]

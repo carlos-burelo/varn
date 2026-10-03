@@ -55,34 +55,7 @@ impl<'r> super::super::Binder<'r> {
                     let params_list = f
                         .params
                         .iter()
-                        .map(|p| {
-                            let mut ty = p
-                                .type_ann
-                                .as_ref()
-                                .map(|ann| self.resolve_type(ann))
-                                .unwrap_or(Type::Dynamic);
-                            if p.is_rest {
-                                let is_array = matches!(
-                                    self.ty_table.get(ty.0),
-                                    varn_core::TypeKind::Array(_)
-                                );
-                                if !is_array {
-                                    ty = Type::array(
-                                        ty,
-                                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                    );
-                                }
-                            }
-                            crate::types::FunctionParam {
-                                name: Some(Arc::from(pattern_lead_name(
-                                    &p.pattern,
-                                    &self.interner,
-                                ))),
-                                ty: ty.0,
-                                optional: p.is_optional || p.default.is_some(),
-                                is_rest: p.is_rest,
-                            }
-                        })
+                        .map(|p| self.function_param(p, crate::binder::ParamSite::Declared))
                         .collect::<Vec<_>>();
                     let fn_type = Type::fn_(
                         crate::types::FunctionType {

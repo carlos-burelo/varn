@@ -108,7 +108,6 @@ pub struct CheckProfile {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CheckOptions {
     pub record_types: bool,
-    pub warn_implicit_dynamic: bool,
 }
 
 impl CheckOptions {
@@ -117,14 +116,6 @@ impl CheckOptions {
     }
 
     pub fn tooling() -> Self {
-        Self {
-            record_types: true,
-            ..Self::default()
-        }
-    }
-
-    pub fn strict(mut self) -> Self {
-        self.warn_implicit_dynamic = true;
-        self
+        Self { record_types: true }
     }
 }

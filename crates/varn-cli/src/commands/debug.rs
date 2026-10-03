@@ -35,7 +35,6 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
         no_run,
         debug,
         trace: false,
-        strict: false,
         capabilities: Default::default(),
     })
 }

@@ -84,7 +84,6 @@ pub struct Checker<'r> {
     pub(crate) scope_spans: Vec<ScopeSpan>,
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
-    pub warn_implicit_dynamic: bool,
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
     pub(crate) in_function: bool,
@@ -124,14 +123,7 @@ impl<'r> Checker<'r> {
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         options: CheckOptions,
     ) -> CheckResult {
-        Self::check_internal(
-            program,
-            ast_arena,
-            interner,
-            resolver,
-            options.record_types,
-            options.warn_implicit_dynamic,
-        )
+        Self::check_internal(program, ast_arena, interner, resolver, options.record_types)
     }
 
     fn check_internal(
@@ -140,7 +132,6 @@ impl<'r> Checker<'r> {
         interner: varn_core::AtomInterner,
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
-        warn_implicit_dynamic: bool,
     ) -> CheckResult {
         let mut profile = CheckProfile::default();
 
@@ -174,7 +165,6 @@ impl<'r> Checker<'r> {
             source_file.clone(),
             bind.global_scope,
             record_expr_types,
-            warn_implicit_dynamic,
             bind.ty_table.clone(),
         );
 

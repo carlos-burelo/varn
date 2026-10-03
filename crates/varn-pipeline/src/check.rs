@@ -60,12 +60,8 @@ pub fn check(
     interner: varn_core::AtomInterner,
     source: &str,
     debug: &DebugFlags,
-    strict: bool,
 ) -> PipelineResult<CheckResult> {
-    let mut options = varn_checker::CheckOptions::compile();
-    if strict {
-        options = options.strict();
-    }
+    let options = varn_checker::CheckOptions::compile();
     let check_result = crate::resolver::with_resolver(|r| {
         Checker::check_with(program, ast_arena, interner, r, options)
     });

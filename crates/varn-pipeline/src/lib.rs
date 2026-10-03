@@ -49,16 +49,10 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     } else {
         read_source(&opts.file_path)?
     };
-    let compiled = if opts.eval.is_none() && !opts.debug.any() && !opts.strict {
+    let compiled = if opts.eval.is_none() && !opts.debug.any() {
         compile_source_cached(&source, &opts.file_path, opts.verbose)?
     } else {
-        compile_source(
-            &source,
-            &opts.file_path,
-            opts.verbose,
-            &opts.debug,
-            opts.strict,
-        )?
+        compile_source(&source, &opts.file_path, opts.verbose, &opts.debug)?
     };
     if opts.no_run {
         return Ok(());
@@ -106,7 +100,7 @@ pub fn compile_source_for_build(
     verbose: bool,
     debug: &DebugFlags,
 ) -> PipelineResult<CompileOutput> {
-    compile_source(source, path, verbose, debug, false)
+    compile_source(source, path, verbose, debug)
 }
 
 fn compile_source(
@@ -114,7 +108,6 @@ fn compile_source(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-    strict: bool,
 ) -> PipelineResult<CompileOutput> {
     let canonical_path = std::path::Path::new(path)
         .canonicalize()
@@ -124,7 +117,7 @@ fn compile_source(
     let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug)?;
     let (program, arena, interner) =
         parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
-    let check_result = check::check(&program, &arena, interner, source, debug, strict)?;
+    let check_result = check::check(&program, &arena, interner, source, debug)?;
     let compiled = compile::compile(&program, &arena, source, check_result, verbose, debug)?;
 
     Ok(compiled)
@@ -155,7 +148,7 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
         varn_core::term::terminal::tagged("Varn", "compile cache miss");
     }
 
-    let compiled = compile_source(source, path, verbose, &DebugFlags::default(), false)?;
+    let compiled = compile_source(source, path, verbose, &DebugFlags::default())?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
             varn_core::term::terminal::tagged(

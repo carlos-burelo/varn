@@ -28,7 +28,6 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
         no_run: false,
         debug: Default::default(),
         trace: args.trace,
-        strict: args.strict,
         capabilities,
     })
 }

@@ -4,7 +4,6 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use std::sync::Arc;
 use varn_core::ast::{InterfaceDecl, InterfaceMember};
-use varn_core::TypeKind;
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
@@ -119,20 +118,7 @@ impl<'r> super::Binder<'r> {
                 let params_list = params
                     .iter()
                     .map(|p| {
-                        let mut ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|m| self.resolve_type(m))
-                            .unwrap_or(Type::Dynamic);
-                        if p.is_rest {
-                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
-                            if !is_array {
-                                ty = Type::array(
-                                    ty,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                );
-                            }
-                        }
+                        let ty = self.param_type(p, super::binding_types::ParamSite::Declared);
                         FunctionParam {
                             name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,
@@ -193,11 +179,7 @@ impl<'r> super::Binder<'r> {
             } => {
                 let ret = self.resolve_type(return_type);
                 let param_name = pattern_lead_name(&param.pattern, &self.interner).to_string();
-                let key_ty = param
-                    .type_ann
-                    .as_ref()
-                    .map(|m| self.resolve_type(m))
-                    .unwrap_or(Type::Dynamic);
+                let key_ty = self.param_type(param, super::binding_types::ParamSite::Declared);
                 members.push(ClassMemberInfo {
                     name: Arc::from(format!(
                         "[{param_name}: {}]",
@@ -230,20 +212,7 @@ impl<'r> super::Binder<'r> {
                 let params_list = params
                     .iter()
                     .map(|p| {
-                        let mut ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|m| self.resolve_type(m))
-                            .unwrap_or(Type::Dynamic);
-                        if p.is_rest {
-                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
-                            if !is_array {
-                                ty = Type::array(
-                                    ty,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                );
-                            }
-                        }
+                        let ty = self.param_type(p, super::binding_types::ParamSite::Declared);
                         FunctionParam {
                             name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
                             ty: ty.0,

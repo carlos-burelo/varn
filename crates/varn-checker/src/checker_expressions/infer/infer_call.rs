@@ -93,6 +93,7 @@ impl<'r> Checker<'r> {
                 }
             })
             .unwrap_or_default();
+        let dynamic_context = self.expected_type.is_some_and(|t| t.is_dynamic());
 
         let ps: Vec<FunctionParam> = params
             .iter()
@@ -109,14 +110,24 @@ impl<'r> Checker<'r> {
                             .map(|ep| Type::resolved(ep.ty))
                             .filter(|t| !t.is_dynamic())
                     })
+                    .or_else(|| {
+                        p.default.map(|d| {
+                            let t = self.infer_type(d, bind);
+                            crate::binder::widen_literal(t)
+                        })
+                    })
                     .unwrap_or_else(|| {
-                        if self.warn_implicit_dynamic && !name.is_empty() && name != "_" {
-                            self.emit(
-                                Diagnostic::hint(ErrorCode::TypeAnnotationRequired, format!("parameter '{name}' has no type annotation — inferred as 'dynamic'"))
-                                    .with_range(*p.pattern.range()),
-                            );
+                        if dynamic_context {
+                            return Type::Dynamic;
                         }
-                        Type::Dynamic
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TypeAnnotationRequired,
+                                format!("parameter '{name}' needs a type annotation: nothing in its context gives it one"),
+                            )
+                            .with_range(p.range),
+                        );
+                        Type::Error
                     });
                 if p.is_rest {
                     let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));

@@ -13,27 +13,7 @@ pub fn build_fn_type(
     table: &mut CheckerTyTable,
     inferred_ret: Type,
 ) -> Type {
-    let interner = ctx.and_then(|c| c.interner());
-    let ps = params
-        .iter()
-        .map(|p| {
-            let name = pattern_to_rc_str(&p.pattern, interner);
-            let mut ty = p
-                .type_ann
-                .as_ref()
-                .map(|m| resolve_type_node(m, ctx, table))
-                .unwrap_or(Type::Dynamic);
-            if p.is_rest && !matches!(table.get(ty.0), TypeKind::Array(_)) {
-                ty = Type::array(ty, table);
-            }
-            FunctionParam {
-                name: Some(name),
-                ty: ty.0,
-                optional: p.is_optional || p.default.is_some(),
-                is_rest: p.is_rest,
-            }
-        })
-        .collect();
+    let ps = build_method_params(params, ctx, table);
     let ret = return_type
         .as_ref()
         .map(|m| resolve_type_node(m, ctx, table))

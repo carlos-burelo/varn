@@ -6,7 +6,6 @@ use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::ClassMember;
-use varn_core::TypeKind;
 
 impl<'r> Binder<'r> {
     pub(crate) fn collect_class_member(
@@ -20,28 +19,7 @@ impl<'r> Binder<'r> {
             ClassMember::Constructor { params, range, .. } => {
                 let ps: Vec<FunctionParam> = params
                     .iter()
-                    .map(|p| {
-                        let mut ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann))
-                            .unwrap_or(Type::Dynamic);
-                        if p.is_rest {
-                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
-                            if !is_array {
-                                ty = Type::array(
-                                    ty,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                );
-                            }
-                        }
-                        FunctionParam {
-                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty: ty.0,
-                            optional: p.is_optional || p.default.is_some(),
-                            is_rest: p.is_rest,
-                        }
-                    })
+                    .map(|p| self.function_param(p, super::binding_types::ParamSite::Declared))
                     .collect();
 
                 let fn_ty = Type::fn_(
@@ -87,11 +65,7 @@ impl<'r> Binder<'r> {
                         let name_str = pattern_lead_name(&p.pattern, &self.interner).to_owned();
                         let key_rc: Arc<str> = Arc::from(name_str.as_str());
                         let key_atom = self.intern_local(&name_str);
-                        let ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann))
-                            .unwrap_or(Type::Dynamic);
+                        let ty = self.param_type(p, super::binding_types::ParamSite::Declared);
 
                         let mut sym =
                             Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
@@ -186,28 +160,7 @@ impl<'r> Binder<'r> {
 
                 let ps: Vec<FunctionParam> = params
                     .iter()
-                    .map(|p| {
-                        let mut ty = p
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann))
-                            .unwrap_or(Type::Dynamic);
-                        if p.is_rest {
-                            let is_array = matches!(self.ty_table.get(ty.0), TypeKind::Array(_));
-                            if !is_array {
-                                ty = Type::array(
-                                    ty,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                );
-                            }
-                        }
-                        FunctionParam {
-                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty: ty.0,
-                            optional: p.is_optional || p.default.is_some(),
-                            is_rest: p.is_rest,
-                        }
-                    })
+                    .map(|p| self.function_param(p, super::binding_types::ParamSite::Declared))
                     .collect();
 
                 let fn_tps: Vec<Arc<str>> = type_params
@@ -302,11 +255,7 @@ impl<'r> Binder<'r> {
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
-                let ty = param
-                    .type_ann
-                    .as_ref()
-                    .map(|ann| self.resolve_type(ann))
-                    .unwrap_or(Type::Dynamic);
+                let ty = self.param_type(param, super::binding_types::ParamSite::Declared);
 
                 let has_explicit = param.type_ann.is_some();
 

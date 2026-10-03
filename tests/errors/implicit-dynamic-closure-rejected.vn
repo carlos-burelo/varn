@@ -1,0 +1,2 @@
+// expect: error[VN3011]
+let inc = (n) => n + 1

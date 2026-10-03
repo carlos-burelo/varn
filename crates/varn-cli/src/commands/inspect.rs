@@ -24,7 +24,6 @@ pub fn execute(args: InspectArgs) -> Result<(), CliError> {
         no_run: true,
         debug,
         trace: false,
-        strict: false,
         capabilities: Default::default(),
     })
 }

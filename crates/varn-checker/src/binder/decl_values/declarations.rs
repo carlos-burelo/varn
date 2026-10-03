@@ -29,6 +29,12 @@ impl<'r> super::super::Binder<'r> {
                     })
                 });
 
+            let ty = if ty.is_none() {
+                self.report_missing_variable_annotation(d);
+                Some(Type::Error)
+            } else {
+                ty
+            };
             let needs_enrich =
                 !has_explicit_ann && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty, has_explicit_ann);
@@ -94,35 +100,7 @@ impl<'r> super::super::Binder<'r> {
         let params: Vec<crate::types::FunctionParam> = f
             .params
             .iter()
-            .map(|p| {
-                let name = Some(Arc::from(crate::binder::pattern_lead_name(
-                    &p.pattern,
-                    &self.interner,
-                )));
-                let mut ty = p
-                    .type_ann
-                    .as_ref()
-                    .map(|ann| self.resolve_type(ann))
-                    .or_else(|| {
-                        p.default
-                            .map(|e| widen_literal(self.infer_expr_type_self(e)))
-                    })
-                    .unwrap_or(Type::Dynamic);
-
-                if p.is_rest {
-                    let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
-                    if !is_array {
-                        ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                    }
-                }
-
-                crate::types::FunctionParam {
-                    name,
-                    ty: ty.0,
-                    optional: p.is_optional || p.default.is_some(),
-                    is_rest: p.is_rest,
-                }
-            })
+            .map(|p| self.function_param(p, crate::binder::ParamSite::Declared))
             .collect();
 
         let declared_ret = f.return_type.as_ref().map(|ann| self.resolve_type(ann));
@@ -186,22 +164,7 @@ impl<'r> super::super::Binder<'r> {
         self.bind_type_params(&f.type_params, line);
 
         for p in f.params.iter() {
-            let mut ty = p
-                .type_ann
-                .as_ref()
-                .map(|ann| self.resolve_type(ann))
-                .or_else(|| {
-                    p.default
-                        .map(|e| widen_literal(self.infer_expr_type_self(e)))
-                })
-                .unwrap_or(Type::Dynamic);
-
-            if p.is_rest {
-                let is_array = matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_));
-                if !is_array {
-                    ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                }
-            }
+            let ty = self.param_type(p, crate::binder::ParamSite::Declared);
 
             self.bind_pattern(
                 &p.pattern,

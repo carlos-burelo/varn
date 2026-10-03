@@ -1,0 +1,3 @@
+// expect: error[VN3011]
+function mystery(cb) { return cb(1) }
+print(mystery((n) => n + 1))

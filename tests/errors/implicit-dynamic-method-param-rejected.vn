@@ -1,0 +1,2 @@
+// expect: error[VN3011]
+class C { m(a) { return a } }

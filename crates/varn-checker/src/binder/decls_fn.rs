@@ -51,19 +51,9 @@ impl<'r> Binder<'r> {
 
     pub(super) fn bind_function_params(&mut self, params: &[Param], line: u32) {
         use crate::symbol::SymbolKind;
-        use crate::types::Type;
 
         for p in params {
-            let ty = p
-                .type_ann
-                .as_ref()
-                .map(|m| self.resolve_type(m))
-                .or_else(|| {
-                    p.default
-                        .map(|e| self.infer_expr_type_self(e))
-                        .filter(|t| !t.is_dynamic())
-                })
-                .unwrap_or(Type::Dynamic);
+            let ty = self.param_type(p, super::binding_types::ParamSite::Closure);
 
             self.bind_pattern(
                 &p.pattern,

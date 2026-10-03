@@ -1,6 +1,6 @@
 use varn_core::ast::{ExprKind, ObjectProp, PropKey};
 
-use crate::binder::{pattern_lead_name, ClassMemberInfo, ClassMemberKind};
+use crate::binder::{ClassMemberInfo, ClassMemberKind};
 use crate::types::Type;
 use std::sync::Arc;
 
@@ -71,17 +71,7 @@ impl<'r> super::super::Binder<'r> {
 
                     let fn_params: Vec<_> = params
                         .iter()
-                        .map(|p| crate::types::FunctionParam {
-                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
-                            ty: p
-                                .type_ann
-                                .as_ref()
-                                .map(|ann| self.resolve_type(ann))
-                                .unwrap_or(Type::Dynamic)
-                                .0,
-                            optional: p.is_optional || p.default.is_some(),
-                            is_rest: p.is_rest,
-                        })
+                        .map(|p| self.function_param(p, crate::binder::ParamSite::Closure))
                         .collect();
 
                     let ty = Type::fn_(
