@@ -54,6 +54,7 @@ pub enum ErrorCode {
     IntegerOverflow = 3021,
     VoidValueUsed = 3022,
     ForbiddenRecordGeneric = 3023,
+    InferOutsideConditional = 3024,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -248,6 +249,7 @@ impl ErrorCode {
             ErrorCode::IntegerOverflow => "integer-overflow",
             ErrorCode::VoidValueUsed => "void-value-used",
             ErrorCode::ForbiddenRecordGeneric => "forbidden-record-generic",
+            ErrorCode::InferOutsideConditional => "infer-outside-conditional",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

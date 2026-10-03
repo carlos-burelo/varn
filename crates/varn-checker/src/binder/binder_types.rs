@@ -31,13 +31,52 @@ impl<'r> Binder<'r> {
                 args.iter().collect()
             }
             K::Array(inner) | K::KeyOf(inner) => vec![inner.as_ref()],
-            K::Union(list) | K::Intersection(list) | K::Tuple(list) => list.iter().collect(),
+            K::Union(list) | K::Intersection(list) | K::Tuple(list) | K::TemplateLiteral(list) => {
+                list.iter().collect()
+            }
             K::Fn((params, ret)) => params
                 .iter()
                 .filter_map(|p| p.constraint.as_ref())
                 .chain(std::iter::once(ret.as_ref()))
                 .collect(),
-            _ => vec![],
+            K::Object(members) => members.iter().flat_map(interface_member_types).collect(),
+            K::IndexedAccess { object, index } => vec![object.as_ref(), index.as_ref()],
+            K::Mapped { source, value, .. } => vec![source.as_ref(), value.as_ref()],
+            K::Conditional {
+                check,
+                true_type,
+                false_type,
+                ..
+            } => vec![check.as_ref(), true_type.as_ref(), false_type.as_ref()],
+            K::TypePredicate { target_type, .. } => vec![target_type.as_ref()],
+            K::EnumVariant {
+                type_args,
+                payload_ty,
+                ..
+            } => type_args
+                .iter()
+                .chain(std::iter::once(payload_ty.as_ref()))
+                .collect(),
+            K::Infer(_) => {
+                if self.reported_type_forms.insert(node.range.start.offset) {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::InferOutsideConditional,
+                            "`infer` is only valid in the `extends` clause of a conditional type",
+                        )
+                        .with_range(node.range),
+                    );
+                }
+                vec![]
+            }
+            K::Primitive(_)
+            | K::Builtin(_)
+            | K::Literal(_)
+            | K::This
+            | K::Named(..)
+            | K::Typeof(_) => {
+                vec![]
+            }
         };
         for child in children {
             self.reject_forbidden_type_forms(child);
@@ -50,5 +89,37 @@ impl<'r> Binder<'r> {
         let result = infer_expr_type(expr, arena, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
         result
+    }
+}
+
+fn interface_member_types(m: &varn_core::ast::InterfaceMember) -> Vec<&TypeNode> {
+    use varn_core::ast::InterfaceMember as M;
+    match m {
+        M::Property { type_ann, .. } => vec![type_ann],
+        M::Method {
+            params,
+            return_type,
+            ..
+        } => params
+            .iter()
+            .filter_map(|p| p.type_ann.as_ref())
+            .chain(return_type.as_ref())
+            .collect(),
+        M::Index {
+            param, return_type, ..
+        } => param
+            .type_ann
+            .iter()
+            .chain(std::iter::once(return_type))
+            .collect(),
+        M::Callable {
+            params,
+            return_type,
+            ..
+        } => params
+            .iter()
+            .filter_map(|p| p.type_ann.as_ref())
+            .chain(std::iter::once(return_type))
+            .collect(),
     }
 }
