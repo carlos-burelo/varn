@@ -421,17 +421,10 @@ fn parse_try_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
         let catch_start = s.range();
         let (param, type_ann) = if s.eat(TokenKind::LParen) {
             let p = super::patterns::parse_pattern(s)?;
-            let ty = match &p {
-                varn_core::ast::Pattern::Identifier { type_ann, .. } if type_ann.is_some() => {
-                    type_ann.clone()
-                }
-                _ => {
-                    if s.eat(TokenKind::Colon) {
-                        Some(crate::types::parse_type(s)?)
-                    } else {
-                        None
-                    }
-                }
+            let ty = if s.eat(TokenKind::Colon) {
+                Some(crate::types::parse_type(s)?)
+            } else {
+                None
             };
             s.expect(TokenKind::RParen)?;
             (Some(p), ty)

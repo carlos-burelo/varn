@@ -3,7 +3,7 @@ use super::Binder;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{ClassMemberInfo, ClassMemberKind, FunctionParam, FunctionType, Type};
 use std::sync::Arc;
-use varn_core::ast::{ClassDecl, Pattern};
+use varn_core::ast::ClassDecl;
 use varn_core::TypeKind;
 
 impl<'r> Binder<'r> {
@@ -21,10 +21,6 @@ impl<'r> Binder<'r> {
                 let mut ty = p
                     .type_ann
                     .as_ref()
-                    .or(match &p.pattern {
-                        Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                        _ => None,
-                    })
                     .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
                 if p.is_rest {
@@ -86,10 +82,6 @@ impl<'r> Binder<'r> {
             let ty = p
                 .type_ann
                 .as_ref()
-                .or(match &p.pattern {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|ann| self.resolve_type(ann))
                 .unwrap_or(Type::Dynamic);
 
@@ -97,11 +89,7 @@ impl<'r> Binder<'r> {
                 Symbol::new(SymbolKind::Property, key_atom, p.range.start.line).with_type(ty);
             sym.col = p.range.start.column;
             sym.offset = p.range.start.offset;
-            sym.has_explicit_type = p.type_ann.is_some()
-                || match &p.pattern {
-                    Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
-                    _ => false,
-                };
+            sym.has_explicit_type = p.type_ann.is_some();
             let symbol_id = self.arena.push(sym);
 
             members.push(ClassMemberInfo {

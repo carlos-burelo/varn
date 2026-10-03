@@ -14,21 +14,10 @@ impl<'r> super::super::Binder<'r> {
         };
         for d in &v.declarators {
             let line = d.range.start.line;
-            let has_explicit_ann = d.type_ann.is_some()
-                || matches!(
-                    &d.id,
-                    Pattern::Identifier {
-                        type_ann: Some(_),
-                        ..
-                    }
-                );
+            let has_explicit_ann = d.type_ann.is_some();
             let ty = d
                 .type_ann
                 .as_ref()
-                .or(match &d.id {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     d.init.map(|e| self.infer_expr_type_self(e)).map(|t| {
@@ -42,7 +31,7 @@ impl<'r> super::super::Binder<'r> {
 
             let needs_enrich =
                 !has_explicit_ann && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
-            self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
+            self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty, has_explicit_ann);
 
             if let Pattern::Identifier { name, .. } = &d.id {
                 if let Some(init) = d.init {
@@ -113,10 +102,6 @@ impl<'r> super::super::Binder<'r> {
                 let mut ty = p
                     .type_ann
                     .as_ref()
-                    .or(match &p.pattern {
-                        Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                        _ => None,
-                    })
                     .map(|ann| self.resolve_type(ann))
                     .or_else(|| {
                         p.default
@@ -204,10 +189,6 @@ impl<'r> super::super::Binder<'r> {
             let mut ty = p
                 .type_ann
                 .as_ref()
-                .or(match &p.pattern {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     p.default
@@ -228,6 +209,7 @@ impl<'r> super::super::Binder<'r> {
                 line,
                 f.doc.clone(),
                 Some(ty),
+                p.type_ann.is_some(),
             );
         }
 

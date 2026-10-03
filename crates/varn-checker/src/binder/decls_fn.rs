@@ -57,10 +57,6 @@ impl<'r> Binder<'r> {
             let ty = p
                 .type_ann
                 .as_ref()
-                .or(match &p.pattern {
-                    varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|m| self.resolve_type(m))
                 .or_else(|| {
                     p.default
@@ -69,7 +65,14 @@ impl<'r> Binder<'r> {
                 })
                 .unwrap_or(Type::Dynamic);
 
-            self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));
+            self.bind_pattern(
+                &p.pattern,
+                SymbolKind::Parameter,
+                line,
+                None,
+                Some(ty),
+                p.type_ann.is_some(),
+            );
 
             if let Some(default_value) = p.default {
                 self.bind_expr(default_value);

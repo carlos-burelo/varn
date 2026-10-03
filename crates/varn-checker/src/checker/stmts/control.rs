@@ -135,10 +135,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_for_var_init(&mut self, declarators: &[VarDeclarator], bind: &BindResult) {
         for declarator in declarators {
-            let ann = declarator.type_ann.as_ref().or(match &declarator.id {
-                varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                _ => None,
-            });
+            let ann = declarator.type_ann.as_ref();
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             if let Some(init_expr) = declarator.init {

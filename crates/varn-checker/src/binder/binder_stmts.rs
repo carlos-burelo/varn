@@ -27,10 +27,6 @@ impl<'r> Binder<'r> {
             let ty = declarator
                 .type_ann
                 .as_ref()
-                .or(match &declarator.id {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|ann| self.resolve_type(ann))
                 .or_else(|| {
                     declarator
@@ -45,6 +41,7 @@ impl<'r> Binder<'r> {
                 line,
                 doc.as_ref().map(|s| s.to_string()),
                 ty,
+                declarator.type_ann.is_some(),
             );
 
             if let Pattern::Identifier { name, .. } = &declarator.id {
@@ -136,7 +133,7 @@ impl<'r> Binder<'r> {
                 let saved = self.current;
                 self.current = child;
                 let line = arena.expr(right).range.start.line;
-                self.bind_pattern(left, SymbolKind::Let, line, None, None);
+                self.bind_pattern(left, SymbolKind::Let, line, None, None, false);
                 self.bind_expr(right);
                 self.bind_stmt(body);
                 self.finalize_array_watch(child);
@@ -169,7 +166,8 @@ impl<'r> Binder<'r> {
                     if let Some(p) = &clause.param {
                         let ty = clause.type_ann.as_ref().map(|ann| self.resolve_type(ann));
                         let block_line = arena.stmt(block).range.start.line;
-                        self.bind_pattern(p, SymbolKind::Let, block_line, None, ty);
+                        let explicit = ty.is_some();
+                        self.bind_pattern(p, SymbolKind::Let, block_line, None, ty, explicit);
                     }
                     self.bind_stmt(clause.body);
                     self.finalize_array_watch(child);

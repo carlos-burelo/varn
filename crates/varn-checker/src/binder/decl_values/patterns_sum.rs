@@ -12,24 +12,16 @@ impl<'r> super::super::Binder<'r> {
         line: u32,
         doc: Option<String>,
         ty: Option<Type>,
+        explicit: bool,
     ) {
         match pattern {
-            Pattern::Identifier {
-                name,
-                type_ann,
-                range,
-                ..
-            } => {
+            Pattern::Identifier { name, range } => {
                 let mut sym = Symbol::new(kind, *name, line);
                 sym.doc = doc.map(|d| self.intern_local(&d));
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
-                sym.has_explicit_type = type_ann.is_some();
-                if let Some(ann) = type_ann {
-                    sym.ty = Some(self.resolve_type(ann));
-                } else {
-                    sym.ty = ty;
-                }
+                sym.has_explicit_type = explicit;
+                sym.ty = ty;
                 self.define(*name, sym);
             }
             Pattern::Array { elements, rest, .. } => {
@@ -44,10 +36,10 @@ impl<'r> super::super::Binder<'r> {
                     _ => None,
                 });
                 for el in elements.iter().flatten() {
-                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty);
+                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty, false);
                 }
                 if let Some(r) = rest {
-                    self.bind_pattern(r, kind, line, doc.clone(), ty);
+                    self.bind_pattern(r, kind, line, doc.clone(), ty, false);
                 }
             }
             Pattern::Object {
@@ -133,7 +125,7 @@ impl<'r> super::super::Binder<'r> {
                         }
                         _ => None,
                     };
-                    self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty);
+                    self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty, false);
                 }
                 if let Some(r) = rest {
                     // El rest-object NO hereda el tipo del objeto fuente: sus
@@ -144,7 +136,7 @@ impl<'r> super::super::Binder<'r> {
                     // dinámico para que los accesos a excluidos sigan siendo
                     // legales y viajen por un registro DYN, no por uno `Int`.
                     let _ = &ty;
-                    self.bind_pattern(r, kind, line, doc.clone(), None);
+                    self.bind_pattern(r, kind, line, doc.clone(), None, false);
                 }
             }
             Pattern::Assignment { left, right, .. } => {
@@ -158,10 +150,10 @@ impl<'r> super::super::Binder<'r> {
                 } else {
                     ty
                 };
-                self.bind_pattern(left, kind, line, doc, resolved_ty);
+                self.bind_pattern(left, kind, line, doc, resolved_ty, false);
             }
             Pattern::Rest { argument, .. } => {
-                self.bind_pattern(argument, kind, line, doc, ty);
+                self.bind_pattern(argument, kind, line, doc, ty, false);
             }
         }
     }

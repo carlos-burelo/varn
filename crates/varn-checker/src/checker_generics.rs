@@ -152,10 +152,6 @@ fn infer_arrow_with_context(
         let explicit_ty = ap
             .type_ann
             .as_ref()
-            .or(match &ap.pattern {
-                varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                _ => None,
-            })
             .map(|m| checker.resolve_type_node_cached(m, bind));
 
         actual_params.push(FunctionParam {
@@ -183,12 +179,6 @@ fn infer_arrow_with_context(
                     let explicit_ty = ap
                         .type_ann
                         .as_ref()
-                        .or(match &ap.pattern {
-                            varn_core::ast::Pattern::Identifier { type_ann, .. } => {
-                                type_ann.as_ref()
-                            }
-                            _ => None,
-                        })
                         .map(|m| checker.resolve_type_node_cached(m, bind));
 
                     let ty = explicit_ty.unwrap_or(Type::resolved(ep.ty));

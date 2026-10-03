@@ -27,10 +27,7 @@ impl<'r> Checker<'r> {
                 );
                 continue;
             }
-            let ann = d.type_ann.as_ref().or(match &d.id {
-                varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                _ => None,
-            });
+            let ann = d.type_ann.as_ref();
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             let init = d.init.unwrap();

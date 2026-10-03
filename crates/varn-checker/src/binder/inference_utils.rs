@@ -21,10 +21,6 @@ pub fn build_fn_type(
             let mut ty = p
                 .type_ann
                 .as_ref()
-                .or(match &p.pattern {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|m| resolve_type_node(m, ctx, table))
                 .unwrap_or(Type::Dynamic);
             if p.is_rest && !matches!(table.get(ty.0), TypeKind::Array(_)) {

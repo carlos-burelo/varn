@@ -184,16 +184,7 @@ pub(crate) fn function_member(f: &FunctionDecl, interner: &AtomInterner) -> Memb
 }
 
 pub(crate) fn param_type(p: &Param) -> Option<&TypeNode> {
-    if let Some(t) = &p.type_ann {
-        return Some(t);
-    }
-    if let Pattern::Identifier {
-        type_ann: Some(t), ..
-    } = &p.pattern
-    {
-        return Some(t);
-    }
-    None
+    p.type_ann.as_ref()
 }
 
 pub(crate) fn map_params(params: &[Param], interner: &AtomInterner) -> Vec<ParamInfo> {

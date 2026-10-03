@@ -223,10 +223,6 @@ impl<'r> Checker<'r> {
                 let mut ty = p
                     .type_ann
                     .as_ref()
-                    .or(match &p.pattern {
-                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                        _ => None,
-                    })
                     .map(|ann| self.resolve_type_node_cached(ann, bind))
                     .unwrap_or(Type::Dynamic);
                 if p.is_rest {

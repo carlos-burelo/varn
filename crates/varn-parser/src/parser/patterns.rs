@@ -90,31 +90,17 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         }
         TokenKind::Placeholder => {
             s.advance();
-            let type_ann = if s.check(TokenKind::Colon) {
-                s.advance();
-                Some(parse_type(s)?)
-            } else {
-                None
-            };
             let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
                 name: s.interner.intern("_"),
-                type_ann,
                 range: full_range,
             })
         }
         _ => {
             let name = s.consume_lexeme();
-            let type_ann = if s.check(TokenKind::Colon) {
-                s.advance();
-                Some(parse_type(s)?)
-            } else {
-                None
-            };
             let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
                 name,
-                type_ann,
                 range: full_range,
             })
         }
@@ -186,7 +172,6 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             (
                 Pattern::Identifier {
                     name: alias,
-                    type_ann: None,
                     range: alias_range,
                 },
                 false,
@@ -195,7 +180,6 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             (
                 Pattern::Identifier {
                     name: key,
-                    type_ann: None,
                     range: prop_range,
                 },
                 true,

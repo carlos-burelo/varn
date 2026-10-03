@@ -5,7 +5,7 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use varn_core::ast::{ClassMember, Pattern};
+use varn_core::ast::ClassMember;
 use varn_core::TypeKind;
 
 impl<'r> Binder<'r> {
@@ -24,10 +24,6 @@ impl<'r> Binder<'r> {
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {
@@ -94,10 +90,6 @@ impl<'r> Binder<'r> {
                         let ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
 
@@ -106,11 +98,7 @@ impl<'r> Binder<'r> {
                                 .with_type(ty);
                         sym.col = p.range.start.column;
                         sym.offset = p.range.start.offset;
-                        sym.has_explicit_type = p.type_ann.is_some()
-                            || match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
-                                _ => false,
-                            };
+                        sym.has_explicit_type = p.type_ann.is_some();
                         let symbol_id = self.arena.push(sym);
 
                         members.push(ClassMemberInfo {
@@ -202,10 +190,6 @@ impl<'r> Binder<'r> {
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {
@@ -321,18 +305,10 @@ impl<'r> Binder<'r> {
                 let ty = param
                     .type_ann
                     .as_ref()
-                    .or(match &param.pattern {
-                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                        _ => None,
-                    })
                     .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
-                let has_explicit = param.type_ann.is_some()
-                    || match &param.pattern {
-                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
-                        _ => false,
-                    };
+                let has_explicit = param.type_ann.is_some();
 
                 let mut sym =
                     Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);

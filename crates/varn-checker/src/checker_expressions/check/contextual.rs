@@ -12,14 +12,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
-            let has_ann = ap.type_ann.is_some()
-                || matches!(
-                    &ap.pattern,
-                    varn_core::ast::Pattern::Identifier {
-                        type_ann: Some(_),
-                        ..
-                    }
-                );
+            let has_ann = ap.type_ann.is_some();
             let ep_ty = Type::resolved(ep.ty);
             if has_ann || ep_ty.is_dynamic() {
                 continue;

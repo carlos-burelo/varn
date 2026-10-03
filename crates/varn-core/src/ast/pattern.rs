@@ -8,7 +8,6 @@ use crate::Atom;
 pub enum Pattern {
     Identifier {
         name: Atom,
-        type_ann: Option<TypeNode>,
         range: SourceRange,
     },
     Array {

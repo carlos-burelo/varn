@@ -94,7 +94,6 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<ExprId, String> {
         vec![Param {
             pattern: Pattern::Identifier {
                 name: param_name,
-                type_ann: None,
                 range: param_range,
             },
             type_ann: None,

@@ -3,7 +3,7 @@ use crate::binder::{ClassMemberInfo, ClassMemberKind};
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionParam, FunctionType, Type};
 use std::sync::Arc;
-use varn_core::ast::{InterfaceDecl, InterfaceMember, Pattern};
+use varn_core::ast::{InterfaceDecl, InterfaceMember};
 use varn_core::TypeKind;
 
 impl<'r> super::Binder<'r> {
@@ -122,10 +122,6 @@ impl<'r> super::Binder<'r> {
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|m| self.resolve_type(m))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {
@@ -237,10 +233,6 @@ impl<'r> super::Binder<'r> {
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|m| self.resolve_type(m))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {

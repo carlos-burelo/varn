@@ -3,7 +3,7 @@ use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use std::sync::Arc;
-use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
+use varn_core::ast::{ExtensionDecl, ExtensionMember};
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
@@ -36,10 +36,6 @@ impl<'r> super::super::Binder<'r> {
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                                _ => None,
-                            })
                             .map(|ann| self.resolve_type(ann))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest {
@@ -167,10 +163,6 @@ impl<'r> super::super::Binder<'r> {
                     let param_ty = param
                         .type_ann
                         .as_ref()
-                        .or(match &param.pattern {
-                            Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                            _ => None,
-                        })
                         .map(|ann| self.resolve_type(ann))
                         .unwrap_or(Type::Dynamic);
                     let fn_type = Type::fn_(
@@ -243,10 +235,6 @@ impl<'r> super::super::Binder<'r> {
             let mut ty = p
                 .type_ann
                 .as_ref()
-                .or(match &p.pattern {
-                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                    _ => None,
-                })
                 .map(|ann| self.resolve_type(ann))
                 .unwrap_or(Type::Dynamic);
             if p.is_rest {
@@ -255,7 +243,14 @@ impl<'r> super::super::Binder<'r> {
                     ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 }
             }
-            self.bind_pattern(&p.pattern, SymbolKind::Parameter, line, None, Some(ty));
+            self.bind_pattern(
+                &p.pattern,
+                SymbolKind::Parameter,
+                line,
+                None,
+                Some(ty),
+                p.type_ann.is_some(),
+            );
             if let Some(def) = p.default {
                 self.bind_expr(def);
             }

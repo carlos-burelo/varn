@@ -43,12 +43,6 @@ pub(super) fn resolve_object_type(
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                varn_core::ast::Pattern::Identifier { type_ann, .. } => {
-                                    type_ann.as_ref()
-                                }
-                                _ => None,
-                            })
                             .map(|ann| resolve_type_node(ann, ctx, table))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest && !matches!(table.get(ty.0), varn_core::TypeKind::Array(_)) {
@@ -84,10 +78,6 @@ pub(super) fn resolve_object_type(
                 let key_ty = param
                     .type_ann
                     .as_ref()
-                    .or(match &param.pattern {
-                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
-                        _ => None,
-                    })
                     .map(|ann| resolve_type_node(ann, ctx, table))
                     .unwrap_or(Type::Str);
                 let value_ty = resolve_type_node(return_type, ctx, table);
@@ -111,12 +101,6 @@ pub(super) fn resolve_object_type(
                         let mut ty = p
                             .type_ann
                             .as_ref()
-                            .or(match &p.pattern {
-                                varn_core::ast::Pattern::Identifier { type_ann, .. } => {
-                                    type_ann.as_ref()
-                                }
-                                _ => None,
-                            })
                             .map(|ann| resolve_type_node(ann, ctx, table))
                             .unwrap_or(Type::Dynamic);
                         if p.is_rest && !matches!(table.get(ty.0), varn_core::TypeKind::Array(_)) {

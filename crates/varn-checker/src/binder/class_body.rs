@@ -74,12 +74,14 @@ impl<'r> Binder<'r> {
                     });
                     self.escape_all_open_array_candidates();
                     self.bind_stmt(*body);
+                    let ty = param.type_ann.as_ref().map(|ann| self.resolve_type(ann));
                     self.bind_pattern(
                         &param.pattern,
                         SymbolKind::Parameter,
                         range.start.line,
                         None,
-                        None,
+                        ty,
+                        param.type_ann.is_some(),
                     );
                 }
                 ClassMember::Property {
