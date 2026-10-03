@@ -74,13 +74,11 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
             cur = m.class(c).and_then(|ci| ci.parent);
         }
     }
-    // The bare null value — `Nullable` over a `Never` payload — is assignable
-    // to every nullable type. It is what `return null` in a `T?` function
-    // produces.
-    if let (BackendTy::Nullable(fi), BackendTy::Nullable(_)) = (from, to) {
-        if m.types.contains(fi) && m.types.get(fi) == BackendTy::Never {
+    if let (BackendTy::Nullable(fi), BackendTy::Nullable(ti)) = (from, to) {
+        if !m.types.contains(fi) || !m.types.contains(ti) {
             return true;
         }
+        return assignable_with_depth(m, m.types.get(fi), m.types.get(ti), depth + 1);
     }
     // T is assignable to T?; the reverse is not.
     if let BackendTy::Nullable(inner) = to {
