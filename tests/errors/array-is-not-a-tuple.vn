@@ -1,0 +1,2 @@
+// expect: error[VN3001]
+let pair: [str, str] = ["a", "b"]

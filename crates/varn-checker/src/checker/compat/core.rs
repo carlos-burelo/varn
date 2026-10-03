@@ -110,12 +110,6 @@ pub(super) fn types_compatible_impl(
             true
         }
 
-        (TypeKind::Tuple(decl_elems), TypeKind::Array(inf_elem)) => {
-            table.get_list(decl_elems).to_vec().iter().all(|dd| {
-                types_compatible_impl(&t(*dd), &t(inf_elem), bind, cache, in_progress, table)
-            })
-        }
-
         (TypeKind::Tuple(decl_elems), TypeKind::Tuple(inf_elems)) => {
             let decl_ids = table.get_list(decl_elems).to_vec();
             let inf_ids = table.get_list(inf_elems).to_vec();

@@ -128,7 +128,7 @@ export class Query {
         for (const key in this.values) {
             const bucket = this.values[key];
             for (const val of bucket) {
-                res.push([key, val]);
+                res.push(#[key, val]);
             }
         }
         return res;
