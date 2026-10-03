@@ -31,6 +31,8 @@ impl<'r> Checker<'r> {
                         origin_str,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
+                } else if let Some(contextual) = self.expected_instantiation(name) {
+                    contextual
                 } else if name_str == varn_core::BuiltinType::Map.name() {
                     Type::generic_with_origin(
                         name_str,
@@ -73,6 +75,8 @@ impl<'r> Checker<'r> {
                             args,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
+                    } else if let Some(contextual) = self.expected_instantiation(*name) {
+                        contextual
                     } else if name_str == varn_core::BuiltinType::Map.name() {
                         Type::generic(
                             name_str,
@@ -86,6 +90,16 @@ impl<'r> Checker<'r> {
                     Type::Dynamic
                 }
             }
+        }
+    }
+
+    fn expected_instantiation(&mut self, name: varn_core::Atom) -> Option<Type> {
+        let expected = self
+            .expected_type?
+            .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        match self.ty_table.get(expected.0) {
+            TypeKind::Generic(expected_name, _, _) if expected_name == name => Some(expected),
+            _ => None,
         }
     }
 }
