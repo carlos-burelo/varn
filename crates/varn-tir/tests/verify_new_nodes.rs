@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! The nodes added as the entry condition of stage 2: `await` / `yield`,
 //! `IsNull`, the enum discriminant and payload accessors, `TypeTest`, and
 //! spread in argument and element lists. Each test builds malformed TIR by

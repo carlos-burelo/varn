@@ -48,7 +48,7 @@ impl ExecSplit {
             return None;
         }
         let compile = Duration::from_nanos(jit.total_compile_time_ns);
-        (compile <= execute).then(|| Self { compile })
+        (compile <= execute).then_some(Self { compile })
     }
 }
 

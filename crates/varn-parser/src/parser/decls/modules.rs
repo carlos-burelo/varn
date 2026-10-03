@@ -66,7 +66,7 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
             let local = if s.eat(TokenKind::As) {
                 s.consume_lexeme()
             } else {
-                imported.clone()
+                imported
             };
             let full_spec_range = s.span_from(spec_range);
             specifiers.push(ImportSpecifier::Named {
@@ -184,7 +184,7 @@ pub fn parse_export_decl(
             let exported = if s.eat(TokenKind::As) {
                 s.consume_lexeme()
             } else {
-                local.clone()
+                local
             };
             let full_spec_range = s.span_from(spec_range);
             specifiers.push(ExportSpecifier {

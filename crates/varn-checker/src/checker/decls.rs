@@ -37,7 +37,7 @@ impl<'r> Checker<'r> {
                     let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
                     if let Some(init_expr) = d.init {
-                        self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init_expr, bind));
+                        self.with_expected(ann_ty_opt, |c| c.check_expr(init_expr, bind));
 
                         if let Some(ann_ty) = &ann_ty_opt {
                             let init_ty = self.infer_type(init_expr, bind);
@@ -602,7 +602,7 @@ impl<'r> Checker<'r> {
                                             if let Some(m) =
                                                 members.iter().find(|m| m.name.as_ref() == key_str)
                                             {
-                                                param_ty = m.ty.clone();
+                                                param_ty = m.ty;
                                             }
                                         }
                                     }

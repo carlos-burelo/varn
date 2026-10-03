@@ -49,7 +49,7 @@ impl InstanceData {
     #[inline]
     pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Rc<InstanceData> {
         let payload_bytes = payload_size as usize;
-        let payload_words = (payload_bytes + 7) / 8;
+        let payload_words = payload_bytes.div_ceil(8);
         let total_words = INSTANCE_HEADER_WORDS + payload_words;
 
         let backing: Rc<[MaybeUninit<u64>]> = Rc::new_uninit_slice(total_words);

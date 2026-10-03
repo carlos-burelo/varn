@@ -68,10 +68,10 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
         if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap_idx()) {
             let obj = obj_ref.borrow();
 
-            if let Some(msg_nv) = obj.get_field_nv("message") {
+            if let Some(msg_nv) = obj.get_field("message") {
                 let msg = heap.str_repr(msg_nv);
 
-                if let Some(name_nv) = obj.get_field_nv("name") {
+                if let Some(name_nv) = obj.get_field("name") {
                     let name = heap.str_repr(name_nv);
                     if !name.is_empty()
                         && name != varn_core::well_known::ERROR
@@ -124,9 +124,9 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return msg;
     };
     let oref = varn_types::value::ObjRef::instance(&cls);
-    oref.set_field_nv(std::sync::Arc::from("message"), msg);
+    oref.set_field(std::sync::Arc::from("message"), msg);
     let name = heap.alloc_str_dynamic(class_name);
-    oref.set_field_nv(std::sync::Arc::from("name"), name);
+    oref.set_field(std::sync::Arc::from("name"), name);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 

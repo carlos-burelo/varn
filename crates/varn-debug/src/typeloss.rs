@@ -64,7 +64,7 @@ pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<
     let mut rows: Vec<(String, Counts)> = Vec::new();
     collect(proto, flags, &mut rows);
     rows.retain(|(_, c)| c.generic > 0);
-    rows.sort_by(|a, b| b.1.generic.cmp(&a.1.generic));
+    rows.sort_by_key(|row| std::cmp::Reverse(row.1.generic));
 
     if rows.is_empty() {
         if module.is_some() {
@@ -182,7 +182,7 @@ fn count_one(proto: &FunctionProto) -> Counts {
         }
         ip += layout.len;
     }
-    generic.sort_by(|a, b| b.1.cmp(&a.1));
+    generic.sort_by_key(|entry| std::cmp::Reverse(entry.1));
     c.by_op = generic;
     c
 }

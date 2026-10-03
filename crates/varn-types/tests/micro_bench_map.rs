@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 use std::time::Instant;
 use varn_types::value::{MapKey, ObjRef, ValueMap};
 use varn_types::vm_value::VmValue;
@@ -72,9 +73,9 @@ fn bench_phase0_map_representations() {
         obj.set_field_str("id", val1);
         obj.set_field_str("user", val2);
         obj.set_field_str("act", val3);
-        let r1 = obj.get_field_nv("id").unwrap();
-        let r2 = obj.get_field_nv("user").unwrap();
-        let r3 = obj.get_field_nv("act").unwrap();
+        let r1 = obj.get_field("id").unwrap();
+        let r2 = obj.get_field("user").unwrap();
+        let r3 = obj.get_field("act").unwrap();
         sum_shape += std::hint::black_box(r1.as_int() + r2.as_int() + r3.as_int());
     }
     let elapsed_shape = t0.elapsed();

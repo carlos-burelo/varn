@@ -40,6 +40,37 @@ impl NativeCtx for Heap {
         self.deref_mut().alloc_bound_native(receiver, func, name)
     }
 
+    fn alloc_map(&mut self, entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        let mut map = varn_types::value::ValueMap::default();
+        for (key, value) in entries {
+            let key = self.deref_mut().canonical_map_key(key);
+            map.insert(key, value);
+        }
+        self.deref_mut().alloc_map_vm(map)
+    }
+
+    fn alloc_set(&mut self, items: Vec<VmValue>) -> VmValue {
+        let mut set = varn_types::value::ValueSet::default();
+        for item in items {
+            set.insert(self.deref_mut().canonical_map_key(item));
+        }
+        self.deref_mut().alloc_set_vm(set)
+    }
+
+    fn alloc_enum_variant(&mut self, data: varn_types::value::EnumVariantData) -> VmValue {
+        self.deref_mut().alloc_enum_variant_vm(data)
+    }
+
+    fn alloc_buffer(&mut self, size: usize) -> VmValue {
+        self.deref_mut()
+            .alloc_vm_buffer(varn_types::VmBuffer::new(size))
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
+        self.deref_mut()
+            .alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
+    }
+
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
         self.alloc_array_vm(items)
     }
@@ -171,7 +202,7 @@ impl NativeCtx for Heap {
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
-                return o.borrow().get_field_nv(key);
+                return o.borrow().get_field(key);
             }
             if let Some(HeapObj::Module(m)) = self.get_by_idx(obj.as_heap_idx()) {
                 let slot = m.export_map.get(key).copied()?;
@@ -185,7 +216,7 @@ impl NativeCtx for Heap {
         if obj.is_heap() {
             let raw_idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
-                o.set_field_nv(Arc::from(key), val);
+                o.set_field(Arc::from(key), val);
                 self.write_barrier(raw_idx, val);
             } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
                 if let Some(s) = m.export_map.get(key).copied() {

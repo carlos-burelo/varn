@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! A missing type costs performance. A WRONG type is a miscompile, and
 //! nothing in the pipeline looks for one today. These checks are the trip
 //! wire.

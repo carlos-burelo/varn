@@ -31,11 +31,11 @@ pub fn render(rep: &Report, filename: &str, fmt: Format, w: &mut dyn Write) -> s
                 "\n{BOLD}Capability Trace{RESET}  {DIM}{filename}{RESET}\n"
             )?;
             if rows.is_empty() {
-                write!(w, "  {DIM}(no capabilities required){RESET}\n")?;
+                writeln!(w, "  {DIM}(no capabilities required){RESET}")?;
             } else {
-                write!(w, "  Required capabilities:\n")?;
+                writeln!(w, "  Required capabilities:")?;
                 for r in rows {
-                    write!(w, "    {CYAN}@cap{RESET}({BOLD}\"{}\"{RESET})\n", r[0])?;
+                    writeln!(w, "    {CYAN}@cap{RESET}({BOLD}\"{}\"{RESET})", r[0])?;
                 }
             }
         }

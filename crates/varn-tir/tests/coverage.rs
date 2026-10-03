@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! The counter that says whether the work is advancing, as opposed to the
 //! verifier, which says whether it is broken. A receiver whose class IS known
 //! but which resolves by name is legal — it is an opportunity lost, not a

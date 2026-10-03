@@ -618,9 +618,7 @@ impl ImportResolver for DiskResolver {
             }
         }
 
-        let Some(source) = self.load_source(&ModuleId::local_str(&canonical)) else {
-            return None;
-        };
+        let source = self.load_source(&ModuleId::local_str(&canonical))?;
         let carrier = super::CarrierKind::from(source.provenance);
         let source = source.text;
         let source = source.as_ref();

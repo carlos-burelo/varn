@@ -162,7 +162,7 @@ varn_contract! {
 
             let mut out = vec![0u8; key_len as usize];
             let hmac_len = 32usize;
-            let num_blocks = ((key_len as usize) + hmac_len - 1) / hmac_len;
+            let num_blocks = (key_len as usize).div_ceil(hmac_len);
             let mut block_buf = Vec::with_capacity(salt_bytes.len() + 4);
 
             for i in 1..=num_blocks {

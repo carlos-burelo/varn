@@ -446,9 +446,6 @@ mod tests {
             registry.source(&local("C:/nope/missing.vn")),
             Err(LoadError::NotFound { .. })
         ));
-        assert!(matches!(
-            registry.resolve("std:math", &local("C:/main.vn")),
-            Ok(_)
-        ));
+        assert!(registry.resolve("std:math", &local("C:/main.vn")).is_ok());
     }
 }

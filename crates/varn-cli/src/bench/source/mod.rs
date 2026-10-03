@@ -26,23 +26,10 @@ use super::stats::PhaseStats;
 use super::BenchOpts;
 use crate::error::CliError;
 
-/// Compile through the TIR path — the same route the pipeline takes.
-fn compile_via_tir(
-    program: &varn_core::ast::Program,
-    ast_arena: &varn_core::ast::AstArena,
-    check: &varn_checker::CheckResult,
-    export_names: Vec<Arc<str>>,
-) -> Result<FunctionProto, String> {
-    let tir = varn_checker::emit::emit_module(
-        program,
-        ast_arena,
-        &check.bind,
-        &check.expr_table,
-        &check.call_mappings,
-        &check.desugar,
-    );
-    varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
-}
+mod e2e;
+mod helpers;
+
+use helpers::{compile_via_tir, export_names_of, parse_shared, verbose_sections};
 
 pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
@@ -257,53 +244,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         |_done, _samples| {},
     )?;
 
-    let e2e_samples = time_n(runs, || {
-        let source = match eval {
-            Some(code) => code.to_owned(),
-            None => crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?,
-        };
-
-        let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
-            .map_err(|e| e.message)?;
-
-        let (program, _, interner, arena) =
-            parse_shared(tokens, lexeme_buf, path).map_err(|errs| {
-                let msgs: Vec<String> = errs
-                    .iter()
-                    .map(|e| {
-                        format!(
-                            "{}:{}:{}: {}",
-                            path, e.range.start.line, e.range.start.column, e.message
-                        )
-                    })
-                    .collect();
-                format!("parse errors:\n{}", msgs.join("\n"))
-            })?;
-
-        let check_result = varn_pipeline::resolver::with_resolver(|r| {
-            Checker::check_with(
-                &program,
-                &arena,
-                interner,
-                r,
-                varn_checker::CheckOptions::compile(),
-            )
-        });
-
-        let proto = compile_via_tir(
-            &program,
-            &arena,
-            &check_result,
-            export_names_of(&program.filename),
-        )
-        .map_err(|e| format!("compile failed: {}", e))?;
-
-        varn_builtins::reset_testing_counters();
-
-        let mut machine = factory.build();
-        let closure = Rc::new(proto);
-        run_vm_to_completion(&mut machine, closure)
-    })?;
+    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![
@@ -394,119 +335,4 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     // Last, so the report is on screen even when the guard fails: a threshold
     // breach is something to read the numbers about, not instead of.
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
-}
-
-fn export_names_of(filename: &str) -> Vec<Arc<str>> {
-    let exports =
-        varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
-    let mut names: Vec<Arc<str>> = exports.keys().map(|k| Arc::from(k.as_str())).collect();
-    names.sort();
-    names
-}
-
-#[allow(clippy::too_many_arguments)]
-fn verbose_sections(
-    factory: &VmFactory,
-    exec_jit: &varn_vm::varn_jit::JitStatsSnapshot,
-    records: &[varn_vm::varn_jit::CompileRecord],
-    parse_profile: &varn_parser::ParseProfile,
-    check_result: &varn_checker::CheckResult,
-    phases: &[PhaseStats],
-    opts: &BenchOpts,
-) -> Result<(), CliError> {
-    varn_builtins::reset_testing_counters();
-    varn_builtins::set_print_silent(true);
-    varn_builtins::set_testing_silent(true);
-
-    let mut profile_vm = factory.build();
-    profile_vm.enable_opcode_profiling();
-    profile_vm.enable_profiling();
-    profile_vm.enable_hotspot_profiling();
-    run_vm_to_completion(&mut profile_vm, factory.entry_proto())
-        .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
-    profile_vm.collect_gc();
-    let opcode_counts = profile_vm.take_opcode_counts();
-    let mut vm_profile = profile_vm.take_profile();
-    let hotspots = profile_vm.take_hotspots();
-
-    varn_builtins::set_print_silent(!opts.show_output);
-    varn_builtins::set_testing_silent(!opts.show_output);
-
-    let breakdown = BreakdownOpts {
-        all_rows: opts.all_rows,
-    };
-    let phase_p50 = |name: &str| phases.iter().find(|p| p.name == name).map(|p| p.p50);
-
-    print_breakdown(
-        "Parser Breakdown",
-        |c| c.green(),
-        &[
-            ("program_loop", parse_profile.program_loop),
-            ("stmt_or_decl", parse_profile.stmt_or_decl),
-            ("block", parse_profile.block),
-            ("recover", parse_profile.recover),
-        ],
-        phase_p50("parse"),
-        &breakdown,
-    );
-
-    let cp = &check_result.profile;
-    print_breakdown(
-        "Checker Breakdown",
-        |c| c.red(),
-        &[
-            ("load_globals", cp.load_globals),
-            ("bind", cp.bind),
-            ("merge_core", cp.merge_core_members),
-            ("enrich_calls", cp.enrich_call_returns),
-            ("init", cp.init),
-            ("check_stmts", cp.check_stmts),
-            ("annotations", cp.collect_annotations),
-            ("finalize", cp.finalize),
-            ("cleanup", cp.cleanup),
-        ],
-        phase_p50("check"),
-        &breakdown,
-    );
-
-    print_coverage(exec_jit, records, "programa completo");
-
-    let interp_share = (exec_jit.total_frames() > 0).then(|| exec_jit.never_compiled_ratio());
-    print_opcode_hotspots(&opcode_counts, interp_share);
-    if let Some(ref mut profile) = vm_profile {
-        let move_count = opcode_counts
-            .iter()
-            .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
-            .map(|(_, n)| *n)
-            .unwrap_or(0);
-        profile.move_opcodes = move_count;
-        print_vm_profile(profile, interp_share);
-    }
-    if let Some(ref hs) = hotspots {
-        print_hotspots(hs);
-    }
-    terminal::blank();
-    Ok(())
-}
-
-/// Parse the benchmarked program into the resolver's atom space, with the
-/// parser's timing profile.
-fn parse_shared(
-    tokens: Vec<varn_core::Token>,
-    lexeme_buf: std::sync::Arc<[u8]>,
-    path: &str,
-) -> Result<
-    (
-        varn_core::ast::Program,
-        varn_parser::ParseProfile,
-        varn_core::AtomInterner,
-        varn_core::ast::AstArena,
-    ),
-    varn_core::DiagnosticBag,
-> {
-    varn_pipeline::in_shared_atoms(|interner| {
-        varn_parser::parse_with_profile(tokens, lexeme_buf, path, interner)
-            .map(|(program, profile, interner, arena)| ((program, profile, arena), interner))
-    })
-    .map(|((program, profile, arena), interner)| (program, profile, interner, arena))
 }

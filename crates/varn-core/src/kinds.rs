@@ -83,11 +83,7 @@ pub enum TypeKind<T, N, C, F, O, E = ()> {
 
 impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
     pub fn is_primitive(&self) -> bool {
-        match self {
-            TypeKind::Primitive(_) => true,
-            TypeKind::This => true,
-            _ => false,
-        }
+        matches!(self, TypeKind::Primitive(_) | TypeKind::This)
     }
 
     /// The language-vocabulary name of a primitive or builtin kind.

@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Integración: muchos módulos publicando `Atom`s/`CheckerTyId`s nuevos al
 //! `DiskResolver` compartido deben seguir resolviendo correctamente incluso
 //! cuando el número de símbolos nuevos cruza el umbral de congelación interno

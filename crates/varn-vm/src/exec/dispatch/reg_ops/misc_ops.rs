@@ -104,7 +104,7 @@ impl ExecCtx {
         crate::exec::class::op_declare_field(obj, &name, tag, &mut self.heap)
     }
 
-    pub(in crate::exec::dispatch) fn exec_get_index_nv(
+    pub(in crate::exec::dispatch) fn exec_get_index(
         &mut self,
         obj: VmValue,
         key_nv: VmValue,

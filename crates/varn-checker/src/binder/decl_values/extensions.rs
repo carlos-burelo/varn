@@ -13,7 +13,7 @@ impl<'r> super::super::Binder<'r> {
 
         if let Some(id) = e.id {
             let line = e.range.start.line;
-            let ext_type = receiver_ty.clone();
+            let ext_type = receiver_ty;
             let mut sym = Symbol::new(SymbolKind::Extension, id, line).with_type(ext_type);
             sym.col = e.range.start.column;
             sym.offset = e.range.start.offset;
@@ -110,7 +110,7 @@ impl<'r> super::super::Binder<'r> {
                         );
                     self.bind_extension_function_scope(
                         line,
-                        receiver_ty.clone(),
+                        receiver_ty,
                         &method.params,
                         method.body,
                     );
@@ -154,12 +154,7 @@ impl<'r> super::super::Binder<'r> {
                         .entry(Arc::from(type_name.as_str()))
                         .or_default()
                         .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
-                    self.bind_extension_function_scope(
-                        range.start.line,
-                        receiver_ty.clone(),
-                        &[],
-                        *body,
-                    );
+                    self.bind_extension_function_scope(range.start.line, receiver_ty, &[], *body);
                 }
                 ExtensionMember::Setter {
                     key,
@@ -221,7 +216,7 @@ impl<'r> super::super::Binder<'r> {
                         .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
                     self.bind_extension_function_scope(
                         range.start.line,
-                        receiver_ty.clone(),
+                        receiver_ty,
                         std::slice::from_ref(param),
                         *body,
                     );

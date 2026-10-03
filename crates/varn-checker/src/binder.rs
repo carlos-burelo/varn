@@ -164,7 +164,7 @@ impl TypeContext for Binder<'_> {
         let scope = self.scopes.get(self.current);
         let atom = self.interner.get(name)?;
         let id = scope.resolve(atom, &self.scopes)?;
-        self.arena.get(id).ty.clone()
+        self.arena.get(id).ty
     }
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
@@ -383,10 +383,7 @@ impl<'r> Binder<'r> {
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
         self.reject_forbidden_type_forms(node);
         self.sync_ty_table();
-        let mut table = std::mem::replace(
-            std::sync::Arc::make_mut(&mut self.ty_table),
-            crate::types::CheckerTyTable::default(),
-        );
+        let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
         let result = resolve_type_node(node, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
         result
@@ -430,10 +427,7 @@ impl<'r> Binder<'r> {
     /// Same rationale as [`Self::resolve_type`], for `infer_expr_type`.
     pub(crate) fn infer_expr_type_self(&mut self, expr: varn_core::ast::ExprId) -> Type {
         self.sync_ty_table();
-        let mut table = std::mem::replace(
-            std::sync::Arc::make_mut(&mut self.ty_table),
-            crate::types::CheckerTyTable::default(),
-        );
+        let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
         let arena = self.ast_arena;
         let result = infer_expr_type(expr, arena, Some(self), &mut table);
         self.ty_table = std::sync::Arc::new(table);
@@ -501,7 +495,7 @@ impl<'r> Binder<'r> {
                     {
                         let fields = self.collect_object_members(properties);
                         if !fields.is_empty() {
-                            self.type_members.objects.insert(name.clone(), fields);
+                            self.type_members.objects.insert(*name, fields);
                         }
                     }
                 }

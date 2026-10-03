@@ -104,9 +104,13 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 
     if a.is_heap() && heap.is_int(b) {
         match heap.get(a.as_heap_idx()) {
-            Some(HeapObj::BigInt(av)) => return **av == num_bigint::BigInt::from(heap.as_int(b)),
+            Some(HeapObj::BigInt(av)) => {
+                let rhs = num_bigint::BigInt::from(heap.as_int(b));
+                return **av == rhs;
+            }
             Some(HeapObj::Decimal(da)) => {
-                return **da == bigdecimal::BigDecimal::from(heap.as_int(b))
+                let rhs = bigdecimal::BigDecimal::from(heap.as_int(b));
+                return **da == rhs;
             }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(b),
             _ => return false,
@@ -114,9 +118,13 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
     if heap.is_int(a) && b.is_heap() {
         match heap.get(b.as_heap_idx()) {
-            Some(HeapObj::BigInt(bv)) => return **bv == num_bigint::BigInt::from(heap.as_int(a)),
+            Some(HeapObj::BigInt(bv)) => {
+                let lhs = num_bigint::BigInt::from(heap.as_int(a));
+                return **bv == lhs;
+            }
             Some(HeapObj::Decimal(db)) => {
-                return bigdecimal::BigDecimal::from(heap.as_int(a)) == **db
+                let lhs = bigdecimal::BigDecimal::from(heap.as_int(a));
+                return lhs == **db;
             }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(a),
             _ => return false,
@@ -206,12 +214,14 @@ pub(crate) fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
     if a.is_heap() && heap.is_int(b) {
         if let Some(HeapObj::Decimal(da)) = heap.get(a.as_heap_idx()) {
-            return **da < bigdecimal::BigDecimal::from(heap.as_int(b));
+            let rhs = bigdecimal::BigDecimal::from(heap.as_int(b));
+            return **da < rhs;
         }
     }
     if heap.is_int(a) && b.is_heap() {
         if let Some(HeapObj::Decimal(db)) = heap.get(b.as_heap_idx()) {
-            return bigdecimal::BigDecimal::from(heap.as_int(a)) < **db;
+            let lhs = bigdecimal::BigDecimal::from(heap.as_int(a));
+            return lhs < **db;
         }
     }
     heap.to_f64_val(a) < heap.to_f64_val(b)

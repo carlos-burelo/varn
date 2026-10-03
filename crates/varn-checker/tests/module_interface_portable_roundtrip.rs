@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Round-trip de la INTERFAZ de un módulo por el caché en disco, con tipos.
 //!
 //! Regresión de la Ley 2 (`AGENTS.md` §2): lo que cruza la frontera de módulo

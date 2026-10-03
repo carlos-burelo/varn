@@ -136,7 +136,7 @@ pub(super) fn resolve_indexed_access(
             }
         }
 
-        match table.get(index.0).clone() {
+        match table.get(index.0) {
             TypeKind::Union(list) => {
                 let ids = table.get_list(list).to_vec();
                 let resolved: Vec<Type> = ids
@@ -173,8 +173,6 @@ pub(super) fn resolve_indexed_access(
     }
 
     if let TypeKind::Named(name, origin) = table.get(obj.0) {
-        let name = name;
-        let origin = origin;
         if let Some(key_name) = key_name {
             let name_str = ctx.and_then(|c| c.atom_text(name));
             let origin_str = origin.and_then(|o| ctx.and_then(|c| c.atom_text(o)));
@@ -193,7 +191,7 @@ pub(super) fn resolve_indexed_access(
         }
     }
 
-    match table.get(index.0).clone() {
+    match table.get(index.0) {
         TypeKind::Union(list) => {
             let ids = table.get_list(list).to_vec();
             let types: Vec<Type> = ids

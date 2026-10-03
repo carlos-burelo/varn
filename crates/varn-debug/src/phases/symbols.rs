@@ -64,22 +64,22 @@ pub fn render(rep: &Report, filename: &str, fmt: Format, w: &mut dyn Write) -> s
                 w,
                 "\n  {BLUE}type inference engine{RESET} {DIM}{padding} {filename}{RESET}\n"
             )?;
-            write!(w, "  Symbol Types\n")?;
-            write!(
+            writeln!(w, "  Symbol Types")?;
+            writeln!(
                 w,
-                "  {DIM}{:<8} │ {:<15} │ {:<20} │ Type Details{RESET}\n",
+                "  {DIM}{:<8} │ {:<15} │ {:<20} │ Type Details{RESET}",
                 "Loc", "Kind", "Name"
             )?;
-            write!(w, "  {}\n", "─".repeat(80))?;
+            writeln!(w, "  {}", "─".repeat(80))?;
             for r in rows {
-                write!(
+                writeln!(
                     w,
-                    "  {DIM}{:<8}{RESET} │ {:<15} │ {DIM}{}{RESET} {BOLD}{:<20}{RESET} │ {YELLOW}{}{RESET}\n",
+                    "  {DIM}{:<8}{RESET} │ {:<15} │ {DIM}{}{RESET} {BOLD}{:<20}{RESET} │ {YELLOW}{}{RESET}",
                     r[0], r[1], r[2], r[3], r[4]
                 )?;
             }
-            write!(w, "\n")?;
-            write!(w, "  {DIM}── end: type inference engine ──{RESET}\n")?;
+            writeln!(w)?;
+            writeln!(w, "  {DIM}── end: type inference engine ──{RESET}")?;
         }
         Format::Text => {
             writeln!(w, "# symbols {}", basename(filename))?;

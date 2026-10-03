@@ -191,7 +191,7 @@ pub fn emit_module(
     let mut fn_index: FxHashMap<Atom, (u32, u32)> = FxHashMap::default();
     for (i, (f, _)) in free_fns.iter().enumerate() {
         fn_index
-            .entry(f.id.clone())
+            .entry(f.id)
             .or_insert((i as u32, f.params.len() as u32));
     }
 
@@ -262,7 +262,7 @@ pub fn emit_module(
             tl_base,
             vec![],
         )
-        .as_top_level();
+        .into_top_level();
         let mut class_ord: u32 = 0;
         for &stmt in &program.body {
             match &ast_arena.stmt(stmt).kind {
@@ -1371,9 +1371,7 @@ fn static_method_sig(
                     crate::types::ClassMemberKind::Method | crate::types::ClassMemberKind::Function
                 )
         })
-        .find_map(|m| {
-            matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty.clone())
-        })?;
+        .find_map(|m| matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty))?;
     Some(tables::intern_signature(
         &ty,
         ctx.checker_table,
@@ -2059,7 +2057,7 @@ fn emit_function(
     let sym_ty = bind
         .global_symbols()
         .find(|s| s.name == f.id)
-        .and_then(|s| s.ty.clone());
+        .and_then(|s| s.ty);
     // Namespace members are not binder symbols, so the lookup above misses:
     // use the member's `Fn` type on the namespace, built from the same
     // annotations the checker used for the body (use-site types agree with
@@ -2075,9 +2073,7 @@ fn emit_function(
                     m.kind == crate::types::ClassMemberKind::Function
                         && m.name.as_ref() == fn_name_str
                 })
-                .find_map(|m| {
-                    matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty.clone())
-                })
+                .find_map(|m| matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty))
         }),
         None => sym_ty.filter(|t| matches!(t.kind(ctx.checker_table), TypeKind::Fn(_))),
     };

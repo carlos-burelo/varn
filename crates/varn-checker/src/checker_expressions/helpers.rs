@@ -49,7 +49,7 @@ pub(super) fn closest_in_list<'a>(name: &str, candidates: &'a [Arc<str>]) -> Opt
 }
 
 pub(super) fn base_type(ty: &Type) -> Type {
-    ty.clone()
+    *ty
 }
 
 pub(super) fn op_str(op: &BinaryOp) -> &'static str {
@@ -152,7 +152,7 @@ impl<'r> Checker<'r> {
     }
 
     pub(crate) fn record_type_with_symbol(&mut self, offset: u32, ty: Type, symbol_id: SymbolId) {
-        self.symbol_types.insert(symbol_id, ty.clone());
+        self.symbol_types.insert(symbol_id, ty);
         self.mark_infer_env_dirty();
         if self.record_expr_types {
             self.expr_types.insert(

@@ -17,6 +17,7 @@ impl std::hash::Hash for MapKey {
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ValueMap {
     Small {
         len: u8,
@@ -71,12 +72,7 @@ impl ValueMap {
         match self {
             Self::Small { len, entries } => {
                 let n = *len as usize;
-                for i in 0..n {
-                    if entries[i].0 == *key {
-                        return Some(&entries[i].1);
-                    }
-                }
-                None
+                entries[..n].iter().find(|e| e.0 == *key).map(|e| &e.1)
             }
             Self::Large(map) => map.get(key),
         }
@@ -87,12 +83,10 @@ impl ValueMap {
         match self {
             Self::Small { len, entries } => {
                 let n = *len as usize;
-                for i in 0..n {
-                    if entries[i].0 == *key {
-                        return Some(&mut entries[i].1);
-                    }
-                }
-                None
+                entries[..n]
+                    .iter_mut()
+                    .find(|e| e.0 == *key)
+                    .map(|e| &mut e.1)
             }
             Self::Large(map) => map.get_mut(key),
         }
@@ -108,12 +102,8 @@ impl ValueMap {
         match self {
             Self::Small { len, entries } => {
                 let n = *len as usize;
-                for i in 0..n {
-                    if entries[i].0 == key {
-                        let old = entries[i].1;
-                        entries[i].1 = val;
-                        return Some(old);
-                    }
+                if let Some(entry) = entries[..n].iter_mut().find(|e| e.0 == key) {
+                    return Some(std::mem::replace(&mut entry.1, val));
                 }
                 if n < SMALL_MAP_CAP {
                     entries[n] = (key, val);
@@ -124,8 +114,8 @@ impl ValueMap {
                     SMALL_MAP_CAP * 2,
                     Default::default(),
                 );
-                for i in 0..SMALL_MAP_CAP {
-                    map.insert(entries[i].0, entries[i].1);
+                for entry in entries.iter() {
+                    map.insert(entry.0, entry.1);
                 }
                 map.insert(key, val);
                 *self = Self::Large(map);

@@ -17,14 +17,14 @@ impl<'r> Checker<'r> {
                 // Pipeline placeholder `_` stands for the piped value, so it
                 // carries that value's type (`x |> f(_, y)` ⇒ `_` has `x`'s type).
                 if name_str == "_" && self.in_pipeline_rhs {
-                    return self.pipeline_value_type.clone().unwrap_or(Type::Dynamic);
+                    return self.pipeline_value_type.unwrap_or(Type::Dynamic);
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(sid) = scope.resolve(*name, &bind.scopes) {
                     if let Some(ty) = self.symbol_types.get(&sid) {
-                        return ty.clone();
+                        return *ty;
                     }
-                    if let Some(ty) = bind.arena.get(sid).ty.clone() {
+                    if let Some(ty) = bind.arena.get(sid).ty {
                         return ty;
                     }
                 }

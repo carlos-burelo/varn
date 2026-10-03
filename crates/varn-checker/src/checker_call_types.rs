@@ -73,7 +73,7 @@ pub(crate) fn infer_call_type(
             if let Some(ctx) = ctx {
                 if let Some(members) = ctx.get_class_members(class_name, origin) {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
-                        return Some(m.ty.clone());
+                        return Some(m.ty);
                     }
                 }
                 if let Some(ext_ty) = ctx.get_extension_method(class_name, prop_name) {
@@ -82,7 +82,7 @@ pub(crate) fn infer_call_type(
             }
             if let Some(methods) = class_methods.get(class_name) {
                 if let Some(ty) = methods.get(prop_name) {
-                    return Some(ty.clone());
+                    return Some(*ty);
                 }
             }
             None

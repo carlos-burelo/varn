@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! One authority for how a typed field is laid out.
 //!
 //! Today there are four sites computing this and two answers:

@@ -44,32 +44,18 @@ pub trait NativeCtx {
     fn alloc_str_owned(&mut self, s: String) -> VmValue;
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue;
     fn alloc_object(&mut self) -> VmValue;
-    fn alloc_bigint(&mut self, _value: num_bigint::BigInt) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_decimal(&mut self, _value: bigdecimal::BigDecimal) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_char(&mut self, _value: char) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_map(&mut self, _entries: Vec<(VmValue, VmValue)>) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_set(&mut self, _items: Vec<VmValue>) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_enum_variant(&mut self, _data: crate::value::EnumVariantData) -> VmValue {
-        VmValue::null()
-    }
+    fn alloc_bigint(&mut self, value: num_bigint::BigInt) -> VmValue;
+    fn alloc_decimal(&mut self, value: bigdecimal::BigDecimal) -> VmValue;
+    fn alloc_char(&mut self, value: char) -> VmValue;
+    fn alloc_map(&mut self, entries: Vec<(VmValue, VmValue)>) -> VmValue;
+    fn alloc_set(&mut self, items: Vec<VmValue>) -> VmValue;
+    fn alloc_enum_variant(&mut self, data: crate::value::EnumVariantData) -> VmValue;
     fn alloc_bound_native(
         &mut self,
-        _receiver: VmValue,
-        _func: NativeFn,
-        _name: &'static str,
-    ) -> VmValue {
-        VmValue::null()
-    }
+        receiver: VmValue,
+        func: NativeFn,
+        name: &'static str,
+    ) -> VmValue;
     fn alloc_object_with_shape(
         &mut self,
         _shape: &Rc<crate::value::Shape>,
@@ -80,12 +66,8 @@ pub trait NativeCtx {
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue;
     fn alloc_class(&mut self, class: Rc<ClassObj>) -> VmValue;
-    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
-        VmValue::null()
-    }
+    fn alloc_buffer(&mut self, size: usize) -> VmValue;
+    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue;
 
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
@@ -267,9 +249,7 @@ pub trait NativeCtx {
         None
     }
 
-    fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
-        VmValue::null()
-    }
+    fn alloc_range_data(&mut self, range: crate::value::RangeData) -> VmValue;
 
     fn range_element(&mut self, range: &crate::value::RangeData, raw: i64) -> VmValue {
         match range.elem {

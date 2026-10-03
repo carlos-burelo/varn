@@ -635,7 +635,7 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
                     let ty = field_types
                         .as_ref()
                         .and_then(|fields| fields.get(i))
-                        .map(|(_, t)| t.clone())
+                        .map(|(_, t)| *t)
                         .unwrap_or(Type::Dynamic);
                     let mut sym =
                         Symbol::new(SymbolKind::Let, binding.name, binding.range.start.line)
@@ -683,7 +683,7 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
                     let ty = field_types
                         .iter()
                         .find(|(fname, _)| fname.as_ref() == field_key_str)
-                        .map(|(_, t)| t.clone())
+                        .map(|(_, t)| *t)
                         .unwrap_or(Type::Dynamic);
                     let sym = Symbol::new(SymbolKind::Let, binding_name, 0).with_type(ty);
                     b.define(binding_name, sym);

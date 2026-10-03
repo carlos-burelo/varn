@@ -111,7 +111,7 @@ impl<'r> Checker<'r> {
                 }
 
                 let actual = if let Some(arg) = argument {
-                    let expected_ret = self.expected_return_type.clone();
+                    let expected_ret = self.expected_return_type;
                     self.with_expected(expected_ret, |c| c.check_expr(arg, bind));
                     self.infer_type(arg, bind)
                 } else {
@@ -425,7 +425,7 @@ impl<'r> Checker<'r> {
                     let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
                     let init = d.init.unwrap();
-                    self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init, bind));
+                    self.with_expected(ann_ty_opt, |c| c.check_expr(init, bind));
                     let init_ty = self.infer_type(init, bind);
 
                     if !init_ty.is_dynamic()
@@ -475,7 +475,7 @@ impl<'r> Checker<'r> {
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             if let Some(init_expr) = declarator.init {
-                self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init_expr, bind));
+                self.with_expected(ann_ty_opt, |c| c.check_expr(init_expr, bind));
 
                 if let Some(ann_ty) = &ann_ty_opt {
                     let init_ty = self.infer_type(init_expr, bind);
@@ -520,7 +520,7 @@ impl<'r> Checker<'r> {
 
     fn push_narrowings(&mut self, narrowings: &[(crate::symbol::SymbolId, Type)]) {
         for (id, ty) in narrowings {
-            self.narrowed_types.entry(*id).or_default().push(ty.clone());
+            self.narrowed_types.entry(*id).or_default().push(*ty);
         }
         self.mark_infer_env_dirty();
     }

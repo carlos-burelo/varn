@@ -45,19 +45,19 @@ pub fn render(rep: &Report, filename: &str, fmt: Format, w: &mut dyn Write) -> s
             let mut exports = 0;
             for r in rows {
                 if r[0] == "import" {
-                    write!(
+                    writeln!(
                         w,
-                        "  {BOLD}import{RESET} {YELLOW}{}{RESET} from {BLUE}{}{RESET}\n",
+                        "  {BOLD}import{RESET} {YELLOW}{}{RESET} from {BLUE}{}{RESET}",
                         r[1], r[2]
                     )?;
                     imports += 1;
                 } else {
-                    write!(w, "  {BOLD}export{RESET} {CYAN}{}{RESET}\n", r[1])?;
+                    writeln!(w, "  {BOLD}export{RESET} {CYAN}{}{RESET}", r[1])?;
                     exports += 1;
                 }
             }
             let _ = (imports, exports);
-            write!(w, "  {DIM}── end: module linkage ──{RESET}\n")?;
+            writeln!(w, "  {DIM}── end: module linkage ──{RESET}")?;
         }
         Format::Text => {
             writeln!(w, "# modules {}", basename(filename))?;

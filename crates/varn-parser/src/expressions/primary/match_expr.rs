@@ -54,7 +54,7 @@ fn parse_match_case(s: &mut TokenStream) -> Result<Vec<MatchCase>, String> {
         .into_iter()
         .map(|pattern| MatchCase {
             pattern,
-            guard: guard.clone(),
+            guard,
             body: body.clone(),
             range: full_case_range,
         })

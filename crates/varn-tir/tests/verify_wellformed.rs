@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Well-formedness: every handle points at something that exists, and every
 //! slot is in range of the table it claims to index. These are the checks
 //! that make a dangling ClassId or an out-of-range vtable slot impossible

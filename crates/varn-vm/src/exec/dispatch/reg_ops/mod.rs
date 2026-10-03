@@ -4,8 +4,10 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
 
+mod call_spread;
 mod calls;
 mod class_ops;
+mod enum_ops;
 mod get_property;
 mod method_calls;
 mod misc_ops;

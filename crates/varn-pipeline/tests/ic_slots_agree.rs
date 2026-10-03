@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! The bytecode and the portable SSA name the same inline-cache slot for every
 //! property site: the JIT lowering from SSA reads and fills the `ic_cache`
 //! entry the interpreter's opcode uses. The slots are numbered once

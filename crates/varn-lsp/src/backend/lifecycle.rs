@@ -141,7 +141,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         }
 
         let done = skipped.len() + idx + 1;
-        if done % 25 == 0 || done == total {
+        if done.is_multiple_of(25) || done == total {
             progress
                 .report(
                     format!("{done}/{total} files"),

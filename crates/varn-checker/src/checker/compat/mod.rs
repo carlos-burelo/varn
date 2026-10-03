@@ -309,7 +309,7 @@ pub(super) fn types_compatible_impl(
         return true;
     }
 
-    let result = match (table.get(declared.0).clone(), table.get(inferred.0).clone()) {
+    let result = match (table.get(declared.0), table.get(inferred.0)) {
         (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _)
         | (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => true,
 

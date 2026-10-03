@@ -10,6 +10,8 @@ pub(crate) mod convert;
 pub(crate) mod ctx;
 pub(crate) mod ctx_csv;
 pub(crate) mod ctx_frames;
+pub(crate) mod ctx_gc_major;
+pub(crate) mod ctx_gc_minor;
 pub(crate) mod ctx_json;
 pub(crate) mod ctx_modules;
 pub(crate) mod ctx_profiling;

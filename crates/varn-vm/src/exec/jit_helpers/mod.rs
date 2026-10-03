@@ -4,6 +4,9 @@
 pub(crate) mod arith;
 pub(crate) mod build;
 pub(crate) mod calls;
+pub(crate) mod calls_invoke;
+pub(crate) mod calls_new;
+pub(crate) mod calls_static;
 pub(crate) mod classes;
 pub(crate) mod construct;
 pub(crate) mod exceptions;

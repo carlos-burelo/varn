@@ -229,7 +229,7 @@ impl Type {
         let mut seen = rustc_hash::FxHashSet::default();
         let mut flat: Vec<Type> = Vec::with_capacity(members.len());
         for m in members {
-            match table.get(m.0).clone() {
+            match table.get(m.0) {
                 TypeKind::Union(inner_list) => {
                     for id in table.get_list(inner_list).to_vec() {
                         let t = Type(id, false);
@@ -355,7 +355,7 @@ impl Type {
     }
 
     pub fn non_nullified(&self, table: &mut CheckerTyTable) -> Type {
-        match table.get(self.0).clone() {
+        match table.get(self.0) {
             TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Never,
             TypeKind::Union(list) => {
                 let members: Vec<Type> = table
@@ -383,7 +383,7 @@ impl Type {
     }
 
     pub fn minus_named(&self, name: varn_core::Atom, table: &mut CheckerTyTable) -> Type {
-        match table.get(self.0).clone() {
+        match table.get(self.0) {
             TypeKind::Named(n, _) if n == name => Type::Never,
             TypeKind::Union(list) => {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
@@ -412,7 +412,7 @@ impl Type {
         if self == other {
             return Type::Never;
         }
-        match table.get(self.0).clone() {
+        match table.get(self.0) {
             TypeKind::Union(list) => {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let dynamic_array = {
@@ -451,7 +451,7 @@ impl Type {
         mapping: &FxHashMap<varn_core::Atom, Type>,
         table: &mut CheckerTyTable,
     ) -> Type {
-        match table.get(self.0).clone() {
+        match table.get(self.0) {
             TypeKind::Named(n, _) => {
                 if let Some(t) = mapping.get(&n) {
                     return *t;
@@ -515,7 +515,7 @@ impl Type {
     }
 
     pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
-        match table.get(self.0).clone() {
+        match table.get(self.0) {
             TypeKind::Named(n, _) => Type(table.intern(TypeKind::Named(n, Some(origin))), self.1),
             TypeKind::Generic(n, args, _) => Type(
                 table.intern(TypeKind::Generic(n, args, Some(origin))),

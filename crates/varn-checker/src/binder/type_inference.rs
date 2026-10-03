@@ -264,7 +264,7 @@ fn infer_member(
 ) -> Type {
     let obj_ty = infer_expr_type(object, arena, ctx, table);
     if computed {
-        return match table.get(obj_ty.0).clone() {
+        return match table.get(obj_ty.0) {
             TypeKind::Array(inner) => Type(inner, false),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
             TypeKind::Named(name, _)
@@ -308,7 +308,7 @@ fn infer_member(
             return Type::Dynamic;
         };
         let prop_name = interner.resolve(prop_name_atom);
-        match table.get(obj_ty.0).clone() {
+        match table.get(obj_ty.0) {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
                 let Some(name_str) = ctx_resolve_text(Some(ctx), name) else {
                     return Type::Dynamic;
@@ -525,7 +525,7 @@ fn infer_new(
     }
     if let ExprKind::Member { .. } = &arena.expr(callee).kind {
         let callee_ty = infer_expr_type(callee, arena, ctx, table);
-        match table.get(callee_ty.0).clone() {
+        match table.get(callee_ty.0) {
             TypeKind::Named(name, origin) => {
                 return Type::named_with_origin_atom(name, origin, table);
             }

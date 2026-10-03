@@ -15,7 +15,7 @@ pub(super) fn resolve_conditional(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    if let TypeKind::Union(list) = table.get(check.0).clone() {
+    if let TypeKind::Union(list) = table.get(check.0) {
         if matches!(&check_node.kind, TypeKind::Named(_, None)) {
             if let TypeKind::Named(var_name, None) = &check_node.kind {
                 let var_name_str = ctx
@@ -117,7 +117,7 @@ fn resolve_extends_with_infer(
             let name_str = ctx
                 .and_then(|c| c.interner())
                 .and_then(|i| i.try_resolve(*name));
-            if let TypeKind::Generic(check_name, check_args, _) = table.get(check.0).clone() {
+            if let TypeKind::Generic(check_name, check_args, _) = table.get(check.0) {
                 let check_name_str = ctx
                     .and_then(|c| c.interner())
                     .map(|i| i.resolve(check_name));
@@ -179,7 +179,7 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         _ => {}
     }
 
-    match (table.get(check.0).clone(), table.get(extends.0).clone()) {
+    match (table.get(check.0), table.get(extends.0)) {
         (_, TypeKind::Union(list)) => table
             .get_list(list)
             .iter()

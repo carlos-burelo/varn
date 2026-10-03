@@ -93,7 +93,7 @@ impl NumConv {
 pub fn float_to_int(f: f64) -> Option<i64> {
     const TWO_POW_63: f64 = 9_223_372_036_854_775_808.0;
     let t = f.trunc();
-    if t.is_nan() || t < -TWO_POW_63 || t >= TWO_POW_63 {
+    if t.is_nan() || !(-TWO_POW_63..TWO_POW_63).contains(&t) {
         return None;
     }
     Some(t as i64)

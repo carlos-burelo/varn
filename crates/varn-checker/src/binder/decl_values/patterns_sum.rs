@@ -44,7 +44,7 @@ impl<'r> super::super::Binder<'r> {
                     _ => None,
                 });
                 for el in elements.iter().flatten() {
-                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty.clone());
+                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty);
                 }
                 if let Some(r) = rest {
                     self.bind_pattern(r, kind, line, doc.clone(), ty);
@@ -98,7 +98,7 @@ impl<'r> super::super::Binder<'r> {
                                     members
                                         .iter()
                                         .find(|m| m.name.as_ref() == key_str)
-                                        .map(|m| m.ty.clone())
+                                        .map(|m| m.ty)
                                 })
                                 .or_else(|| {
                                     if name.as_ref() != "*" {
@@ -110,7 +110,7 @@ impl<'r> super::super::Binder<'r> {
                                         self.resolver.module_exports(origin_path, &mut visiting);
                                     if let Some(sym) = exports.get(key_str.as_str()) {
                                         prop_kind = sym.kind;
-                                        sym.ty.clone()
+                                        sym.ty
                                     } else {
                                         let has_ns = self
                                             .type_members

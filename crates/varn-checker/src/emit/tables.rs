@@ -335,7 +335,7 @@ fn build_one_class(
         .map(|n| (n.clone(), method_sig[&n]))
         .collect();
 
-    let parent_arg = parent_id.zip(parent_info).map(|(id, info)| (id, info));
+    let parent_arg = parent_id.zip(parent_info);
     let mut info = ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods);
     info.constructor = constructor;
     info

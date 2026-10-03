@@ -18,7 +18,7 @@ impl<'r> Checker<'r> {
             if let Some(id) = scope.resolve(*name, &bind.scopes) {
                 if let Some(stack) = self.narrowed_types.get(&id) {
                     if let Some(ty) = stack.last() {
-                        return ty.clone();
+                        return *ty;
                     }
                 }
                 if let Some(ty) = self.symbol_types.get(&id).cloned() {

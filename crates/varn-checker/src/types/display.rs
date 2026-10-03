@@ -62,16 +62,13 @@ impl fmt::Display for TypeDisplay<'_> {
             },
             TypeKind::Builtin(b) => write!(f, "{}", b.name()),
             TypeKind::This => write!(f, "this"),
-            TypeKind::Array(t) => {
-                let t = t;
-                match table.get(t) {
-                    TypeKind::Union(_)
-                    | TypeKind::Intersection(_)
-                    | TypeKind::Fn(_)
-                    | TypeKind::Conditional { .. } => write!(f, "({})[]", self.child(t)),
-                    _ => write!(f, "{}[]", self.child(t)),
-                }
-            }
+            TypeKind::Array(t) => match table.get(t) {
+                TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Conditional { .. } => write!(f, "({})[]", self.child(t)),
+                _ => write!(f, "{}[]", self.child(t)),
+            },
             TypeKind::Union(list) => {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let non_null: Vec<CheckerTyId> = members

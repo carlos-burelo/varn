@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Task 7e regression test: one `AtomInterner` per compilation, not one per
 //! file.
 //!

@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Task 7d regression test: `Atom`s survive a round-trip through the
 //! *on-disk* module-interface cache (`module_resolver/cache.rs`), across two
 //! `DiskResolver`s standing in for two separate `vn` process runs.

@@ -233,7 +233,7 @@ impl HeapInner {
                         .collect();
                     format!("[{}]", parts.join(", "))
                 }
-                Some(HeapObj::Tuple(a)) if a.len() == 0 => "()".into(),
+                Some(HeapObj::Tuple(a)) if a.is_empty() => "()".into(),
                 Some(HeapObj::Tuple(a)) => {
                     let parts: Vec<_> = (0..a.len())
                         .map(|i| self.str_repr(a.get_vm(i).unwrap()))

@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! The type is a field of the NODE, not of some variants of an enum.
 //!
 //! In HirExpr, `ty` sits on Binary and Member but not on Array, Object,

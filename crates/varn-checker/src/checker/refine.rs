@@ -137,7 +137,7 @@ impl<'r> Checker<'r> {
     fn checked_ty(&self, expr: ExprId) -> Type {
         self.expr_table
             .get(&expr.index())
-            .map(|e| e.ty.clone())
+            .map(|e| e.ty)
             .unwrap_or(Type::Dynamic)
     }
 

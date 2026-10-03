@@ -169,8 +169,8 @@ pub fn encode(ty: Type, table: &CheckerTyTable, interner: &AtomInterner) -> Port
             key_var: name(key_var),
             source: Box::new(encode(Type(source, false), table, interner)),
             value: Box::new(encode(Type(value, false), table, interner)),
-            optional: optional,
-            readonly: readonly,
+            optional,
+            readonly,
         },
         TypeKind::Conditional {
             check,

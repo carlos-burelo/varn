@@ -43,20 +43,20 @@ pub fn render(rep: &Report, filename: &str, fmt: Format, w: &mut dyn Write) -> s
                 w,
                 "\n  {MAGENTA}tokens{RESET} {DIM}{padding} {filename}{RESET}\n"
             )?;
-            write!(
+            writeln!(
                 w,
-                "  {DIM}{:<5} │ {:<10} │ {:<20} │ Lexeme{RESET}\n",
+                "  {DIM}{:<5} │ {:<10} │ {:<20} │ Lexeme{RESET}",
                 "Idx", "Loc", "Kind"
             )?;
-            write!(w, "  {}\n", "─".repeat(70))?;
+            writeln!(w, "  {}", "─".repeat(70))?;
             for r in rows {
-                write!(
+                writeln!(
                     w,
-                    "  {DIM}{:<5}{RESET} │ {:<10} │ {MAGENTA}{:<20}{RESET} │ {YELLOW}{}{RESET}\n",
+                    "  {DIM}{:<5}{RESET} │ {:<10} │ {MAGENTA}{:<20}{RESET} │ {YELLOW}{}{RESET}",
                     r[0], r[1], r[2], r[3]
                 )?;
             }
-            write!(w, "  {DIM}── end: tokens ──{RESET}\n")?;
+            writeln!(w, "  {DIM}── end: tokens ──{RESET}")?;
         }
         Format::Text => {
             writeln!(w, "# tokens {}", basename(filename))?;

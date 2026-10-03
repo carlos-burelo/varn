@@ -65,7 +65,7 @@ impl ExecCtx {
                 let mut exports = Vec::with_capacity(keys.len());
                 for (idx, key) in keys.iter().enumerate() {
                     export_map.insert(key.clone(), idx);
-                    let val = obj_ref.get_field_nv(key).unwrap_or(VmValue::null());
+                    let val = obj_ref.get_field(key).unwrap_or(VmValue::null());
                     exports.push(val);
                 }
 
@@ -331,7 +331,7 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
             for (key, child_export) in fields {
                 let child_nv = thaw_export(&child_export, heap);
                 if let Some(HeapObj::Object(o)) = heap.get_by_idx_mut(raw_idx) {
-                    o.set_field_nv(std::sync::Arc::from(key.as_ref()), child_nv);
+                    o.set_field(std::sync::Arc::from(key.as_ref()), child_nv);
                 }
             }
             obj_val

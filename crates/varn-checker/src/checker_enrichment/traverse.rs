@@ -242,9 +242,7 @@ fn enrich_vars_recursive(
                     };
                     if bind.arena.get(sym_id).ty.is_some() {
                         if let Some(existing) = &bind.arena.get(sym_id).ty {
-                            sym_map
-                                .entry(Arc::from(name))
-                                .or_insert_with(|| existing.clone());
+                            sym_map.entry(Arc::from(name)).or_insert_with(|| *existing);
                         }
                         continue;
                     }
@@ -268,7 +266,7 @@ fn enrich_vars_recursive(
                     );
                     bind.ty_table = std::sync::Arc::new(table);
                     if let Some(t) = ty {
-                        bind.arena.get_mut(sym_id).ty = Some(t.clone());
+                        bind.arena.get_mut(sym_id).ty = Some(t);
                         sym_map.insert(Arc::from(name), t);
                     }
                 }

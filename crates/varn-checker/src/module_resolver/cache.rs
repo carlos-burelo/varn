@@ -656,7 +656,7 @@ pub(super) fn save_to_cache(
         exports,
         bind,
         &interner,
-        Some(&*resolver as &dyn ImportResolver),
+        Some(resolver as &dyn ImportResolver),
     ) {
         varn_modules::artifact::write_module_artifact(
             &get_cache_dir(resolver),

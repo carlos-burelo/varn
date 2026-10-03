@@ -72,7 +72,7 @@ impl<'r> super::Binder<'r> {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
 
                 let mut sym =
-                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = true;
@@ -164,8 +164,8 @@ impl<'r> super::Binder<'r> {
                 );
 
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
-                let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
-                    .with_type(fn_type.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Method, *key, range.start.line).with_type(fn_type);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = return_type.is_some();

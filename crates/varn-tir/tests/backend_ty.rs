@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! `BackendTy` is the single type the backend speaks. Two properties matter
 //! more than its shape: it is `Copy`, because it is a field of every node; and
 //! it has no `Default`, because "the type you get when you wrote none" is

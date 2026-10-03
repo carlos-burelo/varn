@@ -23,7 +23,7 @@ pub struct SpatialIndex {
 
 impl SpatialIndex {
     pub fn build(program: &Program, a: &AstArena) -> Self {
-        let initial_cap = program.body.len().saturating_mul(4).min(512).max(16);
+        let initial_cap = program.body.len().saturating_mul(4).clamp(16, 512);
         let mut entries = Vec::with_capacity(initial_cap);
         for stmt in &program.body {
             collect_stmt(a, stmt, &mut entries);

@@ -22,7 +22,7 @@ impl<'r> super::Binder<'r> {
             self.resolver,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
-        let mut sym = Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type.clone());
+        let mut sym = Symbol::new(SymbolKind::Class, name_atom, line).with_type(cls_type);
         sym.col = c.range.start.column;
         sym.offset = c.range.start.offset;
         sym.doc = c.doc.as_ref().map(|s| self.intern_local(s.as_str()));
@@ -88,8 +88,8 @@ impl<'r> super::Binder<'r> {
             );
 
             let ctor_atom = self.intern_local("constructor");
-            let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line)
-                .with_type(fn_ty.clone());
+            let mut sym =
+                Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line).with_type(fn_ty);
             sym.col = c.range.start.column;
             sym.offset = c.range.start.offset;
             let symbol_id = self.arena.push(sym);
@@ -128,8 +128,8 @@ impl<'r> super::Binder<'r> {
                     .map(|ann| self.resolve_type(ann))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
-                    .with_type(ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, key_atom, p.range.start.line).with_type(ty);
                 sym.col = p.range.start.column;
                 sym.offset = p.range.start.offset;
                 sym.has_explicit_type = p.type_ann.is_some()
@@ -409,8 +409,8 @@ impl<'r> super::Binder<'r> {
                 );
 
                 let ctor_atom = self.intern_local("constructor");
-                let mut sym = Symbol::new(SymbolKind::Method, ctor_atom, range.start.line)
-                    .with_type(fn_ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Method, ctor_atom, range.start.line).with_type(fn_ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = true;
@@ -453,7 +453,7 @@ impl<'r> super::Binder<'r> {
 
                         let mut sym =
                             Symbol::new(SymbolKind::Property, key_atom, p.range.start.line)
-                                .with_type(ty.clone());
+                                .with_type(ty);
                         sym.col = p.range.start.column;
                         sym.offset = p.range.start.offset;
                         sym.has_explicit_type = p.type_ann.is_some()
@@ -499,7 +499,7 @@ impl<'r> super::Binder<'r> {
                     .unwrap_or(Type::Dynamic);
 
                 let mut sym =
-                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();
@@ -592,8 +592,8 @@ impl<'r> super::Binder<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
-                let mut sym = Symbol::new(SymbolKind::Method, *key, range.start.line)
-                    .with_type(fn_ty.clone());
+                let mut sym =
+                    Symbol::new(SymbolKind::Method, *key, range.start.line).with_type(fn_ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = return_type.is_some();
@@ -635,7 +635,7 @@ impl<'r> super::Binder<'r> {
                     .unwrap_or(Type::Dynamic);
 
                 let mut sym =
-                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = return_type.is_some();
@@ -686,7 +686,7 @@ impl<'r> super::Binder<'r> {
                     };
 
                 let mut sym =
-                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty.clone());
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = has_explicit;

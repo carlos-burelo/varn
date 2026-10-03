@@ -380,7 +380,7 @@ pub fn resolve_type_node(
 
             let parts_opt: Option<Vec<Vec<ObjectTypeMember>>> = resolved
                 .iter()
-                .map(|m| match table.get(m.0).clone() {
+                .map(|m| match table.get(m.0) {
                     TypeKind::Object(mid) => Some(table.get_object_members(mid).to_vec()),
                     TypeKind::Named(name, origin) => {
                         let ctx = ctx?;

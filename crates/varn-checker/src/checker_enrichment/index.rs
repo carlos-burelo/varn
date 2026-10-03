@@ -22,7 +22,7 @@ pub(super) fn build_enrich_context(
     for sym in symbols.iter() {
         let name_rc: Arc<str> = Arc::from(bind.interner.resolve(sym.name));
         if let Some(ty) = &sym.ty {
-            sym_map.insert(name_rc.clone(), ty.clone());
+            sym_map.insert(name_rc.clone(), *ty);
 
             if sym.kind == SymbolKind::Function {
                 if let TypeKind::Fn(fid) = bind.ty_table.get(ty.0) {

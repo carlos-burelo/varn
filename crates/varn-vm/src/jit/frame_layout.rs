@@ -106,18 +106,19 @@ mod tests {
     #[test]
     fn alloc_bases_offsets_resolve_to_the_activation_bases() {
         use varn_types::register_meta::{RegisterMeta, SlotKind};
-        let mut proto = varn_types::FunctionProto::default();
-        proto.register_count = 4;
-        proto.register_meta = [
-            SlotKind::Dynamic,
-            SlotKind::Int,
-            SlotKind::Float,
-            SlotKind::Ref,
-        ]
-        .iter()
-        .map(|&kind| RegisterMeta { kind })
-        .collect();
-        let proto = std::rc::Rc::new(proto);
+        let proto = std::rc::Rc::new(varn_types::FunctionProto {
+            register_count: 4,
+            register_meta: [
+                SlotKind::Dynamic,
+                SlotKind::Int,
+                SlotKind::Float,
+                SlotKind::Ref,
+            ]
+            .iter()
+            .map(|&kind| RegisterMeta { kind })
+            .collect(),
+            ..varn_types::FunctionProto::default()
+        });
 
         let mut store = crate::frame_store::FrameStore::new();
         let id = store.push_frame(&proto);

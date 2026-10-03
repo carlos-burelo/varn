@@ -262,7 +262,7 @@ impl<'a> FnEmitter<'a> {
         self
     }
 
-    pub fn as_top_level(mut self) -> Self {
+    pub fn into_top_level(mut self) -> Self {
         self.top_level = true;
         self
     }
@@ -1732,7 +1732,7 @@ impl<'a> FnEmitter<'a> {
 
                     if self.top_level && prebound.is_none() {
                         if let Some(&slot) = self.m.globals.get(name_str) {
-                            let value = init.unwrap_or_else(|| TirExpr {
+                            let value = init.unwrap_or(TirExpr {
                                 kind: TirExprKind::NullLit,
                                 ty,
                                 res: Resolution::None,
@@ -4167,7 +4167,7 @@ fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
                 ..
             } => {
                 check(ast_arena, *consequent, in_nested_loop)
-                    || alternate.map_or(false, |a| check(ast_arena, a, in_nested_loop))
+                    || alternate.is_some_and(|a| check(ast_arena, a, in_nested_loop))
             }
             StmtKind::Switch { cases, .. } => cases
                 .iter()
@@ -4181,7 +4181,7 @@ fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
                     || catches
                         .iter()
                         .any(|c| check(ast_arena, c.body, in_nested_loop))
-                    || finally.map_or(false, |f| check(ast_arena, f, in_nested_loop))
+                    || finally.is_some_and(|f| check(ast_arena, f, in_nested_loop))
             }
             StmtKind::Labeled { body, .. } => check(ast_arena, *body, in_nested_loop),
             StmtKind::While { body, .. }

@@ -169,7 +169,7 @@ impl<'r> Checker<'r> {
                 match body {
                     ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
                     ArrowBody::Expr(e) => {
-                        let expected_ret = self.expected_return_type.clone();
+                        let expected_ret = self.expected_return_type;
                         self.with_expected(expected_ret, |c| c.check_expr(e, bind));
                         let actual = self.infer_type(e, bind);
                         if let Some(expected) = self.expected_return_type {
@@ -308,7 +308,7 @@ impl<'r> Checker<'r> {
                     return;
                 }
 
-                let Some(expected_ret) = self.expected_return_type.clone() else {
+                let Some(expected_ret) = self.expected_return_type else {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
@@ -427,7 +427,7 @@ impl<'r> Checker<'r> {
                             self.symbol_types
                                 .get(&id)
                                 .cloned()
-                                .or_else(|| bind.arena.get(id).ty.clone())
+                                .or_else(|| bind.arena.get(id).ty)
                         })
                         .unwrap_or_else(|| self.infer_type(target, bind))
                 } else {
@@ -437,7 +437,7 @@ impl<'r> Checker<'r> {
                 let target_expected = if target_ty.is_dynamic() {
                     None
                 } else {
-                    Some(target_ty.clone())
+                    Some(target_ty)
                 };
                 self.with_expected(target_expected, |c| c.check_expr(value, bind));
 
@@ -796,7 +796,7 @@ impl<'r> Checker<'r> {
                     } else if self.in_pipeline_rhs {
                         // `_` stands for the piped value; record its concrete type so
                         // downstream consumers (compiler, LSP) don't see `dynamic`.
-                        if let Some(ty) = self.pipeline_value_type.clone() {
+                        if let Some(ty) = self.pipeline_value_type {
                             self.record_type(range.start.offset, ty);
                         }
                     }

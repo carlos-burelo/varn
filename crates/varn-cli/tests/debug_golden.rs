@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Golden tests for `vn debug` plain output (DEBUG_PLAN §8.1, Paso 0).
 //!
 //! The refactor promise is **byte-for-byte identical `plain` output**, so this

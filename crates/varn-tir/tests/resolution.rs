@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! What the checker proved about *which* entity an expression refers to.
 //! Today the backend re-derives this at runtime: InvokeVirtual resolves a
 //! method by name, globals are patched from name-keyed to index-keyed before

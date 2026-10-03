@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Invariantes de `CheckerTyTable`.
 //!
 //! Un `CheckerTyId` es el **hash del contenido** de la forma que nombra, no un

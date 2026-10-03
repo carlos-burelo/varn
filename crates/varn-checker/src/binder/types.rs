@@ -337,7 +337,7 @@ impl TypeContext for BindView<'_> {
         let scope = self.bind.scopes.get(self.bind.global_scope);
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
-        self.bind.arena.get(id).ty.clone()
+        self.bind.arena.get(id).ty
     }
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
@@ -376,7 +376,7 @@ impl TypeContext for BindView<'_> {
         let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);
         if sym.kind == crate::binder::SymbolKind::TypeAlias {
-            return sym.ty.clone();
+            return sym.ty;
         }
         None
     }

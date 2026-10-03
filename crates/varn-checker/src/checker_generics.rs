@@ -200,7 +200,7 @@ fn infer_arrow_with_context(
         ArrowBody::Expr(e) => {
             let e = *e;
             let saved_pipeline = checker.in_pipeline_rhs;
-            let saved_pipe_ty = checker.pipeline_value_type.clone();
+            let saved_pipe_ty = checker.pipeline_value_type;
             checker.in_pipeline_rhs = false;
             checker.pipeline_value_type = None;
             let t = checker.infer_type(e, bind);

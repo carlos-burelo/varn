@@ -1,0 +1,97 @@
+use super::*;
+
+impl ExecCtx {
+    pub(super) fn host_str_owned(&self, v: VmValue) -> Option<String> {
+        self.heap.str_owned(v)
+    }
+    pub(super) fn host_current_source_file(&self) -> Option<String> {
+        for frame in self.frames.iter().rev() {
+            let src = &frame.closure().proto.chunk.source_file;
+            if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:")
+            {
+                return Some(src.to_string());
+            }
+        }
+        self.frames
+            .last()
+            .map(|f| f.closure().proto.chunk.source_file.to_string())
+    }
+    pub(super) fn host_get_function_location(&self, func_val: VmValue) -> Option<(String, String)> {
+        if func_val.is_heap() {
+            match self.heap.get_by_idx(func_val.as_heap_idx()) {
+                Some(HeapObj::VmClosure(c)) => {
+                    let source_file = c.proto.chunk.source_file.to_string();
+                    let name = c.proto.name.as_ref()?.to_string();
+                    Some((source_file, name))
+                }
+                Some(HeapObj::BoundMethod(bm)) => match &bm.target {
+                    varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
+                        let c = self.heap.closure_of(*closure)?;
+                        let source_file = c.proto.chunk.source_file.to_string();
+                        let name = c.proto.name.as_ref()?.to_string();
+                        Some((source_file, name))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+    pub(super) fn host_parse_csv(
+        &mut self,
+        text: &str,
+        delimiter: u8,
+        has_header: bool,
+        trim: bool,
+    ) -> Result<VmValue, String> {
+        crate::exec::ctx_csv::parse_csv(self, text, delimiter, has_header, trim)
+    }
+    pub(super) fn host_define_metadata(&mut self, target: VmValue, key: &str, value: VmValue) {
+        let target_k = self.target_meta_key(target);
+        unsafe { &mut *self.metadata.get() }
+            .entry(target_k)
+            .or_default()
+            .insert(key.to_string(), value);
+    }
+    pub(super) fn host_get_metadata(&self, target: VmValue, key: &str) -> Option<VmValue> {
+        let target_k = self.target_meta_key(target);
+        unsafe { &*self.metadata.get() }
+            .get(&target_k)
+            .and_then(|m| m.get(key))
+            .copied()
+    }
+    pub(super) fn host_has_metadata(&self, target: VmValue, key: &str) -> bool {
+        let target_k = self.target_meta_key(target);
+        unsafe { &*self.metadata.get() }
+            .get(&target_k)
+            .map(|m| m.contains_key(key))
+            .unwrap_or(false)
+    }
+}
+
+impl ExecCtx {
+    pub(crate) fn target_meta_key(&self, v: VmValue) -> String {
+        if v.is_heap() {
+            if let Some(obj) = self.heap.get(v.as_heap_idx()) {
+                match obj {
+                    HeapObj::Class(ref cls) => format!("class:{:p}", std::rc::Rc::as_ptr(cls)),
+                    HeapObj::VmClosure(ref c) => {
+                        format!("fn:{:p}", std::rc::Rc::as_ptr(&c.proto))
+                    }
+                    HeapObj::Object(ref oref) => {
+                        format!("obj:{:p}", std::rc::Rc::as_ptr(&oref.0))
+                    }
+                    _ => format!("heap:{:x}", v.as_heap_idx()),
+                }
+            } else {
+                format!("heap:{:x}", v.as_heap_idx())
+            }
+        } else if v.is_int() {
+            format!("int:{}", v.as_int())
+        } else {
+            self.heap.str_repr(v)
+        }
+    }
+}

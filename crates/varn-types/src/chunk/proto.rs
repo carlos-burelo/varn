@@ -12,6 +12,8 @@ use super::literal::opt_rc_str_serde;
 use super::pool::PoolEntry;
 use super::Chunk;
 
+pub type TrivialInitPlan = Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>;
+
 /// Discriminante en `state[0]` del objeto de estado de una máquina de
 /// estados (ver [`FunctionProto::state_size`]) cuando la máquina terminó: el
 /// retorno de `poll` es el resultado final.
@@ -300,8 +302,7 @@ pub struct FunctionProto {
     /// Cached plan for trivial field initialization constructors.
     #[serde(skip)]
     #[serde(default)]
-    pub trivial_init_memo:
-        std::cell::RefCell<Option<Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>>>>,
+    pub trivial_init_memo: std::cell::RefCell<Option<Option<TrivialInitPlan>>>,
 
     /// Portable typed SSA, attached after regalloc, or why the body has none
     /// (the JIT then lowers it from bytecode).
@@ -386,9 +387,7 @@ impl FunctionProto {
     /// Checks if this constructor proto is a trivial field-initializer:
     /// it consists purely of straight-line `SetFixedField this, param_reg, slot`
     /// instructions ending in Return.
-    pub fn trivial_field_init_plan(
-        &self,
-    ) -> Option<Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>> {
+    pub fn trivial_field_init_plan(&self) -> Option<TrivialInitPlan> {
         if let Some(ref cached) = *self.trivial_init_memo.borrow() {
             return cached.clone();
         }

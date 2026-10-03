@@ -114,16 +114,22 @@ impl FrameStore {
         bases[SlotClass::Fpr.index()] = self.fpr.len() as u32;
         bases[SlotClass::Ref.index()] = self.refs.len() as u32;
         bases[SlotClass::Dyn.index()] = self.dyn_.len() as u32;
-        self.gpr
-            .extend(std::iter::repeat(0).take(layout.counts[SlotClass::Gpr.index()] as usize));
-        self.fpr
-            .extend(std::iter::repeat(0.0).take(layout.counts[SlotClass::Fpr.index()] as usize));
-        self.refs.extend(
-            std::iter::repeat(REF_UNINIT).take(layout.counts[SlotClass::Ref.index()] as usize),
-        );
-        self.dyn_.extend(
-            std::iter::repeat(VmValue::null()).take(layout.counts[SlotClass::Dyn.index()] as usize),
-        );
+        self.gpr.extend(std::iter::repeat_n(
+            0,
+            layout.counts[SlotClass::Gpr.index()] as usize,
+        ));
+        self.fpr.extend(std::iter::repeat_n(
+            0.0,
+            layout.counts[SlotClass::Fpr.index()] as usize,
+        ));
+        self.refs.extend(std::iter::repeat_n(
+            REF_UNINIT,
+            layout.counts[SlotClass::Ref.index()] as usize,
+        ));
+        self.dyn_.extend(std::iter::repeat_n(
+            VmValue::null(),
+            layout.counts[SlotClass::Dyn.index()] as usize,
+        ));
         self.allocs.push(FrameAlloc { bases, layout });
         id
     }
@@ -181,10 +187,11 @@ mod tests {
     use varn_types::register_meta::{RegisterMeta, SlotKind};
 
     fn proto_with(meta: &[SlotKind], nregs: u16) -> Rc<FunctionProto> {
-        let mut p = FunctionProto::default();
-        p.register_count = nregs;
-        p.register_meta = meta.iter().map(|&kind| RegisterMeta { kind }).collect();
-        Rc::new(p)
+        Rc::new(FunctionProto {
+            register_count: nregs,
+            register_meta: meta.iter().map(|&kind| RegisterMeta { kind }).collect(),
+            ..FunctionProto::default()
+        })
     }
 
     #[test]

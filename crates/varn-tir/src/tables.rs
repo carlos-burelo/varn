@@ -72,15 +72,14 @@ impl ClassInfo {
 
         // Fields: the parent's prefix, then this class's own, dense.
         let mut out: Vec<FieldInfo> = parent_info.map(|p| p.fields.clone()).unwrap_or_default();
-        let mut slot = out.len() as u16;
-        for (fname, fty) in fields {
+        let first_slot = out.len() as u16;
+        for (slot, (fname, fty)) in (first_slot..).zip(fields) {
             out.push(FieldInfo {
                 name: fname,
                 ty: fty,
                 slot,
                 offset: slot as u32 * SLOT_SIZE,
             });
-            slot += 1;
         }
         let payload_size = out.len() as u32 * SLOT_SIZE;
 

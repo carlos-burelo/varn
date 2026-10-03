@@ -56,7 +56,7 @@ impl<'r> Checker<'r> {
                         .symbol_types
                         .get(&id)
                         .cloned()
-                        .or_else(|| bind.arena.get(id).ty.clone());
+                        .or_else(|| bind.arena.get(id).ty);
                     if let Some(ty) = original_ty {
                         if is_true_branch {
                             let narrowed = ty
@@ -135,7 +135,7 @@ impl<'r> Checker<'r> {
                                     .symbol_types
                                     .get(&id)
                                     .cloned()
-                                    .or_else(|| bind.arena.get(id).ty.clone());
+                                    .or_else(|| bind.arena.get(id).ty);
                                 if let Some(ty) = original_ty {
                                     let narrowed = ty.non_nullified(
                                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),

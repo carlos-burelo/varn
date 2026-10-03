@@ -403,8 +403,7 @@ impl<'r> super::super::Binder<'r> {
             let field_name_rc: Arc<str> = Arc::from(self.interner.resolve(field.name));
 
             let mut field_sym =
-                Symbol::new(SymbolKind::Property, field.name, field.range.start.line)
-                    .with_type(ty.clone());
+                Symbol::new(SymbolKind::Property, field.name, field.range.start.line).with_type(ty);
             field_sym.col = field.range.start.column;
             field_sym.offset = field.range.start.offset;
             field_sym.has_explicit_type = true;

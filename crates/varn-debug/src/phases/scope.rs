@@ -66,16 +66,16 @@ pub fn render(rep: &Report, filename: &str, fmt: Format, w: &mut dyn Write) -> s
                     } else {
                         &indent[..indent.len() - 4]
                     };
-                    write!(
+                    writeln!(
                         w,
-                        "{outer}{marker}{BOLD}fn{RESET} {BLUE}{}{RESET} (upvalues: {})\n",
+                        "{outer}{marker}{BOLD}fn{RESET} {BLUE}{}{RESET} (upvalues: {})",
                         r[2], r[3]
                     )?;
                 } else {
-                    write!(w, "{indent}    {DIM}const pool strings: {}{RESET}\n", r[2])?;
+                    writeln!(w, "{indent}    {DIM}const pool strings: {}{RESET}", r[2])?;
                 }
             }
-            write!(w, "  {DIM}── end: static scope tree ──{RESET}\n")?;
+            writeln!(w, "  {DIM}── end: static scope tree ──{RESET}")?;
         }
         Format::Text => {
             writeln!(w, "# scope {}", basename(filename))?;

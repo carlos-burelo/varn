@@ -231,7 +231,7 @@ varn_contract! {
             unsafe {
                 let addr = (ptr + offset) as *mut u8;
                 match size {
-                    1 => std::ptr::write_unaligned(addr as *mut u8, val as u8),
+                    1 => std::ptr::write_unaligned(addr, val as u8),
                     2 => std::ptr::write_unaligned(addr as *mut i16, val as i16),
                     4 => std::ptr::write_unaligned(addr as *mut i32, val as i32),
                     8 => std::ptr::write_unaligned(addr as *mut i64, val),

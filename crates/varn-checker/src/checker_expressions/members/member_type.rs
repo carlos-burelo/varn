@@ -86,7 +86,7 @@ fn resolve_extension_symbol_type(bind: &BindResult, mangled: &Arc<str>) -> Optio
     let scope = bind.scopes.get(bind.global_scope);
     let atom = bind.interner.get(mangled.as_ref())?;
     let sid = scope.resolve(atom, &bind.scopes)?;
-    bind.arena.get(sid).ty.clone()
+    bind.arena.get(sid).ty
 }
 
 fn extension_method_type(
@@ -143,7 +143,7 @@ fn intrinsic_member_info(
                 .members
                 .iter()
                 .find(|m| m.name.as_ref() == key)
-                .map(|m| (m.ty.clone(), m.symbol_id))
+                .map(|m| (m.ty, m.symbol_id))
         })
 }
 
@@ -156,11 +156,11 @@ impl<'r> Checker<'r> {
     ) -> Option<(Type, Option<usize>)> {
         let ty_key = (*ty, Arc::from(key));
         if let Some(res) = self.member_type_cache.get(&ty_key) {
-            return res.clone();
+            return *res;
         }
 
         let res = self.find_member_info_uncached(ty, key, bind);
-        self.member_type_cache.insert(ty_key, res.clone());
+        self.member_type_cache.insert(ty_key, res);
         res
     }
 
@@ -214,7 +214,7 @@ impl<'r> Checker<'r> {
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
-                                let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
+                                let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
                                 if let Some(origin) = &sym.origin_module {
                                     let origin_str =
                                         self.resolve_bind_atom(bind, *origin).to_string();
@@ -310,11 +310,11 @@ impl<'r> Checker<'r> {
                         // ausente, así que se expone igual: `T | null`.
                         let ty = if m.is_optional {
                             Type::make_nullable(
-                                m.ty.clone(),
+                                m.ty,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             )
                         } else {
-                            m.ty.clone()
+                            m.ty
                         };
                         return Some((ty, m.symbol_id));
                     }
@@ -327,18 +327,18 @@ impl<'r> Checker<'r> {
                         // misma razón que los miembros opcionales de Object.
                         let ty = if m.is_optional {
                             Type::make_nullable(
-                                m.ty.clone(),
+                                m.ty,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             )
                         } else {
-                            m.ty.clone()
+                            m.ty
                         };
                         return Some((ty, m.symbol_id));
                     }
                 }
                 if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                        return Some((m.ty.clone(), m.symbol_id));
+                        return Some((m.ty, m.symbol_id));
                     }
                 }
 
@@ -351,12 +351,12 @@ impl<'r> Checker<'r> {
                 if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_ref()) {
                         if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                            return Some((m.ty.clone(), m.symbol_id));
+                            return Some((m.ty, m.symbol_id));
                         }
                     }
                     if let Some(members) = b.flattened_members.get(name.as_ref()) {
                         if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                            return Some((m.ty.clone(), m.symbol_id));
+                            return Some((m.ty, m.symbol_id));
                         }
                     }
                     if let Some(methods) = b.class_methods.get(name.as_ref()) {
@@ -673,7 +673,7 @@ impl<'r> Checker<'r> {
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
-                                let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
+                                let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
                                 if let Some(origin) = &sym.origin_module {
                                     let origin_str =
                                         self.resolve_bind_atom(bind, *origin).to_string();

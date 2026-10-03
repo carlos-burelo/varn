@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 //! Task 7e follow-up regression test: `quiet_parse::parse_module` (used by
 //! `module_precompile::build_module_graph`, the real multi-module compile
 //! path behind `vn run`/`vn build`) used to mint its own throwaway

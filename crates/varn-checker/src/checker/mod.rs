@@ -145,7 +145,7 @@ impl CheckResult {
             .symbol_types
             .get(&sym_id)
             .cloned()
-            .or_else(|| self.bind.arena.get(sym_id).ty.clone())
+            .or_else(|| self.bind.arena.get(sym_id).ty)
             .unwrap_or(crate::types::Type::Dynamic);
         Some((sym_id, ty))
     }
@@ -456,7 +456,7 @@ impl<'r> Checker<'r> {
                 .map(|e| {
                     let span_len = e.end.saturating_sub(e.start);
                     let info = ExprInfo {
-                        ty: e.ty.clone(),
+                        ty: e.ty,
                         symbol_id: e.symbol_id,
                     };
                     (e.start, span_len, e.seq, info)
@@ -479,7 +479,7 @@ impl<'r> Checker<'r> {
                         .expr_types
                         .entry(sym.offset)
                         .or_insert_with(|| ExprInfo {
-                            ty: sym.ty.clone().unwrap_or(Type::Dynamic),
+                            ty: sym.ty.unwrap_or(Type::Dynamic),
                             symbol_id: Some(id),
                         });
                 }
@@ -536,7 +536,7 @@ impl<'r> Checker<'r> {
             };
 
             if !sym.has_explicit_type && current_is_weak {
-                sym.ty = Some(ty.clone());
+                sym.ty = Some(*ty);
             }
         }
         profile.finalize = started.elapsed();
@@ -668,7 +668,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn infer_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
         let key = (expr, self.current_scope, self.infer_env_rev);
         if let Some(ty) = self.infer_cache.get(&key) {
-            return ty.clone();
+            return *ty;
         }
 
         // Inference does NOT depend on whether the caller wants a type table.
@@ -685,7 +685,7 @@ impl<'r> Checker<'r> {
         // the type is.
         let ty = self.infer_type_internal(expr, bind);
 
-        self.infer_cache.insert(key, ty.clone());
+        self.infer_cache.insert(key, ty);
         ty
     }
 
@@ -875,7 +875,7 @@ impl<'r> Checker<'r> {
     ) -> Type {
         let key = (node.range.start.offset, bind as *const BindResult as usize);
         if let Some(cached) = self.type_node_cache.get(&key) {
-            return cached.clone();
+            return *cached;
         }
         let view = crate::binder::BindView::new(bind, self.resolver);
         let resolved = crate::binder::resolve_type_node(
@@ -883,7 +883,7 @@ impl<'r> Checker<'r> {
             Some(&view),
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
-        self.type_node_cache.insert(key, resolved.clone());
+        self.type_node_cache.insert(key, resolved);
         resolved
     }
 

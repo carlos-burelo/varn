@@ -71,7 +71,7 @@ pub fn enrich_call_returns(
                 if let Some(t) = ty {
                     let name_atom = bind.arena.get(*sym_id).name;
                     let name: Arc<str> = Arc::from(bind.interner.resolve(name_atom));
-                    bind.arena.get_mut(*sym_id).ty = Some(t.clone());
+                    bind.arena.get_mut(*sym_id).ty = Some(t);
                     sym_map.insert(name, t);
                 }
             }

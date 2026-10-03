@@ -23,9 +23,9 @@ impl<'r> Checker<'r> {
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                    self.record_type_with_symbol(range.start.offset, value_ty.clone(), id);
+                    self.record_type_with_symbol(range.start.offset, *value_ty, id);
                 } else {
-                    self.record_type(range.start.offset, value_ty.clone());
+                    self.record_type(range.start.offset, *value_ty);
                 }
             }
             Pattern::Array { elements, rest, .. } => {
@@ -78,7 +78,7 @@ impl<'r> Checker<'r> {
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                    self.record_type_with_symbol(0, value_ty.clone(), id);
+                    self.record_type_with_symbol(0, *value_ty, id);
                 }
             }
             MatchPattern::EnumVariant {
@@ -98,7 +98,7 @@ impl<'r> Checker<'r> {
                     }
                     if let Some((_, field_ty)) = fields.get(i) {
                         let resolved = if mapping.is_empty() {
-                            field_ty.clone()
+                            *field_ty
                         } else {
                             crate::checker_generics::map_generics_cached(self, field_ty, &mapping)
                         };
@@ -121,7 +121,7 @@ impl<'r> Checker<'r> {
                     } else if key_str != "_" && key_str != "__variant__" {
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(*key, &bind.scopes) {
-                            self.record_type_with_symbol(0, member_ty.clone(), id);
+                            self.record_type_with_symbol(0, member_ty, id);
                         }
                     }
                 }
@@ -219,7 +219,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 for (name, arg) in params.iter().zip(args.iter()) {
-                    mapping.insert(name.clone(), arg.clone());
+                    mapping.insert(name.clone(), *arg);
                 }
             }
         }

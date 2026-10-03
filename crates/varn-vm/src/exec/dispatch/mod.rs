@@ -1,14 +1,20 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
+use opgroups::*;
 use varn_core::OpCode;
 mod jit_frame;
 pub(crate) mod modules;
+mod opgroups;
+mod ops_build;
 pub(crate) mod ops_control_calls;
 pub(crate) mod ops_literals_vars;
 pub(crate) mod ops_math_cmp;
+mod ops_misc;
+mod ops_native;
 pub(crate) mod ops_objects_collections;
 pub(crate) mod reg_ops;
+mod returns;
 
 #[inline(always)]
 fn hi(w: u16) -> usize {
@@ -35,10 +41,6 @@ impl ExecCtx {
     }
 
     pub(crate) fn run_until_inner(&mut self, depth: usize) -> VmResult<VmValue> {
-        // Record this context as the CLIF static-call linking context for the
-        // duration of the run: closures constructed here (and thus
-        // clif-compiled) can then resolve their cross-function callees
-        // against the live globals. Restored on exit so nested runs compose.
         let _link = crate::clif_link::CtxGuard::enter(self as *const ExecCtx);
         unsafe { Self::run_until_inner_raw(self as *mut ExecCtx, depth) }
     }
@@ -55,17 +57,6 @@ impl ExecCtx {
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
 
-            // On-stack replacement: `OpCode::Loop` proved this frame is
-            // looping and parked the header ip. Serviced here because entering
-            // compiled code means leaving the dispatch loop, and because the
-            // entry itself is an ordinary `JitFn` — the whole setjmp /
-            // suspend / exception / frame-pop path below is shared with a
-            // normal entry rather than duplicated.
-            //
-            // The ip test is what binds the request to the frame that raised
-            // it: an unrelated frame reached first (the request survives a
-            // `continue 'frame_loop` from anywhere) must not resume at another
-            // function's loop header.
             let osr_fn = match (*ctx).osr_request.take() {
                 Some(osr_ip)
                     if !(*ctx).settings.no_jit && osr_ip == (*ctx).frames[frame_idx].ip =>
@@ -76,19 +67,12 @@ impl ExecCtx {
             };
             let is_osr = osr_fn.is_some();
 
-            // Tiering point: counting entries here (rather than compiling at
-            // closure construction) is what keeps a proto that is built and
-            // run once out of Cranelift.
             let hot_fn = match osr_fn {
                 Some(f) => Some(f),
                 None if !(*ctx).settings.no_jit && is_first_entry => closure.hot_jit_fn(),
                 None => None,
             };
             if let Some(jit_fn) = hot_fn {
-                // Running the frame compiled, and reconciling the four ways
-                // that can end, lives in `jit_frame` — it is a different job
-                // from stepping opcodes and it ran once per frame entry, not
-                // once per opcode.
                 let outcome = jit_frame::run_compiled_frame(
                     ctx,
                     jit_fn,
@@ -113,20 +97,6 @@ impl ExecCtx {
             let mut ip = (*ctx).frames[frame_idx].ip;
             let code_len = closure.proto.chunk.code.len();
 
-            /// Propaga el resultado de una operación que puede fallar, dando
-            /// primero a un `catch` la ocasión de manejarlo.
-            ///
-            /// Sin esto, un `Err` salía del bucle con `?` sin consultar nunca
-            /// la tabla de excepciones —esa búsqueda vivía sólo en el brazo de
-            /// `Throw`—, así que `try/catch` capturaba lo que lanzaba el
-            /// usuario pero no una división por cero ni el fallo de una
-            /// nativa: `JSON.parse` de una entrada inválida terminaba el
-            /// proceso en vez de la petición.
-            ///
-            /// Sincroniza `ip` al frame antes de buscar: es una variable local
-            /// del bucle y la tabla se indexa por el ip de la instrucción que
-            /// falló. Sin esa escritura la búsqueda usa un ip viejo y encuentra
-            /// el rango equivocado, o ninguno.
             macro_rules! tryv {
                 ($e:expr) => {
                     match $e {
@@ -182,7 +152,6 @@ impl ExecCtx {
                 }
 
                 macro_rules! reg_box {
-                    // Lectura boxeada de un registro (cualquier clase).
                     ($r:expr) => {
                         (*ctx).stack.box_reg(base, $r)
                     };
@@ -243,8 +212,6 @@ impl ExecCtx {
                     OpCode::Move => {
                         let w1 = code[ip];
                         ip += 1;
-                        // Sin `resize`: los registros viven dentro de
-                        // `register_count` por construcción del compilador.
                         tryv!((*ctx).stack.mov(base, first_reg, hi(w1)));
                     }
                     OpCode::Convert => {
@@ -258,90 +225,21 @@ impl ExecCtx {
                         let r = tryv!(r);
                         tryv!((*ctx).stack.unbox_into_reg(base, first_reg, r));
                     }
-                    OpCode::LoadGlobal
-                    | OpCode::StoreGlobal
-                    | OpCode::DefineGlobal
-                    | OpCode::LoadUpvalue
-                    | OpCode::StoreUpvalue
-                    | OpCode::CloseUpvalue
-                    | OpCode::LoadTrue
-                    | OpCode::LoadFalse
-                    | OpCode::LoadIntZero
-                    | OpCode::LoadIntOne
-                    | OpCode::LoadIntMinusOne => {
+                    literals_vars_ops!() => {
                         let handled = tryv!((*ctx).exec_literals_vars_op(
                             op, code, &mut ip, base, frame_idx, closure, first_reg,
                         ));
                         debug_assert!(handled, "exec_literals_vars_op must handle grouped opcodes");
                     }
 
-                    OpCode::Add
-                    | OpCode::Sub
-                    | OpCode::Mul
-                    | OpCode::Div
-                    | OpCode::Mod
-                    | OpCode::Pow
-                    | OpCode::BitAnd
-                    | OpCode::BitOr
-                    | OpCode::BitXor
-                    | OpCode::Shl
-                    | OpCode::Shr
-                    | OpCode::Ushr
-                    | OpCode::Negate
-                    | OpCode::Not
-                    | OpCode::AddImm
-                    | OpCode::SubImm
-                    | OpCode::AddInt
-                    | OpCode::SubInt
-                    | OpCode::MulInt
-                    | OpCode::DivInt
-                    | OpCode::ModInt
-                    | OpCode::PowInt
-                    | OpCode::LtInt
-                    | OpCode::GtInt
-                    | OpCode::LteInt
-                    | OpCode::GteInt
-                    | OpCode::EqInt
-                    | OpCode::NeqInt
-                    | OpCode::AddFloat
-                    | OpCode::SubFloat
-                    | OpCode::MulFloat
-                    | OpCode::DivFloat
-                    | OpCode::ModFloat
-                    | OpCode::PowFloat
-                    | OpCode::LtFloat
-                    | OpCode::GtFloat
-                    | OpCode::LteFloat
-                    | OpCode::GteFloat
-                    | OpCode::EqFloat
-                    | OpCode::NeqFloat
-                    | OpCode::Eq
-                    | OpCode::Neq
-                    | OpCode::Lt
-                    | OpCode::Lte
-                    | OpCode::Gt
-                    | OpCode::Gte
-                    | OpCode::ToString
-                    | OpCode::StrConcat
-                    | OpCode::BuildStr
-                    | OpCode::StrLength
-                    | OpCode::StrSlice => {
+                    math_cmp_ops!() => {
                         let handled = tryv!((*ctx).exec_math_cmp_op(
                             op, code, &mut ip, base, frame_idx, closure, first_reg,
                         ));
                         debug_assert!(handled, "exec_math_cmp_op must handle grouped opcodes");
                     }
 
-                    OpCode::Jump
-                    | OpCode::Loop
-                    | OpCode::JumpIfFalse
-                    | OpCode::JumpIfTrue
-                    | OpCode::Return
-                    | OpCode::Call
-                    | OpCode::CallSelf
-                    | OpCode::CallMethod
-                    | OpCode::InvokeVirtual
-                    | OpCode::CallSpread => {
+                    control_call_ops!() => {
                         if let Some(flow) = tryv!((*ctx).exec_control_calls_op(
                             op, code, &mut ip, base, frame_idx, closure, first_reg, depth,
                         )) {
@@ -357,42 +255,7 @@ impl ExecCtx {
                         }
                     }
 
-                    OpCode::MakeClosure
-                    | OpCode::GetProperty
-                    | OpCode::GetPropertyMaybe
-                    | OpCode::SetProperty
-                    | OpCode::GetFixedField
-                    | OpCode::SetFixedField
-                    | OpCode::GetSuper
-                    | OpCode::GetSymbol
-                    | OpCode::AssertNotNull
-                    | OpCode::DeclareField
-                    | OpCode::GetIndex
-                    | OpCode::SetIndex
-                    | OpCode::ArrayGetIndex
-                    | OpCode::ArraySetIndex
-                    | OpCode::BuildArray
-                    | OpCode::BuildTuple
-                    | OpCode::BuildObject
-                    | OpCode::BuildObjectWithShape
-                    | OpCode::BuildRecord
-                    | OpCode::ObjectRest
-                    | OpCode::ObjectKeys
-                    | OpCode::ObjectMerge
-                    | OpCode::WrapSpread
-                    | OpCode::ArrayLength
-                    | OpCode::BytesLength
-                    | OpCode::ArrayPush
-                    | OpCode::ArrayPop
-                    | OpCode::ArrayExtend
-                    | OpCode::In
-                    | OpCode::Instanceof
-                    | OpCode::Typeof
-                    | OpCode::IsNull
-                    | OpCode::IsArray
-                    | OpCode::BuildMap
-                    | OpCode::MapGetIndex
-                    | OpCode::MapSetIndex => {
+                    object_ops!() => {
                         if let Some(flow) = tryv!((*ctx).exec_objects_collections_op(
                             op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )) {
@@ -405,15 +268,7 @@ impl ExecCtx {
                         }
                     }
 
-                    OpCode::MakeClass
-                    | OpCode::Inherit
-                    | OpCode::Method
-                    | OpCode::DefineStatic
-                    | OpCode::DefineGetter
-                    | OpCode::DefineSetter
-                    | OpCode::DefineStaticGetter
-                    | OpCode::DefineStaticSetter
-                    | OpCode::BindMethod => {
+                    class_ops!() => {
                         (*ctx).frames[frame_idx].ip = ip;
                         tryv!(
                             (*ctx).exec_class_op(
@@ -430,33 +285,7 @@ impl ExecCtx {
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
                     }
-                    OpCode::GetEnumTag => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg_box!(src);
-                        let tag = tryv!((*ctx).exec_get_enum_tag(v));
-                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, tag));
-                    }
 
-                    OpCode::Try => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let err_reg = hi(w1) as u8;
-                        let offset_hi = code[ip] as u32;
-                        let offset_lo = code[ip + 1] as u32;
-                        let catch_offset = ((offset_hi << 16) | offset_lo) as usize;
-                        ip += 2;
-                        let catch_ip = ip + catch_offset;
-                        crate::exec::exceptions::push_try(
-                            &mut (*ctx).try_handlers,
-                            catch_ip,
-                            (*ctx).frames.len(),
-                            err_reg,
-                        );
-                    }
-                    OpCode::PopTry => {
-                        crate::exec::exceptions::pop_try(&mut (*ctx).try_handlers);
-                    }
                     OpCode::Throw => {
                         let w1 = code[ip];
                         let src = hi(w1);
@@ -498,15 +327,6 @@ impl ExecCtx {
                         });
                         return Ok(VmValue::null());
                     }
-                    OpCode::Spawn => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (dest, src) = (first_reg, hi(w1));
-
-                        let task_val = reg_box!(src);
-                        let spawned = tryv!((*ctx).exec_spawn(task_val));
-                        tryv!((*ctx).stack.unbox_into_reg(base, dest, spawned));
-                    }
 
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
                         (*ctx).frames[frame_idx].ip = ip;
@@ -523,98 +343,17 @@ impl ExecCtx {
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
                     }
-                    OpCode::Intrinsic => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let wire_byte = (w1 >> 8) as u8;
-
-                        let arg_count = (w1 & 0xFF) as usize;
-                        // `base` es el id de la activación en `FrameStore`
-                        // (índice pequeño), no un offset de stack plano: los
-                        // registros se indexan directo dentro del frame, sin
-                        // sumarle `base`. `base + first_reg` era el cálculo
-                        // correcto en el `Vec<VmValue>` universal de antes de
-                        // la migración; sobrevivió aquí sin actualizarse y
-                        // desplazaba la ventana por el id de la activación
-                        // (`args_start` crecía con cada frame anidado hasta
-                        // salirse de `register_count`).
-                        let args_start = first_reg;
-                        // La ventana ya no es contigua (frame por clases): se
-                        // boxea a un buffer propio antes de invocar.
-                        let result = if arg_count <= 16 {
-                            let mut buf = [VmValue::null(); 16];
-                            for i in 0..arg_count {
-                                buf[i] = (*ctx).stack.box_reg(base, args_start + i);
-                            }
-                            tryv!(crate::exec::intrinsics::dispatch(
-                                wire_byte,
-                                &buf[..arg_count],
-                            ))
-                        } else {
-                            let boxed = (*ctx).stack.box_range(base, args_start, arg_count);
-                            tryv!(crate::exec::intrinsics::dispatch(wire_byte, &boxed,))
-                        };
-                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
+                    OpCode::Intrinsic | OpCode::IntrinsicDirect | OpCode::CallNativeOp => {
+                        tryv!((*ctx).exec_native_op(op, code, &mut ip, base, first_reg, closure));
                     }
 
-                    OpCode::IntrinsicDirect => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let src = (w1 >> 8) as usize;
-                        let wire_byte = (w1 & 0xFF) as u8;
-                        let x = (*ctx).stack.box_reg(base, src);
-                        let result = tryv!(crate::exec::intrinsics::dispatch_unary(wire_byte, x));
-                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
+                    OpCode::Try
+                    | OpCode::PopTry
+                    | OpCode::GetEnumTag
+                    | OpCode::Spawn
+                    | OpCode::LoadStaticFn => {
+                        tryv!((*ctx).exec_misc_op(op, code, &mut ip, base, first_reg, closure,));
                     }
-
-                    OpCode::CallNativeOp => {
-                        let cidx = code[ip] as usize;
-                        let total = code[ip + 1] as usize; // receiver + args
-                        ip += 2;
-                        // op-id is stored as a full i64 constant (NOT the
-                        // NaN-boxed `closure.constants` cache, which truncates).
-                        let op_id = match closure.proto.chunk.constants.get(cidx) {
-                            Some(varn_types::chunk::PoolEntry::Literal(
-                                varn_types::chunk::Literal::Int(i),
-                            )) => *i as u64,
-                            _ => {
-                                return Err(crate::error::RuntimeError::new(format!(
-                                    "CallNativeOp: const {cidx} is not an op-id"
-                                )))
-                            }
-                        };
-                        let f = tryv!(varn_builtins::native_op_fn(op_id).ok_or_else(|| {
-                            crate::error::RuntimeError::new(format!(
-                                "CallNativeOp: unknown op-id {op_id}"
-                            ))
-                        }));
-                        let receiver = (*ctx).stack.box_reg(base, first_reg);
-                        // Reuse the exact native-call path the inline cache uses,
-                        // so error and profiling semantics are identical.
-                        let result = tryv!((*ctx).call_native_with_receiver(
-                            f,
-                            receiver,
-                            crate::exec::method_args::MethodArgs::Regs {
-                                base,
-                                start: first_reg + 1,
-                                count: total - 1,
-                            },
-                        ));
-                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, result));
-                    }
-
-                    OpCode::LoadStaticFn => {
-                        let proto_idx = code[ip] as usize;
-                        ip += 1;
-                        let val = tryv!((*ctx).make_closure(
-                            closure,
-                            proto_idx,
-                            base,
-                            std::iter::empty()
-                        ));
-                        tryv!((*ctx).stack.unbox_into_reg(base, first_reg, val));
-                    }
-
                     OpCode::Nop => {}
                 }
 
@@ -625,65 +364,5 @@ impl ExecCtx {
             }
         }
         Ok(VmValue::null())
-    }
-
-    pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmResult<VmValue> {
-        let val = self.stack.box_reg(base, src);
-        let returning_frame_idx = self.frames.len().saturating_sub(1);
-        let frame = self.frames.pop().unwrap();
-        // Cerrar ANTES de liberar: el close lee el valor vivo del slot.
-        self.close_upvalues_in(frame.base);
-        self.stack.pop_frame();
-
-        let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
-            && !frame.closure().proto.chunk.source_file.is_empty();
-
-        let final_val =
-            crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
-
-        if is_module_frame {
-            let source_file = frame.closure().proto.chunk.source_file.to_string();
-            let module_exports = self.module_exports.remove(&returning_frame_idx);
-            let cached = module_exports.unwrap_or(final_val);
-            let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
-            unsafe { &mut *self.modules.get() }.insert(module_id, cached);
-        }
-
-        if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
-            // Sin llamante (retorno del frame raíz) no hay destino: equivale
-            // a NO_RETURN_REG. Con llamante, conversión a su clase.
-            if let Some(caller) = self.frames.last() {
-                let caller_base = caller.base;
-                self.stack
-                    .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)?;
-            }
-        }
-        Ok(final_val)
-    }
-
-    pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
-        use varn_core::RuntimeKind;
-        if v.is_null() {
-            return RuntimeKind::Null.name();
-        }
-        if v.is_int() {
-            return RuntimeKind::Int.name();
-        }
-        if v.is_f64() {
-            return RuntimeKind::Float.name();
-        }
-        if v.is_bool() {
-            return RuntimeKind::Bool.name();
-        }
-        if v.is_sso() {
-            return RuntimeKind::Str.name();
-        }
-        if !v.is_heap() {
-            return "unknown";
-        }
-        match self.heap.get(v.as_heap_idx()) {
-            Some(obj) => obj.tag().name(),
-            None => "unknown",
-        }
     }
 }

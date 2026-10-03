@@ -150,6 +150,41 @@ use crate::resource::ResourceStore;
 pub struct DummyCtx;
 
 impl NativeCtx for DummyCtx {
+    fn alloc_bigint(&mut self, _value: num_bigint::BigInt) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_decimal(&mut self, _value: bigdecimal::BigDecimal) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_char(&mut self, _value: char) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_map(&mut self, _entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_set(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_enum_variant(&mut self, _data: crate::value::EnumVariantData) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_bound_native(
+        &mut self,
+        _receiver: VmValue,
+        _func: NativeFn,
+        _name: &'static str,
+    ) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
+        VmValue::null()
+    }
     fn alloc_str(&mut self, _s: &str) -> VmValue {
         VmValue::null()
     }
@@ -223,6 +258,41 @@ impl NativeCtx for DummyCtx {
 struct StaticInitCtx;
 
 impl NativeCtx for StaticInitCtx {
+    fn alloc_bigint(&mut self, _value: num_bigint::BigInt) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_decimal(&mut self, _value: bigdecimal::BigDecimal) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_char(&mut self, _value: char) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_map(&mut self, _entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_set(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_enum_variant(&mut self, _data: crate::value::EnumVariantData) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_bound_native(
+        &mut self,
+        _receiver: VmValue,
+        _func: NativeFn,
+        _name: &'static str,
+    ) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
+        VmValue::null()
+    }
     fn alloc_str(&mut self, _s: &str) -> VmValue {
         VmValue::null()
     }

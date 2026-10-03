@@ -194,7 +194,7 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         } else {
             (
                 Pattern::Identifier {
-                    name: key.clone(),
+                    name: key,
                     type_ann: None,
                     range: prop_range,
                 },

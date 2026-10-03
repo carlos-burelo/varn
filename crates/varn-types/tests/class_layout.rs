@@ -1,3 +1,4 @@
+#![allow(unused_crate_dependencies)]
 use std::sync::Arc;
 use varn_core::RuntimeKind;
 use varn_types::value::ClassObj;
