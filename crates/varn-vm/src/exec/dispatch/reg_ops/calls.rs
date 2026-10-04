@@ -28,7 +28,7 @@ impl ExecCtx {
                             let is_jit = nc.jit_fn().is_some();
                             self.record_hotspot_fn(fn_name, is_jit);
                         }
-                        if self.frames.len() >= 10000 {
+                        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                             return Err(crate::error::RuntimeError::new(
                                 "stack overflow: call depth exceeded 10000",
                             ));
@@ -84,7 +84,7 @@ impl ExecCtx {
                             {
                                 let nc = nc.clone();
                                 let owner = owner_class.clone();
-                                if self.frames.len() >= 10000 {
+                                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                                     return Err(crate::error::RuntimeError::new(
                                         "stack overflow: call depth exceeded 10000",
                                     ));
@@ -144,7 +144,7 @@ impl ExecCtx {
                                 let is_jit = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(fn_name, is_jit);
                             }
-                            if self.frames.len() >= 10000 {
+                            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                                 return Err(crate::error::RuntimeError::new(
                                     "stack overflow: call depth exceeded 10000",
                                 ));
@@ -161,7 +161,7 @@ impl ExecCtx {
                             let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                             let is_jit2 = nc.jit_fn().is_some();
                             self.record_hotspot_fn(&fn_name2, is_jit2);
-                            if self.frames.len() >= 10000 {
+                            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                                 return Err(crate::error::RuntimeError::new(
                                     "stack overflow: call depth exceeded 10000",
                                 ));
@@ -282,7 +282,7 @@ impl ExecCtx {
                     let is_jit = closure_ref.jit_fn().is_some();
                     self.record_hotspot_fn(fn_name, is_jit);
                 }
-                if self.frames.len() >= 10000 {
+                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::error::RuntimeError::new(
                         "stack overflow: call depth exceeded 10000",
                     ));
@@ -304,7 +304,7 @@ impl ExecCtx {
                     .to_owned();
                 let is_jit2 = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(&fn_name2, is_jit2);
-                if self.frames.len() >= 10000 {
+                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::error::RuntimeError::new(
                         "stack overflow: call depth exceeded 10000",
                     ));

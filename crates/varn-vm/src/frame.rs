@@ -7,6 +7,10 @@
 use crate::closure::VmClosure;
 use std::rc::Rc;
 
+pub const MAX_CALL_DEPTH: usize = 10000;
+
+pub const VM_STACK_BYTES: usize = 64 << 20;
+
 #[repr(C)]
 pub struct CallFrame {
     pub closure_ptr: *const VmClosure,

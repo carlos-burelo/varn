@@ -178,7 +178,7 @@ impl ExecCtx {
         // read `null`, exactly as the old null-padding; static classes read
         // their zero value — only reachable when the caller under-applies,
         // which the checker rejects for required params).
-        if self.frames.len() >= 10000 {
+        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));

@@ -34,6 +34,7 @@ pub(crate) mod value;
 pub(crate) mod vm;
 
 pub use error::{FrameInfo, RuntimeError, VmResult};
+pub use frame::VM_STACK_BYTES;
 pub use globals::GlobalStore;
 pub use heap::{Heap, HeapObj};
 pub use loader::{CompositeLoader, ModuleError, ModuleLoader};

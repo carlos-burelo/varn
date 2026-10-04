@@ -226,85 +226,88 @@ pub(super) fn spawn_isolate(
     let done = varn_types::HostPromise::pending();
     let done_t = done.clone();
 
-    std::thread::spawn(move || {
-        let mut machine =
-            crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
-        machine
-            .ctx
-            .globals_mut()
-            .define("isIsolate", VmValue::from_bool(true));
-        if let Some(ld) = loader {
-            machine = machine.with_loader(ld);
-        }
+    std::thread::Builder::new()
+        .stack_size(crate::frame::VM_STACK_BYTES)
+        .spawn(move || {
+            let mut machine =
+                crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
+            machine
+                .ctx
+                .globals_mut()
+                .define("isIsolate", VmValue::from_bool(true));
+            if let Some(ld) = loader {
+                machine = machine.with_loader(ld);
+            }
 
-        if let Err(e) = machine.ctx.load_module("std:task") {
-            done_t.reject(worker_error(&format!(
-                "isolate worker: failed to load std:task: {:?}",
-                e
-            )));
-            return;
-        }
-
-        let module_val = match machine.ctx.load_module(&module_path_str) {
-            Ok(m) => m,
-            Err(e) => {
+            if let Err(e) = machine.ctx.load_module("std:task") {
                 done_t.reject(worker_error(&format!(
-                    "isolate worker: failed to load module {}: {:?}",
-                    module_path_str, e
+                    "isolate worker: failed to load std:task: {:?}",
+                    e
                 )));
                 return;
             }
-        };
 
-        let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
-            Some(f) => f,
-            None => {
-                done_t.reject(worker_error(&format!(
-                    "isolate worker: export '{}' not found in module {}",
-                    export_name_str, module_path_str
-                )));
-                return;
-            }
-        };
-
-        // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
-        // `to_value_ctx` emits `__chanEndpoint` markers, which
-        // `host_values::open_resolved` mints into real Sender/Receiver
-        // instances (one minting definition, shared with the same-thread
-        // await-resume path). std:task is already loaded above, so the
-        // endpoint classes exist on this worker's heap.
-        let mut vm_args = Vec::new();
-        for arg in args {
-            let v_nv = arg.to_value_ctx(&mut machine.ctx);
-            vm_args.push(varn_builtins::modules::task::mint_endpoint_marker(
-                &mut machine.ctx,
-                v_nv,
-            ));
-        }
-
-        match machine.ctx.call_vm(func_nv, &vm_args) {
-            Ok(res) => {
-                let lazy = if res.is_heap() {
-                    match machine.ctx.heap.get_by_idx(res.as_heap_idx()) {
-                        Some(HeapObj::Task(lazy)) => Some(std::rc::Rc::clone(lazy)),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
-                if let Some(lazy) = lazy {
-                    let cell = machine.ctx.run_lazy_task_sync(lazy);
-                    if cell.status() == crate::task::Status::Rejected {
-                        let reason = machine.ctx.str_repr(cell.value());
-                        done_t.reject(worker_error(&reason));
-                        return;
-                    }
+            let module_val = match machine.ctx.load_module(&module_path_str) {
+                Ok(m) => m,
+                Err(e) => {
+                    done_t.reject(worker_error(&format!(
+                        "isolate worker: failed to load module {}: {:?}",
+                        module_path_str, e
+                    )));
+                    return;
                 }
-                done_t.resolve(varn_types::value::SendValue::Null);
+            };
+
+            let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
+                Some(f) => f,
+                None => {
+                    done_t.reject(worker_error(&format!(
+                        "isolate worker: export '{}' not found in module {}",
+                        export_name_str, module_path_str
+                    )));
+                    return;
+                }
+            };
+
+            // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
+            // `to_value_ctx` emits `__chanEndpoint` markers, which
+            // `host_values::open_resolved` mints into real Sender/Receiver
+            // instances (one minting definition, shared with the same-thread
+            // await-resume path). std:task is already loaded above, so the
+            // endpoint classes exist on this worker's heap.
+            let mut vm_args = Vec::new();
+            for arg in args {
+                let v_nv = arg.to_value_ctx(&mut machine.ctx);
+                vm_args.push(varn_builtins::modules::task::mint_endpoint_marker(
+                    &mut machine.ctx,
+                    v_nv,
+                ));
             }
-            Err(e) => done_t.reject(worker_error(&e.to_string())),
-        }
-    });
+
+            match machine.ctx.call_vm(func_nv, &vm_args) {
+                Ok(res) => {
+                    let lazy = if res.is_heap() {
+                        match machine.ctx.heap.get_by_idx(res.as_heap_idx()) {
+                            Some(HeapObj::Task(lazy)) => Some(std::rc::Rc::clone(lazy)),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(lazy) = lazy {
+                        let cell = machine.ctx.run_lazy_task_sync(lazy);
+                        if cell.status() == crate::task::Status::Rejected {
+                            let reason = machine.ctx.str_repr(cell.value());
+                            done_t.reject(worker_error(&reason));
+                            return;
+                        }
+                    }
+                    done_t.resolve(varn_types::value::SendValue::Null);
+                }
+                Err(e) => done_t.reject(worker_error(&e.to_string())),
+            }
+        })
+        .expect("failed to spawn isolate thread");
 
     Ok(done)
 }

@@ -65,7 +65,7 @@ impl ExecCtx {
     }
 
     pub(crate) fn push_frame(&mut self, closure: Rc<VmClosure>) -> crate::error::VmResult<()> {
-        if self.frames.len() >= 10000 {
+        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));

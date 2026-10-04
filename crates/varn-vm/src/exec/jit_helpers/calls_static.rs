@@ -11,6 +11,11 @@ pub(super) enum Handoff {
 }
 
 pub(super) unsafe fn hand_off(ctx: &mut ExecCtx, caller_depth: usize, out: *mut usize) -> Handoff {
+    if ctx.frames.len() > crate::frame::MAX_CALL_DEPTH {
+        return Handoff::Ran(Err(crate::error::RuntimeError::new(
+            "stack overflow: call depth exceeded 10000",
+        )));
+    }
     if ctx.frames.len() == caller_depth + 1
         && ctx
             .pending_constructors

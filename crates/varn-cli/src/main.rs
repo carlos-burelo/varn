@@ -49,6 +49,15 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
+    std::thread::Builder::new()
+        .stack_size(varn_vm::VM_STACK_BYTES)
+        .spawn(run_cli)
+        .expect("failed to spawn the VM thread")
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+}
+
+fn run_cli() {
     // Lo primero, antes de registrar la stdlib o tocar argumentos: si el
     // proyecto trae `.env`/`.env.local`, sus claves quedan puestas en el
     // entorno del proceso para todo lo que sigue (`RUST_BACKTRACE`,
