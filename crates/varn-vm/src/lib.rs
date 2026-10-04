@@ -22,7 +22,6 @@ pub(crate) mod heap_array;
 mod heap_str_alloc;
 pub(crate) mod home_trace;
 pub mod jit;
-mod jit_layout;
 pub(crate) mod linker;
 pub mod loader;
 pub(crate) mod nursery;

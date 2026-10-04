@@ -9,7 +9,6 @@ macro_rules! fill_tail {
         resolve_native_op: resolve_native_op_target,
             array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),
-            str_layout: crate::heap::Heap::jit_str_layout(),
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,

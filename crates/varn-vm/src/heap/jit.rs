@@ -106,6 +106,14 @@ impl Heap {
         let none_tag = unsafe { *(&none_slot as *const _ as *const u8) } as usize;
         assert_ne!(array_tag, none_tag, "Option<HeapObj> niche probe failed");
 
+        let str_slot: Option<HeapObj> = Some(HeapObj::Str(super::str::HeapStr::inline("")));
+        let str_tag = unsafe { *(&str_slot as *const _ as *const u8) } as usize;
+        assert_ne!(str_tag, none_tag, "Option<HeapObj> niche probe failed");
+        assert_ne!(
+            str_tag, array_tag,
+            "HeapObj::Str and HeapObj::Array share a tag"
+        );
+
         varn_jit::JitArrayLayout {
             slots_vec_off: 2 * std::mem::size_of::<usize>()
                 + std::mem::offset_of!(HeapInner, objects),
@@ -115,6 +123,7 @@ impl Heap {
             slots_ptr_off,
             slot_size: size,
             array_tag,
+            str_tag,
             payload_off,
             disc_off,
             elems_ptr_off,

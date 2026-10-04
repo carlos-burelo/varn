@@ -64,6 +64,8 @@ pub struct JitArrayLayout {
     /// Discriminant byte value of `HeapObj::Array` (niche-shared by the
     /// `Option` wrapper).
     pub array_tag: usize,
+    /// Discriminant byte value of `HeapObj::Str`.
+    pub str_tag: usize,
     /// Slot base → the array payload's Rc pointer.
     pub payload_off: usize,
     /// Byte offset, from the `ArrayRepr` base (i.e. from payload RcBox + 16),
@@ -124,80 +126,6 @@ pub struct JitObjectLayout {
     pub shape_off: usize,
     /// Shape pointer → `Shape.id` (u32).
     pub shape_id_off: usize,
-}
-
-/// Largest number of bytes of `Option<HeapObj>` the JIT's string template can
-/// hold. `template` below is captured at this fixed size regardless of the
-/// probed `slot_size`, so the buffer only needs widening if `HeapObj` grows
-/// past it — the probe asserts that at startup instead of silently
-/// truncating.
-pub const STR_TEMPLATE_MAX: usize = 64;
-
-/// Probed layout facts for the JIT's inline string allocation.
-///
-/// Stage B writes a `HeapObj::Str(HeapStr::Inline { .. })` straight into a
-/// nursery slot from generated code. `Option<HeapObj>`'s encoding and
-/// `HeapStr::Inline`'s field offsets inside it are not guaranteed by Rust, so
-/// nothing here is hardcoded: `template` is a real value captured as bytes,
-/// and every other field is measured against that same value (see
-/// `Heap::jit_str_layout`, which follows `JitArrayLayout`'s and
-/// `JitObjectLayout`'s precedent of probing rather than assuming).
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct JitStrLayout {
-    /// Discriminant byte value of `HeapObj::Str` (niche-shared with `Option`).
-    pub str_tag: usize,
-    /// A ready-made `Some(HeapObj::Str(HeapStr::Inline { len: 0, ascii:
-    /// UNKNOWN, bytes: [0; INLINE_STR_CAP] }))`, captured as raw bytes.
-    /// Emitted code stores `slot_size` bytes of this and then overwrites
-    /// `len_off` and the payload — so it never has to understand the
-    /// discriminant or the `ascii` cell.
-    pub template: [u8; STR_TEMPLATE_MAX],
-    /// `size_of::<Option<HeapObj>>()` — how much of `template` is live.
-    pub slot_size: usize,
-    /// Slot base → the `Inline` variant's `len: u8`.
-    pub len_off: usize,
-    /// Slot base → the `Inline` variant's `bytes[0]`.
-    pub bytes_off: usize,
-    /// `INLINE_STR_CAP` — the largest result the inline arm may build.
-    pub inline_cap: usize,
-    /// RcBox base → the nursery `forwarding` Vec's three words.
-    pub nursery_fwd_vec_off: usize,
-    /// RcBox base → `Nursery::alloc_count`.
-    pub alloc_count_off: usize,
-    /// `NURSERY_CAPACITY` — the bound the emitted bump checks against.
-    pub nursery_capacity: usize,
-    /// Raw bytes of `Option::<u32>::None`, captured by the probe. Written
-    /// into a freshly bumped `forwarding` slot so it never reads back as a
-    /// stale `Some` left over by `Nursery::collect` (which clears length
-    /// without zeroing the backing bytes).
-    pub fwd_none_pattern: u64,
-    /// `size_of::<Option<u32>>()`. Asserted `== 8` at the probe: emitted code
-    /// always stores `fwd_none_pattern` as a single 8-byte write, which is
-    /// only correct at that width.
-    pub fwd_elem_size: usize,
-}
-
-// `derive(Default)` cannot cover `[u8; STR_TEMPLATE_MAX]`: std only
-// implements `Default` for arrays up to length 32, and `STR_TEMPLATE_MAX` is
-// 64. Hand-written for the same all-zero result the derive would have given
-// every other (all-`usize`) field.
-impl Default for JitStrLayout {
-    fn default() -> Self {
-        JitStrLayout {
-            str_tag: 0,
-            template: [0u8; STR_TEMPLATE_MAX],
-            slot_size: 0,
-            len_off: 0,
-            bytes_off: 0,
-            inline_cap: 0,
-            nursery_fwd_vec_off: 0,
-            alloc_count_off: 0,
-            nursery_capacity: 0,
-            fwd_none_pattern: 0,
-            fwd_elem_size: 0,
-        }
-    }
 }
 
 /// What a compiled call site needs to enter a native activation without the
@@ -295,8 +223,6 @@ macro_rules! define_tail {
         pub array_layout: JitArrayLayout,
         /// Probed object layout for the inline property get/set fast paths.
         pub object_layout: JitObjectLayout,
-        /// Probed string-slot layout for the inline concat allocation path.
-        pub str_layout: JitStrLayout,
         /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
         pub heap_field_offset: usize,
         /// Byte offset from the heap RcBox pointer to the nursery live-object count.
