@@ -16,28 +16,66 @@ use crate::error::CliError;
 ///
 /// The four call sites that used to build this inline (timed run, e2e run, and
 /// two profiling runs) drifted apart in exactly the way that makes a benchmark
-/// lie — one measured a path no user hits — so they share this factory.
+/// lie — one measured a path no user hits — so they share this factory. Every
+/// run initializes its own heap: a run never sees what an earlier one built.
 pub struct VmFactory {
-    pub globals: varn_vm::GlobalStore,
-    pub heap: varn_vm::Heap,
-    pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
-    pub modules: FxHashMap<ModuleId, varn_types::VmValue>,
-    pub loader: Arc<CompositeLoader>,
-    pub module_id: ModuleId,
-    pub proto: Rc<FunctionProto>,
+    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
+    builtins: Vec<Rc<FunctionProto>>,
+    loader: Arc<CompositeLoader>,
+    module_id: ModuleId,
+    proto: Rc<FunctionProto>,
 }
 
 impl VmFactory {
-    /// A fresh VM with the entry module registered, ready to run [`Self::entry_proto`].
+    /// Builds one VM up front so a failing initialization surfaces here, as
+    /// an error, rather than inside a timed run.
+    pub fn new(
+        precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
+        builtins: Vec<FunctionProto>,
+        loader: Arc<CompositeLoader>,
+        module_id: ModuleId,
+        proto: Rc<FunctionProto>,
+    ) -> Result<Self, CliError> {
+        let factory = Self {
+            precompiled,
+            builtins: builtins.into_iter().map(Rc::new).collect(),
+            loader,
+            module_id,
+            proto,
+        };
+        factory.try_build().map_err(CliError::fatal)?;
+        Ok(factory)
+    }
+
+    /// A fresh VM with the builtins initialized and the entry module
+    /// registered, ready to run [`Self::entry_proto`].
     pub fn build(&self) -> Vm {
-        let mut machine = Vm::from_snapshot(
-            self.globals.clone(),
-            self.heap.clone(),
+        self.try_build()
+            .expect("initialization already succeeded in VmFactory::new")
+    }
+
+    fn try_build(&self) -> Result<Vm, String> {
+        let silent = varn_builtins::is_print_silent();
+        varn_builtins::set_print_silent(true);
+        varn_builtins::set_testing_silent(true);
+        let mut machine = Vm::new(
             self.precompiled.clone(),
-            self.modules.clone(),
             varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(self.loader.clone());
+        let init = self.builtins.iter().try_for_each(|bp| {
+            machine
+                .run(bp.clone())
+                .map(|_| ())
+                .map_err(|e| format!("builtin init failed: {e}"))
+        });
+        if init.is_ok() {
+            varn_vm::prefill_native_modules(&mut machine);
+            machine.collect_gc();
+        }
+        varn_builtins::set_print_silent(silent);
+        varn_builtins::set_testing_silent(silent);
+        init?;
 
         let mut export_map = FxHashMap::default();
         for (idx, name) in self.proto.export_names.iter().enumerate() {
@@ -50,7 +88,7 @@ impl VmFactory {
         unsafe { &mut *machine.ctx.modules.get() }.insert(self.module_id.clone(), module_val);
         machine.ctx.module_exports.insert(0, module_val);
 
-        machine
+        Ok(machine)
     }
 
     pub fn entry_proto(&self) -> Rc<FunctionProto> {

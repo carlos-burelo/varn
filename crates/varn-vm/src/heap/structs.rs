@@ -9,22 +9,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 
-#[derive(Clone)]
 pub struct HeapInner {
     /// Identity of this object table, and therefore of every `VmValue` handle
     /// into it. Compiled code bakes those handles as immediates, so it is only
     /// valid while this heap is: see `FunctionProto::jit_epoch`. Shared by
-    /// `Heap::clone` (a nested context reaches the same objects) and fresh for
-    /// `deep_clone` (equal contents, separate table).
+    /// `Heap::clone`, since a nested context reaches the same objects.
     pub jit_epoch: u64,
-    /// Epochs this heap was copied from, each with the compile serial at the
-    /// moment of the copy. A `deep_clone` duplicates the whole table —
-    /// same indices, same contents, same interner — so code an ancestor
-    /// compiled BEFORE the copy baked handles this heap also has, and stays
-    /// valid here. Code compiled after the copy did not: that is what sibling
-    /// clones (the bench's runs) must never share, and the whole point of the
-    /// epoch. Ordered oldest first; typically empty or one entry.
-    pub jit_ancestry: Vec<(u64, u64)>,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
     pub gc_total_freed: u64,
@@ -54,7 +44,6 @@ impl HeapInner {
     pub(crate) fn new() -> Self {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
-            jit_ancestry: Vec::new(),
             slots: SlotTable::with_capacity(4096),
             intrinsic_classes: FxHashMap::default(),
             string_interner: FxHashMap::default(),
@@ -175,25 +164,9 @@ impl Heap {
         }
     }
 
-    pub(crate) fn deep_clone(&self) -> Self {
-        let mut inner_clone = unsafe { (*self.inner.get()).clone() };
-        let parent = inner_clone.jit_epoch;
-        inner_clone
-            .jit_ancestry
-            .push((parent, crate::clif_link::compile_serial()));
-        inner_clone.jit_epoch = crate::clif_link::next_epoch();
-        Self {
-            inner: Rc::new(std::cell::UnsafeCell::new(inner_clone)),
-        }
-    }
-
     #[inline(always)]
     pub(crate) fn jit_epoch(&self) -> u64 {
         unsafe { (*self.inner.get()).jit_epoch }
-    }
-
-    pub(crate) fn jit_ancestry(&self) -> Vec<(u64, u64)> {
-        unsafe { (*self.inner.get()).jit_ancestry.clone() }
     }
 
     /// `&mut` out of `&self`, which is the `UnsafeCell` contract the heap is

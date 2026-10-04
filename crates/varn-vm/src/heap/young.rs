@@ -4,7 +4,7 @@
 
 pub const YOUNG_THRESHOLD: usize = 49152;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct YoungGen {
     pub(crate) born: Vec<u32>,
     pub(crate) remembered: Vec<u32>,

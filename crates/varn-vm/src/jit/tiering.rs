@@ -188,9 +188,7 @@ impl VmClosure {
     /// `FunctionProto::jit_epoch`).
     #[inline(always)]
     pub(crate) fn jit_fn(&self) -> Option<varn_jit::JitFn> {
-        if self.proto.jit_epoch.get() != crate::clif_link::current_epoch()
-            && !crate::clif_link::adopt_if_inherited(&self.proto)
-        {
+        if self.proto.jit_epoch.get() != crate::clif_link::current_epoch() {
             return None;
         }
         let e = self.proto.jit_entry.get();
@@ -234,9 +232,7 @@ impl VmClosure {
         // context may still be executing it (a nested run can reach a proto
         // its caller is in).
         let previous = if self.proto.jit_entry.get() != 0 {
-            if self.proto.jit_epoch.get() == epoch
-                || crate::clif_link::adopt_if_inherited(&self.proto)
-            {
+            if self.proto.jit_epoch.get() == epoch {
                 return;
             }
             let old_epoch = self.proto.jit_epoch.get();
@@ -254,9 +250,6 @@ impl VmClosure {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
                 self.proto.jit_epoch.set(epoch);
-                self.proto
-                    .jit_serial
-                    .set(crate::clif_link::stamp_compile_serial());
                 self.proto.jit_entry.set(entry_usize);
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
                 // Publish the native entry LAST: a call site that observes a

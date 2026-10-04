@@ -7,7 +7,6 @@ use std::time::Duration;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::ModuleId;
-use varn_vm::Vm;
 
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
@@ -33,46 +32,19 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     })?;
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
-
-    varn_builtins::set_print_silent(true);
-    varn_builtins::set_testing_silent(true);
-
-    let precompiled_base = compile_output.precompiled.clone();
-
     let loader = std::sync::Arc::new(varn_vm::loader::CompositeLoader::new(vec![
         Box::new(varn_pipeline::stdlib_loader::FileLoader),
         Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
     ]));
-
-    let settings = varn_vm::ExecSettings::from_env(false);
-    let mut init_vm = Vm::new(precompiled_base.clone(), settings).with_loader(loader.clone());
-    for bp in &builtin_protos {
-        let closure = Rc::new(bp.clone());
-        init_vm
-            .run(closure)
-            .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;
-    }
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
-
-    let optimized_proto = compile_output.entry_proto.clone();
-    let optimized_precompiled = Rc::clone(&precompiled_base);
-
-    init_vm.ctx.run_minor_gc();
-    init_vm.collect_gc();
-    varn_vm::prefill_native_modules(&mut init_vm);
-
-    let (snap_globals, snap_heap, snap_modules) = init_vm.snapshot();
-
-    let factory = VmFactory {
-        globals: snap_globals,
-        heap: snap_heap,
-        precompiled: optimized_precompiled,
-        modules: snap_modules,
-        loader: loader.clone(),
-        module_id: ModuleId::local_str(path),
-        proto: Rc::new(optimized_proto),
-    };
+    let factory = VmFactory::new(
+        compile_output.precompiled.clone(),
+        builtin_protos,
+        loader.clone(),
+        ModuleId::local_str(path),
+        Rc::new(compile_output.entry_proto.clone()),
+    )?;
 
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
         runs,

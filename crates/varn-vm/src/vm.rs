@@ -1,7 +1,6 @@
 use crate::closure::VmClosure;
 use crate::exec;
 use crate::globals::GlobalStore;
-use crate::heap::Heap;
 use crate::loader::ModuleLoader;
 use crate::profile::{HotspotCounters, ProfileCounters, VmProfile};
 use crate::value::VmValue;
@@ -33,20 +32,6 @@ impl Vm {
         self
     }
 
-    pub fn from_snapshot(
-        globals: GlobalStore,
-        heap: Heap,
-        precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
-        modules: rustc_hash::FxHashMap<ModuleId, VmValue>,
-        settings: crate::settings::ExecSettings,
-    ) -> Self {
-        let mut ctx = ExecCtx::new(globals, settings);
-        ctx.heap = heap.deep_clone();
-        ctx.precompiled = precompiled;
-        ctx.modules = std::rc::Rc::new(std::cell::UnsafeCell::new(modules));
-        Self { ctx }
-    }
-
     pub fn run(
         &mut self,
         proto: Rc<varn_types::FunctionProto>,
@@ -64,26 +49,6 @@ impl Vm {
         }
 
         self.ctx.run()
-    }
-
-    pub fn snapshot(&self) -> (GlobalStore, Heap, rustc_hash::FxHashMap<ModuleId, VmValue>) {
-        let native_modules = self
-            .ctx
-            .modules_ref()
-            .iter()
-            .filter(|(id, _)| {
-                matches!(
-                    id,
-                    ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_)
-                )
-            })
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
-        (
-            self.ctx.globals_ref().clone(),
-            self.ctx.heap.clone(),
-            native_modules,
-        )
     }
 
     pub fn enable_opcode_profiling(&mut self) {

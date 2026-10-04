@@ -157,13 +157,6 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_epoch: std::cell::Cell<u64>,
 
-    /// When that code was built, on the VM's monotonic compile clock. A heap
-    /// copied off another inherits the entries its ancestor had already built
-    /// at the moment of the copy, and only those — this is what orders the two.
-    #[serde(skip)]
-    #[serde(default)]
-    pub jit_serial: std::cell::Cell<u64>,
-
     /// Memoised "does this function contain a back edge": `0` not looked at,
     /// `1` yes, `2` no. Decides how the tier threshold applies — see
     /// [`Self::has_backedge`].

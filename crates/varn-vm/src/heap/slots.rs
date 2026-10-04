@@ -13,7 +13,6 @@ pub(crate) enum SlotState {
     Marked = 3,
 }
 
-#[derive(Clone)]
 pub(crate) struct SlotTable {
     objects: Vec<Option<HeapObj>>,
     states: Vec<SlotState>,

@@ -6,7 +6,7 @@ use super::children::{for_each_child, Reach};
 use super::slots::SlotState;
 use super::structs::HeapInner;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(crate) struct MajorMarks {
     bits: Vec<u64>,
     work: Vec<u32>,
