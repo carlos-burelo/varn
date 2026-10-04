@@ -91,7 +91,7 @@ pub(crate) fn infer_member(
                     crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
                     _ => None,
                 })
-                .map(|id| Type::resolved(id))
+                .map(Type::resolved)
                 .unwrap_or(Type::Dynamic),
             _ => Type::Dynamic,
         };

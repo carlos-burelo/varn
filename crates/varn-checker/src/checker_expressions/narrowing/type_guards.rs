@@ -65,7 +65,7 @@ impl<'r> Checker<'r> {
                                         .get_list(list)
                                         .to_vec()
                                         .into_iter()
-                                        .map(|id| Type::resolved(id))
+                                        .map(Type::resolved)
                                         .filter(|m| {
                                             let m_kind = self.ty_table.get(m.0);
                                             match (m_kind, target_kind) {

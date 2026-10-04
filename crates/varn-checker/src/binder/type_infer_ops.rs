@@ -146,7 +146,7 @@ pub(crate) fn infer_new(
             }
             TypeKind::Generic(name, args, origin) => {
                 let arg_ids = table.get_list(args).to_vec();
-                let arg_tys: Vec<Type> = arg_ids.into_iter().map(|id| Type::resolved(id)).collect();
+                let arg_tys: Vec<Type> = arg_ids.into_iter().map(Type::resolved).collect();
                 return Type::generic_atom(name, arg_tys, origin, table);
             }
             _ => {}

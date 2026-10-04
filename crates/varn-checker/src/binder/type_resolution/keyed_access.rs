@@ -22,7 +22,7 @@ pub(super) fn resolve_keyof(
             return if key_types.len() == 1 {
                 Type::resolved(key_types[0])
             } else {
-                let types: Vec<Type> = key_types.into_iter().map(|id| Type::resolved(id)).collect();
+                let types: Vec<Type> = key_types.into_iter().map(Type::resolved).collect();
                 Type::union(types, table)
             };
         }

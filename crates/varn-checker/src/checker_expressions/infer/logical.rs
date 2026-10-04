@@ -74,7 +74,7 @@ impl<'r> Checker<'r> {
                             | TypeKind::Primitive(varn_core::LangPrimitive::Void)
                     )
                 })
-                .map(|id| Type::resolved(id))
+                .map(Type::resolved)
                 .collect();
             if filtered.len() == 1 {
                 return filtered[0];
