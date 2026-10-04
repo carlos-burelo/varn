@@ -149,11 +149,11 @@ impl FnEmitter<'_> {
                 let ret = if coroutine {
                     dynamic
                 } else {
-                    s.return_ty.clone()
+                    s.return_ty
                 };
                 (sig, s.params.clone(), ret)
             }
-            None => (SigId(0), vec![dynamic.clone(); arity], dynamic),
+            None => (SigId(0), vec![dynamic; arity], dynamic),
         }
     }
 }
