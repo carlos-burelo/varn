@@ -118,7 +118,7 @@ pub(in crate::clif) fn emit_array_payload(
     b.switch_to_block(chk);
 
     let slot = obj_payload;
-    let tagb = b.ins().uload8(types::I64, m, slot, 0);
+    let tagb = b.ins().uload8(types::I64, m, slot, lay.kind_off as i32);
     let is_arr = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.array_tag as i64);
     let ok = b.create_block();
     b.ins().brif(is_arr, ok, &[], slow, &[]);
@@ -208,6 +208,7 @@ pub(in crate::clif) fn emit_object_data_base(
     b: &mut FunctionBuilder,
     obj: cranelift_codegen::ir::Value,
     olay: &crate::JitObjectLayout,
+    alay: &crate::JitArrayLayout,
     invalid: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -227,7 +228,9 @@ pub(in crate::clif) fn emit_object_data_base(
     let slot_addr = obj_payload;
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
-    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let tagb = b
+        .ins()
+        .uload8(types::I64, m, slot_addr, alay.kind_off as i32);
     let is_inst = b
         .ins()
         .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);
@@ -261,12 +264,7 @@ pub(in crate::clif) fn is_young(
     alay: &crate::JitArrayLayout,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let block = b.ins().band_imm_u(addr, !(alay.block_bytes as i64 - 1));
-    let within = b.ins().isub(addr, block);
-    let cells = b.ins().iadd_imm_u(within, -(alay.cells_offset as i64));
-    let index = b.ins().udiv_imm_u(cells, alay.cell_bytes as i64);
-    let at = b.ins().iadd(block, index);
-    let state = b.ins().uload8(types::I64, m, at, 0);
+    let state = b.ins().uload8(types::I64, m, addr, alay.state_off as i32);
     b.ins()
         .icmp_imm_u(IntCC::Equal, state, alay.young_state as i64)
 }

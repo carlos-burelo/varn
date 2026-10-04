@@ -52,14 +52,12 @@ pub type JitFn = unsafe extern "C" fn(
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitArrayLayout {
-    /// Heap blocks are this many bytes, aligned to it: masking an object's
-    /// address with `!(block_bytes - 1)` gives its block.
-    pub block_bytes: usize,
-    /// Block base → its first cell; the cell-state bytes sit before it.
-    pub cells_offset: usize,
-    /// Bytes per cell.
-    pub cell_bytes: usize,
-    /// The state byte of a young cell.
+    /// Object address → its header's generation-state byte.
+    pub state_off: usize,
+    /// Object address → its header's kind byte: the `HeapObj` discriminant
+    /// for objects stored as one.
+    pub kind_off: usize,
+    /// The state byte of a young object.
     pub young_state: usize,
     /// Word offset of the data pointer inside a `Vec`.
     pub vec_ptr_off: usize,

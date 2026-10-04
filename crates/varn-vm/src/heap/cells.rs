@@ -1,22 +1,36 @@
-//! Heap memory: aligned blocks of fixed-size cells. A reference is a cell's
-//! address, so reaching an object is a load from that address; each block
-//! keeps the generation state of its cells in its header, reached from any
-//! cell address by masking.
+//! Heap memory: every object is a cell that starts with an 8-byte header —
+//! generation state, kind, size class — followed by its body. A reference is
+//! the cell's address. Cells come from blocks segregated by size class, or
+//! from their own allocation when larger than the largest class.
 
 use super::obj::HeapObj;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::ptr::NonNull;
 use varn_types::HeapRef;
 
-pub(crate) const BLOCK_BYTES: usize = 256 * 1024;
-pub(crate) const CELL_BYTES: usize = std::mem::size_of::<HeapObj>();
-const MAX_CELLS: usize = BLOCK_BYTES / (CELL_BYTES + 1);
-pub(crate) const CELLS_OFFSET: usize = MAX_CELLS.div_ceil(64) * 64;
-pub(crate) const CELLS_PER_BLOCK: usize = (BLOCK_BYTES - CELLS_OFFSET) / CELL_BYTES;
+pub(crate) const HEADER_BYTES: usize = std::mem::size_of::<ObjHeader>();
+pub(crate) const STATE_OFF: usize = std::mem::offset_of!(ObjHeader, state);
+pub(crate) const KIND_OFF: usize = std::mem::offset_of!(ObjHeader, kind);
+const BLOCK_BYTES: usize = 256 * 1024;
+const CELL_ALIGN: usize = 16;
 const MAJOR_MARK: u8 = 0x80;
+const LARGE: u8 = u8::MAX;
+const CLASS_BYTES: [usize; 24] = [
+    16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768,
+    1024, 1536, 2048,
+];
 
-const _: () = assert!(CELLS_PER_BLOCK <= CELLS_OFFSET);
-const _: () = assert!(CELLS_OFFSET.is_multiple_of(std::mem::align_of::<HeapObj>()));
+const _: () = assert!(HEADER_BYTES == 8);
+const _: () = assert!(HEADER_BYTES.is_multiple_of(std::mem::align_of::<HeapObj>()));
+
+#[repr(C)]
+struct ObjHeader {
+    state: u8,
+    kind: u8,
+    class: u8,
+    _pad: u8,
+    _aux: u32,
+}
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -42,14 +56,69 @@ impl SlotState {
 }
 
 #[inline(always)]
-fn state_byte(r: HeapRef) -> *mut u8 {
-    let addr = r.addr() as usize;
-    let block = addr & !(BLOCK_BYTES - 1);
-    (block + (addr - block - CELLS_OFFSET) / CELL_BYTES) as *mut u8
+fn header<'a>(r: HeapRef) -> &'a mut ObjHeader {
+    unsafe { &mut *r.as_ptr::<ObjHeader>() }
+}
+
+#[inline(always)]
+fn body<T>(r: HeapRef) -> *mut T {
+    (r.addr() as usize + HEADER_BYTES) as *mut T
+}
+
+fn class_for(bytes: usize) -> Option<usize> {
+    CLASS_BYTES.iter().position(|&c| c >= bytes)
 }
 
 fn block_layout() -> Layout {
-    Layout::from_size_align(BLOCK_BYTES, BLOCK_BYTES).expect("block layout")
+    Layout::from_size_align(BLOCK_BYTES, CELL_ALIGN).expect("block layout")
+}
+
+fn large_layout(bytes: usize) -> Layout {
+    Layout::from_size_align(bytes, CELL_ALIGN).expect("large cell layout")
+}
+
+#[derive(Default)]
+struct SizeClass {
+    blocks: Vec<NonNull<u8>>,
+    used_in_last: usize,
+    free: Vec<HeapRef>,
+}
+
+impl SizeClass {
+    fn cells_per_block(cell: usize) -> usize {
+        BLOCK_BYTES / cell
+    }
+
+    fn take(&mut self, cell: usize) -> HeapRef {
+        if let Some(r) = self.free.pop() {
+            return r;
+        }
+        if self.blocks.is_empty() || self.used_in_last == Self::cells_per_block(cell) {
+            let block = unsafe { alloc_zeroed(block_layout()) };
+            let block = NonNull::new(block)
+                .unwrap_or_else(|| std::alloc::handle_alloc_error(block_layout()));
+            self.blocks.push(block);
+            self.used_in_last = 0;
+        }
+        let base = self.blocks.last().expect("a block").as_ptr() as usize;
+        let addr = base + self.used_in_last * cell;
+        self.used_in_last += 1;
+        unsafe { HeapRef::from_addr_unchecked(addr as u64) }
+    }
+
+    fn cells(&self, cell: usize) -> impl Iterator<Item = HeapRef> + '_ {
+        let last = self.blocks.len().saturating_sub(1);
+        self.blocks.iter().enumerate().flat_map(move |(bi, block)| {
+            let used = if bi == last {
+                self.used_in_last
+            } else {
+                Self::cells_per_block(cell)
+            };
+            let base = block.as_ptr() as usize;
+            (0..used)
+                .map(move |i| unsafe { HeapRef::from_addr_unchecked((base + i * cell) as u64) })
+        })
+    }
 }
 
 /// Where native code was when it entered: restored when it returns.
@@ -59,9 +128,8 @@ pub(crate) struct NativeScope {
 }
 
 pub(crate) struct CellSpace {
-    blocks: Vec<NonNull<u8>>,
-    bump: usize,
-    free: Vec<HeapRef>,
+    classes: Vec<SizeClass>,
+    large: Vec<HeapRef>,
     live: usize,
     native: bool,
     native_roots: Vec<HeapRef>,
@@ -72,9 +140,8 @@ pub(crate) struct CellSpace {
 impl Default for CellSpace {
     fn default() -> Self {
         Self {
-            blocks: Vec::new(),
-            bump: CELLS_PER_BLOCK,
-            free: Vec::new(),
+            classes: CLASS_BYTES.iter().map(|_| SizeClass::default()).collect(),
+            large: Vec::new(),
             live: 0,
             native: false,
             native_roots: Vec::new(),
@@ -85,24 +152,45 @@ impl Default for CellSpace {
 }
 
 impl CellSpace {
+    /// A cell of at least `body_bytes` after the header, its header written
+    /// and its body left for the caller to fill.
     #[inline]
-    pub(crate) fn alloc(&mut self, obj: HeapObj, state: SlotState) -> HeapRef {
+    fn take_cell(&mut self, body_bytes: usize, kind: u8, state: SlotState) -> HeapRef {
+        let bytes = HEADER_BYTES + body_bytes;
+        let (r, class) = match class_for(bytes) {
+            Some(class) => (self.classes[class].take(CLASS_BYTES[class]), class as u8),
+            None => {
+                let ptr = unsafe { alloc_zeroed(large_layout(bytes)) };
+                let ptr = NonNull::new(ptr)
+                    .unwrap_or_else(|| std::alloc::handle_alloc_error(large_layout(bytes)));
+                let r = unsafe { HeapRef::from_addr_unchecked(ptr.as_ptr() as u64) };
+                self.large.push(r);
+                (r, LARGE)
+            }
+        };
+        *header(r) = ObjHeader {
+            state: state as u8,
+            kind,
+            class,
+            _pad: 0,
+            _aux: 0,
+        };
         self.births += 1;
         if state == SlotState::Old {
             self.old_growth += 1;
         }
         self.live += 1;
-        let r = match self.free.pop() {
-            Some(r) => r,
-            None => self.bump_cell(),
-        };
-        unsafe {
-            std::ptr::write(r.as_ptr::<HeapObj>(), obj);
-            *state_byte(r) = state as u8;
-        }
         if self.native {
             self.native_roots.push(r);
         }
+        r
+    }
+
+    #[inline]
+    pub(crate) fn alloc(&mut self, obj: HeapObj, state: SlotState) -> HeapRef {
+        let kind = unsafe { *(&obj as *const HeapObj as *const u8) };
+        let r = self.take_cell(std::mem::size_of::<HeapObj>(), kind, state);
+        unsafe { std::ptr::write(body::<HeapObj>(r), obj) };
         r
     }
 
@@ -143,51 +231,27 @@ impl CellSpace {
         &self.native_roots
     }
 
-    #[cold]
-    fn new_block(&mut self) {
-        let block = unsafe { alloc_zeroed(block_layout()) };
-        let block =
-            NonNull::new(block).unwrap_or_else(|| std::alloc::handle_alloc_error(block_layout()));
-        self.blocks.push(block);
-        self.bump = 0;
-    }
-
-    #[inline]
-    fn bump_cell(&mut self) -> HeapRef {
-        if self.bump == CELLS_PER_BLOCK {
-            self.new_block();
-        }
-        let block = self
-            .blocks
-            .last()
-            .expect("a block after new_block")
-            .as_ptr() as usize;
-        let addr = block + CELLS_OFFSET + self.bump * CELL_BYTES;
-        self.bump += 1;
-        unsafe { HeapRef::from_addr_unchecked(addr as u64) }
-    }
-
     /// The object `r` names. `r` must come from this space and still be live.
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> &HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
-        unsafe { &*r.as_ptr::<HeapObj>() }
+        unsafe { &*body::<HeapObj>(r) }
     }
 
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, r: HeapRef) -> &mut HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
-        unsafe { &mut *r.as_ptr::<HeapObj>() }
+        unsafe { &mut *body::<HeapObj>(r) }
     }
 
     #[inline(always)]
     pub(crate) fn state(&self, r: HeapRef) -> SlotState {
-        SlotState::from_byte(unsafe { *state_byte(r) })
+        SlotState::from_byte(header(r).state)
     }
 
     #[inline(always)]
     pub(crate) fn set_state(&mut self, r: HeapRef, state: SlotState) {
-        unsafe { *state_byte(r) = state as u8 };
+        header(r).state = state as u8;
     }
 
     pub(crate) fn promote(&mut self, r: HeapRef) {
@@ -196,39 +260,40 @@ impl CellSpace {
     }
 
     /// Drops the object where it stands and frees its cell.
-    #[inline(always)]
     pub(crate) fn release(&mut self, r: HeapRef) {
-        unsafe {
-            std::ptr::drop_in_place(r.as_ptr::<HeapObj>());
-            *state_byte(r) = SlotState::Free as u8;
-        }
-        self.free.push(r);
+        let h = header(r);
+        let class = h.class;
+        unsafe { std::ptr::drop_in_place(body::<HeapObj>(r)) };
+        h.state = SlotState::Free as u8;
         self.live -= 1;
+        if class == LARGE {
+            let bytes = HEADER_BYTES + std::mem::size_of::<HeapObj>();
+            self.large.retain(|&l| l != r);
+            unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
+        } else {
+            self.classes[class as usize].free.push(r);
+        }
     }
 
     /// Marks a young object reached by a minor collection, queueing it once.
     #[inline(always)]
     pub(crate) fn mark_young(r: HeapRef, work: &mut Vec<HeapRef>) {
-        unsafe {
-            let b = state_byte(r);
-            if *b == SlotState::Young as u8 {
-                *b = SlotState::Marked as u8;
-                work.push(r);
-            }
+        let h = header(r);
+        if h.state == SlotState::Young as u8 {
+            h.state = SlotState::Marked as u8;
+            work.push(r);
         }
     }
 
     /// Sets the major-collection mark, answering whether it was clear.
     #[inline(always)]
     pub(crate) fn mark_major(r: HeapRef) -> bool {
-        unsafe {
-            let b = state_byte(r);
-            if *b == SlotState::Free as u8 || *b & MAJOR_MARK != 0 {
-                return false;
-            }
-            *b |= MAJOR_MARK;
-            true
+        let h = header(r);
+        if h.state == SlotState::Free as u8 || h.state & MAJOR_MARK != 0 {
+            return false;
         }
+        h.state |= MAJOR_MARK;
+        true
     }
 
     pub(crate) fn live_count(&self) -> usize {
@@ -236,32 +301,26 @@ impl CellSpace {
     }
 
     pub(crate) fn free_len(&self) -> usize {
-        self.free.len()
+        self.classes.iter().map(|c| c.free.len()).sum()
     }
 
     pub(crate) fn capacity(&self) -> usize {
-        self.blocks.len() * CELLS_PER_BLOCK
+        self.classes
+            .iter()
+            .zip(CLASS_BYTES)
+            .map(|(c, cell)| c.blocks.len() * SizeClass::cells_per_block(cell))
+            .sum::<usize>()
+            + self.large.len()
     }
 
-    fn used_in(&self, block_idx: usize) -> usize {
-        if block_idx + 1 == self.blocks.len() {
-            self.bump
-        } else {
-            CELLS_PER_BLOCK
-        }
-    }
-
-    /// Every live cell, in address order within each block.
+    /// Every live cell.
     pub(crate) fn refs(&self) -> impl Iterator<Item = HeapRef> + '_ {
-        self.blocks.iter().enumerate().flat_map(move |(bi, block)| {
-            let base = block.as_ptr() as usize;
-            (0..self.used_in(bi)).filter_map(move |i| {
-                let live = unsafe { *(base as *const u8).add(i) } != SlotState::Free as u8;
-                live.then(|| unsafe {
-                    HeapRef::from_addr_unchecked((base + CELLS_OFFSET + i * CELL_BYTES) as u64)
-                })
-            })
-        })
+        self.classes
+            .iter()
+            .zip(CLASS_BYTES)
+            .flat_map(|(c, cell)| c.cells(cell))
+            .chain(self.large.iter().copied())
+            .filter(|&r| header(r).state != SlotState::Free as u8)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (HeapRef, &HeapObj, SlotState)> + '_ {
@@ -273,13 +332,11 @@ impl CellSpace {
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         for r in self.refs() {
-            let b = state_byte(r);
-            unsafe {
-                if *b & MAJOR_MARK != 0 {
-                    *b = SlotState::Old as u8;
-                } else {
-                    dead.push(r);
-                }
+            let h = header(r);
+            if h.state & MAJOR_MARK != 0 {
+                h.state = SlotState::Old as u8;
+            } else {
+                dead.push(r);
             }
         }
         for &r in &dead {
@@ -293,10 +350,16 @@ impl Drop for CellSpace {
     fn drop(&mut self) {
         let live: Vec<HeapRef> = self.refs().collect();
         for r in live {
-            unsafe { std::ptr::drop_in_place(r.as_ptr::<HeapObj>()) };
+            unsafe { std::ptr::drop_in_place(body::<HeapObj>(r)) };
         }
-        for block in &self.blocks {
-            unsafe { dealloc(block.as_ptr(), block_layout()) };
+        for class in &self.classes {
+            for block in &class.blocks {
+                unsafe { dealloc(block.as_ptr(), block_layout()) };
+            }
+        }
+        let bytes = HEADER_BYTES + std::mem::size_of::<HeapObj>();
+        for &r in &self.large {
+            unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
         }
     }
 }

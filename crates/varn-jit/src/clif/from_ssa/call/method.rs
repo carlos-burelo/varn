@@ -10,7 +10,7 @@ use super::native_entry::{self, NativeCall};
 #[allow(clippy::too_many_arguments)]
 fn emit_is_str(
     b: &mut FunctionBuilder,
-    str_tag: usize,
+    alay: &crate::JitArrayLayout,
     tag: Value,
     payload: Value,
     yes: cranelift_codegen::ir::Block,
@@ -33,9 +33,8 @@ fn emit_is_str(
     b.switch_to_block(not_sso);
     b.ins().brif(is_heap, walk, &[], no, &[]);
     b.switch_to_block(walk);
-    let slot_addr = payload;
-    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
-    let is_str = b.ins().icmp_imm_u(IntCC::Equal, tagb, str_tag as i64);
+    let tagb = b.ins().uload8(types::I64, m, payload, alay.kind_off as i32);
+    let is_str = b.ins().icmp_imm_u(IntCC::Equal, tagb, alay.str_tag as i64);
     b.ins().brif(is_str, yes, &[], no, &[]);
 }
 
@@ -84,21 +83,14 @@ pub(crate) fn emit_method_call(
         let str_go = b.create_block();
         emit_is_str(
             b,
-            ctx.helpers.array_layout.str_tag,
+            &ctx.helpers.array_layout,
             rt0,
             rp0,
             arg_check,
             inst_entry,
         );
         b.switch_to_block(arg_check);
-        emit_is_str(
-            b,
-            ctx.helpers.array_layout.str_tag,
-            at,
-            ap,
-            str_go,
-            inst_entry,
-        );
+        emit_is_str(b, &ctx.helpers.array_layout, at, ap, str_go, inst_entry);
         b.switch_to_block(str_go);
         let helper = if name == "startsWith" {
             ctx.helpers.str_starts_with
@@ -128,7 +120,12 @@ pub(crate) fn emit_method_call(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
     let slot_addr = rp;
-    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let tagb = b.ins().uload8(
+        types::I64,
+        m,
+        slot_addr,
+        ctx.helpers.array_layout.kind_off as i32,
+    );
     let is_inst = b
         .ins()
         .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);

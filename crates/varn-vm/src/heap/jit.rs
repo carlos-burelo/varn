@@ -100,7 +100,8 @@ impl Heap {
         let array_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
-            .expect("array payload probe failed");
+            .expect("array payload probe failed")
+            + super::cells::HEADER_BYTES;
 
         let none_slot: Option<HeapObj> = None;
         let none_tag = unsafe { *(&none_slot as *const _ as *const u8) } as usize;
@@ -115,9 +116,8 @@ impl Heap {
         );
 
         varn_jit::JitArrayLayout {
-            block_bytes: super::cells::BLOCK_BYTES,
-            cells_offset: super::cells::CELLS_OFFSET,
-            cell_bytes: super::cells::CELL_BYTES,
+            state_off: super::cells::STATE_OFF,
+            kind_off: super::cells::KIND_OFF,
             young_state: super::cells::SlotState::Young as usize,
             vec_ptr_off: slots_ptr_off,
             array_tag,
@@ -183,7 +183,8 @@ impl Heap {
         let object_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
-            .expect("object payload probe failed");
+            .expect("object payload probe failed")
+            + super::cells::HEADER_BYTES;
 
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
@@ -200,7 +201,8 @@ impl Heap {
             .find(|&off| {
                 usize::from_ne_bytes(inst_bytes[off..off + 8].try_into().unwrap()) == inst_rcbox
             })
-            .expect("instance payload probe failed");
+            .expect("instance payload probe failed")
+            + super::cells::HEADER_BYTES;
 
         // Derivado: prefijo control + offset propio (`INST_*`). Tripwire:
         // class_id leído ahí debe coincidir.

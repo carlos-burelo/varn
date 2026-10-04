@@ -64,7 +64,12 @@ pub(crate) fn emit(
 
     b.switch_to_block(walk);
     let slot = cpayload;
-    let slot_tag = b.ins().uload8(types::I64, m, slot, 0);
+    let slot_tag = b.ins().uload8(
+        types::I64,
+        m,
+        slot,
+        ctx.helpers.array_layout.kind_off as i32,
+    );
     let is_closure = b
         .ins()
         .icmp_imm_u(IntCC::Equal, slot_tag, lay.closure_tag as i64);

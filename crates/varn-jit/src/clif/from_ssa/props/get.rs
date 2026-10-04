@@ -39,7 +39,12 @@ pub(crate) fn emit_get_property(
 
     let slot_addr = op;
 
-    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let tagb = b.ins().uload8(
+        types::I64,
+        m,
+        slot_addr,
+        ctx.helpers.array_layout.kind_off as i32,
+    );
     let is_obj = b
         .ins()
         .icmp_imm_u(IntCC::Equal, tagb, olay.object_tag as i64);
