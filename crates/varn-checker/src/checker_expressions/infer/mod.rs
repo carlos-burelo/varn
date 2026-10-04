@@ -13,7 +13,7 @@ use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::ast::{ExprId, ExprKind};
 
-pub(crate) use self::collectors::collect_checked_return_types;
+pub(crate) use self::collectors::arrow_body_return_type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn infer_type_internal(&mut self, expr: ExprId, bind: &BindResult) -> Type {

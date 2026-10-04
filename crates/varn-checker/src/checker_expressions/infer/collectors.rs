@@ -1,22 +1,61 @@
 use crate::checker::Checker;
 use crate::types::Type;
-use varn_core::ast::{StmtId, StmtKind};
+use varn_core::ast::{ArrowBody, StmtId, StmtKind};
 
-pub(crate) fn collect_checked_return_types(
-    stmt: StmtId,
+/// The type an arrow's body returns, its parameters already in scope. A
+/// `return` whose type is not known yet makes the whole body `dynamic`: it
+/// returns a value, so it is never `Never`.
+pub(crate) fn arrow_body_return_type(
+    body: ArrowBody,
     checker: &mut Checker,
     bind: &crate::binder::BindResult,
-) -> Vec<Type> {
-    let mut out = Vec::new();
-    collect_returns(stmt, checker, bind, &mut out);
-    out
+) -> Type {
+    match body {
+        ArrowBody::Expr(e) => {
+            let saved_pipeline = checker.in_pipeline_rhs;
+            let saved_pipe_ty = checker.pipeline_value_type;
+            checker.in_pipeline_rhs = false;
+            checker.pipeline_value_type = None;
+            let t = checker.infer_type(e, bind);
+            checker.in_pipeline_rhs = saved_pipeline;
+            checker.pipeline_value_type = saved_pipe_ty;
+            t
+        }
+        ArrowBody::Block(block) => {
+            let mut returns = Returns::default();
+            collect_returns(block, checker, bind, &mut returns);
+            let mut return_tys = returns.typed;
+            match return_tys.len() {
+                0 if returns.dynamic => Type::Dynamic,
+                0 if !crate::checker::completion::can_complete_normally(
+                    block,
+                    checker.ast_arena,
+                ) =>
+                {
+                    Type::Never
+                }
+                0 => Type::Void,
+                1 => return_tys.pop().expect("one return type"),
+                _ => Type::union(
+                    return_tys,
+                    &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
+                ),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct Returns {
+    typed: Vec<Type>,
+    dynamic: bool,
 }
 
 fn collect_returns(
     stmt: StmtId,
     checker: &mut Checker,
     bind: &crate::binder::BindResult,
-    out: &mut Vec<Type>,
+    out: &mut Returns,
 ) {
     let arena = checker.ast_arena;
     match &arena.stmt(stmt).kind {
@@ -29,8 +68,10 @@ fn collect_returns(
             argument: Some(e), ..
         } => {
             let ty = checker.infer_type(*e, bind);
-            if !ty.is_dynamic() {
-                out.push(ty);
+            if ty.is_dynamic() {
+                out.dynamic = true;
+            } else {
+                out.typed.push(ty);
             }
         }
         StmtKind::If {

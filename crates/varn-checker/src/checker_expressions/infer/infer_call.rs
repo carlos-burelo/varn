@@ -7,8 +7,6 @@ use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind, Param};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-use super::collect_checked_return_types;
-
 impl<'r> Checker<'r> {
     pub(super) fn infer_call_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
         let arena = self.ast_arena;
@@ -170,30 +168,9 @@ impl<'r> Checker<'r> {
             }
         }
 
-        let ret_ty = if let Some(rt) = return_type {
-            self.resolve_type_node_cached(rt, bind)
-        } else {
-            match body {
-                varn_core::ast::ArrowBody::Expr(e) => self.infer_type(e, bind),
-                varn_core::ast::ArrowBody::Block(block) => {
-                    let return_tys = collect_checked_return_types(block, self, bind);
-                    match return_tys.len() {
-                        0 if !crate::checker::completion::can_complete_normally(
-                            block,
-                            self.ast_arena,
-                        ) =>
-                        {
-                            Type::Never
-                        }
-                        0 => Type::Void,
-                        1 => return_tys.into_iter().next().unwrap(),
-                        _ => Type::union(
-                            return_tys,
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        ),
-                    }
-                }
-            }
+        let ret_ty = match return_type {
+            Some(rt) => self.resolve_type_node_cached(rt, bind),
+            None => super::arrow_body_return_type(body, self, bind),
         };
 
         if arrow_scope.is_some() {

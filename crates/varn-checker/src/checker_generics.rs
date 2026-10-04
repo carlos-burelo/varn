@@ -6,7 +6,7 @@ use crate::symbol::SymbolKind;
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use varn_core::ast::{Arg, ArrowBody, ExprId, ExprKind, Param, StmtId, StmtKind, TypeNode};
+use varn_core::ast::{Arg, ExprId, ExprKind, Param, TypeNode};
 use varn_core::TypeKind;
 
 pub(crate) fn build_call_mapping(
@@ -188,34 +188,7 @@ fn infer_arrow_with_context(
         }
     }
 
-    let ret_ty = match &body {
-        ArrowBody::Expr(e) => {
-            let e = *e;
-            let saved_pipeline = checker.in_pipeline_rhs;
-            let saved_pipe_ty = checker.pipeline_value_type;
-            checker.in_pipeline_rhs = false;
-            checker.pipeline_value_type = None;
-            let t = checker.infer_type(e, bind);
-            checker.in_pipeline_rhs = saved_pipeline;
-            checker.pipeline_value_type = saved_pipe_ty;
-            t
-        }
-        ArrowBody::Block(s) => {
-            let s = *s;
-            let mut returns = Vec::new();
-            collect_returns(s, &mut returns, checker, bind);
-            if returns.is_empty() {
-                Type::Void
-            } else if returns.len() == 1 {
-                returns.pop().expect("returns len==1 but pop failed")
-            } else {
-                Type::union(
-                    returns,
-                    &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
-                )
-            }
-        }
-    };
+    let ret_ty = crate::checker_expressions::infer::arrow_body_return_type(body, checker, bind);
 
     if arrow_scope.is_some() {
         checker.current_scope = saved_scope;
@@ -269,35 +242,4 @@ pub(crate) fn find_arrow_scope(
         }
     }
     None
-}
-
-fn collect_returns(stmt: StmtId, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {
-    match &checker.ast_arena.stmt(stmt).kind {
-        StmtKind::Block { stmts } => {
-            let stmts = stmts.clone();
-            for s in stmts {
-                collect_returns(s, out, checker, bind);
-            }
-        }
-        StmtKind::Return { argument } => {
-            if let Some(val_expr) = argument {
-                let val_expr = *val_expr;
-                out.push(checker.infer_type(val_expr, bind));
-            } else {
-                out.push(Type::Void);
-            }
-        }
-        StmtKind::If {
-            consequent,
-            alternate,
-            ..
-        } => {
-            let (consequent, alternate) = (*consequent, *alternate);
-            collect_returns(consequent, out, checker, bind);
-            if let Some(alt) = alternate {
-                collect_returns(alt, out, checker, bind);
-            }
-        }
-        _ => {}
-    }
 }
