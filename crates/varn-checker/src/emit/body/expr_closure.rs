@@ -146,11 +146,7 @@ impl FnEmitter<'_> {
         });
         match checked {
             Some((sig, s)) => {
-                let ret = if coroutine {
-                    dynamic
-                } else {
-                    s.return_ty
-                };
+                let ret = if coroutine { dynamic } else { s.return_ty };
                 (sig, s.params.clone(), ret)
             }
             None => (SigId(0), vec![dynamic; arity], dynamic),
