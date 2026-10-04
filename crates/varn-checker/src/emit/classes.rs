@@ -10,48 +10,7 @@ use crate::checker::TypeEntry;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Param, Pattern, Program, StmtKind};
-use varn_tir::{
-    BackendTy, DynReason, Resolution, Signature, Span, TirExpr, TirExprKind, TirFunction, TirStmt,
-    TyTable,
-};
-
-pub(super) fn param_field_assign(field: Arc<str>, param: u32) -> TirStmt {
-    this_field_assign(
-        field,
-        TirExpr {
-            kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-            res: Resolution::Param(param),
-            span: Span::EMPTY,
-        },
-    )
-}
-
-pub(super) fn this_field_assign(field: Arc<str>, value: TirExpr) -> TirStmt {
-    let this = TirExpr {
-        kind: TirExprKind::Var,
-        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-        res: Resolution::None,
-        span: Span::EMPTY,
-    };
-    TirStmt::Expr(TirExpr {
-        kind: TirExprKind::Assign {
-            target: Box::new(TirExpr {
-                kind: TirExprKind::Field {
-                    object: Box::new(this),
-                    name: field,
-                },
-                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-                res: Resolution::None,
-                span: Span::EMPTY,
-            }),
-            value: Box::new(value),
-        },
-        ty: BackendTy::Void,
-        res: Resolution::None,
-        span: Span::EMPTY,
-    })
-}
+use varn_tir::{BackendTy, DynReason, Signature, TirFunction, TyTable};
 
 pub(super) fn top_level_type_builds(program: &Program, ast_arena: &AstArena) -> u32 {
     let mut n = 0;
@@ -188,7 +147,21 @@ pub(super) fn emit_class(
         def.decorators.push(x);
     }
 
-    let field_defaults: Vec<TirStmt> = {
+    let primary: &[Param] = class.primary_params.as_deref().unwrap_or(&[]);
+    let primary_tys: Vec<BackendTy> = primary
+        .iter()
+        .map(|p| {
+            p.type_ann
+                .as_ref()
+                .and_then(|t| ctx.annotation_types.get(&t.id))
+                .map(|resolved| {
+                    lower_type(resolved, ctx.checker_table, ctx.interner, types, ctx.names)
+                })
+                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported))
+        })
+        .collect();
+
+    let (field_defaults, primary_assigns) = {
         let mut stmts = Vec::new();
         let base = out.len() as u32;
         let mut cls: Vec<TirFunction> = Vec::new();
@@ -218,15 +191,25 @@ pub(super) fn emit_class(
                 }
                 let value = em.lower_expression(*init);
                 stmts.append(&mut em.take_pending());
-                stmts.push(this_field_assign(
-                    Arc::from(ctx.interner.resolve(*key)),
-                    value,
+                stmts.push(em.this_field_assign(Arc::from(ctx.interner.resolve(*key)), value));
+            }
+        }
+        let mut assigns = Vec::new();
+        for (i, p) in primary.iter().enumerate() {
+            if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                continue;
+            }
+            if let Pattern::Identifier { name, .. } = &p.pattern {
+                assigns.push(em.this_param_field_assign(
+                    Arc::from(ctx.interner.resolve(*name)),
+                    i as u32,
+                    primary_tys[i],
                 ));
             }
         }
         drop(em);
         out.extend(cls);
-        stmts
+        (stmts, assigns)
     };
 
     emit_class_members(
@@ -243,7 +226,6 @@ pub(super) fn emit_class(
         out,
     );
 
-    let primary: &[Param] = class.primary_params.as_deref().unwrap_or(&[]);
     let has_ctor = def.methods.iter().any(|m| m.key.as_ref() == "constructor");
 
     if !field_defaults.is_empty() || (!primary.is_empty() && !has_ctor) {
@@ -256,27 +238,8 @@ pub(super) fn emit_class(
             }
             None => {
                 let sig = fresh_sig(signatures, primary.len());
-                {
-                    let tys: Vec<BackendTy> = primary
-                        .iter()
-                        .map(|p| {
-                            p.type_ann
-                                .as_ref()
-                                .and_then(|t| ctx.annotation_types.get(&t.id))
-                                .map(|resolved| {
-                                    lower_type(
-                                        resolved,
-                                        ctx.checker_table,
-                                        ctx.interner,
-                                        types,
-                                        ctx.names,
-                                    )
-                                })
-                                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported))
-                        })
-                        .collect();
-                    signatures[sig.0 as usize].params = tys;
-                }
+                signatures[sig.0 as usize].params = primary_tys;
+                signatures[sig.0 as usize].return_ty = BackendTy::Void;
                 let id = emit_member_fn(
                     Arc::from(format!("{class_name}.constructor")),
                     primary,
@@ -294,17 +257,7 @@ pub(super) fn emit_class(
                     out,
                 );
                 let body = &mut out[id.0 as usize].body;
-                for (i, p) in primary.iter().enumerate() {
-                    if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
-                        continue;
-                    }
-                    if let Pattern::Identifier { name, .. } = &p.pattern {
-                        body.push(param_field_assign(
-                            Arc::from(ctx.interner.resolve(*name)),
-                            i as u32,
-                        ));
-                    }
-                }
+                body.extend(primary_assigns);
                 let mut new = field_defaults;
                 new.extend(std::mem::take(body));
                 *body = new;

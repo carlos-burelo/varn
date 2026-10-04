@@ -5,8 +5,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, ExprId};
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, EnumId, LocalId, Resolution, Signature, TirExpr,
-    TirExprKind, TirFunction, TirStmt, TyTable,
+    BackendTy, ClassId, ClassInfo, DynReason, EnumId, LocalId, Resolution, Signature, Span,
+    TirExpr, TirExprKind, TirFunction, TirStmt, TyTable,
 };
 
 impl<'a> FnEmitter<'a> {
@@ -112,6 +112,20 @@ impl<'a> FnEmitter<'a> {
             kind: TirExprKind::Var,
             ty,
             res: Resolution::Local(local),
+            span,
+        }
+    }
+
+    pub(super) fn this_var(&self, span: Span) -> TirExpr {
+        let ty = self
+            .this_enum
+            .map(BackendTy::Enum)
+            .or_else(|| self.this_class.map(BackendTy::Class))
+            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+        TirExpr {
+            kind: TirExprKind::Var,
+            ty,
+            res: Resolution::None,
             span,
         }
     }

@@ -81,19 +81,7 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_unary(*op, *operand, ty, span);
             }
 
-            ExprKind::This => {
-                let this_ty = self
-                    .this_enum
-                    .map(BackendTy::Enum)
-                    .or_else(|| self.this_class.map(BackendTy::Class))
-                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
-                return TirExpr {
-                    kind: TirExprKind::Var,
-                    ty: this_ty,
-                    res: Resolution::None,
-                    span,
-                };
-            }
+            ExprKind::This => return self.this_var(span),
 
             ExprKind::Member {
                 object,

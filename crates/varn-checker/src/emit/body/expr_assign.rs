@@ -1,10 +1,51 @@
 use super::context::FnEmitter;
 use super::small_utils::assign_bin_op;
+use std::sync::Arc;
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::ExprId;
-use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
+use varn_tir::{
+    BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirStmt, TirUnOp,
+};
 
 impl<'a> FnEmitter<'a> {
+    pub(in crate::emit) fn this_field_assign(
+        &mut self,
+        field: Arc<str>,
+        value: TirExpr,
+    ) -> TirStmt {
+        let this = self.this_var(Span::EMPTY);
+        let target = self.field_access(
+            this,
+            field,
+            BackendTy::Dynamic(DynReason::NotYetSupported),
+            Span::EMPTY,
+        );
+        TirStmt::Expr(TirExpr {
+            kind: TirExprKind::Assign {
+                target: Box::new(target),
+                value: Box::new(value),
+            },
+            ty: BackendTy::Void,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        })
+    }
+
+    pub(in crate::emit) fn this_param_field_assign(
+        &mut self,
+        field: Arc<str>,
+        param: u32,
+        ty: BackendTy,
+    ) -> TirStmt {
+        let value = TirExpr {
+            kind: TirExprKind::Var,
+            ty,
+            res: Resolution::Param(param),
+            span: Span::EMPTY,
+        };
+        self.this_field_assign(field, value)
+    }
+
     pub(super) fn lower_extension_assign(
         &mut self,
         target: ExprId,

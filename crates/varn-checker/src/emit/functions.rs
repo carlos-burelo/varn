@@ -130,9 +130,10 @@ pub(super) fn emit_member_fn(
         for (i, p) in params.iter().enumerate() {
             if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
                 if let Pattern::Identifier { name, .. } = &p.pattern {
-                    b.push(super::classes::param_field_assign(
+                    b.push(em.this_param_field_assign(
                         Arc::from(ctx.interner.resolve(*name)),
                         i as u32,
+                        sig_snapshot.params[i],
                     ));
                 }
             }

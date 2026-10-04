@@ -44,7 +44,18 @@ class Alpha extends Mid {
     }
 }
 
+class InitBase {
+    z: int = 1
+}
+class InitDerived extends InitBase {
+    w: int = 2
+    constructor() {
+        super()
+    }
+}
+
 const horse = new Horse("h")
+const initDerived = new InitDerived()
 const alpha = new Alpha()
 await describe("137 class build order", async () => {
         await it("group 1 part 1", async () => {
@@ -55,6 +66,11 @@ await describe("137 class build order", async () => {
     await it("group 1 part 2", async () => {
         expect(horse.describe() == "stripes 0").toBeTruthy();
         expect(alpha.a + alpha.m + alpha.o).toBe(6);
+    });
+
+    await it("field initializers keep their slots across inheritance", async () => {
+        expect(initDerived.z).toBe(1);
+        expect(initDerived.w).toBe(2);
     });
 
 
