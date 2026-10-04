@@ -18,10 +18,7 @@ pub(crate) fn try_prepare_call_fast(
                 && !nc.proto.is_async
                 && (!nc.proto.has_rest || arg_count <= nc.proto.arity)
             {
-                // La ventana lenta trae callee+args como los últimos
-                // `arg_count` valores de staging.
-                let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
-                let frame = materialize_frame(store, nc, &window).ok()?;
+                let frame = materialize_frame(store, nc, stage_window(staging, arg_count)).ok()?;
                 return Some((PreparedCall::Frame(frame), false));
             }
             None
