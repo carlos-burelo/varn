@@ -56,7 +56,7 @@ pub(crate) extern "C" fn jit_build_map_window(
             return;
         }
         let parts = std::slice::from_raw_parts(pairs_ptr, count * 2);
-        let mut map = varn_types::value::ValueMap::default();
+        let mut map = varn_types::value::ValueMap::with_capacity(count);
         for i in 0..count {
             let key = ctx_ref.heap.canonical_map_key(parts[i * 2]);
             map.insert(key, parts[i * 2 + 1]);

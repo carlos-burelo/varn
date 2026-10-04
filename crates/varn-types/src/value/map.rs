@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 pub const SMALL_MAP_CAP: usize = 8;
 
-const EMPTY_ENTRY: (MapKey, VmValue) = (MapKey(VmValue::null()), VmValue::null());
+type Entry = (MapKey, VmValue);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MapKey(pub VmValue);
@@ -17,22 +17,15 @@ impl std::hash::Hash for MapKey {
 }
 
 #[derive(Clone, Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum ValueMap {
-    Small {
-        len: u8,
-        entries: [(MapKey, VmValue); SMALL_MAP_CAP],
-    },
+    Small(Vec<Entry>),
     Large(rustc_hash::FxHashMap<MapKey, VmValue>),
 }
 
 impl Default for ValueMap {
     #[inline(always)]
     fn default() -> Self {
-        Self::Small {
-            len: 0,
-            entries: [EMPTY_ENTRY; SMALL_MAP_CAP],
-        }
+        Self::Small(Vec::new())
     }
 }
 
@@ -45,7 +38,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn with_capacity(cap: usize) -> Self {
         if cap <= SMALL_MAP_CAP {
-            Self::default()
+            Self::Small(Vec::with_capacity(cap))
         } else {
             Self::Large(rustc_hash::FxHashMap::with_capacity_and_hasher(
                 cap,
@@ -57,7 +50,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn len(&self) -> usize {
         match self {
-            Self::Small { len, .. } => *len as usize,
+            Self::Small(entries) => entries.len(),
             Self::Large(map) => map.len(),
         }
     }
@@ -70,10 +63,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn get(&self, key: &MapKey) -> Option<&VmValue> {
         match self {
-            Self::Small { len, entries } => {
-                let n = *len as usize;
-                entries[..n].iter().find(|e| e.0 == *key).map(|e| &e.1)
-            }
+            Self::Small(entries) => entries.iter().find(|e| e.0 == *key).map(|e| &e.1),
             Self::Large(map) => map.get(key),
         }
     }
@@ -81,13 +71,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn get_mut(&mut self, key: &MapKey) -> Option<&mut VmValue> {
         match self {
-            Self::Small { len, entries } => {
-                let n = *len as usize;
-                entries[..n]
-                    .iter_mut()
-                    .find(|e| e.0 == *key)
-                    .map(|e| &mut e.1)
-            }
+            Self::Small(entries) => entries.iter_mut().find(|e| e.0 == *key).map(|e| &mut e.1),
             Self::Large(map) => map.get_mut(key),
         }
     }
@@ -100,23 +84,19 @@ impl ValueMap {
     #[inline(always)]
     pub fn insert(&mut self, key: MapKey, val: VmValue) -> Option<VmValue> {
         match self {
-            Self::Small { len, entries } => {
-                let n = *len as usize;
-                if let Some(entry) = entries[..n].iter_mut().find(|e| e.0 == key) {
+            Self::Small(entries) => {
+                if let Some(entry) = entries.iter_mut().find(|e| e.0 == key) {
                     return Some(std::mem::replace(&mut entry.1, val));
                 }
-                if n < SMALL_MAP_CAP {
-                    entries[n] = (key, val);
-                    *len += 1;
+                if entries.len() < SMALL_MAP_CAP {
+                    entries.push((key, val));
                     return None;
                 }
                 let mut map = rustc_hash::FxHashMap::with_capacity_and_hasher(
                     SMALL_MAP_CAP * 2,
                     Default::default(),
                 );
-                for entry in entries.iter() {
-                    map.insert(entry.0, entry.1);
-                }
+                map.extend(entries.drain(..));
                 map.insert(key, val);
                 *self = Self::Large(map);
                 None
@@ -128,19 +108,9 @@ impl ValueMap {
     #[inline(always)]
     pub fn remove(&mut self, key: &MapKey) -> Option<VmValue> {
         match self {
-            Self::Small { len, entries } => {
-                let n = *len as usize;
-                for i in 0..n {
-                    if entries[i].0 == *key {
-                        let old = entries[i].1;
-                        if i + 1 < n {
-                            entries[i] = entries[n - 1];
-                        }
-                        *len -= 1;
-                        return Some(old);
-                    }
-                }
-                None
+            Self::Small(entries) => {
+                let i = entries.iter().position(|e| e.0 == *key)?;
+                Some(entries.swap_remove(i).1)
             }
             Self::Large(map) => map.remove(key),
         }
@@ -149,7 +119,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn clear(&mut self) {
         match self {
-            Self::Small { len, .. } => *len = 0,
+            Self::Small(entries) => entries.clear(),
             Self::Large(map) => map.clear(),
         }
     }
@@ -157,9 +127,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn iter(&self) -> ValueMapIter<'_> {
         match self {
-            Self::Small { len, entries } => ValueMapIter::Small {
-                slice: entries[..(*len as usize)].iter(),
-            },
+            Self::Small(entries) => ValueMapIter::Small(entries.iter()),
             Self::Large(map) => ValueMapIter::Large(map.iter()),
         }
     }
@@ -167,9 +135,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn keys(&self) -> ValueMapKeys<'_> {
         match self {
-            Self::Small { len, entries } => ValueMapKeys::Small {
-                slice: entries[..(*len as usize)].iter(),
-            },
+            Self::Small(entries) => ValueMapKeys::Small(entries.iter()),
             Self::Large(map) => ValueMapKeys::Large(map.keys()),
         }
     }
@@ -177,9 +143,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn values(&self) -> ValueMapValues<'_> {
         match self {
-            Self::Small { len, entries } => ValueMapValues::Small {
-                slice: entries[..(*len as usize)].iter(),
-            },
+            Self::Small(entries) => ValueMapValues::Small(entries.iter()),
             Self::Large(map) => ValueMapValues::Large(map.values()),
         }
     }
@@ -187,9 +151,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn values_mut(&mut self) -> ValueMapValuesMut<'_> {
         match self {
-            Self::Small { len, entries } => ValueMapValuesMut::Small {
-                slice: entries[..(*len as usize)].iter_mut(),
-            },
+            Self::Small(entries) => ValueMapValuesMut::Small(entries.iter_mut()),
             Self::Large(map) => ValueMapValuesMut::Large(map.values_mut()),
         }
     }
@@ -197,15 +159,7 @@ impl ValueMap {
     #[inline(always)]
     pub fn drain(&mut self) -> ValueMapDrain<'_> {
         match self {
-            Self::Small { len, entries } => {
-                let n = *len as usize;
-                *len = 0;
-                ValueMapDrain::Small {
-                    items: *entries,
-                    idx: 0,
-                    len: n,
-                }
-            }
+            Self::Small(entries) => ValueMapDrain::Small(entries.drain(..)),
             Self::Large(map) => ValueMapDrain::Large(map.drain()),
         }
     }
@@ -227,163 +181,72 @@ impl PartialEq for ValueMap {
 
 impl Eq for ValueMap {}
 
-pub enum ValueMapIter<'a> {
-    Small {
-        slice: std::slice::Iter<'a, (MapKey, VmValue)>,
-    },
-    Large(std::collections::hash_map::Iter<'a, MapKey, VmValue>),
-}
-
-impl<'a> Iterator for ValueMapIter<'a> {
-    type Item = (&'a MapKey, &'a VmValue);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Small { slice } => slice.next().map(|(k, v)| (k, v)),
-            Self::Large(iter) => iter.next(),
+macro_rules! dual_iter {
+    ($name:ident, $small:ty, $large:ty, $item:ty, $map:expr) => {
+        pub enum $name<'a> {
+            Small($small),
+            Large($large),
         }
-    }
 
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Small { slice } => slice.size_hint(),
-            Self::Large(iter) => iter.size_hint(),
-        }
-    }
-}
+        impl<'a> Iterator for $name<'a> {
+            type Item = $item;
 
-impl<'a> ExactSizeIterator for ValueMapIter<'a> {}
-
-pub enum ValueMapKeys<'a> {
-    Small {
-        slice: std::slice::Iter<'a, (MapKey, VmValue)>,
-    },
-    Large(std::collections::hash_map::Keys<'a, MapKey, VmValue>),
-}
-
-impl<'a> Iterator for ValueMapKeys<'a> {
-    type Item = &'a MapKey;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Small { slice } => slice.next().map(|(k, _)| k),
-            Self::Large(keys) => keys.next(),
-        }
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Small { slice } => slice.size_hint(),
-            Self::Large(keys) => keys.size_hint(),
-        }
-    }
-}
-
-impl<'a> ExactSizeIterator for ValueMapKeys<'a> {}
-
-pub enum ValueMapValues<'a> {
-    Small {
-        slice: std::slice::Iter<'a, (MapKey, VmValue)>,
-    },
-    Large(std::collections::hash_map::Values<'a, MapKey, VmValue>),
-}
-
-impl<'a> Iterator for ValueMapValues<'a> {
-    type Item = &'a VmValue;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Small { slice } => slice.next().map(|(_, v)| v),
-            Self::Large(vals) => vals.next(),
-        }
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Small { slice } => slice.size_hint(),
-            Self::Large(vals) => vals.size_hint(),
-        }
-    }
-}
-
-impl<'a> ExactSizeIterator for ValueMapValues<'a> {}
-
-pub enum ValueMapValuesMut<'a> {
-    Small {
-        slice: std::slice::IterMut<'a, (MapKey, VmValue)>,
-    },
-    Large(std::collections::hash_map::ValuesMut<'a, MapKey, VmValue>),
-}
-
-impl<'a> Iterator for ValueMapValuesMut<'a> {
-    type Item = &'a mut VmValue;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Small { slice } => slice.next().map(|(_, v)| v),
-            Self::Large(vals) => vals.next(),
-        }
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Small { slice } => slice.size_hint(),
-            Self::Large(vals) => vals.size_hint(),
-        }
-    }
-}
-
-impl<'a> ExactSizeIterator for ValueMapValuesMut<'a> {}
-
-pub enum ValueMapDrain<'a> {
-    Small {
-        items: [(MapKey, VmValue); SMALL_MAP_CAP],
-        idx: usize,
-        len: usize,
-    },
-    Large(std::collections::hash_map::Drain<'a, MapKey, VmValue>),
-}
-
-impl<'a> Iterator for ValueMapDrain<'a> {
-    type Item = (MapKey, VmValue);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Small { items, idx, len } => {
-                if *idx < *len {
-                    let item = items[*idx];
-                    *idx += 1;
-                    Some(item)
-                } else {
-                    None
+            #[inline(always)]
+            fn next(&mut self) -> Option<Self::Item> {
+                match self {
+                    Self::Small(it) => it.next().map($map),
+                    Self::Large(it) => it.next(),
                 }
             }
-            Self::Large(drain) => drain.next(),
-        }
-    }
 
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Small { idx, len, .. } => {
-                let rem = len.saturating_sub(*idx);
-                (rem, Some(rem))
+            #[inline(always)]
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                match self {
+                    Self::Small(it) => it.size_hint(),
+                    Self::Large(it) => it.size_hint(),
+                }
             }
-            Self::Large(drain) => drain.size_hint(),
         }
-    }
+
+        impl<'a> ExactSizeIterator for $name<'a> {}
+    };
 }
 
-impl<'a> ExactSizeIterator for ValueMapDrain<'a> {}
+dual_iter!(
+    ValueMapIter,
+    std::slice::Iter<'a, Entry>,
+    std::collections::hash_map::Iter<'a, MapKey, VmValue>,
+    (&'a MapKey, &'a VmValue),
+    |(k, v): &'a Entry| (k, v)
+);
+dual_iter!(
+    ValueMapKeys,
+    std::slice::Iter<'a, Entry>,
+    std::collections::hash_map::Keys<'a, MapKey, VmValue>,
+    &'a MapKey,
+    |(k, _): &'a Entry| k
+);
+dual_iter!(
+    ValueMapValues,
+    std::slice::Iter<'a, Entry>,
+    std::collections::hash_map::Values<'a, MapKey, VmValue>,
+    &'a VmValue,
+    |(_, v): &'a Entry| v
+);
+dual_iter!(
+    ValueMapValuesMut,
+    std::slice::IterMut<'a, Entry>,
+    std::collections::hash_map::ValuesMut<'a, MapKey, VmValue>,
+    &'a mut VmValue,
+    |(_, v): &'a mut Entry| v
+);
+dual_iter!(
+    ValueMapDrain,
+    std::vec::Drain<'a, Entry>,
+    std::collections::hash_map::Drain<'a, MapKey, VmValue>,
+    Entry,
+    |e: Entry| e
+);
 
 #[derive(Clone)]
 pub struct MapRef(pub Rc<RefCell<ValueMap>>);
